@@ -131,6 +131,7 @@ function ViewModeToggle({
   isRTL,
   label,
   compact,
+  iconOnly = false,
   glass,
   onPress,
   onPageMenuPress,
@@ -141,6 +142,8 @@ function ViewModeToggle({
   isRTL: boolean;
   label: string;
   compact: boolean;
+  /** Hides the label when the phone toolbar would otherwise clip its icons. */
+  iconOnly?: boolean;
   glass: boolean;
   onPress: () => void;
   onPageMenuPress?: (anchor: PageViewNavigationAnchor | null) => void;
@@ -200,7 +203,7 @@ function ViewModeToggle({
         })}
       >
         <Icon size={16} color={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={2} />
-        <Text
+        {!iconOnly && <Text
           className="text-primary-accent dark:text-primary-bright"
           numberOfLines={1}
           style={{
@@ -214,7 +217,7 @@ function ViewModeToggle({
           }}
         >
           {label}
-        </Text>
+        </Text>}
       </Pressable>
       {showPageMenu && (
         <Pressable
@@ -499,6 +502,18 @@ function MushafInner() {
   const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const [pageModeHifzAyahs, setPageModeHifzAyahs] = useState<HifzPageAyah[]>([]);
   const isPageMode = viewMode === "page";
+  // The phone toolbar scrolls sideways when its icons do not fit, which hid the last ones with no
+  // hint. Once that happens at this width and mode, drop the view toggle's label instead.
+  const toolbarLayoutKey = `${windowWidth}:${isPageMode ? "page" : "verse"}:${isRTL ? "rtl" : "ltr"}`;
+  const [toolbarOverflowKey, setToolbarOverflowKey] = useState<string | null>(null);
+  const toolbarToggleIconOnly = toolbarOverflowKey === toolbarLayoutKey;
+  const toolbarViewportWidthRef = useRef(0);
+  const toolbarContentWidthRef = useRef(0);
+  const checkToolbarOverflow = useCallback(() => {
+    const viewport = toolbarViewportWidthRef.current;
+    const content = toolbarContentWidthRef.current;
+    if (viewport > 0 && content > viewport + 1) setToolbarOverflowKey(toolbarLayoutKey);
+  }, [toolbarLayoutKey]);
   const currentPageRef = useRef(1);
   const deepLinkHandledRef = useRef(false);
   const hifzCurrentPageAyahsRef = useRef<HifzPageAyah[]>([]);
@@ -843,7 +858,13 @@ function MushafInner() {
           if (item?.type === "ayah") {
             await loadQuranPageFont(quranFontStyle, item.v2Page);
           }
-          await scheduleVerseScrollToIndex(idx, animated);
+          // A surah's first ayah opens on its header, so the reader sees which surah begins.
+          const previous = items[idx - 1];
+          const scrollIndex =
+            target.ayah === 1 && previous?.type === "surah-header" && previous.surahNumber === target.surah
+              ? idx - 1
+              : idx;
+          await scheduleVerseScrollToIndex(scrollIndex, animated);
           setTopAyah({ surah: target.surah, ayah: target.ayah });
           if (item?.type === "ayah") {
             commitCurrentPage(item.v2Page);
@@ -1484,6 +1505,7 @@ function MushafInner() {
                     isRTL={isRTL}
                     label={viewModeLabel}
                     compact
+                    iconOnly={toolbarToggleIconOnly}
                     glass
                     onPress={toggleViewMode}
                     onPageMenuPress={handleOpenPageViewNavigation}
@@ -1501,6 +1523,14 @@ function MushafInner() {
                     width: isPhone ? Math.max(172, windowWidth - (isPageMode ? 154 : 140)) : undefined,
                   }}
                   contentContainerStyle={{ flexGrow: 0 }}
+                  onLayout={(event) => {
+                    toolbarViewportWidthRef.current = event.nativeEvent.layout.width;
+                    checkToolbarOverflow();
+                  }}
+                  onContentSizeChange={(width) => {
+                    toolbarContentWidthRef.current = width;
+                    checkToolbarOverflow();
+                  }}
                 >
                   <View
                     className={`rounded-full border border-white/15 ${isPhone && isPageMode ? "p-0.5" : "p-1"}`}
