@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
+import { toArabicNumber } from "@/lib/arabic";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -79,7 +80,9 @@ export function SurahInfoModal({
 
   const contentIsRTL = info?.language === "ar";
   const title = target ? (uiLanguage === "ar" ? target.nameArabic : target.nameEnglish) : s.surahInfoTitle;
-  const subtitle = target ? `${s.surahInfoTitle} · ${target.surahNumber}` : s.surahInfoTitle;
+  const subtitle = target
+    ? `${s.surahInfoTitle}${uiLanguage === "ar" ? "، " : " · "}${uiLanguage === "ar" ? toArabicNumber(target.surahNumber) : target.surahNumber}`
+    : s.surahInfoTitle;
   const sections = useMemo(() => info?.sections.filter((section) => section.body.trim().length > 0) ?? [], [info]);
 
   return (
