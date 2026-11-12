@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { View, Text, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import { formatAyahRef } from "@/lib/arabic";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useWordInteraction, type WordRef } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
@@ -216,7 +217,7 @@ export function WordDetailSheet() {
             <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
               <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5">
                 <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
-                  {surah}:{ayah}:{wordPos}
+                  {formatAyahRef(isRTL, surah, ayah, wordPos)}
                 </Text>
               </View>
               <Pressable

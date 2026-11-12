@@ -27,6 +27,7 @@ jest.mock("@/components/ui/EmptyState", () => {
 });
 jest.mock("@/lib/settings/context", () => ({ useSettings: () => ({ isDark: false, isRTL: false }) }));
 jest.mock("@/lib/i18n/useStrings", () => ({
+  interpolate: jest.requireActual<typeof import("@/lib/i18n/useStrings")>("@/lib/i18n/useStrings").interpolate,
   useStrings: () => jest.requireActual<typeof import("@/lib/i18n/strings")>("@/lib/i18n/strings").strings.en,
 }));
 jest.mock("@/lib/selection/context", () => ({

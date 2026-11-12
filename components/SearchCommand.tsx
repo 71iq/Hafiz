@@ -9,6 +9,7 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
+import { formatAyahRef } from "@/lib/arabic";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Search, X, Clock, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react-native";
@@ -675,7 +676,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                               className="text-primary-accent dark:text-primary-bright"
                               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}
                             >
-                              {r.surah}:{r.ayah}
+                              {formatAyahRef(isRTL, r.surah, r.ayah)}
                             </Text>
                           </View>
                         </View>
@@ -817,7 +818,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                                   className="text-primary-accent dark:text-primary-bright"
                                   style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}
                                 >
-                                  {occ.surah}:{occ.ayah}
+                                  {formatAyahRef(isRTL, occ.surah, occ.ayah)}
                                 </Text>
                               </View>
                               <Text

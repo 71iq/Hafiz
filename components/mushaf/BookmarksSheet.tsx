@@ -10,7 +10,8 @@ import { removeBookmark } from "@/lib/selection/queries";
 import { useDatabase } from "@/lib/database/provider";
 import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { textStartStyle } from "@/lib/ui/direction";
 
@@ -160,8 +161,9 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
               >
                 <View
                   style={{
-                    width: 36,
+                    minWidth: 36,
                     height: 36,
+                    paddingHorizontal: 8,
                     borderRadius: 18,
                     backgroundColor: isDark ? "rgba(253,220,145,0.14)" : "#FFF0C2",
                     borderColor: isDark ? "rgba(253,220,145,0.22)" : "rgba(154, 98, 0, 0.18)",
@@ -177,7 +179,7 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
                       color: isDark ? "#FDDC91" : "#9A6200",
                     }}
                   >
-                    {b.surah}:{b.ayah}
+                    {formatAyahRef(isRTL, b.surah, b.ayah)}
                   </Text>
                 </View>
                 <View style={{ flex: 1 }}>
@@ -189,7 +191,7 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
                       ...textStartStyle(isRTL),
                     }}
                   >
-                    {b.surahNameArabic}
+                    {isRTL ? b.surahNameArabic : b.surahNameEnglish}
                   </Text>
                   <Text
                     style={{
@@ -199,7 +201,7 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
                       ...textStartStyle(isRTL),
                     }}
                   >
-                    {b.surahNameEnglish}
+                    {interpolate(s.ayahN, { n: isRTL ? toArabicNumber(b.ayah) : b.ayah })}
                   </Text>
                 </View>
               </View>

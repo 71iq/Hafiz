@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
+import { formatAyahRef } from "@/lib/arabic";
 import { Copy, BookMarked, Highlighter, PenLine, StickyNote, Trash2 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
@@ -147,7 +148,7 @@ export function SelectionActionBar() {
               marginBottom: 16,
             }}
           >
-            {selection.start.surah}:{selection.start.ayah}
+            {formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}
           </Text>
         )}
 

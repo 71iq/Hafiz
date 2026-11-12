@@ -10,6 +10,8 @@ import {
   type RootOccurrence,
 } from "@/lib/word/queries";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
+import { useSettings } from "@/lib/settings/context";
+import { formatAyahRef } from "@/lib/arabic";
 
 // Common roots occur thousands of times, so rows load a page at a time.
 const OCCURRENCES_PAGE = 50;
@@ -25,6 +27,7 @@ type Loaded = { key: string; root: string | null; total: number; rows: RootOccur
 export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
   const db = useDatabase();
   const s = useStrings();
+  const { isRTL } = useSettings();
   const { navigateToAyah } = useWordInteraction();
   const wordKey = `${surah}:${ayah}:${wordPos}`;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -128,7 +131,7 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
               }`}
             >
               <Text className="text-sm text-teal-600 dark:text-teal-400 font-medium w-16 underline">
-                {occ.surah}:{occ.ayah}
+                {formatAyahRef(isRTL, occ.surah, occ.ayah)}
               </Text>
               <Text
                 className="text-base text-charcoal dark:text-neutral-100 flex-1 text-right"

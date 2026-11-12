@@ -10,6 +10,7 @@ import {
 import { useRecyclingState } from "@shopify/flash-list";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
+import { formatAyahRef } from "@/lib/arabic";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
@@ -248,7 +249,7 @@ function AyahBlockInner({
             })}
           >
             <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
-              {surah}:{ayah}
+              {formatAyahRef(isRTL, surah, ayah)}
             </Text>
             {bookmarked && (
               <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />

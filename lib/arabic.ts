@@ -7,6 +7,11 @@ export function toArabicNumber(num: number): string {
   return String(num).replace(/\d/g, (d) => ARABIC_DIGITS[parseInt(d, 10)]);
 }
 
+/** "17:105" in English, "١٧:١٠٥" in Arabic, matching the digits the reader shows. */
+export function formatAyahRef(isRTL: boolean, ...parts: number[]): string {
+  return parts.map((part) => (isRTL ? toArabicNumber(part) : String(part))).join(":");
+}
+
 export function normalizeArabicWord(text: string | null | undefined): string {
   return String(text ?? "")
     .replace(ARABIC_DIACRITICS_RE, "")
