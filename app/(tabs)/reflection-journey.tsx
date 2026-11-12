@@ -32,7 +32,7 @@ import type { ReflectionJourneyLevelListItem } from "@/lib/reflection-journey/ty
 import { useSelection, SelectionProvider } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { textStartStyle } from "@/lib/ui/direction";
+import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
 export default function ReflectionJourneyScreen() {
   return (
@@ -367,7 +367,7 @@ function ReflectionJourneyInner() {
                       fontFamily: "Manrope_400Regular",
                       fontSize: 14,
                       lineHeight: 24,
-                      ...textStartStyle(isRTL),
+                      ...inputTextStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   />

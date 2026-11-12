@@ -263,7 +263,7 @@ export function SelectionActionBar() {
         surah={selection.start.surah}
         ayahStart={selection.start.ayah}
         ayahEnd={selection.end.ayah}
-        ayahPreview={`${selection.start.surah}:${selection.start.ayah}${selection.start.ayah !== selection.end.ayah ? `-${selection.end.ayah}` : ""}`}
+        ayahPreview={`${formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}${selection.start.ayah !== selection.end.ayah ? `-${formatAyahRef(isRTL, selection.end.ayah)}` : ""}`}
         onSuccess={() => showToast(s.reflectionPosted)}
       />
     )}
@@ -277,7 +277,7 @@ export function SelectionActionBar() {
         surah={selection.start.surah}
         ayahStart={selection.start.ayah}
         ayahEnd={selection.end.ayah}
-        ayahPreview={`${selection.start.surah}:${selection.start.ayah}${selection.start.ayah !== selection.end.ayah ? `-${selection.end.ayah}` : ""}`}
+        ayahPreview={`${formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}${selection.start.ayah !== selection.end.ayah ? `-${formatAyahRef(isRTL, selection.end.ayah)}` : ""}`}
         onSaved={() => showToast(s.privateNoteSaved)}
       />
     )}

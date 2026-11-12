@@ -39,6 +39,12 @@ export function expectTextAlignStart(node: RtlTestNode, dir: Direction) {
   expect(getStyleValue(node, "direction")).toBe(dir);
 }
 
+/** A TextInput maps textAlign to physical sides on native, so inputs align to the physical start side. */
+export function expectInputTextAlignStart(node: RtlTestNode, dir: Direction) {
+  expect(getStyleValue(node, "textAlign")).toBe(dir === "rtl" ? "right" : "left");
+  expect(getStyleValue(node, "writingDirection")).toBe(dir);
+}
+
 export function expectFlexDirectionForDir(node: RtlTestNode, dir: Direction) {
   expect(getStyleValue(node, "flexDirection")).toBe(dir === "rtl" ? "row-reverse" : "row");
 }

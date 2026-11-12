@@ -26,7 +26,7 @@ import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/Res
 
 import { groupRootResults, groupTextResults, type TextResult, type RootOccurrence, type LemmaGroup } from "@/lib/search/results";
 import { resolveRootCandidates } from "@/lib/search/root-candidates";
-import { textStartStyle } from "@/lib/ui/direction";
+import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
 // ─── Arabic diacritics stripping ───
 // An expanded lemma renders inside one list item, so a common lemma shows its occurrences in pages.
@@ -470,7 +470,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                 fontSize: 15,
                 color: isDark ? "#e5e5e5" : "#2D2D2D",
                 writingDirection: isRTL ? "rtl" : "ltr",
-                ...textStartStyle(isRTL),
+                ...inputTextStartStyle(isRTL),
                 paddingVertical: 4,
                 ...(Platform.OS === "web"
                   ? ({

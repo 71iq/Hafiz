@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, useWindowDimensions } from "react-native";
+import { formatAyahRef } from "@/lib/arabic";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Input } from "@/components/ui/Input";
 import { useDatabase } from "@/lib/database/provider";
@@ -96,7 +97,7 @@ export function PrivateNoteSheet({
     >
       <OverlayHeader
         title={note ? s.privateNoteEdit : s.privateNoteTitle}
-        subtitle={ayahPreview ?? `${surah}:${ayahStart}${ayahStart !== ayahEnd ? `-${ayahEnd}` : ""}`}
+        subtitle={ayahPreview ?? `${formatAyahRef(isRTL, surah, ayahStart)}${ayahStart !== ayahEnd ? `-${formatAyahRef(isRTL, ayahEnd)}` : ""}`}
         onClose={onClose}
         showHandle={isPhone}
         isRTL={isRTL}

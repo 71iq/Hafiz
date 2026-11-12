@@ -14,7 +14,7 @@ import { useSettings } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { errorMessage } from "@/lib/error-message";
-import { textStartStyle } from "@/lib/ui/direction";
+import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
 type RecitationMode = "single" | "range" | "surah";
 
@@ -400,7 +400,7 @@ function LabeledInput({
         style={{
           fontFamily: "Manrope_700Bold",
           fontSize: 16,
-          ...textStartStyle(isRTL),
+          ...inputTextStartStyle(isRTL),
           writingDirection: "ltr",
         }}
       />

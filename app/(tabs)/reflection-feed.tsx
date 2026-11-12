@@ -24,7 +24,7 @@ import { setPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { findJuzRangeForAyah } from "@/lib/mushaf/position";
-import { textStartStyle } from "@/lib/ui/direction";
+import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
 type SurahOption = {
   number: number;
@@ -588,7 +588,7 @@ function ReflectionFeedSearch({
         style={{
           fontFamily: "Manrope_400Regular",
           fontSize: 14,
-          ...textStartStyle(isRTL),
+          ...inputTextStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       />

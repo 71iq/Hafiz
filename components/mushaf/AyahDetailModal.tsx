@@ -1,6 +1,7 @@
 import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { formatAyahRef } from "@/lib/arabic";
 import * as Clipboard from "expo-clipboard";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
 import { BookOpenText, Bookmark, ChevronLeft, ChevronRight, Copy, MessageCircle, NotebookPen, Pause, Play } from "lucide-react-native";
@@ -130,7 +131,7 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   const title = ayahRow
     ? (uiLanguage === "ar" ? ayahRow.surah_name_arabic : ayahRow.surah_name_english)
     : `${activeTarget?.surah ?? ""}:${activeTarget?.ayah ?? ""}`;
-  const subtitle = activeTarget ? `${activeTarget.surah}:${activeTarget.ayah}` : undefined;
+  const subtitle = activeTarget ? formatAyahRef(isRTL, activeTarget.surah, activeTarget.ayah) : undefined;
   const tafsirSourceConfigs = useMemo(() => {
     const rowsBySource = new Set((tafsirRows ?? []).map((row) => row.source));
     return AVAILABLE_TAFSIR_SOURCES.filter((source) => rowsBySource.has(source.id));

@@ -54,7 +54,7 @@ import {
 } from "@/lib/fsrs/types";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { textStartStyle } from "@/lib/ui/direction";
+import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 export { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
 
 type ReviewSettingsMode = "ayah" | "word";
@@ -803,7 +803,7 @@ function StepInputRow({
           fontFamily: "Manrope_600SemiBold",
           fontSize: 14,
           minWidth: compact ? 220 : 240,
-          ...textStartStyle(isRTL),
+          ...inputTextStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       />

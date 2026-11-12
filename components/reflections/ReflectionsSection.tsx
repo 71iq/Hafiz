@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
+import { formatAyahRef } from "@/lib/arabic";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fetchReflections, fetchReflectionCount } from "@/lib/reflections/api";
@@ -39,7 +40,7 @@ function ReflectionsSectionContent({
   onNavigate,
   user,
 }: Props & { user: ReturnType<typeof useAuthStore.getState>["user"] }) {
-  const { isDark, themeColors } = useSettings();
+  const { isDark, isRTL, themeColors } = useSettings();
   const s = useStrings();
   const { begin, pending } = useReflectionMutationScope(JSON.stringify([surah, ayah]), user?.id);
   const firstPageGeneration = useRef(0);
@@ -298,7 +299,7 @@ function ReflectionsSectionContent({
         surah={surah}
         ayahStart={ayah}
         ayahEnd={ayah}
-        ayahPreview={`${surah}:${ayah}`}
+        ayahPreview={formatAyahRef(isRTL, surah, ayah)}
       />
     </>
   );

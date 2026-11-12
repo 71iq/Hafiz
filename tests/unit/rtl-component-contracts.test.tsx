@@ -12,6 +12,7 @@ import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { textAlignForDirection } from "@/lib/ui/direction";
 import {
   expectFlexDirectionForDir,
+  expectInputTextAlignStart,
   expectTextAlignStart,
   expectWritingDirection,
   flattenStyle,
@@ -183,7 +184,7 @@ describe("RTL primitive component contracts", () => {
     const input = getByTestId("search-input");
     const container = findAncestorByClassName(input, "flex-row-reverse");
     expect(container.props.className).toContain("flex-row-reverse");
-    expectTextAlignStart(input, "rtl");
+    expectInputTextAlignStart(input, "rtl");
     expectWritingDirection(input, "rtl");
   });
 
@@ -191,7 +192,7 @@ describe("RTL primitive component contracts", () => {
     const { getByTestId, getByText } = renderWithDirection(<TestFormTextField />, "ltr");
 
     const input = getByTestId("form-email-input");
-    expectTextAlignStart(input, "rtl");
+    expectInputTextAlignStart(input, "rtl");
     expectWritingDirection(input, "rtl");
     expect(input.props.value).toBe("hafiz@example.com");
 

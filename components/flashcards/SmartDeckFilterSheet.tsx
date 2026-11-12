@@ -48,7 +48,7 @@ import {
   type SmartDeckId,
   writeSmartDeckFilter,
 } from "@/lib/fsrs/smart-decks";
-import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
+import { textStartStyle, textEndStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -846,7 +846,7 @@ function RangeInput({
         style={{
           fontFamily: "Manrope_500Medium",
           fontSize: 15,
-          ...textStartStyle(isRTL),
+          ...inputTextStartStyle(isRTL),
         }}
         placeholderTextColor={isDark ? "#525252" : "#DFD9D1"}
       />

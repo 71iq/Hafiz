@@ -45,6 +45,16 @@ export function textStartStyle(dir: DirectionInput): TextStyle {
   return { direction: rtl ? "rtl" : "ltr", textAlign: "left" };
 }
 
+/**
+ * Start alignment for a TextInput. Unlike Text, a native TextInput maps textAlign "left"/"right" to
+ * physical sides whatever its direction, so the textStartStyle form left Arabic placeholders and
+ * typing on the left. Inputs use the physical side on every platform.
+ */
+export function inputTextStartStyle(dir: DirectionInput): TextStyle {
+  const rtl = isRtl(dir);
+  return { textAlign: rtl ? "right" : "left", writingDirection: rtl ? "rtl" : "ltr" };
+}
+
 /** Text style that aligns to the reading end; see textStartStyle. */
 export function textEndStyle(dir: DirectionInput): TextStyle {
   const rtl = isRtl(dir);

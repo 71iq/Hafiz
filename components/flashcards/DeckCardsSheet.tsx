@@ -22,7 +22,7 @@ import type { DeckCardListItem } from "@/lib/fsrs/types";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { useSettings } from "@/lib/settings/context";
 import { State } from "@/lib/fsrs/scheduler";
-import { textStartStyle } from "@/lib/ui/direction";
+import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -203,7 +203,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                 style={{
                   fontFamily: "Manrope_400Regular",
                   fontSize: 14,
-                  ...textStartStyle(isRTL),
+                  ...inputTextStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               />

@@ -66,7 +66,7 @@ import { parseQiraatText } from "@/lib/qiraat/parse";
 import { QiraatBlocks } from "@/components/mushaf/QiraatBlocks";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
-import { textStartStyle } from "@/lib/ui/direction";
+import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -1307,7 +1307,7 @@ function AnswerEditSheet({
             fontFamily: "Manrope_500Medium",
             fontSize: 16,
             lineHeight: 25,
-            ...textStartStyle(answerIsRTL),
+            ...inputTextStartStyle(answerIsRTL),
             writingDirection: answerIsRTL ? "rtl" : "ltr",
           }}
         />
