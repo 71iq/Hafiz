@@ -1185,17 +1185,18 @@ function ContentSettingsRow({
         justifyContent: "space-between",
         minHeight: CONTENT_SETTINGS_ROW_HEIGHT,
         paddingHorizontal: 18,
-        paddingVertical: 0,
+        paddingVertical: 10,
       }}
     >
+      {/* Label and value wrap onto a second line rather than truncating, e.g. "Translation Language". */}
       <Text
         className="text-charcoal dark:text-neutral-100"
-        numberOfLines={1}
+        numberOfLines={2}
         style={{
-          flexShrink: 0,
+          flexShrink: 1,
           fontFamily: "Manrope_600SemiBold",
           fontSize: 16,
-          maxWidth: "48%",
+          maxWidth: "50%",
           ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
@@ -1214,7 +1215,7 @@ function ContentSettingsRow({
         }}
       >
         <Text
-          numberOfLines={1}
+          numberOfLines={2}
           style={{
             color: valueColor,
             flexShrink: 1,
