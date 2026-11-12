@@ -518,6 +518,32 @@ describe("review-setting help caller characterization", () => {
       expect(close).toHaveBeenCalledTimes(1);
     });
 
+    it("accepts an ayah range typed with Arabic-Indic digits", async () => {
+      const en = strings.en;
+      mockDatabase.getAllAsync.mockResolvedValue([
+        { number: 2, name_arabic: "البقرة", name_english: "Al-Baqarah", ayah_count: 286 },
+      ]);
+      jest.mocked(readSmartDeckFilter).mockResolvedValue({ type: "surah", surahs: [2] });
+      jest.mocked(writeSmartDeckFilter).mockResolvedValue(undefined);
+      jest.mocked(writeDeckReviewSettings).mockResolvedValue(undefined);
+      jest.mocked(materializeSmartDeckCards).mockResolvedValue(0);
+      const view = render(editor("smart", 390, "en", jest.fn(), jest.fn()));
+      await waitFor(() => expect(view.getByDisplayValue("3m, 17m")).toBeTruthy());
+      fireEvent.press(view.getByRole("button", { name: en.deckChangeSurahs }));
+      await waitFor(() => expect(view.getByLabelText(en.deckSpecifyAyahRange)).toBeTruthy());
+      fireEvent.press(view.getByLabelText(en.deckSpecifyAyahRange), { stopPropagation: jest.fn() });
+      const from = await waitFor(() => view.getByLabelText(`${en.flashcardsFrom} ${en.reflectionAyahLabel}`));
+      fireEvent.changeText(from, "١٠");
+      fireEvent.changeText(view.getByLabelText(`${en.flashcardsTo} ${en.reflectionAyahLabel}`), "۲۰");
+      expect(save(view, "smart").props.accessibilityState.disabled).toBe(false);
+      fireEvent.press(save(view, "smart"));
+      expect(writeSmartDeckFilter).toHaveBeenCalledWith(mockDatabase, "default-retention", {
+        type: "surah",
+        surahs: [2],
+        ranges: [{ surah: 2, ayahStart: 10, ayahEnd: 20 }],
+      });
+    });
+
     it("disables smart saving for an empty surah selection without writing", async () => {
       jest.mocked(readSmartDeckFilter).mockResolvedValue({ type: "surah", surahs: [] });
       const view = render(editor("smart", 390, "en", jest.fn(), jest.fn()));

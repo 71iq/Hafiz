@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { ReviewSettingInfoSheet } from "@/components/flashcards/ReviewSettingInfoSheet";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
+import { normalizeDateDigits } from "@/lib/date";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { useSettings } from "@/lib/settings/context";
@@ -218,8 +219,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       const surah = surahs.find((row) => row.number === surahNumber);
       if (!surah) return null;
       const range = selectedSurahRanges[surahNumber] ?? { from: "1", to: String(surah.ayah_count) };
-      const ayahStart = Number(range.from);
-      const ayahEnd = Number(range.to);
+      const ayahStart = Number(normalizeDateDigits(range.from.trim()));
+      const ayahEnd = Number(normalizeDateDigits(range.to.trim()));
       if (![ayahStart, ayahEnd].every(Number.isInteger)) return null;
       if (ayahStart < 1 || ayahEnd > surah.ayah_count || ayahEnd < ayahStart) return null;
       if (ayahStart !== 1 || ayahEnd !== surah.ayah_count) hasPartialRange = true;
