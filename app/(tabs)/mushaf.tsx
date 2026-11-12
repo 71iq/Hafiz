@@ -273,7 +273,7 @@ function MushafInner() {
     isRTL,
     themeSurface,
     uiLanguage,
-    quranFontStyle,
+    quranRenderFontStyle: quranFontStyle,
     isLoaded: settingsLoaded,
   } = useSettings();
   const s = useStrings();

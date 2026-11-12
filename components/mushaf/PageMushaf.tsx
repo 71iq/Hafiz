@@ -331,7 +331,7 @@ export function PageMushaf({
   hifzVisibility = null,
 }: Props) {
   const db = useDatabase();
-  const { fontSize, fontSizeIndex, lineHeight, pageScroll, isRTL, uiLanguage, quranFontStyle } = useSettings();
+  const { fontSize, fontSizeIndex, lineHeight, pageScroll, isRTL, uiLanguage, quranRenderFontStyle: quranFontStyle } = useSettings();
   const s = useStrings();
   const { width, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);

@@ -149,6 +149,13 @@ type SettingsContextType = {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   quranFontStyle: QuranFontStyle;
+  /**
+   * The page font style to draw with. The V4 fonts are colour fonts whose base glyphs carry a fixed
+   * black palette entry, which Android draws regardless of text colour, so in dark themes native
+   * draws V4 choices with the QCF2 font instead of black text on a dark page. Web recolours the
+   * palette and keeps the choice. Settings pickers show quranFontStyle, the user's choice.
+   */
+  quranRenderFontStyle: QuranFontStyle;
   setQuranFontStyle: (style: QuranFontStyle) => void;
   quranMarkerStyle: QuranMarkerStyle;
   setQuranMarkerStyle: (style: QuranMarkerStyle) => void;
@@ -196,6 +203,7 @@ const SettingsContext = createContext<SettingsContextType>({
   viewMode: "verse",
   setViewMode: () => {},
   quranFontStyle: "qcf2",
+  quranRenderFontStyle: "qcf2",
   setQuranFontStyle: () => {},
   quranMarkerStyle: "auto",
   setQuranMarkerStyle: () => {},
@@ -787,6 +795,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const isRTL = uiLanguage === "ar";
+  const quranRenderFontStyle: QuranFontStyle =
+    Platform.OS !== "web" && isDark && quranFontStyle !== "qcf2" ? "qcf2" : quranFontStyle;
 
   return (
     <SettingsContext.Provider
@@ -804,6 +814,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         viewMode,
         setViewMode,
         quranFontStyle,
+        quranRenderFontStyle,
         setQuranFontStyle,
         quranMarkerStyle,
         setQuranMarkerStyle,

@@ -53,7 +53,7 @@ export function JourneyAyahCard({ block }: Props) {
     uiLanguage,
     translationLanguage,
     tafseerSource,
-    quranFontStyle,
+    quranRenderFontStyle: quranFontStyle,
     quranMarkerStyle,
     effectiveTheme,
   } = useSettings();

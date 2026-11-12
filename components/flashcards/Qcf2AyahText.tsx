@@ -28,7 +28,7 @@ export function Qcf2AyahText({
   highlightWordPos,
   showAyahMarker = true,
 }: Props) {
-  const { quranFontStyle, showAyahMarkers, quranMarkerStyle, effectiveTheme } = useSettings();
+  const { quranRenderFontStyle: quranFontStyle, showAyahMarkers, quranMarkerStyle, effectiveTheme } = useSettings();
   const visible = useQuranPageFontReady(quranFontStyle, v2Page);
 
   // Glyphs mounted before their page font exists render and measure in the system font.

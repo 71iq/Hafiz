@@ -208,7 +208,7 @@ function MushafPageInner({
   const [fontLoadAttempt, setFontLoadAttempt] = useState(0);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, getWordHighlightColor, selectAyah } = useSelection();
-  const { quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
+  const { quranRenderFontStyle: quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
 

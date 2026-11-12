@@ -11,6 +11,7 @@ jest.mock("@/lib/settings/context", () => ({
     isDark: false,
     isRTL: false,
     quranFontStyle: "qcf2",
+    quranRenderFontStyle: "qcf2",
     quranMarkerStyle: "auto",
     showAyahMarkers: true,
     effectiveTheme: "white",

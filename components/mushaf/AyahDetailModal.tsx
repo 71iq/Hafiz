@@ -79,7 +79,7 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     uiLanguage,
     isRTL,
     isDark,
-    quranFontStyle,
+    quranRenderFontStyle: quranFontStyle,
     showAyahMarkers,
     quranMarkerStyle,
     effectiveTheme,

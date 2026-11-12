@@ -83,7 +83,7 @@ function AyahBlockInner({
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
-  const { recitationId, isRTL, isDark, quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
+  const { recitationId, isRTL, isDark, quranRenderFontStyle: quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
   const s = useStrings();
   const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();

@@ -8,11 +8,12 @@ import type { useSettings } from "@/lib/settings/context";
 
 const mockSettings: Pick<
   ReturnType<typeof useSettings>,
-  "uiLanguage" | "isDark" | "quranFontStyle" | "quranMarkerStyle" | "showAyahMarkers" | "effectiveTheme"
+  "uiLanguage" | "isDark" | "quranFontStyle" | "quranRenderFontStyle" | "quranMarkerStyle" | "showAyahMarkers" | "effectiveTheme"
 > = {
   uiLanguage: "ar",
   isDark: false,
   quranFontStyle: "qcf2",
+  quranRenderFontStyle: "qcf2",
   quranMarkerStyle: "auto",
   showAyahMarkers: true,
   effectiveTheme: "beige",

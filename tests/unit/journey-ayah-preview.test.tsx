@@ -33,6 +33,7 @@ const mockSettings: Pick<
   | "translationLanguage"
   | "tafseerSource"
   | "quranFontStyle"
+  | "quranRenderFontStyle"
   | "quranMarkerStyle"
   | "effectiveTheme"
 > = {
@@ -42,6 +43,7 @@ const mockSettings: Pick<
   translationLanguage: "en",
   tafseerSource: "zilal",
   quranFontStyle: "qcf2",
+  quranRenderFontStyle: "qcf2",
   quranMarkerStyle: "auto",
   effectiveTheme: "white",
 };
@@ -169,6 +171,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real journey card in %s",
       translationLanguage: "en",
       tafseerSource: "zilal",
       quranFontStyle: "qcf2",
+      quranRenderFontStyle: "qcf2",
       quranMarkerStyle: "auto",
       effectiveTheme: "white",
     });
@@ -219,6 +222,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real journey card in %s",
     "uses cached %s glyphs and the chosen marker palette without loading a font",
     async (fontStyle) => {
       mockSettings.quranFontStyle = fontStyle;
+      mockSettings.quranRenderFontStyle = fontStyle;
       mockSettings.quranMarkerStyle = "sepia";
       mockSettings.effectiveTheme = "dark";
       mockDatabase.getAllAsync.mockResolvedValue([quranRows[0]]);

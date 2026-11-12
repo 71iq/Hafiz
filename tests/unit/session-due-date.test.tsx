@@ -80,6 +80,7 @@ const mockSettings: ReturnType<typeof useSettings> = {
   viewMode: "verse",
   setViewMode: jest.fn(),
   quranFontStyle: "qcf2",
+  quranRenderFontStyle: "qcf2",
   setQuranFontStyle: jest.fn(),
   quranMarkerStyle: "auto",
   setQuranMarkerStyle: jest.fn(),
