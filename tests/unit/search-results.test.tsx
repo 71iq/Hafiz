@@ -67,6 +67,7 @@ const mockCloseDetail = jest.fn();
 const mockNavigate = jest.fn();
 const mockPendingLink = jest.fn();
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDb }));
+jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 24, right: 0, bottom: 0, left: 0 }) }));
 jest.mock("@/lib/settings/context", () => ({
   useSettings: () => ({ isDark: false, isRTL: mockLanguage === "ar", uiLanguage: mockLanguage }),
 }));

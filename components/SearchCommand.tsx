@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Search, X, Clock, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { SearchResultsSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -141,6 +142,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
   const db = useDatabase();
   const { isDark, isRTL } = useSettings();
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const s = useStrings();
   const { clearTooltip, closeDetail } = useWordInteraction();
 
@@ -422,7 +424,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
   const mutedColor = isDark ? "#737373" : "#8B8178";
   const LemmaDisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
   const isPhone = width < SIDEBAR_BREAKPOINT;
-  const modalHeight = isPhone ? Math.min(height - 16, 900) : Math.min(height - 48, 760);
+  // The overlay pads its window below the status bar, so a phone sheet must leave insets.top free
+  // or its fixed height pushes the header under the status bar.
+  const modalHeight = isPhone ? Math.min(height - insets.top - 8, 900) : Math.min(height - 48, 760);
 
   return (
     <ResponsiveSheet
@@ -563,6 +567,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                   data={history}
                   keyExtractor={(item) => String(item.id)}
                   keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
                   style={{ flex: 1 }}
                   contentContainerStyle={{ paddingBottom: 24 }}
                   renderItem={({ item }) => (
@@ -626,6 +631,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               data={groupedTextResults}
               keyExtractor={(item) => `surah-${item.surah}`}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 40 }}
               renderItem={({ item: group }) => (
@@ -747,6 +753,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               data={rootResults}
               keyExtractor={(item) => item.lemma}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 40 }}
               renderItem={({ item: group }) => {
