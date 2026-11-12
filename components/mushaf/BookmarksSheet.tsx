@@ -1,12 +1,14 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import { Trash2, BookmarkX } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BusyIndicator } from "@/components/ui/BusyIndicator";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useSelection } from "@/lib/selection/context";
 import { removeBookmark } from "@/lib/selection/queries";
 import { useDatabase } from "@/lib/database/provider";
+import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -18,13 +20,7 @@ type Props = {
   onNavigate: (surah: number, ayah: number) => void;
 };
 
-type BookmarkWithName = {
-  surah: number;
-  ayah: number;
-  createdAt: string;
-  surahNameArabic: string;
-  surahNameEnglish: string;
-};
+type SurahNames = { db: unknown; byNumber: MushafIndex["surahByNumber"] };
 
 export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   const db = useDatabase();
@@ -33,33 +29,45 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   const insets = useSafeAreaInsets();
   const s = useStrings();
   const { bookmarksList, showToast, refreshBookmarks } = useSelection();
-  const [enriched, setEnriched] = useState<BookmarkWithName[]>([]);
+  const [surahNames, setSurahNames] = useState<SurahNames | null>(null);
+  const [namesFailed, setNamesFailed] = useState(false);
+  const [namesAttempt, setNamesAttempt] = useState(0);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 640);
 
+  // Rows come straight from the bookmarks list; only the surah names load, once per database.
+  const namesByNumber = surahNames?.db === db ? surahNames.byNumber : null;
+  const needsNames = visible && bookmarksList.length > 0 && !namesByNumber;
   useEffect(() => {
-    if (!visible || bookmarksList.length === 0) {
-      setEnriched([]);
-      return;
-    }
-    async function enrich() {
-      const rows = await db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
-        "SELECT number, name_arabic, name_english FROM surahs"
-      );
-      const surahMap = new Map<number, { name_arabic: string; name_english: string }>();
-      for (const r of rows) surahMap.set(r.number, r);
+    if (!needsNames) return;
+    let cancelled = false;
+    setNamesFailed(false);
+    loadMushafIndex(db).then(
+      (index) => {
+        if (!cancelled) setSurahNames({ db, byNumber: index.surahByNumber });
+      },
+      (error) => {
+        console.warn("[BookmarksSheet] Failed to load surah names:", error);
+        if (!cancelled) setNamesFailed(true);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [db, needsNames, namesAttempt]);
 
-      setEnriched(
-        bookmarksList.map((b) => ({
-          ...b,
-          surahNameArabic: surahMap.get(b.surah)?.name_arabic ?? "",
-          surahNameEnglish: surahMap.get(b.surah)?.name_english ?? "",
-        }))
-      );
-    }
-    enrich();
-  }, [visible, bookmarksList, db]);
+  const rows = useMemo(
+    () =>
+      namesByNumber
+        ? bookmarksList.map((b) => ({
+            ...b,
+            surahNameArabic: namesByNumber.get(b.surah)?.name_arabic ?? "",
+            surahNameEnglish: namesByNumber.get(b.surah)?.name_english ?? "",
+          }))
+        : [],
+    [bookmarksList, namesByNumber],
+  );
 
   const handleRemove = useCallback(
     async (surah: number, ayah: number) => {
@@ -103,15 +111,27 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
           paddingBottom: Math.max(insets.bottom, 12),
         }}
       >
-        {enriched.length === 0 ? (
+        {bookmarksList.length === 0 ? (
           <EmptyState
             icon={BookmarkX}
             title={s.noBookmarks}
             subtitle={s.emptyBookmarksSubtitle}
             isDark={isDark}
           />
+        ) : !namesByNumber && namesFailed ? (
+          <EmptyState
+            icon={BookmarkX}
+            title={s.bookmarksLoadFailed}
+            actionLabel={s.errorTryAgain}
+            onAction={() => setNamesAttempt((attempt) => attempt + 1)}
+            isDark={isDark}
+          />
+        ) : !namesByNumber ? (
+          <View className="items-center py-10">
+            <BusyIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+          </View>
         ) : (
-          enriched.map((b) => (
+          rows.map((b) => (
             <Pressable
               key={`${b.surah}-${b.ayah}`}
               onPress={() => handleTap(b.surah, b.ayah)}
