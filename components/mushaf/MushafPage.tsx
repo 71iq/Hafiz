@@ -207,7 +207,15 @@ function MushafPageInner({
   const [fontLoadFailed, setFontLoadFailed] = useState(false);
   const [fontLoadAttempt, setFontLoadAttempt] = useState(0);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
-  const { getHighlightColor, getWordHighlightColor, selectAyah } = useSelection();
+  const { getHighlightColor, getWordHighlightColor, selectAyah, selection } = useSelection();
+  // The long-pressed ayah stays marked while its action bar is open, so the reader sees what it acts on.
+  const isSelectedAyah = (surah: number, ayah: number) => {
+    if (!selection) return false;
+    const { start, end } = selection;
+    const afterStart = surah > start.surah || (surah === start.surah && ayah >= start.ayah);
+    const beforeEnd = surah < end.surah || (surah === end.surah && ayah <= end.ayah);
+    return afterStart && beforeEnd;
+  };
   const { quranRenderFontStyle: quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
@@ -472,7 +480,7 @@ function MushafPageInner({
                 !highlightedWord &&
                 highlightedAyahKey === `${identity.surah}:${identity.ayah}`;
               const hlColor =
-                isTargetWord || isTargetAyah
+                isTargetWord || isTargetAyah || isSelectedAyah(identity.surah, identity.ayah)
                   ? "#0d9488"
                   : getWordHighlightColor(identity.surah, identity.ayah, identity.wordPos) ??
                     getHighlightColor(identity.surah, identity.ayah);

@@ -53,6 +53,8 @@ const PAGE_RAIL_MAX_WIDTH = 760;
 // How long after a touch drag, wheel or scroll key a scroll still counts as the reader's own,
 // long enough to cover a fling's momentum.
 const USER_SCROLL_INPUT_WINDOW_MS = 2500;
+// Matches the ayah marker delayLongPress in MushafPage, so a press that selects an ayah never also toggles chrome.
+const LONG_PRESS_MS = 300;
 const HEADER_CONTENT_STYLE = { position: "absolute", top: 0, left: 0, right: 0 } as const;
 const SCROLL_KEYS = new Set(["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "]);
 const READER_INTERACTION_SELECTOR = '[data-hafiz-quran-token], [data-hafiz-word-tooltip="true"], [data-hafiz-reader-interaction="true"]';
@@ -290,7 +292,7 @@ function MushafInner() {
   const { navigateToAyah, detailWord } = useWordInteraction();
   const { visible: chromeVisible, setVisible: setChromeVisible, setImmersive } = useChrome();
   const lastScrollYRef = useRef(0);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; at?: number } | null>(null);
   const touchMovedRef = useRef(false);
   const tapRevealGuardUntilRef = useRef(0);
   const lastUserScrollInputRef = useRef(0);
@@ -426,7 +428,7 @@ function MushafInner() {
         onTouchStart: (e: any) => {
           const touch = e?.nativeEvent?.touches?.[0];
           touchStartRef.current = touch
-            ? { x: touch.pageX ?? 0, y: touch.pageY ?? 0 }
+            ? { x: touch.pageX ?? 0, y: touch.pageY ?? 0, at: Date.now() }
             : null;
           touchMovedRef.current = false;
         },
@@ -446,7 +448,10 @@ function MushafInner() {
           }
         },
         onTouchEnd: () => {
-          if (!touchMovedRef.current) toggleChromeFromReaderTap();
+          // A long press selects an ayah; only a short tap shows or hides the reader chrome.
+          const startedAt = touchStartRef.current?.at;
+          const isShortTap = typeof startedAt === "number" && Date.now() - startedAt < LONG_PRESS_MS;
+          if (!touchMovedRef.current && isShortTap) toggleChromeFromReaderTap();
           touchStartRef.current = null;
         },
       } as Record<string, unknown>);
