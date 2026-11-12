@@ -2,6 +2,7 @@ import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { putUserSetting, removeUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { createEmptyCard } from "./scheduler";
+import { reviewDueCutoff } from "./review-transition";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
   ALL_NEW_REVIEW_ORDERS,
@@ -580,12 +581,13 @@ export async function getSmartDeckStats(
   if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
 
   const now = new Date().toISOString();
+  const dueCutoff = reviewDueCutoff();
   const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
   // A candidate live in another deck is that deck's card; materialization skips it, so it is not new here.
   const missing = ids.filter((id) => !live.has(id)).length;
   return {
     total: ids.length,
-    due: rows.filter((row) => row.due <= now && isReviewableCard(row, now)).length + missing,
+    due: rows.filter((row) => row.due <= dueCutoff && isReviewableCard(row, now)).length + missing,
     newCount: rows.filter((row) => row.state === 0).length + missing,
   };
 }
@@ -602,10 +604,11 @@ export async function getSmartDeckTodayStats(
   if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
 
   const now = new Date().toISOString();
+  const dueCutoff = reviewDueCutoff();
   const normalized = normalizeDueOptions(options);
   const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
   const dueRows = rows
-    .filter((row) => row.due <= now && isReviewableCard(row, now))
+    .filter((row) => row.due <= dueCutoff && isReviewableCard(row, now))
     .sort((a, b) => a.due.localeCompare(b.due));
   const missingRows = ids
     .filter((id) => !live.has(id))
@@ -660,7 +663,8 @@ export async function materializeSmartDeckCards(
   const safeNewCardsLimit = Number.isFinite(newCardsLimit)
     ? Math.max(0, newCardsLimit)
     : DEFAULT_DECK_NEW_CARD_LIMIT;
-  const existingDueRows = rows.filter((row) => row.due <= nowIso && isReviewableCard(row, nowIso));
+  const dueCutoff = reviewDueCutoff();
+  const existingDueRows = rows.filter((row) => row.due <= dueCutoff && isReviewableCard(row, nowIso));
   const existingDueReviewCount = existingDueRows.filter((row) => row.state !== 0).length;
   const existingDueNewCount = existingDueRows.length - existingDueReviewCount;
   const targetDueNewCount = Math.min(safeNewCardsLimit, Math.max(0, targetDueCount - existingDueReviewCount));
@@ -779,7 +783,7 @@ export async function getDueCardsForReview(
   options?: DueCardsForReviewOptions
 ): Promise<StudyCardRow[]> {
   const now = new Date().toISOString();
-  const dueUntil = normalizeDueOptions(options).dueUntil ?? now;
+  const dueUntil = normalizeDueOptions(options).dueUntil ?? reviewDueCutoff();
 
   if (isSmartDeckId(deckId)) {
     const rows = await getSmartDeckDueRows(db, deckId, dueUntil, now);

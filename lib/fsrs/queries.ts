@@ -44,6 +44,7 @@ import {
   todayBounds,
 } from "@/lib/date";
 import { emitReviewActivity } from "./review-events";
+import { reviewDueCutoff } from "./review-transition";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import {
   filterStudyRowsByDefaultDeckFilter,
@@ -487,25 +488,26 @@ export async function getTodayDueCount(
 
 export async function getDueCount(db: AppDatabase, deckId?: string): Promise<number> {
   const now = new Date().toISOString();
+  const dueCutoff = reviewDueCutoff();
   if (isSmartDeckId(deckId)) {
     return (await getSmartDeckStats(db, deckId)).due;
   }
   if (deckId) {
     const rows = await db.getAllAsync<StudyCardRow>(
       `SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL}`,
-      [deckId, now, now]
+      [deckId, dueCutoff, now]
     );
     return (await filterStudyRowsByDefaultDeckFilter(db, rows)).length;
   }
   const [nonSmartRow, smartRows] = await Promise.all([
     db.getAllAsync<StudyCardRow>(
       `SELECT * FROM study_cards WHERE due <= ? AND ${NON_SMART_CARD_SQL} AND ${REVIEWABLE_CARD_SQL}`,
-      [now, now]
+      [dueCutoff, now]
     ),
     getFilteredSmartMaterializedRows(db),
   ]);
   const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(db, nonSmartRow);
-  return nonSmartRows.length + smartRows.filter((row) => row.due <= now && isReviewableCard(row, now)).length;
+  return nonSmartRows.length + smartRows.filter((row) => row.due <= dueCutoff && isReviewableCard(row, now)).length;
 }
 
 export async function getDeckTodayStats(

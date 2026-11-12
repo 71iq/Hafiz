@@ -290,7 +290,6 @@ function FlashcardSessionScreen() {
             activeReviewSettings?.newCardsLimit
           );
         }
-        const sessionDueUntil = localEndOfTodayIso();
         const dueRows = remainingReviewLimit > 0
           ? await getDueCardsForReview(db, normalizedDeckId, activeReviewSettings
               ? {
@@ -299,9 +298,8 @@ function FlashcardSessionScreen() {
                   newReviewOrder: activeReviewSettings.newReviewOrder,
                   reviewSortOrder: activeReviewSettings.reviewSortOrder,
                   newCardSortOrder: activeReviewSettings.newCardSortOrder,
-                  dueUntil: sessionDueUntil,
                 }
-              : { limit: remainingReviewLimit, dueUntil: sessionDueUntil })
+              : { limit: remainingReviewLimit })
           : [];
         if (cancelled) return;
         if (dueRows.length === 0) {
@@ -764,7 +762,7 @@ function FlashcardSessionScreen() {
       });
 
       await persistReviewTransition({ db, cardId: currentCard.card.id, transition });
-      const requeuedCard = transition.shouldRequeueToday
+      const requeuedCard = transition.shouldRequeueInSession
         ? { ...currentCard, card: transition.updatedCard }
         : null;
 

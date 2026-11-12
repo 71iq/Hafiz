@@ -1,6 +1,7 @@
 import { localStartOfTomorrow } from "@/lib/date";
 import {
   calculateReviewTransition,
+  reviewDueCutoff,
   type ReviewTransition,
 } from "@/lib/fsrs/review-transition";
 import { gradeCard, Rating, State, type Grade } from "@/lib/fsrs/scheduler";
@@ -156,7 +157,7 @@ describe("review transition", () => {
     expect(new Date(transition.updatedCard.due).getTime() - REVIEWED_AT.getTime()).toBe(7 * 60 * 1000);
   });
 
-  it("requeues active same-day learning cards", () => {
+  it("requeues active learning cards due within the learn-ahead window", () => {
     const transition = calculateReviewTransition({
       card: makeStudyCard({
         state: State.New,
@@ -173,10 +174,29 @@ describe("review transition", () => {
       reviewPolicy: makeReviewPolicy({ enableFuzz: false, learningSteps: ["1m", "10m"] }),
     });
 
-    expect(new Date(transition.updatedCard.due).getTime()).toBeLessThan(
-      localStartOfTomorrow(REVIEWED_AT).getTime(),
-    );
-    expect(transition.shouldRequeueToday).toBe(true);
+    expect(transition.updatedCard.due <= reviewDueCutoff(REVIEWED_AT)).toBe(true);
+    expect(transition.shouldRequeueInSession).toBe(true);
+  });
+
+  it("keeps a learning card scheduled hours out of the session until it is nearly due", () => {
+    const transition = calculateReviewTransition({
+      card: makeStudyCard({
+        state: State.New,
+        stability: 0,
+        difficulty: 0,
+        elapsed_days: 0,
+        scheduled_days: 0,
+        reps: 0,
+        lapses: 0,
+        last_review: null,
+      }),
+      rating: Rating.Again,
+      reviewedAt: REVIEWED_AT,
+      reviewPolicy: makeReviewPolicy({ enableFuzz: false, learningSteps: ["6h", "1d"] }),
+    });
+
+    expect(new Date(transition.updatedCard.due).getTime() - REVIEWED_AT.getTime()).toBe(6 * 60 * 60 * 1000);
+    expect(transition.shouldRequeueInSession).toBe(false);
   });
 
   it.each<Partial<StudyCardRow>>([
@@ -201,7 +221,7 @@ describe("review transition", () => {
       reviewPolicy: makeReviewPolicy({ enableFuzz: false, learningSteps: ["1m", "10m"] }),
     });
 
-    expect(transition.shouldRequeueToday).toBe(false);
+    expect(transition.shouldRequeueInSession).toBe(false);
   });
 
   it("requeues a same-day card after its burial has expired", () => {
@@ -222,7 +242,7 @@ describe("review transition", () => {
       reviewPolicy: makeReviewPolicy({ enableFuzz: false, learningSteps: ["1m", "10m"] }),
     });
 
-    expect(transition.shouldRequeueToday).toBe(true);
+    expect(transition.shouldRequeueInSession).toBe(true);
   });
 
   it("does not requeue a card scheduled after the local review day", () => {
@@ -236,7 +256,7 @@ describe("review transition", () => {
     expect(new Date(transition.updatedCard.due).getTime()).toBeGreaterThanOrEqual(
       localStartOfTomorrow(REVIEWED_AT).getTime(),
     );
-    expect(transition.shouldRequeueToday).toBe(false);
+    expect(transition.shouldRequeueInSession).toBe(false);
   });
 
   it("rejects a persisted scheduler state outside the known state set", () => {

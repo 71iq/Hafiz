@@ -1,4 +1,3 @@
-import { localStartOfTomorrow } from "@/lib/date";
 import { gradeCard, State, type Card, type Grade } from "@/lib/fsrs/scheduler";
 import type { DeckReviewSettings, StudyCardRow } from "@/lib/fsrs/types";
 
@@ -16,8 +15,19 @@ type ReviewRecord = Readonly<{
 export type ReviewTransition = Readonly<{
   updatedCard: StudyCardRow;
   reviewRecord: ReviewRecord;
-  shouldRequeueToday: boolean;
+  shouldRequeueInSession: boolean;
 }>;
+
+/**
+ * A card counts as due once it is due within this window, like Anki's learn-ahead limit. Home counts,
+ * session queues and in-session requeues share it, so a card on a 1m or 10m learning step comes back
+ * after the cards ahead of it while one scheduled hours out waits until it is nearly due.
+ */
+export const REVIEW_LEARN_AHEAD_MS = 20 * 60 * 1000;
+
+export function reviewDueCutoff(now = new Date()): string {
+  return new Date(now.getTime() + REVIEW_LEARN_AHEAD_MS).toISOString();
+}
 
 export type ReviewTransitionInput = Readonly<{
   card: StudyCardRow;
@@ -61,7 +71,7 @@ export function calculateReviewTransition({
       scheduledDays: result.log.scheduled_days,
       reviewedAt: reviewedAtIso,
     },
-    shouldRequeueToday: isActiveAndDueToday(updatedCard, reviewedAt),
+    shouldRequeueInSession: isActiveAndDueInSession(updatedCard, reviewedAt),
   };
 }
 
@@ -95,12 +105,12 @@ function toSchedulerState(state: number): State {
   }
 }
 
-function isActiveAndDueToday(card: StudyCardRow, reviewedAt: Date): boolean {
+function isActiveAndDueInSession(card: StudyCardRow, reviewedAt: Date): boolean {
   const reviewedAtIso = reviewedAt.toISOString();
   return (
     !card.deleted_at &&
     !card.suspended_at &&
     (!card.buried_until || card.buried_until <= reviewedAtIso) &&
-    card.due < localStartOfTomorrow(reviewedAt).toISOString()
+    card.due <= reviewDueCutoff(reviewedAt)
   );
 }
