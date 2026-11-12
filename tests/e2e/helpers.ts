@@ -36,8 +36,14 @@ export async function waitForQaReady(page: Page) {
 export async function assertHealthyPage(page: Page, capture: ConsoleCapture) {
   await page.waitForLoadState("networkidle", { timeout: 30_000 }).catch(() => {});
 
+  // A route may still show a text-free loading skeleton when the network goes idle (the review
+  // session loads its queue from SQLite), so wait for content instead of sampling once.
+  await expect
+    .poll(async () => (await page.locator("body").innerText({ timeout: 20_000 })).trim().length, {
+      timeout: 15_000,
+    })
+    .toBeGreaterThan(8);
   const bodyText = await page.locator("body").innerText({ timeout: 20_000 });
-  expect(bodyText.trim().length).toBeGreaterThan(8);
 
   for (const pattern of frameworkOverlayPatterns) {
     expect(bodyText).not.toMatch(pattern);
