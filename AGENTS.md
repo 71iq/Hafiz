@@ -14,6 +14,7 @@ Choose simple ownership over more layers. Reuse the established feature componen
 - lib/ owns the local database, sync, themes, bilingual strings, navigation and platform adapters.
 - assets/data/ contains protected datasets and a generated Quran database. supabase/ contains schema, migrations and functions.
 - tests/ and scripts/ contain focused checks. Generated dist/, public/data/ and native build output are not source edits.
+- `user cases.md` lists user-facing behavior. docs/feature-tree.json maps each screen, widget, transition and shared flow to those cases; docs/feature-tree.md explains its fields.
 
 Check the active branch and worktree before edits. Preserve the existing AppNavigation.tsx change in the original checkout. Modernization work has a separate checkout and runbook. Work there only when the task selects it, and follow its local instructions without merging or publishing it as incidental setup work.
 
@@ -36,6 +37,8 @@ Before finishing behavior changes, identify which of these paths apply:
 - Locales include Arabic RTL and English LTR. Check direction-sensitive ordering, gestures and translated strings where the change affects them.
 - State includes startup, loading, empty/error recovery, offline use, account restore, reconnect and app resume. Persisted state must survive reload without accepting stale asynchronous results.
 - Account work includes local SQLite, optional remote sync and the returned UI state. Check the intended merge/restore policy and cross-user isolation before changing it.
+
+Update docs/feature-tree.json in the same change when you add, remove, rename, merge or split a screen, widget, transition or shared flow, or move a user case. tests/unit/feature-tree.test.ts checks it against `user cases.md`.
 
 ## Local development and focused checks
 

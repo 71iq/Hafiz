@@ -1,0 +1,1159 @@
+{
+  "id": "app",
+  "title": "Hafiz app",
+  "kind": "root",
+  "cases": [],
+  "uses": [],
+  "native": false,
+  "children": [
+    {
+      "id": "shell",
+      "title": "Startup and app shell",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "shell.boot",
+          "title": "Launch: fonts + database preparation, DB failure state",
+          "kind": "screen",
+          "cases": ["UI-01", "PUBLIC-05"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shell.entry",
+          "title": "Root entry: onboarding vs Home, /flashcards and /search redirects",
+          "kind": "transition",
+          "cases": ["UI-02", "NAV-04"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shell.notfound",
+          "title": "Unknown URL: not-found page and Home link",
+          "kind": "screen",
+          "cases": ["NAV-05"],
+          "uses": ["shell.entry"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shell.restore",
+          "title": "Reopen: restore preferences, session, local study data",
+          "kind": "transition",
+          "cases": ["UI-03"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shell.offline",
+          "title": "Offline banner and reconnect",
+          "kind": "widget",
+          "cases": ["UI-04"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shell.sync",
+          "title": "Background sync indicator and restore notice",
+          "kind": "widget",
+          "cases": ["UI-05"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shell.errorboundary",
+          "title": "Section error fallback with Try Again",
+          "kind": "widget",
+          "cases": ["UI-11"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shell.responsive",
+          "title": "Phone/tablet/desktop arrangements on resize",
+          "kind": "transition",
+          "cases": ["UI-12"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shell.nav",
+          "title": "Navigation chrome",
+          "kind": "group",
+          "cases": [],
+          "uses": [],
+          "native": false,
+          "children": [
+            {
+              "id": "shell.nav.tabs",
+              "title": "Phone tab bar: Home, Mushaf, Leaderboard, Progress, Settings",
+              "kind": "widget",
+              "cases": ["NAV-01"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shell.nav.tablet",
+              "title": "Tablet floating navigation",
+              "kind": "widget",
+              "cases": ["NAV-02"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shell.nav.desktop",
+              "title": "Desktop sidebar (feed, journey, profile links)",
+              "kind": "widget",
+              "cases": ["NAV-03"],
+              "uses": [],
+              "native": false,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shared",
+      "title": "Shared building blocks (verified once, reused everywhere)",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "shared.overlay",
+          "title": "ResponsiveOverlay: open, fit, scroll lock, keyboard avoid, dismiss, focus restore",
+          "kind": "widget",
+          "cases": ["UI-06", "UI-07"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.confirm",
+          "title": "Confirmation dialog",
+          "kind": "widget",
+          "cases": ["UI-08"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.menu",
+          "title": "Card-actions dropdown menu",
+          "kind": "widget",
+          "cases": ["UI-09"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.toast",
+          "title": "Toast feedback",
+          "kind": "widget",
+          "cases": ["UI-10"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.scope",
+          "title": "Surah / ayah-range scope selector",
+          "kind": "widget",
+          "cases": ["DECK-02"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.tafsirpicker",
+          "title": "Tafsir source picker and download",
+          "kind": "widget",
+          "cases": ["SET-09"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.reciterpicker",
+          "title": "Reciter picker",
+          "kind": "widget",
+          "cases": ["SET-10"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.noteeditor",
+          "title": "Private note editor",
+          "kind": "widget",
+          "cases": ["NOTE-02", "NOTE-03"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.reflectioneditor",
+          "title": "Reflection editor (guest prompt, publish, close)",
+          "kind": "widget",
+          "cases": ["WRITE-01", "WRITE-02", "WRITE-03"],
+          "uses": ["shared.overlay", "auth.login"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.comments",
+          "title": "Comments panel: load, sort, send, like, guest prompt",
+          "kind": "widget",
+          "cases": ["COMMENT-01", "COMMENT-02", "COMMENT-03", "COMMENT-04"],
+          "uses": ["shared.overlay", "auth.login"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.ayahdetail",
+          "title": "Ayah detail sheet",
+          "kind": "screen",
+          "cases": ["AYAH-04", "AYAH-05"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": [
+            {
+              "id": "shared.ayahdetail.tabs",
+              "title": "Tab switching (Arabic UI drops Translation)",
+              "kind": "transition",
+              "cases": ["AYAH-06"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.ayahdetail.translation",
+              "title": "Translation and tafsir tabs, Manage sources",
+              "kind": "widget",
+              "cases": ["AYAH-07"],
+              "uses": ["shared.tafsirpicker"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.ayahdetail.qiraat",
+              "title": "Qiraat tab",
+              "kind": "widget",
+              "cases": ["AYAH-08"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.ayahdetail.hadith",
+              "title": "Hadith tab (when enabled)",
+              "kind": "widget",
+              "cases": ["AYAH-09"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.ayahdetail.notes",
+              "title": "Private notes tab",
+              "kind": "widget",
+              "cases": ["NOTE-01", "NOTE-04"],
+              "uses": ["shared.noteeditor"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.ayahdetail.reflections",
+              "title": "Reflections tab: list, like, See all",
+              "kind": "widget",
+              "cases": ["FEED-10", "FEED-08"],
+              "uses": ["shared.reflectioneditor", "shared.comments", "community.feed"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.ayahdetail.actions",
+              "title": "Copy, bookmark, audio from detail or verse card",
+              "kind": "widget",
+              "cases": ["AYAH-10"],
+              "uses": ["shared.toast", "reader.audio.single"],
+              "native": false,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "shared.worddetail",
+          "title": "Word detail sheet",
+          "kind": "screen",
+          "cases": ["WORD-03"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": [
+            {
+              "id": "shared.worddetail.ayah",
+              "title": "Open ayah detail above the word sheet",
+              "kind": "transition",
+              "cases": ["WORD-04"],
+              "uses": ["shared.ayahdetail"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.worddetail.meaning",
+              "title": "Meaning tab + add to vocabulary",
+              "kind": "widget",
+              "cases": ["WORD-05"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.worddetail.custom",
+              "title": "Custom Arabic meaning",
+              "kind": "widget",
+              "cases": ["WORD-06"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.worddetail.irab",
+              "title": "I'rab and Tasreef tabs",
+              "kind": "widget",
+              "cases": ["WORD-07"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.worddetail.tajweed",
+              "title": "Tajweed tab",
+              "kind": "widget",
+              "cases": ["WORD-08"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shared.worddetail.occurrences",
+              "title": "Occurrences tab -> jump to Mushaf",
+              "kind": "transition",
+              "cases": ["WORD-09"],
+              "uses": ["reader.arrival"],
+              "native": false,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "onboarding",
+      "title": "Onboarding",
+      "kind": "screen",
+      "cases": ["START-01"],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "onboarding.surahs",
+          "title": "Memorized-surah selection and search",
+          "kind": "widget",
+          "cases": ["START-02"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "onboarding.summary",
+          "title": "Deck summary and creation",
+          "kind": "widget",
+          "cases": ["START-03"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "onboarding.finish",
+          "title": "Start review / Continue / Skip",
+          "kind": "transition",
+          "cases": ["START-04", "START-05"],
+          "uses": ["review.session", "home"],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "title": "Home",
+      "kind": "screen",
+      "cases": ["HOME-01"],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "home.resume",
+          "title": "Reading-position card -> Mushaf",
+          "kind": "transition",
+          "cases": ["HOME-02"],
+          "uses": ["reader"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.guestbanner",
+          "title": "Guest account banner",
+          "kind": "widget",
+          "cases": ["HOME-03"],
+          "uses": ["auth.login", "auth.signup"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.achievement",
+          "title": "Achievement announcements",
+          "kind": "widget",
+          "cases": ["HOME-04"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.decks",
+          "title": "Deck cards: start review, configure, card list",
+          "kind": "widget",
+          "cases": ["HOME-05", "HOME-06"],
+          "uses": ["review.session", "decks.config", "decks.cards"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.journey",
+          "title": "Reflection-journey card",
+          "kind": "transition",
+          "cases": ["HOME-07"],
+          "uses": ["journey"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.search",
+          "title": "Search command",
+          "kind": "screen",
+          "cases": ["SEARCH-01"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": [
+            {
+              "id": "home.search.text",
+              "title": "Text mode search",
+              "kind": "widget",
+              "cases": ["SEARCH-02"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "home.search.root",
+              "title": "Root mode search",
+              "kind": "widget",
+              "cases": ["SEARCH-03"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "home.search.result",
+              "title": "Select result -> Mushaf at ayah/word",
+              "kind": "transition",
+              "cases": ["SEARCH-04"],
+              "uses": ["reader.arrival"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "home.search.history",
+              "title": "Recent searches, clear, close reset",
+              "kind": "widget",
+              "cases": ["SEARCH-05", "SEARCH-06"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "home.search.empty",
+              "title": "Short query, no matches, failure + Retry",
+              "kind": "widget",
+              "cases": ["SEARCH-07"],
+              "uses": [],
+              "native": false,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "openlink",
+      "title": "/open deep link bridge",
+      "kind": "transition",
+      "cases": ["SEARCH-08", "SEARCH-09"],
+      "uses": ["reader.arrival"],
+      "native": false,
+      "children": []
+    },
+    {
+      "id": "reader",
+      "title": "Mushaf reader",
+      "kind": "screen",
+      "cases": ["READ-01", "READ-12"],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "reader.mode",
+          "title": "Verse/page mode switch",
+          "kind": "transition",
+          "cases": ["READ-02"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.pages",
+          "title": "Page view: vertical/horizontal, swipe, drag, wheel, arrow keys",
+          "kind": "widget",
+          "cases": ["READ-03", "READ-04", "READ-05"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.rail",
+          "title": "Page rail and Go to (surah/juz)",
+          "kind": "widget",
+          "cases": ["READ-06", "READ-07"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.surahinfo",
+          "title": "Surah information panel",
+          "kind": "widget",
+          "cases": ["READ-08"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.chrome",
+          "title": "Hide/show reader controls, Home control",
+          "kind": "transition",
+          "cases": ["READ-09", "READ-11"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.arrival",
+          "title": "Arrive at ayah/word with target highlight",
+          "kind": "transition",
+          "cases": ["READ-10"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.settings",
+          "title": "Reader settings: theme, font, marker, size",
+          "kind": "widget",
+          "cases": ["SET-03", "SET-04", "SET-05", "SET-06"],
+          "uses": ["shared.overlay", "shared.tafsirpicker"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.hifz",
+          "title": "Memorization",
+          "kind": "group",
+          "cases": [],
+          "uses": [],
+          "native": false,
+          "children": [
+            {
+              "id": "reader.hifz.verse",
+              "title": "Verse-view hiding and reveal",
+              "kind": "widget",
+              "cases": ["HIFZ-01"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "reader.hifz.page",
+              "title": "Page Hifz controls",
+              "kind": "widget",
+              "cases": ["HIFZ-02"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "reader.hifz.auto",
+              "title": "Automatic word revelation and auto-advance",
+              "kind": "widget",
+              "cases": ["HIFZ-03", "HIFZ-04"],
+              "uses": [],
+              "native": false,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "reader.focus",
+          "title": "Focus mode auto-scroll",
+          "kind": "widget",
+          "cases": ["FOCUS-01", "FOCUS-02"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.ayahactions",
+          "title": "Ayah action panel: copy, bookmark, highlight, note, reflection",
+          "kind": "widget",
+          "cases": ["AYAH-01", "AYAH-02", "AYAH-03"],
+          "uses": ["shared.overlay", "shared.toast", "shared.noteeditor", "shared.reflectioneditor"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.words",
+          "title": "Word tooltip and long-press",
+          "kind": "widget",
+          "cases": ["WORD-01", "WORD-02"],
+          "uses": ["shared.worddetail"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.selection",
+          "title": "Web text selection: copy and highlight",
+          "kind": "widget",
+          "cases": ["SELECT-01", "SELECT-02"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.bookmarks",
+          "title": "Bookmarks sheet",
+          "kind": "widget",
+          "cases": ["SAVED-01"],
+          "uses": ["shared.overlay", "reader.arrival"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.audio",
+          "title": "Recitation",
+          "kind": "group",
+          "cases": [],
+          "uses": [],
+          "native": false,
+          "children": [
+            {
+              "id": "reader.audio.single",
+              "title": "Single-ayah playback",
+              "kind": "widget",
+              "cases": ["AUDIO-01"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "reader.audio.range",
+              "title": "Range recitation settings and playback",
+              "kind": "widget",
+              "cases": ["AUDIO-02", "AUDIO-03", "AUDIO-04"],
+              "uses": ["shared.reciterpicker"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "reader.audio.background",
+              "title": "Pause on native background",
+              "kind": "transition",
+              "cases": ["AUDIO-05"],
+              "uses": [],
+              "native": true,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decks",
+      "title": "Decks",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "decks.config",
+          "title": "Built-in deck configuration",
+          "kind": "screen",
+          "cases": ["DECK-01", "DECK-03", "DECK-04", "DECK-05", "DECK-07"],
+          "uses": ["shared.overlay", "shared.scope"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "decks.vocabsettings",
+          "title": "Vocabulary review settings",
+          "kind": "screen",
+          "cases": ["DECK-06"],
+          "uses": ["decks.config"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "decks.cards",
+          "title": "Card list: table, search, filters",
+          "kind": "screen",
+          "cases": ["DECK-08", "DECK-09"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": [
+            {
+              "id": "decks.cards.menu",
+              "title": "Card menu: mark, suspend, bury, reset, delete, due date",
+              "kind": "widget",
+              "cases": ["DECK-10", "DECK-11", "DECK-12"],
+              "uses": ["shared.menu", "shared.confirm"],
+              "native": false,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "title": "Review",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "review.session",
+          "title": "Review session: load, reveal, answer sides",
+          "kind": "screen",
+          "cases": ["REVIEW-01", "REVIEW-02", "REVIEW-03", "REVIEW-04"],
+          "uses": [],
+          "native": false,
+          "children": [
+            {
+              "id": "review.session.grade",
+              "title": "Grade Again/Hard/Good/Easy",
+              "kind": "transition",
+              "cases": ["REVIEW-05"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "review.session.actions",
+              "title": "Card actions: mark, suspend, bury, delete, reset, edit answer, due date",
+              "kind": "widget",
+              "cases": ["REVIEW-06", "REVIEW-07", "REVIEW-08", "REVIEW-09"],
+              "uses": ["shared.menu", "shared.confirm"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "review.session.exit",
+              "title": "Exit with X",
+              "kind": "transition",
+              "cases": ["REVIEW-10"],
+              "uses": ["home"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "review.session.summary",
+              "title": "Session summary and Done",
+              "kind": "screen",
+              "cases": ["REVIEW-11"],
+              "uses": [],
+              "native": false,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "review.vocab",
+          "title": "/flashcards/vocab session",
+          "kind": "screen",
+          "cases": ["REVIEW-12"],
+          "uses": [],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "journey",
+      "title": "Reflection journey",
+      "kind": "screen",
+      "cases": ["JOURNEY-01"],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "journey.levels",
+          "title": "Level strip / side list and locking",
+          "kind": "widget",
+          "cases": ["JOURNEY-02"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "journey.lesson",
+          "title": "Lesson blocks -> ayah detail",
+          "kind": "widget",
+          "cases": ["JOURNEY-03"],
+          "uses": ["shared.ayahdetail"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "journey.response",
+          "title": "Response draft, complete, edit, next, discard",
+          "kind": "widget",
+          "cases": ["JOURNEY-04", "JOURNEY-05", "JOURNEY-06", "JOURNEY-07"],
+          "uses": ["shared.toast"],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "progress",
+      "title": "Progress",
+      "kind": "screen",
+      "cases": ["PROGRESS-01", "PROGRESS-05"],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "progress.heatmap",
+          "title": "Activity heatmap tooltip",
+          "kind": "widget",
+          "cases": ["PROGRESS-02"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "progress.surahs",
+          "title": "Surah progress and View all",
+          "kind": "widget",
+          "cases": ["PROGRESS-03"],
+          "uses": ["reader.arrival", "shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "progress.achievements",
+          "title": "All achievements sheet",
+          "kind": "widget",
+          "cases": ["PROGRESS-04"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "progress.guest",
+          "title": "Guest sign-in prompt",
+          "kind": "widget",
+          "cases": ["PROGRESS-06"],
+          "uses": ["auth.login"],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "leaderboard",
+      "title": "Leaderboard",
+      "kind": "screen",
+      "cases": ["RANK-01", "RANK-02", "RANK-03"],
+      "uses": ["profile.public", "auth.login"],
+      "native": false,
+      "children": []
+    },
+    {
+      "id": "community",
+      "title": "Community",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "community.feed",
+          "title": "Reflection feed",
+          "kind": "screen",
+          "cases": ["FEED-01"],
+          "uses": [],
+          "native": false,
+          "children": [
+            {
+              "id": "community.feed.search",
+              "title": "Search reflections",
+              "kind": "widget",
+              "cases": ["FEED-02"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "community.feed.filter",
+              "title": "Location filter and sort, refresh, load more",
+              "kind": "widget",
+              "cases": ["FEED-03", "FEED-04"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "community.feed.post",
+              "title": "Post: open comments, ayah link, author",
+              "kind": "transition",
+              "cases": ["FEED-05", "FEED-06"],
+              "uses": ["shared.comments", "reader.arrival", "profile.public", "profile.own"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "community.feed.like",
+              "title": "Like and report",
+              "kind": "widget",
+              "cases": ["FEED-07", "FEED-09"],
+              "uses": ["shared.toast"],
+              "native": false,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "profile",
+      "title": "Profiles",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "profile.own",
+          "title": "Own profile sheet: overview, guest prompt",
+          "kind": "screen",
+          "cases": ["PROFILE-01", "PROFILE-02"],
+          "uses": ["shared.overlay", "progress"],
+          "native": false,
+          "children": [
+            {
+              "id": "profile.own.notes",
+              "title": "Notes tab: preview, view all, open, edit, delete",
+              "kind": "widget",
+              "cases": ["NOTE-05", "NOTE-06", "NOTE-07"],
+              "uses": ["shared.noteeditor", "shared.confirm", "reader.arrival"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "profile.own.edit",
+              "title": "Edit profile: name, bio, country, photo, save, draft retention",
+              "kind": "widget",
+              "cases": ["PROFILE-04", "PROFILE-05", "PROFILE-06", "PROFILE-07", "PROFILE-08"],
+              "uses": [],
+              "native": false,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "profile.public",
+          "title": "Public profile",
+          "kind": "screen",
+          "cases": ["PROFILE-03"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "auth",
+      "title": "Authentication",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "auth.login",
+          "title": "Login form",
+          "kind": "screen",
+          "cases": ["AUTH-01", "AUTH-02", "AUTH-03"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "auth.signup",
+          "title": "Signup and confirmation resend",
+          "kind": "screen",
+          "cases": ["AUTH-04", "AUTH-05"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "auth.forgot",
+          "title": "Forgot password",
+          "kind": "screen",
+          "cases": ["AUTH-06"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "auth.reset",
+          "title": "Reset password link",
+          "kind": "screen",
+          "cases": ["AUTH-07"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "auth.providers",
+          "title": "Social / Quran Foundation providers",
+          "kind": "widget",
+          "cases": ["AUTH-08"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "auth.unavailable",
+          "title": "Unconfigured or disabled account service",
+          "kind": "widget",
+          "cases": ["AUTH-09"],
+          "uses": [],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "title": "Settings",
+      "kind": "screen",
+      "cases": ["SET-01"],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "settings.general",
+          "title": "General: language, theme, font, marker, size, reading mode",
+          "kind": "widget",
+          "cases": ["SET-02", "SET-07"],
+          "uses": ["reader.settings"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "settings.content",
+          "title": "Content: translation, tafsir, reciter",
+          "kind": "widget",
+          "cases": ["SET-08"],
+          "uses": ["shared.tafsirpicker", "shared.reciterpicker"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "settings.account",
+          "title": "Account: profile, logout, login/signup",
+          "kind": "widget",
+          "cases": ["SET-11"],
+          "uses": ["shared.confirm", "profile.own", "auth.login"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "settings.qf",
+          "title": "Quran Foundation connect, sync, disconnect",
+          "kind": "widget",
+          "cases": ["SET-12", "SET-13", "SET-14"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "settings.about",
+          "title": "About links and donor dialog",
+          "kind": "widget",
+          "cases": ["SET-15"],
+          "uses": ["public"],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "public",
+      "title": "Public pages",
+      "kind": "screen",
+      "cases": ["PUBLIC-01", "PUBLIC-02", "PUBLIC-03"],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "public.zayt",
+          "title": "/zayt-preview",
+          "kind": "screen",
+          "cases": ["PUBLIC-04"],
+          "uses": [],
+          "native": false,
+          "children": []
+        }
+      ]
+    }
+  ]
+}
