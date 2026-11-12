@@ -6,6 +6,7 @@ import { fetchReflectionFeed } from "@/lib/reflections/api";
 import { reflectionQueryKeys as keys } from "@/lib/reflections/query-keys";
 import type { Reflection } from "@/lib/reflections/types";
 import { strings } from "@/lib/i18n/strings";
+import { flattenStyle } from "../rtl/rtl-test-utils";
 let mockLocale: "en" | "ar" = "en";
 const mockDb = { getAllAsync: async () => [] };
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
@@ -302,5 +303,22 @@ describe.each(["en", "ar"] as const)("feed recovery in %s", (locale) => {
     );
     expect(view.getByText("post|4")).toBeTruthy();
     expect(view.queryByText("post|5")).toBeNull();
+  });
+});
+
+describe.each(["en", "ar"] as const)("feed search row in %s", (locale) => {
+  beforeEach(() => {
+    mockLocale = locale;
+  });
+  it("mirrors by hand in LTR coordinates so the search icon leads and clear trails", async () => {
+    const view = screen();
+    await flush();
+    let row = view.getByPlaceholderText(strings[locale].reflectionFeedSearchPlaceholder).parent;
+    while (row && !flattenStyle(row.props.style).flexDirection) row = row.parent;
+    // Under the RTL wrapper, row-reverse without an LTR pin flipped the row back in Arabic.
+    expect(flattenStyle(row?.props.style)).toMatchObject({
+      direction: "ltr",
+      flexDirection: locale === "ar" ? "row-reverse" : "row",
+    });
   });
 });

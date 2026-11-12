@@ -570,9 +570,11 @@ function ReflectionFeedSearch({
   const iconColor = isDark ? "#737373" : "#8B8178";
 
   return (
+    // Hand-mirrored row pins LTR coordinates; inside the RTL search wrapper row-reverse flipped twice
+    // and put the search icon on the left and the clear button on the right in Arabic.
     <View
       className="min-h-11 items-center gap-2 rounded-2xl bg-surface-low px-4 dark:bg-surface-dark-low"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
     >
       <Search size={17} color={iconColor} />
       <TextInput
