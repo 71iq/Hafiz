@@ -602,7 +602,14 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               <ActivityIndicator color={isDark ? "#5eead4" : "#003638"} />
             </View>
           ) : !visibleProfile ? (
-            <EmptyState icon={UserRound} title={s.authProfile} subtitle={s.errorSubtitle} isDark={isDark} />
+            <EmptyState
+              icon={UserRound}
+              title={s.authProfile}
+              subtitle={s.errorSubtitle}
+              actionLabel={isOwnProfile ? undefined : s.errorTryAgain}
+              onAction={isOwnProfile ? undefined : () => void publicProfileQuery.refetch()}
+              isDark={isDark}
+            />
           ) : (
             <View className="gap-5">
               {tabs.length > 0 ? (
