@@ -112,6 +112,9 @@ export default function RootLayout() {
                   <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
                   <Stack.Screen name="open" />
                   <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen name="hifz/review" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen name="hifz/sabaq" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen name="hifz/setup" options={{ animation: "slide_from_bottom" }} />
                   <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
                   <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
                   <Stack.Screen name="auth/forgot-password" options={{ animation: "slide_from_bottom" }} />

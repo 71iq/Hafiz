@@ -53,3 +53,10 @@ export function formatNumber(n: number, language: Language): string {
 export function formatMinutesShort(n: number, language: Language): string {
   return language === "ar" ? `${toArabicNumber(n)} د` : `${n} min`;
 }
+
+const LINES: ArabicForms = { one: "سطر واحد", two: "سطران", few: "أسطر", many: "سطرًا" };
+
+export function formatLines(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, LINES);
+  return n === 1 ? "1 line" : `${n.toLocaleString("en")} lines`;
+}

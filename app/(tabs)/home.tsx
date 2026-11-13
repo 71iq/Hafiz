@@ -40,6 +40,8 @@ import { WirdStreakCard } from "@/components/habit/WirdStreakCard";
 import { HabitBreakSheet } from "@/components/habit/HabitBreakSheet";
 import { useHabitOverview } from "@/lib/habit/use-habit-overview";
 import { markFullWirdIfComplete } from "@/lib/habit/queries";
+import { WirdPlanCard } from "@/components/hifz/WirdPlanCard";
+import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { putUserSetting } from "@/lib/database/user-settings";
 import {
   migrateLegacyRetentionDecks,
@@ -111,6 +113,7 @@ export default function HomeScreen() {
   );
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit } = useHabitOverview(db);
+  const { wird, inboxCount } = useTodayWird(db);
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   const [dueLoaded, setDueLoaded] = useState(false);
@@ -356,11 +359,19 @@ export default function HomeScreen() {
     return s.smartDeckFilterAll;
   };
 
-  // GOAL-04: once the minimum is met and every Home deck is clear, today's full wird is complete.
+  // GOAL-04: once the minimum is met and today's pages, new lines and every Home deck are done, the
+  // full wird is complete.
+  const planRemaining =
+    wird === undefined
+      ? 1
+      : wird === null
+        ? 0
+        : wird.todo.length + (wird.newLines > 0 && !wird.daily.backlog && !wird.sabaqDoneToday ? 1 : 0);
+  const remainingToday = totalDue + planRemaining;
   useEffect(() => {
-    if (!dueLoaded || !habit?.streak.doneToday || totalDue > 0) return;
-    markFullWirdIfComplete(db, { now: new Date(), remaining: totalDue }).catch(console.warn);
-  }, [db, dueLoaded, habit?.streak.doneToday, totalDue]);
+    if (!dueLoaded || !habit?.streak.doneToday || remainingToday > 0) return;
+    markFullWirdIfComplete(db, { now: new Date(), remaining: remainingToday }).catch(console.warn);
+  }, [db, dueLoaded, habit?.streak.doneToday, remainingToday]);
 
   const dismissGraceNote = useCallback(() => {
     const seen = habit?.recentGraceDay;
@@ -495,6 +506,20 @@ export default function HomeScreen() {
             />
           ) : null}
         </View>
+
+        {wird !== undefined ? (
+          <WirdPlanCard
+            wird={wird}
+            inboxCount={inboxCount}
+            language={uiLanguage}
+            isDark={isDark}
+            s={s}
+            onStartReview={() => router.push("/hifz/review" as Href)}
+            onStartSabaq={() => router.push("/hifz/sabaq" as Href)}
+            onSetup={() => router.push("/hifz/setup" as Href)}
+            onDrill={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}
+          />
+        ) : null}
 
         {resume && (
           <Pressable

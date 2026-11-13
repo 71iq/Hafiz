@@ -95,6 +95,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Date editor overlay is covered by the session-due-date and deck-cards-due-date caller fixtures.",
   ),
   entry(
+    "components/flashcards/GradingButtons.tsx",
+    "button",
+    "rntl",
+    "Grade order stays Again to Easy left to right in both directions, matching the existing session layout; labels follow the interface.",
+  ),
+  entry(
     "components/flashcards/Qcf2AyahText.tsx",
     "quran-text",
     "source",
@@ -135,6 +141,36 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "card",
     "rntl",
     "Home streak card mirrors its rows and the progress fill direction follows the interface.",
+  ),
+  entry(
+    "components/hifz/HifzSetupFlow.tsx",
+    "form-field",
+    "source",
+    "Setup steps mirror option rows through MirroredRow; the step text follows the interface direction.",
+  ),
+  entry(
+    "components/hifz/MemorizedPortionPicker.tsx",
+    "picker-menu",
+    "source",
+    "Juz chips and surah rows mirror; surah names show in the interface language.",
+  ),
+  entry(
+    "components/hifz/MistakeTypeSheet.tsx",
+    "overlay",
+    "source",
+    "Sheet options stack vertically and align to the reading side.",
+  ),
+  entry(
+    "components/hifz/RecitationPage.tsx",
+    "quran-text",
+    "source",
+    "Quran lines are always right to left in the page font; hidden words keep their place and the layout never mirrors with the interface.",
+  ),
+  entry(
+    "components/hifz/WirdPlanCard.tsx",
+    "card",
+    "source",
+    "Home wird card mirrors its rows; counts use the interface digits and the progress fill follows the interface.",
   ),
   entry(
     "components/mushaf/AyahBlock.tsx",

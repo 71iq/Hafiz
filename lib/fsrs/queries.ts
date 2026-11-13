@@ -1199,22 +1199,79 @@ async function updateStudyCardInTransaction(
  * meanwhile, for example by a sync pull, is not revived: the write fails and nothing is queued.
  */
 export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Promise<void> {
+  // A row that carries a tier (page cards) writes it; other callers leave the cached tier alone.
+  const writesTier = card.tier !== undefined;
   const result = await db.runAsync(
     `UPDATE study_cards SET
       due = ?, stability = ?, difficulty = ?, elapsed_days = ?, scheduled_days = ?,
       learning_steps = ?, reps = ?, lapses = ?, state = ?, last_review = ?,
-      suspended_at = ?, buried_until = ?, marked_at = ?, updated_at = ?
+      suspended_at = ?, buried_until = ?, marked_at = ?, updated_at = ?${writesTier ? ", tier = ?, tier_changed_at = ?" : ""}
      WHERE id = ? AND deleted_at IS NULL`,
     [
       card.due, card.stability, card.difficulty, card.elapsed_days, card.scheduled_days,
       card.learning_steps, card.reps, card.lapses, card.state, card.last_review,
       card.suspended_at, card.buried_until, card.marked_at, card.updated_at,
+      ...(writesTier ? [card.tier ?? null, card.tier_changed_at ?? null] : []),
       card.id,
     ]
   );
   if ((result.changes ?? 0) === 0) throw new StudyCardDeletedError();
 
   await enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card));
+}
+
+/**
+ * Create a new card, or revive a deleted one, with its upload queued, using the caller's executor.
+ * Returns false when a live card with this id already exists.
+ */
+export async function insertNewStudyCard(
+  db: DatabaseExecutor,
+  { id, deckId, due, tier = null, now }: { id: string; deckId: string; due: Date; tier?: string | null; now: string },
+): Promise<boolean> {
+  const empty = createEmptyCard(due);
+  const result = await db.runAsync(
+    `INSERT INTO study_cards
+      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review,
+       created_at, updated_at, deleted_at, tier, tier_changed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+      deck_id = excluded.deck_id, due = excluded.due, stability = excluded.stability, difficulty = excluded.difficulty,
+      elapsed_days = excluded.elapsed_days, scheduled_days = excluded.scheduled_days, learning_steps = excluded.learning_steps,
+      reps = excluded.reps, lapses = excluded.lapses, state = excluded.state, last_review = NULL,
+      suspended_at = NULL, buried_until = NULL, marked_at = NULL,
+      created_at = excluded.created_at, updated_at = excluded.updated_at, deleted_at = NULL,
+      tier = excluded.tier, tier_changed_at = excluded.tier_changed_at
+     WHERE study_cards.deleted_at IS NOT NULL`,
+    [
+      id, deckId, empty.due.toISOString(), empty.stability, empty.difficulty, empty.elapsed_days, empty.scheduled_days,
+      empty.learning_steps, empty.reps, empty.lapses, empty.state, now, now, tier, tier ? now : null,
+    ]
+  );
+  if ((result.changes ?? 0) === 0) return false;
+  const row: StudyCardRow = {
+    id,
+    deck_id: deckId,
+    due: empty.due.toISOString(),
+    stability: empty.stability,
+    difficulty: empty.difficulty,
+    elapsed_days: empty.elapsed_days,
+    scheduled_days: empty.scheduled_days,
+    learning_steps: empty.learning_steps,
+    reps: empty.reps,
+    lapses: empty.lapses,
+    state: empty.state,
+    last_review: null,
+    suspended_at: null,
+    buried_until: null,
+    marked_at: null,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+    tier,
+    tier_changed_at: tier ? now : null,
+  };
+  await enqueueSync(db, "study_cards", "INSERT", id, cardToSyncData(row));
+  return true;
 }
 
 export type StudyLogInput = {

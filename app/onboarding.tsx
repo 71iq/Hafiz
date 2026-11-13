@@ -1,334 +1,75 @@
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { HifzSetupFlow } from "@/components/hifz/HifzSetupFlow";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
-import { materializeAllSmartDeckCards, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
-import { interpolate, useStrings } from "@/lib/i18n/useStrings";
+import type { HifzPlan } from "@/lib/hifz/plan";
+import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
+import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import {
-  ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Layers,
-  Play,
-  Search,
-} from "lucide-react-native";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  BackHandler,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react-native";
+import React, { useCallback, useState } from "react";
+import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { matchesSurahQuery } from "@/lib/search/surah-match";
 
-type SurahRow = {
-  number: number;
-  name_arabic: string;
-  name_english: string;
-  ayah_count: number;
-};
-
+/**
+ * The first route for a new install (5.1): a welcome, then the hifz setup (goal, memorized portion,
+ * review tracks, pace and time), then straight into a first short session so the first recitation
+ * starts within about 90 seconds (ONB-01). No account is needed, and every step has "Not now".
+ */
 function OnboardingInner() {
   const db = useDatabase();
-  const { isDark, isLoaded, isRTL, themeColors } = useSettings();
+  const { isDark, isLoaded, isRTL, themeColors, uiLanguage } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { width } = useWindowDimensions();
-
-  const [currentScreen, setCurrentScreen] = useState(0);
-  const [surahs, setSurahs] = useState<SurahRow[]>([]);
-  const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
-  const [surahsLoaded, setSurahsLoaded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [screen, setScreen] = useState<"welcome" | "setup">("welcome");
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retentionSaved, setRetentionSaved] = useState(false);
-  const screenAnim = useRef(new Animated.Value(1)).current;
 
   const isWide = width >= SIDEBAR_BREAKPOINT;
   const dir = isRTL ? "rtl" : "ltr";
   const rowDirection = isRTL ? "row-reverse" : "row";
-  const startTextAlign = isRTL ? "right" : "left";
-  const endTextAlign = isRTL ? "left" : "right";
   const accentColor = isDark ? "#2dd4bf" : "#0d9488";
   const accentPressed = isDark ? "#14b8a6" : "#0f766e";
   const goldColor = "#FDDC91";
   const textPrimary = isDark ? "#F5F5F5" : "#2D2D2D";
   const textMuted = isDark ? "#A3A3A3" : "#8a7058";
-  const subtleText = isDark ? "#737373" : "#9a7c60";
   const panelBg = themeColors.surfaceBright;
   const softPanelBg = themeColors.surfaceLow;
   const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(45,45,45,0.08)";
-  const BackIcon = isRTL ? ChevronRight : ChevronLeft;
   const ForwardIcon = isRTL ? ArrowLeft : ArrowRight;
 
-  useEffect(() => {
-    let cancelled = false;
-    db.getAllAsync<SurahRow>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number")
-      .then((rows) => {
-        if (cancelled) return;
-        setSurahs(rows);
-        setSurahsLoaded(true);
-      })
-      .catch((err) => {
-        console.warn("[Onboarding] Failed to load surahs:", err);
-        if (cancelled) return;
-        setError(s.genericActionFailed);
-        setSurahsLoaded(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [db, s.genericActionFailed]);
-
-  const selectedRows = useMemo(
-    () => surahs.filter((surah) => selectedSurahs.has(surah.number)),
-    [selectedSurahs, surahs],
-  );
-
-  const totalAyahs = useMemo(() => selectedRows.reduce((sum, surah) => sum + surah.ayah_count, 0), [selectedRows]);
-
-  const filteredSurahs = useMemo(() => {
-    if (!searchQuery.trim()) return surahs;
-    return surahs.filter((surah) => matchesSurahQuery(surah, searchQuery));
-  }, [searchQuery, surahs]);
-
-  const allSurahsSelected = surahs.length > 0 && selectedSurahs.size === surahs.length;
-
-  const selectionSummary = interpolate(
-    selectedSurahs.size === 1 ? s.onboardingSelectionSummaryOne : s.onboardingSelectionSummary,
-    {
-      surahs: selectedSurahs.size,
-      ayahs: totalAyahs.toLocaleString(),
-    },
-  );
-
-  const animateTo = useCallback(
-    (screen: number) => {
-      if (screen === currentScreen || creating || completing) return;
+  /** ONB-05: completion is a synced setting, so a restored account skips onboarding. */
+  const complete = useCallback(
+    async (next: Href) => {
+      if (completing) return;
+      setCompleting(true);
       setError(null);
-      screenAnim.setValue(0);
-      setCurrentScreen(screen);
-      Animated.timing(screenAnim, {
-        toValue: 1,
-        duration: 220,
-        useNativeDriver: false,
-      }).start();
+      try {
+        await writeUserSetting(db, "onboarding_completed", "true");
+        emitHabitChanged();
+        router.replace(next);
+      } catch (e) {
+        console.warn("[Onboarding] Failed to complete onboarding:", e);
+        setError(s.onboardingSaveFailed);
+      } finally {
+        setCompleting(false);
+      }
     },
-    [completing, creating, currentScreen, screenAnim],
+    [completing, db, router, s.onboardingSaveFailed],
   );
 
-  // Android Back follows the on-screen back button: it returns one step until the deck is saved,
-  // instead of leaving the app from the middle of onboarding.
-  const canStepBack = currentScreen > 0 && !(currentScreen === 2 && retentionSaved);
-  useEffect(() => {
-    if (!canStepBack) return;
-    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      animateTo(currentScreen - 1);
-      return true;
-    });
-    return () => subscription.remove();
-  }, [animateTo, canStepBack, currentScreen]);
-
-  const completeOnboarding = useCallback(async () => {
-    if (completing) return;
-    setCompleting(true);
-    setError(null);
-    try {
-      await writeUserSetting(db, "onboarding_completed", "true");
-      router.replace("/(tabs)/home");
-    } catch (e) {
-      console.warn("[Onboarding] Failed to complete onboarding:", e);
-      setError(s.onboardingSaveFailed);
-    } finally {
-      setCompleting(false);
-    }
-  }, [completing, db, router, s.onboardingSaveFailed]);
-
-  const handleCreateDeck = useCallback(async () => {
-    if (selectedSurahs.size === 0 || creating) return;
-    setCreating(true);
-    setError(null);
-    try {
-      await writeAllDecksFilter(db, {
-        type: "surah",
-        surahs: Array.from(selectedSurahs),
-      });
-      await materializeAllSmartDeckCards(db);
-      setRetentionSaved(true);
-    } catch (err) {
-      console.error("[Onboarding] Failed to save deck filters:", err);
-      setError(s.deckFilterSaveFailed);
-    } finally {
-      setCreating(false);
-    }
-  }, [creating, db, selectedSurahs, s.deckFilterSaveFailed]);
-
-  const handleStartReview = useCallback(async () => {
-    if (!retentionSaved || completing) return;
-    setCompleting(true);
-    setError(null);
-    try {
-      await writeUserSetting(db, "onboarding_completed", "true");
-      router.replace({ pathname: "/flashcards/session" });
-    } catch (e) {
-      console.warn("[Onboarding] Failed to start review:", e);
-      setError(s.onboardingSaveFailed);
-    } finally {
-      setCompleting(false);
-    }
-  }, [completing, db, retentionSaved, router, s.onboardingSaveFailed]);
-
-  const toggleSurah = useCallback((n: number) => {
-    setSelectedSurahs((prev) => {
-      const next = new Set(prev);
-      if (next.has(n)) next.delete(n);
-      else next.add(n);
-      return next;
-    });
-  }, []);
-
-  const toggleAllSurahs = useCallback(() => {
-    setSelectedSurahs((prev) => {
-      if (surahs.length > 0 && prev.size === surahs.length) return new Set();
-      return new Set(surahs.map((surah) => surah.number));
-    });
-  }, [surahs]);
-
-  const primaryLabel = useMemo(() => {
-    if (currentScreen === 0) return s.onboardingGetStarted;
-    if (currentScreen === 1) return s.onboardingContinue;
-    if (retentionSaved) return s.flashcardsStartReview;
-    return creating ? s.onboardingCreating : s.onboardingCreateAndStart;
-  }, [
-    creating,
-    currentScreen,
-    retentionSaved,
-    s.flashcardsStartReview,
-    s.onboardingContinue,
-    s.onboardingCreateAndStart,
-    s.onboardingCreating,
-    s.onboardingGetStarted,
-  ]);
-
-  const primaryDisabled =
-    (currentScreen === 1 && selectedSurahs.size === 0) ||
-    creating ||
-    completing ||
-    (currentScreen === 2 && !retentionSaved && selectedSurahs.size === 0);
-
-  const handlePrimary = () => {
-    if (currentScreen === 0) {
-      animateTo(1);
-      return;
-    }
-    if (currentScreen === 1) {
-      animateTo(2);
-      return;
-    }
-    if (retentionSaved) {
-      handleStartReview();
-      return;
-    }
-    handleCreateDeck();
+  /** ONB-01, 5.1 step 8: the first session starts right away, on what the plan offers first. */
+  const firstSession = (plan: HifzPlan, declaredPages: number): Href => {
+    if (plan.unit === "ayah") return "/flashcards/session";
+    if (declaredPages > 0) return "/hifz/review";
+    if (plan.newPerDay > 0) return "/hifz/sabaq" as Href;
+    return "/(tabs)/home";
   };
-
-  const renderPrimaryIcon = () => {
-    if (creating || completing) return <ActivityIndicator size="small" color="#FFFFFF" />;
-    if (currentScreen === 2 && retentionSaved) return <Play size={18} color="#FFFFFF" fill="#FFFFFF" />;
-    return <ForwardIcon size={18} color="#FFFFFF" />;
-  };
-
-  const renderStepHeader = () => (
-    <View style={{ gap: 14 }}>
-      <View
-        style={{
-          minHeight: 44,
-          flexDirection: rowDirection,
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        {canStepBack ? (
-          <Pressable
-            accessibilityRole="button"
-            hitSlop={10}
-            onPress={() => animateTo(currentScreen - 1)}
-            style={({ pressed }) => ({
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: softPanelBg,
-              borderWidth: 1,
-              borderColor,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <BackIcon size={20} color={textMuted} />
-          </Pressable>
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
-
-        <Text
-          style={{
-            color: textMuted,
-            fontFamily: "Manrope_600SemiBold",
-            fontSize: 12,
-            letterSpacing: 0,
-            textAlign: "center",
-            writingDirection: dir,
-          }}
-        >
-          {interpolate(s.onboardingStepLabel, {
-            current: currentScreen + 1,
-            total: 3,
-          })}
-        </Text>
-
-        <View style={{ width: 40 }} />
-      </View>
-
-      <View
-        accessibilityRole="progressbar"
-        style={{
-          height: 3,
-          borderRadius: 999,
-          overflow: "hidden",
-          backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(45,45,45,0.08)",
-        }}
-      >
-        <View
-          style={{
-            width: `${((currentScreen + 1) / 3) * 100}%`,
-            height: "100%",
-            borderRadius: 999,
-            backgroundColor: accentColor,
-          }}
-        />
-      </View>
-    </View>
-  );
 
   const renderWelcomeArt = () => (
     <View
@@ -474,454 +215,6 @@ function OnboardingInner() {
     </View>
   );
 
-  const renderSurahRow = (surah: SurahRow) => {
-    const isSelected = selectedSurahs.has(surah.number);
-    return (
-      <Pressable
-        key={surah.number}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: isSelected }}
-        onPress={() => toggleSurah(surah.number)}
-        style={({ pressed }) => ({
-          minHeight: 68,
-          flexDirection: rowDirection,
-          alignItems: "center",
-          gap: 12,
-          paddingVertical: 10,
-          paddingHorizontal: 12,
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: isSelected ? accentColor : borderColor,
-          backgroundColor: isSelected
-            ? isDark
-              ? "rgba(45,212,191,0.10)"
-              : "rgba(13,148,136,0.08)"
-            : pressed
-              ? softPanelBg
-              : panelBg,
-          opacity: pressed ? 0.88 : 1,
-        })}
-      >
-        <View
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 8,
-            borderWidth: 2,
-            borderColor: isSelected ? accentColor : themeColors.surfaceDim,
-            backgroundColor: isSelected ? accentColor : "transparent",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {isSelected ? <Check size={15} color="#FFFFFF" strokeWidth={3} /> : null}
-        </View>
-
-        <View
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: isSelected ? accentColor : softPanelBg,
-          }}
-        >
-          <Text
-            style={{
-              color: isSelected ? "#FFFFFF" : textMuted,
-              fontFamily: "Manrope_700Bold",
-              fontSize: 13,
-              fontVariant: ["tabular-nums"],
-            }}
-          >
-            {surah.number}
-          </Text>
-        </View>
-
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            numberOfLines={1}
-            style={{
-              color: textPrimary,
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 16,
-              textAlign: "right",
-              writingDirection: "rtl",
-            }}
-          >
-            {surah.name_arabic}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={{
-              color: textMuted,
-              fontFamily: "Manrope_400Regular",
-              fontSize: 13,
-              lineHeight: 18,
-              textAlign: startTextAlign,
-              writingDirection: dir,
-            }}
-          >
-            {surah.name_english}
-          </Text>
-        </View>
-
-        <Text
-          numberOfLines={1}
-          style={{
-            color: subtleText,
-            fontFamily: "Manrope_500Medium",
-            fontSize: 12,
-            minWidth: 58,
-            textAlign: endTextAlign,
-            writingDirection: dir,
-          }}
-        >
-          {surah.ayah_count} {s.ayahs}
-        </Text>
-      </Pressable>
-    );
-  };
-
-  const renderMemorization = () => (
-    <View style={{ flex: 1, gap: 16 }}>
-      <View style={{ gap: 8 }}>
-        <View
-          style={{
-            flexDirection: rowDirection,
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <Text
-            style={{
-              flex: 1,
-              color: textPrimary,
-              fontFamily: "NotoSerif_700Bold",
-              fontSize: 28,
-              lineHeight: 34,
-              textAlign: startTextAlign,
-              writingDirection: dir,
-            }}
-          >
-            {s.onboardingMemorizedTitle}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={toggleAllSurahs}
-            disabled={!surahsLoaded || surahs.length === 0}
-            style={({ pressed }) => ({
-              minHeight: 36,
-              borderRadius: 18,
-              borderWidth: 1,
-              borderColor: allSurahsSelected ? accentColor : borderColor,
-              backgroundColor: allSurahsSelected
-                ? isDark
-                  ? "rgba(45,212,191,0.12)"
-                  : "rgba(13,148,136,0.09)"
-                : softPanelBg,
-              flexDirection: rowDirection,
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              paddingHorizontal: 13,
-              opacity: !surahsLoaded || surahs.length === 0 ? 0.45 : pressed ? 0.72 : 1,
-            })}
-          >
-            {allSurahsSelected ? <Check size={15} color={accentColor} strokeWidth={3} /> : null}
-            <Text
-              numberOfLines={1}
-              style={{
-                color: allSurahsSelected ? accentColor : textMuted,
-                fontFamily: "Manrope_700Bold",
-                fontSize: 13,
-                textAlign: "center",
-                writingDirection: dir,
-              }}
-            >
-              {allSurahsSelected ? s.onboardingClearAll : s.onboardingSelectAll}
-            </Text>
-          </Pressable>
-        </View>
-        <Text
-          style={{
-            color: textMuted,
-            fontFamily: "Manrope_400Regular",
-            fontSize: 14,
-            lineHeight: 21,
-            textAlign: startTextAlign,
-            writingDirection: dir,
-          }}
-        >
-          {s.onboardingMemorizedSubtitle}
-        </Text>
-      </View>
-
-      <View
-        style={{
-          minHeight: 50,
-          borderRadius: 18,
-          backgroundColor: panelBg,
-          borderWidth: 1,
-          borderColor,
-          flexDirection: rowDirection,
-          alignItems: "center",
-          gap: 10,
-          paddingHorizontal: 14,
-        }}
-      >
-        <Search size={18} color={textMuted} />
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder={s.onboardingSearchSurahs}
-          placeholderTextColor={subtleText}
-          returnKeyType="search"
-          style={{
-            flex: 1,
-            color: textPrimary,
-            fontFamily: "Manrope_500Medium",
-            fontSize: 15,
-            lineHeight: 20,
-            paddingVertical: 0,
-            textAlign: startTextAlign,
-            writingDirection: dir,
-          }}
-        />
-      </View>
-
-      <View
-        style={{
-          borderRadius: 22,
-          backgroundColor: softPanelBg,
-          borderWidth: 1,
-          borderColor,
-          padding: 8,
-          flex: 1,
-          minHeight: 260,
-        }}
-      >
-        {!surahsLoaded ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <ActivityIndicator size="large" color={accentColor} />
-          </View>
-        ) : filteredSurahs.length === 0 ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 28 }}>
-            <Text
-              style={{
-                color: textMuted,
-                fontFamily: "Manrope_600SemiBold",
-                fontSize: 15,
-                textAlign: "center",
-                writingDirection: dir,
-              }}
-            >
-              {s.onboardingNoSearchResults}
-            </Text>
-          </View>
-        ) : (
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
-          >
-            {filteredSurahs.map(renderSurahRow)}
-          </ScrollView>
-        )}
-      </View>
-
-      {selectedSurahs.size > 0 ? (
-        <View
-          style={{
-            flexDirection: rowDirection,
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            borderRadius: 16,
-            backgroundColor: isDark ? "rgba(45,212,191,0.10)" : "rgba(13,148,136,0.08)",
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-          }}
-        >
-          <Text
-            style={{
-              color: accentColor,
-              fontFamily: "Manrope_700Bold",
-              fontSize: 13,
-              textAlign: startTextAlign,
-              writingDirection: dir,
-            }}
-          >
-            {selectionSummary}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={{
-              flex: 1,
-              color: textMuted,
-              fontFamily: "Manrope_400Regular",
-              fontSize: 12,
-              textAlign: endTextAlign,
-              writingDirection: dir,
-            }}
-          >
-            {selectedRows
-              .slice(0, 3)
-              .map((surah) => surah.name_english)
-              .join(", ")}
-            {selectedRows.length > 3 ? ` +${selectedRows.length - 3}` : ""}
-          </Text>
-        </View>
-      ) : null}
-    </View>
-  );
-
-  const renderDeckSummary = () => (
-    <View style={{ flex: 1, justifyContent: "center", gap: 24 }}>
-      <View style={{ alignItems: "center" }}>
-        <View
-          style={{
-            width: 86,
-            height: 86,
-            borderRadius: 30,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: retentionSaved
-              ? isDark
-                ? "rgba(45,212,191,0.14)"
-                : "rgba(13,148,136,0.10)"
-              : softPanelBg,
-            borderWidth: 1,
-            borderColor: retentionSaved ? accentColor : borderColor,
-          }}
-        >
-          {retentionSaved ? (
-            <CheckCircle2 size={42} color={accentColor} strokeWidth={1.6} />
-          ) : (
-            <Layers size={40} color={accentColor} strokeWidth={1.6} />
-          )}
-        </View>
-      </View>
-
-      <View style={{ gap: 10 }}>
-        <Text
-          style={{
-            color: textPrimary,
-            fontFamily: "NotoSerif_700Bold",
-            fontSize: 28,
-            lineHeight: 34,
-            textAlign: "center",
-            writingDirection: dir,
-          }}
-        >
-          {s.onboardingCreateDeckTitle}
-        </Text>
-        <Text
-          style={{
-            color: textMuted,
-            fontFamily: "Manrope_400Regular",
-            fontSize: 14,
-            lineHeight: 22,
-            textAlign: "center",
-            writingDirection: dir,
-          }}
-        >
-          {s.onboardingCreateDeckDesc}
-        </Text>
-      </View>
-
-      <View
-        style={{
-          borderRadius: 24,
-          backgroundColor: panelBg,
-          borderWidth: 1,
-          borderColor,
-          padding: 18,
-          gap: 16,
-        }}
-      >
-        <View style={{ flexDirection: rowDirection, gap: 12 }}>
-          <View style={{ flex: 1, borderRadius: 18, backgroundColor: softPanelBg, padding: 16, gap: 6 }}>
-            <Text
-              style={{
-                color: accentColor,
-                fontFamily: "NotoSerif_700Bold",
-                fontSize: 30,
-                lineHeight: 36,
-                textAlign: "center",
-                fontVariant: ["tabular-nums"],
-              }}
-            >
-              {selectedSurahs.size}
-            </Text>
-            <Text
-              style={{
-                color: textMuted,
-                fontFamily: "Manrope_600SemiBold",
-                fontSize: 12,
-                textAlign: "center",
-                writingDirection: dir,
-              }}
-            >
-              {s.onboardingSurahsLabel}
-            </Text>
-          </View>
-          <View style={{ flex: 1, borderRadius: 18, backgroundColor: softPanelBg, padding: 16, gap: 6 }}>
-            <Text
-              style={{
-                color: accentColor,
-                fontFamily: "NotoSerif_700Bold",
-                fontSize: 30,
-                lineHeight: 36,
-                textAlign: "center",
-                fontVariant: ["tabular-nums"],
-              }}
-            >
-              {totalAyahs.toLocaleString()}
-            </Text>
-            <Text
-              style={{
-                color: textMuted,
-                fontFamily: "Manrope_600SemiBold",
-                fontSize: 12,
-                textAlign: "center",
-                writingDirection: dir,
-              }}
-            >
-              {s.ayahs}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={{
-            height: 8,
-            borderRadius: 999,
-            backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(45,45,45,0.08)",
-            overflow: "hidden",
-          }}
-        >
-          <View
-            style={{
-              width: retentionSaved ? "100%" : "64%",
-              height: "100%",
-              borderRadius: 999,
-              backgroundColor: retentionSaved ? accentColor : goldColor,
-            }}
-          />
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderScreen = () => {
-    if (currentScreen === 0) return renderWelcome();
-    if (currentScreen === 1) return renderMemorization();
-    return renderDeckSummary();
-  };
-
   if (!isLoaded) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
@@ -933,122 +226,76 @@ function OnboardingInner() {
     );
   }
 
+  if (screen === "setup") {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
+        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
+        <View style={{ flex: 1, width: "100%", maxWidth: 680, alignSelf: "center" }}>
+          <HifzSetupFlow
+            db={db}
+            language={uiLanguage}
+            isDark={isDark}
+            s={s}
+            initialPlan={null}
+            onCancel={() => setScreen("welcome")}
+            onDone={({ plan, declaredPages }) => complete(firstSession(plan, declaredPages))}
+          />
+          {error ? (
+            <Text style={{ color: "#dc2626", fontFamily: "Manrope_600SemiBold", fontSize: 13, textAlign: "center", writingDirection: dir, paddingBottom: 12 }}>
+              {error}
+            </Text>
+          ) : null}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
-      {/* Edge-to-edge Android does not resize for the keyboard; padding keeps Continue above it. */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "web" ? undefined : "padding"}
-        style={{ flex: 1, alignItems: "center", backgroundColor: themeColors.surface }}
-      >
-        <View
-          style={{
-            flex: 1,
-            width: "100%",
-            maxWidth: currentScreen === 1 ? 680 : 560,
-            paddingHorizontal: isWide ? 32 : 22,
-            paddingTop: 8,
-            paddingBottom: 12,
-            gap: 18,
-          }}
-        >
-          {renderStepHeader()}
-
-          <Animated.View
-            style={{
-              flex: 1,
-              opacity: screenAnim,
-              transform: [
-                {
-                  translateY: screenAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [12, 0],
-                  }),
-                },
-              ],
-            }}
-          >
-            {renderScreen()}
-          </Animated.View>
-
+      <View style={{ flex: 1, alignItems: "center", backgroundColor: themeColors.surface }}>
+        <View style={{ flex: 1, width: "100%", maxWidth: 560, paddingHorizontal: isWide ? 32 : 22, paddingTop: 8, paddingBottom: 12, gap: 18 }}>
+          {renderWelcome()}
           <View style={{ gap: 12 }}>
             {error ? (
-              <Text
-                style={{
-                  color: "#dc2626",
-                  fontFamily: "Manrope_600SemiBold",
-                  fontSize: 13,
-                  textAlign: "center",
-                  writingDirection: dir,
-                }}
-              >
+              <Text style={{ color: "#dc2626", fontFamily: "Manrope_600SemiBold", fontSize: 13, textAlign: "center", writingDirection: dir }}>
                 {error}
               </Text>
             ) : null}
-
             <Pressable
               accessibilityRole="button"
-              onPress={handlePrimary}
-              disabled={primaryDisabled}
+              onPress={() => setScreen("setup")}
               style={({ pressed }) => ({
                 minHeight: 54,
                 borderRadius: 27,
-                backgroundColor: pressed && !primaryDisabled ? accentPressed : accentColor,
-                opacity: primaryDisabled ? 0.45 : 1,
+                backgroundColor: pressed ? accentPressed : accentColor,
                 flexDirection: rowDirection,
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 10,
                 paddingHorizontal: 22,
-                transform: [{ scale: pressed && !primaryDisabled ? 0.98 : 1 }],
+                transform: [{ scale: pressed ? 0.98 : 1 }],
               })}
             >
-              {renderPrimaryIcon()}
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.75}
-                style={{
-                  color: "#FFFFFF",
-                  fontFamily: "Manrope_700Bold",
-                  fontSize: 16,
-                  textAlign: "center",
-                  writingDirection: dir,
-                }}
-              >
-                {primaryLabel}
+              <ForwardIcon size={18} color="#FFFFFF" />
+              <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: "center", writingDirection: dir }}>
+                {s.onboardingGetStarted}
               </Text>
             </Pressable>
-
-            {currentScreen > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={completeOnboarding}
-                disabled={creating || completing}
-                hitSlop={8}
-                style={({ pressed }) => ({
-                  minHeight: 38,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: creating || completing ? 0.5 : pressed ? 0.72 : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    color: textMuted,
-                    fontFamily: "Manrope_600SemiBold",
-                    fontSize: 14,
-                    textAlign: "center",
-                    writingDirection: dir,
-                  }}
-                >
-                  {retentionSaved ? s.onboardingContinue : s.onboardingSkipForNow}
-                </Text>
-              </Pressable>
-            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => complete("/(tabs)/home")}
+              disabled={completing}
+              hitSlop={8}
+              style={({ pressed }) => ({ minHeight: 44, alignItems: "center", justifyContent: "center", opacity: completing ? 0.5 : pressed ? 0.72 : 1 })}
+            >
+              <Text style={{ color: textMuted, fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: "center", writingDirection: dir }}>
+                {s.onboardingSkipForNow}
+              </Text>
+            </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }

@@ -1,4 +1,4 @@
-import type { AppDatabase } from "@/lib/database/types";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { publishReviewLogged, putCardRow, putStudyLogRow, type StudyLogInput } from "@/lib/fsrs/queries";
 import type { ReviewTransition } from "@/lib/fsrs/review-transition";
 import { recordSessionProgress, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
@@ -49,11 +49,14 @@ export async function persistReviewTransition({
   cardId,
   transition,
   context = DEFAULT_REVIEW_SAVE_CONTEXT,
+  extraWork,
 }: {
   db: AppDatabase;
   cardId: string;
   transition: ReviewTransition;
   context?: ReviewSaveContext;
+  /** Writes that belong to this grade, such as a manzil cycle completing, run inside its transaction. */
+  extraWork?: (tx: DatabaseExecutor) => Promise<void>;
 }): Promise<ReviewSaveResult> {
   const { reviewRecord } = transition;
   const log: StudyLogInput = {
@@ -91,6 +94,7 @@ export async function persistReviewTransition({
     const resolvedInboxItems = isCleanRecall(reviewRecord.rating, context)
       ? await recordCleanRecitation(tx, { cardId, at: reviewRecord.reviewedAt, localDate })
       : 0;
+    if (extraWork) await extraWork(tx);
     const wird = await recordWirdProgress(tx, { now: reviewedAt, sessionId: context.session?.id ?? null, dhuhr: context.dhuhr });
     if (context.session) {
       const isPage = recitationUnits(cardId) === PAGE_UNITS && cardId.startsWith("page:");

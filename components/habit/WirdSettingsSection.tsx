@@ -22,6 +22,8 @@ type Props = {
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
+  /** Opens the hifz plan and memorized portion setup. */
+  onOpenPlan: () => void;
 };
 
 function Row({ label, hint, dir, children }: { label: string; hint?: string; dir: "ltr" | "rtl"; children: React.ReactNode }) {
@@ -45,7 +47,7 @@ function Row({ label, hint, dir, children }: { label: string; hint?: string; dir
  * start for steady weeks (STR-28), the streak goal (STR-19) and the excused days and pause sheet.
  * All are synced settings, so a change follows the account.
  */
-export function WirdSettingsSection({ db, language, isDark, s }: Props) {
+export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const [settings, setSettings] = useState<HabitSettings | null>(null);
   const [breakOpen, setBreakOpen] = useState(false);
@@ -161,6 +163,19 @@ export function WirdSettingsSection({ db, language, isDark, s }: Props) {
             itemClassName="flex-auto px-2"
           />
         </Row>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenPlan}
+          className="min-h-[44px] justify-center rounded-2xl bg-surface-high dark:bg-surface-dark-high px-4"
+        >
+          <MirroredRow dir={dir} className="items-center justify-between">
+            <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
+              {s.hifzPlanTitle}
+            </Text>
+            <Chevron size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />
+          </MirroredRow>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"

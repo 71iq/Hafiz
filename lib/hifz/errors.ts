@@ -1,6 +1,6 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { addDays, type LocalDate } from "@/lib/habit/dates";
+import { addDays, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { createId } from "@/lib/id";
 
 /** ERR-01 error types. */
@@ -234,4 +234,32 @@ export async function dismissInboxItem(database: AppDatabase, { id, now = new Da
     if (!row || row.deleted_at !== null) return;
     await writeError(db, { ...row, deleted_at: at, updated_at: at });
   });
+}
+
+/**
+ * ERR-02, ERR-05: the result of a quick drill of one inbox item. A clean recall counts once per day
+ * toward resolving it (two clean days resolve it); a miss keeps it open.
+ */
+export async function recordDrillResult(
+  database: AppDatabase,
+  { id, clean, now = new Date() }: { id: string; clean: boolean; now?: Date },
+): Promise<{ resolved: boolean }> {
+  const at = now.toISOString();
+  const localDate = localDateOf(now);
+  let resolved = false;
+  await database.withTransactionAsync(async (db) => {
+    const row = await db.getFirstAsync<RecitationErrorRow>(`SELECT ${ERROR_COLUMNS} FROM recitation_errors WHERE id = ?`, [id]);
+    if (!row || row.deleted_at !== null || row.resolved_at !== null) return;
+    if (!clean || row.last_clean_date === localDate || row.local_date === localDate) return;
+    const cleanCount = row.clean_count + 1;
+    resolved = cleanCount >= INBOX_CLEAN_DAYS_TO_RESOLVE;
+    await writeError(db, {
+      ...row,
+      clean_count: cleanCount,
+      last_clean_date: localDate,
+      resolved_at: resolved ? at : null,
+      updated_at: at,
+    });
+  });
+  return { resolved };
 }

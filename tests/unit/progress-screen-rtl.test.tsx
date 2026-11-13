@@ -5,8 +5,7 @@ import { ScrollView } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import ProgressScreen from "@/app/(tabs)/progress";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount, getWirdStatus } from "@/lib/fsrs/queries";
-import { getTotalScore } from "@/lib/fsrs/scoring";
+import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount } from "@/lib/fsrs/queries";
 import { getAchievementDashboard } from "@/lib/achievements/queries";
 import { getDefaultDeckProgress, getLocalSurahProgress } from "@/lib/profile/progress";
 import { findAncestorByClassName, flattenStyle, type RtlTestNode } from "../rtl/rtl-test-utils";
@@ -87,11 +86,11 @@ jest.mock("@/lib/fsrs/queries", () => ({
   getMemorizedAyahCardCount: jest.fn(),
   getReviewStats: jest.fn(),
   getTotalAyahCardCount: jest.fn(),
-  getWirdStatus: jest.fn(),
 }));
 
-jest.mock("@/lib/fsrs/scoring", () => ({
-  getTotalScore: jest.fn(),
+// The wird streak comes from the habit overview, tested in habit-ui and habit-core.
+jest.mock("@/lib/habit/use-habit-overview", () => ({
+  useHabitOverview: () => ({ overview: null, failed: false, refresh: async () => {} }),
 }));
 
 jest.mock("@/lib/achievements/queries", () => ({
@@ -171,14 +170,6 @@ describe("ProgressScreen RTL behavior", () => {
       averageDailyReviews: 2,
       longestStreak: 1,
     }));
-    jest.mocked(getWirdStatus).mockResolvedValue({
-      currentDays: 1,
-      longestDays: 1,
-      maintainedToday: true,
-      lastReviewDate: "2026-10-15T10:00:00.000Z",
-      state: "maintained_today",
-    });
-    jest.mocked(getTotalScore).mockResolvedValue(25);
     jest.mocked(getAchievementDashboard).mockResolvedValue(achievementDashboardFixture);
     jest.mocked(getDefaultDeckProgress).mockResolvedValue([]);
     jest.mocked(getLocalSurahProgress).mockResolvedValue([]);

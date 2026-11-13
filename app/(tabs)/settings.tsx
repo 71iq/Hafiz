@@ -63,7 +63,7 @@ import {
 } from "@/lib/quran-foundation/user";
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
@@ -601,7 +601,13 @@ export default function SettingsScreen() {
           </Card>
 
           <SectionLabel>{s.habitSettingsTitle}</SectionLabel>
-          <WirdSettingsSection db={db} language={uiLanguage} isDark={isDark} s={s} />
+          <WirdSettingsSection
+            db={db}
+            language={uiLanguage}
+            isDark={isDark}
+            s={s}
+            onOpenPlan={() => router.push("/hifz/setup" as Href)}
+          />
         </>
       )}
 

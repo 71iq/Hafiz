@@ -1,0 +1,318 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { BackHandler, Pressable, ScrollView, View } from "react-native";
+import { Button } from "@/components/ui/Button";
+import { MirroredRow } from "@/components/ui/MirroredRow";
+import { Switch } from "@/components/ui/Switch";
+import { Text } from "@/components/ui/Text";
+import { MemorizedPortionPicker, type SurahChoice } from "@/components/hifz/MemorizedPortionPicker";
+import type { AppDatabase } from "@/lib/database/types";
+import { applyHifzSetup } from "@/lib/hifz/setup";
+import { applyPreset, DEFAULT_HIFZ_PLAN, PRAYERS, type HifzPlan, type PlanPreset, type Prayer } from "@/lib/hifz/plan";
+import { formatMinutes, formatNumber } from "@/lib/i18n/count";
+import type { UIStrings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
+
+type Goal = "memorize" | "keep" | "both";
+type Step = "goal" | "memorized" | "tracks" | "pace" | "when";
+
+const STEPS: readonly Step[] = ["goal", "memorized", "tracks", "pace", "when"];
+const PRESETS: readonly PlanPreset[] = ["part_time_beginner", "part_time_adult", "full_time", "maintenance", "short_surahs"];
+
+function presetLabel(preset: PlanPreset, s: UIStrings): string {
+  switch (preset) {
+    case "part_time_beginner":
+      return s.hifzPresetBeginner;
+    case "part_time_adult":
+      return s.hifzPresetAdult;
+    case "full_time":
+      return s.hifzPresetFullTime;
+    case "maintenance":
+      return s.hifzPresetMaintenance;
+    case "short_surahs":
+      return s.hifzPresetShort;
+  }
+}
+
+export function prayerLabel(prayer: Prayer, s: UIStrings): string {
+  switch (prayer) {
+    case "fajr":
+      return s.hifzPrayerFajr;
+    case "dhuhr":
+      return s.hifzPrayerDhuhr;
+    case "asr":
+      return s.hifzPrayerAsr;
+    case "maghrib":
+      return s.hifzPrayerMaghrib;
+    case "isha":
+      return s.hifzPrayerIsha;
+  }
+}
+
+function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      className={`min-h-[56px] justify-center rounded-3xl px-4 py-3 ${selected ? "bg-primary-accent/12 dark:bg-primary-bright/15 border border-primary-accent dark:border-primary-bright" : "bg-surface-low dark:bg-surface-dark-low border border-transparent"}`}
+    >
+      <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-100"}>
+        {title}
+      </Text>
+      {hint ? (
+        <Text variant="caption" className="mt-0.5">
+          {hint}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+type Props = {
+  db: AppDatabase;
+  language: "en" | "ar";
+  isDark: boolean;
+  s: UIStrings;
+  /** The plan to start from, when editing; null starts from the defaults. */
+  initialPlan: HifzPlan | null;
+  onDone: (result: { plan: HifzPlan; declaredPages: number }) => void;
+  onCancel?: () => void;
+};
+
+/**
+ * Hifz setup (5.1 steps 2 to 6): goal, memorized portion, review tracks (UNIT-02), pace (4.3.2)
+ * and the time anchor (ANC-01). Every step can be skipped with sensible defaults (ONB-06).
+ */
+export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, onCancel }: Props) {
+  const dir = language === "ar" ? "rtl" : "ltr";
+  const [stepIndex, setStepIndex] = useState(0);
+  const [goal, setGoal] = useState<Goal>("both");
+  const [plan, setPlan] = useState<HifzPlan>(initialPlan ?? applyPreset(DEFAULT_HIFZ_PLAN, "part_time_adult"));
+  const [preset, setPreset] = useState<PlanPreset>("part_time_adult");
+  const [surahs, setSurahs] = useState<SurahChoice[]>([]);
+  const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
+  const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const step = STEPS[stepIndex];
+
+  useEffect(() => {
+    db.getAllAsync<SurahChoice>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number")
+      .then(setSurahs)
+      .catch((loadError) => console.warn("[HifzSetup] Surahs failed to load:", loadError));
+  }, [db]);
+
+  const back = useCallback(() => {
+    if (stepIndex === 0) {
+      onCancel?.();
+      return;
+    }
+    setStepIndex((value) => value - 1);
+  }, [onCancel, stepIndex]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (stepIndex === 0 && !onCancel) return false;
+      back();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [back, onCancel, stepIndex]);
+
+  const chooseGoal = (next: Goal) => {
+    setGoal(next);
+    const nextPreset: PlanPreset = next === "keep" ? "maintenance" : "part_time_adult";
+    setPreset(nextPreset);
+    setPlan((value) => applyPreset(value, nextPreset));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const finalPlan: HifzPlan = goal === "keep" ? { ...plan, method: "review_only", newPerDay: 0 } : plan;
+      const result = await applyHifzSetup(db, {
+        plan: finalPlan,
+        memorizedSurahs: [...selectedSurahs],
+        memorizedJuz: [...selectedJuz],
+      });
+      onDone({ plan: finalPlan, declaredPages: result.declaredPages });
+    } catch (saveError) {
+      console.warn("[HifzSetup] Save failed:", saveError);
+      setError(s.hifzSaveFailedGeneric);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const next = () => {
+    if (stepIndex < STEPS.length - 1) setStepIndex((value) => value + 1);
+    else save();
+  };
+
+  const toggle = (set: Set<number>, value: number) => {
+    const copy = new Set(set);
+    if (copy.has(value)) copy.delete(value);
+    else copy.add(value);
+    return copy;
+  };
+
+  const title = useMemo(() => {
+    switch (step) {
+      case "goal":
+        return s.hifzGoalTitle;
+      case "memorized":
+        return s.hifzMemorizedTitle;
+      case "tracks":
+        return s.hifzTracksTitle;
+      case "pace":
+        return s.hifzPaceTitle;
+      case "when":
+        return s.hifzWhenTitle;
+    }
+  }, [s, step]);
+
+  return (
+    <View className="flex-1">
+      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
+        <Text dir={dir} variant="caption">
+          {interpolate(s.hifzStepOf, { n: formatNumber(stepIndex + 1, language), total: formatNumber(STEPS.length, language) })}
+        </Text>
+        <Text dir={dir} style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24, lineHeight: 34 }} className="text-charcoal dark:text-neutral-100">
+          {title}
+        </Text>
+
+        {step === "goal" ? (
+          <View style={{ gap: 10 }}>
+            <OptionCard title={s.hifzGoalMemorize} selected={goal === "memorize"} onPress={() => chooseGoal("memorize")} />
+            <OptionCard title={s.hifzGoalKeep} selected={goal === "keep"} onPress={() => chooseGoal("keep")} />
+            <OptionCard title={s.hifzGoalBoth} selected={goal === "both"} onPress={() => chooseGoal("both")} />
+          </View>
+        ) : null}
+
+        {step === "memorized" ? (
+          <>
+            <Text dir={dir} variant="muted">
+              {s.hifzMemorizedSubtitle}
+            </Text>
+            <MemorizedPortionPicker
+              surahs={surahs}
+              selectedSurahs={selectedSurahs}
+              selectedJuz={selectedJuz}
+              onToggleSurah={(surah) => setSelectedSurahs((value) => toggle(value, surah))}
+              onToggleJuz={(juz) => setSelectedJuz((value) => toggle(value, juz))}
+              language={language}
+              isDark={isDark}
+              s={s}
+            />
+          </>
+        ) : null}
+
+        {step === "tracks" ? (
+          <View style={{ gap: 10 }}>
+            <OptionCard title={s.hifzUnitPage} hint={s.hifzUnitPageHint} selected={plan.unit === "page"} onPress={() => setPlan((value) => ({ ...value, unit: "page" }))} />
+            <OptionCard title={s.hifzUnitHalf} hint={s.hifzUnitHalfHint} selected={plan.unit === "half"} onPress={() => setPlan((value) => ({ ...value, unit: "half" }))} />
+            <OptionCard title={s.hifzUnitAyah} hint={s.hifzUnitAyahHint} selected={plan.unit === "ayah"} onPress={() => setPlan((value) => ({ ...value, unit: "ayah" }))} />
+            <MirroredRow dir={dir} className="mt-2 items-center justify-between gap-3 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
+              <View className="flex-1">
+                <Text dir={dir} style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className="text-charcoal dark:text-neutral-100">
+                  {s.hifzReviewMeanings}
+                </Text>
+                <Text dir={dir} variant="caption">
+                  {s.hifzTracksMeaningsHint}
+                </Text>
+              </View>
+              <Switch value={plan.meanings} onValueChange={(meanings) => setPlan((value) => ({ ...value, meanings }))} />
+            </MirroredRow>
+          </View>
+        ) : null}
+
+        {step === "pace" ? (
+          <View style={{ gap: 10 }}>
+            {PRESETS.filter((candidate) => (goal === "keep" ? candidate === "maintenance" : candidate !== "maintenance")).map((candidate) => (
+              <OptionCard
+                key={candidate}
+                title={presetLabel(candidate, s)}
+                hint={interpolate(s.hifzPresetSummary, { minutes: formatMinutes(applyPreset(plan, candidate).dailyBudgetMin, language) })}
+                selected={preset === candidate}
+                onPress={() => {
+                  setPreset(candidate);
+                  setPlan((value) => applyPreset(value, candidate));
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {step === "when" ? (
+          <View style={{ gap: 10 }}>
+            <Text dir={dir} variant="muted">
+              {s.hifzWhenHint}
+            </Text>
+            <MirroredRow dir={dir} className="flex-wrap gap-2">
+              {PRAYERS.map((prayer) => {
+                const selected = plan.anchor.kind === "prayer" && plan.anchor.prayer === prayer;
+                return (
+                  <Pressable
+                    key={prayer}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => setPlan((value) => ({ ...value, anchor: { kind: "prayer", prayer, offsetMin: 20 } }))}
+                    className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
+                  >
+                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
+                      {interpolate(s.hifzAfterPrayer, { prayer: prayerLabel(prayer, s) })}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              {[
+                { label: s.hifzWhenMorning, minutes: 8 * 60 },
+                { label: s.hifzWhenEvening, minutes: 20 * 60 },
+              ].map((option) => {
+                const selected = plan.anchor.kind === "clock" && plan.anchor.minutes === option.minutes;
+                return (
+                  <Pressable
+                    key={option.minutes}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => setPlan((value) => ({ ...value, anchor: { kind: "clock", minutes: option.minutes } }))}
+                    className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
+                  >
+                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </MirroredRow>
+          </View>
+        ) : null}
+
+        {error ? (
+          <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
+            {error}
+          </Text>
+        ) : null}
+      </ScrollView>
+
+      <View className="px-5 pb-5 pt-2" style={{ gap: 8 }}>
+        <Button label={saving ? s.hifzSaving : stepIndex === STEPS.length - 1 ? s.hifzSaveMemorized : s.hifzContinue} onPress={next} disabled={saving} />
+        <MirroredRow dir={dir} className="items-center justify-between">
+          <Pressable accessibilityRole="button" onPress={back} disabled={saving || (stepIndex === 0 && !onCancel)} className="min-h-[44px] justify-center px-2">
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className={stepIndex === 0 && !onCancel ? "text-transparent" : "text-warm-500 dark:text-neutral-400"}>
+              {s.hifzBack}
+            </Text>
+          </Pressable>
+          {step !== "goal" && stepIndex < STEPS.length - 1 ? (
+            <Pressable accessibilityRole="button" onPress={next} disabled={saving} className="min-h-[44px] justify-center px-2">
+              <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-warm-500 dark:text-neutral-400">
+                {s.hifzNotNow}
+              </Text>
+            </Pressable>
+          ) : null}
+        </MirroredRow>
+      </View>
+    </View>
+  );
+}
