@@ -37,7 +37,7 @@ import { Rating, type Grade } from "@/lib/fsrs/scheduler";
 import type { DeckReviewSettings } from "@/lib/fsrs/types";
 import { localDateOf } from "@/lib/habit/dates";
 import { loadHabitOverview, type WirdProgressEvent } from "@/lib/habit/queries";
-import { INBOX_ITEMS_PER_REVIEW, readMistakeInbox, recordDrillResult, type InboxItem, type RecitationErrorType } from "@/lib/hifz/errors";
+import { dismissInboxItem, INBOX_ITEMS_PER_REVIEW, readMistakeInbox, recordDrillResult, type InboxItem, type RecitationErrorType } from "@/lib/hifz/errors";
 import { GRADE_CAP, defaultSupportLevel, isGradable, SUPPORT_LEVELS, type SupportLevel } from "@/lib/hifz/grading";
 import { loadRecitationPage, type PageToken, type RecitationPage as PageData } from "@/lib/hifz/page-data";
 import { loadPageCards, loadTodayWird, toPlanPage, type PageCard } from "@/lib/hifz/pages";
@@ -77,6 +77,7 @@ type QueueItem =
   | { kind: "page"; card: PageCard; retrievability: number | null }
   | { kind: "half"; card: StudyCardRow; page: number; half: Half }
   | { kind: "seam"; card: StudyCardRow; page: number; prompt: AyahText | null; answer: AyahText | null }
+  | { kind: "cloze"; card: StudyCardRow; surah: number; ayah: number; word: number; page: number }
   | { kind: "drill"; item: InboxItem; text: { qcf2: string; page: number } | null };
 
 type Phase = "loading" | "recite" | "check" | "summary" | "empty" | "error";
@@ -220,11 +221,18 @@ function HifzReviewScreen() {
       } else if (wird) {
         setPlan(wird.plan);
       }
-      // SCH-06, SCH-08: half pages and seams that are relearning come after the pages, before drills.
+      // SCH-06, SCH-08, ERR-06: relearning half pages and seams, and due weak-spot cloze cards, come
+      // after the pages and before drills.
       if (!welcomeBack && !monthlyCheck) {
         for (const unit of await loadDueRemediation(db, now)) {
           if (unit.kind === "half") {
             items.push({ kind: "half", card: unit.row, page: unit.page, half: unit.half });
+          } else if (unit.kind === "cloze") {
+            const row = await db.getFirstAsync<{ v2_page: number }>(
+              "SELECT v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+              [unit.surah, unit.ayah],
+            );
+            if (row) items.push({ kind: "cloze", card: unit.row, surah: unit.surah, ayah: unit.ayah, word: unit.word, page: row.v2_page });
           } else {
             const [prompt, answer] = await Promise.all([
               ayahOnPage(db, unit.page, "last"),
@@ -263,7 +271,7 @@ function HifzReviewScreen() {
   useEffect(() => {
     setSeamText(null);
     setSeamShown(false);
-    if (!current || (current.kind !== "page" && current.kind !== "half")) {
+    if (!current || (current.kind !== "page" && current.kind !== "half" && current.kind !== "cloze")) {
       setPageData(null);
       if (current) {
         setAttempt(emptyAttempt(4));
@@ -273,11 +281,11 @@ function HifzReviewScreen() {
     }
     let cancelled = false;
     const level =
-      current.kind === "half"
+      current.kind === "half" || current.kind === "cloze"
         ? 4
         : (welcomeLevel ??
           defaultSupportLevel(current.card.tier === "sabqi" ? "sabqi" : "manzil", current.retrievability));
-    const pageNumber = current.kind === "half" ? current.page : current.card.page;
+    const pageNumber = current.kind === "page" ? current.card.page : current.page;
     setAttempt(emptyAttempt(level));
     setReveal(HIDDEN);
     setError(null);
@@ -302,9 +310,22 @@ function HifzReviewScreen() {
     setDrillShown(false);
   }, [index]);
 
-  const lineNumbers = useMemo(
-    () => (pageData && current?.kind === "half" ? halfLineNumbers(pageData, current.half) : null),
-    [current, pageData],
+  const lineNumbers = useMemo(() => {
+    if (!pageData) return null;
+    if (current?.kind === "half") return halfLineNumbers(pageData, current.half);
+    // A cloze shows only the lines that hold its ayah.
+    if (current?.kind === "cloze") {
+      return new Set(
+        pageData.lines
+          .filter((line) => line.tokens.some((token) => token.surah === current.surah && token.ayah === current.ayah))
+          .map((line) => line.lineNumber),
+      );
+    }
+    return null;
+  }, [current, pageData]);
+  const clozeWord = useMemo(
+    () => (current?.kind === "cloze" ? { surah: current.surah, ayah: current.ayah, wordPos: current.word } : null),
+    [current],
   );
   const lines = useMemo(() => (pageData ? visibleLines(pageData, lineNumbers) : []), [lineNumbers, pageData]);
   // SCH-06: after a page whose next page the user also holds, the check offers its seam.
@@ -410,10 +431,10 @@ function HifzReviewScreen() {
     return true;
   };
 
-  /** A half page or seam reviewed on its own (SCH-06, SCH-08). */
-  const gradeRemediation = async (rating: Grade, seamAttempt?: Attempt) => {
-    if (!current || (current.kind !== "half" && current.kind !== "seam") || busy) return;
-    const usedAttempt = seamAttempt ?? attempt;
+  /** A half page, seam or weak-spot cloze reviewed on its own (SCH-06, SCH-08, ERR-06). */
+  const gradeRemediation = async (rating: Grade, attemptOverride?: Attempt) => {
+    if (!current || (current.kind !== "half" && current.kind !== "seam" && current.kind !== "cloze") || busy) return;
+    const usedAttempt = attemptOverride ?? attempt;
     const firstToken = current.kind === "half" ? (tokens.find((token) => !token.isMarker) ?? null) : null;
     if (current.kind === "half" && !firstToken) return;
     setBusy(true);
@@ -493,11 +514,13 @@ function HifzReviewScreen() {
     }
   };
 
-  const drillResult = async (clean: boolean) => {
+  const drillResult = async (result: "clean" | "again" | "not_a_mistake") => {
     if (!current || current.kind !== "drill" || busy) return;
     setBusy(true);
     try {
-      await recordDrillResult(db, { id: current.item.id, clean });
+      // An error logged by mistake leaves the inbox instead of waiting for two clean days.
+      if (result === "not_a_mistake") await dismissInboxItem(db, { id: current.item.id });
+      else await recordDrillResult(db, { id: current.item.id, clean: result === "clean" });
       advance();
     } catch (drillError) {
       console.warn("[HifzReview] Drill failed:", drillError);
@@ -759,8 +782,51 @@ function HifzReviewScreen() {
             <Button className="w-full max-w-sm" label={s.hifzDrillShow} onPress={() => setDrillShown(true)} />
           ) : (
             <View className="w-full max-w-sm" style={{ gap: 10 }}>
-              <Button label={s.hifzDrillClean} onPress={() => drillResult(true)} disabled={busy} />
-              <Button variant="outline" label={s.hifzDrillAgain} onPress={() => drillResult(false)} disabled={busy} />
+              <Button label={s.hifzDrillClean} onPress={() => drillResult("clean")} disabled={busy} />
+              <Button variant="outline" label={s.hifzDrillAgain} onPress={() => drillResult("again")} disabled={busy} />
+              <Button variant="ghost" label={s.hifzDrillDismiss} onPress={() => drillResult("not_a_mistake")} disabled={busy} />
+            </View>
+          )}
+        </ScrollView>
+      ) : current?.kind === "cloze" ? (
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 16, alignItems: "center" }}>
+          <View className="rounded-full px-3 py-1 bg-primary-accent/10 dark:bg-primary-bright/15">
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accent }}>{s.hifzStrengthenChip}</Text>
+          </View>
+          <Text dir={dir} align="center" variant="title-md">
+            {s.hifzClozeTitle}
+          </Text>
+          <Text dir={dir} align="center" variant="body">
+            {interpolate(s.hifzClozePrompt, { ref: formatAyahRef(isRTL, current.surah, current.ayah) })}
+          </Text>
+          <Card elevation="low" className="py-4 rounded-3xl" style={{ width: pageWidth - 16 }}>
+            {pageData ? (
+              <RecitationPage
+                page={pageData}
+                level={0}
+                reveal={reveal}
+                lineNumbers={lineNumbers}
+                cloze={clozeWord}
+                surahNames={surahNames}
+                isDark={isDark}
+                width={pageWidth - 16}
+                wordLabel={wordLabel}
+              />
+            ) : (
+              <Skeleton isDark={isDark} width="100%" height={120} borderRadius={16} />
+            )}
+          </Card>
+          {error ? (
+            <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
+              {error}
+            </Text>
+          ) : null}
+          {!reveal.all ? (
+            <Button className="w-full max-w-sm" label={s.hifzDrillShow} onPress={() => setReveal((value) => ({ ...value, all: true }))} disabled={!pageData} />
+          ) : (
+            <View className="w-full max-w-sm" style={{ gap: 10 }}>
+              <Button label={s.hifzDrillClean} onPress={() => gradeRemediation(Rating.Good, emptyAttempt(4))} disabled={busy} />
+              <Button variant="outline" label={s.hifzDrillAgain} onPress={() => gradeRemediation(Rating.Again, emptyAttempt(4))} disabled={busy} />
             </View>
           )}
         </ScrollView>

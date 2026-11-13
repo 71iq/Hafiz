@@ -216,12 +216,17 @@ export async function countMistakeInbox(db: DatabaseExecutor, today: LocalDate):
 }
 
 /** ERR-06: a location wrong in this many separate sessions is a weak spot. */
-const WEAK_SPOT_SESSIONS = 3;
+export const WEAK_SPOT_SESSIONS = 3;
 
-export async function readWeakSpots(db: DatabaseExecutor): Promise<{ surah: number; ayah: number; word: number | null }[]> {
-  return db.getAllAsync<{ surah: number; ayah: number; word: number | null }>(
+/** The errors that count toward a weak spot: clear errors, not tajweed, hesitation or caught slips. */
+export const WEAK_SPOT_ERROR_SQL = "deleted_at IS NULL AND type NOT IN ('tajweed', 'hesitation') AND corrected != 'self'";
+
+export type WeakSpot = Readonly<{ surah: number; ayah: number; word: number | null }>;
+
+export async function readWeakSpots(db: DatabaseExecutor): Promise<WeakSpot[]> {
+  return db.getAllAsync<WeakSpot>(
     `SELECT surah, ayah, word FROM recitation_errors
-      WHERE deleted_at IS NULL AND ayah IS NOT NULL AND type NOT IN ('tajweed', 'hesitation') AND corrected != 'self'
+      WHERE ${WEAK_SPOT_ERROR_SQL} AND ayah IS NOT NULL
       GROUP BY surah, ayah, word
      HAVING COUNT(DISTINCT COALESCE(session_id, id)) >= ?`,
     [WEAK_SPOT_SESSIONS],

@@ -1,4 +1,5 @@
 import { memo, useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
 import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
@@ -208,6 +209,7 @@ function MushafPageInner({
   const [fontLoadAttempt, setFontLoadAttempt] = useState(0);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, getWordHighlightColor, selectAyah, selection } = useSelection();
+  const isWeakSpot = useWeakSpotMarker();
   // The long-pressed ayah stays marked while its action bar is open, so the reader sees what it acts on.
   const isSelectedAyah = (surah: number, ayah: number) => {
     if (!selection) return false;
@@ -498,6 +500,7 @@ function MushafPageInner({
                   v2Page={pageNumber}
                   highlightColor={hlColor}
                   hidden={isHifzWordHidden(identity)}
+                  weakSpot={isWeakSpot(identity.surah, identity.ayah, identity.wordPos)}
                   compactLayout
                 />
               );

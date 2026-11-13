@@ -55,6 +55,8 @@ jest.mock("react-native-reanimated", () => {
 jest.mock("@shopify/flash-list", () => ({ FlashList: () => null }));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDatabase }));
 jest.mock("@/lib/database/user-settings", () => ({ writeUserSetting: jest.fn(async () => undefined) }));
+// Weak-spot markers (ERR-06) load from recitation errors; this suite covers the reveal owner only.
+jest.mock("@/lib/hifz/use-weak-spots", () => ({ useWeakSpotsLoader: () => undefined, useWeakSpotMarker: () => () => false }));
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   return { ...actual, useSettings: () => ({ ...actual.useSettings(), ...mockSettings }) };

@@ -1085,6 +1085,15 @@
               "children": []
             },
             {
+              "id": "hifz.review.cloze",
+              "title": "Weak spots: Mushaf marker and fill-the-gap card",
+              "kind": "widget",
+              "cases": ["PLAN-13"],
+              "uses": ["reader"],
+              "native": false,
+              "children": []
+            },
+            {
               "id": "hifz.review.summary",
               "title": "Exit confirmation and summary",
               "kind": "screen",

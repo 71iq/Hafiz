@@ -4,6 +4,14 @@ import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import { declareMemorizedPages, loadPageCards } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
 import { errorHalf, halfLineNumbers, loadDueRemediation } from "@/lib/hifz/remediation";
+import { readWeakSpots, type RecitationErrorInput } from "@/lib/hifz/errors";
+import { clozeCardId, parseClozeCardId } from "@/lib/hifz/weak-spots";
+import { DEFAULT_REVIEW_SAVE_CONTEXT, persistReviewTransition } from "@/lib/fsrs/persist-review";
+import { setStudyCardMarked } from "@/lib/fsrs/queries";
+import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
+import { startReviewSession } from "@/lib/fsrs/review-sessions";
+import { parseHabitSettings } from "@/lib/habit/settings";
+import { addDays } from "@/lib/habit/dates";
 import { emptyAttempt, savePageGrade, saveRemediationGrade, type Attempt } from "@/lib/hifz/review";
 import { Rating } from "@/lib/fsrs/scheduler";
 import type { StudyCardRow } from "@/lib/fsrs/types";
@@ -153,5 +161,74 @@ describe("half pages and seams from a page grade", () => {
     });
     expect(salah.remediation).toEqual({ half: null, seam: null });
     expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_cards WHERE id LIKE 'seam:%'").get()).toEqual({ count: 0 });
+  });
+});
+
+describe("weak spots (ERR-06)", () => {
+  let store: OutboxDatabase;
+  beforeEach(async () => {
+    store = await openOutboxDatabase();
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(async () => {
+    await store.db.getFirstAsync("SELECT 1");
+    await store.close();
+    jest.restoreAllMocks();
+  });
+
+  async function gradeWithErrors(day: number, errors: RecitationErrorInput[]) {
+    const at = atLocalTime(addDays(TODAY, day), 600);
+    const card = await setStudyCardMarked(store.db, "default-retention", "2:255", false);
+    const transition = calculateReviewTransition({ card, rating: Rating.Again, reviewedAt: at });
+    const session = startReviewSession("wird", { now: at });
+    await persistReviewTransition({
+      db: store.db,
+      cardId: "2:255",
+      transition,
+      context: { ...DEFAULT_REVIEW_SAVE_CONTEXT, session, supportLevel: 4, errors },
+    });
+  }
+  const wrongWord = (word: number, overrides: Partial<RecitationErrorInput> = {}): RecitationErrorInput => ({
+    type: "wrong_word",
+    corrected: "none",
+    surah: 2,
+    ayah: 255,
+    word,
+    ...overrides,
+  });
+  const cards = () => store.sql.prepare("SELECT id FROM study_cards WHERE id LIKE 'cloze:%' ORDER BY id").all();
+
+  it("makes a word wrong in a third session a weak spot with one cloze card, due now", async () => {
+    await gradeWithErrors(0, [wrongWord(4)]);
+    await gradeWithErrors(1, [wrongWord(4), wrongWord(4)]);
+    expect(cards()).toEqual([]);
+    await gradeWithErrors(2, [wrongWord(4)]);
+    expect(cards()).toEqual([{ id: clozeCardId(2, 255, 4) }]);
+    expect(await readWeakSpots(store.db)).toEqual([{ surah: 2, ayah: 255, word: 4 }]);
+    await gradeWithErrors(3, [wrongWord(4)]);
+    expect(cards()).toEqual([{ id: clozeCardId(2, 255, 4) }]);
+
+    const [unit] = await loadDueRemediation(store.db, atLocalTime(addDays(TODAY, 3), 700));
+    expect(unit).toMatchObject({ kind: "cloze", surah: 2, ayah: 255, word: 4 });
+  });
+
+  it("does not count tajweed, hesitation or caught slips toward a weak spot", async () => {
+    for (let day = 0; day < 3; day += 1) {
+      await gradeWithErrors(day, [
+        wrongWord(5, { type: "tajweed" }),
+        wrongWord(6, { type: "hesitation" }),
+        wrongWord(7, { corrected: "self" }),
+      ]);
+    }
+    expect(cards()).toEqual([]);
+    expect(await readWeakSpots(store.db)).toEqual([]);
+  });
+
+  it("reads cloze ids and the marker setting, on by default", () => {
+    expect(parseClozeCardId("cloze:2:255:4")).toEqual({ surah: 2, ayah: 255, word: 4 });
+    expect(parseClozeCardId("cloze:115:1:1")).toBeNull();
+    expect(parseClozeCardId("page:madani15:5")).toBeNull();
+    expect(parseHabitSettings(new Map()).showWeakSpots).toBe(true);
+    expect(parseHabitSettings(new Map([["habit_hide_weak_spots", "true"]])).showWeakSpots).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import type { DhuhrResolver } from "@/lib/habit/cutoff";
 import { localDateOf } from "@/lib/habit/dates";
 import { recordWirdProgress, type WirdProgressEvent } from "@/lib/habit/queries";
 import { insertRecitationErrors, recordCleanRecitation, type RecitationErrorInput } from "@/lib/hifz/errors";
+import { createWeakSpotCards } from "@/lib/hifz/weak-spots";
 import type { Grader, SupportLevel } from "@/lib/hifz/grading";
 import { PAGE_UNITS, recitationUnits } from "@/lib/habit/minimum";
 
@@ -91,6 +92,8 @@ export async function persistReviewTransition({
         at: reviewRecord.reviewedAt,
         localDate,
       });
+      // ERR-06: a word wrong in a third session becomes a weak spot with its own cloze card.
+      await createWeakSpotCards(tx, context.errors, reviewedAt);
     }
     const resolvedInboxItems = isCleanRecall(reviewRecord.rating, context)
       ? await recordCleanRecitation(tx, { cardId, at: reviewRecord.reviewedAt, localDate })

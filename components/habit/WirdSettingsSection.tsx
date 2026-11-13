@@ -150,6 +150,25 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
           />
         </MirroredRow>
 
+        <MirroredRow dir={dir} className="items-center justify-between gap-3">
+          <View className="flex-1">
+            <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
+              {s.habitSettingsWeakSpots}
+            </Text>
+            <Text dir={dir} variant="caption">
+              {s.habitSettingsWeakSpotsHint}
+            </Text>
+          </View>
+          <Switch
+            value={settings.showWeakSpots}
+            onValueChange={(value) =>
+              save(() =>
+                value ? deleteUserSetting(db, HABIT_SETTING_KEYS.hideWeakSpots) : writeUserSetting(db, HABIT_SETTING_KEYS.hideWeakSpots, "true"),
+              )
+            }
+          />
+        </MirroredRow>
+
         <Row label={s.habitSettingsWeekStart} dir={dir}>
           <ToggleGroup<string>
             dir={dir}

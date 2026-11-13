@@ -17,7 +17,13 @@ type Props = {
   highlightColor?: string;
   hidden?: boolean;
   compactLayout?: boolean;
+  /** ERR-06: a small dot under a word missed in 3 or more sessions. Never drawn on a hidden word. */
+  weakSpot?: boolean;
 };
+
+/** The weak-spot dot, in the reader's amber note color. */
+export const WEAK_SPOT_LIGHT = "#d97706";
+export const WEAK_SPOT_DARK = "#f59e0b";
 
 // Android clips each Text to its own box, but QCF page words draw outside their advance: over all
 // 604 pages, shaped words reach up to 1.77 em past the line-end (left) edge and, rarely, 1.48 em past
@@ -41,6 +47,7 @@ function WordTokenInner({
   highlightColor,
   hidden = false,
   compactLayout = false,
+  weakSpot = false,
 }: Props) {
   const { isDark, viewMode, pageScroll } = useSettings();
   const tokenRef = useRef<View>(null);
@@ -86,6 +93,7 @@ function WordTokenInner({
             hafizAyah: String(ayah),
             hafizWordPos: String(wordPos),
             hafizQuranHidden: hidden ? "true" : "false",
+            ...(weakSpot && !hidden ? { hafizWeakSpot: "true" } : null),
           },
         } as any)
       : {};
@@ -173,6 +181,17 @@ function WordTokenInner({
           </Text>
         </View>
       )}
+      {weakSpot && !hidden ? (
+        // A full-width row centers the dot without physical left/right offsets.
+        <View
+          pointerEvents="none"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          style={{ position: "absolute", bottom: 1, width: "100%", alignItems: "center" }}
+        >
+          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isDark ? WEAK_SPOT_DARK : WEAK_SPOT_LIGHT }} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }

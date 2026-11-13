@@ -15,6 +15,7 @@ import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
 import { AyahWordText } from "./WordSpan";
+import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
 import {
   BookOpenText,
   Bookmark,
@@ -87,6 +88,7 @@ function AyahBlockInner({
   const { recitationId, isRTL, isDark, quranRenderFontStyle: quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
   const s = useStrings();
   const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
+  const isWeakSpot = useWeakSpotMarker();
   const { getAyahState, toggleAyah } = useAyahAudio();
 
   const fontVisible = useQuranPageFontReady(quranFontStyle, v2Page);
@@ -348,6 +350,7 @@ function AyahBlockInner({
               wordHighlightColor={(wordPos) =>
                 highlightedWordPos === wordPos ? "#0d9488" : getWordHighlightColor(surah, ayah, wordPos)
               }
+              wordWeakSpot={(wordPos) => !hideMode && isWeakSpot(surah, ayah, wordPos)}
             />
           ) : (
             <View
@@ -390,6 +393,7 @@ function AyahBlockInner({
                         ? "#0d9488"
                         : getWordHighlightColor(surah, ayah, wordPos)
                     }
+                    weakSpot={!hideMode && isWeakSpot(surah, ayah, wordPos)}
                   />
                 );
               })}

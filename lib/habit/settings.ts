@@ -13,6 +13,8 @@ export const HABIT_SETTING_KEYS = {
   weekStart: "habit_week_start",
   /** 5.11 ZAY-02: Zayt can be turned off anywhere it appears. */
   hideZayt: "habit_hide_zayt",
+  /** ERR-06: weak-spot markers in the reader are on unless turned off. */
+  hideWeakSpots: "habit_hide_weak_spots",
 } as const;
 
 /** STR-13: a pause lasts at most 60 days. */
@@ -30,6 +32,7 @@ export type HabitSettings = Readonly<{
   /** 0 is Sunday. Null means the locale default (STR-28). */
   weekStart: number | null;
   showZayt: boolean;
+  showWeakSpots: boolean;
 }>;
 
 function parseJson<T>(value: string | undefined, schema: z.ZodType<T>): T | null {
@@ -42,7 +45,7 @@ function parseJson<T>(value: string | undefined, schema: z.ZodType<T>): T | null
   }
 }
 
-function parseHabitSettings(values: ReadonlyMap<string, string>): HabitSettings {
+export function parseHabitSettings(values: ReadonlyMap<string, string>): HabitSettings {
   const weekStart = Number(values.get(HABIT_SETTING_KEYS.weekStart));
   return {
     minimum: parseWirdMinimum(values.get(HABIT_SETTING_KEYS.minimum)),
@@ -53,6 +56,7 @@ function parseHabitSettings(values: ReadonlyMap<string, string>): HabitSettings 
       ? weekStart
       : null,
     showZayt: values.get(HABIT_SETTING_KEYS.hideZayt) !== "true",
+    showWeakSpots: values.get(HABIT_SETTING_KEYS.hideWeakSpots) !== "true",
   };
 }
 

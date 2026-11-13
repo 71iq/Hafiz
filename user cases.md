@@ -172,12 +172,13 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - PLAN-04. Check the page. Tap a word to mark a mistake by type, change or remove it. When the next page is also memorized, check the continuation into it as clean or stumbled. The rubric proposes a grade, and the support level caps it.
 - PLAN-05. Grade the page. Save the grade, errors, and support level in one step and move to the next page. Recited in salah grades the page Good without a check. With a teacher or partner listening, the grade records them as the grader.
 - PLAN-06. Grade a page Again with every error in one half. That half returns in 10 minutes and the next day. A stumble into the next page brings back its seam the same way. Both appear after the pages and count as spots to strengthen.
-- PLAN-07. Drill the mistake inbox from Home. Recite each noted ayah, check it, and mark it clean or still needing work. An item clears after clean recalls on two later days and expires after 28 days.
+- PLAN-07. Drill the mistake inbox from Home. Recite each noted ayah, check it, and mark it clean, still needing work, or not a mistake, which removes it. An item clears after clean recalls on two later days and expires after 28 days.
 - PLAN-08. Memorize new lines in sabaq. Set an intention, listen, read the meaning and any similar verses, look over the lines, then recite each ayah, the chunk, and its link to the lines before it from memory, and grade the check. The chunk joins the daily review.
 - PLAN-09. Return after 7 or more days away. Home offers a welcome-back review that starts with the strongest pages at a chosen support level.
 - PLAN-10. Accept or decline the monthly check on Home. It reviews 5 memorized pages not seen in two weeks and reports how many were clean.
 - PLAN-11. View hifz progress: memorized pages, how many are steady, fair, or need review, completed juz, and steady weeks.
 - PLAN-12. Leave a hifz review after grading a page. Confirm leaving first, then read the summary with pages, clean pages, spots marked, half pages and seams, minutes, and the wird cards.
+- PLAN-13. Miss the same word in 3 or more sessions. It becomes a weak spot: the Mushaf marks it with a small dot (a dotted underline in verse view on some devices) unless turned off, and a fill-the-gap card shows its ayah with that word hidden until Check, then asks whether it was recited cleanly.
 
 ## Reflection journey
 
@@ -280,7 +281,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - SET-13. After a successful connection, run the initial sync. Show connected, linked-without-sync, disconnected, or reauthentication-needed status with its result message. Connection callbacks clear their temporary URL parameters.
 - SET-14. From a connected account, run manual Quran Foundation sync or disconnect it. Disable actions while pending, update connection status/result feedback, and allow reconnection when required.
 - SET-15. Open About settings to reach About, Privacy, Terms, Credits, or GitHub issue reporting. A failed external launch shows feedback. Become a Donor opens an information dialog that can be dismissed.
-- SET-16. In General, open the Wird section. Choose the minimum wird in pages and minutes, whether meanings count toward it, the week start, and whether Zayt appears. Open the hifz plan to change the setup.
+- SET-16. In General, open the Wird section. Choose the minimum wird in pages and minutes, whether meanings count toward it, whether Zayt appears, whether weak spots are marked in the Mushaf, and the week start. Open the hifz plan to change the setup.
 
 ## Public and direct-access pages
 

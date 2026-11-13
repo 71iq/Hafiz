@@ -41,6 +41,8 @@ type Props = {
   reveal: RevealState;
   /** Line numbers to show, for a half page; null shows the whole page. */
   lineNumbers?: ReadonlySet<number> | null;
+  /** ERR-06 "Fill the gap": this one word stays hidden until the check, whatever the level. */
+  cloze?: Readonly<{ surah: number; ayah: number; wordPos: number }> | null;
   surahNames: ReadonlyMap<number, string>;
   /** Marked mistakes by token key, shown highlighted during the self-check. */
   marked?: ReadonlySet<string>;
@@ -62,6 +64,7 @@ export function RecitationPage({
   level,
   reveal,
   lineNumbers = null,
+  cloze = null,
   surahNames,
   marked,
   onWordPress,
@@ -112,6 +115,7 @@ export function RecitationPage({
   const ink = isDark ? "#f5f5f5" : "#1f1b16";
   const faint = isDark ? "rgba(245,245,245,0.08)" : "rgba(31,27,22,0.07)";
   const markedBackground = isDark ? "rgba(251, 191, 36, 0.28)" : "rgba(217, 119, 6, 0.18)";
+  const gapBackground = isDark ? "rgba(45, 212, 191, 0.16)" : "rgba(13, 148, 136, 0.12)";
 
   let tokenIndex = 0;
   return (
@@ -160,7 +164,11 @@ export function RecitationPage({
                 const index = start + offset;
                 const key = tokenKey(token, index);
                 const shownByPointer = index < reveal.count;
-                const visible = reveal.all || level === 0 || token.isMarker || shownByPointer || (level === 3 && lineTouched);
+                const isGap =
+                  cloze !== null && token.surah === cloze.surah && token.ayah === cloze.ayah && token.wordPos === cloze.wordPos;
+                const visible = isGap
+                  ? reveal.all
+                  : reveal.all || level === 0 || token.isMarker || shownByPointer || (level === 3 && lineTouched);
                 const firstLetterOnly = !visible && level === 1;
                 const isMarked = marked?.has(key) ?? false;
                 const color = visible ? undefined : firstLetterOnly ? undefined : level === 3 ? faint : "transparent";
@@ -180,7 +188,9 @@ export function RecitationPage({
                         style={{
                           ...(token.isMarker ? markerPalette : null),
                           color,
-                          backgroundColor: isMarked ? markedBackground : undefined,
+                          // The gap keeps its place and shows as a soft box, so the reciter knows where it is.
+                          backgroundColor: isMarked ? markedBackground : isGap && !visible ? gapBackground : undefined,
+                          ...(isGap && !visible ? { borderRadius: 6 } : null),
                         }}
                       >
                         {token.glyph}

@@ -5,13 +5,18 @@ import { Rating, type Grade } from "@/lib/fsrs/scheduler";
 import type { DeckReviewSettings, SchedulerStep, StudyCardRow } from "@/lib/fsrs/types";
 import type { PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import { HIFZ_PAGES_DECK_ID, halfCardId, isValidPage, parsePageUnit, seamCardId } from "@/lib/hifz/units";
+import { parseClozeCardId } from "@/lib/hifz/weak-spots";
 
 export type Half = "a" | "b";
 
-/** The units a page review can call up on their own: half pages (SCH-08) and seams (SCH-06). */
+/**
+ * The units reviewed on their own after the pages: half pages (SCH-08) and seams (SCH-06) while they
+ * relearn, and weak-spot cloze cards (ERR-06) whenever they are due.
+ */
 export type RemediationUnit =
   | { kind: "half"; row: StudyCardRow; page: number; half: Half }
-  | { kind: "seam"; row: StudyCardRow; page: number };
+  | { kind: "seam"; row: StudyCardRow; page: number }
+  | { kind: "cloze"; row: StudyCardRow; surah: number; ayah: number; word: number };
 
 /** Ten minutes, then the next day, then FSRS (SCH-08). Seams relearn the same way. */
 const REMEDIATION_STEPS: SchedulerStep[] = ["10m", "1d"];
@@ -108,13 +113,19 @@ export function hasSeamAfter(page: number): boolean {
 export async function loadDueRemediation(db: DatabaseExecutor, now: Date): Promise<RemediationUnit[]> {
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT * FROM study_cards
-     WHERE deck_id = ? AND (id LIKE 'half:%' OR id LIKE 'seam:%') AND (state IN (1, 3) OR learning_steps > 0) AND due <= ?
+     WHERE deck_id = ? AND due <= ?
+       AND (((id LIKE 'half:%' OR id LIKE 'seam:%') AND (state IN (1, 3) OR learning_steps > 0)) OR id LIKE 'cloze:%')
        AND deleted_at IS NULL AND suspended_at IS NULL
      ORDER BY due, id`,
     [HIFZ_PAGES_DECK_ID, now.toISOString()],
   );
   const units: RemediationUnit[] = [];
   for (const row of rows) {
+    const cloze = parseClozeCardId(row.id);
+    if (cloze) {
+      units.push({ kind: "cloze", row, ...cloze });
+      continue;
+    }
     const unit = parsePageUnit(row.id);
     if (unit?.kind === "half") units.push({ kind: "half", row, page: unit.page, half: unit.half });
     else if (unit?.kind === "seam" && hasSeamAfter(unit.page)) units.push({ kind: "seam", row, page: unit.page });

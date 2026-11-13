@@ -11,6 +11,7 @@ import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
 import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine, ChevronDown, SlidersHorizontal, Pause, Play, Square } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
+import { useWeakSpotsLoader } from "@/lib/hifz/use-weak-spots";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -265,6 +266,8 @@ export default function MushafScreen() {
 
 function MushafInner() {
   const db = useDatabase();
+  // ERR-06: weak-spot markers for the pages and verses below.
+  useWeakSpotsLoader(db);
   const {
     fontSize,
     lineHeight,

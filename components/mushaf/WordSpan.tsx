@@ -3,6 +3,7 @@ import { Text, type GestureResponderEvent, type StyleProp, type TextStyle } from
 import { useWordInteraction } from "@/lib/word/context";
 import { useChromeActions } from "@/lib/ui/chrome";
 import { useWordTap } from "./useWordTap";
+import { WEAK_SPOT_LIGHT } from "./WordToken";
 
 type Props = {
   glyph: string;
@@ -13,6 +14,8 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   highlightColor?: string;
+  /** ERR-06: nested text cannot hold a dot, so a weak spot is underlined (dotted where supported). */
+  weakSpot?: boolean;
   onPressIn?: (wordPos: number) => void;
 };
 
@@ -30,6 +33,7 @@ function WordSpanInner({
   fontSize,
   lineHeight,
   highlightColor,
+  weakSpot = false,
   onPressIn,
 }: Props) {
   const { isTooltipSelected, press, longPress } = useWordTap({ surah, ayah, wordPos, v2Page });
@@ -57,7 +61,18 @@ function WordSpanInner({
       onLongPress={longPress}
       suppressHighlighting
       className={isTooltipSelected ? "text-primary-accent dark:text-primary-bright" : undefined}
-      style={backgroundColor ? { backgroundColor } : undefined}
+      style={
+        backgroundColor || weakSpot
+          ? {
+              ...(backgroundColor && { backgroundColor }),
+              ...(weakSpot && {
+                textDecorationLine: "underline" as const,
+                textDecorationStyle: "dotted" as const,
+                textDecorationColor: WEAK_SPOT_LIGHT,
+              }),
+            }
+          : undefined
+      }
     >
       {glyph}
     </Text>
@@ -78,6 +93,7 @@ type AyahWordTextProps = {
   style?: StyleProp<TextStyle>;
   testID?: string;
   wordHighlightColor: (wordPos: number) => string | undefined;
+  wordWeakSpot?: (wordPos: number) => boolean;
 };
 
 /**
@@ -96,6 +112,7 @@ export function AyahWordText({
   style,
   testID,
   wordHighlightColor,
+  wordWeakSpot,
 }: AyahWordTextProps) {
   const { openDetail } = useWordInteraction();
   const { markActivity } = useChromeActions();
@@ -131,6 +148,7 @@ export function AyahWordText({
               fontSize={fontSize}
               lineHeight={lineHeight}
               highlightColor={wordHighlightColor(wordPos)}
+              weakSpot={wordWeakSpot?.(wordPos) ?? false}
               onPressIn={recordWord}
             />{" "}
           </Fragment>
