@@ -160,8 +160,8 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - REMIND-01. In Settings, open Reminders. Turn reminders on or off, turn each reminder type on or off, choose the time after a prayer or at a clock time, and choose the Ramadan time when offered. The reminder time is the hifz plan's "when".
 - REMIND-02. Set prayer times in setup or Settings: use this device's location once, or type latitude and longitude, then choose the calculation method and Asr timing. Today's times show. The location stays on this device and moves the make-up cutoff to Dhuhr.
 - REMIND-03. After the first session, read when the reminder will come and allow notifications or choose Not now. The offer returns at most 4 times, with growing gaps, and never once the system will not ask again.
-- REMIND-04. Receive a local reminder on a native device: the wird reminder, make-up window, streak at risk, a late reminder, earn-back, grace day, Friday al-Kahf, or a comeback note. At most 3 a day, none in quiet hours, and none about the wird on a day already covered.
-- REMIND-05. Tap a reminder to open the review, al-Kahf, or Home, or choose "Remind me in 1 hour" to get it again unless the day is covered by then.
+- REMIND-04. Receive a local reminder on a native device: the wird reminder, make-up window, streak at risk, a late reminder, earn-back, grace day, Friday al-Kahf, halaqa encouragement received since the last check, or a comeback note. At most 2 a day, or 3 on an at-risk day with the late reminder; none in quiet hours (Isha + 1 hour to 30 minutes before Fajr, or 23:00 to 05:00 without prayer times) except the late reminder and reminders at the time you chose; none about the wird on a day already covered.
+- REMIND-05. Tap a reminder to open the hifz review (or the ayah review without a page plan), al-Kahf, or Home, or choose "Remind me in 1 hour" to get it again unless the day is covered by then or the day's limit is reached.
 - REMIND-06. On web, or while native notifications are off, see the reminder as a banner on Home. Start opens the review; dismiss hides it for that day. Export the wird times to a calendar file from Settings.
 
 ## Hifz plan and recitation
@@ -233,7 +233,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 
 - PROFILE-01. Open own profile from Settings/sidebar, or a public profile from the community feed or a halaqa. After database preparation, open the profile sheet. Close to return to the previous screen, or Home when there is no back history.
 - PROFILE-02. Open own profile as a guest. Choose Login or enabled Signup, close the profile, and enter authentication.
-- PROFILE-03. Open another user's profile. Show loading, its identity and badges, the streak and juz completions only when that person shares them with you or made them public, or a missing/failed-profile state. A person who said they are under 18 never shows them publicly.
+- PROFILE-03. Open another user's profile. Show loading, its identity and badges, the streak and juz completions only when that person shares them with you or made them public, or a missing/failed-profile state. A person who said they are under 18 cannot be opened by others at all; halaqa members still see their name in the halaqa.
 - PROFILE-04. On own profile, switch Overview and Notes. Open Edit to change the display name, bio, country, or photo. Display name allows 60 characters; bio allows 280 and shows its count.
 - PROFILE-05. Open the country picker, search English/Arabic names or codes, then choose or clear the country. Show no matches when necessary, or close the picker without selecting.
 - PROFILE-06. Change the photo. Request permission, then handle denied permission, picker cancellation, or a square-cropped image preview. Remove photo shows a placeholder draft; selecting another image replaces it.
@@ -243,13 +243,13 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - HALAQA-02. With no halaqa, create an invite halaqa with a name, optionally as its teacher, or join one with an 8-character code. Invalid, full, or unknown codes show an error and keep the form open.
 - HALAQA-03. Join a matched halaqa of about 20 people at a similar level and pace in a nearby time zone. Matching uses only local plan bands, never mistakes or grades.
 - HALAQA-04. View a halaqa: the weekly shared goal of wird days, members with this week's wird days, streak, and juz completions when each member shares them, and encouragement received this week. There is no ranking.
-- HALAQA-05. Encourage a member once a day per halaqa with a fixed message, or a short note in an invite halaqa. The member reads the fixed message in their own language.
+- HALAQA-05. Encourage a member once a day per halaqa with a fixed message, or a short note in an invite halaqa. The member reads the fixed message in their own language, and a later reminder can mention new encouragement.
 - HALAQA-06. Open "What this halaqa sees" and choose whether members see wird days and streak, and juz completions, and whether teachers see the plan or recent grades. Set profile visibility and say you are under 18 from the same sheet.
 - HALAQA-07. As a teacher, open a member's teacher view. See their plan and stages or recent grades and open-mistake count only for the parts that member allowed; mistakes themselves and recordings are never shown.
 - HALAQA-08. Share an invite code, leave a halaqa after confirming, or join or create another. Offline, the last loaded halaqa shows with its time, and actions wait for a connection.
 - BOARD-01. Open Board as a guest or without account service. Read that the Board is optional and choose Sign in.
 - BOARD-02. Before joining, read the intention note and the point rules, choose whether to appear under a nickname, and say whether you are under 18. A minor must use a nickname, and no photo shows under a nickname.
-- BOARD-03. Join this week's Board. View your small cohort at a similar level, pace, and time zone, with weekly points from wird days only and streaks. Points never come from excused or grace days, and those days are never shown.
+- BOARD-03. Join this week's Board. View your small cohort at a similar level, pace, and time zone that shares your week start, with weekly points from wird days only and streaks. Points never come from excused or grace days, and those days are never shown. Each new week, joined users who studied recently are placed automatically.
 - BOARD-04. Leave the Board. Rejoining in the same week returns to the same group; while a group is still forming, a gathering note shows instead of standings.
 
 ## Authentication
