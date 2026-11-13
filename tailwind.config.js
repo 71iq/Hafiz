@@ -8,7 +8,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        manrope: ["Manrope"],
+        // The loaded face is Manrope_400Regular; a bare "Manrope" fell back to the default serif on web.
+        manrope: ["Manrope_400Regular"],
         "manrope-medium": ["Manrope_500Medium"],
         "manrope-semibold": ["Manrope_600SemiBold"],
         "manrope-bold": ["Manrope_700Bold"],
