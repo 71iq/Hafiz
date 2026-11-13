@@ -42,7 +42,7 @@ function parseJson<T>(value: string | undefined, schema: z.ZodType<T>): T | null
   }
 }
 
-export function parseHabitSettings(values: ReadonlyMap<string, string>): HabitSettings {
+function parseHabitSettings(values: ReadonlyMap<string, string>): HabitSettings {
   const weekStart = Number(values.get(HABIT_SETTING_KEYS.weekStart));
   return {
     minimum: parseWirdMinimum(values.get(HABIT_SETTING_KEYS.minimum)),

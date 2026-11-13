@@ -5,7 +5,7 @@ import { DEFAULT_DECK_LEARNING_STEPS, DEFAULT_DECK_RELEARNING_STEPS, type DeckRe
 import { toArabicNumber } from "@/lib/arabic";
 import type { UIStrings } from "@/lib/i18n/strings";
 
-export const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
+const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
   { rating: Rating.Again, bgLight: "#b91c1c", bgDark: "#dc2626" },
   { rating: Rating.Hard, bgLight: "#b45309", bgDark: "#d97706" },
   { rating: Rating.Good, bgLight: "#15803d", bgDark: "#16a34a" },

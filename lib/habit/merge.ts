@@ -1,7 +1,7 @@
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import { effectiveStatus, STATUS_PRECEDENCE, type EarnedStatus, type HabitDayRow } from "@/lib/habit/types";
 
-export { STATUS_PRECEDENCE };
+{ STATUS_PRECEDENCE };
 
 /** Orders instants, then their spelling (".000Z" or "Z"), so every comparison is total. */
 function compareTimes(a: string, b: string): number {

@@ -2,7 +2,7 @@
  * Review units (spec 3.1). Locations are stored canonically as surah:ayah[:word]; pages are a lookup
  * in the current page source, the 604-page QCF2 Madani layout (UNIT-01).
  */
-export const PAGE_LAYOUT = "madani15";
+const PAGE_LAYOUT = "madani15";
 export const PAGE_COUNT = 604;
 export const LINES_PER_PAGE = 15;
 

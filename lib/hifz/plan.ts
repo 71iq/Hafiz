@@ -3,15 +3,10 @@ import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { putUserSetting } from "@/lib/database/user-settings";
 
 /** Spec 3.3: the user's chosen method and pace. Stored as the synced setting hifz_plan. */
-export const HIFZ_PLAN_KEY = "hifz_plan";
+const HIFZ_PLAN_KEY = "hifz_plan";
 
 export const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"] as const;
 export type Prayer = (typeof PRAYERS)[number];
-
-export const NEW_PER_DAY_OPTIONS = [0, 0.25, 1 / 3, 0.5, 1, 2] as const;
-export const SABQI_DAYS_OPTIONS = [7, 14, 21] as const;
-export const CYCLE_DAYS_OPTIONS = [7, 10, 14, 20, 30] as const;
-export const BUDGET_OPTIONS = [10, 20, 30, 45, 60, 90] as const;
 
 const anchorSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("prayer"), prayer: z.enum(PRAYERS), offsetMin: z.number().int().min(0).max(180) }),
@@ -19,7 +14,7 @@ const anchorSchema = z.discriminatedUnion("kind", [
 ]);
 export type Anchor = z.infer<typeof anchorSchema>;
 
-export const hifzPlanSchema = z.object({
+const hifzPlanSchema = z.object({
   method: z.enum(["standard", "ottoman", "review_only"]),
   direction: z.enum(["juz_amma_first", "from_fatiha"]),
   newPerDay: z.number().min(0).max(2),
@@ -60,7 +55,7 @@ export const DEFAULT_HIFZ_PLAN: HifzPlan = {
 export type PlanPreset = "part_time_beginner" | "part_time_adult" | "full_time" | "maintenance" | "short_surahs";
 
 /** 4.3.2 presets. */
-export const PLAN_PRESETS: Readonly<Record<PlanPreset, Partial<HifzPlan>>> = {
+const PLAN_PRESETS: Readonly<Record<PlanPreset, Partial<HifzPlan>>> = {
   part_time_beginner: { method: "standard", newPerDay: 0.25, sabqiEvery: 2, cycleDays: 30, dailyBudgetMin: 20 },
   part_time_adult: { method: "standard", newPerDay: 0.5, sabqiEvery: 1, cycleDays: 30, dailyBudgetMin: 30 },
   full_time: { method: "standard", newPerDay: 1, sabqiEvery: 1, sabqiDays: 14, cycleDays: 14, dailyBudgetMin: 90 },

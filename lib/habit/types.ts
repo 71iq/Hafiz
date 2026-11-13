@@ -9,7 +9,7 @@ import type { LocalDate } from "@/lib/habit/dates";
  * paused: inside a pause the user set. Keeps the streak without growing it.
  * grace: an earned grace day covered an unplanned miss.
  */
-export const DAY_STATUSES = ["done", "made_up", "earned_back", "excused", "paused", "grace"] as const;
+const DAY_STATUSES = ["done", "made_up", "earned_back", "excused", "paused", "grace"] as const;
 export type DayStatus = (typeof DAY_STATUSES)[number];
 
 /** Statuses the app records. They only ever rise in precedence and are never withdrawn. */

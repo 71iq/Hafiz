@@ -5,7 +5,7 @@ import type { RecitationErrorType } from "@/lib/hifz/errors";
 import type { UIStrings } from "@/lib/i18n/strings";
 
 /** The error types a user can mark on a word after reciting (ERR-01), in the order people need them. */
-export const MARKABLE_TYPES: readonly RecitationErrorType[] = [
+const MARKABLE_TYPES: readonly RecitationErrorType[] = [
   "wrong_word",
   "skip_word",
   "harakah",

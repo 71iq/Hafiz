@@ -9,9 +9,9 @@ import { tierFor, type GradeEvent, type PageHistory, type Tier } from "@/lib/hif
 import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID, isValidPage, pageCardId, parsePageUnit } from "@/lib/hifz/units";
 
 /** PLN-05 seeds: 30 minutes per new page and 3 per review page, then learned per user. */
-export const SEED_MINUTES_PER_NEW_PAGE = 30;
-export const SEED_MINUTES_PER_REVIEW_PAGE = 3;
-export const T_NEW_KEY = "hifz_t_new";
+const SEED_MINUTES_PER_NEW_PAGE = 30;
+const SEED_MINUTES_PER_REVIEW_PAGE = 3;
+const T_NEW_KEY = "hifz_t_new";
 export const T_REV_KEY = "hifz_t_rev";
 
 const retrievabilityScheduler = fsrs();

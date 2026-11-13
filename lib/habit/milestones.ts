@@ -13,7 +13,7 @@ export function nextStreakMilestone(length: number): number {
 }
 
 /** STR-24: the streak icon changes at these lengths. Tier 0 is below the first threshold. */
-export const STREAK_TIER_THRESHOLDS = [7, 14, 30, 50, 100, 365] as const;
+const STREAK_TIER_THRESHOLDS = [7, 14, 30, 50, 100, 365] as const;
 
 export function streakTier(length: number): number {
   return STREAK_TIER_THRESHOLDS.filter((threshold) => length >= threshold).length;
@@ -27,6 +27,3 @@ export function isEveOfStreakTier(length: number): boolean {
 /** STR-19: Duolingo's streak goal options. */
 export const STREAK_GOAL_OPTIONS = [7, 14, 30, 50] as const;
 
-export function nextStreakGoal(reachedTarget: number): number | null {
-  return STREAK_GOAL_OPTIONS.find((option) => option > reachedTarget) ?? null;
-}

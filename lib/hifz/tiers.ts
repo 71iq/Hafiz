@@ -3,7 +3,7 @@ import type { DeckReviewSettings, SchedulerStep } from "@/lib/fsrs/types";
 import type { HifzPlan } from "@/lib/hifz/plan";
 
 /** Spec 3.2 tiers of a memorized page. */
-export const TIERS = ["sabaq", "sabqi", "manzil", "manzil.needs_work", "manzil.unverified"] as const;
+const TIERS = ["sabaq", "sabqi", "manzil", "manzil.needs_work", "manzil.unverified"] as const;
 export type Tier = (typeof TIERS)[number];
 
 export type GradeEvent = Readonly<{ date: LocalDate; rating: 1 | 2 | 3 | 4 }>;

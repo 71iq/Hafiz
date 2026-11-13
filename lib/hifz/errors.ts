@@ -4,7 +4,7 @@ import { addDays, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { createId } from "@/lib/id";
 
 /** ERR-01 error types. */
-export const ERROR_TYPES = [
+const ERROR_TYPES = [
   "skip_word",
   "wrong_word",
   "added_word",
@@ -18,12 +18,12 @@ export const ERROR_TYPES = [
 ] as const;
 export type RecitationErrorType = (typeof ERROR_TYPES)[number];
 
-export const CORRECTIONS = ["self", "tanbih", "fath", "none"] as const;
+const CORRECTIONS = ["self", "tanbih", "fath", "none"] as const;
 export type Correction = (typeof CORRECTIONS)[number];
 export type Severity = "jali" | "khafi";
 
 /** Tajweed errors (lahn khafi) are a separate track and never affect hifz scheduling (4.2.1). */
-export function severityOf(type: RecitationErrorType): Severity {
+function severityOf(type: RecitationErrorType): Severity {
   return type === "tajweed" ? "khafi" : "jali";
 }
 
@@ -57,9 +57,9 @@ export type RecitationErrorRow = {
 };
 
 /** ERR-03: items leave the inbox after this many clean recitations on different days. */
-export const INBOX_CLEAN_DAYS_TO_RESOLVE = 2;
+const INBOX_CLEAN_DAYS_TO_RESOLVE = 2;
 /** ERR-03: items expire after 28 days, Duolingo's window for path mistakes. */
-export const INBOX_EXPIRY_DAYS = 28;
+const INBOX_EXPIRY_DAYS = 28;
 /** ERR-04: at most this many inbox items join one wird review. */
 export const INBOX_ITEMS_PER_REVIEW = 6;
 
@@ -67,7 +67,7 @@ export const INBOX_ITEMS_PER_REVIEW = 6;
  * ERR-03: the inbox holds uncorrected clear errors and every error that needed a peek or the text.
  * Self-corrected slips, hesitations and tajweed notes are logged but stay out of it.
  */
-export function belongsInInbox(type: RecitationErrorType, corrected: Correction): boolean {
+function belongsInInbox(type: RecitationErrorType, corrected: Correction): boolean {
   if (type === "tajweed" || type === "hesitation") return false;
   // A stumble between pages relearns as its seam card (SCH-06), not as an ayah drill.
   if (type === "seam") return false;
@@ -216,7 +216,7 @@ export async function countMistakeInbox(db: DatabaseExecutor, today: LocalDate):
 }
 
 /** ERR-06: a location wrong in this many separate sessions is a weak spot. */
-export const WEAK_SPOT_SESSIONS = 3;
+const WEAK_SPOT_SESSIONS = 3;
 
 export async function readWeakSpots(db: DatabaseExecutor): Promise<{ surah: number; ayah: number; word: number | null }[]> {
   return db.getAllAsync<{ surah: number; ayah: number; word: number | null }>(

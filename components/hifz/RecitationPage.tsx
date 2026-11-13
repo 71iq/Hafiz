@@ -21,7 +21,7 @@ export type RevealState = Readonly<{
 
 export const HIDDEN: RevealState = { all: false, count: 0, touchedLines: new Set() };
 
-export function tokenKey(token: Pick<PageToken, "surah" | "ayah" | "wordPos" | "glyph">, index: number): string {
+function tokenKey(token: Pick<PageToken, "surah" | "ayah" | "wordPos" | "glyph">, index: number): string {
   return `${token.surah}:${token.ayah}:${token.wordPos ?? "m"}:${index}`;
 }
 

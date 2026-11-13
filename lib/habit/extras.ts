@@ -7,7 +7,7 @@ import { addDays, diffDays, isLocalDate, type LocalDate } from "@/lib/habit/date
  * behavior and hidden with one tap. No points, gems or chests (QST-04): completing one only marks it
  * done with a line of encouragement.
  */
-export const EXTRA_KINDS = ["strengthen", "connect", "salah", "deepen"] as const;
+const EXTRA_KINDS = ["strengthen", "connect", "salah", "deepen"] as const;
 export type ExtraKind = (typeof EXTRA_KINDS)[number];
 
 export const EXTRAS_PER_DAY = 2;

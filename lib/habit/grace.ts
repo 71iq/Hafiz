@@ -2,9 +2,9 @@ import type { LocalDate } from "@/lib/habit/dates";
 import type { DayMap } from "@/lib/habit/streak";
 import type { DayStatus } from "@/lib/habit/types";
 
-export const GRACE_FIRST_AWARD_AFTER = 3;
-export const GRACE_AWARD_EVERY = 7;
-export const GRACE_MAX_HELD = 2;
+const GRACE_FIRST_AWARD_AFTER = 3;
+const GRACE_AWARD_EVERY = 7;
+const GRACE_MAX_HELD = 2;
 
 const EARNS_GRACE: ReadonlySet<DayStatus> = new Set<DayStatus>(["done", "made_up", "earned_back"]);
 

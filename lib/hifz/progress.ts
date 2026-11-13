@@ -46,9 +46,9 @@ export async function loadHifzProgress(db: DatabaseExecutor, now = new Date()): 
 }
 
 /** MST-05: 5 memorized pages not reviewed in the last 14 days, picked at random. */
-export const MONTHLY_CHECK_PAGES = 5;
+const MONTHLY_CHECK_PAGES = 5;
 const MONTHLY_CHECK_UNREVIEWED_DAYS = 14;
-export const MONTHLY_CHECK_KEY = "device_monthly_check";
+const MONTHLY_CHECK_KEY = "device_monthly_check";
 
 export function monthlyCheckCandidates(cards: readonly PageCard[], today: string): PageCard[] {
   const cutoff = addDays(today, -MONTHLY_CHECK_UNREVIEWED_DAYS);

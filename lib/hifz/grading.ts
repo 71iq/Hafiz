@@ -8,14 +8,6 @@
 export const SUPPORT_LEVELS = [0, 1, 2, 3, 4] as const;
 export type SupportLevel = (typeof SUPPORT_LEVELS)[number];
 
-export const SUPPORT_LEVEL_NAMES: Readonly<Record<SupportLevel, "full" | "first_letters" | "line_by_line" | "swipe" | "hidden">> = {
-  0: "full",
-  1: "first_letters",
-  2: "line_by_line",
-  3: "swipe",
-  4: "hidden",
-};
-
 export type Grader = "self" | "teacher" | "salah" | "asr";
 export type Rating = 1 | 2 | 3 | 4;
 
@@ -40,17 +32,6 @@ export type AttemptEvents = Readonly<{
   driftUnnoticed: boolean;
   longHesitations: number;
 }>;
-
-export const NO_EVENTS: AttemptEvents = {
-  fath: 0,
-  tanbih: 0,
-  selfCorrected: 0,
-  uncorrectedJali: 0,
-  skippedAyah: false,
-  seamFailed: false,
-  driftUnnoticed: false,
-  longHesitations: 0,
-};
 
 /**
  * GRD-02: the grade the rubric proposes after reveal. Easy needs a fluent attempt with no slips.

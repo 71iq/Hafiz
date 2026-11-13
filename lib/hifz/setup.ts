@@ -6,7 +6,7 @@ import { writeHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { pagesOfJuz } from "@/lib/hifz/units";
 
 /** Pages whose every ayah belongs to one of the surahs (a page shared with an unchosen surah is left out). */
-export async function pagesCoveredBySurahs(db: DatabaseExecutor, surahs: readonly number[]): Promise<number[]> {
+async function pagesCoveredBySurahs(db: DatabaseExecutor, surahs: readonly number[]): Promise<number[]> {
   if (surahs.length === 0) return [];
   const chosen = new Set(surahs);
   const rows = await db.getAllAsync<{ v2_page: number; surah: number }>(
@@ -22,7 +22,7 @@ export async function pagesCoveredBySurahs(db: DatabaseExecutor, surahs: readonl
 }
 
 /** Surahs with at least one ayah on the pages, for scoping the similar-verse decks. */
-export async function surahsOnPages(db: DatabaseExecutor, pages: readonly number[]): Promise<number[]> {
+async function surahsOnPages(db: DatabaseExecutor, pages: readonly number[]): Promise<number[]> {
   if (pages.length === 0) return [];
   const placeholders = pages.map(() => "?").join(", ");
   const rows = await db.getAllAsync<{ surah: number }>(

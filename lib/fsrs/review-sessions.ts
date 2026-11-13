@@ -4,7 +4,7 @@ import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { createId } from "@/lib/id";
 
 /** 4.4 session kinds. `cards` is the existing deck review. */
-export const SESSION_KINDS = [
+const SESSION_KINDS = [
   "cards",
   "wird",
   "sabaq",
@@ -181,10 +181,3 @@ export async function endReviewSession(
   return ended;
 }
 
-/** PLN-05: measured minutes per page, for the daily plan's time estimates. */
-export async function readRecentSessions(db: DatabaseExecutor, limit = 30): Promise<ReviewSessionRow[]> {
-  return db.getAllAsync<ReviewSessionRow>(
-    `SELECT ${SESSION_COLUMNS} FROM review_sessions WHERE deleted_at IS NULL ORDER BY started_at DESC LIMIT ?`,
-    [limit],
-  );
-}

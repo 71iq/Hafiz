@@ -21,7 +21,7 @@ type Props = {
   onOpenBreak: () => void;
 };
 
-export function formatClockTime(at: Date, language: "en" | "ar"): string {
+function formatClockTime(at: Date, language: "en" | "ar"): string {
   return at.toLocaleTimeString(language === "ar" ? "ar" : "en", { hour: "numeric", minute: "2-digit" });
 }
 
@@ -63,21 +63,21 @@ function headlineMessage(overview: HabitOverview, language: "en" | "ar", s: UISt
   }
 }
 
-function headlineIcon(kind: HabitOverview["headline"]["kind"]) {
+function HeadlineIcon({ kind, color }: { kind: HabitOverview["headline"]["kind"]; color: string }) {
   switch (kind) {
     case "paused":
-      return PauseCircle;
+      return <PauseCircle size={15} color={color} />;
     case "excused_today":
-      return Moon;
+      return <Moon size={15} color={color} />;
     case "make_up_open":
-      return CalendarClock;
+      return <CalendarClock size={15} color={color} />;
     case "earn_back":
-      return RotateCcw;
+      return <RotateCcw size={15} color={color} />;
     case "fresh_start":
     case "empty":
-      return Sprout;
+      return <Sprout size={15} color={color} />;
     default:
-      return CalendarCheck2;
+      return <CalendarCheck2 size={15} color={color} />;
   }
 }
 
@@ -91,7 +91,6 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   const muted = isDark ? "#a3a3a3" : "#8B8178";
   const { streak, headline, settings, goal } = overview;
-  const Icon = headlineIcon(headline.kind);
   const showMinimum =
     headline.kind === "at_risk" ||
     headline.kind === "empty" ||
@@ -108,7 +107,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
     >
       <MirroredRow dir={dir} className="items-center justify-between gap-3">
         <MirroredRow dir={dir} className="items-center gap-1.5 flex-shrink-0">
-          <Icon size={15} color={accent} />
+          <HeadlineIcon kind={headline.kind} color={accent} />
           <Text dir={dir} className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}>
             {formatNumber(streak.length, language)}
           </Text>

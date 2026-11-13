@@ -59,11 +59,6 @@ export function atLocalTime(date: LocalDate, minutesOfDay: number): Date {
   return new Date(year, month - 1, day, Math.floor(minutesOfDay / 60), minutesOfDay % 60, 0, 0);
 }
 
-/** Local midnight that starts `date` in the device's zone. */
-export function startOfLocalDate(date: LocalDate): Date {
-  return atLocalTime(date, 0);
-}
-
 /**
  * The device's IANA zone, stored beside each event so its date stays fixed after travel. Falls back
  * to a fixed offset when the runtime cannot name the zone.

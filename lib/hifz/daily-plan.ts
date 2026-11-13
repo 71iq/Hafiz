@@ -56,7 +56,7 @@ const NEVER_DEFER_AFTER_DAYS = 3;
 const MIN_NEW_LINES = 3;
 
 /** The day a manzil page must be reviewed by (SCH-03): its last review + the cycle, or its due date if never reviewed. */
-export function floorDate(page: PlanPage, cycleDays: number): LocalDate {
+function floorDate(page: PlanPage, cycleDays: number): LocalDate {
   return page.lastReviewDate ? addDays(page.lastReviewDate, cycleDays) : page.dueDate;
 }
 

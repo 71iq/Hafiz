@@ -10,7 +10,7 @@ export const DEFAULT_WIRD_MINIMUM: WirdMinimum = { pages: 1, minutes: 5 };
 export const WIRD_MINIMUM_PAGE_OPTIONS = [0.5, 1, 2, 3] as const;
 export const WIRD_MINIMUM_MINUTE_OPTIONS = [3, 5, 10, 15] as const;
 
-export const wirdMinimumSchema = z.object({
+const wirdMinimumSchema = z.object({
   pages: z.number().min(0.25).max(20),
   minutes: z.number().int().min(1).max(120),
 });
@@ -32,7 +32,7 @@ export function parseWirdMinimum(value: string | null | undefined): WirdMinimum 
 export const PAGE_UNITS = 20;
 
 /** A single review's time counts toward the minutes path up to this cap, so an idle screen cannot. */
-export const MAX_COUNTED_REVIEW_MS = 10 * 60_000;
+const MAX_COUNTED_REVIEW_MS = 10 * 60_000;
 
 export type CardRole = "recitation" | "study";
 
@@ -41,7 +41,7 @@ export type CardRole = "recitation" | "study";
  * verses. Study cards (word meanings, qira'at, reasons of revelation) count only when the user turns
  * on "meanings count toward my wird" (UNIT-02), and then only by time.
  */
-export function cardRole(cardId: string): CardRole {
+function cardRole(cardId: string): CardRole {
   if (cardId.startsWith("word:") || cardId.startsWith("qiraat:") || cardId.startsWith("asbab:")) return "study";
   return "recitation";
 }

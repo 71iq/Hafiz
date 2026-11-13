@@ -37,7 +37,7 @@ import { Rating, type Grade } from "@/lib/fsrs/scheduler";
 import type { DeckReviewSettings } from "@/lib/fsrs/types";
 import { localDateOf } from "@/lib/habit/dates";
 import { loadHabitOverview, type WirdProgressEvent } from "@/lib/habit/queries";
-import { readMistakeInbox, recordDrillResult, type InboxItem, type RecitationErrorType } from "@/lib/hifz/errors";
+import { INBOX_ITEMS_PER_REVIEW, readMistakeInbox, recordDrillResult, type InboxItem, type RecitationErrorType } from "@/lib/hifz/errors";
 import { GRADE_CAP, defaultSupportLevel, isGradable, SUPPORT_LEVELS, type SupportLevel } from "@/lib/hifz/grading";
 import { loadRecitationPage, type PageToken, type RecitationPage as PageData } from "@/lib/hifz/page-data";
 import { loadPageCards, loadTodayWird, toPlanPage, type PageCard } from "@/lib/hifz/pages";
@@ -189,7 +189,7 @@ function HifzReviewScreen() {
       const today = localDateOf(now);
       const [wird, inbox, names, base] = await Promise.all([
         loadTodayWird(db, now),
-        readMistakeInbox(db, today, 6),
+        readMistakeInbox(db, today, INBOX_ITEMS_PER_REVIEW),
         db.getAllAsync<{ number: number; name_arabic: string }>("SELECT number, name_arabic FROM surahs"),
         readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID),
       ]);

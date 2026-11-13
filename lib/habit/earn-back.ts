@@ -1,10 +1,10 @@
 import { addDays, datesBetween, type LocalDate } from "@/lib/habit/dates";
 import { computeStreak, isRecited, lastCoveredBefore, runLengthEndingOn, type DayMap } from "@/lib/habit/streak";
 
-export const EARN_BACK_MIN_STREAK = 7;
-export const EARN_BACK_WINDOW_DAYS = 3;
-export const EARN_BACK_DAYS_NEEDED = 3;
-export const EARN_BACK_FULL_DAYS_NEEDED = 2;
+const EARN_BACK_MIN_STREAK = 7;
+const EARN_BACK_WINDOW_DAYS = 3;
+const EARN_BACK_DAYS_NEEDED = 3;
+const EARN_BACK_FULL_DAYS_NEEDED = 2;
 
 export type EarnBack = Readonly<{
   /** Length of the streak that broke. */

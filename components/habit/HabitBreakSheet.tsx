@@ -8,7 +8,7 @@ import { Text } from "@/components/ui/Text";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { formatShortDate } from "@/components/habit/WirdStreakCard";
 import type { AppDatabase } from "@/lib/database/types";
-import { addDays, localDateOf, type LocalDate } from "@/lib/habit/dates";
+import { addDays, localDateOf } from "@/lib/habit/dates";
 import {
   clearExcusedDay,
   EXCUSE_DAYS_AHEAD,

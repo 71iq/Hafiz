@@ -43,7 +43,7 @@ export function emptyAttempt(level: SupportLevel): Attempt {
 }
 
 /** The words an attempt went wrong on: marked, peeked at, or shown (SCH-08 uses their lines). */
-export function errorTokens(attempt: Attempt): PageToken[] {
+function errorTokens(attempt: Attempt): PageToken[] {
   return [...[...attempt.marks.values()].map((mark) => mark.token), ...attempt.peeked, ...attempt.shown];
 }
 
@@ -112,7 +112,7 @@ export const MANZIL_CYCLE_START_KEY = "hifz_manzil_cycle_start";
  * after the cycle start. That day's wird is marked (it feeds board points) and the next cycle starts
  * tomorrow. Runs inside the grade transaction.
  */
-export async function completeManzilCycleIfDone(db: DatabaseExecutor, now: Date): Promise<boolean> {
+async function completeManzilCycleIfDone(db: DatabaseExecutor, now: Date): Promise<boolean> {
   const today = localDateOf(now);
   const startRow = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [MANZIL_CYCLE_START_KEY]);
   const pages = await db.getAllAsync<{ id: string; tier: string | null; last_review: string | null; created_at: string }>(
