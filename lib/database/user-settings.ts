@@ -12,6 +12,7 @@ const SYNCABLE_SETTING_PREFIXES = [
   "card_answer_",
   "habit_",
   "fsrs_weights_",
+  "notif_pref_",
 ];
 const SYNCABLE_SETTING_KEYS = new Set([
   "daily_review_limit",

@@ -15,6 +15,7 @@ import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
 import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 import { SettingsProvider } from "@/lib/settings/context";
+import { useReminderResponses, useReminderScheduling } from "@/lib/notifications/use-reminder-scheduling";
 
 const queryClient = createAppQueryClient();
 
@@ -47,6 +48,13 @@ function StableDocumentTitle() {
     return () => clearTimeout(timer);
   }, [pathname]);
 
+  return null;
+}
+
+/** Local reminders: replans on start, foreground, zone change, sync and reviews, and routes taps. */
+function ReminderLifecycle() {
+  useReminderScheduling();
+  useReminderResponses();
   return null;
 }
 
@@ -102,6 +110,7 @@ export default function RootLayout() {
             <DatabaseNoticeBoundary>
               <AudioProviderBoundary>
                 <StableDocumentTitle />
+                <ReminderLifecycle />
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="about" />

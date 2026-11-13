@@ -381,6 +381,30 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Note rows and actions mirror; note text can use natural direction.",
   ),
   entry(
+    "components/notifications/PrayerTimesSetup.tsx",
+    "form-field",
+    "source",
+    "Coordinate fields, method list and prayer-time rows mirror; digits localize in Arabic.",
+  ),
+  entry(
+    "components/notifications/ReminderPromptCard.tsx",
+    "card",
+    "source",
+    "Title row mirrors its bell icon; the reason and buttons follow the interface direction and digits.",
+  ),
+  entry(
+    "components/notifications/ReminderSettingsSection.tsx",
+    "card",
+    "source",
+    "Switch rows, steppers and toggle groups mirror; the prayer-times sheet uses ResponsiveOverlay.",
+  ),
+  entry(
+    "components/notifications/WirdReminderBanner.tsx",
+    "feedback",
+    "source",
+    "Banner text and the dismiss button mirror; action buttons wrap in reading order.",
+  ),
+  entry(
     "components/profile/ProfileAvatar.tsx",
     "direction-neutral",
     "source",

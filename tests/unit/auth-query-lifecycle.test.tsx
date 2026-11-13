@@ -58,6 +58,11 @@ jest.mock("@/lib/settings/context", () => ({
   SettingsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 jest.mock("@/lib/fonts/ui-fonts", () => ({ UI_FONTS: {}, loadUiFontsWeb: async () => undefined }));
+// Reminder scheduling needs the database and settings; this suite covers auth cache binding only.
+jest.mock("@/lib/notifications/use-reminder-scheduling", () => ({
+  useReminderScheduling: () => undefined,
+  useReminderResponses: () => undefined,
+}));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => false,
   supabase: {

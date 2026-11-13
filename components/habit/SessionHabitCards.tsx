@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 import { CalendarCheck2, Coffee, HeartHandshake, Sparkles, Target } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { ZaytMood, type ZaytMoodName } from "@/components/habit/ZaytMood";
+import { ReminderPromptCard, useReminderOffer } from "@/components/notifications/ReminderPromptCard";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import type { AppDatabase } from "@/lib/database/types";
@@ -14,7 +15,7 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 
 /** ETH-05: suggest rest after this much review in one session. */
-export const REST_SUGGESTION_MS = 45 * 60_000;
+const REST_SUGGESTION_MS = 45 * 60_000;
 
 export type SessionHabitInput = Readonly<{
   /** The strongest wird event this session produced, or null. */
@@ -46,13 +47,18 @@ export function showsCommitment(input: SessionHabitInput): boolean {
   return input.event !== null && (input.overview?.streak.length ?? 0) <= 7;
 }
 
-type CardKind = "goal" | "rest" | "struggle";
+type CardKind = "goal" | "rest" | "struggle" | "reminders";
 
-/** SES-01: at most one prompt card after the streak card, so a summary never shows more than 3. */
-function promptCard(input: SessionHabitInput): CardKind | null {
-  if (input.event && input.overview && !input.overview.goal && input.overview.streak.length >= 1) return "goal";
+/**
+ * SES-01: at most one prompt card after the streak card, so a summary never shows more than 3. Rest
+ * and encouragement come first because they answer how the session went; the reminder offer (ONB-02)
+ * comes before the streak goal.
+ */
+function promptCard(input: SessionHabitInput, reminderOffer: boolean): CardKind | null {
   if (input.durationMs >= REST_SUGGESTION_MS) return "rest";
   if (input.againCount >= 3 && input.total > 0 && input.againCount / input.total >= 0.3) return "struggle";
+  if (reminderOffer) return "reminders";
+  if (input.event && input.overview && !input.overview.goal && input.overview.streak.length >= 1) return "goal";
   return null;
 }
 
@@ -97,7 +103,8 @@ export function SessionHabitCards({
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   const [goalChoice, setGoalChoice] = useState<number | null>(null);
   const [goalDismissed, setGoalDismissed] = useState(false);
-  const prompt = promptCard(input);
+  const reminderAnchor = useReminderOffer(db);
+  const prompt = promptCard(input, reminderAnchor !== null);
   const length = input.event?.length ?? 0;
   const milestone = input.event !== null && isStreakMilestone(length);
   const mood = input.overview?.settings.showZayt === false ? null : sessionMood(input, prompt, milestone);
@@ -187,6 +194,10 @@ export function SessionHabitCards({
             </>
           ) : null}
         </Card>
+      ) : null}
+
+      {prompt === "reminders" && reminderAnchor ? (
+        <ReminderPromptCard db={db} anchor={reminderAnchor} language={language} isDark={isDark} s={s} />
       ) : null}
 
       {prompt === "rest" ? (

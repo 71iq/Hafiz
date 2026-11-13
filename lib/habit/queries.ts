@@ -1,7 +1,8 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
-import { makeUpCutoffFor, NO_PRAYER_TIMES, type DhuhrResolver } from "@/lib/habit/cutoff";
+import { makeUpCutoffFor, type DhuhrResolver } from "@/lib/habit/cutoff";
+import { readDhuhrResolver } from "@/lib/prayer/settings";
 import { addDays, datesBetween, deviceTimeZone, diffDays, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { findEarnBack } from "@/lib/habit/earn-back";
 import { mergeHabitDays } from "@/lib/habit/merge";
@@ -214,7 +215,7 @@ async function streakLength(db: DatabaseExecutor, today: LocalDate): Promise<num
  */
 export async function recordWirdProgress(db: DatabaseExecutor, context: WirdProgressContext): Promise<WirdProgressEvent> {
   const { now, sessionId } = context;
-  const dhuhr = context.dhuhr ?? NO_PRAYER_TIMES;
+  const dhuhr = context.dhuhr ?? (await readDhuhrResolver(db));
   const today = localDateOf(now);
   const yesterday = addDays(today, -1);
   const dayBefore = addDays(today, -2);
@@ -281,10 +282,11 @@ export async function markFullWirdIfComplete(
 /** Run the idempotent settle pass (8.4) and return what it recorded. */
 export async function settleHabitDays(
   database: AppDatabase,
-  { now = new Date(), dhuhr = NO_PRAYER_TIMES }: { now?: Date; dhuhr?: DhuhrResolver } = {},
+  { now = new Date(), dhuhr: given }: { now?: Date; dhuhr?: DhuhrResolver } = {},
 ): Promise<SettlementWrite[]> {
   let writes: SettlementWrite[] = [];
   await database.withTransactionAsync(async (db) => {
+    const dhuhr = given ?? (await readDhuhrResolver(db));
     const [settings, days] = await Promise.all([readHabitSettings(db), readHabitDays(db)]);
     writes = planSettlement({
       days,
@@ -309,11 +311,12 @@ export type HabitOverview = HabitSnapshot & {
 
 export async function loadHabitOverview(
   db: DatabaseExecutor,
-  { now = new Date(), dhuhr = NO_PRAYER_TIMES }: { now?: Date; dhuhr?: DhuhrResolver } = {},
+  { now = new Date(), dhuhr: given }: { now?: Date; dhuhr?: DhuhrResolver } = {},
 ): Promise<HabitOverview> {
   const today = localDateOf(now);
   const yesterday = addDays(today, -1);
-  const [settings, days, reviews, yesterdayRow] = await Promise.all([
+  const [dhuhr, settings, days, reviews, yesterdayRow] = await Promise.all([
+    given ?? readDhuhrResolver(db),
     readHabitSettings(db),
     readHabitDays(db),
     readDayReviews(db, today),
@@ -341,7 +344,7 @@ export async function loadHabitOverview(
 export const EXCUSE_DAYS_BACK = 3;
 export const EXCUSE_DAYS_AHEAD = 30;
 
-export function canExcuse(date: LocalDate, today: LocalDate): boolean {
+function canExcuse(date: LocalDate, today: LocalDate): boolean {
   const offset = diffDays(today, date);
   return offset >= -EXCUSE_DAYS_BACK && offset <= EXCUSE_DAYS_AHEAD;
 }

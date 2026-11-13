@@ -72,7 +72,25 @@ def check(root):
     require(bool(list(resources.glob("drawable*/splashscreen_logo.*"))), "Missing native splash resource")
     for icon in ["ic_launcher_foreground", "ic_launcher_monochrome"]:
         require(bool(list(resources.glob("mipmap-*/" + icon + ".*"))), "Missing native icon resource: " + icon)
-    require(expo["plugins"] == ["expo-router", "expo-sharing", "expo-asset"], "Review changed config-plugin ownership")
+    plugin_names = [plugin[0] if isinstance(plugin, list) else plugin for plugin in expo["plugins"]]
+    require(
+        plugin_names == ["expo-router", "expo-sharing", "expo-asset", "expo-audio", "expo-notifications", "expo-location"],
+        "Review changed config-plugin ownership",
+    )
+    # expo-notifications: the committed project mirrors the plugin's icon and color by hand.
+    notification_meta = {
+        item.get(ANDROID + "name"): item.get(ANDROID + "resource") for item in application.findall("meta-data")
+    }
+    require(
+        resource_exists(notification_meta.get("expo.modules.notifications.default_notification_icon")),
+        "Missing native notification icon resource",
+    )
+    plugin_config = next((plugin[1] for plugin in expo["plugins"] if isinstance(plugin, list) and plugin[0] == "expo-notifications"), {})
+    require(
+        notification_meta.get("expo.modules.notifications.default_notification_color") == "@color/notification_icon_color"
+        and (colors.get("notification_icon_color") or "").lower() == str(plugin_config.get("color", "")).lower(),
+        "Android notification color differs from app.json",
+    )
     require(not (root / "ios").exists(), "Review ownership for the newly present iOS project")
     return errors
 

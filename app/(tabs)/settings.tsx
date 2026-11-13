@@ -41,6 +41,7 @@ import {
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { WirdSettingsSection } from "@/components/habit/WirdSettingsSection";
+import { ReminderSettingsSection } from "@/components/notifications/ReminderSettingsSection";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
 import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
@@ -608,6 +609,9 @@ export default function SettingsScreen() {
             s={s}
             onOpenPlan={() => router.push("/hifz/setup" as Href)}
           />
+
+          <SectionLabel>{s.notifSettingsTitle}</SectionLabel>
+          <ReminderSettingsSection />
         </>
       )}
 

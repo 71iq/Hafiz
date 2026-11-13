@@ -74,6 +74,16 @@ class NativeOwnershipTests(unittest.TestCase):
         (self.root / "ios").mkdir()
         self.assertTrue(checker.check(self.root))
 
+    def test_notification_icon_and_color(self):
+        manifest = self.root / "android/app/src/main/AndroidManifest.xml"
+        text = manifest.read_text()
+        manifest.write_text(text.replace("@drawable/notification_icon", "@drawable/missing_notification_icon"))
+        self.assertTrue(checker.check(self.root))
+        manifest.write_text(text)
+        colors = self.root / "android/app/src/main/res/values/colors.xml"
+        colors.write_text(colors.read_text().replace('name="notification_icon_color">#0D9488', 'name="notification_icon_color">#000000'))
+        self.assertTrue(checker.check(self.root))
+
     def test_missing_asset_and_native_resource(self):
         (self.root / "assets/images/icon.png").unlink()
         self.assertTrue(checker.check(self.root))

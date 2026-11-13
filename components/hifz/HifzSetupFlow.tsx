@@ -7,6 +7,8 @@ import { Text } from "@/components/ui/Text";
 import { MemorizedPortionPicker, type SurahChoice } from "@/components/hifz/MemorizedPortionPicker";
 import type { AppDatabase } from "@/lib/database/types";
 import { applyHifzSetup } from "@/lib/hifz/setup";
+import { Card } from "@/components/ui/Card";
+import { PrayerTimesSetup } from "@/components/notifications/PrayerTimesSetup";
 import { applyPreset, DEFAULT_HIFZ_PLAN, PRAYERS, type HifzPlan, type PlanPreset, type Prayer } from "@/lib/hifz/plan";
 import { formatMinutes, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -33,7 +35,7 @@ function presetLabel(preset: PlanPreset, s: UIStrings): string {
   }
 }
 
-export function prayerLabel(prayer: Prayer, s: UIStrings): string {
+function prayerLabel(prayer: Prayer, s: UIStrings): string {
   switch (prayer) {
     case "fajr":
       return s.hifzPrayerFajr;
@@ -286,6 +288,12 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                 );
               })}
             </MirroredRow>
+            {/* 5.1 step 7: a prayer anchor needs prayer times; without them it falls back to set clock times. */}
+            {plan.anchor.kind === "prayer" ? (
+              <Card elevation="low" className="mt-2 px-4 py-4">
+                <PrayerTimesSetup />
+              </Card>
+            ) : null}
           </View>
         ) : null}
 

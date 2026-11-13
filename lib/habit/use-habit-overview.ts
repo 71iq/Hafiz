@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import type { AppDatabase } from "@/lib/database/types";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
-import { NO_PRAYER_TIMES, type DhuhrResolver } from "@/lib/habit/cutoff";
+import type { DhuhrResolver } from "@/lib/habit/cutoff";
 import { loadHabitOverview, settleHabitDays, type HabitOverview } from "@/lib/habit/queries";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
@@ -24,9 +24,10 @@ export function subscribeHabitChanged(listener: Listener): () => void {
 /**
  * The wird overview for a screen. Each load first runs the idempotent settle pass (8.4), on focus,
  * after reviews, after sync and after habit changes, so grace and paused days are recorded before
- * they are shown. A failed load keeps the last good overview.
+ * they are shown. A failed load keeps the last good overview. Without `dhuhr`, the make-up cutoff
+ * follows the saved prayer location (lib/prayer/settings).
  */
-export function useHabitOverview(db: AppDatabase, dhuhr: DhuhrResolver = NO_PRAYER_TIMES) {
+export function useHabitOverview(db: AppDatabase, dhuhr?: DhuhrResolver) {
   const [overview, setOverview] = useState<HabitOverview | null>(null);
   const [failed, setFailed] = useState(false);
   const latest = useRef(0);
