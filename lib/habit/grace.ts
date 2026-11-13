@@ -10,27 +10,32 @@ const EARNS_GRACE: ReadonlySet<DayStatus> = new Set<DayStatus>(["done", "made_up
 
 /**
  * STR-14: grace days are earned free, one after the 3rd wird day and then one every 7 wird days,
- * holding at most 2. The balance is derived from the history before `before`, never stored (DB-06).
+ * holding at most 2. Feed day statuses in date order; a grace day spends one.
  */
-export function graceBalance(days: DayMap, before: LocalDate): number {
-  const dates = [...days.keys()].filter((date) => date < before).sort();
-  let balance = 0;
-  let earnedRun = 0;
-  let firstAwarded = false;
-  for (const date of dates) {
-    const status = days.get(date)!.status;
+export class GraceCounter {
+  private earnedRun = 0;
+  private firstAwarded = false;
+  balance = 0;
+
+  add(status: DayStatus): void {
     if (status === "grace") {
-      balance = Math.max(0, balance - 1);
-      continue;
+      this.balance = Math.max(0, this.balance - 1);
+      return;
     }
-    if (!EARNS_GRACE.has(status)) continue;
-    earnedRun += 1;
-    const threshold = firstAwarded ? GRACE_AWARD_EVERY : GRACE_FIRST_AWARD_AFTER;
-    if (earnedRun >= threshold) {
-      balance = Math.min(GRACE_MAX_HELD, balance + 1);
-      firstAwarded = true;
-      earnedRun = 0;
+    if (!EARNS_GRACE.has(status)) return;
+    this.earnedRun += 1;
+    const threshold = this.firstAwarded ? GRACE_AWARD_EVERY : GRACE_FIRST_AWARD_AFTER;
+    if (this.earnedRun >= threshold) {
+      this.balance = Math.min(GRACE_MAX_HELD, this.balance + 1);
+      this.firstAwarded = true;
+      this.earnedRun = 0;
     }
   }
-  return balance;
+}
+
+/** The grace balance held before `before`, derived from history and never stored (DB-06). */
+export function graceBalance(days: DayMap, before: LocalDate): number {
+  const counter = new GraceCounter();
+  for (const date of [...days.keys()].filter((date) => date < before).sort()) counter.add(days.get(date)!.status);
+  return counter.balance;
 }

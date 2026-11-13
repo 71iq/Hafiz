@@ -140,6 +140,31 @@ describe("settle pass (8.4)", () => {
     ]);
   });
 
+  it("settles an earlier gap that a later wird day closed off", () => {
+    const history = [...run(addDays(TODAY, -4), 4), day(addDays(TODAY, -2))];
+    expect(planSettlement({ days: history, today: TODAY, now: morning, makeUpCutoffFor: cutoff, pause: null })).toEqual([
+      { localDate: addDays(TODAY, -3), status: "grace" },
+    ]);
+  });
+
+  it("only spends grace that was held on the day it covers", () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(fc.integer({ min: 1, max: 40 }), { maxLength: 30 }),
+        fc.integer({ min: 0, max: 23 * 60 }),
+        (offsets, minutes) => {
+          const now = atLocalTime(TODAY, minutes);
+          const days = offsets.map((offset) => day(addDays(TODAY, -offset)));
+          const writes = planSettlement({ days, today: TODAY, now, makeUpCutoffFor: cutoff, pause: null });
+          const settled = toDayMap([...days, ...writes.map((write) => day(write.localDate, write.status))]);
+          return writes
+            .filter((write) => write.status === "grace")
+            .every((write) => settled.has(addDays(write.localDate, -1)) && graceBalance(settled, write.localDate) > 0);
+        },
+      ),
+    );
+  });
+
   it("writes nothing without a streak to protect or without grace", () => {
     expect(planSettlement({ days: [], today: TODAY, now: afternoon, makeUpCutoffFor: cutoff, pause: null })).toEqual([]);
     const short = run(addDays(TODAY, -2), 2);

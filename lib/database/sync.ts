@@ -164,7 +164,7 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     "SELECT value FROM user_settings WHERE key = 'last_pull_at'",
   );
   owner.requireCurrent();
-  const lastPullAt = lastSyncRow?.value ?? "1970-01-01T00:00:00Z";
+  const lastPullAt = lastSyncRow?.value ?? PULL_EPOCH;
   const pullStartedAt = new Date().toISOString();
 
   let totalPulled = 0;
@@ -190,8 +190,21 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     // Pull study_cards
     await pullTable(db, "study_cards", userId, lastPullAt, upsertStudyCard, owner, onPageApplied);
 
-    // Pull study_log
-    await pullTable(db, "study_log", userId, lastPullAt, upsertStudyLog, owner, onPageApplied);
+    // Pull study_log. A review from an older app version on another device has no wird day row, so
+    // its day is reconciled after the pull.
+    let pulledLegacyReview = false;
+    await pullTable(
+      db,
+      "study_log",
+      userId,
+      lastPullAt,
+      async (tx, row) => {
+        if ((row.grader ?? null) === null) pulledLegacyReview = true;
+        await upsertStudyLog(tx, row);
+      },
+      owner,
+      onPageApplied,
+    );
 
     // Pull bookmarks
     await pullTable(db, "bookmarks", userId, lastPullAt, upsertBookmark, owner, onPageApplied);
@@ -216,10 +229,23 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     // Pull public badge unlocks. Pulled badges are already seen locally.
     await pullTable(db, "achievement_unlocks", userId, lastPullAt, upsertAchievementUnlock, owner, onPageApplied);
 
-    // Wird days merge by status precedence; sessions and errors keep the newer row.
-    await pullTable(db, "habit_days", userId, lastPullAt, upsertHabitDay, owner, onPageApplied);
-    await pullTable(db, "review_sessions", userId, lastPullAt, upsertReviewSession, owner, onPageApplied);
-    await pullTable(db, "recitation_errors", userId, lastPullAt, upsertRecitationError, owner, onPageApplied);
+    // Wird days merge by status precedence; sessions and errors keep the newer row. These tables are
+    // newer than the shared cursor, so each account pulls them in full once: rows another device
+    // uploaded before this device's last pull would otherwise never arrive.
+    const habitTablesPulled = await isBackfillComplete(db, habitPullKey(userId));
+    owner.requireCurrent();
+    const habitSince = habitTablesPulled ? lastPullAt : PULL_EPOCH;
+    await pullTable(db, "habit_days", userId, habitSince, upsertHabitDay, owner, onPageApplied);
+    await pullTable(db, "review_sessions", userId, habitSince, upsertReviewSession, owner, onPageApplied);
+    await pullTable(db, "recitation_errors", userId, habitSince, upsertRecitationError, owner, onPageApplied);
+
+    if (pulledLegacyReview) {
+      owner.requireCurrent();
+      await db.withTransactionAsync(async (tx) => {
+        owner.requireCurrent();
+        await reconcileHabitDaysFromLogs(tx, { now: new Date() });
+      });
+    }
 
     owner.requireCurrent();
     await backfillAchievements(db, { notify: false });
@@ -231,6 +257,8 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('last_pull_at', ?)", [
         pullStartedAt,
       ]);
+      owner.requireCurrent();
+      if (!habitTablesPulled) await markBackfillComplete(db, habitPullKey(userId));
       owner.requireCurrent();
       complete = true;
     }
@@ -290,6 +318,7 @@ function isSyncInternalSetting(key: string): boolean {
     key.startsWith("sync_initial_backfill_") ||
     key.startsWith("sync_user_settings_backfill_") ||
     key.startsWith("sync_habit_backfill_") ||
+    key.startsWith("sync_habit_pull_") ||
     key.startsWith("sync_account_restore_")
   );
 }
@@ -319,6 +348,9 @@ async function markAccountRestoreComplete(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES ('last_pull_at', ?, ?, NULL)",
     [snapshotStartedAt, now],
   );
+  owner.requireCurrent();
+  // The restore snapshot covered the wird tables, so they need no separate full pull.
+  await markBackfillComplete(db, habitPullKey(userId));
   owner.requireCurrent();
   if (!restoredFromRemote) return;
   await db.runAsync(
@@ -1429,6 +1461,19 @@ async function enqueueInitialLocalRows(
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
     [settingsBackfillKey, new Date().toISOString()],
+  );
+}
+
+const PULL_EPOCH = "1970-01-01T00:00:00Z";
+
+function habitPullKey(userId: string): string {
+  return `sync_habit_pull_${userId}_${HABIT_BACKFILL_VERSION}`;
+}
+
+async function markBackfillComplete(db: DatabaseExecutor, key: string): Promise<void> {
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
+    [key, new Date().toISOString()],
   );
 }
 

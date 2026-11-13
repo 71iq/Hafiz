@@ -1,7 +1,7 @@
 import { addDays, datesBetween, type LocalDate } from "@/lib/habit/dates";
 import { findEarnBack } from "@/lib/habit/earn-back";
-import { graceBalance } from "@/lib/habit/grace";
-import { lastCoveredBefore, toDayMap } from "@/lib/habit/streak";
+import { GraceCounter } from "@/lib/habit/grace";
+import { toDayMap } from "@/lib/habit/streak";
 import type { DayStatus, HabitDay, HabitPause } from "@/lib/habit/types";
 
 export type SettlementWrite = Readonly<{ localDate: LocalDate; status: Extract<DayStatus, "grace" | "paused" | "earned_back"> }>;
@@ -24,7 +24,8 @@ export function isMakeUpOpen(input: Pick<SettlementInput, "today" | "now" | "mak
  * The idempotent "settle days" pass, run on app open, on Home focus and after sync, never as a
  * background job. It records what the rules already decided:
  * 1. Paused days inside the user's pause, through today (STR-13).
- * 2. Grace days for missed days whose make-up window has closed, while grace is held (STR-14, STR-15).
+ * 2. Grace days for missed days whose make-up window has closed, while grace is held (STR-14, STR-15),
+ *    replayed over the whole history so an earlier unsettled gap is not skipped.
  * 3. Earned-back days once an earn-back succeeded (STR-17).
  * Days already covered are never touched, so running it twice writes nothing the second time.
  */
@@ -44,19 +45,24 @@ export function planSettlement(input: SettlementInput): SettlementWrite[] {
     }
   }
 
-  const lastCovered = lastCoveredBefore(days, today);
-  if (lastCovered !== null) {
-    let missed = addDays(lastCovered, 1);
-    while (missed < today) {
-      if (days.has(missed)) {
-        missed = addDays(missed, 1);
+  // Walk the whole history in date order with a running balance, so a gap that was never settled
+  // (the app stayed closed, or the next day's wird came from another device) still gets the grace
+  // the rules gave it. Only a day right after a covered day can take grace.
+  const dates = [...days.keys()].sort();
+  if (dates.length > 0) {
+    const counter = new GraceCounter();
+    for (let date = dates[0]!; date < today; date = addDays(date, 1)) {
+      const day = days.get(date);
+      if (day) {
+        counter.add(day.status);
         continue;
       }
-      const windowClosed = now.getTime() >= makeUpCutoffFor(missed).getTime();
-      if (!windowClosed) break;
-      if (graceBalance(days, missed) <= 0) break;
-      record(missed, "grace");
-      missed = addDays(missed, 1);
+      const afterCovered = days.has(addDays(date, -1));
+      const windowClosed = now.getTime() >= makeUpCutoffFor(date).getTime();
+      if (afterCovered && windowClosed && counter.balance > 0) {
+        record(date, "grace");
+        counter.add("grace");
+      }
     }
   }
 

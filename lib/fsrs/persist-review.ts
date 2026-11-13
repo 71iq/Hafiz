@@ -34,8 +34,9 @@ export const DEFAULT_REVIEW_SAVE_CONTEXT: ReviewSaveContext = {
 
 export type ReviewSaveResult = Readonly<{ wird: WirdProgressEvent; resolvedInboxItems: number }>;
 
+/** ERR-03: only a Good or Easy recall at the hidden level with no new errors counts; salah has no check. */
 function isCleanRecall(rating: number, context: ReviewSaveContext): boolean {
-  return rating >= 3 && context.errors.length === 0 && (context.supportLevel === null || context.supportLevel === 4);
+  return rating >= 3 && context.errors.length === 0 && context.supportLevel === 4 && context.grader !== "salah";
 }
 
 /**

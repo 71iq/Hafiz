@@ -85,3 +85,22 @@ export function minimumProgress(tally: WirdTally, minimum: WirdMinimum): number 
   const byMinutes = tally.countedMs / Math.max(1, minimum.minutes * 60_000);
   return Math.min(1, Math.max(byPages, byMinutes));
 }
+
+const STUDY_SQL = "(card_id LIKE 'word:%' OR card_id LIKE 'qiraat:%' OR card_id LIKE 'asbab:%')";
+
+/**
+ * The same tally as tallyReviews, computed by SQLite over one day's review log, so a grade does not
+ * load the day's rows. Bind [studyCounts (0 or 1), localDate]. Keep the weights in step with
+ * recitationUnits; a test compares the two.
+ */
+export const DAY_TALLY_SQL = `SELECT
+  COALESCE(SUM(CASE
+    WHEN ${STUDY_SQL} THEN 0
+    WHEN card_id LIKE 'page:%' OR card_id LIKE 'chunk:%' THEN ${PAGE_UNITS}
+    WHEN card_id LIKE 'half:%' THEN ${PAGE_UNITS / 2}
+    WHEN card_id LIKE 'seam:%' THEN ${PAGE_UNITS / 4}
+    ELSE ${PAGE_UNITS / 10} END), 0) AS page_units,
+  COALESCE(SUM(CASE
+    WHEN ${STUDY_SQL} AND ? = 0 THEN 0
+    ELSE MIN(MAX(COALESCE(duration_ms, 0), 0), ${MAX_COUNTED_REVIEW_MS}) END), 0) AS counted_ms
+  FROM study_log WHERE local_date = ?`;

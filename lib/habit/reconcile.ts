@@ -46,7 +46,7 @@ export async function reconcileHabitDaysFromLogs(db: DatabaseExecutor, { now }: 
   for (const [date, reviews] of [...byDate.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
     if (days.has(date)) continue;
     const previous = days.get(addDays(date, -1));
-    const credited = previous?.status === "made_up" ? previous.credited_through : null;
+    const credited = previous?.credited_through ?? null;
     const own = credited ? reviews.filter((review) => compareSyncTimestamps(review.reviewed_at, credited) > 0) : reviews;
     if (own.length === 0) continue;
     const legacy = own.some((review) => review.grader === null);

@@ -1458,6 +1458,23 @@ it.each([null, {}, { length: 0 }])("rejects non-array account results %p before 
   expect(writes).toEqual([]);
 });
 
+it("pulls the wird tables in full once per account, then from the shared cursor", async () => {
+  restoreComplete();
+  putSetting("last_pull_at", OLD);
+  const wirdTables = new Set(["habit_days", "review_sessions", "recitation_errors"]);
+  const sinceByTable = () =>
+    Object.fromEntries(requests.filter((r) => r.incremental).map((r) => [r.table, r.since]));
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  const first = sinceByTable();
+  for (const table of wirdTables) expect(first[table]).toBe("1970-01-01T00:00:00Z");
+  expect(first.study_log).toBe(OLD);
+  const cursor = sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value;
+  requests.length = 0;
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  const second = sinceByTable();
+  for (const table of wirdTables) expect(second[table]).toBe(cursor);
+});
+
 it("keeps committed page counts and the cursor when a later incremental page is malformed, then retries", async () => {
   restoreComplete();
   putQueueRow();
@@ -1504,5 +1521,10 @@ it.each(
     .get(...keys[table].map((key) => incoming[key] as SQLInputValue));
   const expected = table === "achievement_unlocks" ? { ...incoming, public_payload: "{}" } : incoming;
   expect(selected).toMatchObject(expected);
-  expect(transactions).toBe(1);
+  // A review from an older app version also reconciles its wird day after an incremental pull.
+  const reconciled = table === "study_log" && mode === "incremental";
+  expect(transactions).toBe(reconciled ? 2 : 1);
+  if (reconciled) {
+    expect(sql.prepare("SELECT status FROM habit_days").all()).toEqual([{ status: "done" }]);
+  }
 });

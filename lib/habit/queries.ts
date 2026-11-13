@@ -5,7 +5,7 @@ import { makeUpCutoffFor, NO_PRAYER_TIMES, type DhuhrResolver } from "@/lib/habi
 import { addDays, datesBetween, deviceTimeZone, diffDays, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { findEarnBack } from "@/lib/habit/earn-back";
 import { mergeHabitDays } from "@/lib/habit/merge";
-import { meetsMinimum, minimumProgress, tallyReviews, type WirdTally } from "@/lib/habit/minimum";
+import { DAY_TALLY_SQL, meetsMinimum, minimumProgress, tallyReviews, type WirdTally } from "@/lib/habit/minimum";
 import { readHabitSettings, MAX_PAUSE_DAYS, HABIT_SETTING_KEYS, type HabitSettings } from "@/lib/habit/settings";
 import { planSettlement, type SettlementWrite } from "@/lib/habit/settle";
 import { buildHabitSnapshot, type HabitSnapshot } from "@/lib/habit/snapshot";
@@ -169,63 +169,95 @@ export type WirdProgressContext = Readonly<{
   dhuhr?: DhuhrResolver;
 }>;
 
+async function readDayTally(
+  db: DatabaseExecutor,
+  localDate: LocalDate,
+  creditedThrough: string | null,
+  settings: HabitSettings,
+): Promise<WirdTally> {
+  // A made-up day's credited reviews are filtered by instant, which SQL text order cannot do
+  // reliably across timestamp spellings, so that rare day tallies in JavaScript.
+  if (creditedThrough) return tally(reviewsAfter(await readDayReviews(db, localDate), creditedThrough), settings);
+  const row = await db.getFirstAsync<{ page_units: number; counted_ms: number }>(DAY_TALLY_SQL, [
+    settings.studyCountsTowardMinimum ? 1 : 0,
+    localDate,
+  ]);
+  return { pageUnits: Number(row?.page_units ?? 0), countedMs: Number(row?.counted_ms ?? 0) };
+}
+
+/** Write earned_back for the missed days of a successful earn-back. Returns how many were restored. */
+async function restoreEarnBack(db: DatabaseExecutor, today: LocalDate, at: string): Promise<{ restored: number; length: number } | null> {
+  const dayMap = toDayMap(await readHabitDays(db));
+  const earnBack = findEarnBack(dayMap, today, { makeUpOpen: false });
+  if (!earnBack?.succeeded || earnBack.restoreDays.length === 0) return null;
+  for (const date of earnBack.restoreDays) {
+    await putHabitDay(db, earnedDay(date, "earned_back", at));
+    dayMap.set(date, { localDate: date, status: "earned_back", fullMet: false });
+  }
+  return { restored: earnBack.restoreDays.length, length: computeStreak(dayMap, today, { makeUpOpen: false }).length };
+}
+
+async function streakLength(db: DatabaseExecutor, today: LocalDate): Promise<number> {
+  return computeStreak(toDayMap(await readHabitDays(db)), today, { makeUpOpen: false }).length;
+}
+
 /**
  * Record wird progress after a graded review, inside the grade transaction (DB-01).
  *
  * STR-07, STR-08: when yesterday was missed and its make-up window is open, the first minimum wird
- * today makes up yesterday. The reviews that did it are credited to yesterday only; later reviews
- * count for today. Otherwise the first minimum wird today marks today done, and a successful
- * earn-back restores the missed days.
+ * today makes up yesterday. The reviews that did it are credited to yesterday only, whatever status
+ * yesterday later merges to; later reviews count for today. Otherwise the first minimum wird today
+ * marks today done, and a successful earn-back restores the missed days.
+ *
+ * A grade reads three days and one aggregate row until the minimum is met; the full history is read
+ * once, on the review that meets it.
  */
 export async function recordWirdProgress(db: DatabaseExecutor, context: WirdProgressContext): Promise<WirdProgressEvent> {
   const { now, sessionId } = context;
   const dhuhr = context.dhuhr ?? NO_PRAYER_TIMES;
   const today = localDateOf(now);
   const yesterday = addDays(today, -1);
+  const dayBefore = addDays(today, -2);
   const at = now.toISOString();
-  const [settings, days] = await Promise.all([readHabitSettings(db), readHabitDays(db)]);
-  const dayMap = toDayMap(days);
-  if (dayMap.get(today)?.status === "done") return { kind: "none" };
-
-  const reviews = await readDayReviews(db, today);
+  const rows = await db.getAllAsync<HabitDayRow>(
+    `SELECT ${HABIT_DAY_COLUMNS} FROM habit_days WHERE local_date IN (?, ?, ?)`,
+    [today, yesterday, dayBefore],
+  );
+  const byDate = new Map(rows.map((row) => [row.local_date, row]));
+  if (byDate.get(today)?.status === "done") return { kind: "none" };
+  const covered = (date: LocalDate) => (byDate.get(date)?.status ?? null) !== null;
+  const settings = await readHabitSettings(db);
   const makeUpOpen = now.getTime() < makeUpCutoffFor(yesterday, dhuhr).getTime();
-  const canMakeUp = makeUpOpen && !dayMap.has(yesterday) && dayMap.has(addDays(today, -2));
+  const canMakeUp = makeUpOpen && !covered(yesterday) && covered(dayBefore);
 
   if (canMakeUp) {
+    // Rare and short-lived, so this path reads the day's rows: credited_through must be the latest
+    // instant, compared as instants because pulled rows can spell timestamps differently.
+    const reviews = await readDayReviews(db, today);
     if (!meetsMinimum(tally(reviews, settings), settings.minimum)) return { kind: "none" };
-    const creditedThrough = reviews[reviews.length - 1]?.reviewed_at ?? at;
+    const latest = reviews.reduce<string | null>(
+      (max, review) => (max === null || compareSyncTimestamps(review.reviewed_at, max) > 0 ? review.reviewed_at : max),
+      null,
+    );
     await putHabitDay(
       db,
-      earnedDay(yesterday, "made_up", at, { minimum_met: 1, source_session_id: sessionId, credited_through: creditedThrough }),
+      earnedDay(yesterday, "made_up", at, { minimum_met: 1, source_session_id: sessionId, credited_through: latest ?? at }),
     );
-    dayMap.set(yesterday, { localDate: yesterday, status: "made_up", fullMet: false });
-    return { kind: "made_up", madeUpDay: yesterday, length: computeStreak(dayMap, today, { makeUpOpen: false }).length };
+    return { kind: "made_up", madeUpDay: yesterday, length: await streakLength(db, today) };
   }
 
-  const yesterdayRow = dayMap.get(yesterday)?.status === "made_up" ? await readHabitDayRow(db, yesterday) : null;
-  const ownReviews = reviewsAfter(reviews, yesterdayRow?.credited_through ?? null);
-  if (!meetsMinimum(tally(ownReviews, settings), settings.minimum)) return { kind: "none" };
+  const credited = byDate.get(yesterday)?.credited_through ?? null;
+  if (!meetsMinimum(await readDayTally(db, today, credited, settings), settings.minimum)) return { kind: "none" };
 
   await putHabitDay(db, earnedDay(today, "done", at, { minimum_met: 1, source_session_id: sessionId }));
-  dayMap.set(today, { localDate: today, status: "done", fullMet: dayMap.get(today)?.fullMet ?? false });
-
-  const earnBack = findEarnBack(dayMap, today, { makeUpOpen: false });
-  if (earnBack?.succeeded) {
-    for (const date of earnBack.restoreDays) {
-      await putHabitDay(db, earnedDay(date, "earned_back", at));
-      dayMap.set(date, { localDate: date, status: "earned_back", fullMet: false });
-    }
-    return {
-      kind: "earned_back",
-      length: computeStreak(dayMap, today, { makeUpOpen: false }).length,
-      restoredDays: earnBack.restoreDays.length,
-    };
-  }
-  return { kind: "minimum_met", length: computeStreak(dayMap, today, { makeUpOpen: false }).length };
+  const restored = await restoreEarnBack(db, today, at);
+  if (restored) return { kind: "earned_back", length: restored.length, restoredDays: restored.restored };
+  return { kind: "minimum_met", length: await streakLength(db, today) };
 }
 
 /**
- * GOAL-04: once the minimum is met and nothing is left in today's plan, mark the full wird.
+ * GOAL-04: once the minimum is met and nothing is left in today's plan, mark the full wird. A second
+ * full wird inside an earn-back window can complete it, so the restore runs in the same transaction.
  * Returns true when this call marked it.
  */
 export async function markFullWirdIfComplete(
@@ -234,11 +266,13 @@ export async function markFullWirdIfComplete(
 ): Promise<boolean> {
   if (remaining > 0) return false;
   const today = localDateOf(now);
+  const at = now.toISOString();
   let marked = false;
   await database.withTransactionAsync(async (db) => {
     const row = await readHabitDayRow(db, today);
     if (!row || row.status !== "done" || row.full_met === 1) return;
-    await putHabitDay(db, { ...row, full_met: 1, updated_at: now.toISOString() });
+    await putHabitDay(db, { ...row, full_met: 1, updated_at: at });
+    await restoreEarnBack(db, today, at);
     marked = true;
   });
   return marked;
@@ -285,7 +319,7 @@ export async function loadHabitOverview(
     readDayReviews(db, today),
     readHabitDayRow(db, yesterday),
   ]);
-  const credited = yesterdayRow?.status === "made_up" ? yesterdayRow.credited_through : null;
+  const credited = yesterdayRow?.credited_through ?? null;
   const snapshot = buildHabitSnapshot({
     days,
     today,

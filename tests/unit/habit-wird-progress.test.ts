@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { persistReviewTransition, DEFAULT_REVIEW_SAVE_CONTEXT, type ReviewSaveContext } from "@/lib/fsrs/persist-review";
 import { setStudyCardMarked } from "@/lib/fsrs/queries";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
@@ -9,12 +10,14 @@ import {
   loadHabitOverview,
   markExcusedDays,
   markFullWirdIfComplete,
+  applyRemoteHabitDay,
   putHabitDay,
   readHabitDayRow,
   settleHabitDays,
 } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
 import type { HabitDayRow } from "@/lib/habit/types";
+import { DAY_TALLY_SQL, tallyReviews } from "@/lib/habit/minimum";
 import { countMistakeInbox, readMistakeInbox } from "@/lib/hifz/errors";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
@@ -153,6 +156,20 @@ describe("make-up window (STR-07, STR-08)", () => {
     expect(own.wird).toEqual({ kind: "minimum_met", length: 4 });
   });
 
+  it("keeps the credited reviews off today after another device also marks yesterday done", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    await reciteMinimum(TODAY, 9 * 60);
+    await applyRemoteHabitDay(store.db, doneDay(yesterday));
+    expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "done", credited_through: expect.any(String) });
+
+    const overview = await loadHabitOverview(store.db, { now: atLocalTime(TODAY, 10 * 60) });
+    expect(overview.minimumProgressToday).toBe(0);
+    for (let i = 0; i < 9; i += 1) {
+      expect((await grade(`3:${i + 1}`, atLocalTime(TODAY, 10 * 60 + i))).wird).toEqual({ kind: "none" });
+    }
+    expect((await grade("3:10", atLocalTime(TODAY, 10 * 60 + 9))).wird).toEqual({ kind: "minimum_met", length: 4 });
+  });
+
   it("counts reviews after the cutoff for today, leaving yesterday missed", async () => {
     await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
     const event = await reciteMinimum(TODAY, 13 * 60);
@@ -178,6 +195,15 @@ describe("settle pass, excuses and pause", () => {
     const overview = await loadHabitOverview(store.db, { now: atLocalTime(TODAY, 14 * 60) });
     expect(overview).toMatchObject({ graceHeld: 0, recentGraceDay: addDays(TODAY, -1) });
     expect(overview.headline).toEqual({ kind: "at_risk", length: 4 });
+  });
+
+  it("gives grace to an earlier gap that was never settled before a later wird day", async () => {
+    await seedDone([addDays(TODAY, -6), addDays(TODAY, -5), addDays(TODAY, -4), addDays(TODAY, -2)]);
+    expect(await settleHabitDays(store.db, { now: atLocalTime(TODAY, 9 * 60) })).toEqual([
+      { localDate: addDays(TODAY, -3), status: "grace" },
+    ]);
+    const overview = await loadHabitOverview(store.db, { now: atLocalTime(TODAY, 9 * 60) });
+    expect(overview.streak).toMatchObject({ length: 5, makeUpPending: true });
   });
 
   it("marks and withdraws excused days within 3 days back and 30 ahead", async () => {
@@ -219,6 +245,23 @@ describe("earn-back on grade (STR-17)", () => {
   });
 });
 
+describe("earn-back by full wird (STR-17, GOAL-04)", () => {
+  it("restores the missed day when the second full wird is marked", async () => {
+    const lastDay = "2026-02-10";
+    await seedDone(Array.from({ length: 8 }, (_, i) => addDays(lastDay, -7 + i)));
+    const first = addDays(lastDay, 2);
+    const second = addDays(lastDay, 3);
+    await reciteMinimum(first, 14 * 60);
+    expect(await markFullWirdIfComplete(store.db, { now: atLocalTime(first, 15 * 60), remaining: 0 })).toBe(true);
+    expect((await reciteMinimum(second, 14 * 60)).wird.kind).toBe("minimum_met");
+    expect(await readHabitDayRow(store.db, addDays(lastDay, 1))).toBeNull();
+    expect(await markFullWirdIfComplete(store.db, { now: atLocalTime(second, 15 * 60), remaining: 0 })).toBe(true);
+    expect(await readHabitDayRow(store.db, addDays(lastDay, 1))).toMatchObject({ status: "earned_back" });
+    const overview = await loadHabitOverview(store.db, { now: atLocalTime(second, 16 * 60) });
+    expect(overview.streak.length).toBe(11);
+  });
+});
+
 describe("recitation errors and the mistake inbox (ERR-01 to ERR-04)", () => {
   it("logs errors with the grade and resolves them after clean recalls on two later days", async () => {
     const session = startReviewSession("cards", { now: atLocalTime(TODAY, 590) });
@@ -253,6 +296,18 @@ describe("recitation errors and the mistake inbox (ERR-01 to ERR-04)", () => {
     expect(ended).toMatchObject({ ended_at: atLocalTime(TODAY, 620).toISOString(), duration_ms: 30 * 60_000 });
   });
 
+  it("does not resolve an item from a recall with no support level or one recited in salah", async () => {
+    await grade("2:255", atLocalTime(TODAY, 600), Rating.Again, {
+      supportLevel: 4,
+      errors: [{ type: "skip_word", corrected: "none", surah: 2, ayah: 255, word: 4 }],
+    });
+    await grade("2:255", atLocalTime(addDays(TODAY, 1), 600), Rating.Good, { supportLevel: null });
+    await grade("2:255", atLocalTime(addDays(TODAY, 2), 600), Rating.Good, { supportLevel: null });
+    await grade("2:255", atLocalTime(addDays(TODAY, 3), 600), Rating.Good, { supportLevel: 4, grader: "salah" });
+    await grade("2:255", atLocalTime(addDays(TODAY, 4), 600), Rating.Good, { supportLevel: 4, grader: "salah" });
+    expect(await countMistakeInbox(store.db, addDays(TODAY, 4))).toBe(1);
+  });
+
   it("expires inbox items after 28 days", async () => {
     await grade("2:255", atLocalTime(TODAY, 600), Rating.Again, {
       errors: [{ type: "skip_ayah", corrected: "fath", surah: 2, ayah: 255, word: null }],
@@ -283,5 +338,44 @@ describe("reconciling wird days from the review log", () => {
     expect(await readHabitDayRow(store.db, addDays(TODAY, -3))).toMatchObject({ status: "done" });
     expect(await readHabitDayRow(store.db, addDays(TODAY, -2))).toBeNull();
     expect(await readHabitDayRow(store.db, addDays(TODAY, -1))).toMatchObject({ status: "done" });
+  });
+});
+
+describe("SQL day tally (DAY_TALLY_SQL)", () => {
+  const prefixes = ["page:madani15:", "chunk:", "half:", "seam:", "word:", "qiraat:", "asbab:", "2:", "similar:"];
+
+  it("matches tallyReviews for any mix of cards and durations", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(
+          fc.record({
+            prefix: fc.constantFrom(...prefixes),
+            n: fc.integer({ min: 1, max: 600 }),
+            duration: fc.option(fc.integer({ min: -5_000, max: 30 * 60_000 }), { nil: null }),
+          }),
+          { maxLength: 40 },
+        ),
+        fc.boolean(),
+        async (reviews, studyCounts) => {
+          store.sql.prepare("DELETE FROM study_log").run();
+          const insert = store.sql.prepare(
+            `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days,
+              reviewed_at, local_date, duration_ms) VALUES (?, 3, 2, ?, 1, 1, 0, 1, ?, ?, ?)`,
+          );
+          const at = atLocalTime(TODAY, 600).toISOString();
+          for (const review of reviews) insert.run(`${review.prefix}${review.n}`, at, at, TODAY, review.duration);
+          const row = await store.db.getFirstAsync<{ page_units: number; counted_ms: number }>(DAY_TALLY_SQL, [
+            studyCounts ? 1 : 0,
+            TODAY,
+          ]);
+          const expected = tallyReviews(
+            reviews.map((review) => ({ cardId: `${review.prefix}${review.n}`, durationMs: review.duration })),
+            { studyCounts },
+          );
+          expect({ pageUnits: Number(row?.page_units), countedMs: Number(row?.counted_ms) }).toEqual(expected);
+        },
+      ),
+      { numRuns: 60 },
+    );
   });
 });
