@@ -620,6 +620,7 @@ it("preserves historical duplicate reviews when an equivalent incremental event 
     local_date: null,
     tz: null,
     error_count: 0,
+    makeup_for: null,
   };
   expect({ rows, totalReviews: stats.totalReviews }).toEqual({
     rows: [

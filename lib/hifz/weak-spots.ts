@@ -1,6 +1,5 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { deleteStudyCardRow, insertNewStudyCard } from "@/lib/fsrs/queries";
-import type { RecitationErrorInput } from "@/lib/hifz/errors";
 import { HIFZ_PAGES_DECK_ID } from "@/lib/hifz/units";
 
 /** ERR-06: a location wrong in this many separate sessions is a weak spot. */
@@ -21,7 +20,8 @@ export function parseClozeCardId(id: string): { surah: number; ayah: number; wor
   return surah >= 1 && surah <= 114 && ayah >= 1 && word >= 1 ? { surah, ayah, word } : null;
 }
 
-type ErrorLocation = Pick<RecitationErrorInput, "surah" | "ayah" | "word">;
+/** Where an error was logged; errors.ts imports this module, so the shape is declared here. */
+type ErrorLocation = Readonly<{ surah: number; ayah: number | null; word: number | null }>;
 type WordLocation = Readonly<{ id: string; surah: number; ayah: number; word: number }>;
 
 /** Each word location once, in first-seen order. Ayah-level errors have no word and no cloze card. */
