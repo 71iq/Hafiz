@@ -146,7 +146,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 
 - WIRD-01. View the Home streak card. It shows the streak length and today's state: no wird yet, done today, excused, paused, at risk, yesterday still open to make up, an earn-back in progress, or a fresh start. Progress toward today's minimum shows until it is met.
 - WIRD-02. Grade reviews until today's minimum wird is met: one page of recitation or five minutes of graded review by default. The review that meets it marks the day done once and shows a notice. Study cards count only when meanings count toward the wird.
-- WIRD-03. Miss a day and recite before Dhuhr the next day, or 12:30 without prayer times. Every review graded then counts toward making up yesterday until it reaches the minimum, which makes yesterday up; later reviews count for today. Reviews of a make-up that is not finished in time stay with it and do not count for today. On any device the same reviews count for the same day.
+- WIRD-03. Miss a day and recite before Dhuhr the next day, or 12:30 without prayer times. Every review graded then counts toward making up yesterday until it reaches the minimum, which makes yesterday up; later reviews count for today. Reviews of a make-up that is not finished in time stay with it and do not count for today. On any device the same reviews count for the same day. If another device with an earlier cutoff already covered yesterday with a grace day, finishing the make-up before this device's cutoff still makes yesterday up and gives the grace day back.
 - WIRD-04. Miss a day after the make-up window closes while holding a grace day. A grace day covers it automatically, and Home mentions it the next morning. Grace days are earned after 3 wird days, then every 7, holding at most 2.
 - WIRD-05. Open Excuse or pause on Home and mark excused days from 3 days back to 30 ahead with a reason. Excused days keep the streak without counting toward it. Withdraw an excuse from the same sheet; a recited day keeps its status.
 - WIRD-06. Pause the streak for up to 60 days, then end the pause early from the same sheet. Paused days neither break nor extend the streak.
@@ -178,7 +178,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - PLAN-10. Accept or decline the monthly check on Home. It reviews 5 memorized pages not seen in two weeks and reports how many were clean.
 - PLAN-11. View hifz progress: memorized pages, how many are steady, fair, or need review, completed juz, and steady weeks.
 - PLAN-12. Leave a hifz review after grading a page. Confirm leaving first, then read the summary with pages, clean pages, spots marked, half pages and seams, minutes, and the wird cards.
-- PLAN-13. Miss the same word in 3 or more sessions. It becomes a weak spot: the Mushaf marks it with a small dot (a dotted underline in verse view on some devices) unless turned off, and a fill-the-gap card shows its ayah with that word hidden until Check, then asks whether it was recited cleanly.
+- PLAN-13. Miss the same word in 3 or more sessions. It becomes a weak spot: the Mushaf marks it with a small dot (a dotted underline in verse view on some devices) unless turned off, and a fill-the-gap card shows its ayah with that word hidden until Check, then asks whether it was recited cleanly. Mistakes from other devices count, including after signing in on a new device. Dismissing a mistake on any device removes the card once the word is wrong in fewer than 3 sessions.
 
 ## Reflection journey
 
