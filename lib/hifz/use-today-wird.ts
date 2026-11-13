@@ -7,11 +7,12 @@ import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird, type TodayWird } from "@/lib/hifz/pages";
 import { loadMonthlyCheckDue } from "@/lib/hifz/progress";
+import { countDueRemediation } from "@/lib/hifz/remediation";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
 /**
- * Today's hifz wird and the mistake inbox count for a screen, refreshed on focus, after reviews,
- * after sync and after plan changes. `wird` is null when no plan is set up; undefined while loading.
+ * Today's hifz wird and the count of spots to strengthen (inbox items, plus half pages and seams that
+ * are relearning) for a screen, refreshed on focus, after reviews, after sync and after plan changes. `wird` is null when no plan is set up; undefined while loading.
  */
 export function useTodayWird(db: AppDatabase) {
   const [wird, setWird] = useState<TodayWird | null | undefined>(undefined);
@@ -23,14 +24,15 @@ export function useTodayWird(db: AppDatabase) {
     const load = ++latest.current;
     try {
       const now = new Date();
-      const [next, inbox, monthly] = await Promise.all([
+      const [next, inbox, remediation, monthly] = await Promise.all([
         loadTodayWird(db, now),
         countMistakeInbox(db, localDateOf(now)),
+        countDueRemediation(db, now),
         loadMonthlyCheckDue(db, now),
       ]);
       if (load !== latest.current) return;
       setWird(next);
-      setInboxCount(inbox);
+      setInboxCount(inbox + remediation);
       setMonthlyCheckDue(monthly);
     } catch (error) {
       console.warn("[Hifz] Today's wird failed to load:", error);

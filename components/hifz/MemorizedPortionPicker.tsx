@@ -55,9 +55,11 @@ export function MemorizedPortionPicker({ surahs, selectedSurahs, selectedJuz, on
                 key={juz}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: selected }}
-                accessibilityLabel={interpolate(s.hifzJuzN, { n: juz })}
+                accessibilityLabel={interpolate(s.hifzJuzN, { n: formatNumber(juz, language) })}
                 onPress={() => onToggleJuz(juz)}
-                className={`min-h-[44px] min-w-[64px] items-center justify-center rounded-2xl px-3 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
+                // Five even columns, so the 30 juz fill six full rows at any width.
+                style={{ flexBasis: "18%", flexGrow: 1 }}
+                className={`min-h-[44px] items-center justify-center rounded-2xl px-2 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
               >
                 <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
                   {formatNumber(juz, language)}

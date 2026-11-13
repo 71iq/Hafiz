@@ -69,6 +69,8 @@ export const INBOX_ITEMS_PER_REVIEW = 6;
  */
 export function belongsInInbox(type: RecitationErrorType, corrected: Correction): boolean {
   if (type === "tajweed" || type === "hesitation") return false;
+  // A stumble between pages relearns as its seam card (SCH-06), not as an ayah drill.
+  if (type === "seam") return false;
   return corrected !== "self";
 }
 

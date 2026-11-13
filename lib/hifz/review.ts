@@ -11,11 +11,12 @@ import { addDays, deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habi
 import { putHabitDay } from "@/lib/habit/queries";
 import type { RecitationErrorInput, RecitationErrorType } from "@/lib/hifz/errors";
 import { capRating, proposeRating, type AttemptEvents, type Rating, type SupportLevel } from "@/lib/hifz/grading";
-import type { PageLine, PageToken } from "@/lib/hifz/page-data";
+import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import { T_REV_KEY } from "@/lib/hifz/pages";
 import { isManzil, pagePolicy, tierFor, type PageHistory, type Tier } from "@/lib/hifz/tiers";
-import { HIFZ_PAGES_DECK_ID } from "@/lib/hifz/units";
+import { errorHalf, hasSeamAfter, remediateHalf, remediationPolicy, reviewSeam, type Half } from "@/lib/hifz/remediation";
+import { HIFZ_PAGES_DECK_ID, parsePageUnit } from "@/lib/hifz/units";
 import { bringSimilarCardsForward } from "@/lib/hifz/similar";
 
 /** One location in a recitation attempt, as the user marked or revealed it. */
@@ -31,10 +32,19 @@ export type Attempt = Readonly<{
   slips: number;
   /** Mistakes the user marked on words after Done, keyed by token key. */
   marks: ReadonlyMap<string, AttemptMark>;
+  /** SCH-06: how the recitation continued into the next page's first ayah, when the user checked it. */
+  seam: SeamResult | null;
 }>;
 
+export type SeamResult = Readonly<{ clean: boolean; surah: number; ayah: number }>;
+
 export function emptyAttempt(level: SupportLevel): Attempt {
-  return { level, peeked: [], shown: [], slips: 0, marks: new Map() };
+  return { level, peeked: [], shown: [], slips: 0, marks: new Map(), seam: null };
+}
+
+/** The words an attempt went wrong on: marked, peeked at, or shown (SCH-08 uses their lines). */
+export function errorTokens(attempt: Attempt): PageToken[] {
+  return [...[...attempt.marks.values()].map((mark) => mark.token), ...attempt.peeked, ...attempt.shown];
 }
 
 /** The index of the next hidden word at or after `from`, skipping ayah markers, or -1. */
@@ -65,7 +75,7 @@ export function attemptEvents(attempt: Attempt): AttemptEvents {
     selfCorrected: attempt.slips,
     uncorrectedJali: jali.filter((mark) => mark.type !== "skip_ayah" && mark.type !== "seam" && mark.type !== "mutashabih_drift").length,
     skippedAyah: jali.some((mark) => mark.type === "skip_ayah"),
-    seamFailed: jali.some((mark) => mark.type === "seam"),
+    seamFailed: jali.some((mark) => mark.type === "seam") || attempt.seam?.clean === false,
     driftUnnoticed: jali.some((mark) => mark.type === "mutashabih_drift"),
     longHesitations: marks.filter((mark) => mark.type === "hesitation").length,
   };
@@ -88,6 +98,9 @@ export function attemptErrors(attempt: Attempt, firstToken: PageToken): Recitati
   ];
   for (let i = 0; i < attempt.slips; i += 1) {
     errors.push({ type: "wrong_word", corrected: "self", surah: firstToken.surah, ayah: null, word: null });
+  }
+  if (attempt.seam && !attempt.seam.clean) {
+    errors.push({ type: "seam", corrected: "none", surah: attempt.seam.surah, ayah: attempt.seam.ayah, word: null });
   }
   return errors;
 }
@@ -146,14 +159,22 @@ export type PageGradeInput = Readonly<{
   grader?: "self" | "salah" | "teacher";
   now?: Date;
   dhuhr?: DhuhrResolver;
+  /** The page as recited, to find which half held the errors (SCH-08). */
+  page?: RecitationPage | null;
 }>;
+
+/** What a page grade called up on its own: a half page to relearn (SCH-08) and the seam's review (SCH-06). */
+export type PageRemediation = Readonly<{ half: Half | null; seam: "clean" | "lapsed" | null }>;
 
 /**
  * Save one page grade (DB-01): the FSRS step under the page's tier policy, the review log with its
  * support level and the rubric's proposal, the attempt's errors, the new cached tier, a manzil cycle
  * completing, and the day's wird, in one transaction.
  */
-export async function savePageGrade(db: AppDatabase, input: PageGradeInput): Promise<ReviewSaveResult & { tier: Tier }> {
+export async function savePageGrade(
+  db: AppDatabase,
+  input: PageGradeInput,
+): Promise<ReviewSaveResult & { tier: Tier; remediation: PageRemediation }> {
   const now = input.now ?? new Date();
   const today: LocalDate = localDateOf(now);
   const level = input.attempt.level;
@@ -173,6 +194,22 @@ export async function savePageGrade(db: AppDatabase, input: PageGradeInput): Pro
     tier_changed_at: after === input.card.tier ? (input.card.tier_changed_at ?? null) : now.toISOString(),
   };
   const proposed = input.grader === "salah" ? null : proposedRating(input.attempt);
+  const recited = input.grader !== "salah";
+  const page = parsePageUnit(input.card.id);
+  const pageNumber = page?.kind === "page" ? page.page : null;
+  // SCH-08: an Again with every error in one half relearns that half from 10 minutes.
+  const half = recited && rating === 1 && input.page ? errorHalf(input.page, errorTokens(input.attempt)) : null;
+  // SCH-06: a clean continuation counts for the seam after a Good or Easy page; a stumble always does.
+  const seamStumbled =
+    input.attempt.seam?.clean === false || [...input.attempt.marks.values()].some((mark) => mark.type === "seam");
+  const seam: PageRemediation["seam"] =
+    !recited || pageNumber === null || !hasSeamAfter(pageNumber)
+      ? null
+      : seamStumbled
+        ? "lapsed"
+        : input.attempt.seam?.clean && rating >= 3
+          ? "clean"
+          : null;
   const result = await persistReviewTransition({
     db,
     cardId: input.card.id,
@@ -189,6 +226,8 @@ export async function savePageGrade(db: AppDatabase, input: PageGradeInput): Pro
     },
     extraWork: async (tx) => {
       if (isManzil(after)) await completeManzilCycleIfDone(tx, now);
+      if (half && pageNumber !== null) await remediateHalf(tx, { page: pageNumber, half, now });
+      if (seam && pageNumber !== null) await reviewSeam(tx, { page: pageNumber, clean: seam === "clean", now });
       // SCH-07, MUT-04: a drift into a similar verse brings that pair's cards due within a day.
       if (input.grader !== "salah") {
         for (const mark of input.attempt.marks.values()) {
@@ -197,7 +236,52 @@ export async function savePageGrade(db: AppDatabase, input: PageGradeInput): Pro
       }
     },
   });
-  return { ...result, tier: after };
+  return { ...result, tier: after, remediation: { half: pageNumber === null ? null : half, seam } };
+}
+
+export type RemediationGradeInput = Readonly<{
+  card: StudyCardRow;
+  rating: Grade;
+  attempt: Attempt;
+  firstToken: PageToken | null;
+  session: ReviewSessionRef | null;
+  durationMs: number;
+  grader?: "self" | "teacher";
+  now?: Date;
+  dhuhr?: DhuhrResolver;
+}>;
+
+/**
+ * Grade a half page or seam that surfaced on its own (SCH-06, SCH-08). It is real recitation, so it
+ * logs a review and counts toward the wird like any card.
+ */
+export async function saveRemediationGrade(db: AppDatabase, input: RemediationGradeInput): Promise<ReviewSaveResult> {
+  const now = input.now ?? new Date();
+  const level = input.attempt.level;
+  const rating = capRating(input.rating as Rating, level) as Grade;
+  const base = await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID);
+  const transition = calculateReviewTransition({
+    card: input.card,
+    rating,
+    reviewedAt: now,
+    reviewPolicy: remediationPolicy(base),
+  });
+  const proposed = proposedRating(input.attempt);
+  return persistReviewTransition({
+    db,
+    cardId: input.card.id,
+    transition,
+    context: {
+      session: input.session,
+      firstGradeInSession: true,
+      durationMs: input.durationMs,
+      supportLevel: level,
+      proposedRating: proposed === 0 ? null : proposed,
+      grader: input.grader ?? "self",
+      errors: input.firstToken ? attemptErrors(input.attempt, input.firstToken) : [],
+      dhuhr: input.dhuhr,
+    },
+  });
 }
 
 /** PLN-05: minutes per review page learned as an exponential moving average, alpha 0.2. */
