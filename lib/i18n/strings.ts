@@ -1,3 +1,8 @@
+import { habitStrings } from "@/lib/i18n/features/habit";
+import { hifzStrings } from "@/lib/i18n/features/hifz";
+import { notificationsStrings } from "@/lib/i18n/features/notifications";
+import { socialStrings } from "@/lib/i18n/features/social";
+
 export const strings = {
   en: {
     appName: "Hafiz",
@@ -970,6 +975,10 @@ export const strings = {
     errorTitle: "Something went wrong",
     errorSubtitle: "This section couldn't load properly",
     errorTryAgain: "Try Again",
+    ...habitStrings.en,
+    ...notificationsStrings.en,
+    ...socialStrings.en,
+    ...hifzStrings.en,
   },
   ar: {
     appName: "حافظ",
@@ -1918,6 +1927,10 @@ export const strings = {
     errorTitle: "حدث خطأ ما",
     errorSubtitle: "لم يتم تحميل هذا القسم بشكل صحيح",
     errorTryAgain: "حاول مجددًا",
+    ...habitStrings.ar,
+    ...notificationsStrings.ar,
+    ...socialStrings.ar,
+    ...hifzStrings.ar,
   },
 } as const;
 
