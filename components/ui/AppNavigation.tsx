@@ -122,17 +122,15 @@ function BottomTabItem({
       }}
       accessibilityRole="button"
       accessibilityState={isFocused ? { selected: true } : {}}
-      style={[
-        animatedStyle,
-        styles.bottomTabItem,
-        compact && styles.bottomTabItemCompact,
-        isFocused && styles.bottomTabItemActive,
-      ]}
+      style={[animatedStyle, styles.bottomTabSlot]}
     >
-      {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
-      <Text numberOfLines={1} style={[styles.bottomLabel, { color: iconColor }]}>
-        {label}
-      </Text>
+      {/* The pill hugs the label; the press target is the item's whole share of the bar. */}
+      <View style={[styles.bottomTabItem, compact && styles.bottomTabItemCompact, isFocused && styles.bottomTabItemActive]}>
+        {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
+        <Text numberOfLines={1} style={[styles.bottomLabel, { color: iconColor }]}>
+          {label}
+        </Text>
+      </View>
     </AnimatedPressable>
   );
 }
@@ -653,12 +651,20 @@ const styles = StyleSheet.create({
   bottomContainerCompact: {
     paddingHorizontal: 4,
   },
+  // Each tab takes an equal share of the bar, at least 48 px wide on a 320 px phone, so short labels
+  // keep a 44 px target.
+  bottomTabSlot: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   bottomTabItem: {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 1,
-    minWidth: 0,
+    maxWidth: "100%",
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 9999,

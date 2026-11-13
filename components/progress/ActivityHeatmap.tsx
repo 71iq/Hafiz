@@ -3,7 +3,7 @@ import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
-import { textStartStyle } from "@/lib/ui/direction";
+import { textEndStyle, textStartStyle } from "@/lib/ui/direction";
 import { toArabicNumber } from "@/lib/arabic";
 import { formatNumber } from "@/lib/i18n/count";
 import type { DayStatus } from "@/lib/habit/types";
@@ -66,9 +66,9 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
         ? { backgroundColor: "#713f12", borderWidth: 1, borderColor: "#a16207" }
         : { backgroundColor: "#fcd34d", borderWidth: 1, borderColor: "#d97706" };
     case "paused":
-      // A dashed edge in light mode, where a plain grey fill would read as an empty day.
+      // A dashed edge, since a plain grey fill would read as an empty day.
       return isDark
-        ? { backgroundColor: "#3f3f46" }
+        ? { backgroundColor: "#3f3f46", borderWidth: 1, borderColor: "#71717a", borderStyle: "dashed" as const }
         : { backgroundColor: "#d4d4d8", borderWidth: 1, borderColor: "#a1a1aa", borderStyle: "dashed" as const };
     case "grace":
       return isDark
@@ -157,7 +157,8 @@ export function ActivityHeatmap({
         : showSummary
           ? 15
           : BASE_CELL_SIZE;
-  const DAY_LABEL_WIDTH = isArabic ? (showSummary ? 70 : 58) : (showSummary ? 34 : 28);
+  // The Arabic day names are about 26 px at 10 px; their column sits close to the grid.
+  const DAY_LABEL_WIDTH = isArabic ? (showSummary ? 44 : 38) : (showSummary ? 34 : 28);
   const reservedSummaryWidth = showSummary ? (isSidebarWidth ? 200 : 150) : 0;
   const reservedSummaryGap = showSummary ? (isSidebarWidth ? 32 : 20) : 0;
   const availableWidth = Math.max(220, layoutWidth);
@@ -300,10 +301,12 @@ export function ActivityHeatmap({
                   {label && (
                     <Text
                       style={{
+                        // The rows follow the chosen week start, so these labels must be easy to read.
                         fontFamily: "Manrope_500Medium",
-                        fontSize: 9,
-                        color: isDark ? "#525252" : "#b9a085",
-                        ...textStartStyle(isRTL),
+                        fontSize: 10,
+                        color: isDark ? "#a3a3a3" : "#8B8178",
+                        // Toward the grid: the end of the label column.
+                        ...textEndStyle(isRTL),
                         writingDirection: isRTL ? "rtl" : "ltr",
                         width: DAY_LABEL_WIDTH,
                       }}

@@ -99,13 +99,17 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
     };
   }, [db]);
 
+  /**
+   * Saves the location. `announce` shows "Location saved" where the user acted; a method or Asr change
+   * shows nothing, since the times preview already reflects it and the message would land elsewhere.
+   */
   const save = useCallback(
-    async (next: PrayerLocation | null, place: StatusPlace = "location") => {
+    async (next: PrayerLocation | null, place: StatusPlace = "location", announce = true) => {
       try {
         await writePrayerLocation(db, next);
         setLocation(next);
         onChange?.(next);
-        setStatus(next ? { kind: "message", text: s.notifLocationSaved, tone: "info", place } : { kind: "idle" });
+        setStatus(next && announce ? { kind: "message", text: s.notifLocationSaved, tone: "info", place } : { kind: "idle" });
         // Dhuhr moves the make-up cutoff (STR-07), so open streak views reload too.
         emitHabitChanged();
         rescheduleReminders(db).catch(() => {});
@@ -152,12 +156,12 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
   const chooseMethod = (next: CalculationMethodKey) => {
     setMethod(next);
     setMethodsOpen(false);
-    if (location) void save({ ...location, method: next });
+    if (location) void save({ ...location, method: next }, "location", false);
   };
 
   const chooseMadhab = (next: AsrMadhab) => {
     setMadhab(next);
-    if (location) void save({ ...location, madhab: next });
+    if (location) void save({ ...location, madhab: next }, "location", false);
   };
 
   const locationStatus =

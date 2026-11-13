@@ -1,6 +1,6 @@
 import React from "react";
 import * as ReactNative from "react-native";
-import { AccessibilityInfo, Pressable, Text, View } from "react-native";
+import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from "react-native";
 import { act, cleanup, fireEvent, render, renderHook } from "@testing-library/react-native";
 import { NavigationContainer, NavigationIndependentTree } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -211,6 +211,14 @@ it("preserves prevented tab press and long-press delivery", async () => {
   fireEvent(view.getByRole("button", { name: "Mushaf" }), "longPress");
   expect(longPressed).toHaveBeenCalledTimes(1);
   expect(view.getByText("Home screen")).toBeTruthy();
+});
+it("gives every tab an equal share of the bar as its press target, at least 44 px tall", async () => {
+  const view = render(fixture());
+  await preference(true);
+  for (const name of ["Home", "Mushaf"]) {
+    const style = StyleSheet.flatten(view.getByRole("button", { name }).props.style);
+    expect(style).toMatchObject({ flex: 1, minHeight: 44, minWidth: 0 });
+  }
 });
 it("shares and releases the real preference observer", async () => {
   const observer = renderHook(() => useReducedMotionPreference());

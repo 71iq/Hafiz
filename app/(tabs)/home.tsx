@@ -473,7 +473,8 @@ export default function HomeScreen() {
                   {s.flashcardsDueToday}
                 </Text>
               </View>
-              <View className={`pb-1 ${isRTL ? "items-end" : "items-start"}`}>
+              {/* Shrinks so its label wraps instead of running under Start Review on narrow phones. */}
+              <View className={`min-w-0 shrink pb-1 ${isRTL ? "items-end" : "items-start"}`}>
                 <Text
                   className="text-warm-500 dark:text-neutral-400"
                   style={{

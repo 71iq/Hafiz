@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, waitFor, within } from "@testing-library/react-native";
 import { PrayerTimesSetup } from "@/components/notifications/PrayerTimesSetup";
 import { requestDeviceCoordinates } from "@/lib/prayer/location";
+import { readPrayerLocation, writePrayerLocation } from "@/lib/prayer/settings";
 import { strings } from "@/lib/i18n/strings";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { findAncestorByClassName } from "../rtl/rtl-test-utils";
@@ -41,6 +42,21 @@ function renderSetup() {
 }
 
 describe("PrayerTimesSetup messages", () => {
+  it("saves an Asr change without a location message, since the times already show it", async () => {
+    jest.mocked(readPrayerLocation).mockResolvedValueOnce({
+      latitude: 21.42,
+      longitude: 39.83,
+      method: "MuslimWorldLeague",
+      madhab: "shafi",
+      source: "manual",
+    } as never);
+    const view = renderSetup();
+    await waitFor(() => expect(readPrayerLocation).toHaveBeenCalled());
+    fireEvent.press(await view.findByText(s.notifAsrHanafi));
+    await waitFor(() => expect(writePrayerLocation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ madhab: "hanafi" })));
+    expect(view.queryByText(s.notifLocationSaved)).toBeNull();
+  });
+
   it("shows a location failure under Use my location, and invalid coordinates under Save coordinates", async () => {
     jest.mocked(requestDeviceCoordinates).mockResolvedValue({ kind: "denied", canAskAgain: false });
     const view = renderSetup();

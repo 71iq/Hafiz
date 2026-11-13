@@ -194,7 +194,9 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
       ) : null}
 
       {hasFooterNotes ? (
-      <MirroredRow dir={dir} className="mt-1 items-center justify-between gap-3">
+      // 12 px above, like the blocks above it: the link's 44 px target adds no height, and this
+      // keeps its target clear of the grace note's dismiss button.
+      <MirroredRow dir={dir} className="mt-3 items-center justify-between gap-3">
         <MirroredRow dir={dir} className="flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           {goal ? (
             <Text dir={dir} variant="caption" className={CAPTION_CLASS} style={CAPTION_STYLE}>
