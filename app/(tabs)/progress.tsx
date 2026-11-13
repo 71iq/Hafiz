@@ -24,6 +24,8 @@ import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount } from "@/lib/fsrs/queries";
 import { useHabitOverview } from "@/lib/habit/use-habit-overview";
+import { HifzProgressCard } from "@/components/hifz/HifzProgressCard";
+import { loadHifzProgress, type HifzProgress } from "@/lib/hifz/progress";
 import { countSteadyWeeks, toDayMap } from "@/lib/habit/streak";
 import { effectiveWeekStart } from "@/lib/habit/settings";
 import type { DayStatus } from "@/lib/habit/types";
@@ -63,9 +65,10 @@ export default function ProgressScreen() {
   const [achievementDashboard, setAchievementDashboard] = useState<AchievementDashboard | null>(null);
   const [surahProgressModalOpen, setSurahProgressModalOpen] = useState(false);
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
+  const [hifzProgress, setHifzProgress] = useState<HifzProgress | null>(null);
 
   const loadData = useCallback(async () => {
-    const [cards, memorized, reviewStats, achievements, defaultDecks, surahs] = await Promise.all([
+    const [cards, memorized, reviewStats, achievements, defaultDecks, surahs, hifz] = await Promise.all([
       getTotalAyahCardCount(db).catch((error) => {
         console.warn("[Progress] Failed to load total ayah cards:", error);
         return 0;
@@ -90,6 +93,10 @@ export default function ProgressScreen() {
         console.warn("[Progress] Failed to load surah progress:", error);
         return [];
       }),
+      loadHifzProgress(db).catch((error) => {
+        console.warn("[Progress] Failed to load hifz progress:", error);
+        return null;
+      }),
     ]);
     setTotalAyahCards(cards);
     setMemorizedAyahCards(memorized);
@@ -100,6 +107,7 @@ export default function ProgressScreen() {
     setDefaultDeckProgress(defaultDecks);
     setAchievementDashboard(achievements);
     setSurahProgress(surahs);
+    setHifzProgress(hifz);
   }, [db]);
 
   useFocusEffect(
@@ -252,6 +260,10 @@ export default function ProgressScreen() {
             />
           </View>
         </Card>
+
+        {hifzProgress && hifzProgress.memorizedPages > 0 ? (
+          <HifzProgressCard progress={hifzProgress} language={uiLanguage} isDark={isDark} s={s} />
+        ) : null}
 
         <DefaultDeckProgressChart items={defaultDeckProgress} isDark={isDark} isRTL={isRTL} s={s} />
 

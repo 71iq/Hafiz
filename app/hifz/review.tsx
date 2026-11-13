@@ -10,6 +10,7 @@ import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import { Toast } from "@/components/ui/Toast";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Switch } from "@/components/ui/Switch";
 import { GradingButtons, getGradeSchedulePreviews } from "@/components/flashcards/GradingButtons";
 import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
 import { SessionHabitCards, showsCommitment, strongerWirdEvent, type SessionHabitInput } from "@/components/habit/SessionHabitCards";
@@ -88,8 +89,15 @@ export default function HifzReviewScreen() {
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, fontSize, lineHeight } = useSettings();
   const navigation = useNavigation();
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
-  const drillsOnly = (Array.isArray(mode) ? mode[0] : mode) === "mistakes";
+  const params = useLocalSearchParams<{ mode?: string; level?: string }>();
+  const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  const drillsOnly = mode === "mistakes";
+  // 6.4: a returning user starts with their strongest pages at the support level they chose.
+  const welcomeBack = mode === "welcome_back";
+  const welcomeLevel = ((): SupportLevel | null => {
+    const raw = Number(Array.isArray(params.level) ? params.level[0] : params.level);
+    return raw === 2 || raw === 3 || raw === 4 ? raw : null;
+  })();
   const { width } = useWindowDimensions();
   const pageWidth = Math.min(width, 640);
   const dir = isRTL ? "rtl" : "ltr";
@@ -110,6 +118,7 @@ export default function HifzReviewScreen() {
   const [error, setError] = useState<string | null>(null);
   const [exitOpen, setExitOpen] = useState(false);
   const [drillShown, setDrillShown] = useState(false);
+  const [listener, setListener] = useState(false);
   const [totals, setTotals] = useState<Totals>({ pages: 0, clean: 0, marked: 0 });
   const [planProgress, setPlanProgress] = useState<{ done: number; total: number } | null>(null);
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
@@ -142,7 +151,15 @@ export default function HifzReviewScreen() {
         setPlanProgress({ done: wird.done.length, total: wird.done.length + wird.todo.length });
         const cards = await loadPageCards(db, { today, plan: wird.plan });
         const byId = new Map(cards.map((card) => [card.row.id, card]));
-        for (const page of wird.todo) {
+        let todo = [...wird.todo];
+        if (welcomeBack) {
+          // Three warm-up pages with the highest recall first, then the weakest (6.4 step 3).
+          const byRecall = [...todo].sort((a, b) => (b.retrievability ?? 0) - (a.retrievability ?? 0));
+          const warmUp = byRecall.slice(0, 3);
+          const rest = byRecall.slice(3).reverse();
+          todo = [...warmUp, ...rest];
+        }
+        for (const page of todo) {
           const card = byId.get(page.cardId);
           if (card) items.push({ kind: "page", card, retrievability: page.retrievability });
         }
@@ -157,7 +174,7 @@ export default function HifzReviewScreen() {
         );
         items.push({ kind: "drill", item, text: row ? { qcf2: row.text_qcf2, page: row.v2_page } : null });
       }
-      sessionRef.current = startReviewSession(drillsOnly ? "mistakes" : "wird");
+      sessionRef.current = startReviewSession(drillsOnly ? "mistakes" : welcomeBack ? "welcome_back" : "wird");
       startedAt.current = Date.now();
       setQueue(items);
       setIndex(0);
@@ -166,7 +183,7 @@ export default function HifzReviewScreen() {
       console.warn("[HifzReview] Failed to load:", loadError);
       setPhase("error");
     }
-  }, [db, drillsOnly]);
+  }, [db, drillsOnly, welcomeBack]);
 
   useEffect(() => {
     load();
@@ -179,7 +196,7 @@ export default function HifzReviewScreen() {
       return;
     }
     let cancelled = false;
-    const level = defaultSupportLevel(current.card.tier === "sabqi" ? "sabqi" : "manzil", current.retrievability);
+    const level = welcomeLevel ?? defaultSupportLevel(current.card.tier === "sabqi" ? "sabqi" : "manzil", current.retrievability);
     setAttempt(emptyAttempt(level));
     setReveal(HIDDEN);
     setError(null);
@@ -197,7 +214,7 @@ export default function HifzReviewScreen() {
     return () => {
       cancelled = true;
     };
-  }, [current, db, s.hifzLoadFailed]);
+  }, [current, db, s.hifzLoadFailed, welcomeLevel]);
 
   useEffect(() => {
     setDrillShown(false);
@@ -262,7 +279,8 @@ export default function HifzReviewScreen() {
     setPhase("check");
   };
 
-  const grade = async (rating: Grade, grader: "self" | "salah" = "self") => {
+  const grade = async (rating: Grade, source: "recited" | "salah" = "recited") => {
+    const grader = source === "salah" ? "salah" : listener ? "teacher" : "self";
     if (!current || current.kind !== "page" || !plan || busy) return;
     const firstToken = tokens.find((token) => !token.isMarker) ?? tokens[0];
     if (!firstToken && grader !== "salah") return;
@@ -518,6 +536,19 @@ export default function HifzReviewScreen() {
                         );
                       })}
                   </ScrollView>
+                  <MirroredRow dir={dir} className="mt-1 items-center justify-between gap-3">
+                    <View className="flex-1">
+                      <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="text-charcoal dark:text-neutral-200">
+                        {s.hifzListenerMode}
+                      </Text>
+                      {listener ? (
+                        <Text dir={dir} variant="caption">
+                          {s.hifzListenerModeHint}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Switch value={listener} onValueChange={setListener} />
+                  </MirroredRow>
                   <Text dir={dir} variant="caption">
                     {!isGradable(attempt.level)
                       ? s.hifzLevelNotGraded

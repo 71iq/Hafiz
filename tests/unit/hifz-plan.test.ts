@@ -12,7 +12,8 @@ import {
 } from "@/lib/fsrs/types";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { buildDailyPlan, type PlanPage } from "@/lib/hifz/daily-plan";
-import { declareMemorizedPages, loadTodayWird } from "@/lib/hifz/pages";
+import { declareMemorizedPages, loadTodayWird, type PageCard } from "@/lib/hifz/pages";
+import { completedJuz, isMemorized, strengthBands } from "@/lib/hifz/progress";
 import { DEFAULT_HIFZ_PLAN, parseHifzPlan, writeHifzPlan } from "@/lib/hifz/plan";
 import { pagePolicy, tierFor, type GradeEvent } from "@/lib/hifz/tiers";
 import { pageCardId } from "@/lib/hifz/units";
@@ -207,5 +208,29 @@ describe("memorized pages and today's wird (ONB-04, PLAN-01)", () => {
     const second = (await loadTodayWird(store.db, atLocalTime(TODAY, 620)))!;
     expect(second.todo.map((p) => p.cardId)).toEqual([first.todo[1].cardId]);
     expect(second.done.map((p) => p.cardId)).toEqual([target.cardId]);
+  });
+});
+
+describe("progress views (MST-01 to MST-03)", () => {
+  const card = (page: number, tier: PageCard["tier"], ratings: number[]): PageCard => ({
+    row: {} as PageCard["row"],
+    page,
+    tier,
+    history: { declared: true, firstFluentDate: null, grades: ratings.map((rating, i) => ({ date: addDays(TODAY, -i - 1), rating: rating as 1 | 2 | 3 | 4 })) },
+  });
+
+  it("counts a page as memorized only after a Good grade in sabqi or manzil", () => {
+    expect(isMemorized(card(1, "manzil", [3]))).toBe(true);
+    expect(isMemorized(card(1, "manzil.unverified", []))).toBe(false);
+    expect(isMemorized(card(1, "manzil.needs_work", [1]))).toBe(false);
+    expect(isMemorized(card(1, "sabaq", [4]))).toBe(false);
+  });
+
+  it("bands recall at 0.90 and 0.75 and completes a juz only when every page is memorized", () => {
+    expect(strengthBands([0.95, 0.9, 0.8, 0.75, 0.5])).toEqual({ steady: 2, fair: 2, needsReview: 1 });
+    const juz30 = new Set(Array.from({ length: 23 }, (_, i) => 582 + i));
+    expect(completedJuz(juz30)).toEqual([30]);
+    juz30.delete(600);
+    expect(completedJuz(juz30)).toEqual([]);
   });
 });

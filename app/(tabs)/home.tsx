@@ -41,6 +41,8 @@ import { HabitBreakSheet } from "@/components/habit/HabitBreakSheet";
 import { useHabitOverview } from "@/lib/habit/use-habit-overview";
 import { markFullWirdIfComplete } from "@/lib/habit/queries";
 import { WirdPlanCard } from "@/components/hifz/WirdPlanCard";
+import { WelcomeBackCard } from "@/components/hifz/WelcomeBackCard";
+import { diffDays } from "@/lib/habit/dates";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { putUserSetting } from "@/lib/database/user-settings";
 import {
@@ -368,6 +370,10 @@ export default function HomeScreen() {
         ? 0
         : wird.todo.length + (wird.newLines > 0 && !wird.daily.backlog && !wird.sabaqDoneToday ? 1 : 0);
   const remainingToday = totalDue + planRemaining;
+  // 6.4: after 7 or more days without a wird, welcome the user back before today's review.
+  const lastWirdDay = habit ? habit.days.filter((day) => day.localDate <= habit.today).at(-1)?.localDate ?? null : null;
+  const returning =
+    !!habit && !!wird && wird.todo.length > 0 && !habit.streak.doneToday && lastWirdDay !== null && diffDays(lastWirdDay, habit.today) >= 7;
   useEffect(() => {
     if (!dueLoaded || !habit?.streak.doneToday || remainingToday > 0) return;
     markFullWirdIfComplete(db, { now: new Date(), remaining: remainingToday }).catch(console.warn);
@@ -506,6 +512,16 @@ export default function HomeScreen() {
             />
           ) : null}
         </View>
+
+        {returning ? (
+          <WelcomeBackCard
+            language={uiLanguage}
+            s={s}
+            onChoose={(level) =>
+              router.push({ pathname: "/hifz/review", params: { mode: "welcome_back", level: String(level) } } as Href)
+            }
+          />
+        ) : null}
 
         {wird !== undefined ? (
           <WirdPlanCard

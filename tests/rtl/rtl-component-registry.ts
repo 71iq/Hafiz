@@ -143,6 +143,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Home streak card mirrors its rows and the progress fill direction follows the interface.",
   ),
   entry(
+    "components/hifz/HifzProgressCard.tsx",
+    "progress-chart",
+    "source",
+    "Strength bar fills from the reading side; legend rows mirror and counts use the interface digits.",
+  ),
+  entry(
     "components/hifz/HifzSetupFlow.tsx",
     "form-field",
     "source",
@@ -165,6 +171,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "quran-text",
     "source",
     "Quran lines are always right to left in the page font; hidden words keep their place and the layout never mirrors with the interface.",
+  ),
+  entry(
+    "components/hifz/WelcomeBackCard.tsx",
+    "card",
+    "source",
+    "Welcome-back options stack vertically and align to the reading side.",
   ),
   entry(
     "components/hifz/WirdPlanCard.tsx",
