@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useNavigation } from "expo-router";
-import { Eye, EyeOff, Moon, Plus, X } from "lucide-react-native";
+import { BookOpenCheck, Eye, Moon, PenLine, Plus, RotateCcw, ScanText, X } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import { Toast } from "@/components/ui/Toast";
@@ -81,6 +82,11 @@ type QueueItem =
   | { kind: "drill"; item: InboxItem; text: { qcf2: string; page: number } | null };
 
 type Phase = "loading" | "recite" | "check" | "summary" | "empty" | "error";
+
+/** The shared outline Button has no border; on this screen an outline action needs one to read as a button. */
+const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
+/** Helper actions sit on a tinted fill so they read as buttons, at the full touch height. */
+const HELPER_BUTTON = "flex-1 h-11 px-2 bg-surface-low dark:bg-surface-dark-low";
 
 /** `extra` counts half pages and seams reviewed on their own. */
 type Totals = { pages: number; clean: number; marked: number; extra: number };
@@ -180,6 +186,9 @@ function HifzReviewScreen() {
   const wirdEvent = useRef<SessionHabitInput["event"]>(null);
   const againCount = useRef(0);
   const minutesPerPage = useRef(3);
+  const pageScrollRef = useRef<ScrollView>(null);
+  /** The queue index whose seam check was already scrolled into view. */
+  const seamScrolledFor = useRef<number | null>(null);
 
   const current = queue[index] ?? null;
 
@@ -574,7 +583,12 @@ function HifzReviewScreen() {
     if (current.kind !== "page" || !plan) return {};
     return getGradeSchedulePreviews(current.card.row, pagePolicy(current.card.tier, plan, baseSettings), isRTL);
   }, [baseSettings, current, isRTL, plan]);
-  const markedKeys = useMemo(() => new Set(attempt.marks.keys()), [attempt.marks]);
+  // While the mistake sheet is open, the tapped word stays highlighted so the user sees which one it is.
+  const markedKeys = useMemo(() => {
+    const keys = new Set(attempt.marks.keys());
+    if (markingKey) keys.add(markingKey);
+    return keys;
+  }, [attempt.marks, markingKey]);
   const wordLabel = useCallback(
     (token: PageToken) =>
       token.wordPos
@@ -596,17 +610,21 @@ function HifzReviewScreen() {
 
   if (phase === "empty" || phase === "error") {
     return (
-      <SafeAreaView
-        className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center px-8"
-        style={{ gap: 16 }}
-      >
-        <Text dir={dir} align="center" variant="title-md">
-          {phase === "error" ? s.hifzLoadFailed : drillsOnly ? s.hifzInboxEmpty : s.hifzNothingDue}
-        </Text>
-        <Button
-          label={phase === "error" ? s.homeLoadRetry : s.flashcardsSummaryDone}
-          onPress={phase === "error" ? load : leave}
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center px-6">
+        <EmptyState
+          icon={phase === "error" ? RotateCcw : drillsOnly ? PenLine : BookOpenCheck}
+          title={phase === "error" ? s.hifzLoadFailed : drillsOnly ? s.hifzInboxEmpty : s.hifzNothingDue}
+          isDark={isDark}
         />
+        <View className="w-full max-w-sm" style={{ gap: 10 }}>
+          {phase === "error" ? <Button label={s.homeLoadRetry} onPress={load} /> : null}
+          <Button
+            variant={phase === "error" ? "outline" : "default"}
+            className={phase === "error" ? OUTLINE_BORDER : undefined}
+            label={s.flashcardsSummaryDone}
+            onPress={leave}
+          />
+        </View>
       </SafeAreaView>
     );
   }
@@ -640,8 +658,9 @@ function HifzReviewScreen() {
                 </Text>
                 <Text
                   dir={dir}
-                  style={{ fontFamily: "Manrope_700Bold", fontSize: 17 }}
-                  className="text-charcoal dark:text-neutral-100"
+                  // A zero is not news, so it stays in regular weight beside the counts that are.
+                  style={{ fontFamily: value === 0 ? "Manrope_400Regular" : "Manrope_700Bold", fontSize: 17 }}
+                  className={value === 0 ? "text-warm-600 dark:text-neutral-400" : "text-charcoal dark:text-neutral-100"}
                 >
                   {formatNumber(value as number, uiLanguage)}
                 </Text>
@@ -679,33 +698,51 @@ function HifzReviewScreen() {
 
   const progressLabel = `${formatNumber(index + 1, uiLanguage)} / ${formatNumber(queue.length, uiLanguage)}`;
   const accent = isDark ? "#2dd4bf" : "#0d9488";
+  // Teal text under 14 px uses the darker token in light mode to stay readable on tinted chips.
+  const accentText = isDark ? "#2dd4bf" : "#0f766e";
   const muted = isDark ? "#d4d4d4" : "#6e5a47";
+  const marking = markingToken && markingKey !== null ? markingToken : null;
+  const markingSubtitle = marking
+    ? marking.wordPos
+      ? interpolate(s.hifzMistakeWordRef, {
+          ref: formatAyahRef(isRTL, marking.surah, marking.ayah),
+          n: formatNumber(marking.wordPos, uiLanguage),
+        })
+      : interpolate(s.hifzMistakeAyahRef, { ref: formatAyahRef(isRTL, marking.surah, marking.ayah) })
+    : undefined;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <MirroredRow dir={dir} className="items-center justify-between px-5 pt-3 pb-2">
-        <Pressable
-          onPress={close}
-          accessibilityRole="button"
-          accessibilityLabel={s.genericClose}
-          className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-        >
-          <X size={18} color={muted} />
-        </Pressable>
-        <Text
+      {/* The header shares the page column, so the close button sits beside the page on wide screens. */}
+      <View className="items-center">
+        <MirroredRow
           dir={dir}
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-          className="text-warm-500 dark:text-neutral-400"
+          className="items-center justify-between px-5 pt-3 pb-2"
+          style={{ width: "100%", maxWidth: pageWidth }}
         >
-          {progressLabel}
-        </Text>
-        <View style={{ width: 44 }} />
-      </MirroredRow>
+          <Pressable
+            onPress={close}
+            accessibilityRole="button"
+            accessibilityLabel={s.genericClose}
+            className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+          >
+            <X size={18} color={muted} />
+          </Pressable>
+          <Text
+            dir={dir}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+            className="text-warm-600 dark:text-neutral-400"
+          >
+            {progressLabel}
+          </Text>
+          <View style={{ width: 44 }} />
+        </MirroredRow>
+      </View>
 
       {current?.kind === "seam" ? (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 16, alignItems: "center" }}>
           <View className="rounded-full px-3 py-1 bg-primary-accent/10 dark:bg-primary-bright/15">
-            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accent }}>
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accentText }}>
               {s.hifzStrengthenChip}
             </Text>
           </View>
@@ -748,7 +785,7 @@ function HifzReviewScreen() {
           ) : (
             <View className="w-full max-w-sm" style={{ gap: 10 }}>
               <Button label={s.hifzSeamClean} onPress={() => seamResult(true)} disabled={busy} />
-              <Button variant="outline" label={s.hifzSeamStumbled} onPress={() => seamResult(false)} disabled={busy} />
+              <Button variant="outline" className={OUTLINE_BORDER} label={s.hifzSeamStumbled} onPress={() => seamResult(false)} disabled={busy} />
             </View>
           )}
         </ScrollView>
@@ -783,7 +820,7 @@ function HifzReviewScreen() {
           ) : (
             <View className="w-full max-w-sm" style={{ gap: 10 }}>
               <Button label={s.hifzDrillClean} onPress={() => drillResult("clean")} disabled={busy} />
-              <Button variant="outline" label={s.hifzDrillAgain} onPress={() => drillResult("again")} disabled={busy} />
+              <Button variant="outline" className={OUTLINE_BORDER} label={s.hifzDrillAgain} onPress={() => drillResult("again")} disabled={busy} />
               <Button variant="ghost" label={s.hifzDrillDismiss} onPress={() => drillResult("not_a_mistake")} disabled={busy} />
             </View>
           )}
@@ -791,7 +828,7 @@ function HifzReviewScreen() {
       ) : current?.kind === "cloze" ? (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 16, alignItems: "center" }}>
           <View className="rounded-full px-3 py-1 bg-primary-accent/10 dark:bg-primary-bright/15">
-            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accent }}>{s.hifzStrengthenChip}</Text>
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accentText }}>{s.hifzStrengthenChip}</Text>
           </View>
           <Text dir={dir} align="center" variant="title-md">
             {s.hifzClozeTitle}
@@ -826,13 +863,13 @@ function HifzReviewScreen() {
           ) : (
             <View className="w-full max-w-sm" style={{ gap: 10 }}>
               <Button label={s.hifzDrillClean} onPress={() => gradeRemediation(Rating.Good, emptyAttempt(4))} disabled={busy} />
-              <Button variant="outline" label={s.hifzDrillAgain} onPress={() => gradeRemediation(Rating.Again, emptyAttempt(4))} disabled={busy} />
+              <Button variant="outline" className={OUTLINE_BORDER} label={s.hifzDrillAgain} onPress={() => gradeRemediation(Rating.Again, emptyAttempt(4))} disabled={busy} />
             </View>
           )}
         </ScrollView>
       ) : current?.kind === "page" || current?.kind === "half" ? (
         <>
-          <ScrollView contentContainerStyle={{ paddingBottom: 24, alignItems: "center" }}>
+          <ScrollView ref={pageScrollRef} contentContainerStyle={{ paddingBottom: 24, alignItems: "center" }}>
             <View style={{ width: "100%", maxWidth: pageWidth, paddingHorizontal: 16, gap: 10 }}>
               <MirroredRow dir={dir} className="items-center justify-between gap-2">
                 <Text
@@ -845,7 +882,7 @@ function HifzReviewScreen() {
                     : `${interpolate(s.hifzPageN, { n: formatNumber(current.card.page, uiLanguage) })} · ${interpolate(s.hifzJuzN, { n: formatNumber(juzOfPage(current.card.page), uiLanguage) })}`}
                 </Text>
                 <View className="rounded-full px-3 py-1 bg-primary-accent/10 dark:bg-primary-bright/15">
-                  <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accent }}>
+                  <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accentText }}>
                     {current.kind === "half" ? s.hifzStrengthenChip : tierLabel(current.card.tier, s)}
                   </Text>
                 </View>
@@ -856,11 +893,8 @@ function HifzReviewScreen() {
                   <Text dir={dir} variant="label-md">
                     {s.hifzLevelLabel}
                   </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 6, flexDirection: isRTL ? "row-reverse" : "row" }}
-                  >
+                  {/* Wraps instead of scrolling, so all five levels stay visible in both directions. */}
+                  <MirroredRow dir={dir} className="flex-wrap gap-1.5" accessibilityRole="radiogroup">
                     {SUPPORT_LEVELS.slice()
                       .reverse()
                       .map((level) => {
@@ -871,13 +905,13 @@ function HifzReviewScreen() {
                             accessibilityRole="radio"
                             accessibilityState={{ checked: selected }}
                             onPress={() => setLevel(level)}
-                            className={`min-h-[36px] justify-center rounded-full px-3 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
+                            className={`min-h-[44px] justify-center rounded-full px-3.5 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
                           >
                             <Text
-                              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
                               className={
                                 selected
-                                  ? "text-primary-accent dark:text-primary-bright"
+                                  ? "text-primary-muted dark:text-primary-bright"
                                   : "text-charcoal dark:text-neutral-300"
                               }
                             >
@@ -886,7 +920,7 @@ function HifzReviewScreen() {
                           </Pressable>
                         );
                       })}
-                  </ScrollView>
+                  </MirroredRow>
                   <MirroredRow dir={dir} className="mt-1 items-center justify-between gap-3">
                     <View className="flex-1">
                       <Text
@@ -952,7 +986,17 @@ function HifzReviewScreen() {
               )}
             </Card>
             {phase === "check" && seamPage !== null ? (
-              <Card elevation="low" className="mt-3 px-5 py-4 rounded-3xl" style={{ width: pageWidth - 16, gap: 10 }}>
+              <Card
+                elevation="low"
+                className="mt-3 px-5 py-4 rounded-3xl"
+                style={{ width: pageWidth - 16, gap: 10 }}
+                // The seam check sits below the page; bring it into view once so it is not graded unseen.
+                onLayout={() => {
+                  if (seamScrolledFor.current === index) return;
+                  seamScrolledFor.current = index;
+                  requestAnimationFrame(() => pageScrollRef.current?.scrollToEnd({ animated: true }));
+                }}
+              >
                 <View style={{ gap: 2 }}>
                   <Text dir={dir} variant="title-sm">
                     {interpolate(s.hifzSeamTitle, { n: formatNumber(seamPage, uiLanguage) })}
@@ -971,7 +1015,7 @@ function HifzReviewScreen() {
                 ) : (
                   <Button
                     variant="outline"
-                    size="sm"
+                    className="h-11 bg-surface-high dark:bg-surface-dark-high"
                     label={s.hifzSeamShow}
                     onPress={() => setSeamShown(true)}
                     disabled={!seamText}
@@ -992,13 +1036,13 @@ function HifzReviewScreen() {
                             seam: selected || !seamText ? null : { clean, surah: seamText.surah, ayah: seamText.ayah },
                           }))
                         }
-                        className={`flex-1 min-h-[44px] items-center justify-center rounded-full px-3 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
+                        className={`flex-1 min-h-[44px] items-center justify-center rounded-full px-3 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-high dark:bg-surface-dark-high"}`}
                       >
                         <Text
                           style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
                           className={
                             selected
-                              ? "text-primary-accent dark:text-primary-bright"
+                              ? "text-primary-muted dark:text-primary-bright"
                               : "text-charcoal dark:text-neutral-300"
                           }
                         >
@@ -1024,17 +1068,8 @@ function HifzReviewScreen() {
                 <>
                   {isGradable(attempt.level) ? (
                     <MirroredRow dir={dir} className="gap-2">
-                      {attempt.level === 2 ? (
-                        <Button
-                          className="flex-1"
-                          variant="outline"
-                          size="sm"
-                          label={s.hifzNextLine}
-                          onPress={nextLine}
-                        />
-                      ) : null}
                       <Button
-                        className="flex-1"
+                        className={HELPER_BUTTON}
                         variant="outline"
                         size="sm"
                         onPress={peek}
@@ -1043,28 +1078,30 @@ function HifzReviewScreen() {
                         <Eye size={15} color={muted} />
                         <Text
                           style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
-                          className="text-charcoal dark:text-neutral-200"
+                          className="flex-shrink text-charcoal dark:text-neutral-200"
+                          numberOfLines={1}
                         >
                           {s.hifzPeek}
                         </Text>
                       </Button>
                       <Button
-                        className="flex-1"
+                        className={HELPER_BUTTON}
                         variant="outline"
                         size="sm"
                         onPress={showMe}
                         accessibilityHint={s.hifzShowMeHint}
                       >
-                        <EyeOff size={15} color={muted} />
+                        <ScanText size={15} color={muted} />
                         <Text
                           style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
-                          className="text-charcoal dark:text-neutral-200"
+                          className="flex-shrink text-charcoal dark:text-neutral-200"
+                          numberOfLines={1}
                         >
                           {s.hifzShowMe}
                         </Text>
                       </Button>
                       <Button
-                        className="flex-1"
+                        className={HELPER_BUTTON}
                         variant="outline"
                         size="sm"
                         onPress={() => setAttempt((value) => ({ ...value, slips: value.slips + 1 }))}
@@ -1073,7 +1110,7 @@ function HifzReviewScreen() {
                         <Plus size={15} color={muted} />
                         <Text
                           style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
-                          className="text-charcoal dark:text-neutral-200"
+                          className="flex-shrink text-charcoal dark:text-neutral-200"
                           numberOfLines={1}
                         >
                           {attempt.slips > 0
@@ -1083,7 +1120,19 @@ function HifzReviewScreen() {
                       </Button>
                     </MirroredRow>
                   ) : null}
-                  {isGradable(attempt.level) ? (
+                  {/* Line by line is driven by Next line, so it leads and Done steps back to outline. */}
+                  {isGradable(attempt.level) && attempt.level === 2 ? (
+                    <>
+                      <Button label={s.hifzNextLine} onPress={nextLine} disabled={!pageData} />
+                      <Button
+                        variant="outline"
+                        className={OUTLINE_BORDER}
+                        label={s.hifzDone}
+                        onPress={done}
+                        disabled={!pageData}
+                      />
+                    </>
+                  ) : isGradable(attempt.level) ? (
                     <Button label={s.hifzDone} onPress={done} disabled={!pageData} />
                   ) : (
                     <Button label={s.hifzSabaqNext} onPress={advance} />
@@ -1094,11 +1143,11 @@ function HifzReviewScreen() {
                       accessibilityHint={s.hifzReciteInSalahHint}
                       onPress={() => grade(Rating.Good, "salah")}
                       disabled={busy}
-                      className="min-h-[40px] items-center justify-center"
+                      className="min-h-[44px] items-center justify-center"
                     >
                       <MirroredRow dir={dir} className="items-center gap-1.5">
                         <Moon size={14} color={accent} />
-                        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: accent }}>
+                        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: accentText }}>
                           {s.hifzReciteInSalah}
                         </Text>
                       </MirroredRow>
@@ -1120,6 +1169,7 @@ function HifzReviewScreen() {
                     disabled={busy}
                     proposed={proposal === 0 ? null : proposal}
                     maxRating={(cap === 0 ? Rating.Easy : cap) as Grade}
+                    dir={dir}
                   />
                 </>
               )}
@@ -1131,6 +1181,7 @@ function HifzReviewScreen() {
       <MistakeTypeSheet
         open={markingKey !== null}
         current={markingKey ? (attempt.marks.get(markingKey)?.type ?? null) : null}
+        subtitle={markingSubtitle}
         dir={dir}
         s={s}
         onChoose={chooseMark}

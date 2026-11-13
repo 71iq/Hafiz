@@ -14,7 +14,7 @@ import { WIRD_MINIMUM_MINUTE_OPTIONS, WIRD_MINIMUM_PAGE_OPTIONS } from "@/lib/ha
 import { setStreakGoal } from "@/lib/habit/queries";
 import { effectiveWeekStart, HABIT_SETTING_KEYS, readHabitSettings, type HabitSettings } from "@/lib/habit/settings";
 import { emitHabitChanged, subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
-import { formatMinutesShort, formatNumber, formatPages } from "@/lib/i18n/count";
+import { formatMinutesShort, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 
 type Props = {
@@ -25,6 +25,11 @@ type Props = {
   /** Opens the hifz plan and memorized portion setup. */
   onOpenPlan: () => void;
 };
+
+/** A short page count for a segmented chip: "½", "1" or "١", under a "Pages" caption. */
+function shortPages(pages: number, language: "en" | "ar"): string {
+  return pages === 0.5 ? "½" : formatNumber(pages, language);
+}
 
 function Row({ label, hint, dir, children }: { label: string; hint?: string; dir: "ltr" | "rtl"; children: React.ReactNode }) {
   return (
@@ -89,6 +94,9 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
     <Card elevation="low" className="p-5 mb-8">
       <View style={{ gap: 20 }}>
         <Row label={s.habitSettingsMinimum} hint={s.habitSettingsMinimumHint} dir={dir}>
+          <Text dir={dir} variant="caption" className="text-warm-600 dark:text-neutral-400" style={{ fontSize: 13 }}>
+            {s.habitSettingsPages}
+          </Text>
           <ToggleGroup<string>
             dir={dir}
             value={String(settings.minimum.pages)}
@@ -97,9 +105,13 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
                 writeUserSetting(db, HABIT_SETTING_KEYS.minimum, JSON.stringify({ ...settings.minimum, pages: Number(value) })),
               )
             }
-            items={WIRD_MINIMUM_PAGE_OPTIONS.map((pages) => ({ value: String(pages), label: formatPages(pages, language) }))}
+            items={WIRD_MINIMUM_PAGE_OPTIONS.map((pages) => ({ value: String(pages), label: shortPages(pages, language) }))}
             itemClassName="flex-auto px-2"
+            accessibilityLabel={s.habitSettingsPages}
           />
+          <Text dir={dir} variant="caption" className="text-warm-600 dark:text-neutral-400" style={{ fontSize: 13 }}>
+            {s.habitSettingsOr}
+          </Text>
           <ToggleGroup<string>
             dir={dir}
             value={String(settings.minimum.minutes)}

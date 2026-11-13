@@ -44,6 +44,8 @@ export function errorTypeLabel(type: RecitationErrorType, s: UIStrings): string 
 type Props = {
   open: boolean;
   current: RecitationErrorType | null;
+  /** The tapped word's reference, so the user knows which word they are marking. */
+  subtitle?: string;
   dir: "ltr" | "rtl";
   s: UIStrings;
   onChoose: (type: RecitationErrorType) => void;
@@ -52,10 +54,10 @@ type Props = {
 };
 
 /** Choose what went wrong on a tapped word, or remove the mark. Described neutrally (ERR-07). */
-export function MistakeTypeSheet({ open, current, dir, s, onChoose, onRemove, onClose }: Props) {
+export function MistakeTypeSheet({ open, current, subtitle, dir, s, onChoose, onRemove, onClose }: Props) {
   return (
     <ResponsiveSheet open={open} onClose={onClose} maxWidth={420} maxHeight={560}>
-      <OverlayHeader title={s.hifzMistakeTypeTitle} onClose={onClose} isRTL={dir === "rtl"} showHandle />
+      <OverlayHeader title={s.hifzMistakeTypeTitle} subtitle={subtitle} onClose={onClose} isRTL={dir === "rtl"} showHandle />
       <OverlayBody contentContainerClassName="px-5 py-4" contentContainerStyle={{ gap: 8 }}>
         {MARKABLE_TYPES.map((type) => {
           const selected = current === type;

@@ -4,6 +4,7 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
+import { toArabicNumber } from "@/lib/arabic";
 import type { DayStatus } from "@/lib/habit/types";
 
 type DayData = { date: string; count: number };
@@ -56,7 +57,10 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
     case "excused":
       return { backgroundColor: isDark ? "#4a4030" : "#efe2c6" };
     case "paused":
-      return { backgroundColor: isDark ? "#3f3f46" : "#e4e4e7" };
+      // A dashed edge in light mode, where a plain grey fill would read as an empty day.
+      return isDark
+        ? { backgroundColor: "#3f3f46" }
+        : { backgroundColor: "#d4d4d8", borderWidth: 1, borderColor: "#a1a1aa", borderStyle: "dashed" as const };
     case "grace":
       return { backgroundColor: isDark ? "#1e3a5f" : "#dbeafe" };
   }
@@ -86,6 +90,16 @@ function getDayLabel(dayIndex: number, isArabic: boolean): string | null {
   if (dayIndex === 3) return isArabic ? "الأربعاء" : "Wed";
   if (dayIndex === 5) return isArabic ? "الجمعة" : "Fri";
   return null;
+}
+
+/** The tooltip date in the interface's digits: Arabic uses Arabic-Indic digits throughout. */
+function formatTooltipDate(dateKey: string, isArabic: boolean): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(isArabic ? "ar-u-nu-arab" : "en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function formatDateKey(date: Date): string {
@@ -310,11 +324,25 @@ export function ActivityHeatmap({
                         height: CELL_SIZE,
                         borderRadius: 3,
                         backgroundColor: statusStyle?.backgroundColor ?? getColor(day.count, isDark, themeColors.surfaceHigh),
-                        borderWidth: isToday ? 1 : (statusStyle?.borderWidth ?? 0),
-                        borderColor: isToday ? (isDark ? "#FDDC91" : "#785F22") : (statusStyle?.borderColor ?? "transparent"),
-                        borderStyle: isToday ? "solid" : (statusStyle?.borderStyle ?? "solid"),
+                        borderWidth: statusStyle?.borderWidth ?? 0,
+                        borderColor: statusStyle?.borderColor ?? "transparent",
+                        borderStyle: statusStyle?.borderStyle ?? "solid",
                       }}
-                    />
+                    >
+                      {/* Today: a ring outside the cell with a 1 px gap, so the cell keeps its own status border. */}
+                      {isToday ? (
+                        <View
+                          style={{
+                            pointerEvents: "none",
+                            position: "absolute",
+                            inset: -3 - (statusStyle?.borderWidth ?? 0),
+                            borderRadius: 5,
+                            borderWidth: 2,
+                            borderColor: isDark ? "#ffffff" : "#2D2D2D",
+                          }}
+                        />
+                      ) : null}
+                    </Pressable>
                   );
                 })}
               </View>
@@ -329,7 +357,7 @@ export function ActivityHeatmap({
             style={{ backgroundColor: themeColors.surfaceMid, alignSelf: "center" }}
           >
             <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#d4d4d4" : "#6e5a47" }}>
-              {tooltip.count} {s.heatmapReviews} — {tooltip.date}
+              {isArabic ? toArabicNumber(tooltip.count) : tooltip.count} {s.heatmapReviews} — {formatTooltipDate(tooltip.date, isArabic)}
               {dayStatuses?.get(tooltip.date) ? ` — ${statusLabel(dayStatuses.get(tooltip.date)!, s)}` : ""}
             </Text>
           </View>
@@ -347,7 +375,8 @@ export function ActivityHeatmap({
           }}
         >
           {dayStatuses ? (
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 6 }}>
+            // flex: 1 bounds the legend to the grid width, so it wraps instead of clipping its last items.
+            <View style={{ flex: 1, minWidth: 0, flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 6 }}>
               {STATUS_ORDER.map((status) => {
                 const style = statusCellStyle(status, 0, isDark);
                 return (

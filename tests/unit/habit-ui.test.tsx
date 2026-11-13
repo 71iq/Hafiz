@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { HabitBreakSheet } from "@/components/habit/HabitBreakSheet";
+import { WirdExtras } from "@/components/habit/WirdExtras";
 import { WirdStreakCard } from "@/components/habit/WirdStreakCard";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { makeUpCutoffFor } from "@/lib/habit/cutoff";
@@ -73,7 +74,7 @@ describe("WirdStreakCard", () => {
 
   it("shows the alive streak on the at-risk day with progress toward the minimum (STR-03)", () => {
     const view = renderCard(overview(run(addDays(TODAY, -1), 12)));
-    expect(view.getByText("12")).toBeTruthy();
+    expect(view.getByText("Streak: 12 days")).toBeTruthy();
     expect(view.getByText(s.habitAtRisk)).toBeTruthy();
     expect(view.getByText("Minimum: 1 page or 5 minutes")).toBeTruthy();
   });
@@ -82,7 +83,7 @@ describe("WirdStreakCard", () => {
     const morning = atLocalTime(TODAY, 9 * 60);
     const view = renderCard(overview(run(addDays(TODAY, -2), 5), {}, morning));
     expect(view.getByText(/Yesterday's wird can still be made up before/)).toBeTruthy();
-    expect(view.getByText("5")).toBeTruthy();
+    expect(view.getByText("Streak: 5 days")).toBeTruthy();
   });
 
   it("shows earn-back progress with three dots and frames a broken short streak as a fresh start", () => {
@@ -106,7 +107,7 @@ describe("WirdStreakCard", () => {
   });
 
   it("uses Arabic digits and counted nouns in Arabic", () => {
-    expect(renderCard(overview(run(addDays(TODAY, -1), 12)), "ar").getByText("١٢")).toBeTruthy();
+    expect(renderCard(overview(run(addDays(TODAY, -1), 12)), "ar").getByText("السلسلة: ١٢ يومًا")).toBeTruthy();
     const earnBack = renderCard(overview(run(addDays(TODAY, -3), 12)), "ar");
     expect(earnBack.getByText(/توقّفت سلسلتك بعد ١٢ يومًا/)).toBeTruthy();
     const fresh = renderCard(overview(run(addDays(TODAY, -3), 5)), "ar");
@@ -170,5 +171,58 @@ describe("HabitBreakSheet", () => {
     const today = localDateOf(new Date());
     expect(JSON.parse(String(setting?.value))).toEqual({ start: today, end: addDays(today, 13) });
     expect(await readHabitDayRow(store.db, today)).toMatchObject({ status: "paused" });
+  });
+});
+
+describe("WirdExtras", () => {
+  let store: OutboxDatabase;
+  const s = strings.en;
+
+  beforeEach(async () => {
+    store = await openOutboxDatabase();
+  });
+
+  afterEach(async () => {
+    await store.db.getFirstAsync("SELECT 1");
+    await store.close();
+  });
+
+  function renderExtras(props: Partial<React.ComponentProps<typeof WirdExtras>>) {
+    return render(
+      <DirectionProvider dir="ltr">
+        <WirdExtras
+          db={store.db}
+          inboxCount={0}
+          hasMemorizedPages={false}
+          sabaqToday={false}
+          language="en"
+          isDark={false}
+          s={s}
+          onStrengthen={jest.fn()}
+          onConnect={jest.fn()}
+          {...props}
+        />
+      </DirectionProvider>,
+    );
+  }
+
+  it("opens the mistake drill from the strengthen extra (5.4)", async () => {
+    const onStrengthen = jest.fn();
+    const view = renderExtras({ inboxCount: 4, onStrengthen });
+    fireEvent.press(await view.findByText(s.habitExtraStrengthen));
+    expect(onStrengthen).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the wird review from connect and leaves salah as a note with only its hide button", async () => {
+    const onConnect = jest.fn();
+    const onStrengthen = jest.fn();
+    const view = renderExtras({ hasMemorizedPages: true, onConnect, onStrengthen });
+    fireEvent.press(await view.findByText(s.habitExtraConnect));
+    expect(onConnect).toHaveBeenCalledTimes(1);
+    fireEvent.press(view.getByText(s.habitExtraSalah));
+    expect(onConnect).toHaveBeenCalledTimes(1);
+    expect(onStrengthen).not.toHaveBeenCalled();
+    // One row button (connect) and one hide button per extra.
+    expect(view.getAllByRole("button")).toHaveLength(3);
   });
 });

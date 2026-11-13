@@ -72,10 +72,10 @@ function Chip({
       accessibilityState={{ selected, disabled }}
       onPress={onPress}
       disabled={disabled}
-      className={`min-h-[40px] justify-center rounded-full px-3.5 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
+      className={`min-h-[44px] justify-center rounded-full px-3.5 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
     >
       <Text
-        className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}
+        className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}
         style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
       >
         {label}
@@ -231,8 +231,7 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
                       accessibilityLabel={interpolate(s.habitExcuseRemoveLabel, { date: formatShortDate(day.localDate, language) })}
                       onPress={() => run(() => clearExcusedDay(db, { date: day.localDate }))}
                       disabled={busy}
-                      hitSlop={8}
-                      className="w-10 h-10 items-center justify-center"
+                      className="w-11 h-11 items-center justify-center"
                     >
                       <XIcon size={15} color={isDark ? "#a3a3a3" : "#8B8178"} />
                     </Pressable>

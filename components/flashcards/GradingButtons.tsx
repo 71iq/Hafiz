@@ -2,8 +2,10 @@ import { Pressable, Text, View } from "react-native";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { Rating, State, type Grade } from "@/lib/fsrs/scheduler";
 import { DEFAULT_DECK_LEARNING_STEPS, DEFAULT_DECK_RELEARNING_STEPS, type DeckReviewSettings, type StudyCardRow } from "@/lib/fsrs/types";
+import { Text as DirectionalText } from "@/components/ui/Text";
 import { toArabicNumber } from "@/lib/arabic";
 import type { UIStrings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
 
 const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
   { rating: Rating.Again, bgLight: "#b91c1c", bgDark: "#dc2626" },
@@ -15,7 +17,8 @@ const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
 /**
  * The four FSRS grades with their next-review previews. A recitation can pass the rubric's proposal
  * (GRD-02), shown as a ring the user can override with one tap, and the support level's cap
- * (GRD-03): grades above it are disabled.
+ * (GRD-03): grades above it are disabled. A caption above the row names the suggestion and the cap,
+ * so a muted grade always has its reason in view. Without either, the row is the plain flashcard row.
  */
 export function GradingButtons({
   onGrade,
@@ -25,6 +28,7 @@ export function GradingButtons({
   disabled = false,
   proposed = null,
   maxRating = Rating.Easy,
+  dir = "ltr",
 }: {
   onGrade: (rating: Grade) => void;
   previews: Record<number, string>;
@@ -33,6 +37,8 @@ export function GradingButtons({
   disabled?: boolean;
   proposed?: Grade | null;
   maxRating?: Grade;
+  /** Direction of the caption; the grade row itself always runs Again to Easy from the left. */
+  dir?: "ltr" | "rtl";
 }) {
   const labels: Record<number, string> = {
     [Rating.Again]: s.flashcardsAgain,
@@ -40,61 +46,91 @@ export function GradingButtons({
     [Rating.Good]: s.flashcardsGood,
     [Rating.Easy]: s.flashcardsEasy,
   };
+  const capped = maxRating < Rating.Easy;
+  // Every button gets the same ring space when a suggestion is shown, so no label shifts.
+  const ringSpace = proposed !== null ? 3 : 0;
+  const ringColor = isDark ? "#FDDC91" : "#2D2D2D";
+  const captions = [
+    proposed !== null ? `${s.hifzSuggestedGrade}: ${labels[proposed]}` : null,
+    capped ? interpolate(s.hifzLevelCap, { grade: labels[maxRating] }) : null,
+  ].filter((line): line is string => line !== null);
 
   return (
-    <View className="gap-3">
-      <View className="flex-row gap-3" style={{ direction: "ltr" }}>
+    <View className="gap-2">
+      {captions.length > 0 ? (
+        <View style={{ gap: 2 }}>
+          {captions.map((line) => (
+            <DirectionalText
+              key={line}
+              dir={dir}
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 18 }}
+              className="text-warm-700 dark:text-neutral-300"
+            >
+              {line}
+            </DirectionalText>
+          ))}
+        </View>
+      ) : null}
+      <View className="flex-row" style={{ direction: "ltr", gap: ringSpace > 0 ? 6 : 12 }}>
         {GRADE_BUTTONS.map(({ rating, bgLight, bgDark }) => {
-          const backgroundColor = isDark ? bgDark : bgLight;
-          const capped = rating > maxRating;
+          const isCapped = rating > maxRating;
           const suggested = proposed === rating;
           return (
-            <Pressable
+            <View
               key={rating}
-              onPress={() => onGrade(rating)}
-              disabled={disabled || capped}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: disabled || capped, selected: suggested }}
-              accessibilityHint={suggested ? s.hifzSuggestedGrade : undefined}
-              className="flex-1 rounded-2xl overflow-hidden"
-              style={({ pressed }) => ({
-                opacity: capped ? 0.3 : disabled ? 0.55 : pressed ? 0.88 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-                borderWidth: suggested ? 3 : 0,
-                borderColor: suggested ? (isDark ? "#FDDC91" : "#785F22") : "transparent",
-              })}
+              className="flex-1"
+              style={{ padding: ringSpace, borderRadius: 16 + ringSpace, backgroundColor: suggested ? ringColor : "transparent" }}
             >
-              <View
-                className="items-center justify-center px-1.5 py-2.5"
-                style={{ backgroundColor, minHeight: 58 }}
+              <Pressable
+                onPress={() => onGrade(rating)}
+                disabled={disabled || isCapped}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: disabled || isCapped, selected: suggested }}
+                accessibilityHint={suggested ? s.hifzSuggestedGrade : undefined}
+                className={`flex-1 rounded-2xl overflow-hidden ${isCapped ? "bg-surface-high dark:bg-surface-dark-high" : ""}`}
+                style={({ pressed }) => ({
+                  opacity: disabled && !isCapped ? 0.55 : pressed ? 0.88 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
               >
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.82}
-                  style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: "#fff" }}
+                <View
+                  className="items-center justify-center px-1.5 py-2.5"
+                  style={{ backgroundColor: isCapped ? undefined : isDark ? bgDark : bgLight, minHeight: 58 }}
                 >
-                  {labels[rating]}
-                </Text>
-                {previews[rating] ? (
                   <Text
                     numberOfLines={1}
                     adjustsFontSizeToFit
-                    minimumFontScale={0.75}
-                    style={{ color: "rgba(255,255,255,0.82)", fontFamily: "Manrope_600SemiBold", fontSize: 10, marginTop: 3 }}
+                    minimumFontScale={0.82}
+                    className={isCapped ? "text-warm-700 dark:text-neutral-400" : undefined}
+                    style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: isCapped ? undefined : "#fff" }}
                   >
-                    {previews[rating]}
+                    {labels[rating]}
                   </Text>
-                ) : null}
-              </View>
-            </Pressable>
+                  {previews[rating] ? (
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                      className={isCapped ? "text-warm-700 dark:text-neutral-400" : undefined}
+                      style={{
+                        color: isCapped ? undefined : "rgba(255,255,255,0.82)",
+                        fontFamily: "Manrope_600SemiBold",
+                        fontSize: 10,
+                        marginTop: 3,
+                      }}
+                    >
+                      {previews[rating]}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            </View>
           );
         })}
       </View>
     </View>
   );
 }
-
 
 export function getGradeSchedulePreviews(
   row: StudyCardRow,

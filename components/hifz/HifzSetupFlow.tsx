@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, Pressable, ScrollView, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { MirroredRow } from "@/components/ui/MirroredRow";
@@ -9,7 +9,7 @@ import type { AppDatabase } from "@/lib/database/types";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { Card } from "@/components/ui/Card";
 import { PrayerTimesSetup } from "@/components/notifications/PrayerTimesSetup";
-import { applyPreset, DEFAULT_HIFZ_PLAN, PRAYERS, type HifzPlan, type PlanPreset, type Prayer } from "@/lib/hifz/plan";
+import { applyPreset, DEFAULT_HIFZ_PLAN, PRAYERS, type Anchor, type HifzPlan, type PlanPreset, type Prayer } from "@/lib/hifz/plan";
 import { formatMinutes, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
@@ -49,6 +49,18 @@ function prayerLabel(prayer: Prayer, s: UIStrings): string {
       return s.hifzPrayerIsha;
   }
 }
+
+/** The chosen time in words for the implementation intention (ANC-01): "After Fajr", "In the morning". */
+function anchorPhrase(anchor: Anchor, language: "en" | "ar", s: UIStrings): string {
+  if (anchor.kind === "prayer") return interpolate(s.hifzAfterPrayer, { prayer: prayerLabel(anchor.prayer, s) });
+  if (anchor.minutes === 8 * 60) return s.hifzWhenInMorning;
+  if (anchor.minutes === 20 * 60) return s.hifzWhenInEvening;
+  const at = new Date(2026, 0, 1, Math.floor(anchor.minutes / 60), anchor.minutes % 60);
+  const time = at.toLocaleTimeString(language === "ar" ? "ar-u-nu-arab" : "en", { hour: "numeric", minute: "2-digit" });
+  return interpolate(s.hifzWhenAtTime, { time });
+}
+
+type StepEntry = Readonly<{ plan: HifzPlan; preset: PlanPreset; surahs: Set<number>; juz: Set<number> }>;
 
 function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: string; selected: boolean; onPress: () => void }) {
   return (
@@ -97,6 +109,12 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const step = STEPS[stepIndex];
+  // What the current step showed when it opened, so "Not now" can leave it untouched.
+  const stepEntry = useRef<StepEntry | null>(null);
+  const goToStep = (index: number) => {
+    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz };
+    setStepIndex(index);
+  };
 
   useEffect(() => {
     db.getAllAsync<SurahChoice>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number")
@@ -109,8 +127,9 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
       onCancel?.();
       return;
     }
-    setStepIndex((value) => value - 1);
-  }, [onCancel, stepIndex]);
+    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz };
+    setStepIndex(stepIndex - 1);
+  }, [onCancel, plan, preset, selectedJuz, selectedSurahs, stepIndex]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -148,8 +167,21 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   };
 
   const next = () => {
-    if (stepIndex < STEPS.length - 1) setStepIndex((value) => value + 1);
+    if (stepIndex < STEPS.length - 1) goToStep(stepIndex + 1);
     else save();
+  };
+
+  /** Skip this step: undo any change made on it, then move on with what it showed when it opened. */
+  const skip = () => {
+    const entry = stepEntry.current;
+    if (entry) {
+      setPlan(entry.plan);
+      setPreset(entry.preset);
+      setSelectedSurahs(entry.surahs);
+      setSelectedJuz(entry.juz);
+    }
+    stepEntry.current = entry ? { ...entry } : { plan, preset, surahs: selectedSurahs, juz: selectedJuz };
+    setStepIndex(stepIndex + 1);
   };
 
   const toggle = (set: Set<number>, value: number) => {
@@ -249,7 +281,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         {step === "when" ? (
           <View style={{ gap: 10 }}>
             <Text dir={dir} variant="muted">
-              {s.hifzWhenHint}
+              {interpolate(s.hifzWhenHint, { when: anchorPhrase(plan.anchor, language, s) })}
             </Text>
             <MirroredRow dir={dir} className="flex-wrap gap-2">
               {PRAYERS.map((prayer) => {
@@ -262,7 +294,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                     onPress={() => setPlan((value) => ({ ...value, anchor: { kind: "prayer", prayer, offsetMin: 20 } }))}
                     className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
                   >
-                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
+                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
                       {interpolate(s.hifzAfterPrayer, { prayer: prayerLabel(prayer, s) })}
                     </Text>
                   </Pressable>
@@ -281,7 +313,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                     onPress={() => setPlan((value) => ({ ...value, anchor: { kind: "clock", minutes: option.minutes } }))}
                     className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
                   >
-                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
+                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
                       {option.label}
                     </Text>
                   </Pressable>
@@ -313,7 +345,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
             </Text>
           </Pressable>
           {step !== "goal" && stepIndex < STEPS.length - 1 ? (
-            <Pressable accessibilityRole="button" onPress={next} disabled={saving} className="min-h-[44px] justify-center px-2">
+            <Pressable accessibilityRole="button" onPress={skip} disabled={saving} className="min-h-[44px] justify-center px-2">
               <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-warm-500 dark:text-neutral-400">
                 {s.hifzNotNow}
               </Text>

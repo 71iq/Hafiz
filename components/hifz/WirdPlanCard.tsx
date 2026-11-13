@@ -1,5 +1,5 @@
 import { Pressable, View } from "react-native";
-import { BookOpenCheck, PenLine, Sparkles } from "lucide-react-native";
+import { BookOpenCheck, ChevronLeft, ChevronRight, PenLine, Sparkles } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MirroredRow } from "@/components/ui/MirroredRow";
@@ -30,6 +30,8 @@ type Props = {
 export function WirdPlanCard({ wird, inboxCount, language, isDark, s, onStartReview, onStartSabaq, onSetup, onDrill }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
+  // Teal text under 14 px uses the darker token in light mode.
+  const accentText = isDark ? "#2dd4bf" : "#0f766e";
 
   if (wird === null) {
     return (
@@ -59,6 +61,7 @@ export function WirdPlanCard({ wird, inboxCount, language, isDark, s, onStartRev
   const sabqi = wird.todo.filter((page) => page.tier === "sabqi").length;
   const manzil = wird.todo.length - sabqi;
   const showSabaq = wird.newLines > 0 && !wird.daily.backlog;
+  const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
 
   return (
     <Card elevation="low" className="mb-6 p-5 rounded-4xl">
@@ -75,6 +78,12 @@ export function WirdPlanCard({ wird, inboxCount, language, isDark, s, onStartRev
           </Text>
         ) : null}
       </MirroredRow>
+
+      {complete ? (
+        <Text dir={dir} className="mt-1.5 text-warm-600 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
+          {s.hifzWirdCompleteLine}
+        </Text>
+      ) : null}
 
       {total > 0 ? <Progress value={(wird.done.length / total) * 100} dir={dir} className="mt-3 h-1" /> : null}
 
@@ -117,27 +126,53 @@ export function WirdPlanCard({ wird, inboxCount, language, isDark, s, onStartRev
         </Text>
       ) : null}
 
-      <View className="mt-4" style={{ gap: 8 }}>
-        {wird.todo.length > 0 ? (
-          <Button label={wird.done.length > 0 ? s.hifzWirdContinue : s.hifzWirdStart} onPress={onStartReview} />
-        ) : null}
-        {showSabaq ? <Button variant={wird.todo.length > 0 ? "outline" : "default"} label={s.hifzSabaqStart} onPress={onStartSabaq} /> : null}
-      </View>
+      {complete ? (
+        // Once the wird is complete, new lines stay on offer but nothing more is pressed on the user.
+        showSabaq ? (
+          <MirroredRow dir={dir} className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              // Small text and width, but still a 44 px touch target.
+              className="h-11 border border-warm-300 dark:border-neutral-700"
+              label={s.hifzSabaqStart}
+              onPress={onStartSabaq}
+            />
+          </MirroredRow>
+        ) : null
+      ) : (
+        <View className="mt-4" style={{ gap: 8 }}>
+          {wird.todo.length > 0 ? (
+            <Button label={wird.done.length > 0 ? s.hifzWirdContinue : s.hifzWirdStart} onPress={onStartReview} />
+          ) : null}
+          {showSabaq ? (
+            <Button
+              variant={wird.todo.length > 0 ? "outline" : "default"}
+              className={wird.todo.length > 0 ? "border border-warm-300 dark:border-neutral-700" : undefined}
+              label={s.hifzSabaqStart}
+              onPress={onStartSabaq}
+            />
+          ) : null}
+        </View>
+      )}
 
       {inboxCount > 0 ? (
         <Pressable
           accessibilityRole="button"
           onPress={onDrill}
-          className="mt-3 min-h-[44px] justify-center rounded-2xl bg-surface-high dark:bg-surface-dark-high px-4"
+          className="mt-3 min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4"
         >
           <MirroredRow dir={dir} className="items-center justify-between gap-3">
-            <MirroredRow dir={dir} className="items-center gap-2">
+            <MirroredRow dir={dir} className="flex-shrink items-center gap-2">
               <PenLine size={15} color={accent} />
-              <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="text-charcoal dark:text-neutral-200">
+              <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="flex-shrink text-charcoal dark:text-neutral-200">
                 {interpolate(s.hifzInboxCount, { n: formatNumber(inboxCount, language) })}
               </Text>
             </MirroredRow>
-            <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 12, color: accent }}>{s.hifzInboxAction}</Text>
+            <MirroredRow dir={dir} className="items-center gap-1">
+              <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 13, color: accentText }}>{s.hifzInboxAction}</Text>
+              <Chevron size={16} color={accentText} />
+            </MirroredRow>
           </MirroredRow>
         </Pressable>
       ) : null}

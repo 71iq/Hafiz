@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "expo-router";
 import { HifzSetupFlow } from "@/components/hifz/HifzSetupFlow";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
@@ -17,6 +18,8 @@ function HifzSetupScreen() {
   const s = useStrings();
   const { uiLanguage, isDark } = useSettings();
   const navigation = useNavigation();
+  // The app-level notice outlives this route, so the confirmation shows on the screen the user returns to.
+  const showNotice = useOperationNotice();
   const [plan, setPlan] = useState<HifzPlan | null | undefined>(undefined);
 
   useEffect(() => {
@@ -40,6 +43,7 @@ function HifzSetupScreen() {
         onCancel={close}
         onDone={() => {
           emitHabitChanged();
+          showNotice(s.hifzPlanSaved);
           close();
         }}
       />

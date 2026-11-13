@@ -10,6 +10,10 @@ import { formatDays, formatMinutes, formatNumber, formatPages } from "@/lib/i18n
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 
+/** Card notes at 13 px in a darker warm tone, readable on the tinted card. */
+const CAPTION_CLASS = "text-warm-600 dark:text-neutral-400";
+const CAPTION_STYLE = { fontSize: 13, lineHeight: 18 } as const;
+
 type Props = {
   overview: HabitOverview;
   language: "en" | "ar";
@@ -21,13 +25,18 @@ type Props = {
   onOpenBreak: () => void;
 };
 
+/** Arabic dates and times use Arabic-Indic digits throughout, never a mix with Latin digits. */
+function dateLocale(language: "en" | "ar"): string {
+  return language === "ar" ? "ar-u-nu-arab" : "en";
+}
+
 function formatClockTime(at: Date, language: "en" | "ar"): string {
-  return at.toLocaleTimeString(language === "ar" ? "ar" : "en", { hour: "numeric", minute: "2-digit" });
+  return at.toLocaleTimeString(dateLocale(language), { hour: "numeric", minute: "2-digit" });
 }
 
 export function formatShortDate(localDate: string, language: "en" | "ar"): string {
   const [year, month, day] = localDate.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(language === "ar" ? "ar" : "en", {
+  return new Date(year, month - 1, day).toLocaleDateString(dateLocale(language), {
     month: "short",
     day: "numeric",
   });
@@ -98,6 +107,15 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
     (headline.kind === "earn_back" && !streak.doneToday);
   const showGraceNote = overview.recentGraceDay !== null && !graceNoteDismissed;
   const tomorrowTier = streak.doneToday && isEveOfStreakTier(streak.length);
+  // With no goal, grace or tier line, the break link sits under the message instead of alone in a row.
+  const hasFooterNotes = goal !== null || overview.graceHeld > 0 || tomorrowTier;
+  const breakLink = (
+    <Pressable onPress={onOpenBreak} accessibilityRole="button" className="min-h-[44px] justify-center">
+      <Text dir={dir} className="text-primary-muted dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+        {s.habitTakeBreak}
+      </Text>
+    </Pressable>
+  );
 
   return (
     <View
@@ -105,24 +123,24 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
       accessibilityRole="summary"
       accessibilityLabel={`${s.habitStreakLabel}: ${formatDays(streak.length, language)}. ${headlineMessage(overview, language, s)}`}
     >
-      <MirroredRow dir={dir} className="items-center justify-between gap-3">
-        <MirroredRow dir={dir} className="items-center gap-1.5 flex-shrink-0">
+      <MirroredRow dir={dir} className="items-start justify-between gap-3">
+        <MirroredRow dir={dir} className="min-h-[24px] items-center gap-1.5 flex-shrink-0">
           <HeadlineIcon kind={headline.kind} color={accent} />
-          <Text dir={dir} className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}>
-            {formatNumber(streak.length, language)}
-          </Text>
-          <Text dir={dir} className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
-            {s.habitStreakLabel}
+          <Text dir={dir} className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }}>
+            {interpolate(s.habitStreakCount, { days: formatDays(streak.length, language) })}
           </Text>
         </MirroredRow>
-        <Text
-          dir={dir}
-          align="end"
-          className="flex-shrink text-warm-500 dark:text-neutral-400"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 17 }}
-        >
-          {headlineMessage(overview, language, s)}
-        </Text>
+        <View className={`flex-shrink ${dir === "rtl" ? "items-start" : "items-end"}`}>
+          <Text
+            dir={dir}
+            align="end"
+            className="text-warm-600 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 18 }}
+          >
+            {headlineMessage(overview, language, s)}
+          </Text>
+          {hasFooterNotes ? null : breakLink}
+        </View>
       </MirroredRow>
 
       {headline.kind === "earn_back" ? (
@@ -134,7 +152,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
               style={{ width: 10, height: 10, borderRadius: 5 }}
             />
           ))}
-          <Text dir={dir} variant="caption">
+          <Text dir={dir} variant="caption" className={CAPTION_CLASS} style={CAPTION_STYLE}>
             {interpolate(s.habitEarnBackProgress, { done: formatNumber(headline.earnBack.daysDone, language) })}
           </Text>
         </MirroredRow>
@@ -143,7 +161,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
       {showMinimum ? (
         <View className="mt-3" style={{ gap: 6 }}>
           <Progress value={overview.minimumProgressToday * 100} dir={dir} className="h-1" />
-          <Text dir={dir} variant="caption">
+          <Text dir={dir} variant="caption" className={CAPTION_CLASS} style={CAPTION_STYLE}>
             {interpolate(s.habitMinimumHint, {
               pages: formatPages(settings.minimum.pages, language),
               minutes: formatMinutes(settings.minimum.minutes, language),
@@ -154,25 +172,25 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
 
       {showGraceNote ? (
         <MirroredRow dir={dir} className="mt-3 items-start gap-2 rounded-2xl bg-surface-high dark:bg-surface-dark-high px-3 py-2">
-          <Text dir={dir} className="flex-1 text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18 }}>
+          <Text dir={dir} className="flex-1 self-center text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 18 }}>
             {interpolate(s.habitGraceUsed, { n: formatNumber(overview.graceHeld, language) })}
           </Text>
           <Pressable
             onPress={onDismissGraceNote}
             accessibilityRole="button"
             accessibilityLabel={s.habitDismiss}
-            hitSlop={12}
-            className="w-6 h-6 items-center justify-center"
+            className="w-11 h-11 -my-1.5 items-center justify-center"
           >
-            <XIcon size={13} color={muted} />
+            <XIcon size={14} color={muted} />
           </Pressable>
         </MirroredRow>
       ) : null}
 
-      <MirroredRow dir={dir} className="mt-3 items-center justify-between gap-3">
+      {hasFooterNotes ? (
+      <MirroredRow dir={dir} className="mt-2 items-center justify-between gap-3">
         <MirroredRow dir={dir} className="flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           {goal ? (
-            <Text dir={dir} variant="caption">
+            <Text dir={dir} variant="caption" className={CAPTION_CLASS} style={CAPTION_STYLE}>
               {goal.reached
                 ? interpolate(s.habitGoalReached, { days: formatDays(goal.target, language) })
                 : interpolate(s.habitGoalProgress, {
@@ -182,27 +200,19 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
             </Text>
           ) : null}
           {overview.graceHeld > 0 ? (
-            <Text dir={dir} variant="caption">
+            <Text dir={dir} variant="caption" className={CAPTION_CLASS} style={CAPTION_STYLE}>
               {interpolate(s.habitGraceHeld, { n: formatNumber(overview.graceHeld, language) })}
             </Text>
           ) : null}
           {tomorrowTier ? (
-            <Text dir={dir} variant="caption">
+            <Text dir={dir} variant="caption" className={CAPTION_CLASS} style={CAPTION_STYLE}>
               {interpolate(s.habitTomorrowTier, { n: formatNumber(streak.length + 1, language) })}
             </Text>
           ) : null}
         </MirroredRow>
-        <Pressable
-          onPress={onOpenBreak}
-          accessibilityRole="button"
-          hitSlop={8}
-          className="min-h-[32px] justify-center"
-        >
-          <Text dir={dir} className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-            {s.habitTakeBreak}
-          </Text>
-        </Pressable>
+        {breakLink}
       </MirroredRow>
+      ) : null}
     </View>
   );
 }

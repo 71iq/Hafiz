@@ -119,26 +119,33 @@ export function SessionHabitCards({
       });
   };
 
+  // Zayt sits inside the first card beside its text instead of floating between cards.
+  const zayt = mood ? (
+    <View className="flex-shrink-0">
+      <ZaytMood mood={mood} height={64} />
+    </View>
+  ) : null;
+
   return (
     <View className="w-full max-w-sm" style={{ gap: 10 }}>
-      {mood ? (
-        <View className="items-center">
-          <ZaytMood mood={mood} />
-        </View>
-      ) : null}
       {input.event ? (
         <Card elevation="low" className="px-5 py-4" accessibilityRole="summary">
-          <MirroredRow dir={dir} className="items-center gap-2">
-            {milestone ? <Sparkles size={16} color={accent} /> : <CalendarCheck2 size={16} color={accent} />}
-            <Text dir={dir} className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }}>
-              {milestone
-                ? interpolate(s.habitMilestoneTitle, { days: formatDays(length, language) })
-                : interpolate(s.habitStreakDay, { n: formatNumber(length, language) })}
-            </Text>
+          <MirroredRow dir={dir} className="items-center gap-3">
+            {zayt}
+            <View className="flex-1">
+              <MirroredRow dir={dir} className="items-center gap-2">
+                {milestone ? <Sparkles size={16} color={accent} /> : <CalendarCheck2 size={16} color={accent} />}
+                <Text dir={dir} className="flex-shrink text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }}>
+                  {milestone
+                    ? interpolate(s.habitMilestoneTitle, { days: formatDays(length, language) })
+                    : interpolate(s.habitStreakDay, { n: formatNumber(length, language) })}
+                </Text>
+              </MirroredRow>
+              <Text dir={dir} className="mt-1.5 text-warm-600 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
+                {eventLine(input, language, s)}
+              </Text>
+            </View>
           </MirroredRow>
-          <Text dir={dir} className="mt-1.5 text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
-            {eventLine(input, language, s)}
-          </Text>
           {milestone ? (
             <Text dir={dir} variant="caption" className="mt-1.5">
               {length >= 30 ? s.habitMilestoneLine : s.habitMilestoneSmall}
@@ -168,25 +175,29 @@ export function SessionHabitCards({
               <Text dir={dir} variant="caption" className="mt-1.5" style={{ lineHeight: 18 }}>
                 {s.habitGoalOfferBody}
               </Text>
+              {/* The goals share one row; Not now has its own line instead of wrapping alone. */}
               <MirroredRow dir={dir} className="mt-3 flex-wrap gap-2">
                 {STREAK_GOAL_OPTIONS.map((target) => (
                   <Pressable
                     key={target}
                     accessibilityRole="button"
                     onPress={() => chooseGoal(target)}
-                    className="min-h-[40px] justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 px-3.5"
+                    style={{ flexGrow: 1 }}
+                    className="min-h-[44px] items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 px-3"
                   >
-                    <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                    <Text className="text-primary-muted dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
                       {formatDays(target, language)}
                     </Text>
                   </Pressable>
                 ))}
+              </MirroredRow>
+              <MirroredRow dir={dir}>
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => setGoalDismissed(true)}
-                  className="min-h-[40px] justify-center rounded-full px-3.5"
+                  className="mt-1 min-h-[44px] justify-center px-1"
                 >
-                  <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                  <Text className="text-warm-600 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
                     {s.habitGoalNotNow}
                   </Text>
                 </Pressable>
@@ -202,7 +213,8 @@ export function SessionHabitCards({
 
       {prompt === "rest" ? (
         <Card elevation="low" className="px-5 py-4">
-          <MirroredRow dir={dir} className="items-start gap-2">
+          <MirroredRow dir={dir} className="items-center gap-2">
+            {input.event ? null : zayt}
             <Coffee size={16} color={accent} />
             <Text dir={dir} className="flex-1 text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
               {s.habitRestSuggestion}
@@ -213,7 +225,8 @@ export function SessionHabitCards({
 
       {prompt === "struggle" ? (
         <Card elevation="low" className="px-5 py-4">
-          <MirroredRow dir={dir} className="items-start gap-2">
+          <MirroredRow dir={dir} className="items-center gap-2">
+            {input.event ? null : zayt}
             <HeartHandshake size={16} color={accent} />
             <Text dir={dir} className="flex-1 text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
               {s.habitStruggleReward}

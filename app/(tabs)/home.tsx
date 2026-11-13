@@ -29,6 +29,7 @@ import { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
 import { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
 import { SearchCommand } from "@/components/SearchCommand";
 import { Toast } from "@/components/ui/Toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { AchievementUnlockToast } from "@/components/achievements/AchievementUnlockToast";
 import {
   getDeckTodayStats,
@@ -119,7 +120,7 @@ export default function HomeScreen() {
     vocabStats.dueCount + vocabStats.newCount,
   );
   const [memorizedCards, setMemorizedCards] = useState(0);
-  const { overview: habit } = useHabitOverview(db);
+  const { overview: habit, failed: habitFailed } = useHabitOverview(db);
   const { wird, inboxCount, monthlyCheckDue, refresh: refreshWird } = useTodayWird(db);
   // A wird reminder opens the page review when a hifz plan reviews pages, otherwise the ayah review.
   const openReminderRoute = useCallback(
@@ -527,7 +528,10 @@ export default function HomeScreen() {
               onDismissGraceNote={dismissGraceNote}
               onOpenBreak={() => setHabitBreakOpen(true)}
             />
-          ) : null}
+          ) : habitFailed ? null : (
+            // Hold the card's place while it loads, so the content below does not jump down.
+            <Skeleton isDark={isDark} height={64} borderRadius={24} className="mt-4" accessibilityElementsHidden />
+          )}
         </View>
 
         {returning ? (
@@ -553,7 +557,9 @@ export default function HomeScreen() {
             onSetup={() => router.push("/hifz/setup" as Href)}
             onDrill={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}
           />
-        ) : null}
+        ) : (
+          <Skeleton isDark={isDark} height={160} borderRadius={32} className="mb-6" accessibilityElementsHidden />
+        )}
 
         {monthlyCheckDue && !returning ? (
           <MonthlyCheckCard
@@ -575,6 +581,8 @@ export default function HomeScreen() {
             language={uiLanguage}
             isDark={isDark}
             s={s}
+            onStrengthen={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}
+            onConnect={() => router.push("/hifz/review" as Href)}
           />
         ) : null}
 
