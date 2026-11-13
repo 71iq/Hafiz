@@ -10,7 +10,7 @@ import { meetsMinimum, minimumProgress, PAGE_UNITS, tallyReviews } from "@/lib/h
 import { isMakeUpOpen, planSettlement } from "@/lib/habit/settle";
 import { buildHabitSnapshot } from "@/lib/habit/snapshot";
 import { computeStreak, countSteadyWeeks, longestStreak, toDayMap } from "@/lib/habit/streak";
-import { EARNED_STATUSES, effectiveStatus, type DayStatus, type HabitDay, type HabitDayRow } from "@/lib/habit/types";
+import { COUNTS_TOWARD_LENGTH, EARNED_STATUSES, effectiveStatus, type DayStatus, type HabitDay, type HabitDayRow } from "@/lib/habit/types";
 import { userState } from "@/lib/habit/user-state";
 
 const TODAY = "2026-11-13";
@@ -68,6 +68,38 @@ describe("streak (STR-03)", () => {
     const days = toDayMap(run(addDays(TODAY, -2), 6));
     expect(computeStreak(days, TODAY, { makeUpOpen: false }).length).toBe(0);
     expect(computeStreak(days, TODAY, { makeUpOpen: true })).toMatchObject({ length: 6, makeUpPending: true, atRisk: true });
+  });
+
+  it("keeps a grace day another device settled open for make-up until this device's cutoff (STR-07)", () => {
+    const graced = [...run(addDays(TODAY, -2), 3), day(addDays(TODAY, -1), "grace")];
+    expect(computeStreak(toDayMap(graced), TODAY, { makeUpOpen: true })).toMatchObject({ length: 4, makeUpPending: true, atRisk: true });
+    expect(computeStreak(toDayMap(graced), TODAY, { makeUpOpen: false })).toMatchObject({ length: 4, makeUpPending: false });
+    // Today's own wird does not count the run twice.
+    const doneToday = toDayMap([...graced, day(TODAY)]);
+    expect(computeStreak(doneToday, TODAY, { makeUpOpen: true })).toMatchObject({ length: 5, makeUpPending: true, doneToday: true });
+    // An excuse or a pause already covers the day, so there is nothing to make up.
+    for (const status of ["excused", "paused"] as const) {
+      const covered = toDayMap([...run(addDays(TODAY, -2), 3), day(addDays(TODAY, -1), status)]);
+      expect(computeStreak(covered, TODAY, { makeUpOpen: true }).makeUpPending).toBe(false);
+    }
+  });
+
+  it("never counts a day twice, whatever the statuses and make-up window", () => {
+    const statuses: DayStatus[] = ["done", "made_up", "earned_back", "excused", "paused", "grace"];
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(fc.record({ offset: fc.integer({ min: -2, max: 20 }), status: fc.constantFrom(...statuses) }), {
+          selector: (entry) => entry.offset,
+          maxLength: 20,
+        }),
+        fc.boolean(),
+        (entries, makeUpOpen) => {
+          const days = toDayMap(entries.map(({ offset, status }) => day(addDays(TODAY, -offset), status)));
+          const counted = entries.filter(({ offset, status }) => offset >= 0 && COUNTS_TOWARD_LENGTH[status]).length;
+          return computeStreak(days, TODAY, { makeUpOpen }).length <= counted;
+        },
+      ),
+    );
   });
 
   it("counts excused and grace days but not paused ones", () => {

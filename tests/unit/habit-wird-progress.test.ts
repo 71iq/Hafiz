@@ -170,6 +170,34 @@ describe("make-up window (STR-07, STR-08)", () => {
     expect((await grade("3:10", atLocalTime(TODAY, 10 * 60 + 9))).wird).toEqual({ kind: "minimum_met", length: 4 });
   });
 
+  it("finishes a make-up after another device with an earlier cutoff settled the day as grace", async () => {
+    // This device has Dhuhr at 13:00; the other device has no prayer times, so its cutoff is 12:30.
+    const dhuhr = (date: string) => atLocalTime(date, 13 * 60);
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    for (let i = 0; i < 5; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 10 * 60 + i), Rating.Good, { dhuhr });
+    await applyRemoteHabitDay(store.db, { ...doneDay(yesterday), status: "grace", earned_status: "grace", minimum_met: 0 });
+
+    const open = await loadHabitOverview(store.db, { now: atLocalTime(TODAY, 12 * 60 + 35), dhuhr });
+    expect(open.streak).toMatchObject({ makeUpPending: true, length: 3 });
+    expect(open.minimumProgressToday).toBe(0.5);
+
+    let event;
+    for (let i = 0; i < 5; i += 1) event = await grade(`3:${i + 1}`, atLocalTime(TODAY, 12 * 60 + 40 + i), Rating.Good, { dhuhr });
+    expect(event!.wird).toEqual({ kind: "made_up", madeUpDay: yesterday, length: 3 });
+    expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "made_up", earned_status: "made_up" });
+    expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
+    const after = await loadHabitOverview(store.db, { now: atLocalTime(TODAY, 14 * 60), dhuhr });
+    expect(after.minimumProgressToday).toBe(0);
+  });
+
+  it("does not make up a day that an excuse already covers", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    await markExcusedDays(store.db, { from: yesterday, to: yesterday, reason: "illness", now: atLocalTime(TODAY, 8 * 60) });
+    const event = await reciteMinimum(TODAY, 9 * 60);
+    expect(event.wird).toEqual({ kind: "minimum_met", length: 4 });
+    expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "excused" });
+  });
+
   it("counts reviews after the cutoff for today, leaving yesterday missed", async () => {
     await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
     const event = await reciteMinimum(TODAY, 13 * 60);

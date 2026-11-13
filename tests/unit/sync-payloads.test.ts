@@ -1540,6 +1540,57 @@ it("credits pulled make-up reviews to the missed day, not to today", async () =>
   expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(today)).toBeUndefined();
 });
 
+/** A clear error at 2:255 word 4, one per session, as another device uploads it. */
+function weakSpotError(session: number, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: `error-${session}`,
+    card_id: "2:255",
+    session_id: `session-${session}`,
+    surah: 2,
+    ayah: 255,
+    word: 4,
+    type: "wrong_word",
+    severity: "jali",
+    corrected: "none",
+    sibling_ref: null,
+    local_date: "2026-02-01",
+    clean_count: 0,
+    last_clean_date: null,
+    resolved_at: null,
+    created_at: OLD,
+    updated_at: OLD,
+    deleted_at: null,
+    ...overrides,
+  };
+}
+const liveClozeCards = () =>
+  sql.prepare("SELECT id FROM study_cards WHERE id LIKE 'cloze:%' AND deleted_at IS NULL ORDER BY id").all();
+
+it("gives a restored weak spot its cloze card when the account's errors came from several devices", async () => {
+  mockTableRows.set("recitation_errors:restore", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
+  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+});
+
+it("does not make a cloze card on restore for a word wrong in fewer than 3 sessions", async () => {
+  mockTableRows.set("recitation_errors:restore", [weakSpotError(1), weakSpotError(2), weakSpotError(3, { deleted_at: NEW })]);
+  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  expect(liveClozeCards()).toEqual([]);
+});
+
+it("removes the cloze card when another device's dismissal takes the word below 3 sessions", async () => {
+  restoreComplete();
+  mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+
+  mockTableRows.set("recitation_errors:incremental", [
+    { ...weakSpotError(3, { updated_at: NEW, deleted_at: NEW }), synced_at: "2099-01-01T00:00:00.000Z" },
+  ]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(liveClozeCards()).toEqual([]);
+});
+
 it("keeps committed page counts and the cursor when a later incremental page is malformed, then retries", async () => {
   restoreComplete();
   putQueueRow();

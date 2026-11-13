@@ -24,6 +24,16 @@ export type StreakView = Readonly<{
 }>;
 
 /**
+ * STR-07: a missed day can be made up while it has no status, or only a grace day: another device
+ * whose cutoff came earlier (12:30 without prayer times, or an earlier Dhuhr) may settle grace while
+ * this device's window is still open. Making it up raises grace to made up and gives the grace day
+ * back. An excuse, a pause or recitation already cover the day.
+ */
+export function canStillMakeUp(status: DayStatus | string | null): boolean {
+  return status === null || status === "grace";
+}
+
+/**
  * STR-03: a streak stays alive while the last covered day is today or yesterday, and shows its full
  * length during the at-risk day. When yesterday was missed but its make-up window is still open,
  * the streak is pending instead of broken.
@@ -31,9 +41,10 @@ export type StreakView = Readonly<{
 export function computeStreak(days: DayMap, today: LocalDate, options: { makeUpOpen: boolean }): StreakView {
   const todayStatus = days.get(today)?.status ?? null;
   const yesterday = addDays(today, -1);
+  const yesterdayStatus = days.get(yesterday)?.status ?? null;
   // Yesterday's gap stays open until its cutoff, whatever today holds: an excused or paused today
   // must not hide it (STR-07).
-  const makeUpPending = !days.has(yesterday) && options.makeUpOpen && days.has(addDays(today, -2));
+  const makeUpPending = canStillMakeUp(yesterdayStatus) && options.makeUpOpen && days.has(addDays(today, -2));
   let length = 0;
   let startDay: LocalDate | null = null;
   let lastCoveredDay: LocalDate | null = null;
@@ -47,7 +58,7 @@ export function computeStreak(days: DayMap, today: LocalDate, options: { makeUpO
     }
   };
   if (todayStatus) countRunFrom(today);
-  if (makeUpPending) countRunFrom(addDays(today, -2));
+  if (makeUpPending && yesterdayStatus === null) countRunFrom(addDays(today, -2));
   else if (!todayStatus) countRunFrom(yesterday);
   if (startDay === null) {
     return { length: 0, startDay: null, lastCoveredDay: null, todayStatus, doneToday: false, atRisk: false, makeUpPending: false };

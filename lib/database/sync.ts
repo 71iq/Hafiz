@@ -26,7 +26,7 @@ import { isSyncableUserSetting, putUserSetting, userSettingToSyncData } from "@/
 import { errorMessage } from "@/lib/error-message";
 import { applyRemoteHabitDay, habitDaySyncData } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
-import { createWeakSpotCards } from "@/lib/hifz/weak-spots";
+import { createWeakSpotCards, removeClearedWeakSpotCards } from "@/lib/hifz/weak-spots";
 import type { HabitDayRow } from "@/lib/habit/types";
 import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 
@@ -220,6 +220,8 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       await db.withTransactionAsync(async (tx) => {
         owner.requireCurrent();
         await createWeakSpotCards(tx, pulledErrorLocations, new Date());
+        // A dismissal from another device can take a word below three sessions; its card goes too.
+        await removeClearedWeakSpotCards(tx, pulledErrorLocations);
       });
     }
 
@@ -432,6 +434,13 @@ async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Pr
     owner.requireCurrent();
     // Reviews from app versions before wird days were synced still count for their days.
     await reconcileHabitDaysFromLogs(tx, { now: new Date() });
+    owner.requireCurrent();
+    // ERR-06: weak spots that formed across devices get their cloze card from the restored errors.
+    await createWeakSpotCards(
+      tx,
+      remoteRows.recitation_errors.map((row) => ({ surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null })),
+      new Date(),
+    );
     owner.requireCurrent();
     await markAccountRestoreComplete(tx, userId, true, snapshotStartedAt, owner);
     owner.requireCurrent();

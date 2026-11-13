@@ -10,7 +10,7 @@ import { DAY_TALLY_SQL, MAKEUP_TALLY_SQL, meetsMinimum, minimumProgress, type Wi
 import { readHabitSettings, MAX_PAUSE_DAYS, HABIT_SETTING_KEYS, type HabitSettings } from "@/lib/habit/settings";
 import { planSettlement, type SettlementWrite } from "@/lib/habit/settle";
 import { buildHabitSnapshot, type HabitSnapshot } from "@/lib/habit/snapshot";
-import { computeStreak, toDayMap } from "@/lib/habit/streak";
+import { canStillMakeUp, computeStreak, toDayMap } from "@/lib/habit/streak";
 import { toHabitDay, type EarnedStatus, type ExcuseReason, type HabitDay, type HabitDayRow } from "@/lib/habit/types";
 import { putUserSetting, removeUserSetting } from "@/lib/database/user-settings";
 
@@ -184,8 +184,8 @@ export async function makeUpTarget(
     "SELECT local_date, status FROM habit_days WHERE local_date IN (?, ?)",
     [yesterday, dayBefore],
   );
-  const covered = (date: LocalDate) => rows.some((row) => row.local_date === date && row.status !== null);
-  return !covered(yesterday) && covered(dayBefore) ? yesterday : null;
+  const statusOf = (date: LocalDate) => rows.find((row) => row.local_date === date)?.status ?? null;
+  return canStillMakeUp(statusOf(yesterday)) && statusOf(dayBefore) !== null ? yesterday : null;
 }
 
 /** Write earned_back for the missed days of a successful earn-back. Returns how many were restored. */
@@ -223,7 +223,7 @@ export async function recordWirdProgress(db: DatabaseExecutor, context: WirdProg
 
   if (makeupFor) {
     const madeUp = await readHabitDayRow(db, makeupFor);
-    if (madeUp?.status) return { kind: "none" };
+    if (!canStillMakeUp(madeUp?.status ?? null)) return { kind: "none" };
     if (!meetsMinimum(await readWirdTally(db, { day: makeupFor, makeUp: true, settings }), settings.minimum)) {
       return { kind: "none" };
     }
