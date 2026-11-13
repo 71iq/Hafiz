@@ -52,6 +52,7 @@ export async function persistReviewTransition({
   transition,
   context = DEFAULT_REVIEW_SAVE_CONTEXT,
   extraWork,
+  beforeWork,
 }: {
   db: AppDatabase;
   cardId: string;
@@ -59,6 +60,8 @@ export async function persistReviewTransition({
   context?: ReviewSaveContext;
   /** Writes that belong to this grade, such as a manzil cycle completing, run inside its transaction. */
   extraWork?: (tx: DatabaseExecutor) => Promise<void>;
+  /** Writes that must exist before the card is saved, such as creating it, run first in the transaction. */
+  beforeWork?: (tx: DatabaseExecutor) => Promise<void>;
 }): Promise<ReviewSaveResult> {
   const { reviewRecord } = transition;
   const log: StudyLogInput = {
@@ -82,6 +85,7 @@ export async function persistReviewTransition({
   const localDate = localDateOf(reviewedAt);
   let result: ReviewSaveResult = { wird: { kind: "none" }, resolvedInboxItems: 0 };
   await db.withTransactionAsync(async (tx) => {
+    if (beforeWork) await beforeWork(tx);
     await putCardRow(tx, transition.updatedCard);
     await putStudyLogRow(tx, log);
     if (context.errors.length > 0) {

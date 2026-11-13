@@ -1,7 +1,7 @@
 import { atLocalTime } from "@/lib/habit/dates";
 import { readHabitDayRow } from "@/lib/habit/queries";
-import { loadPageCards } from "@/lib/hifz/pages";
-import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
+import { loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
+import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { completeSabaqChunk, newPageOrder, nextSabaqTarget } from "@/lib/hifz/sabaq";
 import { PAGE_COUNT, pageCardId } from "@/lib/hifz/units";
 import { Rating } from "@/lib/fsrs/scheduler";
@@ -79,6 +79,11 @@ describe("sabaq chunks (SBQ-02)", () => {
     const now = atLocalTime(TODAY, 9 * 60);
     const firstSave = await completeSabaqChunk(store.db, { target: first, plan, rating: Rating.Good, session: null, durationMs: 600_000, now });
     expect(firstSave).toMatchObject({ pageAdded: false });
+    // One chunk covers 4 lines, so a larger daily allocation is not done yet.
+    await writeHifzPlan(store.db, { ...plan, newPerDay: 1, dailyBudgetMin: 240 });
+    const wird = (await loadTodayWird(store.db, atLocalTime(TODAY, 9 * 60 + 30)))!;
+    expect(wird.sabaqLinesToday).toBe(4);
+    expect(wird.sabaqDoneToday).toBe(wird.newLines <= 4 && wird.newLines > 0);
     expect(firstSave.wird.kind).toBe("minimum_met");
 
     const second = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
@@ -98,5 +103,31 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(target.completesPage).toBe(true);
     const result = await completeSabaqChunk(store.db, { target, plan, rating: Rating.Again, session: null, durationMs: 60_000 });
     expect(result.pageAdded).toBe(false);
+
+    // The failed check is offered again on the same chunk card, and passing it adds the page.
+    const again = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
+    expect(again).toMatchObject({ page: 1, fromLine: target.fromLine, toLine: target.toLine, completesPage: true });
+    const passed = await completeSabaqChunk(store.db, {
+      target: again,
+      plan,
+      rating: Rating.Good,
+      session: null,
+      durationMs: 60_000,
+      now: new Date(Date.now() + 60_000),
+    });
+    expect(passed.pageAdded).toBe(true);
+    expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_cards WHERE id LIKE 'chunk:%'").get()).toEqual({ count: 1 });
+    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null })).toBeNull();
+  });
+
+  it("leaves no chunk behind when the grade cannot be saved", async () => {
+    const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords: () => null }))!;
+    // Queue order inside the grade: the new chunk card, its update, the review log, then the wird day.
+    store.failQueueInsert(3);
+    await expect(
+      completeSabaqChunk(store.db, { target, plan, rating: Rating.Good, session: null, durationMs: 600_000 }),
+    ).rejects.toThrow("Synthetic sync_queue write failure");
+    expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_cards WHERE id LIKE 'chunk:%'").get()).toEqual({ count: 0 });
+    expect(await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords: () => null })).toMatchObject({ fromLine: target.fromLine });
   });
 });

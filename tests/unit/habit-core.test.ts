@@ -99,6 +99,26 @@ describe("streak (STR-03)", () => {
   });
 });
 
+describe("review fixes for streak edges", () => {
+  it("keeps yesterday's make-up pending when today is already excused", () => {
+    const history = toDayMap([...run(addDays(TODAY, -2), 8), day(TODAY, "excused")]);
+    expect(computeStreak(history, TODAY, { makeUpOpen: true })).toMatchObject({ length: 9, makeUpPending: true, todayStatus: "excused" });
+    expect(computeStreak(history, TODAY, { makeUpOpen: false })).toMatchObject({ length: 1, makeUpPending: false });
+  });
+
+  it("finds the original break when full wirds fall on non-consecutive window days", () => {
+    const lastDay = addDays(TODAY, -4);
+    const history = toDayMap([
+      ...run(lastDay, 8),
+      day(addDays(lastDay, 2), "done", true),
+      day(addDays(lastDay, 4), "done", true),
+    ]);
+    const earnBack = findEarnBack(history, TODAY, { makeUpOpen: false });
+    expect(earnBack).toMatchObject({ lastDay, succeeded: true, fullDone: 2 });
+    expect(earnBack!.restoreDays).toEqual([addDays(lastDay, 1), addDays(lastDay, 3)]);
+  });
+});
+
 describe("grace days (STR-14)", () => {
   it("awards one after the 3rd wird day, then one every 7, holding at most 2", () => {
     const days = (count: number) => toDayMap(run(addDays(TODAY, -1), count));

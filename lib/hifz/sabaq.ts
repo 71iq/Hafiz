@@ -1,5 +1,5 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { insertNewStudyCard, readDeckReviewSettings } from "@/lib/fsrs/queries";
+import { insertNewStudyCard, newStudyCardRow, readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { persistReviewTransition, type ReviewSaveResult } from "@/lib/fsrs/persist-review";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import type { ReviewSessionRef } from "@/lib/fsrs/review-sessions";
@@ -76,7 +76,14 @@ export async function nextSabaqTarget(
 ): Promise<SabaqTarget | null> {
   const [pageRows, chunkRows] = await Promise.all([
     db.getAllAsync<{ id: string }>("SELECT id FROM study_cards WHERE deck_id = ? AND id LIKE 'page:%' AND deleted_at IS NULL", [HIFZ_PAGES_DECK_ID]),
-    db.getAllAsync<{ id: string }>("SELECT id FROM study_cards WHERE deck_id = ? AND id LIKE 'chunk:%' AND deleted_at IS NULL", [HIFZ_SABAQ_DECK_ID]),
+    // SBQ-02: a chunk counts as memorized once its fluent check passed (Good or Easy at least once).
+    // A chunk that only failed is offered again rather than skipped.
+    db.getAllAsync<{ id: string }>(
+      `SELECT c.id FROM study_cards AS c
+        WHERE c.deck_id = ? AND c.id LIKE 'chunk:%' AND c.deleted_at IS NULL
+          AND EXISTS (SELECT 1 FROM study_log AS l WHERE l.card_id = c.id AND l.rating >= 3)`,
+      [HIFZ_SABAQ_DECK_ID],
+    ),
   ]);
   const memorized = new Set(pageRows.flatMap((row) => {
     const unit = parsePageUnit(row.id);
@@ -146,11 +153,10 @@ export async function completeSabaqChunk(
 ): Promise<ReviewSaveResult & { pageAdded: boolean }> {
   const at = now.toISOString();
   const id = chunkCardId(target.page, Math.max(1, target.fromLine), Math.min(LINES_PER_PAGE, target.toLine));
-  await db.withTransactionAsync(async (tx) => {
-    await insertNewStudyCard(tx, { id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
-  });
-  const card = await db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ?", [id]);
-  if (!card) throw new Error("Sabaq card was not saved");
+  // A chunk that failed its fluent check before is checked again on the same card. A new chunk is
+  // created in the grade's own transaction, so a failed save leaves nothing behind.
+  const existing = await db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [id]);
+  const card = existing ?? newStudyCardRow({ id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
   const base = await readDeckReviewSettings(db, HIFZ_SABAQ_DECK_ID);
   const transition = calculateReviewTransition({ card, rating, reviewedAt: now, reviewPolicy: pagePolicy("sabaq", plan, base) });
   const addsPage = target.completesPage && rating >= 3;
@@ -159,6 +165,11 @@ export async function completeSabaqChunk(
     db,
     cardId: id,
     transition,
+    beforeWork: existing
+      ? undefined
+      : async (tx) => {
+          await insertNewStudyCard(tx, { id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
+        },
     context: {
       session,
       firstGradeInSession: true,

@@ -27,7 +27,7 @@ import { errorMessage } from "@/lib/error-message";
 import { applyRemoteHabitDay, habitDaySyncData } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
 import type { HabitDayRow } from "@/lib/habit/types";
-import { deviceTimeZone, localDateOf } from "@/lib/habit/dates";
+import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
 
@@ -190,16 +190,28 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     // Pull study_cards
     await pullTable(db, "study_cards", userId, lastPullAt, upsertStudyCard, owner, onPageApplied);
 
-    // Pull study_log. A review from an older app version on another device has no wird day row, so
-    // its day is reconciled after the pull.
-    let pulledLegacyReview = false;
+    // Wird days come before the review log: a make-up reservation (credited_through) must be in place
+    // before the reviews it reserves, or a grade between the two pulls could count them for today.
+    // Wird days merge by status precedence; sessions and errors keep the newer row. These tables are
+    // newer than the shared cursor, so each account pulls them in full once: rows another device
+    // uploaded before this device's last pull would otherwise never arrive.
+    const habitTablesPulled = await isBackfillComplete(db, habitPullKey(userId));
+    owner.requireCurrent();
+    const habitSince = habitTablesPulled ? lastPullAt : PULL_EPOCH;
+    await pullTable(db, "habit_days", userId, habitSince, upsertHabitDay, owner, onPageApplied);
+    await pullTable(db, "review_sessions", userId, habitSince, upsertReviewSession, owner, onPageApplied);
+    await pullTable(db, "recitation_errors", userId, habitSince, upsertRecitationError, owner, onPageApplied);
+
+    // Pull study_log. Pulled reviews can complete a day's minimum together with this device's own
+    // (or come from an older app version without wird days), so their days are reconciled after.
+    const pulledReviewDates = new Set<LocalDate>();
     await pullTable(
       db,
       "study_log",
       userId,
       lastPullAt,
       async (tx, row) => {
-        if ((row.grader ?? null) === null) pulledLegacyReview = true;
+        pulledReviewDates.add(row.local_date ?? localDateOf(new Date(row.reviewed_at)));
         await upsertStudyLog(tx, row);
       },
       owner,
@@ -229,21 +241,11 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     // Pull public badge unlocks. Pulled badges are already seen locally.
     await pullTable(db, "achievement_unlocks", userId, lastPullAt, upsertAchievementUnlock, owner, onPageApplied);
 
-    // Wird days merge by status precedence; sessions and errors keep the newer row. These tables are
-    // newer than the shared cursor, so each account pulls them in full once: rows another device
-    // uploaded before this device's last pull would otherwise never arrive.
-    const habitTablesPulled = await isBackfillComplete(db, habitPullKey(userId));
-    owner.requireCurrent();
-    const habitSince = habitTablesPulled ? lastPullAt : PULL_EPOCH;
-    await pullTable(db, "habit_days", userId, habitSince, upsertHabitDay, owner, onPageApplied);
-    await pullTable(db, "review_sessions", userId, habitSince, upsertReviewSession, owner, onPageApplied);
-    await pullTable(db, "recitation_errors", userId, habitSince, upsertRecitationError, owner, onPageApplied);
-
-    if (pulledLegacyReview) {
+    if (pulledReviewDates.size > 0) {
       owner.requireCurrent();
       await db.withTransactionAsync(async (tx) => {
         owner.requireCurrent();
-        await reconcileHabitDaysFromLogs(tx, { now: new Date() });
+        await reconcileHabitDaysFromLogs(tx, { now: new Date(), dates: pulledReviewDates });
       });
     }
 
@@ -531,10 +533,27 @@ async function clearLocalSyncableData(db: DatabaseExecutor): Promise<void> {
 
   const settings = await db.getAllAsync<{ key: string }>("SELECT key FROM user_settings");
   for (const row of settings) {
-    if (isSyncableUserSetting(row.key) || isSyncInternalSetting(row.key)) {
+    if (isSyncableUserSetting(row.key) || isSyncInternalSetting(row.key) || isAccountDerivedDeviceSetting(row.key)) {
       await db.runAsync("DELETE FROM user_settings WHERE key = ?", [row.key]);
     }
   }
+}
+
+/**
+ * Device-only state built from the replaced account's data: today's hifz page list, the monthly
+ * check, today's extras and pending reminder follow-ups. Rebuilt from the restored account.
+ */
+const ACCOUNT_DERIVED_DEVICE_KEYS = new Set([
+  "device_hifz_today_plan",
+  "device_monthly_check",
+  "device_wird_extras",
+  "notif_remind_later",
+  "notif_group_pending",
+  "notif_banner_dismissed",
+]);
+
+function isAccountDerivedDeviceSetting(key: string): boolean {
+  return ACCOUNT_DERIVED_DEVICE_KEYS.has(key);
 }
 
 async function applyRemoteAccountRows(
@@ -998,12 +1017,13 @@ async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"
     return;
   }
 
+  // The cached page tier travels with the card, so a restored device knows its manzil pages.
   await db.runAsync(
     `INSERT OR REPLACE INTO study_cards
      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
       learning_steps, reps, lapses, state, last_review, suspended_at, buried_until,
-      marked_at, created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+      marked_at, created_at, updated_at, deleted_at, tier, tier_changed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
     [
       row.id,
       row.deck_id,
@@ -1022,6 +1042,8 @@ async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"
       row.marked_at ?? null,
       row.created_at,
       remoteUpdatedAt,
+      row.tier ?? null,
+      row.tier_changed_at ?? null,
     ],
   );
 }

@@ -141,6 +141,26 @@ describe("half pages and seams from a page grade", () => {
     expect(await countMistakeInbox(store.db, TODAY)).toBe(0);
   });
 
+  it("grades a queued seam from its current row when a page grade reviewed it after the queue was built", async () => {
+    const seam = { surah: 2, ayah: 16 };
+    await gradePage({ ...emptyAttempt(4), seam: { clean: false, ...seam } }, Rating.Again);
+    const queuedAt = new Date(start.getTime() + 10 * MINUTE);
+    const [queued] = await loadDueRemediation(store.db, queuedAt);
+    expect(queued.kind).toBe("seam");
+    await gradePage({ ...emptyAttempt(4), seam: { clean: true, ...seam } }, Rating.Good, new Date(start.getTime() + 11 * MINUTE));
+    const current = store.sql.prepare("SELECT reps FROM study_cards WHERE id = 'seam:madani15:5'").get() as { reps: number };
+    await saveRemediationGrade(store.db, {
+      card: queued.row,
+      rating: Rating.Good,
+      attempt: { ...emptyAttempt(4), seam: { clean: true, ...seam } },
+      firstToken: null,
+      session: null,
+      durationMs: MINUTE,
+      now: new Date(start.getTime() + 12 * MINUTE),
+    });
+    expect(store.sql.prepare("SELECT reps FROM study_cards WHERE id = 'seam:madani15:5'").get()).toEqual({ reps: current.reps + 1 });
+  });
+
   it("does not count a clean seam after a weak page, or any seam recited in salah", async () => {
     const seam = { clean: true, surah: 2, ayah: 16 };
     expect((await gradePage({ ...emptyAttempt(4), seam }, Rating.Hard)).remediation.seam).toBeNull();

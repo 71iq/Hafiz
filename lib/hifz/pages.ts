@@ -32,24 +32,46 @@ async function readPageRows(db: DatabaseExecutor): Promise<StudyCardRow[]> {
   );
 }
 
-/** Pages that were memorized through sabaq in the app; every other page card was declared. */
-async function readSabaqPages(db: DatabaseExecutor): Promise<Set<number>> {
-  const rows = await db.getAllAsync<{ id: string }>(
-    "SELECT id FROM study_cards WHERE deck_id = ? AND id LIKE 'chunk:%' AND deleted_at IS NULL",
-    [HIFZ_SABAQ_DECK_ID],
-  );
+/**
+ * Pages that were memorized through sabaq in the app (every other page card was declared), and the
+ * local dates of passing fluent checks by instant. The page card is created in the same transaction
+ * as its last chunk's passing grade, so that grade's stored local date is the page's fluent date,
+ * and travel later does not move it.
+ */
+async function readSabaqPages(db: DatabaseExecutor): Promise<{ pages: Set<number>; passedOn: Map<number, LocalDate> }> {
+  const [rows, passes] = await Promise.all([
+    db.getAllAsync<{ id: string }>(
+      "SELECT id FROM study_cards WHERE deck_id = ? AND id LIKE 'chunk:%' AND deleted_at IS NULL",
+      [HIFZ_SABAQ_DECK_ID],
+    ),
+    db.getAllAsync<{ reviewed_at: string; local_date: LocalDate | null }>(
+      "SELECT reviewed_at, local_date FROM study_log WHERE card_id LIKE 'chunk:%' AND rating >= 3 AND local_date IS NOT NULL",
+    ),
+  ]);
   const pages = new Set<number>();
   for (const row of rows) {
     const unit = parsePageUnit(row.id);
     if (unit) pages.add(unit.page);
   }
-  return pages;
+  const passedOn = new Map<number, LocalDate>();
+  for (const pass of passes) {
+    const instant = Date.parse(pass.reviewed_at);
+    if (Number.isFinite(instant) && pass.local_date) passedOn.set(instant, pass.local_date);
+  }
+  return { pages, passedOn };
 }
 
 async function readPageGrades(db: DatabaseExecutor): Promise<Map<string, GradeEvent[]>> {
-  const rows = await db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
-    "SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id LIKE 'page:%' ORDER BY reviewed_at",
+  return gradesByCard(
+    await db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
+      "SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id LIKE 'page:%' ORDER BY reviewed_at",
+    ),
   );
+}
+
+function gradesByCard(
+  rows: readonly { card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }[],
+): Map<string, GradeEvent[]> {
   const grades = new Map<string, GradeEvent[]>();
   for (const row of rows) {
     if (row.rating < 1 || row.rating > 4) continue;
@@ -60,19 +82,57 @@ async function readPageGrades(db: DatabaseExecutor): Promise<Map<string, GradeEv
   return grades;
 }
 
+/**
+ * The derived tier of a few page cards (TIER-01), reading only their own history. For checks that
+ * run inside a grade, where loading every page would cost a read of the whole review log.
+ */
+export async function derivePageTiers(
+  db: DatabaseExecutor,
+  cardIds: readonly string[],
+  { today, plan }: { today: LocalDate; plan: Pick<HifzPlan, "sabqiDays"> },
+): Promise<Map<string, Tier>> {
+  const tiers = new Map<string, Tier>();
+  if (cardIds.length === 0) return tiers;
+  const placeholders = cardIds.map(() => "?").join(", ");
+  const [rows, sabaq, logs] = await Promise.all([
+    db.getAllAsync<StudyCardRow>(`SELECT * FROM study_cards WHERE id IN (${placeholders}) AND deleted_at IS NULL`, [...cardIds]),
+    readSabaqPages(db),
+    db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
+      `SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id IN (${placeholders}) ORDER BY reviewed_at`,
+      [...cardIds],
+    ),
+  ]);
+  const grades = gradesByCard(logs);
+  for (const row of rows) {
+    const unit = parsePageUnit(row.id);
+    if (unit?.kind !== "page") continue;
+    tiers.set(row.id, tierFor(pageHistory(row, unit.page, sabaq, grades), today, plan));
+  }
+  return tiers;
+}
+
+function pageHistory(
+  row: StudyCardRow,
+  page: number,
+  sabaq: Awaited<ReturnType<typeof readSabaqPages>>,
+  grades: Map<string, GradeEvent[]>,
+): PageHistory {
+  const declared = !sabaq.pages.has(page);
+  return {
+    declared,
+    firstFluentDate: declared ? null : (sabaq.passedOn.get(Date.parse(row.created_at)) ?? localDateOf(new Date(row.created_at))),
+    grades: grades.get(row.id) ?? [],
+  };
+}
+
 /** Every page card with its derived tier (TIER-01). The tier is recomputed from history, never read from the cache. */
 export async function loadPageCards(db: DatabaseExecutor, { today, plan }: { today: LocalDate; plan: HifzPlan }): Promise<PageCard[]> {
-  const [rows, sabaqPages, grades] = await Promise.all([readPageRows(db), readSabaqPages(db), readPageGrades(db)]);
+  const [rows, sabaq, grades] = await Promise.all([readPageRows(db), readSabaqPages(db), readPageGrades(db)]);
   const cards: PageCard[] = [];
   for (const row of rows) {
     const unit = parsePageUnit(row.id);
     if (!unit || unit.kind !== "page") continue;
-    const declared = !sabaqPages.has(unit.page);
-    const history: PageHistory = {
-      declared,
-      firstFluentDate: declared ? null : localDateOf(new Date(row.created_at)),
-      grades: grades.get(row.id) ?? [],
-    };
+    const history = pageHistory(row, unit.page, sabaq, grades);
     cards.push({ row, page: unit.page, history, tier: tierFor(history, today, plan) });
   }
   return cards;
@@ -166,7 +226,11 @@ export type TodayWird = Readonly<{
   minutesPerReviewPage: number;
   minutesPerNewPage: number;
   memorizedPages: number;
-  /** A sabaq chunk was graded today, so today's new memorization is done. */
+  /** Lines whose fluent check passed today. */
+  sabaqLinesToday: number;
+  /** Every page card with its tier, so callers do not read the review history again. */
+  cards: readonly PageCard[];
+  /** Today's new memorization is done: the lines passed today reach the day's allocation. */
   sabaqDoneToday: boolean;
 }>;
 
@@ -183,8 +247,8 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
     loadPageCards(database, { today, plan }),
     readMinutesPerPage(database),
     database.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [TODAY_PLAN_KEY]),
-    database.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM study_log WHERE card_id LIKE 'chunk:%' AND local_date = ?",
+    database.getAllAsync<{ card_id: string }>(
+      "SELECT DISTINCT card_id FROM study_log WHERE card_id LIKE 'chunk:%' AND local_date = ? AND rating >= 3",
       [today],
     ),
   ]);
@@ -206,6 +270,11 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
       [TODAY_PLAN_KEY, JSON.stringify(snapshot), now.toISOString()],
     );
   }
+  let linesToday = 0;
+  for (const row of sabaqToday) {
+    const unit = parsePageUnit(row.card_id);
+    if (unit?.kind === "chunk") linesToday += unit.toLine - unit.fromLine + 1;
+  }
   const byId = new Map(pages.map((page) => [page.cardId, page]));
   const todo = snapshot.ids.flatMap((id) => {
     const page = byId.get(id);
@@ -222,7 +291,10 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
     minutesPerReviewPage: minutes.reviewPage,
     minutesPerNewPage: minutes.newPage,
     memorizedPages: cards.filter(isMemorized).length,
-    sabaqDoneToday: (sabaqToday?.count ?? 0) > 0,
+    cards,
+    sabaqLinesToday: linesToday,
+    // Today's new memorization is done once the lines passed today reach the day's allocation.
+    sabaqDoneToday: snapshot.newLines > 0 ? linesToday >= snapshot.newLines : linesToday > 0,
   };
 }
 

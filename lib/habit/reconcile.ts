@@ -21,14 +21,23 @@ type LoggedReview = {
  * A review without a grader comes from such an older version. Its day counts if it has any review,
  * which is the rule those versions showed the user. Newer reviews must meet the minimum wird.
  * Reviews credited to a made-up day never count again for their own day (STR-08).
- * Existing days are never changed, so this only adds.
+ * It only raises days to done; merging never lowers a status.
  */
-export async function reconcileHabitDaysFromLogs(db: DatabaseExecutor, { now }: { now: Date }): Promise<number> {
+export async function reconcileHabitDaysFromLogs(
+  db: DatabaseExecutor,
+  { now, dates }: { now: Date; dates?: ReadonlySet<LocalDate> },
+): Promise<number> {
   const today = localDateOf(now);
+  // After an incremental pull only the pulled reviews' days can change, so only those are read.
+  const only = dates ? [...dates] : null;
   const [settings, logs, habitRows] = await Promise.all([
     readHabitSettings(db),
     db.getAllAsync<LoggedReview>(
-      "SELECT local_date, card_id, duration_ms, reviewed_at, grader FROM study_log WHERE local_date IS NOT NULL ORDER BY reviewed_at",
+      only
+        ? `SELECT local_date, card_id, duration_ms, reviewed_at, grader FROM study_log
+            WHERE local_date IN (${only.map(() => "?").join(", ")}) ORDER BY reviewed_at`
+        : "SELECT local_date, card_id, duration_ms, reviewed_at, grader FROM study_log WHERE local_date IS NOT NULL ORDER BY reviewed_at",
+      only ?? [],
     ),
     db.getAllAsync<HabitDayRow>("SELECT * FROM habit_days WHERE status IS NOT NULL"),
   ]);
@@ -44,7 +53,10 @@ export async function reconcileHabitDaysFromLogs(db: DatabaseExecutor, { now }: 
   let written = 0;
   const at = now.toISOString();
   for (const [date, reviews] of [...byDate.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    if (days.has(date)) continue;
+    // A day already earned by recitation needs nothing. A lower status (grace, excused, paused, made
+    // up or earned back) is raised to done when its own reviews prove it; the merge keeps any
+    // make-up reservation on the row.
+    if (days.get(date)?.earned_status === "done") continue;
     const previous = days.get(addDays(date, -1));
     const credited = previous?.credited_through ?? null;
     const own = credited ? reviews.filter((review) => compareSyncTimestamps(review.reviewed_at, credited) > 0) : reviews;

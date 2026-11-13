@@ -6,7 +6,6 @@ import { pagesOfJuz } from "@/lib/hifz/units";
 
 export type StrengthBands = Readonly<{ steady: number; fair: number; needsReview: number }>;
 
-
 /** MST-02: steady at recall 0.90 or more, fair from 0.75, needs review below. Accurate, never inflated (ETH-09). */
 export function strengthBands(recalls: readonly number[]): StrengthBands {
   let steady = 0;
@@ -73,14 +72,10 @@ export function monthlyCheckDue(lastMonth: string | null, today: string, candida
   return candidates >= MONTHLY_CHECK_PAGES && lastMonth !== today.slice(0, 7);
 }
 
-export async function loadMonthlyCheckDue(db: DatabaseExecutor, now = new Date()): Promise<boolean> {
-  const plan = await readHifzPlan(db);
-  if (!plan) return false;
+/** The same check for page cards a caller already loaded (Home has them from today's wird). */
+export async function monthlyCheckDueFor(db: DatabaseExecutor, cards: readonly PageCard[], now = new Date()): Promise<boolean> {
   const today = localDateOf(now);
-  const [cards, last] = await Promise.all([
-    loadPageCards(db, { today, plan }),
-    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [MONTHLY_CHECK_KEY]),
-  ]);
+  const last = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [MONTHLY_CHECK_KEY]);
   return monthlyCheckDue(last?.value ?? null, today, monthlyCheckCandidates(cards, today).length);
 }
 

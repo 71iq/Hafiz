@@ -21,6 +21,7 @@ export type PlanPage = Readonly<{
 export type DailyPlan = Readonly<{
   /** Pages already reviewed today. */
   done: readonly PlanPage[];
+  /** Sabqi pages due today, after any page sent back to sabaq for relearning. */
   sabqi: readonly PlanPage[];
   /** Manzil pages kept within the cycle today (SCH-03, SCH-04). */
   floor: readonly PlanPage[];
@@ -77,10 +78,15 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlan {
   const { plan, today } = input;
   const done = input.pages.filter((page) => page.reviewedToday);
   const pages = input.pages.filter((page) => !page.reviewedToday);
-  const sabqi = pages
-    .filter((page) => page.tier === "sabqi")
-    .filter((page) => !page.lastReviewDate || diffDays(page.lastReviewDate, today) >= plan.sabqiEvery)
-    .sort((a, b) => a.page - b.page);
+  // A page sent back to sabaq after failing sabqi twice is relearned every day, ahead of sabqi.
+  const relearn = pages.filter((page) => page.tier === "sabaq").sort((a, b) => a.page - b.page);
+  const sabqi = [
+    ...relearn,
+    ...pages
+      .filter((page) => page.tier === "sabqi")
+      .filter((page) => !page.lastReviewDate || diffDays(page.lastReviewDate, today) >= plan.sabqiEvery)
+      .sort((a, b) => a.page - b.page),
+  ];
   const manzil = pages.filter((page) => isManzil(page.tier));
   const manzilTotal = manzil.length + done.filter((page) => isManzil(page.tier)).length;
   const floorOf = (page: PlanPage) => floorDate(page, plan.cycleDays);

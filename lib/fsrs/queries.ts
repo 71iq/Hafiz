@@ -1187,6 +1187,45 @@ export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Prom
   await enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card));
 }
 
+/** The row insertNewStudyCard writes, for a caller that grades a card in the transaction that creates it. */
+export function newStudyCardRow({
+  id,
+  deckId,
+  due,
+  tier = null,
+  now,
+}: {
+  id: string;
+  deckId: string;
+  due: Date;
+  tier?: string | null;
+  now: string;
+}): StudyCardRow {
+  const empty = createEmptyCard(due);
+  return {
+    id,
+    deck_id: deckId,
+    due: empty.due.toISOString(),
+    stability: empty.stability,
+    difficulty: empty.difficulty,
+    elapsed_days: empty.elapsed_days,
+    scheduled_days: empty.scheduled_days,
+    learning_steps: empty.learning_steps,
+    reps: empty.reps,
+    lapses: empty.lapses,
+    state: empty.state,
+    last_review: null,
+    suspended_at: null,
+    buried_until: null,
+    marked_at: null,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+    tier,
+    tier_changed_at: tier ? now : null,
+  };
+}
+
 /**
  * Create a new card, or revive a deleted one, with its upload queued, using the caller's executor.
  * Returns false when a live card with this id already exists.
@@ -1215,28 +1254,7 @@ export async function insertNewStudyCard(
     ]
   );
   if ((result.changes ?? 0) === 0) return false;
-  const row: StudyCardRow = {
-    id,
-    deck_id: deckId,
-    due: empty.due.toISOString(),
-    stability: empty.stability,
-    difficulty: empty.difficulty,
-    elapsed_days: empty.elapsed_days,
-    scheduled_days: empty.scheduled_days,
-    learning_steps: empty.learning_steps,
-    reps: empty.reps,
-    lapses: empty.lapses,
-    state: empty.state,
-    last_review: null,
-    suspended_at: null,
-    buried_until: null,
-    marked_at: null,
-    created_at: now,
-    updated_at: now,
-    deleted_at: null,
-    tier,
-    tier_changed_at: tier ? now : null,
-  };
+  const row = newStudyCardRow({ id, deckId, due, tier, now });
   await enqueueSync(db, "study_cards", "INSERT", id, cardToSyncData(row));
   return true;
 }

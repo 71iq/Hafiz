@@ -1,3 +1,4 @@
+import { localDateOf } from "@/lib/habit/dates";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
 import type { Session } from "@supabase/supabase-js";
@@ -1473,6 +1474,53 @@ it("pulls the wird tables in full once per account, then from the shared cursor"
   await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
   const second = sinceByTable();
   for (const table of wirdTables) expect(second[table]).toBe(cursor);
+});
+
+it("keeps a pulled page card's cached tier", async () => {
+  restoreComplete();
+  mockTableRows.set("study_cards:incremental", [
+    { ...card("page:madani15:5"), tier: "manzil", tier_changed_at: NEW, updated_at: NEW },
+  ]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(sql.prepare("SELECT tier, tier_changed_at FROM study_cards WHERE id = 'page:madani15:5'").get()).toEqual({
+    tier: "manzil",
+    tier_changed_at: NEW,
+  });
+});
+
+it("drops device state built from the replaced account when restoring another", async () => {
+  putSetting("device_hifz_today_plan", JSON.stringify({ date: "2026-11-13", ids: ["page:madani15:5"], newLines: 0 }));
+  putSetting("device_wird_extras", "{}");
+  putSetting("hifz_auto_delay_ms", "900");
+  mockTableRows.set("user_settings:restore", [boundaryRows.user_settings]);
+  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  const keys = sql.prepare("SELECT key FROM user_settings").all().map((row) => row.key);
+  expect(keys).not.toContain("device_hifz_today_plan");
+  expect(keys).not.toContain("device_wird_extras");
+  expect(keys).toContain("hifz_auto_delay_ms");
+});
+
+it("pulls wird days before reviews and marks a day whose minimum two devices met together", async () => {
+  restoreComplete();
+  putSetting("last_pull_at", OLD);
+  const now = new Date();
+  const today = localDateOf(now);
+  const earlier = new Date(now.getTime() - 60 * 60_000).toISOString();
+  // This device recited the first half of a page; another device recited the second half.
+  sql
+    .prepare(
+      `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
+        local_date, grader) VALUES ('half:madani15:5:a', 3, 2, ?, 1, 1, 0, 1, ?, ?, 'self')`,
+    )
+    .run(earlier, earlier, today);
+  const remoteAt = new Date(now.getTime() - 30 * 60_000).toISOString();
+  mockTableRows.set("study_log:incremental", [
+    { ...boundaryRows.study_log, card_id: "half:madani15:5:b", reviewed_at: remoteAt, local_date: today, grader: "self" },
+  ]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  const tables = requests.filter((r) => r.incremental).map((r) => r.table);
+  expect(tables.indexOf("habit_days")).toBeLessThan(tables.indexOf("study_log"));
+  expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(today)).toEqual({ status: "done" });
 });
 
 it("keeps committed page counts and the cursor when a later incremental page is malformed, then retries", async () => {

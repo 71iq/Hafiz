@@ -13,7 +13,7 @@ import type { RecitationErrorInput, RecitationErrorType } from "@/lib/hifz/error
 import { capRating, proposeRating, type AttemptEvents, type Rating, type SupportLevel } from "@/lib/hifz/grading";
 import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import type { HifzPlan } from "@/lib/hifz/plan";
-import { T_REV_KEY } from "@/lib/hifz/pages";
+import { derivePageTiers, T_REV_KEY } from "@/lib/hifz/pages";
 import { isManzil, pagePolicy, tierFor, type PageHistory, type Tier } from "@/lib/hifz/tiers";
 import { errorHalf, hasSeamAfter, remediateHalf, remediationPolicy, reviewSeam, type Half } from "@/lib/hifz/remediation";
 import { HIFZ_PAGES_DECK_ID, parsePageUnit } from "@/lib/hifz/units";
@@ -110,22 +110,40 @@ export const MANZIL_CYCLE_START_KEY = "hifz_manzil_cycle_start";
 /**
  * MST-04: a manzil cycle completes on the day every manzil page has a graded review dated on or
  * after the cycle start. That day's wird is marked (it feeds board points) and the next cycle starts
- * tomorrow. Runs inside the grade transaction.
+ * tomorrow. Runs inside the grade transaction. Membership uses the cached tier, which every grade and
+ * every sync carries, plus the derived tier of cached sabqi pages, which can graduate by time alone.
+ * Review days are the stored local dates, so travel does not move them.
  */
-async function completeManzilCycleIfDone(db: DatabaseExecutor, now: Date): Promise<boolean> {
+async function completeManzilCycleIfDone(
+  db: DatabaseExecutor,
+  now: Date,
+  plan: Pick<HifzPlan, "sabqiDays">,
+): Promise<boolean> {
   const today = localDateOf(now);
-  const startRow = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [MANZIL_CYCLE_START_KEY]);
-  const pages = await db.getAllAsync<{ id: string; tier: string | null; last_review: string | null; created_at: string }>(
-    "SELECT id, tier, last_review, created_at FROM study_cards WHERE deck_id = ? AND id LIKE 'page:%' AND deleted_at IS NULL AND suspended_at IS NULL",
-    [HIFZ_PAGES_DECK_ID],
-  );
-  const manzil = pages.filter((page) => page.tier !== null && page.tier.startsWith("manzil"));
+  const [startRow, pages, lastReviews] = await Promise.all([
+    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [MANZIL_CYCLE_START_KEY]),
+    db.getAllAsync<{ id: string; tier: string | null; created_at: string }>(
+      "SELECT id, tier, created_at FROM study_cards WHERE deck_id = ? AND id LIKE 'page:%' AND deleted_at IS NULL AND suspended_at IS NULL",
+      [HIFZ_PAGES_DECK_ID],
+    ),
+    db.getAllAsync<{ card_id: string; last: LocalDate | null }>(
+      "SELECT card_id, MAX(local_date) AS last FROM study_log WHERE card_id LIKE 'page:%' GROUP BY card_id",
+    ),
+  ]);
+  const maybeGraduated = pages.filter((page) => page.tier === "sabqi" || page.tier === null).map((page) => page.id);
+  const derived = await derivePageTiers(db, maybeGraduated, { today, plan });
+  const manzil = pages.filter((page) => {
+    const tier = derived.get(page.id) ?? page.tier;
+    return tier !== null && tier !== undefined && tier.startsWith("manzil");
+  });
   if (manzil.length === 0) return false;
-  const start =
-    startRow?.value ??
-    manzil.map((page) => localDateOf(new Date(page.created_at))).sort()[0];
+  const start = startRow?.value ?? manzil.map((page) => localDateOf(new Date(page.created_at))).sort()[0];
   if (start > today) return false;
-  const complete = manzil.every((page) => page.last_review !== null && localDateOf(new Date(page.last_review)) >= start);
+  const last = new Map(lastReviews.map((row) => [row.card_id, row.last]));
+  const complete = manzil.every((page) => {
+    const reviewed = last.get(page.id);
+    return reviewed !== null && reviewed !== undefined && reviewed >= start;
+  });
   if (!complete) return false;
   const at = now.toISOString();
   await putHabitDay(db, {
@@ -225,7 +243,7 @@ export async function savePageGrade(
       dhuhr: input.dhuhr,
     },
     extraWork: async (tx) => {
-      if (isManzil(after)) await completeManzilCycleIfDone(tx, now);
+      if (isManzil(after)) await completeManzilCycleIfDone(tx, now, input.plan);
       if (half && pageNumber !== null) await remediateHalf(tx, { page: pageNumber, half, now });
       if (seam && pageNumber !== null) await reviewSeam(tx, { page: pageNumber, clean: seam === "clean", now });
       // SCH-07, MUT-04: a drift into a similar verse brings that pair's cards due within a day.
@@ -260,8 +278,13 @@ export async function saveRemediationGrade(db: AppDatabase, input: RemediationGr
   const level = input.attempt.level;
   const rating = capRating(input.rating as Rating, level) as Grade;
   const base = await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID);
+  // The queued row can be stale: a page grade earlier in the session may have reviewed this seam or
+  // half since the queue was built. Grade from the card as it is now.
+  const current =
+    (await db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [input.card.id])) ??
+    input.card;
   const transition = calculateReviewTransition({
-    card: input.card,
+    card: current,
     rating,
     reviewedAt: now,
     reviewPolicy: remediationPolicy(base),

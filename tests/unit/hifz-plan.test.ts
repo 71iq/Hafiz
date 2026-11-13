@@ -71,6 +71,25 @@ describe("tiers (3.2, 8.6)", () => {
     expect(tierFor({ declared: false, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe("sabaq");
   });
 
+  it("keeps a graduated page in manzil after a later Hard or Again", () => {
+    const memorized = (grades: GradeEvent[]) => tierFor({ declared: false, firstFluentDate: addDays(TODAY, -30), grades }, TODAY, plan);
+    const graduated = [grade(12, 3), grade(11, 3), grade(10, 3)];
+    expect(memorized(graduated)).toBe("manzil");
+    expect(memorized([...graduated, grade(5, 2)])).toBe("manzil");
+    expect(memorized([...graduated, grade(5, 1)])).toBe("manzil.needs_work");
+    expect(memorized([...graduated, grade(5, 1), grade(4, 3), grade(3, 3)])).toBe("manzil");
+  });
+
+  it("relearns a page sent back to sabaq and starts a new sabqi period on its next Good grade", () => {
+    const memorized = (grades: GradeEvent[]) => tierFor({ declared: false, firstFluentDate: addDays(TODAY, -30), grades }, TODAY, plan);
+    const failed = [grade(29, 3), grade(28, 1), grade(27, 1)];
+    expect(memorized(failed)).toBe("sabaq");
+    expect(memorized([...failed, grade(26, 2)])).toBe("sabaq");
+    expect(memorized([...failed, grade(26, 3)])).toBe("sabqi");
+    expect(memorized([...failed, grade(26, 3), grade(20, 3), grade(10, 3)])).toBe("manzil");
+    expect(memorized([...failed, grade(5, 3)])).toBe("sabqi");
+  });
+
   it("caps manzil intervals at the cycle and sabqi at one day (SCH-02, SCH-03)", () => {
     const manzil = pagePolicy("manzil", { cycleDays: 20, retention: 0.95 }, DEFAULT_DECK_REVIEW_SETTINGS);
     expect(manzil).toMatchObject({ maximumInterval: 20, requestRetention: 0.95, learningSteps: [], relearningSteps: ["10m", "1d"] });
@@ -111,6 +130,13 @@ describe("daily plan (4.3.1)", () => {
     expect(result.floor[0]).toBe(overdue);
     expect(result.floor).toHaveLength(2);
     expect(result.overdueCount).toBe(1);
+  });
+
+  it("puts a page sent back to sabaq first in the review every day", () => {
+    const relearn = page(300, { tier: "sabaq", lastReviewDate: addDays(TODAY, -1) });
+    const sabqi = page(200, { tier: "sabqi", lastReviewDate: addDays(TODAY, -1) });
+    const result = buildDailyPlan(input([page(1), sabqi, relearn]));
+    expect(result.review.slice(0, 2)).toEqual([relearn, sabqi]);
   });
 
   it("adds manzil pages FSRS wants sooner and pages that need work, needs-work first", () => {

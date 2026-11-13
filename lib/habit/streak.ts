@@ -31,41 +31,34 @@ export type StreakView = Readonly<{
 export function computeStreak(days: DayMap, today: LocalDate, options: { makeUpOpen: boolean }): StreakView {
   const todayStatus = days.get(today)?.status ?? null;
   const yesterday = addDays(today, -1);
-  let cursor: LocalDate = todayStatus ? today : yesterday;
-  let makeUpPending = false;
-  if (!todayStatus && !days.has(yesterday)) {
-    if (options.makeUpOpen && days.has(addDays(today, -2))) {
-      makeUpPending = true;
-      cursor = addDays(today, -2);
-    } else {
-      return {
-        length: 0,
-        startDay: null,
-        lastCoveredDay: null,
-        todayStatus,
-        doneToday: false,
-        atRisk: false,
-        makeUpPending: false,
-      };
-    }
-  }
-  const lastCoveredDay = cursor;
+  // Yesterday's gap stays open until its cutoff, whatever today holds: an excused or paused today
+  // must not hide it (STR-07).
+  const makeUpPending = !days.has(yesterday) && options.makeUpOpen && days.has(addDays(today, -2));
   let length = 0;
-  let startDay: LocalDate = cursor;
-  while (days.has(cursor)) {
-    const status = days.get(cursor)!.status;
-    if (COUNTS_TOWARD_LENGTH[status]) length += 1;
-    startDay = cursor;
-    cursor = addDays(cursor, -1);
+  let startDay: LocalDate | null = null;
+  let lastCoveredDay: LocalDate | null = null;
+  const countRunFrom = (from: LocalDate) => {
+    let cursor = from;
+    while (days.has(cursor)) {
+      if (COUNTS_TOWARD_LENGTH[days.get(cursor)!.status]) length += 1;
+      lastCoveredDay ??= cursor;
+      startDay = cursor;
+      cursor = addDays(cursor, -1);
+    }
+  };
+  if (todayStatus) countRunFrom(today);
+  if (makeUpPending) countRunFrom(addDays(today, -2));
+  else if (!todayStatus) countRunFrom(yesterday);
+  if (startDay === null) {
+    return { length: 0, startDay: null, lastCoveredDay: null, todayStatus, doneToday: false, atRisk: false, makeUpPending: false };
   }
-  const protectedToday = todayStatus !== null;
   return {
     length,
     startDay,
     lastCoveredDay,
     todayStatus,
     doneToday: todayStatus === "done",
-    atRisk: !protectedToday,
+    atRisk: todayStatus === null,
     makeUpPending,
   };
 }

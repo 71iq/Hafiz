@@ -1,5 +1,5 @@
 import { addDays, datesBetween, type LocalDate } from "@/lib/habit/dates";
-import { computeStreak, isRecited, lastCoveredBefore, runLengthEndingOn, type DayMap } from "@/lib/habit/streak";
+import { computeStreak, isRecited, runLengthEndingOn, type DayMap } from "@/lib/habit/streak";
 
 const EARN_BACK_MIN_STREAK = 7;
 const EARN_BACK_WINDOW_DAYS = 3;
@@ -32,10 +32,20 @@ export type EarnBack = Readonly<{
  * window that can no longer succeed.
  */
 export function findEarnBack(days: DayMap, today: LocalDate, options: { makeUpOpen: boolean }): EarnBack | null {
-  const view = computeStreak(days, today, options);
-  if (view.makeUpPending) return null;
-  const lastDay = lastCoveredBefore(days, view.startDay ?? today);
-  if (lastDay === null) return null;
+  if (computeStreak(days, today, options).makeUpPending) return null;
+  // The break is found from the window, not from the latest run: a missed day inside the window
+  // ends a short run but must not hide the original break. Look back over every last covered day
+  // whose window could include today (or has just succeeded), latest first.
+  for (let offset = 2; offset <= 2 * EARN_BACK_WINDOW_DAYS + 1; offset += 1) {
+    const lastDay = addDays(today, -offset);
+    if (!days.has(lastDay) || days.has(addDays(lastDay, 1))) continue;
+    const earnBack = earnBackFrom(days, today, lastDay);
+    if (earnBack) return earnBack;
+  }
+  return null;
+}
+
+function earnBackFrom(days: DayMap, today: LocalDate, lastDay: LocalDate): EarnBack | null {
   const windowStart = addDays(lastDay, 2);
   const windowEnd = addDays(lastDay, 1 + EARN_BACK_WINDOW_DAYS);
   if (today < windowStart) return null;

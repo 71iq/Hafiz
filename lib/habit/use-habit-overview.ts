@@ -47,19 +47,29 @@ export function useHabitOverview(db: AppDatabase, dhuhr?: DhuhrResolver) {
     }
   }, [db, dhuhr]);
 
+  // A screen behind another (Home behind a review) skips events: each grade would otherwise reload
+  // history it cannot show. Focus always refreshes, so nothing is missed.
+  const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {
+      focused.current = true;
       refresh();
+      return () => {
+        focused.current = false;
+      };
     }, [refresh]),
   );
-  useEffect(() => subscribeReviewActivity(refresh), [refresh]);
-  useEffect(() => subscribeHabitChanged(refresh), [refresh]);
+  const refreshIfFocused = useCallback(() => {
+    if (focused.current) refresh();
+  }, [refresh]);
+  useEffect(() => subscribeReviewActivity(refreshIfFocused), [refreshIfFocused]);
+  useEffect(() => subscribeHabitChanged(refreshIfFocused), [refreshIfFocused]);
   useEffect(
     () =>
       subscribeSyncCompleted(({ pulled }) => {
-        if (pulled > 0) refresh();
+        if (pulled > 0) refreshIfFocused();
       }),
-    [refresh],
+    [refreshIfFocused],
   );
 
   return { overview, failed, refresh };

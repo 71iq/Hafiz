@@ -327,6 +327,18 @@ describe("reconciling wird days from the review log", () => {
       .run(cardId, at.toISOString(), at.toISOString(), localDateOf(at), grader);
   }
 
+  it("raises a grace day to done when reviews from an older version prove it", async () => {
+    const graced = { ...doneDay(addDays(TODAY, -1)), status: "grace" as const, earned_status: "grace" as const };
+    await store.db.withTransactionAsync(async (tx) => {
+      await putHabitDay(tx, graced);
+    });
+    insertLog("2:1", atLocalTime(addDays(TODAY, -1), 600), null);
+    await store.db.withTransactionAsync(async (tx) => {
+      await reconcileHabitDaysFromLogs(tx, { now: atLocalTime(TODAY, 600) });
+    });
+    expect(await readHabitDayRow(store.db, addDays(TODAY, -1))).toMatchObject({ status: "done", earned_status: "done" });
+  });
+
   it("keeps the old any-review rule for reviews from older app versions and the minimum for newer ones", async () => {
     insertLog("2:1", atLocalTime(addDays(TODAY, -3), 600), null);
     insertLog("2:2", atLocalTime(addDays(TODAY, -2), 600), "self");

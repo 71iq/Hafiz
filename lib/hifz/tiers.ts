@@ -28,11 +28,15 @@ function needsWork(grades: readonly GradeEvent[]): boolean {
 }
 
 /**
- * TIER-01: a page's tier is a pure function of its review history and the plan (8.6).
+ * TIER-01: a page's tier is a pure function of its review history and the plan (8.6), replayed in
+ * date order so a decision made on one day is not undone by a later ordinary grade.
  * - Declared pages are manzil, unverified until their first graded review (ONB-04).
- * - A page memorized in the app is sabqi for sabqi_days after its fluent check, and until its last
- *   3 grades are Good or better; failing sabqi twice in a row sends it back to sabaq.
- * - A manzil page needs work from its last Again until two Good or better grades in a row.
+ * - A page memorized in the app is sabqi from its fluent check. It graduates to manzil once it is
+ *   sabqi_days old and its last 3 grades in this sabqi period are Good or better. Two Again grades
+ *   in a row while sabqi send it back to sabaq; the next Good grade passes it again and starts a new
+ *   sabqi period from that day.
+ * - Once manzil, a page stays manzil: it needs work from its last Again until two Good or better
+ *   grades in a row.
  */
 export function tierFor(history: PageHistory, today: LocalDate, plan: Pick<HifzPlan, "sabqiDays">): Tier {
   const { grades } = history;
@@ -41,16 +45,28 @@ export function tierFor(history: PageHistory, today: LocalDate, plan: Pick<HifzP
     return needsWork(grades) ? "manzil.needs_work" : "manzil";
   }
   if (!history.firstFluentDate) return "sabaq";
-  const sinceFluent = grades.filter((grade) => grade.date >= history.firstFluentDate!);
-  const lastTwo = sinceFluent.slice(-2);
-  const lastThree = sinceFluent.slice(-3);
-  const settled = lastThree.length === 3 && lastThree.every((grade) => grade.rating >= 3);
-  const inSabqi = diffDays(history.firstFluentDate, today) < plan.sabqiDays || !settled;
-  if (inSabqi) {
-    if (lastTwo.length === 2 && lastTwo.every((grade) => grade.rating === 1)) return "sabaq";
-    return "sabqi";
+  type State = { kind: "sabqi"; since: LocalDate; grades: GradeEvent[] } | { kind: "sabaq" } | { kind: "manzil"; grades: GradeEvent[] };
+  const graduates = (state: { since: LocalDate; grades: GradeEvent[] }, on: LocalDate) => {
+    const lastThree = state.grades.slice(-3);
+    return diffDays(state.since, on) >= plan.sabqiDays && lastThree.length === 3 && lastThree.every((grade) => grade.rating >= 3);
+  };
+  let state: State = { kind: "sabqi", since: history.firstFluentDate, grades: [] };
+  for (const grade of grades) {
+    if (grade.date < history.firstFluentDate) continue;
+    if (state.kind === "manzil") {
+      state.grades.push(grade);
+    } else if (state.kind === "sabaq") {
+      if (grade.rating >= 3) state = { kind: "sabqi", since: grade.date, grades: [grade] };
+    } else {
+      const previous = state.grades[state.grades.length - 1];
+      state.grades.push(grade);
+      if (grade.rating === 1 && previous?.rating === 1) state = { kind: "sabaq" };
+      else if (graduates(state, grade.date)) state = { kind: "manzil", grades: [] };
+    }
   }
-  return needsWork(sinceFluent) ? "manzil.needs_work" : "manzil";
+  if (state.kind === "sabqi") return graduates(state, today) ? "manzil" : "sabqi";
+  if (state.kind === "sabaq") return "sabaq";
+  return needsWork(state.grades) ? "manzil.needs_work" : "manzil";
 }
 
 export function isManzil(tier: Tier): boolean {

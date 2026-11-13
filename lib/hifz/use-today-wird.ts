@@ -6,7 +6,7 @@ import { localDateOf } from "@/lib/habit/dates";
 import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird, type TodayWird } from "@/lib/hifz/pages";
-import { loadMonthlyCheckDue } from "@/lib/hifz/progress";
+import { monthlyCheckDueFor } from "@/lib/hifz/progress";
 import { countDueRemediation } from "@/lib/hifz/remediation";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
@@ -24,12 +24,12 @@ export function useTodayWird(db: AppDatabase) {
     const load = ++latest.current;
     try {
       const now = new Date();
-      const [next, inbox, remediation, monthly] = await Promise.all([
+      const [next, inbox, remediation] = await Promise.all([
         loadTodayWird(db, now),
         countMistakeInbox(db, localDateOf(now)),
         countDueRemediation(db, now),
-        loadMonthlyCheckDue(db, now),
       ]);
+      const monthly = next ? await monthlyCheckDueFor(db, next.cards, now) : false;
       if (load !== latest.current) return;
       setWird(next);
       setInboxCount(inbox + remediation);
@@ -40,19 +40,29 @@ export function useTodayWird(db: AppDatabase) {
     }
   }, [db]);
 
+  // A screen behind another (Home behind a review) skips events: each grade would otherwise reload
+  // history it cannot show. Focus always refreshes, so nothing is missed.
+  const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {
+      focused.current = true;
       refresh();
+      return () => {
+        focused.current = false;
+      };
     }, [refresh]),
   );
-  useEffect(() => subscribeReviewActivity(refresh), [refresh]);
-  useEffect(() => subscribeHabitChanged(refresh), [refresh]);
+  const refreshIfFocused = useCallback(() => {
+    if (focused.current) refresh();
+  }, [refresh]);
+  useEffect(() => subscribeReviewActivity(refreshIfFocused), [refreshIfFocused]);
+  useEffect(() => subscribeHabitChanged(refreshIfFocused), [refreshIfFocused]);
   useEffect(
     () =>
       subscribeSyncCompleted(({ pulled }) => {
-        if (pulled > 0) refresh();
+        if (pulled > 0) refreshIfFocused();
       }),
-    [refresh],
+    [refreshIfFocused],
   );
 
   return { wird, inboxCount, monthlyCheckDue, refresh };
