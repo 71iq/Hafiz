@@ -40,7 +40,7 @@ import { loadHabitOverview, type WirdProgressEvent } from "@/lib/habit/queries";
 import { readMistakeInbox, recordDrillResult, type InboxItem, type RecitationErrorType } from "@/lib/hifz/errors";
 import { GRADE_CAP, defaultSupportLevel, isGradable, SUPPORT_LEVELS, type SupportLevel } from "@/lib/hifz/grading";
 import { loadRecitationPage, type PageToken, type RecitationPage as PageData } from "@/lib/hifz/page-data";
-import { isMemorized, loadPageCards, loadTodayWird, toPlanPage, type PageCard } from "@/lib/hifz/pages";
+import { loadPageCards, loadTodayWird, toPlanPage, type PageCard } from "@/lib/hifz/pages";
 import {
   halfLineNumbers,
   hasSeamAfter,
@@ -167,7 +167,8 @@ function HifzReviewScreen() {
   const [drillShown, setDrillShown] = useState(false);
   const [listener, setListener] = useState(false);
   const [totals, setTotals] = useState<Totals>({ pages: 0, clean: 0, marked: 0, extra: 0 });
-  const [memorized, setMemorized] = useState<ReadonlySet<number>>(new Set());
+  // Pages the user holds, declared or reviewed: a seam leads only into one of them.
+  const [heldPages, setHeldPages] = useState<ReadonlySet<number>>(new Set());
   const [seamText, setSeamText] = useState<AyahText | null>(null);
   const [seamShown, setSeamShown] = useState(false);
   const [planProgress, setPlanProgress] = useState<{ done: number; total: number } | null>(null);
@@ -201,7 +202,7 @@ function HifzReviewScreen() {
         setPlanProgress({ done: wird.done.length, total: wird.done.length + wird.todo.length });
         const cards = await loadPageCards(db, { today, plan: wird.plan });
         const byId = new Map(cards.map((card) => [card.row.id, card]));
-        setMemorized(new Set(cards.filter(isMemorized).map((card) => card.page)));
+        setHeldPages(new Set(cards.filter((card) => card.tier !== "sabaq").map((card) => card.page)));
         let todo = monthlyCheck
           ? pickMonthlyCheck(monthlyCheckCandidates(cards, today)).map((card) => toPlanPage(card, today, now))
           : [...wird.todo];
@@ -306,9 +307,9 @@ function HifzReviewScreen() {
     [current, pageData],
   );
   const lines = useMemo(() => (pageData ? visibleLines(pageData, lineNumbers) : []), [lineNumbers, pageData]);
-  // SCH-06: after a page whose next page is also memorized, the check offers its seam.
+  // SCH-06: after a page whose next page the user also holds, the check offers its seam.
   const seamPage =
-    current?.kind === "page" && hasSeamAfter(current.card.page) && memorized.has(current.card.page + 1)
+    current?.kind === "page" && hasSeamAfter(current.card.page) && heldPages.has(current.card.page + 1)
       ? current.card.page + 1
       : null;
 
