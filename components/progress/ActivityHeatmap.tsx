@@ -44,7 +44,10 @@ function statusLabel(status: DayStatus, s: UIStrings): string {
   }
 }
 
-/** Calm, distinct styles: recited days stay teal, protected days take soft neutral tones. */
+/**
+ * Calm, distinct styles: recited days stay teal, protected days take soft tones. In light mode the
+ * excused and grace fills also carry a 1 px edge, since a pale fill alone read as an empty day.
+ */
 function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
   const recitedFill = count > 0 ? undefined : isDark ? "#134e4a" : "#99f6e4";
   switch (status) {
@@ -55,14 +58,18 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
     case "earned_back":
       return { backgroundColor: recitedFill, borderWidth: 2, borderColor: isDark ? "#5eead4" : "#0f766e", borderStyle: "dashed" as const };
     case "excused":
-      return { backgroundColor: isDark ? "#4a4030" : "#efe2c6" };
+      return isDark
+        ? { backgroundColor: "#a16207" }
+        : { backgroundColor: "#fcd34d", borderWidth: 1, borderColor: "#d97706" };
     case "paused":
       // A dashed edge in light mode, where a plain grey fill would read as an empty day.
       return isDark
         ? { backgroundColor: "#3f3f46" }
         : { backgroundColor: "#d4d4d8", borderWidth: 1, borderColor: "#a1a1aa", borderStyle: "dashed" as const };
     case "grace":
-      return { backgroundColor: isDark ? "#1e3a5f" : "#dbeafe" };
+      return isDark
+        ? { backgroundColor: "#1d4ed8" }
+        : { backgroundColor: "#93c5fd", borderWidth: 1, borderColor: "#3b82f6" };
   }
 }
 
@@ -392,7 +399,7 @@ export function ActivityHeatmap({
                         borderStyle: style.borderStyle ?? "solid",
                       }}
                     />
-                    <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 10, color: isDark ? "#a3a3a3" : "#8B8178" }}>
+                    <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 10, color: isDark ? "#d4d4d4" : "#6e5a47" }}>
                       {statusLabel(status, s)}
                     </Text>
                   </View>

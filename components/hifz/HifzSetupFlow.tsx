@@ -8,11 +8,13 @@ import { MemorizedPortionPicker, type SurahChoice } from "@/components/hifz/Memo
 import type { AppDatabase } from "@/lib/database/types";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { Card } from "@/components/ui/Card";
-import { PrayerTimesSetup } from "@/components/notifications/PrayerTimesSetup";
+import { CALCULATION_METHOD_LABEL_KEYS, PrayerTimesSetup } from "@/components/notifications/PrayerTimesSetup";
 import { applyPreset, DEFAULT_HIFZ_PLAN, PRAYERS, type Anchor, type HifzPlan, type PlanPreset, type Prayer } from "@/lib/hifz/plan";
 import { formatMinutes, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import { readPrayerLocation } from "@/lib/prayer/settings";
+import type { PrayerLocation } from "@/lib/prayer/times";
 
 type Goal = "memorize" | "keep" | "both";
 type Step = "goal" | "memorized" | "tracks" | "pace" | "when";
@@ -108,6 +110,8 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prayerTimesOpen, setPrayerTimesOpen] = useState(false);
+  const [prayerLocation, setPrayerLocation] = useState<PrayerLocation | null>(null);
   const step = STEPS[stepIndex];
   // What the current step showed when it opened, so "Not now" can leave it untouched.
   const stepEntry = useRef<StepEntry | null>(null);
@@ -121,6 +125,20 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
       .then(setSurahs)
       .catch((loadError) => console.warn("[HifzSetup] Surahs failed to load:", loadError));
   }, [db]);
+
+  // The optional prayer-times row says whether a location is already saved on this device.
+  useEffect(() => {
+    if (step !== "when") return;
+    let active = true;
+    readPrayerLocation(db)
+      .then((saved) => {
+        if (active) setPrayerLocation(saved);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [db, step]);
 
   const back = useCallback(() => {
     if (stepIndex === 0) {
@@ -320,10 +338,35 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                 );
               })}
             </MirroredRow>
-            {/* 5.1 step 7: a prayer anchor needs prayer times; without them it falls back to set clock times. */}
+            {/* 5.1 step 7: a prayer anchor needs prayer times; without them it falls back to set clock times.
+                The setup stays one optional row until asked for, so the anchor choice and Save lead the step. */}
             {plan.anchor.kind === "prayer" ? (
-              <Card elevation="low" className="mt-2 px-4 py-4">
-                <PrayerTimesSetup />
+              <Card elevation="low" className="mt-2 px-4 py-3">
+                <MirroredRow dir={dir} className="min-h-[44px] items-center gap-3">
+                  <View className="min-w-0 flex-1">
+                    <Text dir={dir} variant="title-sm">
+                      {s.notifPrayerTimesOptional}
+                    </Text>
+                    <Text dir={dir} variant="caption">
+                      {prayerLocation ? s[CALCULATION_METHOD_LABEL_KEYS[prayerLocation.method]] : s.notifPrayerTimesNotSet}
+                    </Text>
+                  </View>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    dir={dir}
+                    className="h-11 border border-warm-300 dark:border-neutral-700"
+                    accessibilityState={{ expanded: prayerTimesOpen }}
+                    accessibilityLabel={`${s.notifPrayerTimesTitle}: ${prayerTimesOpen ? s.notifHide : prayerLocation ? s.notifChange : s.notifSetUp}`}
+                    label={prayerTimesOpen ? s.notifHide : prayerLocation ? s.notifChange : s.notifSetUp}
+                    onPress={() => setPrayerTimesOpen((open) => !open)}
+                  />
+                </MirroredRow>
+                {prayerTimesOpen ? (
+                  <View className="mt-3">
+                    <PrayerTimesSetup onChange={setPrayerLocation} onDone={() => setPrayerTimesOpen(false)} />
+                  </View>
+                ) : null}
               </Card>
             ) : null}
           </View>

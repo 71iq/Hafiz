@@ -109,6 +109,9 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
   const tomorrowTier = streak.doneToday && isEveOfStreakTier(streak.length);
   // With no goal, grace or tier line, the break link sits under the message instead of alone in a row.
   const hasFooterNotes = goal !== null || overview.graceHeld > 0 || tomorrowTier;
+  // The link keeps a 44 pt target, which centers its text with about 13 px above and below. When it
+  // ends the card, the card's own bottom padding shrinks so the space under it matches the space above.
+  const breakLinkIsLast = hasFooterNotes || (headline.kind !== "earn_back" && !showMinimum && !showGraceNote);
   const breakLink = (
     <Pressable onPress={onOpenBreak} accessibilityRole="button" className="min-h-[44px] justify-center">
       <Text dir={dir} className="text-primary-muted dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
@@ -119,7 +122,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
 
   return (
     <View
-      className="mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
+      className={`mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 pt-3 ${breakLinkIsLast ? "pb-0.5" : "pb-3"}`}
       accessibilityRole="summary"
       accessibilityLabel={`${s.habitStreakLabel}: ${formatDays(streak.length, language)}. ${headlineMessage(overview, language, s)}`}
     >
@@ -187,7 +190,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
       ) : null}
 
       {hasFooterNotes ? (
-      <MirroredRow dir={dir} className="mt-2 items-center justify-between gap-3">
+      <MirroredRow dir={dir} className="mt-1 items-center justify-between gap-3">
         <MirroredRow dir={dir} className="flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           {goal ? (
             <Text dir={dir} variant="caption" className={CAPTION_CLASS} style={CAPTION_STYLE}>
@@ -206,7 +209,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
           ) : null}
           {tomorrowTier ? (
             <Text dir={dir} variant="caption" className={CAPTION_CLASS} style={CAPTION_STYLE}>
-              {interpolate(s.habitTomorrowTier, { n: formatNumber(streak.length + 1, language) })}
+              {interpolate(s.habitTomorrowTier, { days: formatDays(streak.length + 1, language) })}
             </Text>
           ) : null}
         </MirroredRow>

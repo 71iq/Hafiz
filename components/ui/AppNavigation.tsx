@@ -32,9 +32,11 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const ACTIVE_BG = "#1B4D4F";
 const ACTIVE_TEXT = "#FDDC91";
-const INACTIVE_OPACITY = 0.5;
 const INACTIVE_LIGHT = "rgba(45, 45, 45, 0.5)";
 const INACTIVE_DARK = "rgba(232, 225, 218, 0.5)";
+/** Bottom tab labels are 10 px, so inactive ones use solid colors that stay readable on the bar. */
+const INACTIVE_TAB_LIGHT = "#6b7280";
+const INACTIVE_TAB_DARK = "#a3a3a3";
 const PANEL_WIDTH = 248;
 const SIDEBAR_PRIMARY_ROUTES = [
   "home",
@@ -97,7 +99,7 @@ function BottomTabItem({
 
   const { options } = descriptor;
   const label = options.title ?? route.name;
-  const iconColor = isFocused ? ACTIVE_TEXT : isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
+  const iconColor = isFocused ? ACTIVE_TEXT : isDark ? INACTIVE_TAB_DARK : INACTIVE_TAB_LIGHT;
 
   return (
     <AnimatedPressable
@@ -117,7 +119,6 @@ function BottomTabItem({
         animatedStyle,
         styles.bottomTabItem,
         isFocused && styles.bottomTabItemActive,
-        !isFocused && { opacity: INACTIVE_OPACITY },
       ]}
     >
       {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
@@ -645,8 +646,8 @@ const styles = StyleSheet.create({
   },
   bottomLabel: {
     fontFamily: "Manrope_500Medium",
-    fontSize: 9,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 12,
     letterSpacing: 0,
     marginTop: 2,
   },

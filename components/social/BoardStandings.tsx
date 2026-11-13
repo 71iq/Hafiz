@@ -1,5 +1,5 @@
 import { Pressable, View } from "react-native";
-import { Flame, LogOut, Users } from "lucide-react-native";
+import { CalendarCheck2, LogOut, Users } from "lucide-react-native";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Card } from "@/components/ui/Card";
 import { Text } from "@/components/ui/Text";
@@ -115,7 +115,7 @@ function StandingRow({ standing, language, s }: { standing: BoardStanding; langu
           {standing.isMe ? ` · ${s.boardYou}` : ""}
         </Text>
         <View className="items-center gap-1" style={socialRowStyle(isRTL)}>
-          <Flame size={12} color={accent} />
+          <CalendarCheck2 size={12} color={accent} />
           <Text variant="caption">{formatDays(standing.streak, language)}</Text>
         </View>
       </View>

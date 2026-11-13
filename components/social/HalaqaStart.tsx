@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { View } from "react-native";
-import { KeyRound, Plus, Users } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, KeyRound, Plus, Users, type LucideIcon } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { DisclosureRow } from "@/components/ui/MirroredRow";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Text } from "@/components/ui/Text";
 import { HALAQA_NAME_MAX, INVITE_CODE_PATTERN, normalizeInviteCode } from "@/lib/halaqa/api";
@@ -12,6 +13,28 @@ import { useSettings } from "@/lib/settings/context";
 import { SocialErrorText, SocialToggleRow, socialRowStyle, useSocialAccent } from "./SocialControls";
 
 type FormMode = "create" | "join" | null;
+
+/** One plain row of the compact card: icon, label and a chevron, a full-width 48 pt target. */
+function CompactAction({ icon: Icon, label, disabled, onPress }: { icon: LucideIcon; label: string; disabled: boolean; onPress: () => void }) {
+  const { isRTL } = useSettings();
+  const { accent, muted } = useSocialAccent();
+  const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
+  return (
+    <DisclosureRow
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className="min-h-12"
+      style={{ opacity: disabled ? 0.5 : 1 }}
+      leading={<Icon size={18} color={accent} />}
+      trailing={<DisclosureChevron size={18} color={muted} />}
+    >
+      <Text variant="title-sm">{label}</Text>
+    </DisclosureRow>
+  );
+}
 
 /**
  * Ways into a halaqa (SOC-02, SOC-04): create an invite halaqa, join one by code, or join a matched
@@ -71,7 +94,7 @@ export function HalaqaStart({
 
   return (
     <>
-      <Card elevation="low" className={compact ? "gap-3 p-5" : "items-stretch gap-4 p-6"}>
+      <Card elevation="low" className={compact ? "gap-1 px-5 py-4" : "items-stretch gap-4 p-6"}>
         {compact ? (
           <Text variant="title-sm">{s.halaqaAddAnother}</Text>
         ) : (
@@ -87,25 +110,35 @@ export function HalaqaStart({
             </Text>
           </View>
         )}
-        <View className="gap-3">
-          <Button label={s.halaqaJoinMatched} onPress={onJoinMatched} disabled={pending} />
-          {!compact ? <Text variant="caption" align="center">{s.halaqaMatchedNote}</Text> : null}
-          <View className="gap-3" style={compact ? socialRowStyle(isRTL) : undefined}>
-            <Button variant="outline" className="flex-1 border border-warm-300 dark:border-neutral-700" onPress={() => open("join")} disabled={pending}>
+        {compact ? (
+          // Under a joined halaqa these are secondary: plain stacked rows, no filled button.
+          <View>
+            <CompactAction icon={Users} label={s.halaqaJoinMatched} disabled={pending} onPress={onJoinMatched} />
+            <CompactAction icon={KeyRound} label={s.halaqaJoinCode} disabled={pending} onPress={() => open("join")} />
+            <CompactAction icon={Plus} label={s.halaqaCreate} disabled={pending} onPress={() => open("create")} />
+            {mode === null ? <SocialErrorText message={error} /> : null}
+          </View>
+        ) : (
+          <View className="gap-3">
+            <Button label={s.halaqaJoinMatched} onPress={onJoinMatched} disabled={pending} />
+            <Text variant="caption" align="center">
+              {s.halaqaMatchedNote}
+            </Text>
+            <Button variant="outline" className="border border-warm-300 dark:border-neutral-700" onPress={() => open("join")} disabled={pending}>
               <View className="items-center gap-2" style={socialRowStyle(isRTL)}>
                 <KeyRound size={16} color={accent} />
                 <Text variant="title-sm">{s.halaqaJoinCode}</Text>
               </View>
             </Button>
-            <Button variant="outline" className="flex-1 border border-warm-300 dark:border-neutral-700" onPress={() => open("create")} disabled={pending}>
+            <Button variant="outline" className="border border-warm-300 dark:border-neutral-700" onPress={() => open("create")} disabled={pending}>
               <View className="items-center gap-2" style={socialRowStyle(isRTL)}>
                 <Plus size={16} color={accent} />
                 <Text variant="title-sm">{s.halaqaCreate}</Text>
               </View>
             </Button>
+            {mode === null ? <SocialErrorText message={error} /> : null}
           </View>
-          {mode === null ? <SocialErrorText message={error} /> : null}
-        </View>
+        )}
       </Card>
 
       <ResponsiveSheet open={mode !== null} onClose={close} dismissOnBackdrop={!pending} maxWidth={520} avoidKeyboard>

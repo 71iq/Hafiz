@@ -1,5 +1,5 @@
 import { Pressable, View } from "react-native";
-import { ClipboardList, Flame, HandHeart, LogOut, Settings2, Share2, BookCheck } from "lucide-react-native";
+import { BookCheck, CalendarCheck2, ClipboardList, Eye, HandHeart, LogOut, Share2 } from "lucide-react-native";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -44,26 +44,29 @@ export function HalaqaGroup({
   return (
     <View className="gap-4">
       <Card elevation="low" className="gap-4 p-5">
-        <View className="items-start gap-3" style={socialRowStyle(isRTL)}>
-          <View className="min-w-0 flex-1 gap-1">
-            <Text variant="display-sm" accessibilityRole="header">
-              {title}
-            </Text>
-            <Text variant="caption">
-              {interpolate(s.halaqaMemberCount, { n: socialNumber(group.memberCount, language) })}
-              {group.role === "teacher" ? ` · ${s.halaqaTeacherBadge}` : ""}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={s.halaqaSharingA11y}
-            onPress={onOpenSharing}
-            hitSlop={4}
-            className="h-11 w-11 items-center justify-center rounded-full bg-surface-mid dark:bg-surface-dark-mid"
-          >
-            <Settings2 size={20} color={accent} />
-          </Pressable>
+        <View className="gap-1">
+          <Text variant="display-sm" accessibilityRole="header">
+            {title}
+          </Text>
+          <Text variant="caption">
+            {interpolate(s.halaqaMemberCount, { n: socialNumber(group.memberCount, language) })}
+            {group.role === "teacher" ? ` · ${s.halaqaTeacherBadge}` : ""}
+          </Text>
         </View>
+
+        {/* ETH-06, ETH-07: what is shared is named in words, one tap from the group. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={s.halaqaSharingA11y}
+          onPress={onOpenSharing}
+          className="-my-1 min-h-11 items-center gap-2 self-start"
+          style={socialRowStyle(isRTL)}
+        >
+          <Eye size={16} color={accent} />
+          <Text variant="label-lg" className="text-primary-accent dark:text-primary-bright">
+            {s.halaqaSharingTitle}
+          </Text>
+        </Pressable>
 
         {group.inviteCode ? (
           <View className="items-center gap-3" style={socialRowStyle(isRTL)}>
@@ -71,7 +74,8 @@ export function HalaqaGroup({
               <Text variant="label-md" className="text-warm-500 dark:text-neutral-400">
                 {s.halaqaInviteCode}
               </Text>
-              <Text variant="title-lg" selectable dir="ltr" style={{ letterSpacing: 2 }}>
+              {/* The code reads left to right in both languages and sits at the interface's start edge. */}
+              <Text variant="title-lg" selectable dir="ltr" align={isRTL ? "end" : "start"} style={{ letterSpacing: 2 }}>
                 {group.inviteCode}
               </Text>
             </View>
@@ -230,7 +234,7 @@ function MemberRow({
           {member.week ? <WeekDots week={member.week} s={s} language={language} /> : null}
           {member.streak !== null ? (
             <View className="items-center gap-1" style={socialRowStyle(isRTL)}>
-              <Flame size={14} color={accent} />
+              <CalendarCheck2 size={14} color={accent} />
               <Text variant="label-md">{interpolate(s.halaqaStreak, { days: formatDays(member.streak, language) })}</Text>
             </View>
           ) : null}

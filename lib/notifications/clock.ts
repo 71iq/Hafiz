@@ -27,9 +27,25 @@ export const deviceClock: DayClock = {
   },
 };
 
-/** "05:20" style 24-hour time for a minute of the day. */
+/** "05:20" style 24-hour time for a minute of the day. For stored values and logs; screens use formatClockMinutesForDisplay. */
 export function formatClockMinutes(minutes: number): string {
   const normalized = ((minutes % 1440) + 1440) % 1440;
   const hours = Math.floor(normalized / 60);
   return `${String(hours).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
+}
+
+const displayFormatters = new Map<"en" | "ar", Intl.DateTimeFormat>();
+
+/**
+ * A minute of the day as the interface language writes a time: "11:15 PM" in English, and the Arabic
+ * form with Arabic-Indic digits in Arabic, matching the other dates and times on screen.
+ */
+export function formatClockMinutesForDisplay(minutes: number, language: "en" | "ar"): string {
+  const normalized = ((minutes % 1440) + 1440) % 1440;
+  let formatter = displayFormatters.get(language);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(language === "ar" ? "ar-u-nu-arab" : "en", { hour: "numeric", minute: "2-digit" });
+    displayFormatters.set(language, formatter);
+  }
+  return formatter.format(new Date(2000, 0, 1, Math.floor(normalized / 60), normalized % 60));
 }

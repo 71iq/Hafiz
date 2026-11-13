@@ -384,7 +384,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/notifications/PrayerTimesSetup.tsx",
     "form-field",
     "source",
-    "Coordinate fields, method list and prayer-time rows mirror; digits localize in Arabic.",
+    "Coordinate fields, method list and prayer-time rows mirror through MirroredRow; times and digits localize in Arabic.",
   ),
   entry(
     "components/notifications/ReminderPromptCard.tsx",
@@ -396,13 +396,13 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/notifications/ReminderSettingsSection.tsx",
     "card",
     "source",
-    "Switch rows, steppers and toggle groups mirror; the prayer-times sheet uses ResponsiveOverlay.",
+    "Switch rows and the prayer-times row mirror through MirroredRow; the time stepper keeps minus left and plus right in both directions.",
   ),
   entry(
     "components/notifications/WirdReminderBanner.tsx",
     "feedback",
     "source",
-    "Banner text and the dismiss button mirror; action buttons wrap in reading order.",
+    "Banner text and the dismiss button mirror through MirroredRow; action buttons wrap in reading order.",
   ),
   entry(
     "components/profile/ProfileAvatar.tsx",
@@ -541,7 +541,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/social/HalaqaStart.tsx",
     "card",
     "rntl",
-    "Empty-state actions and the create or join sheet mirror; the invite code input stays LTR.",
+    "Empty-state actions, the compact disclosure rows and the create or join sheet mirror; the invite code input stays LTR.",
   ),
   entry(
     "components/social/SocialControls.tsx",
@@ -556,10 +556,16 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Halaqa and Board tab shell; title and subtitle align to the reading side.",
   ),
   entry(
+    "components/social/SocialSkeletons.tsx",
+    "feedback",
+    "source",
+    "Loading rows for halaqa members, board standings and the teacher view; rows use the explicit mirrored row style.",
+  ),
+  entry(
     "components/social/TeacherViewSheet.tsx",
     "overlay",
     "source",
-    "Teacher view sheet; stage and grade rows mirror while card ids stay LTR.",
+    "Teacher view sheet; stage and grade rows mirror and cards read as pages or ayahs in the interface digits.",
   ),
   entry(
     "components/ui/AppNavigation.tsx",

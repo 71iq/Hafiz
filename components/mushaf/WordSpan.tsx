@@ -1,9 +1,10 @@
 import { Fragment, memo, useCallback, useRef, type ReactNode } from "react";
 import { Text, type GestureResponderEvent, type StyleProp, type TextStyle } from "react-native";
+import { useSettings } from "@/lib/settings/context";
 import { useWordInteraction } from "@/lib/word/context";
 import { useChromeActions } from "@/lib/ui/chrome";
 import { useWordTap } from "./useWordTap";
-import { WEAK_SPOT_LIGHT } from "./WordToken";
+import { WEAK_SPOT_DARK, WEAK_SPOT_LIGHT } from "./WordToken";
 
 type Props = {
   glyph: string;
@@ -14,7 +15,7 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   highlightColor?: string;
-  /** ERR-06: nested text cannot hold a dot, so a weak spot is underlined (dotted where supported). */
+  /** ERR-06: nested text cannot hold a separate mark, so a weak spot is a solid underline. */
   weakSpot?: boolean;
   onPressIn?: (wordPos: number) => void;
 };
@@ -37,6 +38,7 @@ function WordSpanInner({
   onPressIn,
 }: Props) {
   const { isTooltipSelected, press, longPress } = useWordTap({ surah, ayah, wordPos, v2Page });
+  const { isDark } = useSettings();
 
   const handlePress = useCallback(
     (event: GestureResponderEvent) => {
@@ -67,8 +69,8 @@ function WordSpanInner({
               ...(backgroundColor && { backgroundColor }),
               ...(weakSpot && {
                 textDecorationLine: "underline" as const,
-                textDecorationStyle: "dotted" as const,
-                textDecorationColor: WEAK_SPOT_LIGHT,
+                textDecorationStyle: "solid" as const,
+                textDecorationColor: isDark ? WEAK_SPOT_DARK : WEAK_SPOT_LIGHT,
               }),
             }
           : undefined

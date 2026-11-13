@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppState, Pressable, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import { useDatabase } from "@/lib/database/provider";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
@@ -30,9 +31,8 @@ export type WirdReminderBannerProps = {
 export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
   const db = useDatabase();
   const s = useStrings();
-  const { isRTL, isDark, uiLanguage } = useSettings();
+  const { isDark, uiLanguage } = useSettings();
   const [banner, setBanner] = useState<ReminderBanner | null>(null);
-  const row = isRTL ? "row-reverse" : "row";
 
   const refresh = useCallback(() => {
     loadReminderBanner(db, { language: uiLanguage })
@@ -67,11 +67,11 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
     return (
       <Card elevation="mid" className="p-4 gap-3" accessibilityRole="alert">
         <Text variant="body">{s.notifRamadanOffer}</Text>
-        <View style={{ flexDirection: row, flexWrap: "wrap", gap: 8 }}>
+        <MirroredRow className="flex-wrap gap-2">
           <Button size="sm" className="h-11" onPress={() => choose("after_taraweeh")} label={s.notifRamadanAfterTaraweeh} />
           <Button size="sm" className="h-11" onPress={() => choose("before_suhoor")} label={s.notifRamadanBeforeSuhoor} />
           <Button size="sm" variant="ghost" className="h-11" onPress={() => choose(null)} label={s.notifRamadanKeep} />
-        </View>
+        </MirroredRow>
       </Card>
     );
   }
@@ -84,7 +84,7 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
 
   return (
     <Card elevation="mid" className="p-4" accessibilityRole="alert" accessibilityLabel={`${s.notifBannerLabel}: ${banner.title}`}>
-      <View style={{ flexDirection: row, alignItems: "flex-start", gap: 8 }}>
+      <MirroredRow className="items-start gap-2">
         <View style={{ flex: 1, gap: 4 }}>
           <Text variant="title-md">{banner.title}</Text>
           <Text variant="body-sm">{banner.body}</Text>
@@ -98,11 +98,11 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
         >
           <X size={18} color={isDark ? "#E5E5E5" : "#3F3F46"} />
         </Pressable>
-      </View>
+      </MirroredRow>
       {banner.route !== "home" || onStart ? (
-        <View style={{ flexDirection: row, marginTop: 8 }}>
+        <MirroredRow className="mt-2">
           <Button size="sm" className="h-11" onPress={start} label={s.notifBannerStart} />
-        </View>
+        </MirroredRow>
       ) : null}
     </Card>
   );

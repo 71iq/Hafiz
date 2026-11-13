@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Platform, Pressable, RefreshControl, Share, View } from "react-native";
+import { Platform, Pressable, RefreshControl, Share, View } from "react-native";
 import { router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import { HalaqaSharingSheet, type ProfileVisibility } from "@/components/social/
 import { HalaqaStart } from "@/components/social/HalaqaStart";
 import { SocialGate, SocialNotice, socialRowStyle } from "@/components/social/SocialControls";
 import { SocialScreen } from "@/components/social/SocialScreen";
+import { HalaqaSkeleton } from "@/components/social/SocialSkeletons";
 import { TeacherViewSheet } from "@/components/social/TeacherViewSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Text } from "@/components/ui/Text";
@@ -54,7 +55,7 @@ export default function HalaqaScreen() {
   if (!isSupabaseConfigured()) {
     return (
       <SocialScreen title={s.halaqaTitle} subtitle={s.halaqaSubtitle}>
-        <SocialGate icon={Users} title={s.halaqaTitle} body={s.socialUnconfigured} />
+        <SocialGate icon={Users} title={s.socialUnavailableTitle} body={s.socialUnconfigured} />
       </SocialScreen>
     );
   }
@@ -253,11 +254,11 @@ function HalaqaContent({ userId }: { userId: string }) {
                 onPress={() => setSelectedId(group.id)}
                 className={
                   selected
-                    ? "min-h-11 justify-center rounded-full bg-primary-accent px-4 dark:bg-primary-bright/80"
+                    ? "min-h-11 justify-center rounded-full bg-primary-accent/15 px-4 dark:bg-primary-bright/15"
                     : "min-h-11 justify-center rounded-full bg-surface-mid px-4 dark:bg-surface-dark-mid"
                 }
               >
-                <Text variant="title-sm" className={selected ? "text-white dark:text-neutral-900" : undefined}>
+                <Text variant="title-sm" className={selected ? "text-primary-muted dark:text-primary-bright" : undefined}>
                   {name}
                 </Text>
               </Pressable>
@@ -267,7 +268,7 @@ function HalaqaContent({ userId }: { userId: string }) {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator color={isDark ? "#2dd4bf" : "#0d9488"} accessibilityLabel={s.halaqaTitle} />
+        <HalaqaSkeleton label={s.loading} />
       ) : loadError && !mine.data ? (
         <SocialNotice
           icon={offline ? CloudOff : undefined}

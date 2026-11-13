@@ -4,6 +4,7 @@ import { AppState, Platform, Pressable, View } from "react-native";
 import { PrayerTimesSetup, CALCULATION_METHOD_LABEL_KEYS } from "@/components/notifications/PrayerTimesSetup";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { MirroredRow } from "@/components/ui/MirroredRow";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Switch } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
@@ -13,7 +14,7 @@ import { addDays } from "@/lib/habit/dates";
 import type { UIStringKey } from "@/lib/i18n/strings";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { exportWirdCalendar } from "@/lib/notifications/calendar";
-import { deviceClock, formatClockMinutes } from "@/lib/notifications/clock";
+import { deviceClock, formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import {
   getNotificationPermission,
   openNotificationSystemSettings,
@@ -55,6 +56,8 @@ const CLOCK_STEP = 15;
 /** "Morning" in the plan anchor list (3.3). */
 const DEFAULT_CLOCK_MINUTES = 6 * 60;
 type RamadanChoice = RamadanAnchor | "usual";
+/** Outline buttons need a visible edge; the shared outline variant is transparent only. */
+const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
 type SwitchRowProps = {
   label: string;
@@ -62,11 +65,10 @@ type SwitchRowProps = {
   value: boolean;
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
-  isRTL: boolean;
 };
 
 /** The whole row is the 44 pt target and the accessible switch; the visual switch is decorative. */
-function SwitchRow({ label, hint, value, onValueChange, disabled, isRTL }: SwitchRowProps) {
+function SwitchRow({ label, hint, value, onValueChange, disabled }: SwitchRowProps) {
   return (
     <Pressable
       onPress={() => !disabled && onValueChange(!value)}
@@ -74,15 +76,17 @@ function SwitchRow({ label, hint, value, onValueChange, disabled, isRTL }: Switc
       accessibilityLabel={label}
       accessibilityHint={hint}
       accessibilityState={{ checked: value, disabled }}
-      style={{ minHeight: 44, flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 12, paddingVertical: 6 }}
+      style={{ minHeight: 44, justifyContent: "center", paddingVertical: 6 }}
     >
-      <View style={{ flex: 1 }}>
-        <Text variant="title-md">{label}</Text>
-        {hint ? <Text variant="caption">{hint}</Text> : null}
-      </View>
-      <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-        <Switch value={value} onValueChange={onValueChange} disabled={disabled} />
-      </View>
+      <MirroredRow className="items-center gap-3">
+        <View style={{ flex: 1 }}>
+          <Text variant="title-md">{label}</Text>
+          {hint ? <Text variant="caption">{hint}</Text> : null}
+        </View>
+        <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          <Switch value={value} onValueChange={onValueChange} disabled={disabled} />
+        </View>
+      </MirroredRow>
     </Pressable>
   );
 }
@@ -95,17 +99,17 @@ type StepperProps = {
   onIncrease: () => void;
   canDecrease: boolean;
   canIncrease: boolean;
-  isRTL: boolean;
   iconColor: string;
 };
 
-function Stepper({ value, decreaseLabel, increaseLabel, onDecrease, onIncrease, canDecrease, canIncrease, isRTL, iconColor }: StepperProps) {
+/** Minus stays on the left and plus on the right in both languages, like a number line. */
+function Stepper({ value, decreaseLabel, increaseLabel, onDecrease, onIncrease, canDecrease, canIncrease, iconColor }: StepperProps) {
   return (
-    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 12 }}>
+    <View style={{ direction: "ltr", flexDirection: "row", alignItems: "center", gap: 12 }}>
       <Button
         variant="outline"
         size="icon"
-        className="h-11 w-11"
+        className={`h-11 w-11 ${OUTLINE_BORDER}`}
         onPress={onDecrease}
         disabled={!canDecrease}
         accessibilityLabel={decreaseLabel}
@@ -118,7 +122,7 @@ function Stepper({ value, decreaseLabel, increaseLabel, onDecrease, onIncrease, 
       <Button
         variant="outline"
         size="icon"
-        className="h-11 w-11"
+        className={`h-11 w-11 ${OUTLINE_BORDER}`}
         onPress={onIncrease}
         disabled={!canIncrease}
         accessibilityLabel={increaseLabel}
@@ -147,7 +151,6 @@ export function ReminderSettingsSection() {
   const [error, setError] = useState<string | null>(null);
   const isWeb = Platform.OS === "web";
   const iconColor = isDark ? "#E5E5E5" : "#3F3F46";
-  const row = isRTL ? "row-reverse" : "row";
 
   const refresh = useCallback(async () => {
     const [nextPrefs, nextPermission, nextLocation, nextPreview] = await Promise.all([
@@ -210,7 +213,7 @@ export function ReminderSettingsSection() {
 
   const whenText = (() => {
     if (!preview?.next) return null;
-    const time = localizeDigits(formatClockMinutes(deviceClock.minutesOf(preview.next.at)), uiLanguage);
+    const time = formatClockMinutesForDisplay(deviceClock.minutesOf(preview.next.at), uiLanguage);
     if (preview.next.localDate === today) return interpolate(s.notifWhenToday, { time });
     if (preview.next.localDate === addDays(today, 1)) return interpolate(s.notifWhenTomorrow, { time });
     const date = new Intl.DateTimeFormat(uiLanguage, { weekday: "long" }).format(preview.next.at);
@@ -225,13 +228,13 @@ export function ReminderSettingsSection() {
           hint={s.notifMasterHint}
           value={prefs.enabled}
           onValueChange={(value) => void update({ kind: "enabled", value })}
-          isRTL={isRTL}
         />
         {nativeBlocked && prefs.enabled && (
           <View className="gap-2">
             <Text variant="body-sm">{s.notifPermissionOff}</Text>
             <Button
               variant="outline"
+              className={OUTLINE_BORDER}
               onPress={() => void allowNotifications()}
               label={permission?.canAskAgain ? s.notifAllowButton : s.notifOpenSystemSettings}
             />
@@ -277,20 +280,18 @@ export function ReminderSettingsSection() {
                 onIncrease={() =>
                   setAnchor({ ...anchor, offsetMinutes: Math.min(MAX_PRAYER_OFFSET_MINUTES, anchor.offsetMinutes + OFFSET_STEP) })
                 }
-                isRTL={isRTL}
                 iconColor={iconColor}
               />
             </>
           ) : (
             <Stepper
-              value={interpolate(s.notifClockValue, { time: localizeDigits(formatClockMinutes(anchor.minutes), uiLanguage) })}
+              value={interpolate(s.notifClockValue, { time: formatClockMinutesForDisplay(anchor.minutes, uiLanguage) })}
               decreaseLabel={s.notifClockEarlier}
               increaseLabel={s.notifClockLater}
               canDecrease
               canIncrease
               onDecrease={() => setAnchor({ kind: "clock", minutes: (anchor.minutes - CLOCK_STEP + 1440) % 1440 })}
               onIncrease={() => setAnchor({ kind: "clock", minutes: (anchor.minutes + CLOCK_STEP) % 1440 })}
-              isRTL={isRTL}
               iconColor={iconColor}
             />
           )}
@@ -312,7 +313,7 @@ export function ReminderSettingsSection() {
             </View>
           )}
 
-          <View style={{ flexDirection: row, alignItems: "center", gap: 12, minHeight: 44 }}>
+          <MirroredRow className="items-center gap-3" style={{ minHeight: 44 }}>
             <View style={{ flex: 1 }}>
               <Text variant="title-sm">{s.notifPrayerTimesTitle}</Text>
               <Text variant="caption">
@@ -322,11 +323,11 @@ export function ReminderSettingsSection() {
             <Button
               variant="outline"
               size="sm"
-              className="h-11"
+              className={`h-11 ${OUTLINE_BORDER}`}
               onPress={() => setPrayerSheetOpen(true)}
               label={location ? s.notifPrayerTimesEdit : s.notifPrayerTimesSetup}
             />
-          </View>
+          </MirroredRow>
         </Card>
       )}
 
@@ -345,7 +346,6 @@ export function ReminderSettingsSection() {
                 hint={s[hintKey]}
                 value={prefs.types[type]}
                 onValueChange={(value) => void update({ kind: "type", type, value })}
-                isRTL={isRTL}
               />
             );
           })}
@@ -355,13 +355,12 @@ export function ReminderSettingsSection() {
               hint={s.notifBadgeHint}
               value={prefs.badge}
               onValueChange={(value) => void update({ kind: "badge", value })}
-              isRTL={isRTL}
             />
           )}
         </Card>
       )}
 
-      <Button variant="outline" onPress={() => void addToCalendar()} label={s.notifCalendarButton} />
+      <Button variant="outline" className={OUTLINE_BORDER} onPress={() => void addToCalendar()} label={s.notifCalendarButton} />
       {error && (
         <Text variant="body-sm" accessibilityLiveRegion="polite" className="text-red-600 dark:text-red-400">
           {error}

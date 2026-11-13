@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, RefreshControl } from "react-native";
+import { RefreshControl } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CloudOff, Trophy } from "lucide-react-native";
@@ -7,6 +7,7 @@ import { BoardJoin } from "@/components/social/BoardJoin";
 import { BoardStandings } from "@/components/social/BoardStandings";
 import { SocialGate, SocialNotice } from "@/components/social/SocialControls";
 import { SocialScreen } from "@/components/social/SocialScreen";
+import { StandingsSkeleton } from "@/components/social/SocialSkeletons";
 import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys, boardRead, joinBoard, leaveBoard } from "@/lib/board/api";
 import { useDatabase } from "@/lib/database/provider";
@@ -34,7 +35,7 @@ export default function BoardScreen() {
   if (!isSupabaseConfigured()) {
     return (
       <SocialScreen title={s.boardTitle} subtitle={s.boardSubtitle}>
-        <SocialGate icon={Trophy} title={s.boardTitle} body={s.socialUnconfigured} />
+        <SocialGate icon={Trophy} title={s.socialUnavailableTitle} body={s.socialUnconfigured} />
       </SocialScreen>
     );
   }
@@ -57,7 +58,7 @@ export default function BoardScreen() {
 function BoardContent({ userId }: { userId: string }) {
   const s = useStrings();
   const db = useDatabase();
-  const { isDark, uiLanguage } = useSettings();
+  const { uiLanguage } = useSettings();
   const language = uiLanguage === "ar" ? "ar" : "en";
   const queryClient = useQueryClient();
   const offline = useIsOffline();
@@ -125,7 +126,7 @@ function BoardContent({ userId }: { userId: string }) {
       {leaveError ? <SocialNotice message={leaveError} actionLabel={s.socialDismiss} onAction={() => setLeaveError(null)} /> : null}
 
       {loading ? (
-        <ActivityIndicator color={isDark ? "#2dd4bf" : "#0d9488"} accessibilityLabel={s.boardTitle} />
+        <StandingsSkeleton label={s.loading} />
       ) : !view ? (
         <SocialNotice
           icon={offline ? CloudOff : undefined}

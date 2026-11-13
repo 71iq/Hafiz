@@ -16,8 +16,6 @@ export function useSocialAccent() {
   return {
     accent: isDark ? "#2dd4bf" : "#0d9488",
     muted: isDark ? "#a3a3a3" : "#8B8178",
-    onAccent: "#FDDC91",
-    accentSurface: isDark ? "#1B4D4F" : "#003638",
   };
 }
 
@@ -64,7 +62,7 @@ export function SocialGate({
   signInLabel?: string;
   onSignIn?: () => void;
 }) {
-  const { accent, onAccent, accentSurface } = useSocialAccent();
+  const { accent } = useSocialAccent();
   const { isRTL } = useSettings();
   return (
     <Card elevation="low" className="items-center gap-4 px-6 py-8">
@@ -78,20 +76,14 @@ export function SocialGate({
         {body}
       </Text>
       {signInLabel && onSignIn ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={signInLabel}
-          onPress={onSignIn}
-          className="min-h-11 items-center justify-center rounded-full px-6"
-          style={({ pressed }) => ({ backgroundColor: accentSurface, opacity: pressed ? 0.8 : 1 })}
-        >
+        <Button accessibilityLabel={signInLabel} onPress={onSignIn}>
           <View className="items-center gap-2" style={socialRowStyle(isRTL)}>
-            <LogIn size={16} color={onAccent} />
-            <Text variant="title-sm" style={{ color: onAccent }}>
+            <LogIn size={16} color="#ffffff" />
+            <Text variant="title-sm" className="text-white">
               {signInLabel}
             </Text>
           </View>
-        </Pressable>
+        </Button>
       ) : null}
     </Card>
   );

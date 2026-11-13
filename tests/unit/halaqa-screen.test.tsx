@@ -173,6 +173,7 @@ describe("Halaqa tab", () => {
     mockConfigured = false;
     signIn(USER);
     const screen = renderScreen();
+    expect(screen.getByText(strings.en.socialUnavailableTitle)).toBeTruthy();
     expect(screen.getByText(strings.en.socialUnconfigured)).toBeTruthy();
     expect(mockRpc).not.toHaveBeenCalled();
   });

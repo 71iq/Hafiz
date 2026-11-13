@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { View } from "react-native";
-import { Trophy } from "lucide-react-native";
+import { ChevronDown, ChevronUp, Trophy } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { DisclosureRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import { BOARD_NICKNAME_MAX, isValidBoardNickname, normalizeBoardNickname } from "@/lib/board/api";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -27,7 +28,8 @@ export function BoardJoin({
   onJoin: (choice: { nickname: string | null; isMinor: boolean }) => void;
 }) {
   const s = useStrings();
-  const { accent } = useSocialAccent();
+  const { accent, muted } = useSocialAccent();
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [useNickname, setUseNickname] = useState(initialNickname !== null || initialIsMinor);
   const [nickname, setNickname] = useState(initialNickname ?? "");
   const [isMinor, setIsMinor] = useState(initialIsMinor);
@@ -49,8 +51,19 @@ export function BoardJoin({
       <Text variant="body" className="text-warm-700 dark:text-neutral-300">
         {s.boardIntentionBody}
       </Text>
-      <Text variant="body-sm">{s.boardRules}</Text>
       <Text variant="body-sm">{s.boardIntentionPrivacy}</Text>
+      <View>
+        <DisclosureRow
+          onPress={() => setRulesOpen((open) => !open)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: rulesOpen }}
+          className="min-h-11"
+          trailing={rulesOpen ? <ChevronUp size={18} color={muted} /> : <ChevronDown size={18} color={muted} />}
+        >
+          <Text variant="title-sm">{s.boardHowPoints}</Text>
+        </DisclosureRow>
+        {rulesOpen ? <Text variant="body-sm">{s.boardRules}</Text> : null}
+      </View>
 
       <View className="gap-1">
         <SocialToggleRow

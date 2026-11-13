@@ -17,11 +17,11 @@ type Props = {
   highlightColor?: string;
   hidden?: boolean;
   compactLayout?: boolean;
-  /** ERR-06: a small dot under a word missed in 3 or more sessions. Never drawn on a hidden word. */
+  /** ERR-06: a short bar under a word missed in 3 or more sessions. Never drawn on a hidden word. */
   weakSpot?: boolean;
 };
 
-/** The weak-spot dot, in the reader's amber note color. */
+/** The weak-spot mark, in the reader's amber note color. */
 export const WEAK_SPOT_LIGHT = "#d97706";
 export const WEAK_SPOT_DARK = "#f59e0b";
 
@@ -182,14 +182,15 @@ function WordTokenInner({
         </View>
       )}
       {weakSpot && !hidden ? (
-        // A full-width row centers the dot without physical left/right offsets.
+        // A short rounded bar, half the word's width: a dot under a Quran word could read as part of
+        // the script. A full-width row centers it without physical left/right offsets.
         <View
           pointerEvents="none"
           accessible={false}
           importantForAccessibility="no-hide-descendants"
           style={{ position: "absolute", bottom: 1, width: "100%", alignItems: "center" }}
         >
-          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isDark ? WEAK_SPOT_DARK : WEAK_SPOT_LIGHT }} />
+          <View style={{ width: "50%", height: 2, borderRadius: 1, backgroundColor: isDark ? WEAK_SPOT_DARK : WEAK_SPOT_LIGHT }} />
         </View>
       ) : null}
     </Pressable>

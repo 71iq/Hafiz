@@ -8,10 +8,10 @@ import { Text } from "@/components/ui/Text";
 import type { AppDatabase } from "@/lib/database/types";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
-import { formatClockMinutes } from "@/lib/notifications/clock";
+import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { declineNotificationPrompt, requestNotificationPermission, shouldOfferNotificationPrompt } from "@/lib/notifications/permission";
 import { readReminderPrefs } from "@/lib/notifications/settings";
-import { localizeDigits, prayerLabel } from "@/lib/notifications/templates";
+import { prayerLabel } from "@/lib/notifications/templates";
 import type { ReminderAnchor } from "@/lib/notifications/types";
 
 /** Whether the session end may ask for notification permission now (ONB-02, ONB-03), with the reminder time. */
@@ -54,7 +54,7 @@ export function ReminderPromptCard({
   const reason =
     anchor.kind === "prayer"
       ? interpolate(s.notifPermissionReasonPrayer, { prayer: prayerLabel(anchor.prayer, language) })
-      : interpolate(s.notifPermissionReasonClock, { time: localizeDigits(formatClockMinutes(anchor.minutes), language) });
+      : interpolate(s.notifPermissionReasonClock, { time: formatClockMinutesForDisplay(anchor.minutes, language) });
 
   if (answered) return null;
 
@@ -75,11 +75,18 @@ export function ReminderPromptCard({
           {s.notifPromptTitle}
         </Text>
       </MirroredRow>
-      <Text dir={dir} variant="caption" className="mt-1.5" style={{ lineHeight: 18 }}>
+      <Text dir={dir} variant="body-sm" className="mt-1.5 text-warm-700 dark:text-neutral-300">
         {reason}
       </Text>
+      {/* Outline, so the session's own filled commit button stays the one primary action on screen. */}
       <View className="mt-3" style={{ gap: 6 }}>
-        <Button label={s.notifAllowButton} onPress={allow} />
+        <Button
+          variant="outline"
+          dir={dir}
+          className="border border-warm-300 dark:border-neutral-700"
+          label={s.notifAllowButton}
+          onPress={allow}
+        />
         <Pressable accessibilityRole="button" onPress={decline} className="min-h-[44px] items-center justify-center">
           <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
             {s.notifSkip}

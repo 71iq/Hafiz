@@ -11,7 +11,7 @@ import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
 import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine, ChevronDown, SlidersHorizontal, Pause, Play, Square } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
-import { useWeakSpotsLoader } from "@/lib/hifz/use-weak-spots";
+import { useWeakSpotMarker, useWeakSpotsLoader } from "@/lib/hifz/use-weak-spots";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -29,6 +29,8 @@ import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
 import { RecitationRangeSheet } from "@/components/mushaf/RecitationRangeSheet";
 import { ReadingSettingsSheet } from "@/components/mushaf/ReadingSettingsSheet";
 import { PageViewNavigationSheet, type PageViewNavigationAnchor } from "@/components/mushaf/PageViewNavigationSheet";
+import { WEAK_SPOT_DARK, WEAK_SPOT_LIGHT } from "@/components/mushaf/WordToken";
+import { textStartStyle } from "@/lib/ui/direction";
 import type { HifzVisibility } from "@/components/mushaf/MushafPage";
 import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, pageForAyah, type MushafIndex } from "@/lib/mushaf/position";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
@@ -50,6 +52,8 @@ import {
 
 type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 type HifzPageAyah = { key: string; wordCount: number };
+/** Device-only (off the sync allowlist): the reader has dismissed the weak-spot explanation. */
+const WEAK_SPOT_NOTE_KEY = "device_weak_spot_note_seen";
 
 const PAGE_RAIL_MAX_WIDTH = 760;
 // How long after a touch drag, wheel or scroll key a scroll still counts as the reader's own,
@@ -691,6 +695,40 @@ function MushafInner() {
     [currentPage, items]
   );
   const currentPageHifzAyahs = isPageMode ? pageModeHifzAyahs : verseModeHifzAyahs;
+
+  // ERR-06: the first time weak-spot markers appear on the open page, one dismissible note says what
+  // they mean. The dismissal is read only once markers show, and stays on this device.
+  const isWeakSpot = useWeakSpotMarker();
+  const weakSpotsOnPage = useMemo(
+    () =>
+      currentPageHifzAyahs.some(({ key, wordCount }) => {
+        const [surah, ayah] = key.split(":").map(Number);
+        for (let word = 1; word <= Math.max(1, wordCount); word += 1) {
+          if (isWeakSpot(surah, ayah, word)) return true;
+        }
+        return false;
+      }),
+    [currentPageHifzAyahs, isWeakSpot]
+  );
+  const [weakSpotNoteSeen, setWeakSpotNoteSeen] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!weakSpotsOnPage || weakSpotNoteSeen !== null) return;
+    let active = true;
+    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ? AND deleted_at IS NULL", [WEAK_SPOT_NOTE_KEY])
+      .then((row) => {
+        if (active) setWeakSpotNoteSeen(row?.value === "1");
+      })
+      .catch(() => {
+        if (active) setWeakSpotNoteSeen(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [db, weakSpotNoteSeen, weakSpotsOnPage]);
+  const dismissWeakSpotNote = useCallback(() => {
+    setWeakSpotNoteSeen(true);
+    writeUserSetting(db, WEAK_SPOT_NOTE_KEY, "1").catch((e) => console.warn("[Mushaf] failed to save the weak-spot note:", e));
+  }, [db]);
 
   useEffect(() => {
     if (!isPageMode) {
@@ -2088,6 +2126,64 @@ function MushafInner() {
                 className="h-10 w-10 items-center justify-center rounded-full"
               >
                 <Square size={16} color={isDark ? "#d4d4d4" : "#6e5a47"} />
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* One-time weak-spot explanation, above the page rail. */}
+        {weakSpotsOnPage && weakSpotNoteSeen === false && chromeVisible && !focusModeActive && !recitation.active && (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
+              left: 0,
+              right: 0,
+              bottom: railBottomOffset + (showBottomSlider || showHifzControls ? 68 : 8),
+              zIndex: 72,
+              alignItems: "center",
+              paddingHorizontal: isPhone ? 12 : 16,
+            }}
+          >
+            <View
+              accessibilityLiveRegion="polite"
+              style={[
+                {
+                  width: "100%",
+                  maxWidth: 520,
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center",
+                  gap: 10,
+                  borderRadius: 18,
+                  paddingVertical: 8,
+                  paddingHorizontal: 14,
+                },
+                floatingRailSurface,
+              ]}
+            >
+              <View style={{ width: 16, height: 2, borderRadius: 1, backgroundColor: isDark ? WEAK_SPOT_DARK : WEAK_SPOT_LIGHT }} />
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{
+                  flex: 1,
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 13,
+                  lineHeight: 18,
+                  ...textStartStyle(isRTL),
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {s.habitWeakSpotNote}
+              </Text>
+              <Pressable
+                onPress={dismissWeakSpotNote}
+                accessibilityRole="button"
+                className="min-h-[44px] justify-center px-2"
+              >
+                <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                  {s.habitWeakSpotNoteDismiss}
+                </Text>
               </Pressable>
             </View>
           </View>

@@ -101,19 +101,19 @@ export function GradingButtons({
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.82}
-                    className={isCapped ? "text-warm-700 dark:text-neutral-400" : undefined}
+                    className={isCapped ? "text-warm-500 dark:text-neutral-500" : undefined}
                     style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: isCapped ? undefined : "#fff" }}
                   >
                     {labels[rating]}
                   </Text>
-                  {previews[rating] ? (
+                  {/* A capped grade cannot be chosen, so it shows no next-review interval. */}
+                  {previews[rating] && !isCapped ? (
                     <Text
                       numberOfLines={1}
                       adjustsFontSizeToFit
                       minimumFontScale={0.75}
-                      className={isCapped ? "text-warm-700 dark:text-neutral-400" : undefined}
                       style={{
-                        color: isCapped ? undefined : "rgba(255,255,255,0.82)",
+                        color: "rgba(255,255,255,0.82)",
                         fontFamily: "Manrope_600SemiBold",
                         fontSize: 10,
                         marginTop: 3,

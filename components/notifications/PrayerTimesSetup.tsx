@@ -3,14 +3,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { DisclosureRow, MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { useDatabase } from "@/lib/database/provider";
 import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { deviceClock, formatClockMinutes } from "@/lib/notifications/clock";
+import { deviceClock, formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { rescheduleReminders } from "@/lib/notifications/schedule";
-import { localizeDigits, prayerLabel } from "@/lib/notifications/templates";
+import { prayerLabel } from "@/lib/notifications/templates";
 import { parseManualCoordinates, requestDeviceCoordinates, type Coordinates } from "@/lib/prayer/location";
 import { readPrayerLocation, writePrayerLocation } from "@/lib/prayer/settings";
 import {
@@ -40,6 +41,9 @@ export const CALCULATION_METHOD_LABEL_KEYS: Readonly<Record<CalculationMethodKey
   Turkey: "notifMethodTurkey",
 };
 
+/** Outline buttons and the coordinate fields need a visible edge on the light card. */
+const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
+
 type Status = { kind: "idle" } | { kind: "locating" } | { kind: "message"; text: string; tone: "info" | "error" };
 
 export type PrayerTimesSetupProps = {
@@ -58,16 +62,17 @@ export type PrayerTimesSetupProps = {
 export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupProps) {
   const db = useDatabase();
   const s = useStrings();
-  const { isRTL, isDark, uiLanguage } = useSettings();
+  const { isDark, uiLanguage } = useSettings();
   const [location, setLocation] = useState<PrayerLocation | null>(null);
   const [method, setMethod] = useState<CalculationMethodKey>(DEFAULT_CALCULATION_METHOD);
   const [madhab, setMadhab] = useState<AsrMadhab>("shafi");
   const [latitudeText, setLatitudeText] = useState("");
   const [longitudeText, setLongitudeText] = useState("");
   const [methodsOpen, setMethodsOpen] = useState(false);
+  const [coordinatesOpen, setCoordinatesOpen] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const iconColor = isDark ? "#E5E5E5" : "#3F3F46";
-  const row = isRTL ? "row-reverse" : "row";
+  const placeholderColor = isDark ? "#737373" : "#8B8178";
 
   useEffect(() => {
     let active = true;
@@ -110,6 +115,8 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
       const result = await requestDeviceCoordinates();
       if (result.kind === "ok") await saveCoordinates(result.coordinates, "device");
       else {
+        // The message asks for coordinates, so the fields open with it.
+        setCoordinatesOpen(true);
         setStatus({
           kind: "message",
           text: result.kind === "denied" ? s.notifLocationDenied : s.notifLocationUnavailable,
@@ -117,6 +124,7 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
         });
       }
     } catch {
+      setCoordinatesOpen(true);
       setStatus({ kind: "message", text: s.notifLocationUnavailable, tone: "error" });
     }
   };
@@ -151,37 +159,62 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
       <Text variant="body-sm">{s.notifPrayerTimesIntro}</Text>
 
       <Button
-        variant="secondary"
+        variant="outline"
+        className={OUTLINE_BORDER}
         onPress={useDeviceLocation}
         disabled={status.kind === "locating"}
         label={s.notifUseMyLocation}
       />
 
       <View className="gap-2">
-        <Text variant="title-sm">{s.notifManualEntry}</Text>
-        <View style={{ flexDirection: row, gap: 8 }}>
-          <View style={{ flex: 1 }}>
-            <Input
-              value={latitudeText}
-              onChangeText={setLatitudeText}
-              placeholder={s.notifLatitude}
-              accessibilityLabel={s.notifLatitude}
-              keyboardType="numbers-and-punctuation"
-              autoCorrect={false}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Input
-              value={longitudeText}
-              onChangeText={setLongitudeText}
-              placeholder={s.notifLongitude}
-              accessibilityLabel={s.notifLongitude}
-              keyboardType="numbers-and-punctuation"
-              autoCorrect={false}
-            />
-          </View>
-        </View>
-        <Button variant="outline" onPress={saveManual} label={s.notifSaveCoordinates} />
+        <DisclosureRow
+          onPress={() => setCoordinatesOpen((open) => !open)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: coordinatesOpen }}
+          style={{ minHeight: 44 }}
+          trailing={coordinatesOpen ? <ChevronUp size={18} color={iconColor} /> : <ChevronDown size={18} color={iconColor} />}
+        >
+          <Text variant="title-sm">{s.notifManualEntry}</Text>
+        </DisclosureRow>
+        {coordinatesOpen ? (
+          <>
+            <MirroredRow className="gap-2">
+              <View className="gap-1" style={{ flex: 1 }}>
+                <Text variant="label-lg" nativeID="prayer-latitude-label">
+                  {s.notifLatitude}
+                </Text>
+                <Input
+                  value={latitudeText}
+                  onChangeText={setLatitudeText}
+                  placeholder={s.notifLatitudeExample}
+                  placeholderTextColor={placeholderColor}
+                  className={OUTLINE_BORDER}
+                  accessibilityLabel={s.notifLatitude}
+                  accessibilityLabelledBy="prayer-latitude-label"
+                  keyboardType="numbers-and-punctuation"
+                  autoCorrect={false}
+                />
+              </View>
+              <View className="gap-1" style={{ flex: 1 }}>
+                <Text variant="label-lg" nativeID="prayer-longitude-label">
+                  {s.notifLongitude}
+                </Text>
+                <Input
+                  value={longitudeText}
+                  onChangeText={setLongitudeText}
+                  placeholder={s.notifLongitudeExample}
+                  placeholderTextColor={placeholderColor}
+                  className={OUTLINE_BORDER}
+                  accessibilityLabel={s.notifLongitude}
+                  accessibilityLabelledBy="prayer-longitude-label"
+                  keyboardType="numbers-and-punctuation"
+                  autoCorrect={false}
+                />
+              </View>
+            </MirroredRow>
+            <Button variant="outline" className={OUTLINE_BORDER} onPress={saveManual} label={s.notifSaveCoordinates} />
+          </>
+        ) : null}
       </View>
 
       {status.kind !== "idle" && (
@@ -202,12 +235,14 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
           accessibilityLabel={`${s.notifCalculationMethod}: ${s[CALCULATION_METHOD_LABEL_KEYS[method]]}`}
           accessibilityState={{ expanded: methodsOpen }}
           className="rounded-2xl bg-surface-high dark:bg-surface-dark-high px-4"
-          style={{ minHeight: 44, flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 8 }}
+          style={{ minHeight: 44, justifyContent: "center" }}
         >
-          <Text variant="body" style={{ flex: 1 }}>
-            {s[CALCULATION_METHOD_LABEL_KEYS[method]]}
-          </Text>
-          {methodsOpen ? <ChevronUp size={18} color={iconColor} /> : <ChevronDown size={18} color={iconColor} />}
+          <MirroredRow className="items-center justify-between gap-2">
+            <Text variant="body" style={{ flex: 1 }}>
+              {s[CALCULATION_METHOD_LABEL_KEYS[method]]}
+            </Text>
+            {methodsOpen ? <ChevronUp size={18} color={iconColor} /> : <ChevronDown size={18} color={iconColor} />}
+          </MirroredRow>
         </Pressable>
         {methodsOpen && (
           <View accessibilityRole="radiogroup" className="gap-1">
@@ -221,12 +256,14 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
                   accessibilityState={{ checked: selected }}
                   accessibilityLabel={s[CALCULATION_METHOD_LABEL_KEYS[key]]}
                   className="rounded-xl px-4"
-                  style={{ minHeight: 44, flexDirection: row, alignItems: "center", gap: 8 }}
+                  style={{ minHeight: 44, justifyContent: "center" }}
                 >
-                  <View style={{ width: 18 }}>{selected ? <Check size={18} color={iconColor} /> : null}</View>
-                  <Text variant="body" style={{ flex: 1 }}>
-                    {s[CALCULATION_METHOD_LABEL_KEYS[key]]}
-                  </Text>
+                  <MirroredRow className="items-center gap-2">
+                    <View style={{ width: 18 }}>{selected ? <Check size={18} color={iconColor} /> : null}</View>
+                    <Text variant="body" style={{ flex: 1 }}>
+                      {s[CALCULATION_METHOD_LABEL_KEYS[key]]}
+                    </Text>
+                  </MirroredRow>
                 </Pressable>
               );
             })}
@@ -250,21 +287,19 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
         <View className="gap-1" accessibilityRole="summary">
           <Text variant="title-sm">{s.notifTodayTimes}</Text>
           {PRAYERS.map((prayer) => (
-            <View key={prayer} style={{ flexDirection: row, justifyContent: "space-between" }}>
+            <MirroredRow key={prayer} className="justify-between">
               <Text variant="body-sm">{prayerLabel(prayer, uiLanguage)}</Text>
-              <Text variant="body-sm">
-                {localizeDigits(formatClockMinutes(deviceClock.minutesOf(todayTimes[prayer])), uiLanguage)}
-              </Text>
-            </View>
+              <Text variant="body-sm">{formatClockMinutesForDisplay(deviceClock.minutesOf(todayTimes[prayer]), uiLanguage)}</Text>
+            </MirroredRow>
           ))}
         </View>
       )}
 
-      <View style={{ flexDirection: row, flexWrap: "wrap", gap: 8 }}>
+      <MirroredRow className="flex-wrap gap-2">
         {location && <Button variant="ghost" onPress={() => void save(null)} label={s.notifRemoveLocation} />}
         {onSkip && !location && <Button variant="ghost" onPress={onSkip} label={s.notifSkip} />}
         {onDone && location && <Button onPress={onDone} label={s.notifDone} />}
-      </View>
+      </MirroredRow>
     </View>
   );
 }
