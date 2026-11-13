@@ -17,6 +17,7 @@ import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 import { SettingsProvider } from "@/lib/settings/context";
 import { useReminderResponses, useReminderScheduling } from "@/lib/notifications/use-reminder-scheduling";
 import { useGroupEncouragementChecks } from "@/lib/halaqa/encouragement-notifications";
+import { useBoardBandRefresh } from "@/lib/board/refresh";
 
 const queryClient = createAppQueryClient();
 
@@ -59,7 +60,10 @@ function ReminderLifecycle() {
   return null;
 }
 
-/** Halaqa encouragement received since the last check becomes one batched local reminder (5.8.2). */
+/**
+ * Social upkeep for the signed-in account: halaqa encouragement since the last check becomes one
+ * batched local reminder (5.8.2), and the board bands stay current for the weekly placement pass.
+ */
 function EncouragementChecks() {
   const { isReady } = useDatabaseStatus();
   return isReady ? <EncouragementCheckRunner /> : null;
@@ -67,6 +71,8 @@ function EncouragementChecks() {
 
 function EncouragementCheckRunner() {
   useGroupEncouragementChecks();
+  // The weekly board pass places joined users from the bands their device last reported.
+  useBoardBandRefresh();
   return null;
 }
 

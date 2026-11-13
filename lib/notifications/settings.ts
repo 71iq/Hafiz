@@ -158,14 +158,16 @@ export const optInPromptsSchema = z.object({
 export type OptInPrompts = z.infer<typeof optInPromptsSchema>;
 
 export const backoffSchema = z.object({
+  /**
+   * Reminders ignored since `since`, kept as a running total: log rows older than 90 days are pruned,
+   * but the reminders they record stay ignored until the next session.
+   */
   consecutive_ignored: z.number().int().min(0),
   level: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-  /**
-   * The latest session when the count was taken, null before any session. While it is still the
-   * latest, the stored count is a floor: log rows older than 90 days are pruned, but the reminders
-   * they record stay ignored until the next session.
-   */
+  /** The latest session when the count was taken, null before any session. A new one resets it. */
   since: z.string().nullable().optional(),
+  /** The last log row already counted, so a run adds only rows after it (lib/notifications/log.ts). */
+  cursor: z.object({ at: z.string(), id: z.string() }).nullable().optional(),
 });
 export type BackoffState = z.infer<typeof backoffSchema>;
 
@@ -180,12 +182,24 @@ export const remindLaterSchema = z.object({
 });
 export type RemindLaterPending = z.infer<typeof remindLaterSchema>;
 
-/** Encouragements received and not yet notified, batched into one notification a day. */
-export const groupPendingSchema = z.object({
+/**
+ * Encouragements received and not yet notified (5.8.2). Each batch belongs to the account that
+ * received it and becomes at most one notification; only the signed-in account's batches are
+ * scheduled. A batch records the log row of the notification that carries it, so that notification's
+ * delivery retires that batch alone, and arrivals after it start a new batch.
+ */
+const groupBatchSchema = z.object({
+  id: z.string(),
+  account_id: z.string(),
   first_received_at: z.string(),
   count: z.number().int().min(1),
+  log_id: z.string().nullable(),
 });
-export type GroupPending = z.infer<typeof groupPendingSchema>;
+export type GroupBatch = z.infer<typeof groupBatchSchema>;
+export const groupPendingSchema = z.object({ batches: z.array(groupBatchSchema) });
+
+/** The batch the planner places: when its first encouragement arrived and how many it holds. */
+export type GroupPending = Readonly<Pick<GroupBatch, "first_received_at" | "count">>;
 
 export const ramadanOfferSchema = z.object({ hijri_year: z.number().int() });
 

@@ -21,33 +21,69 @@ const COUNTED_FOR_BACKOFF: ReadonlySet<string> = new Set<NotificationType>([
   "comeback",
 ]);
 
-type FiredFields = Pick<NotificationLogRow, "scheduled_for" | "cancelled_at"> & Partial<Pick<NotificationLogRow, "delivered_at">>;
+type FiredFields = Pick<NotificationLogRow, "scheduled_for" | "cancelled_at"> &
+  Partial<Pick<NotificationLogRow, "id" | "delivered_at">>;
 
 /**
- * A reminder fired when the OS showed it, or when its time passed without it being cancelled. A
+ * A reminder fired when the OS showed it, or when its time passed and the OS no longer holds it. One
+ * the OS still lists after its time is late, not delivered: pass the log ids the OS still has
+ * scheduled as `stillScheduled`. Without that list (previews), a past reminder counts as fired. A
  * cancelled reminder never counts as delivered, unless the OS had already shown it.
  */
-export function isFired(row: FiredFields, now: Date): boolean {
+export function isFired(row: FiredFields, now: Date, stillScheduled?: ReadonlySet<string>): boolean {
   if (row.delivered_at) return true;
-  return row.cancelled_at === null && Date.parse(row.scheduled_for) <= now.getTime();
+  if (row.cancelled_at !== null || Date.parse(row.scheduled_for) > now.getTime()) return false;
+  return !(row.id !== undefined && stillScheduled?.has(row.id));
+}
+
+/** A position in the log, in time order with the id breaking ties. */
+export type LogCursor = Readonly<{ at: string; id: string }>;
+
+/**
+ * NOT-09: reminders ignored since the latest session (`since`, null before any). `cursor` is the last
+ * row already looked at, so each run adds only rows after it and pruning old rows never lowers the
+ * count.
+ */
+export type IgnoredTally = Readonly<{ count: number; since: string | null; cursor: LogCursor | null }>;
+
+type TallyRow = Pick<NotificationLogRow, "id" | "type"> & FiredFields;
+
+function afterCursor(row: TallyRow, cursor: LogCursor | null): boolean {
+  if (cursor === null) return true;
+  const at = Date.parse(row.scheduled_for);
+  const cursorAt = Date.parse(cursor.at);
+  return at > cursorAt || (at === cursorAt && row.id > cursor.id);
 }
 
 /**
- * NOT-09: reminders delivered since the latest session whose 2-hour window has passed. Any session
- * resets the count to 0, so only reminders after the latest session start can be ignored ones.
+ * Adds the reminders ignored after the tally's cursor. A reminder is ignored once it fired and its
+ * 2-hour window passed with no session, so only rows after the latest session count; a new session
+ * starts the tally over. Rows are taken in time order and the cursor stops at the first one that has
+ * not settled (window still open, or the OS still holds it), so none is skipped or counted twice.
  */
-export function countConsecutiveIgnored(
-  rows: readonly (Pick<NotificationLogRow, "type"> & FiredFields)[],
-  sessionStarts: readonly string[],
+export function advanceIgnoredTally(
+  previous: IgnoredTally | null,
+  rows: readonly TallyRow[],
+  latestSession: string | null,
   now: Date,
-): number {
-  const lastSession = sessionStarts.reduce((latest, start) => Math.max(latest, Date.parse(start)), -Infinity);
+  stillScheduled?: ReadonlySet<string>,
+): IgnoredTally {
+  const sameSession = previous !== null && previous.since === latestSession;
+  let count = sameSession ? previous.count : 0;
+  let cursor = sameSession ? previous.cursor : null;
+  const sessionAt = latestSession === null ? -Infinity : Date.parse(latestSession);
   const settledBefore = now.getTime() - CONVERSION_WINDOW_MS;
-  return rows.filter((row) => {
-    if (!COUNTED_FOR_BACKOFF.has(row.type) || !isFired(row, now)) return false;
-    const at = Date.parse(row.scheduled_for);
-    return at <= settledBefore && at > lastSession;
-  }).length;
+  const ordered = rows
+    .filter((row) => Date.parse(row.scheduled_for) > sessionAt && afterCursor(row, cursor))
+    .sort((a, b) => Date.parse(a.scheduled_for) - Date.parse(b.scheduled_for) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const row of ordered) {
+    if (Date.parse(row.scheduled_for) > settledBefore) break;
+    const fired = isFired(row, now, stillScheduled);
+    if (!fired && row.cancelled_at === null) break;
+    if (fired && COUNTED_FOR_BACKOFF.has(row.type)) count += 1;
+    cursor = { at: row.scheduled_for, id: row.id };
+  }
+  return { count, since: latestSession, cursor };
 }
 
 /** Fired rows not yet marked converted that had a session start within 2 hours. */
@@ -55,10 +91,11 @@ export function findConversions(
   rows: readonly (Pick<NotificationLogRow, "id" | "converted"> & FiredFields)[],
   sessionStarts: readonly string[],
   now: Date,
+  stillScheduled?: ReadonlySet<string>,
 ): string[] {
   const starts = sessionStarts.map((start) => Date.parse(start)).filter(Number.isFinite);
   return rows
-    .filter((row) => row.converted === 0 && isFired(row, now))
+    .filter((row) => row.converted === 0 && isFired(row, now, stillScheduled))
     .filter((row) => {
       const at = Date.parse(row.scheduled_for);
       return starts.some((start) => start >= at && start - at <= CONVERSION_WINDOW_MS);
@@ -97,15 +134,20 @@ export async function readLatestSessionAt(db: DatabaseExecutor): Promise<string 
   return candidates.reduce((latest, value) => (Date.parse(value) > Date.parse(latest) ? value : latest));
 }
 
-/** Rows that can count as ignored reminders: everything scheduled after the latest session. */
+/** Rows the ignored tally has not looked at yet: from `from` (inclusive) on, in time order. */
 export async function readBackoffRows(
   db: DatabaseExecutor,
-  after: string | null,
-): Promise<Pick<NotificationLogRow, "type" | "scheduled_for" | "cancelled_at" | "delivered_at">[]> {
+  from: string | null,
+): Promise<Pick<NotificationLogRow, "id" | "type" | "scheduled_for" | "cancelled_at" | "delivered_at">[]> {
   return db.getAllAsync(
-    `SELECT type, scheduled_for, cancelled_at, delivered_at FROM notification_log WHERE scheduled_for > ?`,
-    [after === null ? "" : new Date(after).toISOString()],
+    `SELECT id, type, scheduled_for, cancelled_at, delivered_at FROM notification_log WHERE scheduled_for >= ?
+      ORDER BY scheduled_for, id`,
+    [from === null ? "" : new Date(from).toISOString()],
   );
+}
+
+export async function readLogRow(db: DatabaseExecutor, id: string): Promise<NotificationLogRow | null> {
+  return db.getFirstAsync<NotificationLogRow>(`SELECT ${LOG_COLUMNS} FROM notification_log WHERE id = ?`, [id]);
 }
 
 export async function insertLogRow(db: DatabaseExecutor, row: NotificationLogRow): Promise<void> {

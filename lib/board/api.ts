@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { deleteOwnAvatarFiles } from "@/lib/profile/privacy";
 import type { SocialOwner } from "@/lib/social/owner";
 import { callSocialRpc, localDateSchema, readSocial, voidResult, type SocialRead } from "@/lib/social/remote";
 import type { SocialBands } from "@/lib/social/bands";
@@ -108,16 +109,24 @@ export function isValidBoardNickname(nickname: string | null): boolean {
   return nickname === null || (nickname.length >= BOARD_NICKNAME_MIN && nickname.length <= BOARD_NICKNAME_MAX);
 }
 
-export function joinBoard(
+/** Joining as a minor records it on the account, so the stored photo files are deleted too (ETH-07). */
+export async function joinBoard(
   input: { nickname: string | null; isMinor: boolean; inputs: BoardInputs; today: string },
   owner: SocialOwner,
 ): Promise<BoardView> {
-  return callSocialRpc(
+  const view = await callSocialRpc(
     "join_board",
     { p_nickname: input.nickname, p_is_minor: input.isMinor, ...boardArgs(input.inputs, input.today) },
     boardViewSchema,
     owner,
   );
+  if (input.isMinor) await deleteOwnAvatarFiles(owner);
+  return view;
+}
+
+/** Stores the latest bands for the weekly pass (8.13). A no-op on the server for users off the board. */
+export async function refreshBoardBandsRemote(inputs: BoardInputs, today: string, owner: SocialOwner): Promise<void> {
+  await callSocialRpc("refresh_board_bands", boardArgs(inputs, today), voidResult, owner);
 }
 
 export async function leaveBoard(owner: SocialOwner): Promise<void> {

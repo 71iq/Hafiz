@@ -35,6 +35,7 @@ jest.mock("@tanstack/react-query", () => ({
 }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
+  supabaseAnonKey: () => "synthetic-public-key",
   supabase: {
     from: () => {
       let updating = false;
@@ -83,7 +84,11 @@ jest.mock("@/lib/leaderboard/api", () => ({
 }));
 jest.mock("@/lib/profile/privacy", () => ({
   fetchProfileSummary: async () => null,
-  profilePrivacyKeys: { summary: (viewer: string | null, target: string) => ["profileSummary", viewer, target] },
+  fetchProfilePrivacy: async () => ({ boardJoined: false, boardNickname: null, showStreak: false, showJuzCompletions: false, isMinor: false }),
+  profilePrivacyKeys: {
+    summary: (viewer: string | null, target: string) => ["profileSummary", viewer, target],
+    mine: (userId: string | null) => ["profilePrivacy", userId ?? "signed-out"],
+  },
 }));
 jest.mock("@/lib/profile/avatar", () => ({
   uploadProfileAvatar: (id: string, asset: unknown) => mockUpload(id, asset),

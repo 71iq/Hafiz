@@ -31,6 +31,6 @@ export function socialFailureMessage(error: unknown, s: UIStrings): string {
       return key ? s[key] : s.socialErrorGeneric;
     }
     case "failed":
-      return s.socialErrorGeneric;
+      return failure.message === "avatar_delete_incomplete" ? s.socialErrorPhotoNotRemoved : s.socialErrorGeneric;
   }
 }

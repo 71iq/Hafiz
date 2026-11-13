@@ -48,6 +48,7 @@ jest.mock("@/lib/auth/store", () => ({
 }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
+  supabaseAnonKey: () => "synthetic-public-key",
   supabase: {
     rpc: (fn: string, args: Record<string, unknown>) =>
       require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),

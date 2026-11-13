@@ -60,6 +60,11 @@ export type PlannerInput = Readonly<{
   weekStart: number;
   backoff: BackoffLevel;
   delivered: readonly DeliveredReminder[];
+  /**
+   * Reminders whose time passed that the OS still holds. They are not delivered yet, but will show, so
+   * they count toward their day's cap (NOT-07).
+   */
+  late?: readonly DeliveredReminder[];
   remindLater: RemindLaterPending | null;
   groupPending: GroupPending | null;
   facts: (date: LocalDate) => ReminderFactValues;
@@ -206,7 +211,9 @@ export function planNotifications(input: PlannerInput): PlanResult {
     const makeUpAt = leadAt.getTime() < times.anchorAt.getTime() ? leadAt : times.anchorAt;
     const makeUp = project(date, makeUpAt).snapshot;
 
-    if (makeUp.headline.kind === "make_up_open" && prefs.types.makeup_window) {
+    // Home shows yesterday's open make-up even on an excused or paused day, but a reminder to recite
+    // today would press on a day the user set aside, so it is not sent then.
+    if (makeUp.headline.kind === "make_up_open" && !isCoveredToday(makeUp) && prefs.types.makeup_window) {
       add({
         type: "makeup_window",
         at: makeUpAt,
@@ -353,7 +360,9 @@ export function planNotifications(input: PlannerInput): PlanResult {
   const byDate = new Map<LocalDate, Candidate[]>();
   for (const candidate of timed) byDate.set(candidate.localDate, [...(byDate.get(candidate.localDate) ?? []), candidate]);
   for (const [date, list] of byDate) {
-    let used = input.delivered.filter((item) => item.localDate === date && item.at.getTime() <= now.getTime()).length;
+    let used =
+      input.delivered.filter((item) => item.localDate === date && item.at.getTime() <= now.getTime()).length +
+      (input.late ?? []).filter((item) => item.localDate === date).length;
     const ordered = [...list].sort((a, b) => a.priority - b.priority || a.at.getTime() - b.at.getTime());
     for (const candidate of ordered.filter((item) => !item.late)) {
       if (used < DAILY_CAP) {

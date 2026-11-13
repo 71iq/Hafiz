@@ -188,10 +188,15 @@ function HalaqaContent({ userId }: { userId: string }) {
       await setHalaqaSharing(active.id, input.sharing, owner);
       if (input.visibility) await saveProfilePrivacy(input.visibility, owner);
     },
-    onSuccess: async () => {
+    onSuccess: async (_result, input) => {
       setSharingOpen(false);
       setNotice(s.socialSaved);
-      await Promise.all([refreshAll(), queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) })]);
+      await Promise.all([
+        refreshAll(),
+        queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) }),
+        // ETH-07: stating minority clears the photo on the server, so the signed-in profile reloads.
+        input.visibility?.isMinor ? useAuthStore.getState().fetchProfile() : null,
+      ]);
     },
     onError: (error) => setSharingError(socialFailureMessage(error, s)),
   });

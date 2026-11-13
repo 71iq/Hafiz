@@ -333,6 +333,13 @@ describe("planNotifications", () => {
     expect(later.slots.some((slot) => slot.type === "earnback_open")).toBe(false);
   });
 
+  it("sends no make-up reminder on an excused day, though yesterday can still be made up", () => {
+    const habit = { days: days({ ...streak(6, -2), [TODAY]: "excused" }), pause: null };
+    const types = { ...DEFAULT_REMINDER_PREFS.types, makeup_window: true };
+    const result = planNotifications(input({ habit, prefs: prefsWith({ types }), now: RIYADH.at(TODAY, 0) }));
+    expect(result.slots.filter((slot) => slot.localDate === TODAY && slot.type === "makeup_window")).toEqual([]);
+  });
+
   it("sends no earn-back reminder on a day whose wird is already done", () => {
     // The earn-back headline leads on Home even when today is done; the planner must still see today as covered.
     const habit = { days: days({ ...streak(10, -3, "excused"), [TODAY]: "done" }), pause: null };

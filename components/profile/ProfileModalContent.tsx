@@ -33,7 +33,10 @@ import {
   type PublicProfile,
 } from "@/lib/leaderboard/api";
 import { uploadProfileAvatar } from "@/lib/profile/avatar";
-import { fetchProfileSummary, profilePrivacyKeys } from "@/lib/profile/privacy";
+import { fetchProfilePrivacy, fetchProfileSummary, profilePrivacyKeys } from "@/lib/profile/privacy";
+import { requireSocialOwner } from "@/lib/social/owner";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { socialFailureOf } from "@/lib/social/remote";
 import {
   attachSurahNames,
   getDefaultDeckProgress,
@@ -284,7 +287,18 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     queryFn: () => fetchProfileSummary(requestedUserId, user?.id ?? null),
     enabled: hasValidRequestedUserId && !isOwnProfile && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
+    // A read cut short by a sign-in or sign-out is retried for the new viewer, not shown as an error.
+    retry: (count, error) => socialFailureOf(error).kind === "account_changed" && count < 2,
   });
+
+  // ETH-07: a person who said they are under 18 has no profile photo, and the server refuses uploads.
+  const ownPrivacyQuery = useQuery({
+    queryKey: profilePrivacyKeys.mine(user?.id ?? null),
+    queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
+    enabled: isOwnProfile && !!user && isSupabaseConfigured(),
+    staleTime: 1000 * 60,
+  });
+  const photosOff = ownPrivacyQuery.data?.isMinor === true;
 
   // The server copy of surah progress is readable only by its owner; it fills in other devices' cards.
   const publicSurahProgressQuery = useQuery({
@@ -783,15 +797,21 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                     marginTop: 4,
                   }}
                 >
-                  <ProfileEditActionButton
-                    icon={Camera}
-                    label={s.profileChangePhoto}
-                    color={isDark ? "#5eead4" : "#003638"}
-                    borderColor={isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.16)"}
-                    disabled={profileSaving || authLoading}
-                    isRTL={isRTL}
-                    onPress={handlePickAvatar}
-                  />
+                  {photosOff ? (
+                    <Text style={{ fontSize: 13, color: isDark ? "#a3a3a3" : "#6b6157", ...textStartStyle(isRTL) }}>
+                      {s.profilePhotoMinorNote}
+                    </Text>
+                  ) : (
+                    <ProfileEditActionButton
+                      icon={Camera}
+                      label={s.profileChangePhoto}
+                      color={isDark ? "#5eead4" : "#003638"}
+                      borderColor={isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.16)"}
+                      disabled={profileSaving || authLoading}
+                      isRTL={isRTL}
+                      onPress={handlePickAvatar}
+                    />
+                  )}
                   {avatarPreviewUrl ? (
                     <ProfileEditActionButton
                       icon={Trash2}

@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { boardViewSchema, fetchBoard, joinBoard } from "@/lib/board/api";
 import {
   fetchHalaqaDetail,
-  fetchReceivedEncouragementsSince,
+  fetchReceivedEncouragements,
   fetchTeacherView,
   halaqaDetailRead,
   halaqaKeys,
@@ -28,15 +28,44 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
 const mockHeaders: Record<string, string> = {};
 let mockConfigured = true;
+// The avatars bucket: stored paths, and every list or remove call with the bearer it was sent with.
+const mockAvatarFiles = new Set<string>();
+const mockStorageCalls: { op: "list" | "remove"; bucket: string; auth: string | undefined }[] = [];
+let mockRemoveRefused = false;
 // The store and the shared client's session are separate, as in the app: a switch can reach one first.
 let mockAuth: FakeAuthState;
 let mockClientSession: FakeAuthState["session"];
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => mockConfigured,
+  supabaseAnonKey: () => "synthetic-public-key",
   supabase: {
+    supabaseKey: "synthetic-public-key",
     rpc: (fn: string, args: Record<string, unknown>) =>
       require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
     auth: { getSession: async () => ({ data: { session: mockClientSession }, error: null }) },
+    storage: {
+      from: (bucket: string) => {
+        const headers: Record<string, string> = {};
+        const files = {
+          setHeader: (name: string, value: string) => {
+            headers[name] = value;
+            return files;
+          },
+          list: async (folder: string) => {
+            mockStorageCalls.push({ op: "list", bucket, auth: headers.Authorization });
+            const names = [...mockAvatarFiles].filter((path) => path.startsWith(`${folder}/`)).map((path) => path.slice(folder.length + 1));
+            return { data: names.map((name) => ({ id: `id-${name}`, name })), error: null };
+          },
+          remove: async (paths: string[]) => {
+            mockStorageCalls.push({ op: "remove", bucket, auth: headers.Authorization });
+            if (mockRemoveRefused) return { data: [], error: null };
+            for (const path of paths) mockAvatarFiles.delete(path);
+            return { data: paths.map((name) => ({ name })), error: null };
+          },
+        };
+        return files;
+      },
+    },
   },
 }));
 jest.mock("@/lib/auth/store", () => ({ useAuthStore: { getState: () => mockAuth } }));
@@ -103,6 +132,9 @@ beforeEach(async () => {
   mockRpc.mockReset();
   for (const key of Object.keys(mockHeaders)) delete mockHeaders[key];
   mockConfigured = true;
+  mockAvatarFiles.clear();
+  mockStorageCalls.length = 0;
+  mockRemoveRefused = false;
   signIn(signedIn(USER));
   await AsyncStorage.clear();
 });
@@ -233,9 +265,75 @@ describe("board adapter", () => {
 });
 
 describe("profile summary (SOC-01)", () => {
-  it("keeps hidden fields hidden", async () => {
+  it("keeps hidden fields hidden, as the signed-in viewer", async () => {
     mockRpc.mockResolvedValue({ data: { streak: null, juz_completed: [30] }, error: null });
-    await expect(fetchProfileSummary(OTHER)).resolves.toEqual({ streak: null, juzCompleted: [30] });
+    await expect(fetchProfileSummary(OTHER, USER)).resolves.toEqual({ streak: null, juzCompleted: [30] });
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+  });
+
+  it("runs a signed-out request with the public key, not a session the client picked up", async () => {
+    signIn(signedOut());
+    // The shared client already holds a sign-in the store has not seen yet.
+    mockClientSession = signedIn(USER).session;
+    mockRpc.mockResolvedValue({ data: { streak: 3, juz_completed: null }, error: null });
+    await expect(fetchProfileSummary(OTHER)).resolves.toEqual({ streak: 3, juzCompleted: null });
+    expect(mockHeaders.Authorization).toBe("Bearer synthetic-public-key");
+  });
+
+  it("refuses a signed-out answer that arrives after a sign-in", async () => {
+    signIn(signedOut());
+    let respond: (value: { data: unknown; error: unknown }) => void = () => undefined;
+    mockRpc.mockReturnValue(new Promise((resolve) => (respond = resolve)));
+    const load = fetchProfileSummary(OTHER);
+    await waitForRpc();
+    signIn(signedIn(USER));
+    respond({ data: { streak: 9, juz_completed: [1] }, error: null });
+    await expect(load).rejects.toMatchObject({ failure: { kind: "account_changed" } });
+  });
+
+  it("does not start a signed-out request while an account is signed in", async () => {
+    await expect(fetchProfileSummary(OTHER)).rejects.toMatchObject({ failure: { kind: "account_changed" } });
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("a minor's photo (ETH-07)", () => {
+  const privacy = (isMinor: boolean) => ({
+    data: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: isMinor },
+    error: null,
+  });
+
+  it("deletes the account's own photo files once it is saved as a minor, as that account", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/2.png`).add(`${OTHER}/3.jpg`);
+    mockRpc.mockResolvedValue(privacy(true));
+    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner());
+    expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
+    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "remove", "list"]);
+    expect(mockStorageCalls.every((call) => call.bucket === "avatars" && bearerSubject(call.auth) === USER)).toBe(true);
+  });
+
+  it("leaves an adult's photos alone", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRpc.mockResolvedValue(privacy(false));
+    await saveProfilePrivacy({ showStreak: true, showJuzCompletions: false, isMinor: false }, owner());
+    expect(mockStorageCalls).toEqual([]);
+  });
+
+  it("deletes them after joining the board as a minor", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRpc.mockResolvedValue({ data: { status: "gathering", week_start: "2026-11-09", member_count: 1, min_members: 5 }, error: null });
+    const inputs = { bands: { levelBand: "juz_amma", paceBand: "light", utcOffsetMinutes: 180 }, weekStart: 6 } as const;
+    await joinBoard({ nickname: "Little Star", isMinor: true, inputs, today: "2026-11-13" }, owner());
+    expect(mockAvatarFiles.size).toBe(0);
+  });
+
+  it("fails the save when a photo could not be deleted, so it can be retried", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRemoveRefused = true;
+    mockRpc.mockResolvedValue(privacy(true));
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner()),
+    ).rejects.toMatchObject({ failure: { kind: "failed" } });
   });
 });
 
@@ -385,14 +483,17 @@ describe("teacher view plan (SOC-03)", () => {
 });
 
 describe("received encouragements (5.8.2)", () => {
-  it("passes the stored mark verbatim and keeps the server's spelling of the newest one", async () => {
+  it("lists ids with the server's time, for the device to acknowledge", async () => {
     mockRpc.mockResolvedValue({
-      data: { count: 2, latest_created_at: "2026-11-13T08:00:00.123456+00:00", checked_at: "2026-11-13T09:00:00+00:00" },
+      data: { items: [{ id: GROUP, created_at: "2026-11-13T08:00:00.123456+00:00" }], checked_at: "2026-11-13T09:00:00+00:00" },
       error: null,
     });
-    const result = await fetchReceivedEncouragementsSince("2026-11-12T08:00:00.654321+00:00", owner());
-    expect(mockRpc).toHaveBeenCalledWith("get_received_encouragements_since", { p_since: "2026-11-12T08:00:00.654321+00:00" });
-    expect(result).toEqual({ count: 2, latestCreatedAt: "2026-11-13T08:00:00.123456+00:00", checkedAt: "2026-11-13T09:00:00+00:00" });
+    const result = await fetchReceivedEncouragements(owner());
+    expect(mockRpc).toHaveBeenCalledWith("get_received_encouragements", {});
+    expect(result).toEqual({
+      items: [{ id: GROUP, createdAt: "2026-11-13T08:00:00.123456+00:00" }],
+      checkedAt: "2026-11-13T09:00:00+00:00",
+    });
   });
 });
 

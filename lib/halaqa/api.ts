@@ -281,21 +281,23 @@ export function fetchTeacherView(groupId: string, memberId: string, today: strin
 }
 
 /**
- * Encouragements received after `since` across the reader's halaqas (5.8.2). `latestCreatedAt` is
- * the server's own spelling of the newest one, kept verbatim as the next `since` so no precision is
- * lost; `checkedAt` is the server's time when nothing has arrived yet.
+ * Encouragements the reader received in the last 7 days across the halaqas they are still in (5.8.2),
+ * newest first and at most 50, each with its id for the device to acknowledge. `checkedAt` is the
+ * server's time, for pruning acknowledged ids by age.
  */
-const receivedSinceSchema = z
+const receivedSchema = z
   .object({
-    count: count,
-    latest_created_at: z.string().min(1).nullable(),
+    items: z.array(z.object({ id: z.string().uuid(), created_at: z.string().min(1) })).max(50),
     checked_at: z.string().min(1),
   })
-  .transform((row) => ({ count: row.count, latestCreatedAt: row.latest_created_at, checkedAt: row.checked_at }));
-export type ReceivedSince = z.output<typeof receivedSinceSchema>;
+  .transform((row) => ({
+    items: row.items.map((item) => ({ id: item.id, createdAt: item.created_at })),
+    checkedAt: row.checked_at,
+  }));
+export type ReceivedEncouragements = z.output<typeof receivedSchema>;
 
-export function fetchReceivedEncouragementsSince(since: string | null, owner: SocialOwner): Promise<ReceivedSince> {
-  return callSocialRpc("get_received_encouragements_since", { p_since: since }, receivedSinceSchema, owner);
+export function fetchReceivedEncouragements(owner: SocialOwner): Promise<ReceivedEncouragements> {
+  return callSocialRpc("get_received_encouragements", {}, receivedSchema, owner);
 }
 
 export function isEncouragementTemplateId(value: string | null): value is EncouragementTemplateId {

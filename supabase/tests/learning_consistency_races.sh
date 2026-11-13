@@ -191,4 +191,24 @@ check "one send refused as already sent" \
 check "one encouragement stored" \
   "$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE group_id = '$GROUP' AND from_user = '$(uid 4)'")" 1
 
+# ─── Second review, finding 11: a send and a leave by one member cannot deadlock ─────
+# User 5 sends to user 6 while leaving the group. The controller holds user 5's membership row. The
+# send takes the group row before that membership row, as leaving does, so the send waits on the
+# membership row while holding the group and the leave waits on the group. A send that locked the
+# membership row first and the group only at its insert would deadlock with the leave here.
+rm -f "$WORK"/*
+controller send_leave "SELECT 1 FROM public.halaqa_members WHERE group_id = '$GROUP' AND user_id = '$(uid 5)' FOR UPDATE;" 2
+wait_for_controller send_leave
+session sl_send "$(uid 5)" "SELECT public.send_halaqa_encouragement('$GROUP', '$(uid 6)', 'ease', NULL, '$TODAY');"
+wait_for_waiters 1
+session sl_leave "$(uid 5)" "SELECT public.leave_halaqa('$GROUP');"
+wait
+check "no deadlock" "$(cat "$WORK"/sl_send "$WORK"/sl_leave | grep -c 'deadlock detected' || true)" 0
+check "send finished" "$(tail -1 "$WORK/sl_send")" ok
+check "leave finished" "$(tail -1 "$WORK/sl_leave")" ok
+check "the send is stored" \
+  "$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE group_id = '$GROUP' AND from_user = '$(uid 5)'")" 1
+check "the sender has left" \
+  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE group_id = '$GROUP' AND user_id = '$(uid 5)' AND left_at IS NULL")" 0
+
 echo "learning_consistency_races.sh: all races passed"

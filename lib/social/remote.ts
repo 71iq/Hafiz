@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { isSupabaseConfigured, supabase, supabaseAnonKey } from "@/lib/supabase";
 
 /**
  * Halaqa and board are online features (SB-01). Each failure keeps its cause so the UI can tell
@@ -29,20 +29,22 @@ const SOCIAL_REJECTION_CODES = [
   "invalid_week_start",
 ] as const;
 /**
- * The account a halaqa or board request belongs to. The Supabase client is shared, so a request
- * started for one account could otherwise run with another account's credentials after a switch,
- * cache that account's groups under the first one's key, or apply an old draft to it. Each request
- * sends this owner's own access token, and its result is used only while the same account and
- * session are still signed in. Built on the auth coordinator's owner tickets, as sync is.
+ * Who a request runs as. The Supabase client is shared, so a request started for one viewer could
+ * otherwise run with another account's credentials after a sign-in or switch, cache that account's
+ * data under the first viewer's key, or apply an old draft to it. Each request sends the viewer's own
+ * bearer token, and its result is used only while the same viewer is still current. Built on the
+ * auth coordinator's owner tickets, as sync is (lib/social/owner.ts).
  */
-export type SocialOwner = Readonly<{
-  userId: string;
+export type SocialViewer = Readonly<{
   isCurrent: () => boolean;
   /** Throws an "account_changed" failure once another account or session has taken over. */
   requireCurrent: () => void;
-  /** The access token of this owner's session, refreshed by the client as usual. */
+  /** The bearer token: the owner's session token, or the public key for a signed-out viewer. */
   accessToken: () => Promise<string>;
 }>;
+
+/** A signed-in account a halaqa or board request belongs to. */
+export type SocialOwner = SocialViewer & Readonly<{ userId: string }>;
 
 export type SocialRejectionCode = (typeof SOCIAL_REJECTION_CODES)[number];
 
@@ -89,14 +91,23 @@ export function classifyRemoteError(error: unknown): SocialFailure {
 export type SocialRead<T> = Readonly<{ fn: string; args: Record<string, unknown>; schema: z.ZodType<T> }>;
 
 /**
- * Calls a SECURITY DEFINER RPC and returns its unvalidated payload. Callers must parse it. With an
- * owner, the request carries that account's token rather than whatever session the shared client
- * holds at dispatch, and its result is refused once that account is no longer signed in.
+ * The project's public (anon) key, from the app configuration. A request that sends it as its
+ * bearer runs as anon, whatever session the shared client holds.
+ */
+export function publicApiKey(): string {
+  if (!isSupabaseConfigured()) throw socialError({ kind: "unconfigured" });
+  return supabaseAnonKey();
+}
+
+/**
+ * Calls a SECURITY DEFINER RPC and returns its unvalidated payload. Callers must parse it. With a
+ * viewer, the request carries that viewer's token rather than whatever session the shared client
+ * holds at dispatch, and its result is refused once that viewer is no longer current.
  */
 export async function callSocialRpcRaw(
   fn: string,
   args: Record<string, unknown>,
-  owner?: SocialOwner,
+  owner?: SocialViewer,
 ): Promise<unknown> {
   if (!isSupabaseConfigured()) throw socialError({ kind: "unconfigured" });
   const token = owner ? await owner.accessToken() : null;
@@ -123,7 +134,7 @@ export async function callSocialRpc<T>(
   fn: string,
   args: Record<string, unknown>,
   schema: z.ZodType<T>,
-  owner?: SocialOwner,
+  owner?: SocialViewer,
 ): Promise<T> {
   return parseSocialPayload(schema, await callSocialRpcRaw(fn, args, owner));
 }

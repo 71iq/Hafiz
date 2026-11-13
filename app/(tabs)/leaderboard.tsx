@@ -97,8 +97,13 @@ function BoardContent({ userId }: { userId: string }) {
       if (!inputs.data) throw new Error("Board inputs are not ready");
       return joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
     },
-    onSuccess: async () => {
-      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) })]);
+    onSuccess: async (_result, choice) => {
+      await Promise.all([
+        refresh(),
+        queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) }),
+        // ETH-07: joining as a minor clears the photo on the server, so the signed-in profile reloads.
+        choice.isMinor ? useAuthStore.getState().fetchProfile() : null,
+      ]);
     },
     onError: (error) => setJoinError(socialFailureMessage(error, s)),
   });

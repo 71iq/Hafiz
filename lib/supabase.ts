@@ -53,6 +53,11 @@ const SUPABASE_ANON_KEY =
   "YOUR_ANON_KEY";
 
 /** Returns true if the Supabase client is configured with real credentials */
+/** The public (anon) API key, for a request that must run without any user session. */
+export function supabaseAnonKey(): string {
+  return SUPABASE_ANON_KEY;
+}
+
 export function isSupabaseConfigured(): boolean {
   return !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_ANON_KEY");
 }

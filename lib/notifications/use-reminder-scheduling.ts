@@ -1,6 +1,7 @@
 import { usePathname, useRootNavigationState } from "expo-router";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
+import { useAuthStore } from "@/lib/auth/store";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { deviceTimeZone } from "@/lib/habit/dates";
@@ -11,7 +12,12 @@ import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { reminderPlatform } from "@/lib/notifications/platform";
 import type { ReminderResponse } from "@/lib/notifications/platform-types";
 import { openReminderRoute } from "@/lib/notifications/reminder-route";
-import { recordReminderOpened, requestRemindLater, rescheduleReminders } from "@/lib/notifications/schedule";
+import {
+  recordReminderOpened,
+  requestRemindLater,
+  rescheduleReminders,
+  setReminderAccountSource,
+} from "@/lib/notifications/schedule";
 import type { ReminderRoute } from "@/lib/notifications/types";
 
 const REVIEW_SETTLE_MS = 1500;
@@ -27,12 +33,23 @@ function warn(error: unknown) {
 
 /**
  * NOT-04: replan the next 7 days on app start, on return to the foreground, when the time zone
- * changes, after sync, after review activity (sessions and grades) and when the language changes.
+ * changes, after sync, after review activity (sessions and grades), when the language changes and
+ * when another account signs in, whose halaqa encouragement is the only one scheduled (5.8.2).
  * Mount once, under the database and settings providers.
  */
 export function useReminderScheduling(): void {
   const { db, isReady } = useDatabaseStatus();
   const { uiLanguage, isLoaded } = useSettings();
+  const accountId = useAuthStore((state) => state.user?.id ?? null);
+
+  useEffect(() => {
+    setReminderAccountSource(() => useAuthStore.getState().user?.id ?? null);
+  }, []);
+
+  // Replans when another account signs in or out. A run already waiting is shared.
+  useEffect(() => {
+    if (db && isReady && isLoaded) rescheduleReminders(db, { language: uiLanguage }).catch(warn);
+  }, [db, isReady, isLoaded, uiLanguage, accountId]);
 
   useEffect(() => {
     if (!db || !isReady || !isLoaded) return;

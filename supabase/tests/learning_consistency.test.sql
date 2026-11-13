@@ -135,19 +135,33 @@ BEGIN
   -- Every SECURITY DEFINER function pins an empty search_path.
   PERFORM hz_test.eq('definer functions pin search_path', (
     SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
-    WHERE n.nspname IN ('public', 'private') AND p.prosecdef
+    WHERE n.nspname IN ('public', 'private', 'rls') AND p.prosecdef
       AND p.proname IN ('get_board', 'join_board', 'leave_board', 'get_my_halaqas', 'create_invite_halaqa',
         'join_halaqa_by_code', 'leave_halaqa', 'join_matched_halaqa', 'set_halaqa_sharing', 'set_halaqa_member_role',
         'get_halaqa_goal', 'get_halaqa_detail', 'send_halaqa_encouragement', 'get_halaqa_teacher_view',
         'get_profile_privacy', 'set_profile_privacy', 'get_profile_summary', 'halaqa_shares_with_me',
-        'habit_days_before_write', 'profile_identity_visible', 'get_received_encouragements_since')
+        'habit_days_before_write', 'profile_identity_visible', 'caller_is_minor', 'get_received_encouragements',
+        'refresh_board_bands', 'requeue_board_after_wird_day')
       AND NOT (COALESCE(p.proconfig, '{}') @> ARRAY['search_path=""'])
   ), 0::BIGINT);
   PERFORM hz_test.eq('every definer function above exists', (
     SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'public' AND p.prosecdef
-      AND p.proname IN ('profile_identity_visible', 'get_received_encouragements_since')
-  ), 2::BIGINT);
+    WHERE p.prosecdef AND (n.nspname, p.proname) IN (('rls', 'profile_identity_visible'), ('rls', 'caller_is_minor'),
+      ('public', 'get_received_encouragements'), ('public', 'refresh_board_bands'), ('private', 'requeue_board_after_wird_day'))
+  ), 5::BIGINT);
+  -- Finding 8 (second review): the RLS helpers live outside public, which is the only schema PostgREST
+  -- serves as RPCs, so no endpoint reveals who is a minor.
+  PERFORM hz_test.eq('no public RLS helper', (
+    SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname IN ('profile_identity_visible', 'caller_is_minor')
+  ), 0::BIGINT);
+  PERFORM hz_test.eq('profiles policy uses the rls helper', (
+    SELECT qual FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles' AND cmd = 'SELECT'
+  ), 'rls.profile_identity_visible(id)');
+  PERFORM hz_test.eq('PUBLIC cannot run the rls helpers', (
+    SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'rls' AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) AS acl WHERE acl.grantee = 0))
+  ), 0::BIGINT);
   -- Finding 15: board weeks follow each user's week start, so cohorts are not limited to Mondays.
   PERFORM hz_test.eq('no Monday-only cohort check', (
     SELECT count(*) FROM pg_constraint WHERE conrelid = 'public.board_cohorts'::regclass AND contype = 'c'
@@ -163,6 +177,10 @@ BEGIN
   PERFORM hz_test.eq('no unique key on the caller date', (
     SELECT count(*) FROM pg_constraint WHERE conrelid = 'public.halaqa_encouragements'::regclass AND contype = 'u'
   ), 0::BIGINT);
+  -- Finding 5 (second review): one send per group, sender and server-derived calendar day.
+  PERFORM hz_test.eq('unique key on the server day', (
+    SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indexrelid = 'public.idx_halaqa_encouragements_sender_day'::regclass
+  ), 'CREATE UNIQUE INDEX idx_halaqa_encouragements_sender_day ON public.halaqa_encouragements USING btree (group_id, from_user, sent_on)');
 END $$;
 
 -- ─── 2. Wird-day merge equals lib/habit/merge.ts (fixture from the TypeScript merge) ─────
@@ -363,6 +381,9 @@ BEGIN
   PERFORM hz_test.expect_error('SELECT * FROM public.profile_privacy', 'permission denied');
   PERFORM hz_test.expect_error($q$SELECT public.get_board('starting', 'light', 0, '2026-11-13', 1)$q$, 'permission denied');
   PERFORM hz_test.expect_error('SELECT public.get_my_halaqas()', 'permission denied');
+  -- Finding 8 (second review): the profiles policy helper is no RPC anon can call.
+  PERFORM hz_test.expect_error($q$SELECT public.profile_identity_visible('00000000-0000-4000-8000-00000000000b')$q$,
+    'does not exist');
 END $$;
 RESET ROLE;
 
@@ -468,25 +489,16 @@ DECLARE
   gid UUID := (SELECT value FROM hz_test.state WHERE key = 'group')::UUID;
   detail JSONB;
   inbox JSONB;
-  latest TIMESTAMPTZ;
 BEGIN
   detail := public.get_halaqa_detail(gid, hz_test.today_text());
   PERFORM hz_test.eq('encouragement received', detail->'received'->0->>'template_id', 'ease');
   PERFORM hz_test.eq('sender named', detail->'received'->0->>'from_name', 'Teacher A');
-  -- Finding 18: the notification inbox counts what arrived after the device's watermark.
-  inbox := public.get_received_encouragements_since(NULL);
-  latest := (inbox->>'latest_created_at')::TIMESTAMPTZ;
-  PERFORM hz_test.eq('inbox counts from the start', (inbox->>'count')::INTEGER, 1);
-  PERFORM hz_test.eq('inbox latest is the encouragement', latest, (detail->'received'->0->>'created_at')::TIMESTAMPTZ);
+  -- The notification inbox lists ids the device acknowledges, not a time watermark.
+  inbox := public.get_received_encouragements();
+  PERFORM hz_test.eq('inbox lists the encouragement', inbox->'items',
+    jsonb_build_array(jsonb_build_object('id', detail->'received'->0->'id', 'created_at', detail->'received'->0->'created_at')));
   PERFORM hz_test.eq('inbox reports server time', (inbox->>'checked_at')::TIMESTAMPTZ IS NOT NULL, true);
-  PERFORM hz_test.eq('nothing after the watermark',
-    public.get_received_encouragements_since(latest)->>'count', '0');
-  PERFORM hz_test.eq('watermark kept when nothing is new',
-    public.get_received_encouragements_since(latest)->'latest_created_at', 'null'::JSONB);
-  PERFORM hz_test.eq('the exact stored spelling round-trips',
-    public.get_received_encouragements_since((inbox->>'latest_created_at')::TIMESTAMPTZ)->>'count', '0');
-  PERFORM hz_test.eq('one just before the watermark',
-    public.get_received_encouragements_since(latest - INTERVAL '1 microsecond')->>'count', '1');
+  INSERT INTO hz_test.state VALUES ('first_encouragement', detail->'received'->0->>'id');
   PERFORM public.send_halaqa_encouragement(gid, '00000000-0000-4000-8000-00000000000a', NULL, 'Jazakum Allahu khayran', hz_test.today_text());
   PERFORM hz_test.expect_error(format($q$SELECT public.get_halaqa_teacher_view(%L, %L, %L)$q$,
     gid, '00000000-0000-4000-8000-00000000000a', hz_test.today_text()), 'not_allowed');
@@ -494,6 +506,33 @@ BEGIN
     gid, '00000000-0000-4000-8000-00000000000b'), 'not_allowed');
   -- B shares plan and grades with teachers, and stops sharing consistency.
   PERFORM public.set_halaqa_sharing(gid, false, true, true, true);
+END $$;
+RESET ROLE;
+
+-- Finding 9 (second review): a send that commits after a later one carries an earlier created_at. A
+-- watermark already past it would never return it; the 7-day id list does. Rows older than 7 days
+-- are not listed.
+INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, local_date, sent_on, created_at)
+SELECT value::UUID, '00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000b', 'dua',
+  hz_test.d(hz_test.utc_today() - 1), hz_test.utc_today() - 1,
+  (SELECT created_at FROM public.halaqa_encouragements WHERE id = (SELECT value FROM hz_test.state WHERE key = 'first_encouragement')::UUID)
+    - INTERVAL '1 hour'
+FROM hz_test.state WHERE key = 'group';
+INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, local_date, sent_on, created_at)
+SELECT value::UUID, '00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000b', 'dua',
+  hz_test.d(hz_test.utc_today() - 9), hz_test.utc_today() - 9, now() - INTERVAL '8 days'
+FROM hz_test.state WHERE key = 'group';
+SELECT hz_test.login('00000000-0000-4000-8000-00000000000b');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  items JSONB := public.get_received_encouragements()->'items';
+BEGIN
+  PERFORM hz_test.eq('late commit is listed', jsonb_array_length(items), 2);
+  PERFORM hz_test.eq('newest first', items->0->>'id', (SELECT value FROM hz_test.state WHERE key = 'first_encouragement'));
+  PERFORM hz_test.eq('older than 7 days is not listed', (
+    SELECT count(*) FROM jsonb_array_elements(items) AS i WHERE (i->>'created_at')::TIMESTAMPTZ < now() - INTERVAL '7 days'
+  ), 0::BIGINT);
 END $$;
 RESET ROLE;
 
@@ -617,21 +656,78 @@ BEGIN
     VALUES (%L, 'invite', '00000000-0000-4000-8002-000000000001')$q$, other_group), 'halaqa_members_group_kind_fkey');
 END $$;
 
--- Finding 18: the inbox counts encouragements only from halaqas the reader is still in, but still
--- reports the newest one so the device's watermark moves past it.
+-- Finding 18: the inbox lists encouragements only from halaqas the reader is still in.
 SELECT hz_test.login('00000000-0000-4000-8002-000000000001');
 SET ROLE authenticated;
 DO $$
 DECLARE
   gid UUID := (SELECT value FROM hz_test.state WHERE key = 'matched_group')::UUID;
 BEGIN
-  PERFORM hz_test.eq('inbox counts an active halaqa', public.get_received_encouragements_since(NULL)->>'count', '1');
+  PERFORM hz_test.eq('inbox lists an active halaqa', jsonb_array_length(public.get_received_encouragements()->'items'), 1);
   PERFORM public.leave_halaqa(gid);
-  PERFORM hz_test.eq('inbox skips a left halaqa', public.get_received_encouragements_since(NULL)->>'count', '0');
-  PERFORM hz_test.eq('left halaqa still moves the watermark',
-    public.get_received_encouragements_since(NULL)->'latest_created_at' <> 'null'::JSONB, true);
+  PERFORM hz_test.eq('inbox skips a left halaqa', public.get_received_encouragements()->'items', '[]'::JSONB);
 END $$;
 RESET ROLE;
+
+-- Finding 5 (second review): the limit is one send per calendar day of the sender, by the server's
+-- clock in their stored zone, not one per 20 hours.
+SELECT hz_test.make_user(('00000000-0000-4000-8005-' || lpad(i::TEXT, 12, '0'))::UUID, 'enc_user_' || i, NULL)
+FROM generate_series(1, 2) AS i;
+SELECT hz_test.login('00000000-0000-4000-8005-000000000001');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  INSERT INTO hz_test.state VALUES ('enc_code', public.create_invite_halaqa('Daily limit')->>'invite_code');
+  PERFORM hz_test.login('00000000-0000-4000-8005-000000000002');
+  INSERT INTO hz_test.state VALUES ('enc_group', public.join_halaqa_by_code((SELECT value FROM hz_test.state WHERE key = 'enc_code'))->>'id');
+  PERFORM hz_test.login('00000000-0000-4000-8005-000000000001');
+  PERFORM public.send_halaqa_encouragement((SELECT value FROM hz_test.state WHERE key = 'enc_group')::UUID,
+    '00000000-0000-4000-8005-000000000002', 'ease', NULL, hz_test.today_text());
+END $$;
+RESET ROLE;
+-- The first send was 21 hours ago, earlier the same day.
+UPDATE public.halaqa_encouragements SET created_at = now() - INTERVAL '21 hours'
+WHERE from_user = '00000000-0000-4000-8005-000000000001';
+CREATE FUNCTION hz_test.send_enc() RETURNS JSONB LANGUAGE sql AS $$
+  SELECT public.send_halaqa_encouragement((SELECT value FROM hz_test.state WHERE key = 'enc_group')::UUID,
+    '00000000-0000-4000-8005-000000000002', 'dua', NULL, hz_test.today_text())
+$$;
+GRANT EXECUTE ON FUNCTION hz_test.send_enc() TO authenticated;
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM hz_test.expect_error('SELECT hz_test.send_enc()', 'already_encouraged_today');
+END $$;
+RESET ROLE;
+-- A send on a later day of the sender's (a stored zone further east) still counts as today.
+UPDATE public.halaqa_encouragements SET sent_on = sent_on + 1 WHERE from_user = '00000000-0000-4000-8005-000000000001';
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM hz_test.expect_error('SELECT hz_test.send_enc()', 'already_encouraged_today');
+END $$;
+RESET ROLE;
+-- Yesterday's send, three hours ago, leaves today open. The day comes from the sender's stored zone.
+UPDATE public.halaqa_encouragements SET sent_on = sent_on - 2, created_at = now() - INTERVAL '3 hours'
+WHERE from_user = '00000000-0000-4000-8005-000000000001';
+INSERT INTO public.habit_days (user_id, local_date, earned_status, minimum_met, tz, created_at, updated_at)
+VALUES ('00000000-0000-4000-8005-000000000001', hz_test.d(hz_test.utc_today() - 20), 'done', true, 'Pacific/Kiritimati',
+  now(), now());
+SET ROLE authenticated;
+DO $$
+DECLARE
+  sent UUID := (hz_test.send_enc()->>'id')::UUID;
+BEGIN
+  PERFORM hz_test.expect_error('SELECT hz_test.send_enc()', 'already_encouraged_today');
+  INSERT INTO hz_test.state VALUES ('enc_sent', sent);
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('day from the stored zone', (
+    SELECT sent_on FROM public.halaqa_encouragements WHERE id = (SELECT value FROM hz_test.state WHERE key = 'enc_sent')::UUID
+  ), (now() AT TIME ZONE 'Pacific/Kiritimati')::DATE);
+END $$;
 
 DO $$
 BEGIN
@@ -934,6 +1030,62 @@ BEGIN
   PERFORM hz_test.eq('103 people make four cohorts', (
     SELECT count(*) FROM public.board_cohorts WHERE week_start = hz_test.wednesday_week()
   ), 4::BIGINT);
+  PERFORM hz_test.eq('inactive user is waiting', (
+    SELECT board_waiting FROM public.profile_privacy WHERE user_id = '00000000-0000-4000-8004-000000000104'
+  ), true);
+END $$;
+
+-- Finding 6 (second review): a user a pass left waiting returns to the queue with their next synced
+-- wird day, and passes place users from the bands the app last reported (refresh_board_bands).
+SELECT hz_test.day('00000000-0000-4000-8004-000000000104', hz_test.utc_today(), 'done');
+DO $$
+BEGIN
+  PERFORM hz_test.eq('a synced wird day requeues the waiting user', (
+    SELECT NOT board_waiting AND board_enrolled_week < hz_test.wednesday_week()
+    FROM public.profile_privacy WHERE user_id = '00000000-0000-4000-8004-000000000104'
+  ), true);
+END $$;
+-- 106 joined with juz_amma bands and now reports hafiz; 107 moves its week start to Saturday.
+SELECT hz_test.make_user(('00000000-0000-4000-8004-' || lpad(i::TEXT, 12, '0'))::UUID, 'pass_user_' || i, NULL)
+FROM generate_series(106, 107) AS i;
+INSERT INTO public.profile_privacy (user_id, board_joined, board_week_start, board_level_band, board_pace_band,
+  board_utc_offset_minutes, board_enrolled_week)
+SELECT ('00000000-0000-4000-8004-' || lpad(i::TEXT, 12, '0'))::UUID, true, 3, 'juz_amma', 'light', 180,
+  hz_test.wednesday_week() - CASE WHEN i = 106 THEN 7 ELSE 0 END
+FROM generate_series(106, 107) AS i;
+SELECT hz_test.day('00000000-0000-4000-8004-000000000106', hz_test.utc_today() - 1, 'done');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM hz_test.login('00000000-0000-4000-8004-000000000106');
+  PERFORM public.refresh_board_bands('hafiz', 'light', 180, hz_test.today_text(), 3);
+  PERFORM hz_test.expect_error(format($q$SELECT public.refresh_board_bands('hafiz', 'warp', 180, %L, 3)$q$,
+    hz_test.today_text()), 'invalid_bands');
+  PERFORM hz_test.login('00000000-0000-4000-8004-000000000107');
+  PERFORM public.refresh_board_bands('juz_amma', 'light', 180, hz_test.today_text(), 6);
+  PERFORM hz_test.login('00000000-0000-4000-8004-000000000105');
+  PERFORM public.refresh_board_bands('hafiz', 'light', 180, hz_test.today_text(), 3);
+  PERFORM hz_test.login('00000000-0000-4000-8004-000000000001');
+  PERFORM public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 3);
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('the requeued user is placed by the next pass', (
+    SELECT count(*) FROM public.board_members
+    WHERE user_id = '00000000-0000-4000-8004-000000000104' AND week_start = hz_test.wednesday_week() AND left_at IS NULL
+  ), 1::BIGINT);
+  PERFORM hz_test.eq('the pass uses the reported bands', (
+    SELECT bc.level_band FROM public.board_members AS bm JOIN public.board_cohorts AS bc ON bc.id = bm.cohort_id
+    WHERE bm.user_id = '00000000-0000-4000-8004-000000000106' AND bm.week_start = hz_test.wednesday_week()
+  ), 'hafiz');
+  PERFORM hz_test.eq('a new week start returns the user to the queue for it', (
+    SELECT board_week_start = 6 AND board_enrolled_week < hz_test.saturday_week() AND NOT board_waiting
+    FROM public.profile_privacy WHERE user_id = '00000000-0000-4000-8004-000000000107'
+  ), true);
+  PERFORM hz_test.eq('bands of a user off the board stay as they were', (
+    SELECT board_level_band FROM public.profile_privacy WHERE user_id = '00000000-0000-4000-8004-000000000105'
+  ), 'juz_amma');
 END $$;
 
 -- ─── 7. Profile visibility (SOC-01, ETH-07) ──────────────────────────────────
@@ -984,6 +1136,50 @@ RESET ROLE;
 SELECT hz_test.login('00000000-0000-4000-8000-00000000000b');
 SET ROLE authenticated;
 SELECT public.set_profile_privacy(true, true, true);
+RESET ROLE;
+
+-- Finding 1 (second review): stating minority clears the profile photo in the same transaction, and
+-- the public avatars bucket refuses a minor's uploads and replacements. Deleting stays allowed.
+INSERT INTO storage.objects (bucket_id, name, owner) VALUES
+  ('avatars', '00000000-0000-4000-8000-00000000000b/old.png', '00000000-0000-4000-8000-00000000000b'),
+  ('avatars', '00000000-0000-4000-8000-00000000000a/old.png', '00000000-0000-4000-8000-00000000000a');
+DO $$
+BEGIN
+  PERFORM hz_test.eq('a minor''s photo is cleared', (SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000b'), NULL::TEXT);
+  PERFORM hz_test.eq('an adult keeps their photo', (SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000a'),
+    'https://example.invalid/a.png');
+  PERFORM hz_test.eq('joining the board as a minor clears the photo too', (
+    SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8003-000000000003'
+  ), NULL::TEXT);
+END $$;
+SET ROLE authenticated;
+-- A minor setting an outside image URL on their own profile keeps no photo.
+UPDATE public.profiles SET avatar_url = 'https://example.invalid/outside.png' WHERE id = '00000000-0000-4000-8000-00000000000b';
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('a minor cannot set an outside photo URL', (SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000b'), NULL::TEXT);
+END $$;
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM hz_test.expect_error($q$INSERT INTO storage.objects (bucket_id, name, owner)
+    VALUES ('avatars', '00000000-0000-4000-8000-00000000000b/new.png', '00000000-0000-4000-8000-00000000000b')$q$, 'row-level security');
+  PERFORM hz_test.expect_error($q$UPDATE storage.objects SET name = '00000000-0000-4000-8000-00000000000b/renamed.png'
+    WHERE name = '00000000-0000-4000-8000-00000000000b/old.png'$q$, 'row-level security');
+  DELETE FROM storage.objects WHERE name = '00000000-0000-4000-8000-00000000000b/old.png';
+  PERFORM hz_test.eq('a minor deletes their own photo', (
+    SELECT count(*) FROM storage.objects WHERE name LIKE '00000000-0000-4000-8000-00000000000b/%'
+  ), 0::BIGINT);
+  PERFORM hz_test.login('00000000-0000-4000-8000-00000000000a');
+  INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('avatars', '00000000-0000-4000-8000-00000000000a/new.png', '00000000-0000-4000-8000-00000000000a');
+  UPDATE storage.objects SET name = '00000000-0000-4000-8000-00000000000a/renamed.png' WHERE name = '00000000-0000-4000-8000-00000000000a/old.png';
+  PERFORM hz_test.eq('an adult uploads and replaces', (
+    SELECT count(*) FROM storage.objects WHERE name IN ('00000000-0000-4000-8000-00000000000a/new.png', '00000000-0000-4000-8000-00000000000a/renamed.png')
+  ), 2::BIGINT);
+  PERFORM hz_test.expect_error($q$INSERT INTO storage.objects (bucket_id, name, owner)
+    VALUES ('avatars', '00000000-0000-4000-8000-00000000000b/x.png', '00000000-0000-4000-8000-00000000000a')$q$, 'row-level security');
+END $$;
 RESET ROLE;
 
 -- Finding 1: once B states they are a minor, their identity row is hidden from everyone but B. The

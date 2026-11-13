@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { AppState } from "react-native";
+import { z } from "zod";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabase } from "@/lib/database/provider";
 import type { AppDatabase } from "@/lib/database/types";
 import { putUserSetting } from "@/lib/database/user-settings";
-import { fetchReceivedEncouragementsSince } from "@/lib/halaqa/api";
+import { fetchReceivedEncouragements, type ReceivedEncouragements } from "@/lib/halaqa/api";
 import { notifyGroupEncouragement } from "@/lib/notifications/schedule";
 import { captureSocialOwner } from "@/lib/social/owner";
 import { socialFailureOf } from "@/lib/social/remote";
@@ -12,47 +13,78 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
 /**
- * The group_encouragement trigger (5.8.2). The device keeps, per account, the server time of the
- * newest encouragement it has handled. A check asks the server for what arrived after it, hands the
- * count to notifyGroupEncouragement, which batches it into at most one notification a day, and only
- * then moves the mark forward, so a failed notification is retried by the next check.
+ * The group_encouragement trigger (5.8.2). The server lists what the reader received in the last 7
+ * days by id, and the device keeps, per account, the ids it has already handled. A check hands the
+ * count of new ids to notifyGroupEncouragement, which batches them into at most one notification a
+ * day for this account only, and then acknowledges them, so a failed check is retried by the next
+ * one. Ids rather than a time mark, because a send that commits after a later one carries the
+ * earlier time.
  *
  * The key starts with "device_", which is off the sync allowlist (lib/database/user-settings.ts): the
- * mark describes this device's notifications, not the account.
+ * acknowledgements describe this device's notifications, not the account.
  */
-const WATERMARK_PREFIX = "device_halaqa_encouragements_seen:";
+const ACKS_PREFIX = "device_halaqa_encouragements_acked:";
+/** The server lists 7 days; an hour more absorbs the boundary. */
+const ACK_KEEP_MS = (7 * 24 + 1) * 60 * 60 * 1000;
 
-export function encouragementWatermarkKey(userId: string): string {
-  return `${WATERMARK_PREFIX}${userId}`;
+export function encouragementAcksKey(userId: string): string {
+  return `${ACKS_PREFIX}${userId}`;
+}
+
+/** Acknowledged ids with each encouragement's server time, for pruning by age. */
+const acksSchema = z.object({ acked: z.array(z.tuple([z.string(), z.string()])) });
+
+function parseAcks(value: string | undefined): Map<string, string> | null {
+  if (!value) return null;
+  try {
+    const parsed = acksSchema.safeParse(JSON.parse(value));
+    return parsed.success ? new Map(parsed.data.acked) : null;
+  } catch {
+    return null;
+  }
+}
+
+function serializeAcks(acked: ReadonlyMap<string, string>, received: ReceivedEncouragements): string {
+  const oldest = Date.parse(received.checkedAt) - ACK_KEEP_MS;
+  const kept = [...acked].filter(([, createdAt]) => !(Date.parse(createdAt) < oldest));
+  return JSON.stringify({ acked: kept });
 }
 
 export type EncouragementCheck =
   /** Signed out, no account service, or the account changed. */
   | { status: "skipped" }
-  /** First check for this account on this device: the mark starts now and nothing is announced. */
+  /** First check for this account on this device: what is listed is acknowledged, nothing announced. */
   | { status: "started" }
   | { status: "checked"; received: number };
 
 async function runCheck(db: AppDatabase, userId: string): Promise<EncouragementCheck> {
   const owner = captureSocialOwner(userId);
   if (!owner) return { status: "skipped" };
-  const key = encouragementWatermarkKey(userId);
+  const key = encouragementAcksKey(userId);
   const stored = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [key]);
-  const since = stored?.value || null;
-  const result = await fetchReceivedEncouragementsSince(since, owner);
+  if (!owner.isCurrent()) return { status: "skipped" };
+  const acked = parseAcks(stored?.value);
+  const received = await fetchReceivedEncouragements(owner);
   if (!owner.isCurrent()) return { status: "skipped" };
 
-  if (since === null) {
+  if (acked === null) {
     // Older encouragements were seen in the app or are past; announcing them now would be noise.
-    await putUserSetting(db, key, result.latestCreatedAt ?? result.checkedAt);
+    await putUserSetting(db, key, serializeAcks(new Map(received.items.map((item) => [item.id, item.createdAt])), received));
     return { status: "started" };
   }
-  if (result.count > 0) await notifyGroupEncouragement(db, { count: result.count });
-  // Rows from halaqas the reader has left are not counted but still move the mark past them.
-  if (result.latestCreatedAt !== null && result.latestCreatedAt !== since) {
-    await putUserSetting(db, key, result.latestCreatedAt);
+  const fresh = received.items.filter((item) => !acked.has(item.id));
+  if (fresh.length > 0) {
+    // Records the batch for this account only, and nothing once another account has signed in.
+    const recorded = await notifyGroupEncouragement(db, { account: owner, count: fresh.length });
+    if (!recorded) return { status: "skipped" };
+    // The batch is now this account's, so its ids are acknowledged under this account's own key even
+    // if another account signed in meanwhile; leaving them would announce them twice.
+    for (const item of fresh) acked.set(item.id, item.createdAt);
+  } else if (!owner.isCurrent()) {
+    return { status: "skipped" };
   }
-  return { status: "checked", received: result.count };
+  await putUserSetting(db, key, serializeAcks(acked, received));
+  return { status: "checked", received: fresh.length };
 }
 
 // One check at a time per account, so a foreground and a finished sync arriving together cannot

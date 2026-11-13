@@ -6,8 +6,8 @@
 # 1. Migration path: schema.sql at BASE_REF, the review-aggregate migrations it lacks, then this
 #    migration. Runs learning_consistency.test.sql there (merge parity, RLS as several users, every RPC),
 #    then learning_consistency_races.sh (two-session races on the board, halaqa and encouragement locks).
-# 2. Parity: a second pristine container built from the current schema.sql must dump the same public
-#    and private schemas, including privileges.
+# 2. Parity: a second pristine container built from the current schema.sql must dump the same public,
+#    private and rls schemas, including privileges, and the same storage policies.
 #
 # Usage: bash supabase/tests/run-learning-consistency.sh
 #   BASE_REF  commit whose schema.sql predates the migration (default 1980757e)
@@ -50,7 +50,8 @@ CREATE OR REPLACE FUNCTION storage.foldername(name TEXT) RETURNS TEXT[] LANGUAGE
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE storage.buckets OWNER TO postgres;
 ALTER TABLE storage.objects OWNER TO postgres;
-GRANT USAGE ON SCHEMA storage TO postgres;
+GRANT USAGE ON SCHEMA storage TO postgres, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
 SQL
 }
 
@@ -61,8 +62,11 @@ apply() {
 }
 
 dump() {
-  docker exec "$1" pg_dump -U supabase_admin -d postgres --schema-only --no-owner --schema=public --schema=private |
+  docker exec "$1" pg_dump -U supabase_admin -d postgres --schema-only --no-owner --schema=public --schema=private --schema=rls |
     grep -v '^--' | grep -v '^SET \|^SELECT pg_catalog.set_config\|^\\restrict \|^\\unrestrict ' | sed '/^$/d'
+  # The avatar policies live on storage.objects, outside the dumped schemas.
+  docker exec "$1" psql -U supabase_admin -d postgres -qtA -c \
+    "SELECT policyname, cmd, roles, qual, with_check FROM pg_policies WHERE schemaname = 'storage' ORDER BY policyname"
 }
 
 MIGRATED="$PREFIX-migrated"
@@ -94,7 +98,7 @@ apply "$FRESH" <"$ROOT/supabase/schema.sql"
 dump "$FRESH" >"$WORK/fresh.sql"
 docker rm -f "$FRESH" >/dev/null
 if diff -u "$WORK/migrated.sql" "$WORK/fresh.sql" >"$WORK/parity.diff"; then
-  echo "parity: schema.sql matches the migrated public and private schemas ($(wc -l <"$WORK/fresh.sql") dump lines)"
+  echo "parity: schema.sql matches the migrated public, private and rls schemas and storage policies ($(wc -l <"$WORK/fresh.sql") dump lines)"
 else
   echo "parity: differences between the migrated database and schema.sql"
   cat "$WORK/parity.diff"

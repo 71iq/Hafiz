@@ -1,6 +1,6 @@
 import * as fc from "fast-check";
 import { notificationsStrings } from "@/lib/i18n/features/notifications";
-import { countConsecutiveIgnored, findConversions, isFired } from "@/lib/notifications/log";
+import { advanceIgnoredTally, findConversions, isFired } from "@/lib/notifications/log";
 import { canAskNotificationPermission } from "@/lib/notifications/permission";
 import {
   chooseTemplate,
@@ -53,11 +53,15 @@ describe("permission re-ask (8.10, ONB-03)", () => {
 });
 
 describe("back-off counting (8.11, NOT-09)", () => {
+  let nextId = 0;
   const row = (type: string, at: Date, cancelled = false) => ({
+    id: `row-${String(nextId++).padStart(3, "0")}`,
     type,
     scheduled_for: at.toISOString(),
     cancelled_at: cancelled ? at.toISOString() : null,
   });
+  const tally = (rows: Parameters<typeof advanceIgnoredTally>[1], session: string | null = null) =>
+    advanceIgnoredTally(null, rows, session, NOW).count;
 
   it("counts delivered reminders since the last session once their 2-hour window has passed", () => {
     const rows = [
@@ -69,9 +73,9 @@ describe("back-off counting (8.11, NOT-09)", () => {
       row("streak_at_risk", daysAgo(0.5), true),
       row("wird_reminder", new Date(NOW.getTime() - 60 * 60 * 1000)),
     ];
-    expect(countConsecutiveIgnored(rows, [], NOW)).toBe(4);
-    expect(countConsecutiveIgnored(rows, [daysAgo(2.2).toISOString()], NOW)).toBe(2);
-    expect(countConsecutiveIgnored(rows, [NOW.toISOString()], NOW)).toBe(0);
+    expect(tally(rows)).toBe(4);
+    expect(tally(rows, daysAgo(2.2).toISOString())).toBe(2);
+    expect(tally(rows, NOW.toISOString())).toBe(0);
   });
 
   it("never counts a cancelled reminder as delivered, unless the OS had already shown it", () => {
@@ -81,10 +85,34 @@ describe("back-off counting (8.11, NOT-09)", () => {
     expect(isFired({ scheduled_for: due, cancelled_at: due, delivered_at: due }, NOW)).toBe(true);
     expect(isFired({ scheduled_for: new Date(NOW.getTime() + 60_000).toISOString(), cancelled_at: null }, NOW)).toBe(false);
     const rows = [
-      { type: "wird_reminder", scheduled_for: due, cancelled_at: due, delivered_at: null },
-      { type: "wird_reminder", scheduled_for: daysAgo(2).toISOString(), cancelled_at: null, delivered_at: null },
+      { id: "a", type: "wird_reminder", scheduled_for: due, cancelled_at: due, delivered_at: null },
+      { id: "b", type: "wird_reminder", scheduled_for: daysAgo(2).toISOString(), cancelled_at: null, delivered_at: null },
     ];
-    expect(countConsecutiveIgnored(rows, [], NOW)).toBe(1);
+    expect(tally(rows)).toBe(1);
+  });
+
+  it("treats a reminder the OS still holds after its time as late, not delivered", () => {
+    const late = { id: "late", scheduled_for: daysAgo(0.2).toISOString(), cancelled_at: null, delivered_at: null };
+    expect(isFired(late, NOW, new Set(["late"]))).toBe(false);
+    expect(isFired(late, NOW, new Set())).toBe(true);
+    expect(isFired({ ...late, delivered_at: NOW.toISOString() }, NOW, new Set(["late"]))).toBe(true);
+    // The tally waits for it rather than skipping past it.
+    const rows = [{ ...late, type: "wird_reminder" }, row("wird_reminder", daysAgo(0.15))];
+    const waiting = advanceIgnoredTally(null, rows, null, NOW, new Set(["late"]));
+    expect(waiting).toEqual({ count: 0, since: null, cursor: null });
+    expect(advanceIgnoredTally(waiting, rows, null, NOW, new Set()).count).toBe(2);
+  });
+
+  it("keeps a running total, so pruning old rows never lowers it and no row counts twice", () => {
+    const old = Array.from({ length: 7 }, (_, index) => row("wird_reminder", daysAgo(100 - index)));
+    const first = advanceIgnoredTally(null, old, null, NOW);
+    expect(first.count).toBe(7);
+    expect(advanceIgnoredTally(first, old, null, NOW)).toEqual(first);
+    // The seven old rows are pruned and seven new ones are ignored.
+    const fresh = Array.from({ length: 7 }, (_, index) => row("wird_reminder", daysAgo(10 - index)));
+    expect(advanceIgnoredTally(first, fresh, null, NOW).count).toBe(14);
+    // A new session starts over.
+    expect(advanceIgnoredTally(first, fresh, daysAgo(6.5).toISOString(), NOW).count).toBe(3);
   });
 
   it("marks a reminder converted when a session starts within 2 hours", () => {

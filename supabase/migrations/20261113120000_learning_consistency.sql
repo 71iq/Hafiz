@@ -6,7 +6,10 @@
 -- - profiles keeps only identity (username, display name, avatar, bio, country), which the public
 --   reflection feed needs. Totals and client-written streaks are dropped. A profile whose owner
 --   stated they are a minor is readable only by its owner; halaqa co-members see the name through
---   the halaqa RPCs and the board shows only the nickname (BRD-07).
+--   the halaqa RPCs and the board shows only the nickname (BRD-07). A minor has no photo: stating
+--   it clears the avatar, and the public avatars bucket refuses their uploads.
+-- - Helpers that RLS policies call live in the rls schema, which PostgREST does not expose, so a
+--   client cannot call them as RPCs.
 -- - Board and visibility choices live in profile_privacy, readable only by the owner, because
 --   is_minor or a nickname next to a username must never be public.
 -- - Activity and progress data are readable by their owner, or by halaqa members the owner shared
@@ -20,14 +23,23 @@
 -- server stores with the board choice. Cohorts are keyed by their week's first date, so users with
 -- different week starts never share one. There is no cron on the self-hosted stack: a board read
 -- places its caller and, in the same pass, a bounded batch of other joined users with the same week
--- start who have not been placed for that week yet, from the bands they last reported.
+-- start who have not been placed for that week yet, from the bands they last reported. The app
+-- reports changed bands (refresh_board_bands), and a user skipped for inactivity returns to the
+-- queue with their next synced wird day.
 --
 -- Concurrency: each user's board placement, joining and leaving serialize on that user's
 -- profile_privacy row; cohort choice and capacity serialize on one advisory lock per board week.
--- Halaqa joins serialize on one advisory lock per user, and joining or leaving a group on its row.
+-- Halaqa joins serialize on one advisory lock per user. Joining, leaving and sending encouragement
+-- lock the group row first and then a membership row.
 
 CREATE SCHEMA IF NOT EXISTS private;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;
+
+-- Helpers that RLS policies call. anon and authenticated need USAGE to evaluate those policies, but
+-- PostgREST exposes only public, so no client can call these as RPCs.
+CREATE SCHEMA IF NOT EXISTS rls;
+REVOKE ALL ON SCHEMA rls FROM PUBLIC;
+GRANT USAGE ON SCHEMA rls TO anon, authenticated;
 
 -- ─── 1. Review detail on existing sync tables (7.1) ──────────────────────────
 ALTER TABLE public.study_log
@@ -359,6 +371,9 @@ CREATE TABLE IF NOT EXISTS public.profile_privacy (
   board_utc_offset_minutes INTEGER CHECK (board_utc_offset_minutes BETWEEN -720 AND 840),
   -- The latest board week this user was considered for, by their own read or another user's pass.
   board_enrolled_week DATE,
+  -- A pass found no recent wird day and left this user unplaced for board_enrolled_week. Their next
+  -- synced wird day returns them to the queue (private.requeue_board_after_wird_day).
+  board_waiting BOOLEAN NOT NULL DEFAULT false,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   -- BRD-07: a minor appears on the board only under a nickname.
   CONSTRAINT profile_privacy_minor_nickname CHECK (NOT (is_minor AND board_joined AND board_nickname IS NULL)),
@@ -385,7 +400,9 @@ GRANT SELECT ON public.profile_privacy TO authenticated;
 -- ETH-07: minors cannot go public. Identity stays readable for the reflection feed, except a profile
 -- whose owner stated they are a minor, which only its owner reads. profile_privacy is owner-only, so
 -- the policy asks this definer helper. It must not read profiles itself, or the policy would recurse.
-CREATE OR REPLACE FUNCTION public.profile_identity_visible(target UUID)
+-- It answers for any user id, so it stays out of public, where anon could call it as an RPC and
+-- learn who is a minor.
+CREATE OR REPLACE FUNCTION rls.profile_identity_visible(target UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
@@ -395,14 +412,91 @@ AS $$
   SELECT target = (SELECT auth.uid())
     OR NOT EXISTS (SELECT 1 FROM public.profile_privacy AS pp WHERE pp.user_id = target AND pp.is_minor);
 $$;
-REVOKE ALL ON FUNCTION public.profile_identity_visible(UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.profile_identity_visible(UUID) TO anon, authenticated;
+REVOKE ALL ON FUNCTION rls.profile_identity_visible(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION rls.profile_identity_visible(UUID) TO anon, authenticated;
 
 DROP POLICY IF EXISTS "Profiles are publicly readable" ON public.profiles;
 DROP POLICY IF EXISTS "Profiles are readable unless the owner is a minor" ON public.profiles;
 CREATE POLICY "Profiles are readable unless the owner is a minor"
   ON public.profiles FOR SELECT
-  USING (public.profile_identity_visible(id));
+  USING (rls.profile_identity_visible(id));
+DROP FUNCTION IF EXISTS public.profile_identity_visible(UUID);
+
+-- ETH-07: a minor's photo never goes public. The avatars bucket is public, so a stated minor may not
+-- upload or replace an avatar there (deleting stays allowed). Stating it clears the profile's photo
+-- in the same transaction, and the app then deletes the stored files (lib/profile/privacy.ts).
+CREATE OR REPLACE FUNCTION rls.caller_is_minor()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profile_privacy AS pp WHERE pp.user_id = (SELECT auth.uid()) AND pp.is_minor);
+$$;
+REVOKE ALL ON FUNCTION rls.caller_is_minor() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION rls.caller_is_minor() TO authenticated;
+
+DROP POLICY IF EXISTS "Users can upload own avatar images" ON storage.objects;
+CREATE POLICY "Users can upload own avatar images"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND NOT rls.caller_is_minor()
+  );
+
+DROP POLICY IF EXISTS "Users can update own avatar images" ON storage.objects;
+CREATE POLICY "Users can update own avatar images"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  )
+  WITH CHECK (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND NOT rls.caller_is_minor()
+  );
+
+-- Covers every way is_minor is set: set_profile_privacy and join_board.
+CREATE OR REPLACE FUNCTION private.clear_minor_avatar()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  UPDATE public.profiles SET avatar_url = NULL WHERE id = NEW.user_id AND avatar_url IS NOT NULL;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profile_privacy_minor_avatar ON public.profile_privacy;
+CREATE TRIGGER profile_privacy_minor_avatar AFTER INSERT OR UPDATE OF is_minor ON public.profile_privacy
+  FOR EACH ROW WHEN (NEW.is_minor) EXECUTE FUNCTION private.clear_minor_avatar();
+
+-- A minor's profile never keeps a photo, whatever URL a client writes (ETH-07): the avatars bucket
+-- refuses their uploads, and this covers an outside image URL set directly on the profile.
+CREATE OR REPLACE FUNCTION private.profiles_minor_photo()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.avatar_url IS NOT NULL
+    AND EXISTS (SELECT 1 FROM public.profile_privacy AS pp WHERE pp.user_id = NEW.id AND pp.is_minor) THEN
+    NEW.avatar_url := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_minor_photo ON public.profiles;
+CREATE TRIGGER profiles_minor_photo BEFORE INSERT OR UPDATE OF avatar_url ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION private.profiles_minor_photo();
 
 -- ─── 6. Halaqa (5.7.1) ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.halaqa_groups (
@@ -455,9 +549,11 @@ CREATE TABLE IF NOT EXISTS public.halaqa_encouragements (
   )),
   -- Free text only in invite halaqas (SOC-06), checked by send_halaqa_encouragement.
   body TEXT CHECK (body IS NULL OR (char_length(btrim(body)) BETWEEN 1 AND 200 AND body !~ '[[:cntrl:]]')),
-  -- The sender's local date, for display only. SOC-06's one-a-day limit uses created_at, which the
-  -- caller cannot choose (send_halaqa_encouragement).
+  -- The sender's local date as their device sent it, for display only.
   local_date TEXT NOT NULL CHECK (local_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),
+  -- SOC-06: the sender's calendar day by the server's clock in their stored zone
+  -- (private.member_today), which the caller cannot choose. One send per group, sender and day.
+  sent_on DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (template_id IS NOT NULL OR body IS NOT NULL),
   CHECK (from_user <> to_user)
@@ -482,8 +578,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_members_one_matched
 CREATE INDEX IF NOT EXISTS idx_halaqa_groups_matched
   ON public.halaqa_groups(level_band, pace_band, utc_offset_band) WHERE kind = 'matched' AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_halaqa_encouragements_to_user ON public.halaqa_encouragements(to_user, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_halaqa_encouragements_sender
-  ON public.halaqa_encouragements(group_id, from_user, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_encouragements_sender_day
+  ON public.halaqa_encouragements(group_id, from_user, sent_on);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_review_partners_active_pair
   ON public.review_partners(user_a, user_b) WHERE ended_at IS NULL;
 
@@ -1001,9 +1097,10 @@ AS $$
   SELECT pg_advisory_xact_lock(hashtextextended('hafiz:halaqa-user:' || member::TEXT, 0));
 $$;
 
--- SOC-06: one encouragement per sender per day in each group, measured on the server's clock so the
--- caller's date cannot widen it. 20 hours lets a daily habit drift a little earlier each day.
-CREATE OR REPLACE FUNCTION private.encouraged_recently(target_group UUID, sender UUID, recipient UUID DEFAULT NULL)
+-- SOC-06: one encouragement per sender per calendar day in each group. `today` is the sender's day
+-- by the server (private.member_today). A send on a later day also counts: that day can only come
+-- from the sender's stored zone moving west, which must not open a second send.
+CREATE OR REPLACE FUNCTION private.encouraged_today(target_group UUID, sender UUID, today DATE, recipient UUID DEFAULT NULL)
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
@@ -1011,9 +1108,8 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.halaqa_encouragements AS e
-    WHERE e.group_id = target_group AND e.from_user = sender
+    WHERE e.group_id = target_group AND e.from_user = sender AND e.sent_on >= today
       AND (recipient IS NULL OR e.to_user = recipient)
-      AND e.created_at > now() - INTERVAL '20 hours'
   );
 $$;
 
@@ -1341,6 +1437,7 @@ DECLARE
   uid UUID := private.require_user();
   today DATE := private.checked_local_date(p_today);
   week_start DATE := date_trunc('week', today)::DATE;
+  sender_day DATE := private.member_today(uid);
   mine public.halaqa_members;
 BEGIN
   mine := private.require_halaqa_member(p_group_id, uid);
@@ -1361,7 +1458,7 @@ BEGIN
           'streak', CASE WHEN m.share_consistency OR m.user_id = uid
             THEN private.habit_streak(m.user_id, private.member_today(m.user_id)) END,
           'juz_completions', CASE WHEN m.share_juz OR m.user_id = uid THEN private.juz_completions(m.user_id) END,
-          'encouraged_today', private.encouraged_recently(p_group_id, uid, m.user_id),
+          'encouraged_today', private.encouraged_today(p_group_id, uid, sender_day, m.user_id),
           'teacher_view', mine.role = 'teacher' AND m.user_id <> uid
             AND (m.share_plan_with_teachers OR m.share_grades_with_teachers)
         ) AS member
@@ -1370,7 +1467,7 @@ BEGIN
         WHERE m.group_id = p_group_id AND m.left_at IS NULL
       ) AS members
     ),
-    'encouraged_today', private.encouraged_recently(p_group_id, uid),
+    'encouraged_today', private.encouraged_today(p_group_id, uid, sender_day),
     'received', (
       SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'id', e.id,
@@ -1406,10 +1503,20 @@ DECLARE
   uid UUID := private.require_user();
   today DATE := private.checked_local_date(p_today);
   group_kind TEXT;
+  sender_day DATE;
   clean_body TEXT := NULLIF(btrim(COALESCE(p_body, '')), '');
   new_id UUID;
 BEGIN
-  PERFORM private.require_halaqa_member(p_group_id, uid);
+  -- The group row, then the sender's membership row: the order leave_halaqa and the joins use, so a
+  -- send and a leave cannot deadlock. Membership is checked under both locks, so a sender who is
+  -- leaving cannot send, and concurrent sends by one sender see each other.
+  SELECT kind INTO group_kind FROM public.halaqa_groups WHERE id = p_group_id AND deleted_at IS NULL FOR SHARE;
+  PERFORM 1 FROM public.halaqa_members
+  WHERE group_id = p_group_id AND user_id = uid AND left_at IS NULL
+  FOR UPDATE;
+  IF group_kind IS NULL OR NOT FOUND THEN
+    RAISE EXCEPTION 'not_a_member' USING ERRCODE = '42501';
+  END IF;
   IF p_to_user IS NULL OR p_to_user = uid THEN
     RAISE EXCEPTION 'invalid_recipient';
   END IF;
@@ -1418,37 +1525,33 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN
     RAISE EXCEPTION 'invalid_recipient';
   END;
-  SELECT kind INTO group_kind FROM public.halaqa_groups WHERE id = p_group_id;
   IF clean_body IS NOT NULL AND group_kind <> 'invite' THEN
     RAISE EXCEPTION 'free_text_invite_only';
   END IF;
   IF p_template_id IS NULL AND clean_body IS NULL THEN
     RAISE EXCEPTION 'invalid_template';
   END IF;
-  -- The sender's membership row lock orders concurrent sends, so the second one sees the first.
-  PERFORM 1 FROM public.halaqa_members
-  WHERE group_id = p_group_id AND user_id = uid AND left_at IS NULL
-  FOR UPDATE;
-  IF private.encouraged_recently(p_group_id, uid) THEN
+  sender_day := private.member_today(uid);
+  IF private.encouraged_today(p_group_id, uid, sender_day) THEN
     RAISE EXCEPTION 'already_encouraged_today';
   END IF;
   BEGIN
-    INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, body, local_date)
-    VALUES (p_group_id, uid, p_to_user, p_template_id, clean_body, to_char(today, 'YYYY-MM-DD'))
+    INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, body, local_date, sent_on)
+    VALUES (p_group_id, uid, p_to_user, p_template_id, clean_body, to_char(today, 'YYYY-MM-DD'), sender_day)
     RETURNING id INTO new_id;
   EXCEPTION
     WHEN check_violation THEN RAISE EXCEPTION 'invalid_template';
+    WHEN unique_violation THEN RAISE EXCEPTION 'already_encouraged_today';
   END;
   RETURN jsonb_build_object('id', new_id);
 END;
 $$;
 
--- 5.8.2 group_encouragement: how many encouragements the caller received after p_since in the
--- halaqas they are still in, and the newest created_at seen, which the device keeps as its next
--- p_since. At most the 50 newest rows are read, through idx_halaqa_encouragements_to_user, so a
--- device that was away for long gets a capped count. With no p_since the count starts the
--- watermark; checked_at is the server's time for an inbox with nothing in it yet.
-CREATE OR REPLACE FUNCTION public.get_received_encouragements_since(p_since TIMESTAMPTZ)
+-- 5.8.2 group_encouragement: what the caller received in the last 7 days in the halaqas they are
+-- still in, newest first, at most 50 rows, read through idx_halaqa_encouragements_to_user. The
+-- device acknowledges ids instead of keeping a time watermark, so a send that commits after a later
+-- one is still announced. checked_at is the server's time, for pruning acknowledged ids by age.
+CREATE OR REPLACE FUNCTION public.get_received_encouragements()
 RETURNS JSONB
 LANGUAGE plpgsql
 STABLE
@@ -1458,22 +1561,23 @@ AS $$
 DECLARE
   uid UUID := private.require_user();
 BEGIN
-  RETURN (
-    SELECT jsonb_build_object(
-      'count', count(*) FILTER (WHERE EXISTS (
-        SELECT 1 FROM public.halaqa_members AS m
-        JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
-        WHERE m.group_id = recent.group_id AND m.user_id = uid AND m.left_at IS NULL
-      )),
-      'latest_created_at', max(recent.created_at),
-      'checked_at', now()
-    )
-    FROM (
-      SELECT e.group_id, e.created_at FROM public.halaqa_encouragements AS e
-      WHERE e.to_user = uid AND e.created_at > COALESCE(p_since, '-infinity'::TIMESTAMPTZ)
-      ORDER BY e.created_at DESC
-      LIMIT 50
-    ) AS recent
+  RETURN jsonb_build_object(
+    'items', (
+      SELECT COALESCE(jsonb_agg(jsonb_build_object('id', recent.id, 'created_at', recent.created_at)
+        ORDER BY recent.created_at DESC, recent.id), '[]'::JSONB)
+      FROM (
+        SELECT e.id, e.created_at FROM public.halaqa_encouragements AS e
+        WHERE e.to_user = uid AND e.created_at > now() - INTERVAL '7 days'
+          AND EXISTS (
+            SELECT 1 FROM public.halaqa_members AS m
+            JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
+            WHERE m.group_id = e.group_id AND m.user_id = uid AND m.left_at IS NULL
+          )
+        ORDER BY e.created_at DESC
+        LIMIT 50
+      ) AS recent
+    ),
+    'checked_at', now()
   );
 END;
 $$;
@@ -1649,10 +1753,12 @@ $$;
 -- The weekly placement (BRD-01, MAT-03) without cron. Each board read continues it for the reader's
 -- week: up to 100 joined users who share that week start and were not yet considered for the week
 -- are placed from the bands they last reported. Users with no synced wird day in the two weeks
--- before are only marked as considered, so people who stopped using the app do not fill cohorts;
--- their own next board read places them. Rows another transaction holds (that user reading, joining
--- or leaving the board) are skipped and left to it. idx_profile_privacy_board_pending serves the
--- scan in this order, so a pass reads at most 100 candidates.
+-- before are marked as waiting, so people who stopped using the app do not fill cohorts; their next
+-- synced wird day returns them to the queue (private.requeue_board_after_wird_day), and their own
+-- board read places them anyway. Rows another transaction holds (that user reading, joining or
+-- leaving the board, or syncing a wird day) are skipped and left for a later pass.
+-- idx_profile_privacy_board_pending serves the scan in this order, so a pass reads at most 100
+-- candidates.
 CREATE OR REPLACE FUNCTION private.board_enroll_pending(board_week DATE)
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -1660,6 +1766,7 @@ SET search_path = ''
 AS $$
 DECLARE
   candidate public.profile_privacy;
+  active BOOLEAN;
   placed INTEGER := 0;
 BEGIN
   FOR candidate IN
@@ -1671,21 +1778,49 @@ BEGIN
     LIMIT 100
     FOR UPDATE SKIP LOCKED
   LOOP
-    IF EXISTS (
+    active := EXISTS (
       SELECT 1 FROM public.habit_days AS h
       WHERE h.user_id = candidate.user_id
         AND h.status IS NOT NULL
         AND h.local_date >= to_char(board_week - 14, 'YYYY-MM-DD')
-    ) THEN
+    );
+    IF active THEN
       PERFORM private.board_place(candidate.user_id, board_week, candidate.board_level_band,
         candidate.board_pace_band, candidate.board_utc_offset_minutes);
       placed := placed + 1;
     END IF;
-    UPDATE public.profile_privacy SET board_enrolled_week = board_week WHERE user_id = candidate.user_id;
+    UPDATE public.profile_privacy SET board_enrolled_week = board_week, board_waiting = NOT active
+    WHERE user_id = candidate.user_id;
   END LOOP;
   RETURN placed;
 END;
 $$;
+
+-- A waiting board user who records a wird day returns to the queue: their considered week moves back
+-- a week, so the next pass of the current week places them from their latest bands. The trigger is
+-- deferred to commit and first locks the user's privacy row, so a pass considering them at the same
+-- time either finishes first (and is undone here) or skips the locked row and sees this day later.
+-- Runs as owner because the client writes habit_days and has no access to profile_privacy.
+CREATE OR REPLACE FUNCTION private.requeue_board_after_wird_day()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.profile_privacy WHERE user_id = NEW.user_id AND board_joined FOR NO KEY UPDATE;
+  IF FOUND THEN
+    UPDATE public.profile_privacy SET board_waiting = false, board_enrolled_week = board_enrolled_week - 7
+    WHERE user_id = NEW.user_id AND board_waiting;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS habit_days_board_requeue ON public.habit_days;
+CREATE CONSTRAINT TRIGGER habit_days_board_requeue AFTER INSERT OR UPDATE ON public.habit_days
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW WHEN (NEW.status IS NOT NULL) EXECUTE FUNCTION private.requeue_board_after_wird_day();
 
 -- BRD-05, BRD-07, BRD-08: standings show only when the cohort has at least 5 people. Each row has a
 -- nickname or display name, weekly points and current streak. The avatar is never shown for a minor
@@ -1781,13 +1916,50 @@ BEGIN
     board_level_band = p_level_band,
     board_pace_band = p_pace_band,
     board_utc_offset_minutes = p_utc_offset_minutes,
-    board_enrolled_week = GREATEST(board_enrolled_week, board_week)
+    board_enrolled_week = GREATEST(board_enrolled_week, board_week),
+    board_waiting = false
   WHERE user_id = uid
-    AND (board_week_start, board_level_band, board_pace_band, board_utc_offset_minutes, board_enrolled_week)
-      IS DISTINCT FROM (p_week_start, p_level_band, p_pace_band, p_utc_offset_minutes, GREATEST(board_enrolled_week, board_week));
+    AND (board_week_start, board_level_band, board_pace_band, board_utc_offset_minutes, board_enrolled_week, board_waiting)
+      IS DISTINCT FROM (p_week_start, p_level_band, p_pace_band, p_utc_offset_minutes, GREATEST(board_enrolled_week, board_week), false);
   cohort := private.board_place(uid, board_week, p_level_band, p_pace_band, p_utc_offset_minutes);
   PERFORM private.board_enroll_pending(board_week);
   RETURN private.board_view(uid, board_week, cohort);
+END;
+$$;
+
+-- 8.13: the app reports its bands when they change and at most once a day otherwise
+-- (lib/board/refresh.ts), so a weekly pass places a joined user who has not opened the Board tab
+-- from their current bands. A new week start is a new board week, so the user returns to the queue
+-- for it. Users who are not on the board are left alone.
+CREATE OR REPLACE FUNCTION public.refresh_board_bands(
+  p_level_band TEXT,
+  p_pace_band TEXT,
+  p_utc_offset_minutes INTEGER,
+  p_today TEXT,
+  p_week_start INTEGER
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.require_user();
+  today DATE := private.checked_local_date(p_today);
+BEGIN
+  PERFORM private.check_bands(p_level_band, p_pace_band, p_utc_offset_minutes);
+  PERFORM private.check_week_start(p_week_start);
+  UPDATE public.profile_privacy SET
+    board_level_band = p_level_band,
+    board_pace_band = p_pace_band,
+    board_utc_offset_minutes = p_utc_offset_minutes,
+    board_week_start = p_week_start,
+    board_enrolled_week = CASE WHEN board_week_start = p_week_start THEN board_enrolled_week
+      ELSE LEAST(board_enrolled_week, private.board_week(today, p_week_start) - 7) END,
+    board_waiting = board_waiting AND board_week_start = p_week_start
+  WHERE user_id = uid AND board_joined
+    AND (board_level_band, board_pace_band, board_utc_offset_minutes, board_week_start)
+      IS DISTINCT FROM (p_level_band, p_pace_band, p_utc_offset_minutes, p_week_start::SMALLINT);
 END;
 $$;
 
@@ -1833,6 +2005,7 @@ BEGIN
     board_pace_band = EXCLUDED.board_pace_band,
     board_utc_offset_minutes = EXCLUDED.board_utc_offset_minutes,
     board_enrolled_week = GREATEST(public.profile_privacy.board_enrolled_week, EXCLUDED.board_enrolled_week),
+    board_waiting = false,
     updated_at = EXCLUDED.updated_at;
   RETURN public.get_board(p_level_band, p_pace_band, p_utc_offset_minutes, p_today, p_week_start);
 END;
@@ -1861,6 +2034,7 @@ REVOKE ALL ON FUNCTION
   private.effective_habit_status(TEXT, TEXT),
   private.merge_habit_day(public.habit_days, public.habit_days),
   private.habit_days_before_write(),
+  private.clear_minor_avatar(),
   private.require_user(),
   private.checked_local_date(TEXT),
   private.local_today(TEXT),
@@ -1880,7 +2054,7 @@ REVOKE ALL ON FUNCTION
   private.require_halaqa_member(UUID, UUID),
   private.check_halaqa_limit(UUID),
   private.lock_halaqa_user(UUID),
-  private.encouraged_recently(UUID, UUID, UUID),
+  private.encouraged_today(UUID, UUID, DATE, UUID),
   private.halaqa_summary(UUID, UUID),
   private.new_invite_code(),
   private.halaqa_goal(UUID, DATE),
@@ -1888,6 +2062,7 @@ REVOKE ALL ON FUNCTION
   private.board_choose_cohort(DATE, TEXT, TEXT, INTEGER, UUID),
   private.board_place(UUID, DATE, TEXT, TEXT, INTEGER),
   private.board_enroll_pending(DATE),
+  private.requeue_board_after_wird_day(),
   private.board_view(UUID, DATE, UUID)
 FROM PUBLIC, anon, authenticated;
 
@@ -1905,9 +2080,10 @@ REVOKE ALL ON FUNCTION
   public.get_halaqa_goal(UUID, TEXT),
   public.get_halaqa_detail(UUID, TEXT),
   public.send_halaqa_encouragement(UUID, UUID, TEXT, TEXT, TEXT),
-  public.get_received_encouragements_since(TIMESTAMPTZ),
+  public.get_received_encouragements(),
   public.get_halaqa_teacher_view(UUID, UUID, TEXT),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
+  public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.join_board(TEXT, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.leave_board()
 FROM PUBLIC, anon, authenticated;
@@ -1926,9 +2102,10 @@ GRANT EXECUTE ON FUNCTION
   public.get_halaqa_goal(UUID, TEXT),
   public.get_halaqa_detail(UUID, TEXT),
   public.send_halaqa_encouragement(UUID, UUID, TEXT, TEXT, TEXT),
-  public.get_received_encouragements_since(TIMESTAMPTZ),
+  public.get_received_encouragements(),
   public.get_halaqa_teacher_view(UUID, UUID, TEXT),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
+  public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.join_board(TEXT, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.leave_board()
 TO authenticated;
