@@ -12,10 +12,9 @@ import {
 } from "@/lib/fsrs/types";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { buildDailyPlan, type PlanPage } from "@/lib/hifz/daily-plan";
-import { declareMemorizedPages, loadTodayWird, type PageCard } from "@/lib/hifz/pages";
+import { declareMemorizedPages, isMemorized, loadTodayWird, type PageCard } from "@/lib/hifz/pages";
 import {
   completedJuz,
-  isMemorized,
   monthlyCheckCandidates,
   monthlyCheckDue,
   pickMonthlyCheck,

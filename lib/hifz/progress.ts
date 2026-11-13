@@ -1,20 +1,11 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { addDays, localDateOf } from "@/lib/habit/dates";
-import { loadPageCards, toPlanPage, type PageCard } from "@/lib/hifz/pages";
+import { isMemorized, loadPageCards, toPlanPage, type PageCard } from "@/lib/hifz/pages";
 import { readHifzPlan } from "@/lib/hifz/plan";
 import { pagesOfJuz } from "@/lib/hifz/units";
 
 export type StrengthBands = Readonly<{ steady: number; fair: number; needsReview: number }>;
 
-/**
- * MST-01: a page counts as memorized when it is sabqi or manzil and its last graded review was Good
- * or better. Declared pages count once their first check passes.
- */
-export function isMemorized(card: PageCard): boolean {
-  if (card.tier === "sabaq" || card.tier === "manzil.unverified") return false;
-  const last = card.history.grades[card.history.grades.length - 1];
-  return last !== undefined && last.rating >= 3;
-}
 
 /** MST-02: steady at recall 0.90 or more, fair from 0.75, needs review below. Accurate, never inflated (ETH-09). */
 export function strengthBands(recalls: readonly number[]): StrengthBands {

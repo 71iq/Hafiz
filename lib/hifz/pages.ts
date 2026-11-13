@@ -102,6 +102,17 @@ function retrievability(row: StudyCardRow, now: Date): number | null {
   }
 }
 
+/**
+ * MST-01: a page counts as memorized when it is sabqi or manzil and its last graded review was Good
+ * or better. Declared pages count once their first check passes. Home, Progress and the board use
+ * this one definition.
+ */
+export function isMemorized(card: PageCard): boolean {
+  if (card.tier === "sabaq" || card.tier === "manzil.unverified") return false;
+  const last = card.history.grades[card.history.grades.length - 1];
+  return last !== undefined && last.rating >= 3;
+}
+
 export function toPlanPage(card: PageCard, today: LocalDate, now: Date): PlanPage {
   const before = card.history.grades.filter((grade) => grade.date < today);
   return {
@@ -210,7 +221,7 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
     remainingMinutes: todo.length * minutes.reviewPage,
     minutesPerReviewPage: minutes.reviewPage,
     minutesPerNewPage: minutes.newPage,
-    memorizedPages: cards.filter((card) => card.tier !== "sabaq").length,
+    memorizedPages: cards.filter(isMemorized).length,
     sabaqDoneToday: (sabaqToday?.count ?? 0) > 0,
   };
 }

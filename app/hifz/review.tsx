@@ -17,7 +17,9 @@ import { SessionHabitCards, showsCommitment, strongerWirdEvent, type SessionHabi
 import { MistakeTypeSheet, errorTypeLabel } from "@/components/hifz/MistakeTypeSheet";
 import { HIDDEN, RecitationPage, orderedTokens, visibleLines, type RevealState } from "@/components/hifz/RecitationPage";
 import { loadPageWordsData } from "@/components/mushaf/MushafPage";
-import { useDatabase } from "@/lib/database/provider";
+import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
+import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { endReviewSession, startReviewSession, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import { Rating, type Grade } from "@/lib/fsrs/scheduler";
@@ -85,7 +87,7 @@ function gradeLabel(rating: number, s: UIStrings): string {
  * support level, checked word by word, and graded with the rubric's proposal (4.2), followed by up
  * to 6 drills from the mistake inbox (ERR-04). Progress saves after every page (REV-01).
  */
-export default function HifzReviewScreen() {
+function HifzReviewScreen() {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, fontSize, lineHeight } = useSettings();
@@ -636,7 +638,7 @@ export default function HifzReviewScreen() {
                       variant="outline"
                       size="sm"
                       onPress={() => setAttempt((value) => ({ ...value, slips: value.slips + 1 }))}
-                      accessibilityLabel={`${s.hifzSlip}. ${interpolate(s.hifzSlipCount, { n: attempt.slips })}`}
+                      accessibilityLabel={`${s.hifzSlipHint}. ${interpolate(s.hifzSlipCount, { n: attempt.slips })}`}
                     >
                       <Plus size={15} color={muted} />
                       <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="text-charcoal dark:text-neutral-200" numberOfLines={1}>
@@ -711,4 +713,13 @@ export default function HifzReviewScreen() {
       {notice ? <Toast message={notice} onDismiss={() => setNotice(null)} duration={3500} announce /> : null}
     </SafeAreaView>
   );
+}
+
+/** Opened from a deep link or a reminder, the route waits for the database like the other routes. */
+export default function HifzReviewScreenRoute() {
+  const { isReady, progress, error } = useDatabaseStatus();
+  const s = useStrings();
+  if (error) return <DatabaseErrorState title={s.databaseError} message={error} />;
+  if (!isReady) return <LoadingScreen progress={progress} />;
+  return <HifzReviewScreen />;
 }

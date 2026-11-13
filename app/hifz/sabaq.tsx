@@ -14,7 +14,9 @@ import { SessionHabitCards, showsCommitment, strongerWirdEvent, type SessionHabi
 import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
 import { loadPageWordsData } from "@/components/mushaf/MushafPage";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
-import { useDatabase } from "@/lib/database/provider";
+import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
+import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { endReviewSession, startReviewSession, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import type { Grade } from "@/lib/fsrs/scheduler";
 import { loadHabitOverview } from "@/lib/habit/queries";
@@ -44,7 +46,7 @@ const LISTEN_REPEATS = 3;
  * ayah from memory with chaining, the whole chunk three times cleanly, linking to what came before,
  * then a graded fluent check that turns the chunk into a sabaq card (SBQ-02).
  */
-export default function SabaqScreen() {
+function SabaqScreen() {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage } = useSettings();
@@ -442,4 +444,13 @@ function SimilarLine({ reference, isRTL, accent, muted = false }: { reference: S
       </Text>
     </View>
   );
+}
+
+/** Opened from a deep link or a reminder, the route waits for the database like the other routes. */
+export default function SabaqScreenRoute() {
+  const { isReady, progress, error } = useDatabaseStatus();
+  const s = useStrings();
+  if (error) return <DatabaseErrorState title={s.databaseError} message={error} />;
+  if (!isReady) return <LoadingScreen progress={progress} />;
+  return <SabaqScreen />;
 }

@@ -373,6 +373,8 @@ export default function HomeScreen() {
         ? 0
         : wird.todo.length + (wird.newLines > 0 && !wird.daily.backlog && !wird.sabaqDoneToday ? 1 : 0);
   const remainingToday = totalDue + planRemaining;
+  // MST-01: with page or half-page review, Home counts memorized pages instead of ayah cards.
+  const pageMode = !!wird && wird.plan.unit !== "ayah";
   // 6.4: after 7 or more days without a wird, welcome the user back before today's review.
   const lastWirdDay = habit ? habit.days.filter((day) => day.localDate <= habit.today).at(-1)?.localDate ?? null : null;
   const returning =
@@ -479,13 +481,13 @@ export default function HomeScreen() {
                     fontVariant: ["tabular-nums"],
                   }}
                 >
-                  {localNumber(memorizedCards)}
+                  {localNumber(pageMode ? wird!.memorizedPages : memorizedCards)}
                 </Text>
                 <Text
                   className="text-warm-400 dark:text-neutral-500"
                   style={{ fontFamily: "Manrope_500Medium", fontSize: 11, ...textStartStyle(isRTL)}}
                 >
-                  {s.homeMemorized}
+                  {pageMode ? s.hifzHomeMemorizedPages : s.homeMemorized}
                 </Text>
               </View>
             </View>
