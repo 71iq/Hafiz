@@ -7,6 +7,7 @@ import { createSchema } from "@/lib/database/schema";
 import { fullSync } from "@/lib/database/sync";
 import { State } from "@/lib/fsrs/scheduler";
 import { getReviewStats } from "@/lib/fsrs/queries";
+import { encouragementAcksKey } from "@/lib/halaqa/encouragement-notifications";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const OLD = "2026-01-01T00:00:00.000Z";
@@ -1499,6 +1500,20 @@ it("drops device state built from the replaced account when restoring another", 
   expect(keys).not.toContain("device_hifz_today_plan");
   expect(keys).not.toContain("device_wird_extras");
   expect(keys).toContain("hifz_auto_delay_ms");
+});
+
+it("keeps another account's pending encouragement batches through a restore, with their acknowledgements", async () => {
+  const otherAccount = "00000000-0000-4000-8000-000000000002";
+  const pending = JSON.stringify({
+    batches: [{ id: "group-1", account_id: otherAccount, first_received_at: NEW, count: 2, log_id: null }],
+  });
+  const acksKey = encouragementAcksKey(otherAccount);
+  putSetting("notif_group_pending", pending);
+  putSetting(acksKey, "{}");
+  mockTableRows.set("user_settings:restore", [boundaryRows.user_settings]);
+  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key = 'notif_group_pending'").get()).toEqual({ value: pending });
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(acksKey)).toEqual({ value: "{}" });
 });
 
 it("pulls wird days before reviews and marks a day whose minimum two devices met together", async () => {

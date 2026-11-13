@@ -573,13 +573,16 @@ async function clearLocalSyncableData(db: DatabaseExecutor): Promise<void> {
 /**
  * Device-only state built from the replaced account's data: today's hifz page list, the monthly
  * check, today's extras and pending reminder follow-ups. Rebuilt from the restored account.
+ *
+ * Pending halaqa encouragement batches (notif_group_pending) stay: each batch names its account and
+ * only the signed-in account's batches are scheduled, while each account's acknowledged ids stay
+ * under its own key. Dropping the batches would leave those ids acknowledged and never announced.
  */
 const ACCOUNT_DERIVED_DEVICE_KEYS = new Set([
   "device_hifz_today_plan",
   "device_monthly_check",
   "device_wird_extras",
   "notif_remind_later",
-  "notif_group_pending",
   "notif_banner_dismissed",
 ]);
 
