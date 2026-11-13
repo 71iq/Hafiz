@@ -13,7 +13,14 @@ import {
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { buildDailyPlan, type PlanPage } from "@/lib/hifz/daily-plan";
 import { declareMemorizedPages, loadTodayWird, type PageCard } from "@/lib/hifz/pages";
-import { completedJuz, isMemorized, strengthBands } from "@/lib/hifz/progress";
+import {
+  completedJuz,
+  isMemorized,
+  monthlyCheckCandidates,
+  monthlyCheckDue,
+  pickMonthlyCheck,
+  strengthBands,
+} from "@/lib/hifz/progress";
 import { DEFAULT_HIFZ_PLAN, parseHifzPlan, writeHifzPlan } from "@/lib/hifz/plan";
 import { pagePolicy, tierFor, type GradeEvent } from "@/lib/hifz/tiers";
 import { pageCardId } from "@/lib/hifz/units";
@@ -232,5 +239,23 @@ describe("progress views (MST-01 to MST-03)", () => {
     expect(completedJuz(juz30)).toEqual([30]);
     juz30.delete(600);
     expect(completedJuz(juz30)).toEqual([]);
+  });
+});
+
+describe("monthly check (MST-05)", () => {
+  const card = (page: number, daysAgo: number, rating = 3): PageCard => ({
+    row: {} as PageCard["row"],
+    page,
+    tier: "manzil",
+    history: { declared: true, firstFluentDate: null, grades: [{ date: addDays(TODAY, -daysAgo), rating: rating as 3 }] },
+  });
+
+  it("checks memorized pages not reviewed in two weeks, once a month", () => {
+    const cards = [card(1, 20), card(2, 15), card(3, 14), card(4, 30, 1), card(5, 40), card(6, 50), card(7, 60)];
+    expect(monthlyCheckCandidates(cards, TODAY).map((c) => c.page)).toEqual([1, 2, 5, 6, 7]);
+    expect(pickMonthlyCheck(monthlyCheckCandidates(cards, TODAY), () => 0)).toHaveLength(5);
+    expect(monthlyCheckDue(null, TODAY, 5)).toBe(true);
+    expect(monthlyCheckDue("2026-11", TODAY, 5)).toBe(false);
+    expect(monthlyCheckDue("2026-10", TODAY, 4)).toBe(false);
   });
 });

@@ -190,6 +190,10 @@ export const hifzStrings = {
     hifzStrengthFair: "Fair: {{n}}",
     hifzStrengthNeedsReview: "Needs review: {{n}}",
     hifzJuzComplete: "Juz memorized: {{n}}",
+    hifzMonthlyTitle: "Monthly check",
+    hifzMonthlyBody: "5 pages you have not reviewed in two weeks, to see how your memorization is holding.",
+    hifzMonthlyStart: "Start the check",
+    hifzMonthlyResult: "{{clean}} of {{total}} pages recited cleanly.",
   },
   ar: {
     hifzSuggestedGrade: "مقترح بحسب تسميعك",
@@ -377,5 +381,9 @@ export const hifzStrings = {
     hifzStrengthFair: "متوسطة: {{n}}",
     hifzStrengthNeedsReview: "تحتاج مراجعة: {{n}}",
     hifzJuzComplete: "الأجزاء المحفوظة: {{n}}",
+    hifzMonthlyTitle: "التسميع الشهري",
+    hifzMonthlyBody: "خمس صفحات لم تراجعها منذ أسبوعين، لترى ثبات حفظك.",
+    hifzMonthlyStart: "ابدأ التسميع",
+    hifzMonthlyResult: "سُمِّعت {{clean}} من {{total}} صفحات بلا خطأ.",
   },
 } as const;

@@ -179,6 +179,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Sheet options stack vertically and align to the reading side.",
   ),
   entry(
+    "components/hifz/MonthlyCheckCard.tsx",
+    "card",
+    "source",
+    "Monthly check buttons mirror through MirroredRow; text aligns to the reading side.",
+  ),
+  entry(
     "components/hifz/RecitationPage.tsx",
     "quran-text",
     "source",

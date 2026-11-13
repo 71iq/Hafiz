@@ -6,6 +6,7 @@ import { localDateOf } from "@/lib/habit/dates";
 import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird, type TodayWird } from "@/lib/hifz/pages";
+import { loadMonthlyCheckDue } from "@/lib/hifz/progress";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
 /**
@@ -15,16 +16,22 @@ import { subscribeSyncCompleted } from "@/lib/sync/events";
 export function useTodayWird(db: AppDatabase) {
   const [wird, setWird] = useState<TodayWird | null | undefined>(undefined);
   const [inboxCount, setInboxCount] = useState(0);
+  const [monthlyCheckDue, setMonthlyCheckDue] = useState(false);
   const latest = useRef(0);
 
   const refresh = useCallback(async () => {
     const load = ++latest.current;
     try {
       const now = new Date();
-      const [next, inbox] = await Promise.all([loadTodayWird(db, now), countMistakeInbox(db, localDateOf(now))]);
+      const [next, inbox, monthly] = await Promise.all([
+        loadTodayWird(db, now),
+        countMistakeInbox(db, localDateOf(now)),
+        loadMonthlyCheckDue(db, now),
+      ]);
       if (load !== latest.current) return;
       setWird(next);
       setInboxCount(inbox);
+      setMonthlyCheckDue(monthly);
     } catch (error) {
       console.warn("[Hifz] Today's wird failed to load:", error);
       if (load === latest.current) setWird((current) => current ?? null);
@@ -46,5 +53,5 @@ export function useTodayWird(db: AppDatabase) {
     [refresh],
   );
 
-  return { wird, inboxCount, refresh };
+  return { wird, inboxCount, monthlyCheckDue, refresh };
 }

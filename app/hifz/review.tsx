@@ -27,7 +27,8 @@ import { loadHabitOverview } from "@/lib/habit/queries";
 import { readMistakeInbox, recordDrillResult, type InboxItem, type RecitationErrorType } from "@/lib/hifz/errors";
 import { GRADE_CAP, defaultSupportLevel, isGradable, SUPPORT_LEVELS, type SupportLevel } from "@/lib/hifz/grading";
 import { loadRecitationPage, type PageToken, type RecitationPage as PageData } from "@/lib/hifz/page-data";
-import { loadPageCards, loadTodayWird, type PageCard } from "@/lib/hifz/pages";
+import { loadPageCards, loadTodayWird, toPlanPage, type PageCard } from "@/lib/hifz/pages";
+import { markMonthlyCheck, monthlyCheckCandidates, pickMonthlyCheck } from "@/lib/hifz/progress";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import {
   emptyAttempt,
@@ -94,6 +95,8 @@ export default function HifzReviewScreen() {
   const drillsOnly = mode === "mistakes";
   // 6.4: a returning user starts with their strongest pages at the support level they chose.
   const welcomeBack = mode === "welcome_back";
+  // MST-05: the monthly check reviews 5 random pages not seen in two weeks and reports honestly.
+  const monthlyCheck = mode === "monthly_check";
   const welcomeLevel = ((): SupportLevel | null => {
     const raw = Number(Array.isArray(params.level) ? params.level[0] : params.level);
     return raw === 2 || raw === 3 || raw === 4 ? raw : null;
@@ -151,7 +154,9 @@ export default function HifzReviewScreen() {
         setPlanProgress({ done: wird.done.length, total: wird.done.length + wird.todo.length });
         const cards = await loadPageCards(db, { today, plan: wird.plan });
         const byId = new Map(cards.map((card) => [card.row.id, card]));
-        let todo = [...wird.todo];
+        let todo = monthlyCheck
+          ? pickMonthlyCheck(monthlyCheckCandidates(cards, today)).map((card) => toPlanPage(card, today, now))
+          : [...wird.todo];
         if (welcomeBack) {
           // Three warm-up pages with the highest recall first, then the weakest (6.4 step 3).
           const byRecall = [...todo].sort((a, b) => (b.retrievability ?? 0) - (a.retrievability ?? 0));
@@ -166,7 +171,7 @@ export default function HifzReviewScreen() {
       } else if (wird) {
         setPlan(wird.plan);
       }
-      for (const item of inbox) {
+      for (const item of monthlyCheck ? [] : inbox) {
         if (item.ayah === null) continue;
         const row = await db.getFirstAsync<{ text_qcf2: string; v2_page: number }>(
           "SELECT text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
@@ -174,7 +179,9 @@ export default function HifzReviewScreen() {
         );
         items.push({ kind: "drill", item, text: row ? { qcf2: row.text_qcf2, page: row.v2_page } : null });
       }
-      sessionRef.current = startReviewSession(drillsOnly ? "mistakes" : welcomeBack ? "welcome_back" : "wird");
+      sessionRef.current = startReviewSession(
+        drillsOnly ? "mistakes" : welcomeBack ? "welcome_back" : monthlyCheck ? "portion_check" : "wird",
+      );
       startedAt.current = Date.now();
       setQueue(items);
       setIndex(0);
@@ -183,7 +190,7 @@ export default function HifzReviewScreen() {
       console.warn("[HifzReview] Failed to load:", loadError);
       setPhase("error");
     }
-  }, [db, drillsOnly, welcomeBack]);
+  }, [db, drillsOnly, monthlyCheck, welcomeBack]);
 
   useEffect(() => {
     load();
@@ -233,9 +240,10 @@ export default function HifzReviewScreen() {
         ? recordReviewPace(db, { minutes: durationMs / 60_000, pages: totals.pages, current: minutesPerPage.current }).catch(console.warn)
         : null,
     ]);
+    if (monthlyCheck && totals.pages > 0) await markMonthlyCheck(db).catch(console.warn);
     setHabitResult({ event: wirdEvent.current, overview, againCount: againCount.current, total: totals.pages, durationMs });
     setPhase("summary");
-  }, [db, totals.pages]);
+  }, [db, monthlyCheck, totals.pages]);
 
   const advance = useCallback(() => {
     setMarkingKey(null);
@@ -430,7 +438,12 @@ export default function HifzReviewScreen() {
                 </Text>
               </MirroredRow>
             ))}
-            {planProgress && planProgress.total > 0 ? (
+            {monthlyCheck && totals.pages > 0 ? (
+              <Text dir={dir} variant="body-sm">
+                {interpolate(s.hifzMonthlyResult, { clean: formatNumber(totals.clean, uiLanguage), total: formatNumber(totals.pages, uiLanguage) })}
+              </Text>
+            ) : null}
+            {!monthlyCheck && planProgress && planProgress.total > 0 ? (
               <Text dir={dir} variant="caption">
                 {interpolate(s.hifzSummaryPlan, { done: formatNumber(planProgress.done, uiLanguage), total: formatNumber(planProgress.total, uiLanguage) })}
               </Text>

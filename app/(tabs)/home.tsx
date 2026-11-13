@@ -43,6 +43,8 @@ import { markFullWirdIfComplete } from "@/lib/habit/queries";
 import { WirdPlanCard } from "@/components/hifz/WirdPlanCard";
 import { WelcomeBackCard } from "@/components/hifz/WelcomeBackCard";
 import { WirdExtras } from "@/components/habit/WirdExtras";
+import { MonthlyCheckCard } from "@/components/hifz/MonthlyCheckCard";
+import { markMonthlyCheck } from "@/lib/hifz/progress";
 import { diffDays } from "@/lib/habit/dates";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { putUserSetting } from "@/lib/database/user-settings";
@@ -116,7 +118,7 @@ export default function HomeScreen() {
   );
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit } = useHabitOverview(db);
-  const { wird, inboxCount } = useTodayWird(db);
+  const { wird, inboxCount, monthlyCheckDue, refresh: refreshWird } = useTodayWird(db);
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   const [dueLoaded, setDueLoaded] = useState(false);
@@ -536,6 +538,17 @@ export default function HomeScreen() {
             onStartSabaq={() => router.push("/hifz/sabaq" as Href)}
             onSetup={() => router.push("/hifz/setup" as Href)}
             onDrill={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}
+          />
+        ) : null}
+
+        {monthlyCheckDue && !returning ? (
+          <MonthlyCheckCard
+            language={uiLanguage}
+            s={s}
+            onStart={() => router.push({ pathname: "/hifz/review", params: { mode: "monthly_check" } } as Href)}
+            onDecline={() => {
+              markMonthlyCheck(db).then(refreshWird).catch(console.warn);
+            }}
           />
         ) : null}
 
