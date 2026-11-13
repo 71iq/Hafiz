@@ -11,6 +11,8 @@ export const HABIT_SETTING_KEYS = {
   goal: "habit_streak_goal",
   pause: "habit_pause",
   weekStart: "habit_week_start",
+  /** 5.11 ZAY-02: Zayt can be turned off anywhere it appears. */
+  hideZayt: "habit_hide_zayt",
 } as const;
 
 /** STR-13: a pause lasts at most 60 days. */
@@ -27,6 +29,7 @@ export type HabitSettings = Readonly<{
   pause: HabitPause | null;
   /** 0 is Sunday. Null means the locale default (STR-28). */
   weekStart: number | null;
+  showZayt: boolean;
 }>;
 
 function parseJson<T>(value: string | undefined, schema: z.ZodType<T>): T | null {
@@ -49,6 +52,7 @@ export function parseHabitSettings(values: ReadonlyMap<string, string>): HabitSe
     weekStart: Number.isInteger(weekStart) && weekStart >= 0 && weekStart <= 6 && values.has(HABIT_SETTING_KEYS.weekStart)
       ? weekStart
       : null,
+    showZayt: values.get(HABIT_SETTING_KEYS.hideZayt) !== "true",
   };
 }
 

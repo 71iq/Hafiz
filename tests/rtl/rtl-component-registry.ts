@@ -149,6 +149,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Home streak card mirrors its rows and the progress fill direction follows the interface.",
   ),
   entry(
+    "components/habit/ZaytMood.tsx",
+    "direction-neutral",
+    "source",
+    "Decorative character art; it is hidden from screen readers and never mirrors.",
+  ),
+  entry(
     "components/hifz/HifzProgressCard.tsx",
     "progress-chart",
     "source",

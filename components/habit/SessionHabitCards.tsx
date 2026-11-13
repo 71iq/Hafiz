@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { CalendarCheck2, Coffee, HeartHandshake, Sparkles, Target } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
+import { ZaytMood, type ZaytMoodName } from "@/components/habit/ZaytMood";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import type { AppDatabase } from "@/lib/database/types";
@@ -55,6 +56,16 @@ function promptCard(input: SessionHabitInput): CardKind | null {
   return null;
 }
 
+/** 5.11: Zayt's mood for the session end, calm in every case (ZAY-01). */
+function sessionMood(input: SessionHabitInput, prompt: CardKind | null, milestone: boolean): ZaytMoodName | null {
+  if (prompt === "rest") return "tired_low_energy";
+  if (prompt === "struggle") return "compassionate_again";
+  if (!input.event) return null;
+  if (milestone) return "warm_glow_good";
+  if (input.event.kind === "earned_back") return "recovering_calm";
+  return "quiet_shimmer_easy";
+}
+
 function eventLine(input: SessionHabitInput, language: "en" | "ar", s: UIStrings): string {
   const event = input.event!;
   const length = event.length;
@@ -89,6 +100,7 @@ export function SessionHabitCards({
   const prompt = promptCard(input);
   const length = input.event?.length ?? 0;
   const milestone = input.event !== null && isStreakMilestone(length);
+  const mood = input.overview?.settings.showZayt === false ? null : sessionMood(input, prompt, milestone);
 
   const chooseGoal = (target: number) => {
     setGoalChoice(target);
@@ -102,6 +114,11 @@ export function SessionHabitCards({
 
   return (
     <View className="w-full max-w-sm" style={{ gap: 10 }}>
+      {mood ? (
+        <View className="items-center">
+          <ZaytMood mood={mood} />
+        </View>
+      ) : null}
       {input.event ? (
         <Card elevation="low" className="px-5 py-4" accessibilityRole="summary">
           <MirroredRow dir={dir} className="items-center gap-2">

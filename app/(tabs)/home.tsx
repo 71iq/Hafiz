@@ -518,6 +518,7 @@ export default function HomeScreen() {
           <WelcomeBackCard
             language={uiLanguage}
             s={s}
+            showZayt={habit?.settings.showZayt ?? true}
             onChoose={(level) =>
               router.push({ pathname: "/hifz/review", params: { mode: "welcome_back", level: String(level) } } as Href)
             }

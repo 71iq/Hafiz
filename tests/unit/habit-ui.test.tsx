@@ -44,7 +44,7 @@ function overview(days: HabitDay[], extra: Partial<HabitOverview> = {}, now = af
   });
   return {
     ...snapshot,
-    settings: { minimum: DEFAULT_WIRD_MINIMUM, studyCountsTowardMinimum: false, goal: null, pause: null, weekStart: null },
+    settings: { minimum: DEFAULT_WIRD_MINIMUM, studyCountsTowardMinimum: false, goal: null, pause: null, weekStart: null, showZayt: true },
     days,
     minimumProgressToday: 0.4,
     ...extra,
