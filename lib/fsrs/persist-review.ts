@@ -4,7 +4,8 @@ import type { ReviewTransition } from "@/lib/fsrs/review-transition";
 import { recordSessionProgress, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import type { DhuhrResolver } from "@/lib/habit/cutoff";
 import { localDateOf } from "@/lib/habit/dates";
-import { recordWirdProgress, type WirdProgressEvent } from "@/lib/habit/queries";
+import { makeUpTarget, recordWirdProgress, type WirdProgressEvent } from "@/lib/habit/queries";
+import { readDhuhrResolver } from "@/lib/prayer/settings";
 import { insertRecitationErrors, recordCleanRecitation, type RecitationErrorInput } from "@/lib/hifz/errors";
 import { createWeakSpotCards } from "@/lib/hifz/weak-spots";
 import type { Grader, SupportLevel } from "@/lib/hifz/grading";
@@ -45,6 +46,9 @@ function isCleanRecall(rating: number, context: ReviewSaveContext): boolean {
  * session counters, the day's wird status and every queued upload commit together or not at all, so
  * a failed grade leaves the streak, the inbox and the card as they were. Achievements and review
  * listeners run only after the commit.
+ *
+ * `transition` can be a function of the transaction, for a caller whose card another grade may have
+ * changed since it was read: it then reads the card and calculates inside the same transaction.
  */
 export async function persistReviewTransition({
   db,
@@ -56,38 +60,45 @@ export async function persistReviewTransition({
 }: {
   db: AppDatabase;
   cardId: string;
-  transition: ReviewTransition;
+  transition: ReviewTransition | ((tx: DatabaseExecutor) => Promise<ReviewTransition>);
   context?: ReviewSaveContext;
   /** Writes that belong to this grade, such as a manzil cycle completing, run inside its transaction. */
   extraWork?: (tx: DatabaseExecutor) => Promise<void>;
   /** Writes that must exist before the card is saved, such as creating it, run first in the transaction. */
   beforeWork?: (tx: DatabaseExecutor) => Promise<void>;
 }): Promise<ReviewSaveResult> {
-  const { reviewRecord } = transition;
-  const log: StudyLogInput = {
-    cardId,
-    rating: reviewRecord.rating,
-    state: reviewRecord.state,
-    due: reviewRecord.due,
-    stability: reviewRecord.stability,
-    difficulty: reviewRecord.difficulty,
-    elapsedDays: reviewRecord.elapsedDays,
-    scheduledDays: reviewRecord.scheduledDays,
-    reviewedAt: reviewRecord.reviewedAt,
-    sessionId: context.session?.id ?? null,
-    durationMs: context.durationMs,
-    supportLevel: context.supportLevel,
-    proposedRating: context.proposedRating,
-    grader: context.grader,
-    errorCount: context.errors.length,
-  };
-  const reviewedAt = new Date(reviewRecord.reviewedAt);
-  const localDate = localDateOf(reviewedAt);
   let result: ReviewSaveResult = { wird: { kind: "none" }, resolvedInboxItems: 0 };
+  let log: StudyLogInput | null = null;
   await db.withTransactionAsync(async (tx) => {
     if (beforeWork) await beforeWork(tx);
-    await putCardRow(tx, transition.updatedCard);
-    await putStudyLogRow(tx, log);
+    const resolved = typeof transition === "function" ? await transition(tx) : transition;
+    const { reviewRecord } = resolved;
+    const reviewedAt = new Date(reviewRecord.reviewedAt);
+    const localDate = localDateOf(reviewedAt);
+    const dhuhr = context.dhuhr ?? (await readDhuhrResolver(tx));
+    // STR-07, STR-08: decided before the log is written and stored on it, so every device credits
+    // this review to the same day.
+    const makeupFor = await makeUpTarget(tx, { now: reviewedAt, dhuhr });
+    const entry: StudyLogInput = {
+      cardId,
+      rating: reviewRecord.rating,
+      state: reviewRecord.state,
+      due: reviewRecord.due,
+      stability: reviewRecord.stability,
+      difficulty: reviewRecord.difficulty,
+      elapsedDays: reviewRecord.elapsedDays,
+      scheduledDays: reviewRecord.scheduledDays,
+      reviewedAt: reviewRecord.reviewedAt,
+      sessionId: context.session?.id ?? null,
+      durationMs: context.durationMs,
+      supportLevel: context.supportLevel,
+      proposedRating: context.proposedRating,
+      grader: context.grader,
+      errorCount: context.errors.length,
+      makeupFor,
+    };
+    await putCardRow(tx, resolved.updatedCard);
+    await putStudyLogRow(tx, entry);
     if (context.errors.length > 0) {
       await insertRecitationErrors(tx, {
         cardId,
@@ -103,7 +114,7 @@ export async function persistReviewTransition({
       ? await recordCleanRecitation(tx, { cardId, at: reviewRecord.reviewedAt, localDate })
       : 0;
     if (extraWork) await extraWork(tx);
-    const wird = await recordWirdProgress(tx, { now: reviewedAt, sessionId: context.session?.id ?? null, dhuhr: context.dhuhr });
+    const wird = await recordWirdProgress(tx, { now: reviewedAt, sessionId: context.session?.id ?? null, dhuhr, makeupFor });
     if (context.session) {
       const isPage = recitationUnits(cardId) === PAGE_UNITS && cardId.startsWith("page:");
       await recordSessionProgress(
@@ -119,8 +130,9 @@ export async function persistReviewTransition({
         reviewedAt,
       );
     }
+    log = entry;
     result = { wird, resolvedInboxItems };
   });
-  publishReviewLogged(db, log);
+  if (log) publishReviewLogged(db, log);
   return result;
 }

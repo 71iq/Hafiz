@@ -734,7 +734,8 @@ export async function deleteStudyCard(database: AppDatabase, deckId: string, car
   await database.withTransactionAsync((db) => deleteStudyCardRow(db, deckId, cardId));
 }
 
-async function deleteStudyCardRow(db: DatabaseExecutor, deckId: string, cardId: string): Promise<void> {
+/** Soft-delete a card with its upload queued, using the caller's executor (inside its transaction). */
+export async function deleteStudyCardRow(db: DatabaseExecutor, deckId: string, cardId: string): Promise<void> {
   const row = await db.getFirstAsync<StudyCardRow>(
     "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [cardId, deckId]
@@ -1279,6 +1280,8 @@ export type StudyLogInput = {
   proposedRating?: number | null;
   grader?: Grader;
   errorCount?: number;
+  /** STR-08: the missed day this review was graded toward, or null when it counts for its own day. */
+  makeupFor?: string | null;
 };
 
 /**
@@ -1296,13 +1299,14 @@ export async function putStudyLogRow(db: DatabaseExecutor, log: StudyLogInput): 
   const proposedRating = log.proposedRating ?? null;
   const grader = log.grader ?? "self";
   const errorCount = log.errorCount ?? 0;
+  const makeupFor = log.makeupFor ?? null;
   await db.runAsync(
     `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, sync_status,
-       session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+       session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count, makeup_for)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       cardId, rating, state, due, stability, difficulty, elapsedDays, scheduledDays, reviewedAt,
-      sessionId, durationMs, supportLevel, proposedRating, grader, localDate, tz, errorCount,
+      sessionId, durationMs, supportLevel, proposedRating, grader, localDate, tz, errorCount, makeupFor,
     ]
   );
   await enqueueSync(db, "study_log", "INSERT", `${cardId}:${reviewedAt}`, {
@@ -1323,6 +1327,7 @@ export async function putStudyLogRow(db: DatabaseExecutor, log: StudyLogInput): 
     local_date: localDate,
     tz,
     error_count: errorCount,
+    makeup_for: makeupFor,
   });
 }
 

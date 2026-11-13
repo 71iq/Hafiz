@@ -88,12 +88,7 @@ export function minimumProgress(tally: WirdTally, minimum: WirdMinimum): number 
 
 const STUDY_SQL = "(card_id LIKE 'word:%' OR card_id LIKE 'qiraat:%' OR card_id LIKE 'asbab:%')";
 
-/**
- * The same tally as tallyReviews, computed by SQLite over one day's review log, so a grade does not
- * load the day's rows. Bind [studyCounts (0 or 1), localDate]. Keep the weights in step with
- * recitationUnits; a test compares the two.
- */
-export const DAY_TALLY_SQL = `SELECT
+const TALLY_SELECT = `SELECT
   COALESCE(SUM(CASE
     WHEN ${STUDY_SQL} THEN 0
     WHEN card_id LIKE 'page:%' OR card_id LIKE 'chunk:%' THEN ${PAGE_UNITS}
@@ -103,4 +98,15 @@ export const DAY_TALLY_SQL = `SELECT
   COALESCE(SUM(CASE
     WHEN ${STUDY_SQL} AND ? = 0 THEN 0
     ELSE MIN(MAX(COALESCE(duration_ms, 0), 0), ${MAX_COUNTED_REVIEW_MS}) END), 0) AS counted_ms
-  FROM study_log WHERE local_date = ?`;
+  FROM study_log`;
+
+/**
+ * The same tally as tallyReviews, computed by SQLite, so a grade does not load the day's rows. Keep
+ * the weights in step with recitationUnits; a test compares the two.
+ * - DAY_TALLY_SQL: a day's own reviews, without those graded toward a make-up. Bind
+ *   [studyCounts (0 or 1), localDate].
+ * - MAKEUP_TALLY_SQL: the reviews graded toward making up a missed day (STR-08). Bind
+ *   [studyCounts (0 or 1), missedDay].
+ */
+export const DAY_TALLY_SQL = `${TALLY_SELECT} WHERE local_date = ? AND makeup_for IS NULL`;
+export const MAKEUP_TALLY_SQL = `${TALLY_SELECT} WHERE makeup_for = ?`;

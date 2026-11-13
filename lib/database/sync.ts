@@ -26,6 +26,7 @@ import { isSyncableUserSetting, putUserSetting, userSettingToSyncData } from "@/
 import { errorMessage } from "@/lib/error-message";
 import { applyRemoteHabitDay, habitDaySyncData } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
+import { createWeakSpotCards } from "@/lib/hifz/weak-spots";
 import type { HabitDayRow } from "@/lib/habit/types";
 import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 
@@ -200,7 +201,27 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     const habitSince = habitTablesPulled ? lastPullAt : PULL_EPOCH;
     await pullTable(db, "habit_days", userId, habitSince, upsertHabitDay, owner, onPageApplied);
     await pullTable(db, "review_sessions", userId, habitSince, upsertReviewSession, owner, onPageApplied);
-    await pullTable(db, "recitation_errors", userId, habitSince, upsertRecitationError, owner, onPageApplied);
+    // ERR-06: errors from other devices can make a weak spot here, so their locations get cloze cards.
+    const pulledErrorLocations: { surah: number; ayah: number | null; word: number | null }[] = [];
+    await pullTable(
+      db,
+      "recitation_errors",
+      userId,
+      habitSince,
+      async (tx, row) => {
+        pulledErrorLocations.push({ surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null });
+        await upsertRecitationError(tx, row);
+      },
+      owner,
+      onPageApplied,
+    );
+    if (pulledErrorLocations.length > 0) {
+      owner.requireCurrent();
+      await db.withTransactionAsync(async (tx) => {
+        owner.requireCurrent();
+        await createWeakSpotCards(tx, pulledErrorLocations, new Date());
+      });
+    }
 
     // Pull study_log. Pulled reviews can complete a day's minimum together with this device's own
     // (or come from an older app version without wird days), so their days are reconciled after.
@@ -212,6 +233,7 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       lastPullAt,
       async (tx, row) => {
         pulledReviewDates.add(row.local_date ?? localDateOf(new Date(row.reviewed_at)));
+        if (row.makeup_for) pulledReviewDates.add(row.makeup_for);
         await upsertStudyLog(tx, row);
       },
       owner,
@@ -1088,8 +1110,8 @@ async function upsertStudyLog(
   await db.runAsync(
     `INSERT INTO study_log
      (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, sync_status,
-      session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count, makeup_for)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.card_id,
       row.rating,
@@ -1108,6 +1130,7 @@ async function upsertStudyLog(
       row.local_date ?? localDateOf(reviewedAt),
       row.tz ?? (row.local_date ? null : deviceTimeZone(reviewedAt)),
       row.error_count ?? 0,
+      row.makeup_for ?? null,
     ],
   );
   rememberRestoreKey();
@@ -1410,7 +1433,7 @@ async function enqueueInitialLocalRows(
       db.getAllAsync<Record<string, any>>("SELECT * FROM study_cards"),
       db.getAllAsync<Record<string, any>>(
         `SELECT card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
-              session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count
+              session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count, makeup_for
        FROM study_log`,
       ),
       db.getAllAsync<Record<string, any>>("SELECT * FROM bookmarks"),

@@ -1,6 +1,6 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
-import { addDays, deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
+import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { meetsMinimum, tallyReviews } from "@/lib/habit/minimum";
 import { putHabitDay } from "@/lib/habit/queries";
 import { readHabitSettings } from "@/lib/habit/settings";
@@ -12,16 +12,39 @@ type LoggedReview = {
   duration_ms: number | null;
   reviewed_at: string;
   grader: string | null;
+  makeup_for: LocalDate | null;
 };
+
+const EARNED_RANK: Readonly<Record<string, number>> = { done: 6, made_up: 5 };
+
+function rowFor(date: LocalDate, status: "done" | "made_up", at: string, creditedThrough: string | null): HabitDayRow {
+  return {
+    local_date: date,
+    status,
+    earned_status: status,
+    reason: null,
+    excuse_updated_at: null,
+    minimum_met: 1,
+    full_met: 0,
+    manzil_cycle_completed: 0,
+    source_session_id: null,
+    credited_through: creditedThrough,
+    tz: deviceTimeZone(),
+    created_at: at,
+    updated_at: at,
+  };
+}
 
 /**
  * Record wird days that the review log proves but no habit row records: reviews saved by app versions
- * before wird days existed, and restored accounts whose old devices never uploaded wird days.
+ * before wird days existed, reviews from several devices that meet a minimum only together, and
+ * restored accounts whose old devices never uploaded wird days.
  *
- * A review without a grader comes from such an older version. Its day counts if it has any review,
- * which is the rule those versions showed the user. Newer reviews must meet the minimum wird.
- * Reviews credited to a made-up day never count again for their own day (STR-08).
- * It only raises days to done; merging never lowers a status.
+ * Each review counts once, for the day stored on it (STR-08): a review graded toward a make-up
+ * (makeup_for) counts only for that missed day, which becomes made up when those reviews meet the
+ * minimum; every other review counts for its own local date. A review without a grader comes from
+ * an older version, and its day counts if it has any review, the rule those versions showed. It only
+ * raises days; merging never lowers a status.
  */
 export async function reconcileHabitDaysFromLogs(
   db: DatabaseExecutor,
@@ -30,65 +53,59 @@ export async function reconcileHabitDaysFromLogs(
   const today = localDateOf(now);
   // After an incremental pull only the pulled reviews' days can change, so only those are read.
   const only = dates ? [...dates] : null;
+  const marks = only ? only.map(() => "?").join(", ") : "";
   const [settings, logs, habitRows] = await Promise.all([
     readHabitSettings(db),
     db.getAllAsync<LoggedReview>(
       only
-        ? `SELECT local_date, card_id, duration_ms, reviewed_at, grader FROM study_log
-            WHERE local_date IN (${only.map(() => "?").join(", ")}) ORDER BY reviewed_at`
-        : "SELECT local_date, card_id, duration_ms, reviewed_at, grader FROM study_log WHERE local_date IS NOT NULL ORDER BY reviewed_at",
-      only ?? [],
+        ? `SELECT local_date, card_id, duration_ms, reviewed_at, grader, makeup_for FROM study_log
+            WHERE local_date IN (${marks}) OR makeup_for IN (${marks})`
+        : "SELECT local_date, card_id, duration_ms, reviewed_at, grader, makeup_for FROM study_log WHERE local_date IS NOT NULL",
+      only ? [...only, ...only] : [],
     ),
     db.getAllAsync<HabitDayRow>("SELECT * FROM habit_days WHERE status IS NOT NULL"),
   ]);
   const days = new Map(habitRows.map((row) => [row.local_date, row]));
-  const byDate = new Map<LocalDate, LoggedReview[]>();
+  const own = new Map<LocalDate, LoggedReview[]>();
+  const makeUps = new Map<LocalDate, LoggedReview[]>();
   for (const log of logs) {
-    if (log.local_date > today) continue;
-    const list = byDate.get(log.local_date) ?? [];
+    const [bucket, day] = log.makeup_for ? [makeUps, log.makeup_for] : [own, log.local_date];
+    if (day > today) continue;
+    const list = bucket.get(day) ?? [];
     list.push(log);
-    byDate.set(log.local_date, list);
+    bucket.set(day, list);
   }
+  const meets = (reviews: LoggedReview[]) =>
+    meetsMinimum(
+      tallyReviews(
+        reviews.map((review) => ({ cardId: review.card_id, durationMs: review.duration_ms })),
+        { studyCounts: settings.studyCountsTowardMinimum },
+      ),
+      settings.minimum,
+    );
+  const rank = (date: LocalDate) => EARNED_RANK[days.get(date)?.earned_status ?? ""] ?? 0;
 
   let written = 0;
   const at = now.toISOString();
-  for (const [date, reviews] of [...byDate.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    // A day already earned by recitation needs nothing. A lower status (grace, excused, paused, made
-    // up or earned back) is raised to done when its own reviews prove it; the merge keeps any
-    // make-up reservation on the row.
-    if (days.get(date)?.earned_status === "done") continue;
-    const previous = days.get(addDays(date, -1));
-    const credited = previous?.credited_through ?? null;
-    const own = credited ? reviews.filter((review) => compareSyncTimestamps(review.reviewed_at, credited) > 0) : reviews;
-    if (own.length === 0) continue;
-    const legacy = own.some((review) => review.grader === null);
-    const met =
-      legacy ||
-      meetsMinimum(
-        tallyReviews(
-          own.map((review) => ({ cardId: review.card_id, durationMs: review.duration_ms })),
-          { studyCounts: settings.studyCountsTowardMinimum },
-        ),
-        settings.minimum,
+  const allDates = [...new Set([...own.keys(), ...makeUps.keys()])].sort();
+  for (const date of allDates) {
+    const ownReviews = own.get(date) ?? [];
+    if (rank(date) < EARNED_RANK.done && ownReviews.length > 0) {
+      if (ownReviews.some((review) => review.grader === null) || meets(ownReviews)) {
+        days.set(date, await putHabitDay(db, rowFor(date, "done", at, null)));
+        written += 1;
+        continue;
+      }
+    }
+    const makeUpReviews = makeUps.get(date) ?? [];
+    if (rank(date) < EARNED_RANK.made_up && makeUpReviews.length > 0 && meets(makeUpReviews)) {
+      const latest = makeUpReviews.reduce<string>(
+        (max, review) => (compareSyncTimestamps(review.reviewed_at, max) > 0 ? review.reviewed_at : max),
+        makeUpReviews[0].reviewed_at,
       );
-    if (!met) continue;
-    const row: HabitDayRow = {
-      local_date: date,
-      status: "done",
-      earned_status: "done",
-      reason: null,
-      excuse_updated_at: null,
-      minimum_met: 1,
-      full_met: 0,
-      manzil_cycle_completed: 0,
-      source_session_id: null,
-      credited_through: null,
-      tz: deviceTimeZone(),
-      created_at: at,
-      updated_at: at,
-    };
-    days.set(date, await putHabitDay(db, row));
-    written += 1;
+      days.set(date, await putHabitDay(db, rowFor(date, "made_up", at, latest)));
+      written += 1;
+    }
   }
   return written;
 }

@@ -119,6 +119,16 @@ describe("review fixes for streak edges", () => {
   });
 });
 
+describe("headline order", () => {
+  it("shows yesterday's open make-up before today's excuse", () => {
+    const days = [...run(addDays(TODAY, -2), 5), day(TODAY, "excused")];
+    const snapshot = buildHabitSnapshot({ days, today: TODAY, now: morning, makeUpCutoff: cutoff(addDays(TODAY, -1)), pause: null, goal: null });
+    expect(snapshot.headline.kind).toBe("make_up_open");
+    const later = buildHabitSnapshot({ days, today: TODAY, now: afternoon, makeUpCutoff: cutoff(addDays(TODAY, -1)), pause: null, goal: null });
+    expect(later.headline.kind).toBe("excused_today");
+  });
+});
+
 describe("grace days (STR-14)", () => {
   it("awards one after the 3rd wird day, then one every 7, holding at most 2", () => {
     const days = (count: number) => toDayMap(run(addDays(TODAY, -1), count));

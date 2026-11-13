@@ -365,7 +365,8 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       grader TEXT,
       local_date TEXT,
       tz TEXT,
-      error_count INTEGER NOT NULL DEFAULT 0
+      error_count INTEGER NOT NULL DEFAULT 0,
+      makeup_for TEXT
     );
 
     -- Review sessions (synced owner-only). One row per session, updated as cards are graded.
@@ -656,6 +657,8 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   await addColumnIfMissing(db, "study_log", "local_date", "local_date TEXT");
   await addColumnIfMissing(db, "study_log", "tz", "tz TEXT");
   await addColumnIfMissing(db, "study_log", "error_count", "error_count INTEGER NOT NULL DEFAULT 0");
+  // STR-08: the missed day this review was graded toward, while that day could still be made up.
+  await addColumnIfMissing(db, "study_log", "makeup_for", "makeup_for TEXT");
   await addColumnIfMissing(db, "study_cards", "tier", "tier TEXT");
   await addColumnIfMissing(db, "study_cards", "tier_changed_at", "tier_changed_at TEXT");
 
@@ -743,6 +746,8 @@ async function createUserMigrationIndexes(db: DatabaseExecutor): Promise<void> {
     "CREATE INDEX IF NOT EXISTS idx_review_sessions_local_date ON review_sessions(local_date)",
     "CREATE INDEX IF NOT EXISTS idx_recitation_errors_open ON recitation_errors(resolved_at, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_recitation_errors_card ON recitation_errors(card_id)",
+    "CREATE INDEX IF NOT EXISTS idx_recitation_errors_location ON recitation_errors(surah, ayah, word)",
+    "CREATE INDEX IF NOT EXISTS idx_study_log_makeup_for ON study_log(makeup_for) WHERE makeup_for IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS idx_notification_log_date ON notification_log(local_date)",
   ];
 

@@ -391,3 +391,57 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
     );
   });
 });
+
+describe("make-up attribution on each review (STR-08)", () => {
+  const yesterday = addDays(TODAY, -1);
+
+  function insertLog(cardId: string, at: Date, makeupFor: string | null) {
+    store.sql
+      .prepare(
+        `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
+          local_date, grader, makeup_for) VALUES (?, 3, 2, ?, 1, 1, 0, 1, ?, ?, 'self', ?)`,
+      )
+      .run(cardId, at.toISOString(), at.toISOString(), localDateOf(at), makeupFor);
+  }
+  async function reconcile(dates: string[]) {
+    await store.db.withTransactionAsync(async (tx) => {
+      await reconcileHabitDaysFromLogs(tx, { now: atLocalTime(TODAY, 14 * 60), dates: new Set(dates) });
+    });
+  }
+
+  it("stores the missed day on reviews graded toward a make-up, and only until it is made up", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    await reciteMinimum(TODAY, 9 * 60);
+    await grade("3:1", atLocalTime(TODAY, 9 * 60 + 30));
+    const rows = store.sql.prepare("SELECT makeup_for FROM study_log ORDER BY reviewed_at").all() as { makeup_for: string | null }[];
+    expect(rows.slice(0, 10).every((row) => row.makeup_for === yesterday)).toBe(true);
+    expect(rows[10]).toEqual({ makeup_for: null });
+  });
+
+  it("credits reviews pulled from another device to the day they made up, never to today", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    for (let i = 0; i < 10; i += 1) insertLog(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i), yesterday);
+    await reconcile([TODAY, yesterday]);
+    expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "made_up" });
+    expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
+  });
+
+  it("makes up a day from reviews two devices graded toward it together", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    insertLog("half:madani15:5:a", atLocalTime(TODAY, 9 * 60), yesterday);
+    insertLog("half:madani15:5:b", atLocalTime(TODAY, 10 * 60), yesterday);
+    await reconcile([TODAY, yesterday]);
+    expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "made_up" });
+    expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
+  });
+
+  it("keeps the reviews of an unfinished make-up off today after the cutoff", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    for (let i = 0; i < 5; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i));
+    for (let i = 0; i < 9; i += 1) {
+      expect((await grade(`3:${i + 1}`, atLocalTime(TODAY, 13 * 60 + i))).wird).toEqual({ kind: "none" });
+    }
+    expect((await grade("3:10", atLocalTime(TODAY, 13 * 60 + 9))).wird).toEqual({ kind: "minimum_met", length: 1 });
+    expect(await readHabitDayRow(store.db, yesterday)).toBeNull();
+  });
+});

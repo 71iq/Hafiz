@@ -67,11 +67,13 @@ export function buildHabitSnapshot(input: SnapshotInput): HabitSnapshot {
   const todayStatus = streak.todayStatus;
   if (earnBack && !earnBack.succeeded) headline = { kind: "earn_back", earnBack };
   else if (todayStatus === "done") headline = { kind: "done_today", length: streak.length };
+  // Yesterday's open make-up comes before today's excuse or pause: the excuse covers today only,
+  // and the make-up is what can still keep the streak (STR-07).
+  else if (streak.makeUpPending) headline = { kind: "make_up_open", length: streak.length, cutoff: makeUpCutoff };
   else if (todayStatus === "excused") headline = { kind: "excused_today", length: streak.length };
   else if (todayStatus === "paused" || (pause && pause.start <= today && today <= pause.end)) {
     headline = { kind: "paused", length: streak.length, until: pause?.end ?? today };
-  } else if (streak.makeUpPending) headline = { kind: "make_up_open", length: streak.length, cutoff: makeUpCutoff };
-  else if (streak.length > 0) headline = { kind: "at_risk", length: streak.length };
+  } else if (streak.length > 0) headline = { kind: "at_risk", length: streak.length };
   else if (longest > 0) headline = { kind: "fresh_start", longest };
   else headline = { kind: "empty" };
 

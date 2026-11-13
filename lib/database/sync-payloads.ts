@@ -87,6 +87,7 @@ const log = z.object({
   local_date: localDate.nullish(),
   tz: z.string().nullish(),
   error_count: nonNegative.nullish(),
+  makeup_for: localDate.nullish(),
 });
 const bookmark = z.object({
   ...wireMetadata,

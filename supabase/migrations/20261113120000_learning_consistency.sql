@@ -39,7 +39,10 @@ ALTER TABLE public.study_log
   -- Nullable: older clients omit it.
   ADD COLUMN IF NOT EXISTS local_date TEXT CHECK (local_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),
   ADD COLUMN IF NOT EXISTS tz TEXT,
-  ADD COLUMN IF NOT EXISTS error_count INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0);
+  ADD COLUMN IF NOT EXISTS error_count INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
+  -- STR-08: the missed day a review was graded toward while it could still be made up. The
+  -- attribution travels with the review, so every device credits it to the same day.
+  ADD COLUMN IF NOT EXISTS makeup_for TEXT CHECK (makeup_for ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 ALTER TABLE public.study_cards
   ADD COLUMN IF NOT EXISTS tier TEXT

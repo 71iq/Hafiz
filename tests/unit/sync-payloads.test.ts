@@ -1523,6 +1523,22 @@ it("pulls wird days before reviews and marks a day whose minimum two devices met
   expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(today)).toEqual({ status: "done" });
 });
 
+it("credits pulled make-up reviews to the missed day, not to today", async () => {
+  restoreComplete();
+  putSetting("last_pull_at", OLD);
+  const now = new Date();
+  const today = localDateOf(now);
+  const yesterday = localDateOf(new Date(now.getTime() - 24 * 60 * 60_000));
+  const earlier = new Date(now.getTime() - 60 * 60_000).toISOString();
+  mockTableRows.set("study_log:incremental", [
+    { ...boundaryRows.study_log, card_id: "page:madani15:5", reviewed_at: earlier, local_date: today, grader: "self", makeup_for: yesterday },
+  ]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(sql.prepare("SELECT makeup_for FROM study_log WHERE card_id = 'page:madani15:5'").get()).toEqual({ makeup_for: yesterday });
+  expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(yesterday)).toEqual({ status: "made_up" });
+  expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(today)).toBeUndefined();
+});
+
 it("keeps committed page counts and the cursor when a later incremental page is malformed, then retries", async () => {
   restoreComplete();
   putQueueRow();
