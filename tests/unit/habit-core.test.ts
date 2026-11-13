@@ -300,6 +300,11 @@ describe("habit day merge (DB-02)", () => {
     });
     const olderWithdrawal = excuse(null, "2026-11-13T07:00:00.000Z");
     expect(mergeHabitDays(excused, olderWithdrawal)).toMatchObject({ status: "excused", reason: "travel" });
+    // The same instant spelled two ways resolves by reason, as the server merge does.
+    const sameInstantWithdrawal = excuse(null, "2026-11-13T12:00:00Z");
+    const sameInstantIllness = excuse("illness", "2026-11-13T12:00:00.000Z");
+    expect(mergeHabitDays(sameInstantWithdrawal, sameInstantIllness)).toMatchObject({ reason: "illness" });
+    expect(mergeHabitDays(sameInstantIllness, sameInstantWithdrawal)).toMatchObject({ reason: "illness" });
   });
 
   it("shows a recited day over an excuse, and the excuse over a pause or grace day", () => {

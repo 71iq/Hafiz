@@ -1,8 +1,6 @@
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import { effectiveStatus, STATUS_PRECEDENCE, type EarnedStatus, type HabitDayRow } from "@/lib/habit/types";
 
-{ STATUS_PRECEDENCE };
-
 /** Orders instants, then their spelling (".000Z" or "Z"), so every comparison is total. */
 function compareTimes(a: string, b: string): number {
   const order = compareSyncTimestamps(a, b);
@@ -37,16 +35,22 @@ function compareEarned(a: HabitDayRow, b: HabitDayRow): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-/** Total order for the excuse register: last write wins, then the reason spelling. */
+/**
+ * Total order for the excuse register: last write wins by instant, then the reason, then the
+ * timestamp spelling. The server merge (private.merge_habit_day) compares the same instant and
+ * reason, so a withdrawal and an excuse written at the same instant but spelled ".000Z" and "Z"
+ * resolve the same way on both sides. The spelling only decides which equal string is kept.
+ */
 function compareExcuse(a: HabitDayRow, b: HabitDayRow): number {
   if (a.excuse_updated_at === null || b.excuse_updated_at === null) {
     return (a.excuse_updated_at === null ? 0 : 1) - (b.excuse_updated_at === null ? 0 : 1);
   }
-  const byTime = compareTimes(a.excuse_updated_at, b.excuse_updated_at);
-  if (byTime !== 0) return byTime;
+  const byInstant = compareSyncTimestamps(a.excuse_updated_at, b.excuse_updated_at);
+  if (byInstant !== 0) return byInstant;
   const left = a.reason ?? "";
   const right = b.reason ?? "";
-  return left < right ? -1 : left > right ? 1 : 0;
+  if (left !== right) return left < right ? -1 : 1;
+  return compareTimes(a.excuse_updated_at, b.excuse_updated_at);
 }
 
 /**
