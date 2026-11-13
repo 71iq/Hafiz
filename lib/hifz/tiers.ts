@@ -53,6 +53,10 @@ export function tierFor(history: PageHistory, today: LocalDate, plan: Pick<HifzP
   let state: State = { kind: "sabqi", since: history.firstFluentDate, grades: [] };
   for (const grade of grades) {
     if (grade.date < history.firstFluentDate) continue;
+    // A page that reached sabqi_days with its last 3 grades Good graduated that day, before this
+    // grade, so the grade is a manzil review. Otherwise a lapse after time-based graduation would be
+    // replayed as sabqi and could send the page back to sabaq.
+    if (state.kind === "sabqi" && graduates(state, grade.date)) state = { kind: "manzil", grades: [] };
     if (state.kind === "manzil") {
       state.grades.push(grade);
     } else if (state.kind === "sabaq") {

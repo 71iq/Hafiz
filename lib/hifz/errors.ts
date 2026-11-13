@@ -1,6 +1,7 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { addDays, localDateOf, type LocalDate } from "@/lib/habit/dates";
+import { removeClearedWeakSpotCards, WEAK_SPOT_ERROR_SQL, WEAK_SPOT_SESSIONS } from "@/lib/hifz/weak-spots";
 import { createId } from "@/lib/id";
 
 /** ERR-01 error types. */
@@ -215,12 +216,6 @@ export async function countMistakeInbox(db: DatabaseExecutor, today: LocalDate):
   return row?.count ?? 0;
 }
 
-/** ERR-06: a location wrong in this many separate sessions is a weak spot. */
-export const WEAK_SPOT_SESSIONS = 3;
-
-/** The errors that count toward a weak spot: clear errors, not tajweed, hesitation or caught slips. */
-export const WEAK_SPOT_ERROR_SQL = "deleted_at IS NULL AND type NOT IN ('tajweed', 'hesitation') AND corrected != 'self'";
-
 export type WeakSpot = Readonly<{ surah: number; ayah: number; word: number | null }>;
 
 export async function readWeakSpots(db: DatabaseExecutor): Promise<WeakSpot[]> {
@@ -233,13 +228,18 @@ export async function readWeakSpots(db: DatabaseExecutor): Promise<WeakSpot[]> {
   );
 }
 
-/** Remove one inbox item by hand, for an error logged by mistake. */
+/**
+ * Remove one inbox item by hand, for an error logged by mistake. When that leaves its word wrong in
+ * fewer than 3 sessions, the weak spot's cloze card is deleted in the same transaction (ERR-06).
+ * Callers refresh the reader's weak-spot markers afterwards.
+ */
 export async function dismissInboxItem(database: AppDatabase, { id, now = new Date() }: { id: string; now?: Date }): Promise<void> {
   const at = now.toISOString();
   await database.withTransactionAsync(async (db) => {
     const row = await db.getFirstAsync<RecitationErrorRow>(`SELECT ${ERROR_COLUMNS} FROM recitation_errors WHERE id = ?`, [id]);
     if (!row || row.deleted_at !== null) return;
     await writeError(db, { ...row, deleted_at: at, updated_at: at });
+    await removeClearedWeakSpotCards(db, [row]);
   });
 }
 

@@ -3,7 +3,7 @@ import { readHabitDayRow } from "@/lib/habit/queries";
 import { loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { completeSabaqChunk, newPageOrder, nextSabaqTarget } from "@/lib/hifz/sabaq";
-import { PAGE_COUNT, pageCardId } from "@/lib/hifz/units";
+import { chunkCardId, PAGE_COUNT, pageCardId } from "@/lib/hifz/units";
 import { Rating } from "@/lib/fsrs/scheduler";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
@@ -118,6 +118,22 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(passed.pageAdded).toBe(true);
     expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_cards WHERE id LIKE 'chunk:%'").get()).toEqual({ count: 1 });
     expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null })).toBeNull();
+  });
+
+  it("counts overlapping chunks passed on two devices once per line", async () => {
+    await writeHifzPlan(store.db, { ...plan, newPerDay: 1, dailyBudgetMin: 240 });
+    // Lines 1-4 on one device and 1-6 on another cover 6 lines of page 5, not 10.
+    const pass = store.sql.prepare(
+      `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, local_date)
+       VALUES (?, 3, 1, ?, 1, 5, 0, 0, ?, ?)`,
+    );
+    const at = atLocalTime(TODAY, 9 * 60).toISOString();
+    pass.run(chunkCardId(5, 1, 4), at, at, TODAY);
+    pass.run(chunkCardId(5, 1, 6), at, at, TODAY);
+    const wird = (await loadTodayWird(store.db, atLocalTime(TODAY, 10 * 60)))!;
+    expect(wird.sabaqLinesToday).toBe(6);
+    expect(wird.newLines).toBeGreaterThan(6);
+    expect(wird.sabaqDoneToday).toBe(false);
   });
 
   it("leaves no chunk behind when the grade cannot be saved", async () => {

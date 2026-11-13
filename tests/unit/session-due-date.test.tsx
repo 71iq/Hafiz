@@ -16,7 +16,8 @@ import type { SmartCardContent, SmartDeckRef } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
 import { DEFAULT_TAFSIR_SOURCE } from "@/lib/tafsir/sources";
 import { endReviewSession, recordSessionProgress, startReviewSession } from "@/lib/fsrs/review-sessions";
-import { loadHabitOverview, recordWirdProgress } from "@/lib/habit/queries";
+import { loadHabitOverview, makeUpTarget, recordWirdProgress } from "@/lib/habit/queries";
+import { readDhuhrResolver } from "@/lib/prayer/settings";
 import { recordCleanRecitation } from "@/lib/hifz/errors";
 import { getSmartCardContent } from "@/lib/fsrs/smart-decks";
 import {
@@ -166,6 +167,11 @@ jest.mock("@/lib/fsrs/smart-decks", () => ({
 jest.mock("@/lib/habit/queries", () => ({
   recordWirdProgress: jest.fn(),
   loadHabitOverview: jest.fn(),
+  makeUpTarget: jest.fn(),
+}));
+// The make-up cutoff reads prayer times inside the grade; covered by habit-wird-progress.
+jest.mock("@/lib/prayer/settings", () => ({
+  readDhuhrResolver: jest.fn(async () => () => null),
 }));
 // Inbox resolution is covered by habit-wird-progress against a real schema.
 jest.mock("@/lib/hifz/errors", () => ({
@@ -644,6 +650,8 @@ describe("Flashcard session due-date editor characterization", () => {
     jest.mocked(endReviewSession).mockResolvedValue(null);
     jest.mocked(loadHabitOverview).mockResolvedValue(null as never);
     jest.mocked(recordWirdProgress).mockResolvedValue({ kind: "none" });
+    jest.mocked(makeUpTarget).mockResolvedValue(null);
+    jest.mocked(readDhuhrResolver).mockResolvedValue(() => null);
     jest.mocked(recordCleanRecitation).mockResolvedValue(0);
     // Restore the React Native preset clock cleared by the fixture mock reset.
     jest.mocked(performance.now).mockImplementation(Date.now);
@@ -1735,6 +1743,7 @@ describe("Flashcard session due-date editor characterization", () => {
         proposedRating: null,
         grader: "self",
         errorCount: 0,
+        makeupFor: null,
       });
       await act(async () => logWrite.resolve());
       await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());

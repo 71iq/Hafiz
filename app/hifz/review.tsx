@@ -63,6 +63,7 @@ import {
 } from "@/lib/hifz/review";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { pagePolicy, type Tier } from "@/lib/hifz/tiers";
+import { refreshWeakSpots } from "@/lib/hifz/use-weak-spots";
 import { HIFZ_PAGES_DECK_ID, juzOfPage } from "@/lib/hifz/units";
 import { formatAyahRef } from "@/lib/arabic";
 import { formatDays, formatNumber } from "@/lib/i18n/count";
@@ -90,6 +91,7 @@ const HELPER_BUTTON = "flex-1 h-11 px-2 bg-surface-low dark:bg-surface-dark-low"
 
 /** `extra` counts half pages and seams reviewed on their own. */
 type Totals = { pages: number; clean: number; marked: number; extra: number };
+const NO_TOTALS: Totals = { pages: 0, clean: 0, marked: 0, extra: 0 };
 
 /** The first or last ayah that starts on a page, in the page font. */
 async function ayahOnPage(
@@ -173,7 +175,16 @@ function HifzReviewScreen() {
   const [exitOpen, setExitOpen] = useState(false);
   const [drillShown, setDrillShown] = useState(false);
   const [listener, setListener] = useState(false);
-  const [totals, setTotals] = useState<Totals>({ pages: 0, clean: 0, marked: 0, extra: 0 });
+  const [totals, setTotals] = useState<Totals>(NO_TOTALS);
+  /** The totals including every finished save, updated in the same tick so finalization never reads a stale render. */
+  const totalsRef = useRef<Totals>(NO_TOTALS);
+  /**
+   * One action at a time. Taken synchronously on the tap, before React renders `busy`, and held through
+   * the save, the advance and any finalization, so a second tap cannot save the same item twice.
+   */
+  const actionLock = useRef(false);
+  /** The queue index actions may act on. It moves past an item once its save succeeds, so a stale handler for that item does nothing. */
+  const actionIndex = useRef(0);
   // Pages the user holds, declared or reviewed: a seam leads only into one of them.
   const [heldPages, setHeldPages] = useState<ReadonlySet<number>>(new Set());
   const [seamText, setSeamText] = useState<AyahText | null>(null);
@@ -263,6 +274,9 @@ function HifzReviewScreen() {
         drillsOnly ? "mistakes" : welcomeBack ? "welcome_back" : monthlyCheck ? "portion_check" : "wird",
       );
       startedAt.current = Date.now();
+      actionIndex.current = 0;
+      totalsRef.current = NO_TOTALS;
+      setTotals(NO_TOTALS);
       setQueue(items);
       setIndex(0);
       setPhase(items.length === 0 ? "empty" : "recite");
@@ -357,40 +371,92 @@ function HifzReviewScreen() {
   }, [db, phase, seamPage]);
   const tokens = useMemo(() => orderedTokens(lines), [lines]);
 
-  const finish = useCallback(async () => {
-    const session = sessionRef.current;
-    const durationMs = Date.now() - startedAt.current;
-    const [overview] = await Promise.all([
-      loadHabitOverview(db).catch(() => null),
-      session ? endReviewSession(db, { session }).catch(console.warn) : null,
-      totals.pages > 0
-        ? recordReviewPace(db, {
-            minutes: durationMs / 60_000,
-            pages: totals.pages,
-            current: minutesPerPage.current,
-          }).catch(console.warn)
-        : null,
-    ]);
-    if (monthlyCheck && totals.pages > 0) await markMonthlyCheck(db).catch(console.warn);
-    setHabitResult({
-      event: wirdEvent.current,
-      overview,
-      againCount: againCount.current,
-      total: totals.pages + totals.extra,
-      durationMs,
-    });
-    setPhase("summary");
-  }, [db, monthlyCheck, totals.extra, totals.pages]);
+  /** End the session with the totals that include the last save, passed in rather than read from a render. */
+  const finish = useCallback(
+    async (final: Totals) => {
+      const session = sessionRef.current;
+      const durationMs = Date.now() - startedAt.current;
+      const [overview] = await Promise.all([
+        loadHabitOverview(db).catch(() => null),
+        session ? endReviewSession(db, { session }).catch(console.warn) : null,
+        final.pages > 0
+          ? recordReviewPace(db, {
+              minutes: durationMs / 60_000,
+              pages: final.pages,
+              current: minutesPerPage.current,
+            }).catch(console.warn)
+          : null,
+      ]);
+      if (monthlyCheck && final.pages > 0) await markMonthlyCheck(db).catch(console.warn);
+      setHabitResult({
+        event: wirdEvent.current,
+        overview,
+        againCount: againCount.current,
+        total: final.pages + final.extra,
+        durationMs,
+      });
+      setPhase("summary");
+    },
+    [db, monthlyCheck],
+  );
 
-  const advance = useCallback(() => {
-    setMarkingKey(null);
-    if (index + 1 >= queue.length) {
-      finish();
-      return;
+  /** Move past the item at `from`, or finish after the last one. Resolves once the summary is ready. */
+  const advance = useCallback(
+    async (from: number, final: Totals) => {
+      setMarkingKey(null);
+      actionIndex.current = from + 1;
+      if (from + 1 >= queue.length) {
+        await finish(final);
+        return;
+      }
+      setIndex(from + 1);
+      setPhase("recite");
+    },
+    [finish, queue.length],
+  );
+
+  /** Record a finished save in the totals now, so the advance and finalization see it. */
+  const addTotals = (delta: Partial<Totals>): Totals => {
+    const value = totalsRef.current;
+    const next: Totals = {
+      pages: value.pages + (delta.pages ?? 0),
+      clean: value.clean + (delta.clean ?? 0),
+      marked: value.marked + (delta.marked ?? 0),
+      extra: value.extra + (delta.extra ?? 0),
+    };
+    totalsRef.current = next;
+    setTotals(next);
+    return next;
+  };
+
+  /**
+   * Run one action on the current item under the action lock: the save, then the advance and, after
+   * the last item, the finalization. A failed save releases the lock and keeps the item open.
+   */
+  const runItemAction = async (label: string, save: () => Promise<Totals>) => {
+    const from = index;
+    if (actionLock.current || actionIndex.current !== from) return;
+    actionLock.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      let final: Totals;
+      try {
+        final = await save();
+      } catch (saveError) {
+        console.warn(`[HifzReview] ${label} failed:`, saveError);
+        setError(s.hifzSaveFailed);
+        return;
+      }
+      await advance(from, final);
+    } finally {
+      actionLock.current = false;
+      setBusy(false);
     }
-    setIndex((value) => value + 1);
-    setPhase("recite");
-  }, [finish, index, queue.length]);
+  };
+
+  /** Next at an ungraded support level: nothing is saved, but it still advances only once. */
+  const skip = () => runItemAction("Skip", async () => totalsRef.current);
 
   const setLevel = (level: SupportLevel) => {
     setAttempt((value) => ({ ...value, level }));
@@ -442,15 +508,14 @@ function HifzReviewScreen() {
 
   /** A half page, seam or weak-spot cloze reviewed on its own (SCH-06, SCH-08, ERR-06). */
   const gradeRemediation = async (rating: Grade, attemptOverride?: Attempt) => {
-    if (!current || (current.kind !== "half" && current.kind !== "seam" && current.kind !== "cloze") || busy) return;
+    if (!current || (current.kind !== "half" && current.kind !== "seam" && current.kind !== "cloze")) return;
+    const card = current.card;
     const usedAttempt = attemptOverride ?? attempt;
     const firstToken = current.kind === "half" ? (tokens.find((token) => !token.isMarker) ?? null) : null;
     if (current.kind === "half" && !firstToken) return;
-    setBusy(true);
-    setError(null);
-    try {
+    await runItemAction("Grade", async () => {
       const result = await saveRemediationGrade(db, {
-        card: current.card,
+        card,
         rating,
         attempt: usedAttempt,
         firstToken,
@@ -459,15 +524,9 @@ function HifzReviewScreen() {
         grader: listener ? "teacher" : "self",
       });
       if (rating === Rating.Again) againCount.current += 1;
-      setTotals((value) => ({ ...value, extra: value.extra + 1 }));
       showWirdNotice(result.wird);
-      advance();
-    } catch (saveError) {
-      console.warn("[HifzReview] Grade failed:", saveError);
-      setError(s.hifzSaveFailed);
-    } finally {
-      setBusy(false);
-    }
+      return addTotals({ extra: 1 });
+    });
   };
 
   const seamResult = (clean: boolean) => {
@@ -483,17 +542,17 @@ function HifzReviewScreen() {
       return;
     }
     const grader = source === "salah" ? "salah" : listener ? "teacher" : "self";
-    if (!current || current.kind !== "page" || !plan || busy) return;
+    if (!current || current.kind !== "page" || !plan) return;
+    const card = current.card;
     const firstToken = tokens.find((token) => !token.isMarker) ?? tokens[0];
     if (!firstToken && grader !== "salah") return;
-    setBusy(true);
-    setError(null);
-    try {
+    const usedAttempt = grader === "salah" ? emptyAttempt(4) : attempt;
+    await runItemAction("Grade", async () => {
       const result = await savePageGrade(db, {
-        card: current.card.row,
-        history: current.card.history,
+        card: card.row,
+        history: card.history,
         plan,
-        attempt: grader === "salah" ? emptyAttempt(4) : attempt,
+        attempt: usedAttempt,
         rating,
         firstToken: firstToken ?? { glyph: "", surah: 1, ayah: 1, wordPos: null, isMarker: true, firstLetter: null },
         session: sessionRef.current,
@@ -502,41 +561,30 @@ function HifzReviewScreen() {
         page: pageData,
       });
       if (rating === Rating.Again) againCount.current += 1;
-      const markedCount = grader === "salah" ? 0 : attempt.marks.size + attempt.peeked.length + attempt.shown.length;
-      setTotals((value) => ({
-        ...value,
-        pages: value.pages + 1,
-        clean: value.clean + (rating >= Rating.Good && markedCount === 0 ? 1 : 0),
-        marked: value.marked + markedCount,
-      }));
+      const markedCount = grader === "salah" ? 0 : usedAttempt.marks.size + usedAttempt.peeked.length + usedAttempt.shown.length;
       setPlanProgress((value) => (value ? { ...value, done: value.done + 1 } : value));
       // A wird milestone is the bigger news; the half page shows up in the queue either way.
       if (!showWirdNotice(result.wird) && result.remediation.half) {
         setNotice(result.remediation.half === "a" ? s.hifzHalfScheduledA : s.hifzHalfScheduledB);
       }
-      advance();
-    } catch (saveError) {
-      console.warn("[HifzReview] Grade failed:", saveError);
-      setError(s.hifzSaveFailed);
-    } finally {
-      setBusy(false);
-    }
+      return addTotals({ pages: 1, clean: rating >= Rating.Good && markedCount === 0 ? 1 : 0, marked: markedCount });
+    });
   };
 
   const drillResult = async (result: "clean" | "again" | "not_a_mistake") => {
-    if (!current || current.kind !== "drill" || busy) return;
-    setBusy(true);
-    try {
+    if (!current || current.kind !== "drill") return;
+    const { id } = current.item;
+    await runItemAction("Drill", async () => {
       // An error logged by mistake leaves the inbox instead of waiting for two clean days.
-      if (result === "not_a_mistake") await dismissInboxItem(db, { id: current.item.id });
-      else await recordDrillResult(db, { id: current.item.id, clean: result === "clean" });
-      advance();
-    } catch (drillError) {
-      console.warn("[HifzReview] Drill failed:", drillError);
-      setError(s.hifzSaveFailed);
-    } finally {
-      setBusy(false);
-    }
+      if (result === "not_a_mistake") {
+        await dismissInboxItem(db, { id });
+        // ERR-06: the dismissal can end a weak spot, so the reader's markers reload.
+        refreshWeakSpots(db).catch((refreshError) => console.warn("[HifzReview] Weak spots failed to refresh:", refreshError));
+      } else {
+        await recordDrillResult(db, { id, clean: result === "clean" });
+      }
+      return totalsRef.current;
+    });
   };
 
   const toggleMark = (token: PageToken, key: string) => {
@@ -717,7 +765,7 @@ function HifzReviewScreen() {
       <View className="items-center">
         <MirroredRow
           dir={dir}
-          className="items-center justify-between px-5 pt-3 pb-2"
+          className="items-center justify-between px-2 pt-3 pb-2"
           style={{ width: "100%", maxWidth: pageWidth }}
         >
           <Pressable
@@ -870,7 +918,7 @@ function HifzReviewScreen() {
       ) : current?.kind === "page" || current?.kind === "half" ? (
         <>
           <ScrollView ref={pageScrollRef} contentContainerStyle={{ paddingBottom: 24, alignItems: "center" }}>
-            <View style={{ width: "100%", maxWidth: pageWidth, paddingHorizontal: 16, gap: 10 }}>
+            <View style={{ width: "100%", maxWidth: pageWidth, paddingHorizontal: 8, gap: 10 }}>
               <MirroredRow dir={dir} className="items-center justify-between gap-2">
                 <Text
                   dir={dir}
@@ -1056,9 +1104,10 @@ function HifzReviewScreen() {
             ) : null}
           </ScrollView>
 
-          <View className="px-4 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
+          <View className="px-2 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
             {/* The actions line up with the page on wide screens instead of spanning the window. */}
-            <View style={{ width: "100%", maxWidth: pageWidth, gap: 10 }}>
+            {/* Header, title, page card and actions all start 8 px inside the page column. */}
+            <View style={{ width: "100%", maxWidth: pageWidth - 16, gap: 10 }}>
               {error ? (
                 <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
                   {error}
@@ -1135,7 +1184,7 @@ function HifzReviewScreen() {
                   ) : isGradable(attempt.level) ? (
                     <Button label={s.hifzDone} onPress={done} disabled={!pageData} />
                   ) : (
-                    <Button label={s.hifzSabaqNext} onPress={advance} />
+                    <Button label={s.hifzSabaqNext} onPress={skip} disabled={busy} />
                   )}
                   {current.kind === "page" ? (
                     <Pressable

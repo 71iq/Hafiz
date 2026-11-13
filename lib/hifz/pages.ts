@@ -1,4 +1,5 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
+import { putUserSetting } from "@/lib/database/user-settings";
 import { insertNewStudyCard } from "@/lib/fsrs/queries";
 import { fsrs } from "ts-fsrs";
 import type { StudyCardRow } from "@/lib/fsrs/types";
@@ -214,6 +215,20 @@ function parseSnapshot(value: string | undefined): TodaySnapshot | null {
   }
 }
 
+/**
+ * The lines covered by passed chunks, counting each page line once. Two devices can pass
+ * overlapping chunks of a page, such as lines 1-4 and 1-6, which cover 6 lines, not 10.
+ */
+export function passedLineCount(chunkIds: readonly string[]): number {
+  const lines = new Set<string>();
+  for (const id of chunkIds) {
+    const unit = parsePageUnit(id);
+    if (unit?.kind !== "chunk") continue;
+    for (let line = unit.fromLine; line <= unit.toLine; line += 1) lines.add(`${unit.page}:${line}`);
+  }
+  return lines.size;
+}
+
 export type TodayWird = Readonly<{
   plan: HifzPlan;
   daily: DailyPlan;
@@ -270,11 +285,7 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
       [TODAY_PLAN_KEY, JSON.stringify(snapshot), now.toISOString()],
     );
   }
-  let linesToday = 0;
-  for (const row of sabaqToday) {
-    const unit = parsePageUnit(row.card_id);
-    if (unit?.kind === "chunk") linesToday += unit.toLine - unit.fromLine + 1;
-  }
+  const linesToday = passedLineCount(sabaqToday.map((row) => row.card_id));
   const byId = new Map(pages.map((page) => [page.cardId, page]));
   const todo = snapshot.ids.flatMap((id) => {
     const page = byId.get(id);
@@ -320,8 +331,28 @@ export async function declareMemorizedPages(
         created += 1;
       }
     }
+    // MST-04: the first manzil cycle starts on the day pages are first declared, stored as a calendar
+    // date so later travel does not move it.
+    if (created > 0) await ensureManzilCycleStart(db, today);
   });
   return created;
+}
+
+/** MST-04: the synced calendar date the current manzil cycle started on. */
+export const MANZIL_CYCLE_START_KEY = "hifz_manzil_cycle_start";
+
+/**
+ * The stored manzil cycle start, or `fallback` stored as the start when none is stored yet. Pass a
+ * transaction so the setting and its queued upload commit with the caller's other writes.
+ */
+export async function ensureManzilCycleStart(db: DatabaseExecutor, fallback: LocalDate): Promise<LocalDate> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ? AND deleted_at IS NULL",
+    [MANZIL_CYCLE_START_KEY],
+  );
+  if (row?.value) return row.value;
+  await putUserSetting(db, MANZIL_CYCLE_START_KEY, fallback);
+  return fallback;
 }
 
 /** The pages that have a page card, for the memorized-portion picker. */

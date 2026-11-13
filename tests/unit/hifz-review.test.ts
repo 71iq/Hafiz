@@ -19,6 +19,7 @@ import {
   type AttemptMark,
 } from "@/lib/hifz/review";
 import { Rating } from "@/lib/fsrs/scheduler";
+import { pageCardId } from "@/lib/hifz/units";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 const TODAY = "2026-11-13";
@@ -169,6 +170,58 @@ describe("saving a page grade", () => {
     expect(store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(MANZIL_CYCLE_START_KEY)).toEqual({
       value: addDays(TODAY, 1),
     });
+  });
+
+  async function gradeGood(pageNumber: number, now: Date) {
+    const page = await card(pageNumber, now);
+    await savePageGrade(store.db, {
+      card: page.row,
+      history: page.history,
+      plan,
+      attempt: emptyAttempt(4),
+      rating: Rating.Good,
+      firstToken: tokens[0],
+      session: null,
+      durationMs: 60_000,
+      now,
+    });
+  }
+  const cycleStart = () => store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(MANZIL_CYCLE_START_KEY);
+  /** A zone further east puts the cards' creation instant on the next local day; a fallback start would move with it. */
+  const travelEast = () =>
+    store.sql.prepare("UPDATE study_cards SET created_at = ? WHERE id LIKE 'page:%'").run(atLocalTime(addDays(TODAY, 1), 30).toISOString());
+
+  it("counts a manzil page toward the cycle when its synced cached tier is stale (MST-04)", async () => {
+    await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now: atLocalTime(TODAY, 600) });
+    // Another device's older row left page 8 cached as sabaq, while its merged history makes it manzil.
+    store.sql.prepare("UPDATE study_cards SET tier = 'sabaq' WHERE id = ?").run(pageCardId(8));
+    await gradeGood(7, atLocalTime(TODAY, 601));
+    expect((await readHabitDayRow(store.db, TODAY))?.manzil_cycle_completed).toBe(0);
+    await gradeGood(8, atLocalTime(TODAY, 602));
+    expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ manzil_cycle_completed: 1 });
+  });
+
+  it("stores the first cycle's start as the declared calendar day, so travel does not move it (MST-04)", async () => {
+    await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now: atLocalTime(TODAY, 600) });
+    expect(cycleStart()).toEqual({ value: TODAY });
+    expect(
+      store.sql.prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE table_name = 'user_settings' AND row_id = ?").get(MANZIL_CYCLE_START_KEY),
+    ).toEqual({ count: 1 });
+    travelEast();
+    await gradeGood(8, atLocalTime(TODAY, 601));
+    await gradeGood(7, atLocalTime(addDays(TODAY, 1), 600));
+    expect(await readHabitDayRow(store.db, addDays(TODAY, 1))).toMatchObject({ manzil_cycle_completed: 1 });
+  });
+
+  it("stores the first cycle's start the first time it is needed when none was stored (MST-04)", async () => {
+    await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now: atLocalTime(TODAY, 600) });
+    // As for pages that reached manzil through sabqi, with no declaration to store a start.
+    store.sql.prepare("DELETE FROM user_settings WHERE key = ?").run(MANZIL_CYCLE_START_KEY);
+    await gradeGood(8, atLocalTime(TODAY, 601));
+    expect(cycleStart()).toEqual({ value: TODAY });
+    travelEast();
+    await gradeGood(7, atLocalTime(addDays(TODAY, 1), 600));
+    expect(await readHabitDayRow(store.db, addDays(TODAY, 1))).toMatchObject({ manzil_cycle_completed: 1 });
   });
 
   it("resolves a drilled inbox item after clean drills on two later days", async () => {

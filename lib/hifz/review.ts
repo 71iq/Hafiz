@@ -13,7 +13,7 @@ import type { RecitationErrorInput, RecitationErrorType } from "@/lib/hifz/error
 import { capRating, proposeRating, type AttemptEvents, type Rating, type SupportLevel } from "@/lib/hifz/grading";
 import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import type { HifzPlan } from "@/lib/hifz/plan";
-import { derivePageTiers, T_REV_KEY } from "@/lib/hifz/pages";
+import { derivePageTiers, ensureManzilCycleStart, MANZIL_CYCLE_START_KEY, T_REV_KEY } from "@/lib/hifz/pages";
 import { isManzil, pagePolicy, tierFor, type PageHistory, type Tier } from "@/lib/hifz/tiers";
 import { errorHalf, hasSeamAfter, remediateHalf, remediationPolicy, reviewSeam, type Half } from "@/lib/hifz/remediation";
 import { HIFZ_PAGES_DECK_ID, parsePageUnit } from "@/lib/hifz/units";
@@ -105,14 +105,16 @@ export function attemptErrors(attempt: Attempt, firstToken: PageToken): Recitati
   return errors;
 }
 
-export const MANZIL_CYCLE_START_KEY = "hifz_manzil_cycle_start";
+export { MANZIL_CYCLE_START_KEY };
 
 /**
  * MST-04: a manzil cycle completes on the day every manzil page has a graded review dated on or
  * after the cycle start. That day's wird is marked (it feeds board points) and the next cycle starts
- * tomorrow. Runs inside the grade transaction. Membership uses the cached tier, which every grade and
- * every sync carries, plus the derived tier of cached sabqi pages, which can graduate by time alone.
- * Review days are the stored local dates, so travel does not move them.
+ * tomorrow. Runs inside the grade transaction. A cached manzil tier is trusted, since a page stays
+ * manzil once it gets there. Every other page card is derived from its history, because a sabqi page
+ * can graduate by time alone and a synced cached tier can be older than the merged history. Review
+ * days are the stored local dates, and the cycle start is a stored calendar date, so travel moves
+ * neither.
  */
 async function completeManzilCycleIfDone(
   db: DatabaseExecutor,
@@ -120,8 +122,7 @@ async function completeManzilCycleIfDone(
   plan: Pick<HifzPlan, "sabqiDays">,
 ): Promise<boolean> {
   const today = localDateOf(now);
-  const [startRow, pages, lastReviews] = await Promise.all([
-    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [MANZIL_CYCLE_START_KEY]),
+  const [pages, lastReviews] = await Promise.all([
     db.getAllAsync<{ id: string; tier: string | null; created_at: string }>(
       "SELECT id, tier, created_at FROM study_cards WHERE deck_id = ? AND id LIKE 'page:%' AND deleted_at IS NULL AND suspended_at IS NULL",
       [HIFZ_PAGES_DECK_ID],
@@ -130,14 +131,16 @@ async function completeManzilCycleIfDone(
       "SELECT card_id, MAX(local_date) AS last FROM study_log WHERE card_id LIKE 'page:%' GROUP BY card_id",
     ),
   ]);
-  const maybeGraduated = pages.filter((page) => page.tier === "sabqi" || page.tier === null).map((page) => page.id);
-  const derived = await derivePageTiers(db, maybeGraduated, { today, plan });
+  const uncertain = pages.filter((page) => !page.tier?.startsWith("manzil")).map((page) => page.id);
+  const derived = await derivePageTiers(db, uncertain, { today, plan });
   const manzil = pages.filter((page) => {
     const tier = derived.get(page.id) ?? page.tier;
     return tier !== null && tier !== undefined && tier.startsWith("manzil");
   });
   if (manzil.length === 0) return false;
-  const start = startRow?.value ?? manzil.map((page) => localDateOf(new Date(page.created_at))).sort()[0];
+  // Without a stored start (pages that reached manzil through sabqi), the first cycle starts on the
+  // day the earliest manzil page was created, fixed as a calendar date the first time it is needed.
+  const start = await ensureManzilCycleStart(db, manzil.map((page) => localDateOf(new Date(page.created_at))).sort()[0]);
   if (start > today) return false;
   const last = new Map(lastReviews.map((row) => [row.card_id, row.last]));
   const complete = manzil.every((page) => {
@@ -278,22 +281,19 @@ export async function saveRemediationGrade(db: AppDatabase, input: RemediationGr
   const level = input.attempt.level;
   const rating = capRating(input.rating as Rating, level) as Grade;
   const base = await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID);
-  // The queued row can be stale: a page grade earlier in the session may have reviewed this seam or
-  // half since the queue was built. Grade from the card as it is now.
-  const current =
-    (await db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [input.card.id])) ??
-    input.card;
-  const transition = calculateReviewTransition({
-    card: current,
-    rating,
-    reviewedAt: now,
-    reviewPolicy: remediationPolicy(base),
-  });
   const proposed = proposedRating(input.attempt);
   return persistReviewTransition({
     db,
     cardId: input.card.id,
-    transition,
+    // The queued row can be stale: a page grade earlier in the session, or another grade still in the
+    // connection's queue, may have reviewed this seam or half since the queue was built. Read and
+    // calculate inside the grade's own transaction, so nothing can change the card in between.
+    transition: async (tx) => {
+      const current =
+        (await tx.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [input.card.id])) ??
+        input.card;
+      return calculateReviewTransition({ card: current, rating, reviewedAt: now, reviewPolicy: remediationPolicy(base) });
+    },
     context: {
       session: input.session,
       firstGradeInSession: true,

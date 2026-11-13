@@ -72,6 +72,7 @@ export async function persistReviewTransition({
   await db.withTransactionAsync(async (tx) => {
     if (beforeWork) await beforeWork(tx);
     const resolved = typeof transition === "function" ? await transition(tx) : transition;
+    await putCardRow(tx, resolved.updatedCard);
     const { reviewRecord } = resolved;
     const reviewedAt = new Date(reviewRecord.reviewedAt);
     const localDate = localDateOf(reviewedAt);
@@ -97,7 +98,6 @@ export async function persistReviewTransition({
       errorCount: context.errors.length,
       makeupFor,
     };
-    await putCardRow(tx, resolved.updatedCard);
     await putStudyLogRow(tx, entry);
     if (context.errors.length > 0) {
       await insertRecitationErrors(tx, {

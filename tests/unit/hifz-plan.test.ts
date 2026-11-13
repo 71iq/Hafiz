@@ -80,6 +80,17 @@ describe("tiers (3.2, 8.6)", () => {
     expect(memorized([...graduated, grade(5, 1), grade(4, 3), grade(3, 3)])).toBe("manzil");
   });
 
+  it("graduates a page by time before its next grade, so later Again grades do not send it back (TIER-01)", () => {
+    const memorized = (grades: GradeEvent[]) => tierFor({ declared: false, firstFluentDate: addDays(TODAY, -30), grades }, TODAY, plan);
+    // Three Good grades early in sabqi, then no grade until well past sabqi_days: manzil by time alone.
+    const early = [grade(29, 3), grade(28, 3), grade(27, 3)];
+    expect(memorized(early)).toBe("manzil");
+    expect(memorized([...early, grade(5, 1)])).toBe("manzil.needs_work");
+    expect(memorized([...early, grade(5, 1), grade(4, 1)])).toBe("manzil.needs_work");
+    // Before sabqi_days have passed, two Again grades in a row still send the page back.
+    expect(memorized([...early, grade(26, 1), grade(25, 1)])).toBe("sabaq");
+  });
+
   it("relearns a page sent back to sabaq and starts a new sabqi period on its next Good grade", () => {
     const memorized = (grades: GradeEvent[]) => tierFor({ declared: false, firstFluentDate: addDays(TODAY, -30), grades }, TODAY, plan);
     const failed = [grade(29, 3), grade(28, 1), grade(27, 1)];

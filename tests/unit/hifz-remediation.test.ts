@@ -4,8 +4,8 @@ import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import { declareMemorizedPages, loadPageCards } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
 import { errorHalf, halfLineNumbers, loadDueRemediation } from "@/lib/hifz/remediation";
-import { readWeakSpots, type RecitationErrorInput } from "@/lib/hifz/errors";
-import { clozeCardId, parseClozeCardId } from "@/lib/hifz/weak-spots";
+import { dismissInboxItem, readMistakeInbox, readWeakSpots, type RecitationErrorInput } from "@/lib/hifz/errors";
+import { clozeCardId, createWeakSpotCards, parseClozeCardId } from "@/lib/hifz/weak-spots";
 import { DEFAULT_REVIEW_SAVE_CONTEXT, persistReviewTransition } from "@/lib/fsrs/persist-review";
 import { setStudyCardMarked } from "@/lib/fsrs/queries";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
@@ -141,6 +141,16 @@ describe("half pages and seams from a page grade", () => {
     expect(await countMistakeInbox(store.db, TODAY)).toBe(0);
   });
 
+  it("keeps the next-day step for a stumbled seam when the next continuation is clean (SCH-06)", async () => {
+    const seam = { surah: 2, ayah: 16 };
+    await gradePage({ ...emptyAttempt(4), seam: { clean: false, ...seam } }, Rating.Again);
+    const later = new Date(start.getTime() + 11 * MINUTE);
+    await gradePage({ ...emptyAttempt(4), seam: { clean: true, ...seam } }, Rating.Good, later);
+    // The clean continuation counts as the 10-minute step; the seam still comes back the next day.
+    expect(await ids(new Date(later.getTime() + 60 * MINUTE))).toEqual([]);
+    expect(await ids(new Date(later.getTime() + 24 * 60 * MINUTE + MINUTE))).toEqual(["seam:madani15:5"]);
+  });
+
   it("grades a queued seam from its current row when a page grade reviewed it after the queue was built", async () => {
     const seam = { surah: 2, ayah: 16 };
     await gradePage({ ...emptyAttempt(4), seam: { clean: false, ...seam } }, Rating.Again);
@@ -159,6 +169,25 @@ describe("half pages and seams from a page grade", () => {
       now: new Date(start.getTime() + 12 * MINUTE),
     });
     expect(store.sql.prepare("SELECT reps FROM study_cards WHERE id = 'seam:madani15:5'").get()).toEqual({ reps: current.reps + 1 });
+  });
+
+  it("applies two grades of the same queued card queued at once, each from the row the other left", async () => {
+    const seam = { surah: 2, ayah: 16 };
+    await gradePage({ ...emptyAttempt(4), seam: { clean: false, ...seam } }, Rating.Again);
+    const [queued] = await loadDueRemediation(store.db, new Date(start.getTime() + 10 * MINUTE));
+    const before = store.sql.prepare("SELECT reps FROM study_cards WHERE id = 'seam:madani15:5'").get() as { reps: number };
+    const gradeAt = (minutes: number) =>
+      saveRemediationGrade(store.db, {
+        card: queued.row,
+        rating: Rating.Good,
+        attempt: { ...emptyAttempt(4), seam: { clean: true, ...seam } },
+        firstToken: null,
+        session: null,
+        durationMs: MINUTE,
+        now: new Date(start.getTime() + minutes * MINUTE),
+      });
+    await Promise.all([gradeAt(11), gradeAt(12)]);
+    expect(store.sql.prepare("SELECT reps FROM study_cards WHERE id = 'seam:madani15:5'").get()).toEqual({ reps: before.reps + 2 });
   });
 
   it("does not count a clean seam after a weak page, or any seam recited in salah", async () => {
@@ -242,6 +271,73 @@ describe("weak spots (ERR-06)", () => {
     }
     expect(cards()).toEqual([]);
     expect(await readWeakSpots(store.db)).toEqual([]);
+  });
+
+  const liveCards = () => store.sql.prepare("SELECT id FROM study_cards WHERE id LIKE 'cloze:%' AND deleted_at IS NULL ORDER BY id").all();
+
+  it("deletes the cloze card, with its upload queued, when a dismissal leaves the word wrong in fewer than 3 sessions", async () => {
+    for (let day = 0; day < 3; day += 1) await gradeWithErrors(day, [wrongWord(4)]);
+    expect(liveCards()).toEqual([{ id: clozeCardId(2, 255, 4) }]);
+    const [item] = await readMistakeInbox(store.db, addDays(TODAY, 2));
+    await dismissInboxItem(store.db, { id: item.id, now: atLocalTime(addDays(TODAY, 2), 700) });
+
+    expect(liveCards()).toEqual([]);
+    expect(await readWeakSpots(store.db)).toEqual([]);
+    expect(await loadDueRemediation(store.db, atLocalTime(addDays(TODAY, 2), 800))).toEqual([]);
+    const upload = store.sql
+      .prepare("SELECT data FROM sync_queue WHERE table_name = 'study_cards' AND operation = 'DELETE' AND row_id = ?")
+      .get(clozeCardId(2, 255, 4)) as { data: string } | undefined;
+    expect(JSON.parse(upload?.data ?? "{}")).toMatchObject({ id: clozeCardId(2, 255, 4), deck_id: "hifz-pages", deleted_at: expect.any(String) });
+  });
+
+  it("keeps the cloze card when the word is still wrong in 3 sessions after a dismissal", async () => {
+    for (let day = 0; day < 4; day += 1) await gradeWithErrors(day, [wrongWord(4)]);
+    const [item] = await readMistakeInbox(store.db, addDays(TODAY, 3));
+    await dismissInboxItem(store.db, { id: item.id, now: atLocalTime(addDays(TODAY, 3), 700) });
+    expect(liveCards()).toEqual([{ id: clozeCardId(2, 255, 4) }]);
+  });
+
+  it("skips locations that already have a cloze card and counts the rest in one query", async () => {
+    for (let day = 0; day < 3; day += 1) await gradeWithErrors(day, [wrongWord(4)]);
+    await gradeWithErrors(3, [wrongWord(5)]);
+    const counts: string[] = [];
+    const now = atLocalTime(addDays(TODAY, 3), 700);
+    await store.db.withTransactionAsync(async (tx) => {
+      // Record each read of the error log made through this executor.
+      const counting = new Proxy(tx, {
+        get(target, key) {
+          const value = Reflect.get(target, key);
+          if (typeof value !== "function") return value;
+          return (sql: string, ...rest: unknown[]) => {
+            if ((key === "getAllAsync" || key === "getFirstAsync") && sql.includes("FROM recitation_errors")) counts.push(sql);
+            return value.call(target, sql, ...rest);
+          };
+        },
+      });
+      expect(await createWeakSpotCards(counting, [wrongWord(4), wrongWord(5), wrongWord(6), wrongWord(5)], now)).toBe(0);
+      expect(counts).toHaveLength(1);
+      counts.length = 0;
+      expect(await createWeakSpotCards(counting, [wrongWord(4)], now)).toBe(0);
+      expect(counts).toHaveLength(0);
+    });
+  });
+
+  it("creates the cloze card for a weak spot whose sessions were pulled from other devices", async () => {
+    const insert = store.sql.prepare(
+      `INSERT INTO recitation_errors (id, card_id, session_id, surah, ayah, word, type, severity, corrected, local_date, created_at, updated_at)
+       VALUES (?, '2:255', ?, 2, 255, 7, 'wrong_word', 'jali', 'none', ?, ?, ?)`,
+    );
+    for (let day = 0; day < 3; day += 1) {
+      const at = atLocalTime(addDays(TODAY, day), 600).toISOString();
+      insert.run(`err-pulled-${day}`, `session-device-${day}`, addDays(TODAY, day), at, at);
+    }
+    const pulled = store.sql.prepare("SELECT surah, ayah, word FROM recitation_errors").all() as { surah: number; ayah: number; word: number }[];
+    let created = 0;
+    await store.db.withTransactionAsync(async (tx) => {
+      created = await createWeakSpotCards(tx, pulled, atLocalTime(addDays(TODAY, 2), 700));
+    });
+    expect(created).toBe(1);
+    expect(liveCards()).toEqual([{ id: clozeCardId(2, 255, 7) }]);
   });
 
   it("reads cloze ids and the marker setting, on by default", () => {

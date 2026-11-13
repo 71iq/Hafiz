@@ -83,6 +83,7 @@ function SabaqScreen() {
   );
   const sessionRef = useRef<ReviewSessionRef | null>(null);
   const startedAt = useRef(Date.now());
+  const saveLock = useRef(false);
   const step: Step = habitResult ? "done" : STEPS[stepIndex];
 
   const load = useCallback(async () => {
@@ -154,7 +155,11 @@ function SabaqScreen() {
   };
 
   const finish = async (rating: Grade) => {
-    if (!target || !plan || busy) return;
+    if (!target || !plan || saveLock.current) return;
+    // Taken before React renders `busy`, so a second tap cannot grade the chunk again. A saved chunk
+    // keeps the lock, since the check is over; a failed save releases it so the user can retry.
+    saveLock.current = true;
+    let saved = false;
     setBusy(true);
     setError(null);
     try {
@@ -165,6 +170,7 @@ function SabaqScreen() {
         session: sessionRef.current,
         durationMs: Date.now() - startedAt.current,
       });
+      saved = true;
       const session = sessionRef.current;
       const [overview] = await Promise.all([
         loadHabitOverview(db).catch(() => null),
@@ -182,6 +188,7 @@ function SabaqScreen() {
       console.warn("[Sabaq] Save failed:", saveError);
       setError(s.hifzSaveFailed);
     } finally {
+      if (!saved) saveLock.current = false;
       setBusy(false);
     }
   };
@@ -255,7 +262,12 @@ function SabaqScreen() {
             </Text>
             <View style={{ width: 44 }} />
           </MirroredRow>
-          {step !== "done" ? <Progress value={((stepIndex + 1) / STEPS.length) * 100} dir={dir} className="mx-5 h-1" /> : null}
+          {step !== "done" ? (
+            // Padding on a wrapper: the track is full width, so a margin on it would only move its start.
+            <View className="px-5">
+              <Progress value={((stepIndex + 1) / STEPS.length) * 100} dir={dir} className="h-1" />
+            </View>
+          ) : null}
         </View>
       </View>
 

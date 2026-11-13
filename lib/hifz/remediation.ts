@@ -1,7 +1,7 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { insertNewStudyCard, putCardRow, readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
-import { Rating, type Grade } from "@/lib/fsrs/scheduler";
+import { Rating, State, type Grade } from "@/lib/fsrs/scheduler";
 import type { DeckReviewSettings, SchedulerStep, StudyCardRow } from "@/lib/fsrs/types";
 import type { PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import { HIFZ_PAGES_DECK_ID, halfCardId, isValidPage, parsePageUnit, seamCardId } from "@/lib/hifz/units";
@@ -80,8 +80,10 @@ async function rateDerivedUnit(db: DatabaseExecutor, id: string, rating: Grade, 
     if (!card) throw new Error(`Could not create ${id}`);
   }
   const base = remediationPolicy(await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID));
-  // A clean seam needs no learning steps, so a seam that never lapsed never surfaces on its own.
-  const policy = rating === Rating.Again ? base : { ...base, learningSteps: [] };
+  // A clean first review of a new seam needs no learning steps, so a seam that never lapsed never
+  // surfaces on its own. A seam already learning or relearning keeps its 10m and 1d steps, so a
+  // clean continuation after a stumble does not skip the next-day check.
+  const policy = rating !== Rating.Again && card.state === State.New ? { ...base, learningSteps: [] } : base;
   const { updatedCard } = calculateReviewTransition({ card, rating, reviewedAt: now, reviewPolicy: policy });
   await putCardRow(db, updatedCard);
   return updatedCard;
