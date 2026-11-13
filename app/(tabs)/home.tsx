@@ -39,7 +39,6 @@ import {
 } from "@/lib/fsrs/queries";
 import { WirdStreakCard } from "@/components/habit/WirdStreakCard";
 import { WirdReminderBanner } from "@/components/notifications/WirdReminderBanner";
-import type { ReminderRoute } from "@/lib/notifications/types";
 import { HabitBreakSheet } from "@/components/habit/HabitBreakSheet";
 import { useHabitOverview } from "@/lib/habit/use-habit-overview";
 import { markFullWirdIfComplete } from "@/lib/habit/queries";
@@ -122,14 +121,6 @@ export default function HomeScreen() {
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
   const { wird, inboxCount, monthlyCheckDue, refresh: refreshWird } = useTodayWird(db);
-  // A wird reminder opens the page review when a hifz plan reviews pages, otherwise the ayah review.
-  const openReminderRoute = useCallback(
-    (route: ReminderRoute) => {
-      if (route === "wird") router.push((wird && wird.plan.unit !== "ayah" ? "/hifz/review" : "/flashcards/session") as Href);
-      else if (route === "kahf") router.push({ pathname: "/open", params: { surah: "18", ayah: "1" } });
-    },
-    [router, wird],
-  );
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   const [dueLoaded, setDueLoaded] = useState(false);
@@ -516,8 +507,9 @@ export default function HomeScreen() {
               </Pressable>
             )}
           </View>
-          {/* NOT-03: the in-app reminder, on web and while native notifications are off. */}
-          <WirdReminderBanner onStart={openReminderRoute} />
+          {/* NOT-03: the in-app reminder, on web and while native notifications are off. Its Start opens
+              the same plan-aware route as a notification tap (lib/notifications/reminder-route). */}
+          <WirdReminderBanner />
           {habit ? (
             <WirdStreakCard
               overview={habit}

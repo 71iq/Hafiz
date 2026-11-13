@@ -160,7 +160,14 @@ export type OptInPrompts = z.infer<typeof optInPromptsSchema>;
 export const backoffSchema = z.object({
   consecutive_ignored: z.number().int().min(0),
   level: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  /**
+   * The latest session when the count was taken, null before any session. While it is still the
+   * latest, the stored count is a floor: log rows older than 90 days are pruned, but the reminders
+   * they record stay ignored until the next session.
+   */
+  since: z.string().nullable().optional(),
 });
+export type BackoffState = z.infer<typeof backoffSchema>;
 
 const localDate = z.string().refine(isLocalDate);
 

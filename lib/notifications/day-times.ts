@@ -13,7 +13,10 @@ export type ReminderDayTimes = Readonly<{
   anchorAt: Date;
   /** The anchor is a Ramadan time the user chose (NOT-10), which may fall in quiet hours. */
   ramadanAnchor: boolean;
-  /** 5.8.2: max(midnight - 3 h, Isha), kept 30 minutes ahead of the late reminder. */
+  /**
+   * 5.8.2: 3 hours before midnight, or after Isha when prayer times are set. After Isha it lands 20
+   * minutes in, before quiet hours start, and it stays 30 minutes ahead of the late reminder.
+   */
   atRiskAt: Date;
   /** 5.8.2: 23:15 local. */
   lateAt: Date;
@@ -35,9 +38,15 @@ export type DayTimesInput = Readonly<{
   isRamadan: (date: LocalDate) => boolean;
 }>;
 
-const AT_RISK_EARLIEST_MINUTES = 21 * 60;
+/** 3 hours before local midnight, used without prayer times. */
+const AT_RISK_MINUTES = 21 * 60;
+const AT_RISK_AFTER_ISHA_MINUTES = 20;
 const AT_RISK_LATEST_MINUTES = 22 * 60 + 45;
 const LATE_REMINDER_MINUTES = 23 * 60 + 15;
+/** NOT-08 with prayer times: quiet from Isha + 1 hour until 30 minutes before Fajr. */
+const QUIET_AFTER_ISHA_MINUTES = 60;
+const QUIET_BEFORE_FAJR_MINUTES = 30;
+/** NOT-08 without prayer times. */
 const QUIET_START_MINUTES = 23 * 60;
 const QUIET_END_MINUTES = 5 * 60;
 const KAHF_MINUTES = 9 * 60;
@@ -46,10 +55,6 @@ const SUHOOR_BEFORE_FAJR_MINUTES = 60;
 
 function plus(at: Date, minutes: number): Date {
   return new Date(at.getTime() + minutes * MINUTE);
-}
-
-function later(a: Date, b: Date): Date {
-  return a.getTime() >= b.getTime() ? a : b;
 }
 
 function earlier(a: Date, b: Date): Date {
@@ -73,10 +78,9 @@ function anchorTime(input: DayTimesInput, date: LocalDate): { at: Date; ramadan:
 }
 
 /**
- * NOT-08 reads "Isha + 1 hour (or 23:00)" and "30 minutes before Fajr (or 05:00)". The quiet window
- * is the narrower reading, from the later of the two evening times to the earlier of the two
- * morning times. That keeps the 21:00 at-risk reminder (5.8.2) out of quiet hours in winter, when
- * Isha + 1 hour is early evening, and keeps a Fajr + 20 reminder in summer.
+ * NOT-08: no reminder between Isha + 1 hour and 30 minutes before Fajr. The clock times in the rule,
+ * 23:00 and 05:00, apply only when prayer times are not set. With prayer times the at-risk reminder
+ * (5.8.2) follows Isha so it is sent before quiet hours start, even in winter when Isha is early.
  */
 export function buildDayTimes(input: DayTimesInput, date: LocalDate): ReminderDayTimes {
   const { clock } = input;
@@ -86,13 +90,13 @@ export function buildDayTimes(input: DayTimesInput, date: LocalDate): ReminderDa
   const fajr = prayers?.fajr ?? null;
 
   const lateAt = clock.at(date, LATE_REMINDER_MINUTES);
-  const atRiskBase = later(clock.at(date, AT_RISK_EARLIEST_MINUTES), isha ?? clock.at(date, 0));
-  const atRiskAt = earlier(atRiskBase, clock.at(date, AT_RISK_LATEST_MINUTES));
+  const atRiskAt = earlier(
+    isha ? plus(isha, AT_RISK_AFTER_ISHA_MINUTES) : clock.at(date, AT_RISK_MINUTES),
+    clock.at(date, AT_RISK_LATEST_MINUTES),
+  );
 
-  const quietStartsAt = isha
-    ? later(plus(isha, 60), clock.at(date, QUIET_START_MINUTES))
-    : clock.at(date, QUIET_START_MINUTES);
-  const quietEndsAt = fajr ? earlier(plus(fajr, -30), clock.at(date, QUIET_END_MINUTES)) : clock.at(date, QUIET_END_MINUTES);
+  const quietStartsAt = isha ? plus(isha, QUIET_AFTER_ISHA_MINUTES) : clock.at(date, QUIET_START_MINUTES);
+  const quietEndsAt = fajr ? plus(fajr, -QUIET_BEFORE_FAJR_MINUTES) : clock.at(date, QUIET_END_MINUTES);
 
   const nineAm = clock.at(date, KAHF_MINUTES);
   const nearNine = Math.abs(anchor.at.getTime() - nineAm.getTime()) < 30 * MINUTE;

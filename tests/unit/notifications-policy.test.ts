@@ -1,6 +1,6 @@
 import * as fc from "fast-check";
 import { notificationsStrings } from "@/lib/i18n/features/notifications";
-import { countConsecutiveIgnored, findConversions } from "@/lib/notifications/log";
+import { countConsecutiveIgnored, findConversions, isFired } from "@/lib/notifications/log";
 import { canAskNotificationPermission } from "@/lib/notifications/permission";
 import {
   chooseTemplate,
@@ -72,6 +72,19 @@ describe("back-off counting (8.11, NOT-09)", () => {
     expect(countConsecutiveIgnored(rows, [], NOW)).toBe(4);
     expect(countConsecutiveIgnored(rows, [daysAgo(2.2).toISOString()], NOW)).toBe(2);
     expect(countConsecutiveIgnored(rows, [NOW.toISOString()], NOW)).toBe(0);
+  });
+
+  it("never counts a cancelled reminder as delivered, unless the OS had already shown it", () => {
+    const due = daysAgo(1).toISOString();
+    expect(isFired({ scheduled_for: due, cancelled_at: null }, NOW)).toBe(true);
+    expect(isFired({ scheduled_for: due, cancelled_at: due, delivered_at: null }, NOW)).toBe(false);
+    expect(isFired({ scheduled_for: due, cancelled_at: due, delivered_at: due }, NOW)).toBe(true);
+    expect(isFired({ scheduled_for: new Date(NOW.getTime() + 60_000).toISOString(), cancelled_at: null }, NOW)).toBe(false);
+    const rows = [
+      { type: "wird_reminder", scheduled_for: due, cancelled_at: due, delivered_at: null },
+      { type: "wird_reminder", scheduled_for: daysAgo(2).toISOString(), cancelled_at: null, delivered_at: null },
+    ];
+    expect(countConsecutiveIgnored(rows, [], NOW)).toBe(1);
   });
 
   it("marks a reminder converted when a session starts within 2 hours", () => {

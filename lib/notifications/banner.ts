@@ -1,7 +1,8 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import type { LocalDate } from "@/lib/habit/dates";
 import { deviceClock, type DayClock } from "@/lib/notifications/clock";
-import { planNotifications, projectHabit } from "@/lib/notifications/planner";
+import { projectHabit } from "@/lib/notifications/habit-projection";
+import { planNotifications } from "@/lib/notifications/planner";
 import { reminderPlatform } from "@/lib/notifications/platform";
 import { hijriDateOf, RAMADAN_MONTH } from "@/lib/notifications/ramadan";
 import { loadReminderContext, rescheduleReminders } from "@/lib/notifications/schedule";

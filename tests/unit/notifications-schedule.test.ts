@@ -1,6 +1,8 @@
+import { router } from "expo-router";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { putHabitDay } from "@/lib/habit/queries";
 import type { HabitDayRow } from "@/lib/habit/types";
+import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { dismissReminderBanner, loadReminderBanner } from "@/lib/notifications/banner";
 import type {
   PermissionState,
@@ -15,14 +17,19 @@ import {
   requestNotificationPermission,
   shouldOfferNotificationPrompt,
 } from "@/lib/notifications/permission";
+import { openReminderRoute, resolveReminderHref } from "@/lib/notifications/reminder-route";
 import {
   diffReminders,
+  loadReminderContext,
   notifyGroupEncouragement,
+  reconcileReminders,
   requestRemindLater,
   rescheduleReminders,
 } from "@/lib/notifications/schedule";
 import { LOCAL_KEYS, writeReminderPref } from "@/lib/notifications/settings";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
+
+jest.mock("expo-router", () => ({ router: { push: jest.fn(), navigate: jest.fn() } }));
 
 type FakePlatform = {
   supportsScheduling: boolean;
@@ -120,6 +127,24 @@ function scheduledTypes() {
 
 function logCount(where = "1 = 1") {
   return Number(store.sql.prepare(`SELECT COUNT(*) AS count FROM notification_log WHERE ${where}`).get()?.count);
+}
+
+async function insertSession(id: string, started: Date) {
+  const stamp = started.toISOString();
+  await store.db.runAsync(
+    `INSERT INTO review_sessions (id, kind, deck_id, started_at, ended_at, duration_ms, local_date, tz, cards_reviewed,
+      pages_reviewed, new_lines, clean_pages, errors, minimum_met, full_met, source, created_at, updated_at, deleted_at)
+     VALUES (?, 'cards', NULL, ?, ?, 60000, ?, 'UTC', 3, 0, 0, 0, 0, 0, 0, 'app', ?, ?, NULL)`,
+    [id, stamp, stamp, localDateOf(started), stamp, stamp],
+  );
+}
+
+async function addLogRow(id: string, type: string, scheduled: Date) {
+  await store.db.runAsync(
+    `INSERT INTO notification_log (id, type, template_id, local_date, scheduled_for, os_id, delivered_at, opened_at, converted, cancelled_at)
+     VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, 0, NULL)`,
+    [id, type, `${type}.1`, localDateOf(scheduled), scheduled.toISOString()],
+  );
 }
 
 beforeEach(async () => {
@@ -268,6 +293,121 @@ describe("rescheduleReminders", () => {
     );
     await rescheduleReminders(store.db, { now: at(TODAY, 9), language: "en" });
     expect(logCount("converted = 1 AND type = 'wird_reminder'")).toBe(1);
+  });
+
+  it("leaves a reminder about to fire alone, so it is logged once and the evening reminder stays", async () => {
+    await seed(lastDays(5));
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    const wirdToday = () => fake.scheduled.filter((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY);
+    const original = wirdToday()[0].osId;
+    for (const now of [at(TODAY, 5, 19), new Date(at(TODAY, 5, 19).getTime() + 30_000)]) {
+      const result = await rescheduleReminders(store.db, { now, language: "en" });
+      expect(result.created).toBe(0);
+      expect(wirdToday().map((item) => item.osId)).toEqual([original]);
+    }
+    await rescheduleReminders(store.db, { now: at(TODAY, 5, 25), language: "en" });
+    expect(logCount(`local_date = '${TODAY}' AND type = 'wird_reminder'`)).toBe(1);
+    expect(scheduledTypes()).toContain(`${TODAY} streak_at_risk`);
+  });
+
+  it("records a reminder cancelled just before its time as cancelled, never as delivered", async () => {
+    await seed(lastDays(5));
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    await seed([TODAY]);
+    await rescheduleReminders(store.db, { now: at(TODAY, 5, 19), language: "en" });
+    expect(fake.scheduled.some((item) => item.data.localDate === TODAY && item.data.type === "wird_reminder")).toBe(false);
+    const row = store.sql
+      .prepare("SELECT cancelled_at FROM notification_log WHERE local_date = ? AND type = 'wird_reminder'")
+      .get(TODAY);
+    expect(row?.cancelled_at).toBe(at(TODAY, 5, 19).toISOString());
+    const later = await loadReminderContext(store.db, { now: at(TODAY, 9), language: "en" });
+    expect(later.input.delivered.filter((item) => item.localDate === TODAY)).toEqual([]);
+  });
+
+  it("refuses a follow-up once two reminders fired that day (NOT-07)", async () => {
+    await seed(lastDays(5));
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    const original = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
+    await addLogRow("group-1", "group_encouragement", at(TODAY, 9));
+    expect(await requestRemindLater(store.db, { data: original.data, action: "remind_later" }, { now: at(TODAY, 10) })).toBe(false);
+    expect(fake.scheduled.some((item) => item.data.type === "remind_later")).toBe(false);
+  });
+
+  it("keeps back-off until the next session, however old the ignored reminders are (NOT-09)", async () => {
+    // 14 reminders ignored from 25 October to 7 November, then no session for months.
+    for (let offset = 0; offset < 14; offset += 1) {
+      const date = addDays("2026-10-25", offset);
+      await addLogRow(`ignored-${offset}`, "wird_reminder", at(date, 5, 20));
+    }
+    const level = async (date: string) => (await loadReminderContext(store.db, { now: at(date, 3), language: "en" })).input.backoff;
+    expect(await level("2026-11-08")).toBe(2);
+    await rescheduleReminders(store.db, { now: at("2026-11-08", 3), language: "en" });
+    expect(await level("2026-11-24")).toBe(2);
+
+    // Past the log's 90-day retention the rows are gone, and the stored count still holds.
+    await rescheduleReminders(store.db, { now: at("2027-02-10", 3), language: "en" });
+    expect(logCount(`id LIKE 'ignored-%'`)).toBe(0);
+    expect(await level("2027-02-11")).toBe(2);
+
+    await insertSession("s-back", at("2027-02-11", 6));
+    expect(await level("2027-02-11")).toBe(0);
+  });
+});
+
+describe("reconcileReminders", () => {
+  const NOW = at(TODAY, 5, 19);
+  const scheduledAt = (osId: string, type: "wird_reminder" | "streak_at_risk", time: Date) => ({
+    osId,
+    data: {
+      source: "hafiz-reminder" as const,
+      logId: osId,
+      type,
+      localDate: TODAY,
+      route: "wird" as const,
+      at: time.getTime(),
+      contentKey: `${osId}-old`,
+    },
+  });
+  const desiredAt = (type: "wird_reminder" | "streak_at_risk", time: Date) => ({
+    slot: { type, localDate: TODAY, at: time, templateId: `${type}.2`, vars: {}, route: "wird" as const },
+    title: "",
+    body: "",
+    remindLaterAction: false,
+    contentKey: `${type}-new`,
+  });
+
+  it("keeps a reminder about to fire even when its text or time changed, and replaces later ones", () => {
+    const scheduled = [scheduledAt("soon", "wird_reminder", at(TODAY, 5, 20)), scheduledAt("evening", "streak_at_risk", at(TODAY, 21))];
+    const result = reconcileReminders(scheduled, [desiredAt("wird_reminder", at(TODAY, 8)), desiredAt("streak_at_risk", at(TODAY, 21))], NOW);
+    expect(result.keep.map((item) => item.osId)).toEqual(["soon"]);
+    expect(result.cancel.map((item) => item.osId)).toEqual(["evening"]);
+    expect(result.create.map((item) => item.slot.type)).toEqual(["streak_at_risk"]);
+  });
+
+  it("cancels a reminder about to fire that the plan no longer has, and clears one already due", () => {
+    const scheduled = [scheduledAt("soon", "wird_reminder", at(TODAY, 5, 20)), scheduledAt("due", "wird_reminder", at(TODAY, 5, 18))];
+    const result = reconcileReminders(scheduled, [], NOW);
+    expect(result.keep).toEqual([]);
+    expect(result.cancel.map((item) => item.osId).sort()).toEqual(["due", "soon"]);
+  });
+});
+
+describe("reminder routes", () => {
+  it("opens the page review for a page or half-page plan and the ayah review otherwise", async () => {
+    expect(await resolveReminderHref(store.db, "wird")).toBe("/flashcards/session");
+    await writeHifzPlan(store.db, { ...DEFAULT_HIFZ_PLAN, unit: "half" });
+    expect(await resolveReminderHref(store.db, "wird")).toBe("/hifz/review");
+    await writeHifzPlan(store.db, { ...DEFAULT_HIFZ_PLAN, unit: "ayah" });
+    expect(await resolveReminderHref(store.db, "wird")).toBe("/flashcards/session");
+    expect(await resolveReminderHref(store.db, "kahf")).toEqual({ pathname: "/open", params: { surah: "18", ayah: "1" } });
+  });
+
+  it("pushes the review or al-Kahf and navigates back to Home", async () => {
+    await writeHifzPlan(store.db, DEFAULT_HIFZ_PLAN);
+    await openReminderRoute(store.db, "wird");
+    expect(router.push).toHaveBeenLastCalledWith("/hifz/review");
+    await openReminderRoute(store.db, "home");
+    expect(router.navigate).toHaveBeenLastCalledWith("/(tabs)/home");
   });
 });
 

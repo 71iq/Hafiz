@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { X } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { AppState, Pressable, View } from "react-native";
@@ -14,18 +13,14 @@ import {
   loadReminderBanner,
   type ReminderBanner,
 } from "@/lib/notifications/banner";
+import { openReminderRoute } from "@/lib/notifications/reminder-route";
 import type { RamadanAnchor, ReminderRoute } from "@/lib/notifications/types";
 import { useSettings } from "@/lib/settings/context";
 
 export type WirdReminderBannerProps = {
-  /** Called on "Start". Defaults to the reminder's own route: the wird review, al-Kahf or Home. */
+  /** Called on "Start". Defaults to the reminder's own route: the wird review for the plan, al-Kahf or Home. */
   onStart?: (route: ReminderRoute) => void;
 };
-
-function openRoute(route: ReminderRoute) {
-  if (route === "wird") router.push("/flashcards/session");
-  else if (route === "kahf") router.push({ pathname: "/open", params: { surah: "18", ayah: "1" } });
-}
 
 /**
  * In-app reminder (NOT-03). On web it replaces scheduled notifications; on native it shows only
@@ -84,7 +79,7 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
   const start = () => {
     dismiss();
     if (onStart) onStart(banner.route);
-    else openRoute(banner.route);
+    else openReminderRoute(db, banner.route).catch(() => {});
   };
 
   return (

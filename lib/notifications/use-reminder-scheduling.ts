@@ -1,4 +1,4 @@
-import { router, usePathname, useRootNavigationState } from "expo-router";
+import { usePathname, useRootNavigationState } from "expo-router";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
@@ -10,6 +10,7 @@ import { subscribeSyncCompleted } from "@/lib/sync/events";
 import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { reminderPlatform } from "@/lib/notifications/platform";
 import type { ReminderResponse } from "@/lib/notifications/platform-types";
+import { openReminderRoute } from "@/lib/notifications/reminder-route";
 import { recordReminderOpened, requestRemindLater, rescheduleReminders } from "@/lib/notifications/schedule";
 import type { ReminderRoute } from "@/lib/notifications/types";
 
@@ -78,16 +79,10 @@ export function useReminderScheduling(): void {
   }, [db, isReady, isLoaded, uiLanguage]);
 }
 
-function openReminderRoute(route: ReminderRoute) {
-  if (route === "wird") router.push("/flashcards/session");
-  else if (route === "kahf") router.push({ pathname: "/open", params: { surah: "18", ayah: "1" } });
-  else router.navigate("/(tabs)/home");
-}
-
 /**
- * Notification taps open the wird review, al-Kahf or Home, and "Remind me in 1 hour" sets the
- * follow-up. A cold-start tap waits until the start route has redirected, and is not routed while
- * onboarding is open.
+ * Notification taps open the wird review for the user's plan, al-Kahf or Home, and "Remind me in 1
+ * hour" sets the follow-up. A cold-start tap waits until the start route has redirected, and is not
+ * routed while onboarding is open.
  */
 export function useReminderResponses(): void {
   const { db, isReady } = useDatabaseStatus();
@@ -121,8 +116,8 @@ export function useReminderResponses(): void {
   }, [db, isReady]);
 
   useEffect(() => {
-    if (!pendingRoute || !navigationKey || pathname === "/") return;
-    if (pathname !== "/onboarding") openReminderRoute(pendingRoute);
+    if (!db || !pendingRoute || !navigationKey || pathname === "/") return;
+    if (pathname !== "/onboarding") openReminderRoute(db, pendingRoute).catch(warn);
     setPendingRoute(null);
-  }, [pendingRoute, navigationKey, pathname]);
+  }, [db, pendingRoute, navigationKey, pathname]);
 }

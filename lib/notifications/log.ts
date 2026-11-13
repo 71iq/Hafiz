@@ -21,7 +21,14 @@ const COUNTED_FOR_BACKOFF: ReadonlySet<string> = new Set<NotificationType>([
   "comeback",
 ]);
 
-function fired(row: Pick<NotificationLogRow, "scheduled_for" | "cancelled_at">, now: Date): boolean {
+type FiredFields = Pick<NotificationLogRow, "scheduled_for" | "cancelled_at"> & Partial<Pick<NotificationLogRow, "delivered_at">>;
+
+/**
+ * A reminder fired when the OS showed it, or when its time passed without it being cancelled. A
+ * cancelled reminder never counts as delivered, unless the OS had already shown it.
+ */
+export function isFired(row: FiredFields, now: Date): boolean {
+  if (row.delivered_at) return true;
   return row.cancelled_at === null && Date.parse(row.scheduled_for) <= now.getTime();
 }
 
@@ -30,14 +37,14 @@ function fired(row: Pick<NotificationLogRow, "scheduled_for" | "cancelled_at">, 
  * resets the count to 0, so only reminders after the latest session start can be ignored ones.
  */
 export function countConsecutiveIgnored(
-  rows: readonly Pick<NotificationLogRow, "type" | "scheduled_for" | "cancelled_at">[],
+  rows: readonly (Pick<NotificationLogRow, "type"> & FiredFields)[],
   sessionStarts: readonly string[],
   now: Date,
 ): number {
   const lastSession = sessionStarts.reduce((latest, start) => Math.max(latest, Date.parse(start)), -Infinity);
   const settledBefore = now.getTime() - CONVERSION_WINDOW_MS;
   return rows.filter((row) => {
-    if (!COUNTED_FOR_BACKOFF.has(row.type) || !fired(row, now)) return false;
+    if (!COUNTED_FOR_BACKOFF.has(row.type) || !isFired(row, now)) return false;
     const at = Date.parse(row.scheduled_for);
     return at <= settledBefore && at > lastSession;
   }).length;
@@ -45,13 +52,13 @@ export function countConsecutiveIgnored(
 
 /** Fired rows not yet marked converted that had a session start within 2 hours. */
 export function findConversions(
-  rows: readonly Pick<NotificationLogRow, "id" | "scheduled_for" | "cancelled_at" | "converted">[],
+  rows: readonly (Pick<NotificationLogRow, "id" | "converted"> & FiredFields)[],
   sessionStarts: readonly string[],
   now: Date,
 ): string[] {
   const starts = sessionStarts.map((start) => Date.parse(start)).filter(Number.isFinite);
   return rows
-    .filter((row) => row.converted === 0 && fired(row, now))
+    .filter((row) => row.converted === 0 && isFired(row, now))
     .filter((row) => {
       const at = Date.parse(row.scheduled_for);
       return starts.some((start) => start >= at && start - at <= CONVERSION_WINDOW_MS);
@@ -72,6 +79,33 @@ export async function readSessionStartsSince(db: DatabaseExecutor, since: Date):
     [since.toISOString()],
   );
   return rows.map((row) => row.started_at);
+}
+
+/**
+ * The latest session on this device or synced to it, however long ago: a session row, or a review in
+ * study_log for reviews without one. Back-off counts from here (8.11).
+ */
+export async function readLatestSessionAt(db: DatabaseExecutor): Promise<string | null> {
+  const row = await db.getFirstAsync<{ session: string | null; review: string | null }>(
+    `SELECT (SELECT MAX(started_at) FROM review_sessions WHERE deleted_at IS NULL) AS session,
+            (SELECT MAX(reviewed_at) FROM study_log) AS review`,
+  );
+  const candidates = [row?.session, row?.review].filter(
+    (value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)),
+  );
+  if (candidates.length === 0) return null;
+  return candidates.reduce((latest, value) => (Date.parse(value) > Date.parse(latest) ? value : latest));
+}
+
+/** Rows that can count as ignored reminders: everything scheduled after the latest session. */
+export async function readBackoffRows(
+  db: DatabaseExecutor,
+  after: string | null,
+): Promise<Pick<NotificationLogRow, "type" | "scheduled_for" | "cancelled_at" | "delivered_at">[]> {
+  return db.getAllAsync(
+    `SELECT type, scheduled_for, cancelled_at, delivered_at FROM notification_log WHERE scheduled_for > ?`,
+    [after === null ? "" : new Date(after).toISOString()],
+  );
 }
 
 export async function insertLogRow(db: DatabaseExecutor, row: NotificationLogRow): Promise<void> {
@@ -100,6 +134,15 @@ function placeholders(count: number): string {
 export async function deleteLogRows(db: DatabaseExecutor, ids: readonly string[]): Promise<void> {
   if (ids.length === 0) return;
   await db.runAsync(`DELETE FROM notification_log WHERE id IN (${placeholders(ids.length)})`, [...ids]);
+}
+
+/** Record reminders cancelled just before their time, so they never count as delivered. */
+export async function markCancelled(db: DatabaseExecutor, ids: readonly string[], at: Date): Promise<void> {
+  if (ids.length === 0) return;
+  await db.runAsync(
+    `UPDATE notification_log SET cancelled_at = COALESCE(cancelled_at, ?) WHERE id IN (${placeholders(ids.length)})`,
+    [at.toISOString(), ...ids],
+  );
 }
 
 export async function markConverted(db: DatabaseExecutor, ids: readonly string[]): Promise<void> {

@@ -1,11 +1,11 @@
 import { addDays, diffDays, type LocalDate } from "@/lib/habit/dates";
-import { planSettlement } from "@/lib/habit/settle";
-import { buildHabitSnapshot, type HabitSnapshot } from "@/lib/habit/snapshot";
+import type { HabitSnapshot } from "@/lib/habit/snapshot";
 import type { HabitDay, HabitPause } from "@/lib/habit/types";
 import { userState } from "@/lib/habit/user-state";
 import type { DayPrayerTimes } from "@/lib/prayer/times";
 import type { DayClock } from "@/lib/notifications/clock";
 import { buildDayTimes, isQuietAt, makeUpCutoff, type DayTimesInput, type ReminderDayTimes } from "@/lib/notifications/day-times";
+import { createHabitProjector, type HabitProjector } from "@/lib/notifications/habit-projection";
 import type { GroupPending, RemindLaterPending } from "@/lib/notifications/settings";
 import { chooseTemplate, type TemplateUse, type TemplateVars } from "@/lib/notifications/templates";
 import type { NotificationType, PlannedSlot, ReminderPrefs, ReminderRoute } from "@/lib/notifications/types";
@@ -42,7 +42,7 @@ export type ReminderFactValues = Readonly<{
   manzil?: number;
 }>;
 
-/** A notification that already fired on this device (or is presumed delivered). */
+/** A notification that already fired on this device. Cancelled ones are never included. */
 export type DeliveredReminder = Readonly<{ type: string; templateId: string; localDate: LocalDate; at: Date }>;
 
 export type PlannerInput = Readonly<{
@@ -69,7 +69,16 @@ export type PlannerInput = Readonly<{
   horizonDays?: number;
 }>;
 
-export type SkipReason = "past" | "expired" | "quiet" | "backoff" | "cap" | "no_template" | "state_changed" | "late_hour";
+export type SkipReason =
+  | "past"
+  | "expired"
+  | "quiet"
+  | "backoff"
+  | "cap"
+  | "no_template"
+  | "state_changed"
+  | "late_hour"
+  | "sent";
 export type SkippedSlot = Readonly<{ type: NotificationType; localDate: LocalDate; at: Date; reason: SkipReason }>;
 export type PlanResult = Readonly<{ slots: PlannedSlot[]; skipped: SkippedSlot[] }>;
 
@@ -83,41 +92,9 @@ type Candidate = {
   priority: number;
   exemptQuiet: boolean;
   backoff: boolean;
-  countsTowardCap: boolean;
   late: boolean;
   times: ReminderDayTimes;
 };
-
-export type HabitProjection = Readonly<{ snapshot: HabitSnapshot; days: readonly HabitDay[] }>;
-
-/**
- * The habit as it will stand at `at` on `date` if the user does nothing more: the settle pass
- * (grace and pause days) runs with the same rules as lib/habit, then the snapshot is built. Any
- * session triggers a replan, so planning for "nothing more happens" is always current.
- */
-export function projectHabit(
-  input: Pick<PlannerInput, "habit" | "clock" | "prayers">,
-  date: LocalDate,
-  at: Date,
-): HabitProjection {
-  const cutoffFor = (missed: LocalDate) => makeUpCutoff(input, missed);
-  const writes = planSettlement({ days: input.habit.days, today: date, now: at, makeUpCutoffFor: cutoffFor, pause: input.habit.pause });
-  let days = input.habit.days;
-  if (writes.length > 0) {
-    const byDate = new Map(days.map((day) => [day.localDate, day]));
-    for (const write of writes) byDate.set(write.localDate, { localDate: write.localDate, status: write.status, fullMet: false });
-    days = [...byDate.values()].sort((a, b) => (a.localDate < b.localDate ? -1 : 1));
-  }
-  const snapshot = buildHabitSnapshot({
-    days,
-    today: date,
-    now: at,
-    makeUpCutoff: cutoffFor(addDays(date, -1)),
-    pause: input.habit.pause,
-    goal: null,
-  });
-  return { snapshot, days };
-}
 
 /** NOT-05b: the streak state a remind-later follow-up was scheduled under. */
 export function streakFingerprint(snapshot: HabitSnapshot): string {
@@ -154,8 +131,8 @@ function minutesBefore(at: Date, minutes: number): Date {
  *
  * Rules: nothing on a day already done, excused or paused (NOT-05); quiet hours except the opt-in
  * late reminder and a Ramadan anchor the user chose (NOT-08, NOT-10); every slot inside its own
- * date (NOT-06); back-off (NOT-09); the daily cap with group messages counted (NOT-07); follow-up
- * skip rules (NOT-05b); random template choice without repeats (NOT-12).
+ * date (NOT-06); back-off (NOT-09); the daily cap with follow-ups and group messages counted
+ * (NOT-07); follow-up skip rules (NOT-05b); random template choice without repeats (NOT-12).
  */
 export function planNotifications(input: PlannerInput): PlanResult {
   const { now, clock, prefs } = input;
@@ -174,7 +151,8 @@ export function planNotifications(input: PlannerInput): PlanResult {
     if (!timesCache.has(date)) timesCache.set(date, buildDayTimes(dayTimesInput, date));
     return timesCache.get(date)!;
   };
-  const project = (date: LocalDate, at: Date) => projectHabit(input, date, at);
+  // The history is settled once; every slot below projects from that summary.
+  const project = createHabitProjector(input, today);
   const sharedVars = (date: LocalDate): TemplateVars => {
     const facts = input.facts(date);
     return {
@@ -208,6 +186,9 @@ export function planNotifications(input: PlannerInput): PlanResult {
       next: length >= 1 ? length + 1 : undefined,
       prayer: prayerVar,
     };
+    // Slots at the anchor come at the time the user chose for reminders (3.3), so quiet hours, which
+    // keep unasked-for messages out of the night, do not apply to them. Otherwise an anchor such as
+    // 90 minutes after Isha could never fire.
     const wirdCandidate = () =>
       add({
         type: "wird_reminder",
@@ -215,9 +196,8 @@ export function planNotifications(input: PlannerInput): PlanResult {
         vars: wirdVars,
         route: "wird",
         priority: 1,
-        exemptQuiet: times.ramadanAnchor,
+        exemptQuiet: true,
         backoff: true,
-        countsTowardCap: true,
         late: false,
       });
 
@@ -239,7 +219,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
         priority: 1,
         exemptQuiet: false,
         backoff: true,
-        countsTowardCap: true,
         late: false,
       });
     } else if (!isCoveredToday(morning.snapshot)) {
@@ -254,9 +233,8 @@ export function planNotifications(input: PlannerInput): PlanResult {
           vars: { ...base, n: headline.earnBack.brokenLength },
           route: "home",
           priority: 1,
-          exemptQuiet: times.ramadanAnchor,
+          exemptQuiet: true,
           backoff: false,
-          countsTowardCap: true,
           late: false,
         });
       } else if (
@@ -271,9 +249,8 @@ export function planNotifications(input: PlannerInput): PlanResult {
           vars: { ...base, n: length, g: morning.snapshot.graceHeld },
           route: "home",
           priority: 1,
-          exemptQuiet: times.ramadanAnchor,
+          exemptQuiet: true,
           backoff: false,
-          countsTowardCap: true,
           late: false,
         });
       } else if (headline.kind === "at_risk" || headline.kind === "empty" || headline.kind === "make_up_open") {
@@ -287,9 +264,8 @@ export function planNotifications(input: PlannerInput): PlanResult {
             vars: { ...base, ramadan: comeback.ramadan ? 1 : undefined },
             route: "wird",
             priority: 1,
-            exemptQuiet: times.ramadanAnchor,
+            exemptQuiet: true,
             backoff: comeback.backoff,
-            countsTowardCap: true,
             late: false,
           });
         }
@@ -308,7 +284,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
           priority: 2,
           exemptQuiet: false,
           backoff: true,
-          countsTowardCap: true,
           late: false,
         });
       }
@@ -333,7 +308,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
             priority: 5,
             exemptQuiet: true,
             backoff: true,
-            countsTowardCap: true,
             late: true,
           });
         }
@@ -350,7 +324,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
         priority: 3,
         exemptQuiet: false,
         backoff: false,
-        countsTowardCap: true,
         late: false,
       });
     }
@@ -361,26 +334,29 @@ export function planNotifications(input: PlannerInput): PlanResult {
   const group = groupCandidate(input, timesFor, today, horizon);
   if (group) candidates.push(group);
 
-  // Timing filters.
+  // Timing filters. A reminder that already fired is not sent again that day, even at a new time;
+  // each "Remind me in 1 hour" request is its own follow-up.
+  const sent = (candidate: Candidate) =>
+    candidate.type !== "remind_later" &&
+    input.delivered.some((item) => item.type === candidate.type && item.localDate === candidate.localDate);
   const timed: Candidate[] = [];
   for (const candidate of candidates) {
-    const reason = timingProblem(candidate, now, input.backoff, input.weekStart, clock);
+    const reason = timingProblem(candidate, now, input.backoff, input.weekStart, clock) ?? (sent(candidate) ? "sent" : null);
     if (reason) skipped.push({ type: candidate.type, localDate: candidate.localDate, at: candidate.at, reason });
     else timed.push(candidate);
   }
 
-  // NOT-07 caps per date, counting what already fired today. Follow-ups replace the reminder they repeat.
+  // NOT-07 caps per date, counting everything that already fired that day, follow-ups and group
+  // messages included. A follow-up ranks first, so it takes the place of the lowest-ranked later
+  // reminder of its day only when the cap would otherwise be exceeded.
   const accepted: Candidate[] = [];
   const byDate = new Map<LocalDate, Candidate[]>();
   for (const candidate of timed) byDate.set(candidate.localDate, [...(byDate.get(candidate.localDate) ?? []), candidate]);
   for (const [date, list] of byDate) {
-    let used = input.delivered.filter(
-      (item) => item.localDate === date && item.type !== "remind_later" && item.at.getTime() <= now.getTime(),
-    ).length;
+    let used = input.delivered.filter((item) => item.localDate === date && item.at.getTime() <= now.getTime()).length;
     const ordered = [...list].sort((a, b) => a.priority - b.priority || a.at.getTime() - b.at.getTime());
     for (const candidate of ordered.filter((item) => !item.late)) {
-      if (!candidate.countsTowardCap) accepted.push(candidate);
-      else if (used < DAILY_CAP) {
+      if (used < DAILY_CAP) {
         accepted.push(candidate);
         used += 1;
       } else skipped.push({ type: candidate.type, localDate: date, at: candidate.at, reason: "cap" });
@@ -479,7 +455,7 @@ function remindLaterCandidate(
   input: PlannerInput,
   today: LocalDate,
   timesFor: (date: LocalDate) => ReminderDayTimes,
-  project: (date: LocalDate, at: Date) => HabitProjection,
+  project: HabitProjector,
   sharedVars: (date: LocalDate) => TemplateVars,
   skipped: SkippedSlot[],
 ): Candidate | null {
@@ -507,7 +483,6 @@ function remindLaterCandidate(
     priority: 0,
     exemptQuiet: false,
     backoff: false,
-    countsTowardCap: false,
     late: false,
     times: timesFor(date),
   };
@@ -544,7 +519,6 @@ function groupCandidate(
     priority: 4,
     exemptQuiet: false,
     backoff: false,
-    countsTowardCap: true,
     late: false,
     times: timesFor(date),
   };

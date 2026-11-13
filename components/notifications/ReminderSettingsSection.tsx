@@ -295,11 +295,6 @@ export function ReminderSettingsSection() {
             />
           )}
           {whenText && <Text variant="body-sm">{interpolate(s.notifNextReminder, { when: whenText })}</Text>}
-          {preview?.anchorInQuietHours && (
-            <Text variant="body-sm" className="text-red-600 dark:text-red-400">
-              {s.notifQuietHoursHint}
-            </Text>
-          )}
 
           {showRamadan && (
             <View className="gap-2">

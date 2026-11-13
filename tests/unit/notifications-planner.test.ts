@@ -3,11 +3,11 @@ import { addDays, type LocalDate } from "@/lib/habit/dates";
 import type { DayStatus, HabitDay } from "@/lib/habit/types";
 import type { DayClock } from "@/lib/notifications/clock";
 import { buildDayTimes, isQuietAt } from "@/lib/notifications/day-times";
+import { projectHabit } from "@/lib/notifications/habit-projection";
 import {
   backoffLevel,
   comebackCadence,
   planNotifications,
-  projectHabit,
   streakFingerprint,
   type PlannerInput,
 } from "@/lib/notifications/planner";
@@ -155,14 +155,57 @@ describe("planNotifications", () => {
     const habit = { days: days(streak(5, -2)), pause: null };
     const result = planNotifications(input({ prayers, habit }));
     const lines = summary(result).filter((line) => line.startsWith(TODAY));
-    expect(lines).toEqual([`${TODAY} 05:10 makeup_window`, `${TODAY} 21:30 streak_at_risk`]);
+    expect(lines).toEqual([`${TODAY} 05:10 makeup_window`, `${TODAY} 21:50 streak_at_risk`]);
     expect(result.slots[0].vars.cutoff).toBe("dhuhr");
   });
 
-  it("keeps the 21:00 at-risk reminder outside quiet hours when Isha is early (NOT-08)", () => {
+  it("sends the at-risk reminder after Isha, before quiet hours start an hour after Isha (NOT-08)", () => {
     const prayers = prayerTimes(RIYADH, WINTER);
     const result = planNotifications(input({ prayers }));
-    expect(summary(result)).toContain(`${TODAY} 21:00 streak_at_risk`);
+    expect(summary(result)).toContain(`${TODAY} 18:50 streak_at_risk`);
+    expect(summary(result)).not.toContain(`${TODAY} 21:00 streak_at_risk`);
+
+    // Isha is 18:30, so 20:00 is in quiet hours with prayer times, but the user chose that time for
+    // the wird reminder, so it is sent either way.
+    const evening = prefsWith({ anchor: { kind: "clock", minutes: 20 * 60 } });
+    expect(summary(planNotifications(input({ prefs: evening, prayers })))).toContain(`${TODAY} 20:00 wird_reminder`);
+    expect(summary(planNotifications(input({ prefs: evening })))).toContain(`${TODAY} 20:00 wird_reminder`);
+  });
+
+  it("ends quiet hours 30 minutes before Fajr, and uses 05:00 only without prayer times (NOT-08)", () => {
+    const prayers = prayerTimes(RIYADH, WINTER);
+    // Fajr is 04:50, so quiet hours end at 04:20 with prayer times and at 05:00 without them. The
+    // at-risk reminder is not chosen by the user, so it follows the window.
+    const times = (prayersFor: typeof prayers | (() => null)) =>
+      buildDayTimes({ clock: RIYADH, prayers: prayersFor, anchor: DEFAULT_REMINDER_PREFS.anchor, ramadanAnchor: null, isRamadan: () => false }, TODAY);
+    expect(isQuietAt(times(prayers), RIYADH.at(TODAY, 4 * 60 + 30))).toBe(false);
+    expect(isQuietAt(times(() => null), RIYADH.at(TODAY, 4 * 60 + 30))).toBe(true);
+    // The wird reminder at a chosen 04:30 is sent in both cases.
+    const early = prefsWith({ anchor: { kind: "clock", minutes: 4 * 60 + 30 } });
+    const now = RIYADH.at(TODAY, 0);
+    expect(summary(planNotifications(input({ prefs: early, prayers, now })))).toContain(`${TODAY} 04:30 wird_reminder`);
+    expect(summary(planNotifications(input({ prefs: early, now })))).toContain(`${TODAY} 04:30 wird_reminder`);
+  });
+
+  it("builds the quiet window from prayer times, with clock fallbacks only without them", () => {
+    const times = buildDayTimes(
+      { clock: RIYADH, prayers: prayerTimes(RIYADH, WINTER), anchor: DEFAULT_REMINDER_PREFS.anchor, ramadanAnchor: null, isRamadan: () => false },
+      TODAY,
+    );
+    expect([times.quietEndsAt, times.atRiskAt, times.quietStartsAt].map((at) => RIYADH.minutesOf(at))).toEqual([
+      4 * 60 + 20,
+      18 * 60 + 50,
+      19 * 60 + 30,
+    ]);
+    const fallback = buildDayTimes(
+      { clock: RIYADH, prayers: () => null, anchor: DEFAULT_REMINDER_PREFS.anchor, ramadanAnchor: null, isRamadan: () => false },
+      TODAY,
+    );
+    expect([fallback.quietEndsAt, fallback.atRiskAt, fallback.quietStartsAt].map((at) => RIYADH.minutesOf(at))).toEqual([
+      5 * 60,
+      21 * 60,
+      23 * 60,
+    ]);
   });
 
   it("does not send the at-risk reminder for a 1-day streak", () => {
@@ -202,6 +245,41 @@ describe("planNotifications", () => {
     expect(result.skipped).toContainEqual(expect.objectContaining({ type: "friday_kahf", localDate: friday, reason: "cap" }));
   });
 
+  it("counts follow-ups toward the daily cap, and lets one displace a later reminder (NOT-07)", () => {
+    const now = RIYADH.at(TODAY, 5 * 60 + 30);
+    const wird = { type: "wird_reminder", templateId: "wird_reminder.1", localDate: TODAY, at: RIYADH.at(TODAY, 5 * 60 + 20) };
+    const base = input({ now, delivered: [wird] });
+    const fingerprint = streakFingerprint(projectHabit(base, TODAY, now).snapshot);
+    const remindLater = { at: RIYADH.at(TODAY, 6 * 60 + 30).toISOString(), local_date: TODAY, fingerprint };
+
+    // One reminder fired: the follow-up takes the second place and the evening reminder gives way.
+    const displaced = planNotifications({ ...base, remindLater });
+    expect(summary(displaced).filter((line) => line.startsWith(TODAY))).toEqual([`${TODAY} 06:30 remind_later`]);
+    expect(displaced.skipped).toContainEqual(expect.objectContaining({ type: "streak_at_risk", localDate: TODAY, reason: "cap" }));
+
+    // Two fired, one of them a follow-up: no more follow-ups, and the late reminder is the third.
+    const later = RIYADH.at(TODAY, 10 * 60);
+    const fired = [wird, { type: "remind_later", templateId: "remind_later.1", localDate: TODAY, at: RIYADH.at(TODAY, 6 * 60 + 30) }];
+    const capped = planNotifications({
+      ...base,
+      now: later,
+      prefs: prefsWith({ types: { late_reminder: true } }),
+      delivered: fired,
+      remindLater: { ...remindLater, at: RIYADH.at(TODAY, 11 * 60).toISOString() },
+    });
+    expect(summary(capped).filter((line) => line.startsWith(TODAY))).toEqual([`${TODAY} 23:15 late_reminder`]);
+    expect(capped.skipped).toContainEqual(expect.objectContaining({ type: "remind_later", reason: "cap" }));
+  });
+
+  it("does not send a reminder type twice on one date when its time moves after it fired", () => {
+    const now = RIYADH.at(TODAY, 7 * 60);
+    const delivered = [{ type: "wird_reminder", templateId: "wird_reminder.1", localDate: TODAY, at: RIYADH.at(TODAY, 5 * 60 + 20) }];
+    const prefs = prefsWith({ anchor: { kind: "clock", minutes: 8 * 60 } });
+    const result = planNotifications(input({ now, prefs, delivered }));
+    expect(summary(result).filter((line) => line.startsWith(TODAY))).toEqual([`${TODAY} 21:00 streak_at_risk`]);
+    expect(result.skipped).toContainEqual(expect.objectContaining({ type: "wird_reminder", localDate: TODAY, reason: "sent" }));
+  });
+
   it("sends Friday al-Kahf when opted in, even after the wird is done", () => {
     const prefs = prefsWith({ types: { friday_kahf: true } });
     const friday = addDays(TODAY, 1);
@@ -218,11 +296,10 @@ describe("planNotifications", () => {
     expect(result.slots.some((slot) => slot.type === "wird_reminder")).toBe(true);
   });
 
-  it("drops a reminder whose time is in quiet hours", () => {
+  it("sends a reminder at the time the user chose even inside quiet hours", () => {
     const prefs = prefsWith({ anchor: { kind: "clock", minutes: 4 * 60 } });
-    const result = planNotifications(input({ prefs, habit: { days: days(streak(5, 0)), pause: null } }));
-    expect(result.slots.some((slot) => slot.type === "wird_reminder")).toBe(false);
-    expect(result.skipped).toContainEqual(expect.objectContaining({ type: "wird_reminder", reason: "quiet" }));
+    const result = planNotifications(input({ prefs, now: RIYADH.at(TODAY, 60) }));
+    expect(summary(result)).toContain(`${TODAY} 04:00 wird_reminder`);
   });
 
   it("lets a Ramadan anchor the user chose fall before Suhoor (NOT-10)", () => {
@@ -375,7 +452,10 @@ describe("planNotifications properties", () => {
     backoff: fc.constantFrom<0 | 1 | 2>(0, 1, 2),
     clock: fc.constantFrom(RIYADH, LONDON, NEW_YORK),
     group: fc.boolean(),
-    deliveredToday: fc.integer({ min: 0, max: 3 }),
+    deliveredToday: fc.array(fc.constantFrom<NotificationType>("wird_reminder", "remind_later", "group_encouragement", "streak_at_risk"), {
+      maxLength: 3,
+    }),
+    followUp: fc.boolean(),
   });
 
   type Scenario = typeof scenarioArb extends fc.Arbitrary<infer T> ? T : never;
@@ -387,7 +467,7 @@ describe("planNotifications properties", () => {
       if (status) record[addDays(TODAY, -scenario.history.length + index)] = status;
     });
     const now = clock.at(TODAY, scenario.nowMinutes);
-    return input({
+    const base = input({
       clock,
       now,
       prefs: prefsWith({ anchor: scenario.anchor, types: scenario.types }),
@@ -395,24 +475,27 @@ describe("planNotifications properties", () => {
       habit: { days: days(record), pause: null },
       backoff: scenario.backoff,
       groupPending: scenario.group ? { first_received_at: now.toISOString(), count: 1 } : null,
-      delivered: Array.from({ length: scenario.deliveredToday }, (_, index) => ({
-        type: "wird_reminder",
-        templateId: `wird_reminder.${index + 2}`,
+      delivered: scenario.deliveredToday.map((type, index) => ({
+        type,
+        templateId: `${type}.${index + 2}`,
         localDate: TODAY,
         at: new Date(now.getTime() - (index + 1) * 60_000),
       })),
       random: () => 0.5,
     });
+    const followUpAt = new Date(now.getTime() + 60 * 60_000);
+    if (!scenario.followUp || clock.dateOf(followUpAt) !== TODAY) return base;
+    const fingerprint = streakFingerprint(projectHabit(base, TODAY, now).snapshot);
+    return { ...base, remindLater: { at: followUpAt.toISOString(), local_date: TODAY, fingerprint } };
   }
 
-  it("never plans more than the daily cap, and only the late reminder takes a third place", () => {
+  it("never plans more than the daily cap, follow-ups included, and only the late reminder takes a third place", () => {
     fc.assert(
       fc.property(scenarioArb, (scenario) => {
         const plannerInput = build(scenario);
         const result = planNotifications(plannerInput);
         const perDate = new Map<LocalDate, NotificationType[]>();
         for (const slot of result.slots) {
-          if (slot.type === "remind_later") continue;
           perDate.set(slot.localDate, [...(perDate.get(slot.localDate) ?? []), slot.type]);
         }
         for (const [date, types] of perDate) {
@@ -426,12 +509,43 @@ describe("planNotifications properties", () => {
     );
   });
 
-  it("never plans inside quiet hours except the late reminder", () => {
+  it("sends the at-risk reminder after Isha and before quiet hours when prayer times are set (5.8.2, NOT-08)", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 17 * 60, max: 22 * 60 + 20 }),
+        fc.integer({ min: 3 * 60, max: 6 * 60 + 30 }),
+        fc.constantFrom(RIYADH, LONDON, NEW_YORK),
+        (isha, fajr, clock) => {
+          const prayers = prayerTimes(clock, { ...WINTER, fajr, isha });
+          const times = buildDayTimes({ clock, prayers, anchor: DEFAULT_REMINDER_PREFS.anchor, ramadanAnchor: null, isRamadan: () => false }, TODAY);
+          const ishaAt = prayers(TODAY).isha.getTime();
+          expect(times.atRiskAt.getTime()).toBeGreaterThan(ishaAt);
+          expect(times.atRiskAt.getTime()).toBeLessThan(times.quietStartsAt.getTime());
+          expect(times.quietStartsAt.getTime()).toBe(ishaAt + 60 * 60_000);
+          expect(times.quietEndsAt.getTime()).toBe(prayers(TODAY).fajr.getTime() - 30 * 60_000);
+          expect(isQuietAt(times, times.atRiskAt)).toBe(false);
+        },
+      ),
+    );
+  });
+
+  it("never plans inside quiet hours except the late reminder and the user's chosen time", () => {
     fc.assert(
       fc.property(scenarioArb, (scenario) => {
         const plannerInput = build(scenario);
         for (const slot of planNotifications(plannerInput).slots) {
           if (slot.type === "late_reminder") continue;
+          const chosen = buildDayTimes(
+            {
+              clock: plannerInput.clock,
+              prayers: plannerInput.prayers,
+              anchor: plannerInput.prefs.anchor,
+              ramadanAnchor: plannerInput.prefs.ramadanAnchor,
+              isRamadan: plannerInput.isRamadan,
+            },
+            slot.localDate,
+          ).anchorAt;
+          if (slot.at.getTime() === chosen.getTime()) continue;
           const times = buildDayTimes(
             {
               clock: plannerInput.clock,
