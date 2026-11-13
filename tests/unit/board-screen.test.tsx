@@ -8,6 +8,7 @@ import BoardScreen from "@/app/(tabs)/leaderboard";
 import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { flattenStyle } from "../rtl/rtl-test-utils";
+import { bearerSubject, signedIn, signedOut, type FakeAuthState } from "./social-test-auth";
 
 jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
@@ -27,7 +28,11 @@ const mockSettings = {
     surfaceBright: "#FFFFFF",
   },
 };
-const mockAuth: { user: { id: string } | null } = { user: null };
+const mockAuth: FakeAuthState = signedOut();
+const mockHeaders: Record<string, string> = {};
+function signIn(userId: string) {
+  Object.assign(mockAuth, signedIn(userId));
+}
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useRouter: () => ({ push: jest.fn() }) }));
@@ -37,14 +42,24 @@ jest.mock("@/lib/settings/context", () => {
   return { ...actual, useSettings: () => mockSettings };
 });
 jest.mock("@/lib/auth/store", () => ({
-  useAuthStore: (selector: (state: typeof mockAuth) => unknown) => selector(mockAuth),
+  useAuthStore: Object.assign((selector: (state: typeof mockAuth) => unknown) => selector(mockAuth), {
+    getState: () => mockAuth,
+  }),
 }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
-  supabase: { rpc: (fn: string, args: Record<string, unknown>) => mockRpc(fn, args) },
+  supabase: {
+    rpc: (fn: string, args: Record<string, unknown>) =>
+      require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
+    auth: { getSession: async () => ({ data: { session: mockAuth.session }, error: null }) },
+  },
 }));
 jest.mock("@/lib/social/queries", () => ({
-  readLocalSocialBands: async () => ({ levelBand: "juz_4_15", paceBand: "half_page", utcOffsetMinutes: 120 }),
+  // The real reader takes the week start from the wird settings (tested in social-bands.test.ts).
+  readLocalBoardInputs: async (_db: unknown, language: "en" | "ar") => ({
+    bands: { levelBand: "juz_4_15", paceBand: "half_page", utcOffsetMinutes: 120 },
+    weekStart: language === "ar" ? 6 : 1,
+  }),
 }));
 
 const USER = "00000000-0000-4000-8000-00000000000a";
@@ -83,7 +98,8 @@ let boardState: unknown;
 beforeEach(async () => {
   mockSettings.isRTL = false;
   mockSettings.uiLanguage = "en";
-  mockAuth.user = null;
+  Object.assign(mockAuth, signedOut());
+  for (const key of Object.keys(mockHeaders)) delete mockHeaders[key];
   boardState = { status: "not_joined", week_start: "2026-11-09" };
   mockRpc.mockReset().mockImplementation(async (fn) => {
     switch (fn) {
@@ -120,7 +136,7 @@ describe("Board tab", () => {
   });
 
   it("is opt-in, with the intention note before joining (BRD-04)", async () => {
-    mockAuth.user = { id: USER };
+    signIn(USER);
     const screen = renderScreen();
 
     expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
@@ -130,7 +146,9 @@ describe("Board tab", () => {
       p_pace_band: "half_page",
       p_utc_offset_minutes: 120,
       p_today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      p_week_start: 1,
     });
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
 
     fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
     await waitFor(() =>
@@ -140,7 +158,7 @@ describe("Board tab", () => {
   });
 
   it("requires a nickname from a reader under 18 (BRD-07)", async () => {
-    mockAuth.user = { id: USER };
+    signIn(USER);
     const screen = renderScreen();
     await screen.findByText(strings.en.boardIntentionTitle);
 
@@ -158,7 +176,7 @@ describe("Board tab", () => {
   });
 
   it("shows standings with name, points and streak, and leaves in one tap (BRD-05, BRD-04)", async () => {
-    mockAuth.user = { id: USER };
+    signIn(USER);
     boardState = ready;
     const screen = renderScreen();
 
@@ -177,7 +195,7 @@ describe("Board tab", () => {
   it("mirrors standing rows in Arabic and uses Arabic digits", async () => {
     mockSettings.isRTL = true;
     mockSettings.uiLanguage = "ar";
-    mockAuth.user = { id: USER };
+    signIn(USER);
     boardState = ready;
     const screen = renderScreen();
 
@@ -185,5 +203,7 @@ describe("Board tab", () => {
       interpolate(strings.ar.boardPointsA11y, { name: "Little Star", rank: "١", points: "٩", streak: "١٢ يومًا" }),
     );
     expect(flattenStyle(row.props.style)).toMatchObject({ direction: "ltr", flexDirection: "row-reverse" });
+    // STR-28: an Arabic reader's week starts on Saturday unless they chose another day.
+    expect(mockRpc).toHaveBeenCalledWith("get_board", expect.objectContaining({ p_week_start: 6 }));
   });
 });

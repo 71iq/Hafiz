@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { HifzPlan } from "@/lib/hifz/plan";
 
 /**
  * Matching bands for halaqa and board placement (spec 5.7.3, 8.13). The client reports its bands and
@@ -16,14 +16,24 @@ const MUSHAF_PAGES = 604;
 const PAGES_PER_JUZ = 20;
 
 /**
- * Pages from memorized ayah cards, until page cards exist (UNIT-02). 6,236 ayat over 604 pages is
- * about 10.3 ayat a page. Every caller goes through this one function so the approximation has a
- * single place to change.
+ * Pages from memorized ayah cards, for ayah learners, who have no page cards (UNIT-02). 6,236 ayat
+ * over 604 pages is about 10.3 ayat a page. Every caller goes through this one function so the
+ * approximation has a single place to change.
  */
 const AYAHS_PER_PAGE_ESTIMATE = 10.3;
 export function approximatePagesFromAyahs(memorizedAyahs: number): number {
   if (!Number.isFinite(memorizedAyahs) || memorizedAyahs <= 0) return 0;
   return Math.min(MUSHAF_PAGES, memorizedAyahs / AYAHS_PER_PAGE_ESTIMATE);
+}
+
+/**
+ * Memorized pages for the level band. Page learners count memorized page cards (MST-01, the same
+ * definition Home and Progress use). Ayah cards are converted with the estimate above. Someone with
+ * both counts whichever is larger, since the two may cover the same pages.
+ */
+export function memorizedPagesFromCards(input: { memorizedPageCards: number; memorizedAyahCards: number }): number {
+  const pages = Number.isFinite(input.memorizedPageCards) ? Math.max(0, input.memorizedPageCards) : 0;
+  return Math.min(MUSHAF_PAGES, Math.max(pages, approximatePagesFromAyahs(input.memorizedAyahCards)));
 }
 
 export function levelBand(memorizedPages: number): LevelBand {
@@ -62,27 +72,22 @@ export type SocialBands = Readonly<{
 }>;
 
 export function socialBands(input: {
-  memorizedAyahs: number;
+  memorizedPages: number;
   newPerDayPages: number;
   utcOffsetMinutes: number;
 }): SocialBands {
   return {
-    levelBand: levelBand(approximatePagesFromAyahs(input.memorizedAyahs)),
+    levelBand: levelBand(input.memorizedPages),
     paceBand: paceBand(input.newPerDayPages),
     utcOffsetMinutes: input.utcOffsetMinutes,
   };
 }
 
-// Only the field matching needs. A missing, unreadable or partial plan means maintenance pace.
-const planPace = z.object({ new_per_day: z.number().finite().nonnegative().optional() }).passthrough();
-
-/** New pages a day from the synced `hifz_plan` setting (spec 7.6). */
-export function newPerDayFromPlan(value: string | null | undefined): number {
-  if (!value) return 0;
-  try {
-    const parsed = planPace.safeParse(JSON.parse(value));
-    return parsed.success ? (parsed.data.new_per_day ?? 0) : 0;
-  } catch {
-    return 0;
-  }
+/**
+ * New pages a day from a hifz plan parsed by lib/hifz/plan.ts. No plan, or a review-only plan, adds
+ * no new memorization, which is maintenance pace.
+ */
+export function newPagesPerDay(plan: HifzPlan | null): number {
+  if (!plan || plan.method === "review_only") return 0;
+  return plan.newPerDay;
 }

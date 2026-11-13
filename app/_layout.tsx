@@ -16,6 +16,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 import { SettingsProvider } from "@/lib/settings/context";
 import { useReminderResponses, useReminderScheduling } from "@/lib/notifications/use-reminder-scheduling";
+import { useGroupEncouragementChecks } from "@/lib/halaqa/encouragement-notifications";
 
 const queryClient = createAppQueryClient();
 
@@ -55,6 +56,17 @@ function StableDocumentTitle() {
 function ReminderLifecycle() {
   useReminderScheduling();
   useReminderResponses();
+  return null;
+}
+
+/** Halaqa encouragement received since the last check becomes one batched local reminder (5.8.2). */
+function EncouragementChecks() {
+  const { isReady } = useDatabaseStatus();
+  return isReady ? <EncouragementCheckRunner /> : null;
+}
+
+function EncouragementCheckRunner() {
+  useGroupEncouragementChecks();
   return null;
 }
 
@@ -111,6 +123,7 @@ export default function RootLayout() {
               <AudioProviderBoundary>
                 <StableDocumentTitle />
                 <ReminderLifecycle />
+                <EncouragementChecks />
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="about" />

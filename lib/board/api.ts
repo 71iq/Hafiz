@@ -1,11 +1,13 @@
 import { z } from "zod";
+import type { SocialOwner } from "@/lib/social/owner";
 import { callSocialRpc, localDateSchema, readSocial, voidResult, type SocialRead } from "@/lib/social/remote";
 import type { SocialBands } from "@/lib/social/bands";
 
 /**
  * Board service adapter (spec 5.7.2). Opt-in weekly cohorts of about 30 people. The server places the
  * caller and computes every score from synced wird days (PTS-02, SB-04); the client only reports its
- * bands. Standings carry no user ids, and never show a photo under a nickname or for a minor (BRD-07).
+ * bands and its week start (BRD-01, STR-28). Standings carry no user ids, and never show a photo under
+ * a nickname or for a minor (BRD-07).
  */
 const BOARD_NICKNAME_MIN = 3;
 export const BOARD_NICKNAME_MAX = 20;
@@ -61,28 +63,40 @@ export const boardViewSchema = z
 export type BoardView = z.output<typeof boardViewSchema>;
 export type BoardStanding = Extract<BoardView, { status: "ready" }>["standings"][number];
 
+/** What the board needs from this device: matching bands (8.13) and the effective week start, 0 to 6. */
+export type BoardInputs = Readonly<{ bands: SocialBands; weekStart: number }>;
+
 export const boardKeys = {
   all: (userId: string | null) => ["board", userId ?? "signed-out"] as const,
-  view: (userId: string | null, today: string, bands: SocialBands) =>
-    ["board", userId ?? "signed-out", today, bands.levelBand, bands.paceBand, bands.utcOffsetMinutes] as const,
+  view: (userId: string | null, today: string, inputs: BoardInputs) =>
+    [
+      "board",
+      userId ?? "signed-out",
+      today,
+      inputs.bands.levelBand,
+      inputs.bands.paceBand,
+      inputs.bands.utcOffsetMinutes,
+      inputs.weekStart,
+    ] as const,
 };
 
-function bandArgs(bands: SocialBands, today: string) {
+function boardArgs(inputs: BoardInputs, today: string) {
   return {
-    p_level_band: bands.levelBand,
-    p_pace_band: bands.paceBand,
-    p_utc_offset_minutes: bands.utcOffsetMinutes,
+    p_level_band: inputs.bands.levelBand,
+    p_pace_band: inputs.bands.paceBand,
+    p_utc_offset_minutes: inputs.bands.utcOffsetMinutes,
     p_today: today,
+    p_week_start: inputs.weekStart,
   };
 }
 
 /** Called when the Board tab opens; places a joined user in this week's cohort if needed. */
-export function boardRead(bands: SocialBands, today: string): SocialRead<BoardView> {
-  return { fn: "get_board", args: bandArgs(bands, today), schema: boardViewSchema };
+export function boardRead(inputs: BoardInputs, today: string): SocialRead<BoardView> {
+  return { fn: "get_board", args: boardArgs(inputs, today), schema: boardViewSchema };
 }
 
-export function fetchBoard(bands: SocialBands, today: string): Promise<BoardView> {
-  return readSocial(boardRead(bands, today));
+export function fetchBoard(inputs: BoardInputs, today: string, owner: SocialOwner): Promise<BoardView> {
+  return readSocial(boardRead(inputs, today), owner);
 }
 
 export function normalizeBoardNickname(input: string): string | null {
@@ -94,19 +108,18 @@ export function isValidBoardNickname(nickname: string | null): boolean {
   return nickname === null || (nickname.length >= BOARD_NICKNAME_MIN && nickname.length <= BOARD_NICKNAME_MAX);
 }
 
-export function joinBoard(input: {
-  nickname: string | null;
-  isMinor: boolean;
-  bands: SocialBands;
-  today: string;
-}): Promise<BoardView> {
+export function joinBoard(
+  input: { nickname: string | null; isMinor: boolean; inputs: BoardInputs; today: string },
+  owner: SocialOwner,
+): Promise<BoardView> {
   return callSocialRpc(
     "join_board",
-    { p_nickname: input.nickname, p_is_minor: input.isMinor, ...bandArgs(input.bands, input.today) },
+    { p_nickname: input.nickname, p_is_minor: input.isMinor, ...boardArgs(input.inputs, input.today) },
     boardViewSchema,
+    owner,
   );
 }
 
-export async function leaveBoard(): Promise<void> {
-  await callSocialRpc("leave_board", {}, voidResult);
+export async function leaveBoard(owner: SocialOwner): Promise<void> {
+  await callSocialRpc("leave_board", {}, voidResult, owner);
 }

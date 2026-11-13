@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
+import { requireSocialOwner } from "@/lib/social/owner";
 import {
   callSocialRpcRaw,
   parseSocialPayload,
@@ -53,6 +54,10 @@ async function writeSocialCache(userId: string, name: string, payload: unknown, 
  * Loads fresh data and keeps a copy. When the device is offline or the request cannot reach the
  * server, returns the saved copy instead; with no copy, the offline failure is rethrown. Server
  * refusals and invalid responses are never hidden behind an old copy.
+ *
+ * The load belongs to `userId`: it runs only while that account is signed in, sends that account's
+ * token, and checks the account again before it writes or returns anything, so another account's
+ * data never lands under this key.
  */
 export async function loadWithSocialCache<T>(options: {
   userId: string;
@@ -62,20 +67,28 @@ export async function loadWithSocialCache<T>(options: {
   now?: () => Date;
 }): Promise<SocialSnapshot<T>> {
   const { userId, name, read, offline } = options;
-  if (offline) {
+  const owner = requireSocialOwner(userId);
+  const readOwnCopy = async () => {
     const cached = await readSocialCache(userId, name, read.schema);
+    owner.requireCurrent();
+    return cached;
+  };
+  if (offline) {
+    const cached = await readOwnCopy();
     if (cached) return cached;
     throw socialError({ kind: "offline" });
   }
   try {
-    const payload = await callSocialRpcRaw(read.fn, read.args);
+    const payload = await callSocialRpcRaw(read.fn, read.args, owner);
     const data = parseSocialPayload(read.schema, payload);
     const savedAt = (options.now?.() ?? new Date()).toISOString();
+    owner.requireCurrent();
     await writeSocialCache(userId, name, payload, savedAt);
+    owner.requireCurrent();
     return { data, savedAt, source: "network" };
   } catch (error) {
     if (socialFailureOf(error).kind === "offline") {
-      const cached = await readSocialCache(userId, name, read.schema);
+      const cached = await readOwnCopy();
       if (cached) return cached;
     }
     throw error;

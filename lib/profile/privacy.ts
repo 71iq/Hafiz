@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { requireSocialOwner, type SocialOwner } from "@/lib/social/owner";
 import { callSocialRpc } from "@/lib/social/remote";
 
 /**
@@ -38,24 +39,31 @@ export const profilePrivacyKeys = {
   summary: (viewerId: string | null, targetId: string) => ["profileSummary", viewerId ?? "signed-out", targetId] as const,
 };
 
-export function fetchProfilePrivacy(): Promise<ProfilePrivacy> {
-  return callSocialRpc("get_profile_privacy", {}, profilePrivacySchema);
+/** The owner's own choices. Runs as that account (lib/social/owner.ts). */
+export function fetchProfilePrivacy(owner: SocialOwner): Promise<ProfilePrivacy> {
+  return callSocialRpc("get_profile_privacy", {}, profilePrivacySchema, owner);
 }
 
-export function saveProfilePrivacy(input: {
-  showStreak: boolean;
-  showJuzCompletions: boolean;
-  isMinor: boolean;
-}): Promise<ProfilePrivacy> {
+export function saveProfilePrivacy(
+  input: { showStreak: boolean; showJuzCompletions: boolean; isMinor: boolean },
+  owner: SocialOwner,
+): Promise<ProfilePrivacy> {
   return callSocialRpc(
     "set_profile_privacy",
     { p_show_streak: input.showStreak, p_show_juz_completions: input.showJuzCompletions, p_is_minor: input.isMinor },
     profilePrivacySchema,
+    owner,
   );
 }
 
-/** What this viewer may see of another person's consistency; null when unavailable or hidden. */
-export async function fetchProfileSummary(userId: string): Promise<ProfileSummary> {
+/**
+ * What this viewer may see of another person's consistency; null when unavailable or hidden. The
+ * answer depends on the viewer, so pass the viewer's id when signed in: the request then runs as that
+ * account and is refused once it is no longer signed in. Without one it uses whatever session the
+ * shared client holds.
+ */
+export async function fetchProfileSummary(userId: string, viewerId?: string | null): Promise<ProfileSummary> {
   if (!isSupabaseConfigured() || !userId) return null;
-  return callSocialRpc("get_profile_summary", { p_user_id: userId }, profileSummarySchema);
+  const owner = viewerId ? requireSocialOwner(viewerId) : undefined;
+  return callSocialRpc("get_profile_summary", { p_user_id: userId }, profileSummarySchema, owner);
 }

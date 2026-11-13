@@ -1,11 +1,14 @@
 import { z } from "zod";
+import { parseHifzPlan } from "@/lib/hifz/plan";
+import type { SocialOwner } from "@/lib/social/owner";
 import { callSocialRpc, localDateSchema, readSocial, voidResult, type SocialRead } from "@/lib/social/remote";
 import type { SocialBands } from "@/lib/social/bands";
 
 /**
  * Halaqa service adapter (spec 5.7.1). Every read and write is a SECURITY DEFINER RPC that checks the
  * caller; members see each other's wird days, streak and juz completions only where shared, never
- * mistakes, grades or recordings (SOC-02).
+ * mistakes, grades or recordings (SOC-02). Each call runs as the account that started it
+ * (lib/social/owner.ts).
  */
 
 /** SOC-06 fixed encouragements, rendered in each reader's language. Keep in step with the server check. */
@@ -156,7 +159,9 @@ const teacherViewSchema = z
   })
   .transform((row) => ({
     name: row.name,
-    plan: row.plan ? { hifzPlan: row.plan.hifz_plan, tiers: row.plan.tiers } : null,
+    // The member's synced hifz_plan setting, read with the app's own plan schema (spec 3.3). Null
+    // when they have no plan or it cannot be read.
+    plan: row.plan ? { hifzPlan: parseHifzPlan(row.plan.hifz_plan), tiers: row.plan.tiers } : null,
     grades: row.grades
       ? {
           mistakeInboxCount: row.grades.mistake_inbox_count,
@@ -191,12 +196,17 @@ export function halaqaDetailRead(groupId: string, today: string): SocialRead<Hal
   return { fn: "get_halaqa_detail", args: { p_group_id: groupId, p_today: today }, schema: halaqaDetailSchema };
 }
 
-export function fetchHalaqaDetail(groupId: string, today: string): Promise<HalaqaDetail> {
-  return readSocial(halaqaDetailRead(groupId, today));
+export function fetchHalaqaDetail(groupId: string, today: string, owner: SocialOwner): Promise<HalaqaDetail> {
+  return readSocial(halaqaDetailRead(groupId, today), owner);
 }
 
-export function createInviteHalaqa(name: string, asTeacher: boolean): Promise<HalaqaSummary> {
-  return callSocialRpc("create_invite_halaqa", { p_name: name.trim(), p_as_teacher: asTeacher }, halaqaSummarySchema);
+export function createInviteHalaqa(name: string, asTeacher: boolean, owner: SocialOwner): Promise<HalaqaSummary> {
+  return callSocialRpc(
+    "create_invite_halaqa",
+    { p_name: name.trim(), p_as_teacher: asTeacher },
+    halaqaSummarySchema,
+    owner,
+  );
 }
 
 /** Codes are shared in upper case; spaces and dashes from a pasted link or message are ignored. */
@@ -204,23 +214,24 @@ export function normalizeInviteCode(input: string): string {
   return input.replace(/[\s-]/g, "").toUpperCase();
 }
 
-export function joinHalaqaByCode(code: string): Promise<HalaqaSummary> {
-  return callSocialRpc("join_halaqa_by_code", { p_code: normalizeInviteCode(code) }, halaqaSummarySchema);
+export function joinHalaqaByCode(code: string, owner: SocialOwner): Promise<HalaqaSummary> {
+  return callSocialRpc("join_halaqa_by_code", { p_code: normalizeInviteCode(code) }, halaqaSummarySchema, owner);
 }
 
-export function joinMatchedHalaqa(bands: SocialBands): Promise<HalaqaSummary> {
+export function joinMatchedHalaqa(bands: SocialBands, owner: SocialOwner): Promise<HalaqaSummary> {
   return callSocialRpc(
     "join_matched_halaqa",
     { p_level_band: bands.levelBand, p_pace_band: bands.paceBand, p_utc_offset_minutes: bands.utcOffsetMinutes },
     halaqaSummarySchema,
+    owner,
   );
 }
 
-export async function leaveHalaqa(groupId: string): Promise<void> {
-  await callSocialRpc("leave_halaqa", { p_group_id: groupId }, voidResult);
+export async function leaveHalaqa(groupId: string, owner: SocialOwner): Promise<void> {
+  await callSocialRpc("leave_halaqa", { p_group_id: groupId }, voidResult, owner);
 }
 
-export function setHalaqaSharing(groupId: string, sharing: HalaqaSharing): Promise<HalaqaSummary> {
+export function setHalaqaSharing(groupId: string, sharing: HalaqaSharing, owner: SocialOwner): Promise<HalaqaSummary> {
   return callSocialRpc(
     "set_halaqa_sharing",
     {
@@ -231,16 +242,20 @@ export function setHalaqaSharing(groupId: string, sharing: HalaqaSharing): Promi
       p_share_grades_with_teachers: sharing.gradesWithTeachers,
     },
     halaqaSummarySchema,
+    owner,
   );
 }
 
-export async function sendEncouragement(input: {
-  groupId: string;
-  toUserId: string;
-  templateId: EncouragementTemplateId | null;
-  body: string | null;
-  today: string;
-}): Promise<void> {
+export async function sendEncouragement(
+  input: {
+    groupId: string;
+    toUserId: string;
+    templateId: EncouragementTemplateId | null;
+    body: string | null;
+    today: string;
+  },
+  owner: SocialOwner,
+): Promise<void> {
   const body = input.body?.trim() || null;
   await callSocialRpc(
     "send_halaqa_encouragement",
@@ -252,15 +267,35 @@ export async function sendEncouragement(input: {
       p_today: input.today,
     },
     z.object({ id: z.string().uuid() }),
+    owner,
   );
 }
 
-export function fetchTeacherView(groupId: string, memberId: string, today: string): Promise<TeacherView> {
+export function fetchTeacherView(groupId: string, memberId: string, today: string, owner: SocialOwner): Promise<TeacherView> {
   return callSocialRpc(
     "get_halaqa_teacher_view",
     { p_group_id: groupId, p_member_id: memberId, p_today: today },
     teacherViewSchema,
+    owner,
   );
+}
+
+/**
+ * Encouragements received after `since` across the reader's halaqas (5.8.2). `latestCreatedAt` is
+ * the server's own spelling of the newest one, kept verbatim as the next `since` so no precision is
+ * lost; `checkedAt` is the server's time when nothing has arrived yet.
+ */
+const receivedSinceSchema = z
+  .object({
+    count: count,
+    latest_created_at: z.string().min(1).nullable(),
+    checked_at: z.string().min(1),
+  })
+  .transform((row) => ({ count: row.count, latestCreatedAt: row.latest_created_at, checkedAt: row.checked_at }));
+export type ReceivedSince = z.output<typeof receivedSinceSchema>;
+
+export function fetchReceivedEncouragementsSince(since: string | null, owner: SocialOwner): Promise<ReceivedSince> {
+  return callSocialRpc("get_received_encouragements_since", { p_since: since }, receivedSinceSchema, owner);
 }
 
 export function isEncouragementTemplateId(value: string | null): value is EncouragementTemplateId {

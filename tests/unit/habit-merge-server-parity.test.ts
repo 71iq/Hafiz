@@ -10,9 +10,9 @@ import { EARNED_STATUSES, effectiveStatus, type HabitDayRow } from "@/lib/habit/
  * merge returns for each order of its inputs; supabase/tests/learning_consistency.test.sql proves the
  * server returns the same rows. Regenerate with UPDATE_HABIT_MERGE_FIXTURE=1 after a deliberate change.
  *
- * Times use one spelling (".000Z"). The server stores instants, so it cannot see the spelling tie-break
- * the client uses for equal instants; that tie only matters for two different excuses written in the
- * same millisecond.
+ * Times mostly use one spelling (".000Z"). The server stores instants, so it never sees the spelling.
+ * The excuse register therefore orders by instant, then reason, on both sides, and the spelling only
+ * picks which equal string the client keeps; the named "spelled differently" cases pin that down.
  */
 const FIXTURE = path.join(process.cwd(), "supabase/tests/habit-merge-cases.json");
 const TODAY = "2026-11-13";
@@ -104,6 +104,18 @@ function buildCases(): MergeCase[] {
     ["equal status and session ties on zone", [row({ tz: "Asia/Amman" }), row({ tz: "Europe/Berlin" })]],
     ["null session sorts first", [row({ source_session_id: null, tz: "Europe/Berlin" }), row({ source_session_id: "s1", tz: null })]],
     ["same excuse time ties on reason", [excuse("illness", T(9)), excuse("travel", T(9))]],
+    [
+      "same instant spelled differently ties on reason",
+      [excuse("illness", "2026-11-13T12:00:00Z"), excuse("travel", "2026-11-13T12:00:00.000Z")],
+    ],
+    [
+      "same instant spelled differently, reason before spelling",
+      [excuse("travel", "2026-11-13T12:00:00Z"), excuse("illness", "2026-11-13T12:00:00.000Z")],
+    ],
+    [
+      "same instant spelled differently, excuse beats withdrawal",
+      [excuse(null, "2026-11-13T12:00:00.000Z"), excuse("other", "2026-11-13T12:00:00Z")],
+    ],
     ["nothing recorded stays uncovered", [row({ earned_status: null }), row({ earned_status: null, updated_at: T(9) })]],
     ["earliest creation and latest update", [row({ created_at: T(6), updated_at: T(7) }), row({ created_at: T(9), updated_at: T(11) })]],
     ["identical rows are idempotent", [row({ earned_status: "earned_back", minimum_met: 1 }), row({ earned_status: "earned_back", minimum_met: 1 })]],

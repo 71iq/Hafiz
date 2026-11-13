@@ -15,15 +15,17 @@ import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { useSettings } from "@/lib/settings/context";
 import { socialFailureMessage } from "@/lib/social/messages";
-import { readLocalSocialBands } from "@/lib/social/queries";
+import { requireSocialOwner } from "@/lib/social/owner";
+import { readLocalBoardInputs } from "@/lib/social/queries";
 import { formatSocialDate } from "@/lib/social/text";
 import { useIsOffline, useSocialQuery } from "@/lib/social/use-social-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 /**
  * Board tab (spec 5.7.2): an opt-in weekly cohort ranked by consistency points the server computes.
- * Opening the tab places a joined user in this week's cohort. Offline it shows the last saved
- * standings with their date (SB-01).
+ * Opening the tab places a joined user in this week's cohort, which starts on the user's own week
+ * start (BRD-01, STR-28). Offline it shows the last saved standings with their date (SB-01). Every
+ * request runs as the account this screen belongs to (lib/social/owner.ts).
  */
 export default function BoardScreen() {
   const s = useStrings();
@@ -63,24 +65,25 @@ function BoardContent({ userId }: { userId: string }) {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
-  // Bands come from the local plan and memorized cards (8.13); the server picks the cohort.
-  const bands = useQuery({
-    queryKey: ["socialBands", userId, today],
-    queryFn: () => readLocalSocialBands(db),
+  // Bands come from the local plan and memorized cards (8.13), and the week start from the wird
+  // settings; the server picks the cohort.
+  const inputs = useQuery({
+    queryKey: ["boardInputs", userId, today, language],
+    queryFn: () => readLocalBoardInputs(db, language),
     staleTime: 5 * 60_000,
   });
 
   const board = useSocialQuery({
-    queryKey: bands.data ? boardKeys.view(userId, today, bands.data) : boardKeys.all(userId),
+    queryKey: inputs.data ? boardKeys.view(userId, today, inputs.data) : boardKeys.all(userId),
     userId,
     cacheName: "board",
-    read: bands.data ? boardRead(bands.data, today) : null,
+    read: inputs.data ? boardRead(inputs.data, today) : null,
   });
   const view = board.data?.data ?? null;
 
   const privacy = useQuery({
     queryKey: profilePrivacyKeys.mine(userId),
-    queryFn: fetchProfilePrivacy,
+    queryFn: () => fetchProfilePrivacy(requireSocialOwner(userId)),
     enabled: view?.status === "not_joined" && !offline,
     retry: false,
     networkMode: "always",
@@ -90,8 +93,8 @@ function BoardContent({ userId }: { userId: string }) {
 
   const join = useMutation({
     mutationFn: (choice: { nickname: string | null; isMinor: boolean }) => {
-      if (!bands.data) throw new Error("Bands are not ready");
-      return joinBoard({ ...choice, bands: bands.data, today });
+      if (!inputs.data) throw new Error("Board inputs are not ready");
+      return joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
     },
     onSuccess: async () => {
       await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) })]);
@@ -100,7 +103,7 @@ function BoardContent({ userId }: { userId: string }) {
   });
 
   const leave = useMutation({
-    mutationFn: leaveBoard,
+    mutationFn: () => leaveBoard(requireSocialOwner(userId)),
     onSuccess: async () => {
       await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) })]);
     },
@@ -108,7 +111,7 @@ function BoardContent({ userId }: { userId: string }) {
   });
 
   const savedAt = board.data?.source === "cache" ? board.data.savedAt : null;
-  const loading = bands.isLoading || board.isLoading;
+  const loading = inputs.isLoading || board.isLoading;
 
   return (
     <SocialScreen
@@ -135,7 +138,7 @@ function BoardContent({ userId }: { userId: string }) {
           key={privacy.dataUpdatedAt}
           initialNickname={privacy.data?.boardNickname ?? null}
           initialIsMinor={privacy.data?.isMinor ?? false}
-          pending={join.isPending || !bands.data}
+          pending={join.isPending || !inputs.data}
           error={joinError}
           onJoin={(choice) => {
             setJoinError(null);

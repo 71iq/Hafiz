@@ -280,7 +280,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   // Another person's streak and juz completions, only where they shared them (SOC-01).
   const profileSummaryQuery = useQuery({
     queryKey: profilePrivacyKeys.summary(user?.id ?? null, requestedUserId),
-    queryFn: () => fetchProfileSummary(requestedUserId),
+    // Bound to the viewer, so a summary read during an account switch is not shown to the next account.
+    queryFn: () => fetchProfileSummary(requestedUserId, user?.id ?? null),
     enabled: hasValidRequestedUserId && !isOwnProfile && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
   });

@@ -1,5 +1,4 @@
 import { ActivityIndicator, View } from "react-native";
-import { z } from "zod";
 import { Card } from "@/components/ui/Card";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Text } from "@/components/ui/Text";
@@ -9,7 +8,7 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { formatSocialDate, socialNumber } from "@/lib/social/text";
-import { newPerDayFromPlan } from "@/lib/social/bands";
+import { newPagesPerDay } from "@/lib/social/bands";
 import { socialRowStyle, useSocialAccent } from "./SocialControls";
 
 type Language = "en" | "ar";
@@ -28,18 +27,6 @@ const GRADE_KEYS: Readonly<Record<number, keyof UIStrings>> = {
   3: "teacherViewGradeGood",
   4: "teacherViewGradeEasy",
 };
-
-const planCycle = z.object({ cycle_days: z.number().int().positive().optional() }).passthrough();
-
-function cycleDays(plan: string | null): number | null {
-  if (!plan) return null;
-  try {
-    const parsed = planCycle.safeParse(JSON.parse(plan));
-    return parsed.success ? (parsed.data.cycle_days ?? null) : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * SOC-03: what a member chose to share with this halaqa's teachers. Sections the member did not share
@@ -90,16 +77,12 @@ export function TeacherViewSheet({
                     <>
                       <Text variant="body-sm">
                         {interpolate(s.teacherViewNewPerDay, {
-                          pages: formatPages(newPerDayFromPlan(view.plan.hifzPlan), language),
+                          pages: formatPages(newPagesPerDay(view.plan.hifzPlan), language),
                         })}
                       </Text>
-                      {cycleDays(view.plan.hifzPlan) !== null ? (
-                        <Text variant="body-sm">
-                          {interpolate(s.teacherViewCycle, {
-                            days: formatDays(cycleDays(view.plan.hifzPlan) ?? 0, language),
-                          })}
-                        </Text>
-                      ) : null}
+                      <Text variant="body-sm">
+                        {interpolate(s.teacherViewCycle, { days: formatDays(view.plan.hifzPlan.cycleDays, language) })}
+                      </Text>
                     </>
                   ) : (
                     <Text variant="body-sm">{s.teacherViewNoPlan}</Text>

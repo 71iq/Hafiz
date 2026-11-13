@@ -865,6 +865,156 @@
     }
   },
   {
+    "name": "same instant spelled differently ties on reason",
+    "rows": [
+      {
+        "local_date": "2026-11-13",
+        "status": "excused",
+        "earned_status": null,
+        "reason": "illness",
+        "excuse_updated_at": "2026-11-13T12:00:00Z",
+        "minimum_met": 0,
+        "full_met": 0,
+        "manzil_cycle_completed": 0,
+        "source_session_id": null,
+        "credited_through": null,
+        "tz": "Asia/Amman",
+        "created_at": "2026-11-13T12:00:00Z",
+        "updated_at": "2026-11-13T12:00:00Z"
+      },
+      {
+        "local_date": "2026-11-13",
+        "status": "excused",
+        "earned_status": null,
+        "reason": "travel",
+        "excuse_updated_at": "2026-11-13T12:00:00.000Z",
+        "minimum_met": 0,
+        "full_met": 0,
+        "manzil_cycle_completed": 0,
+        "source_session_id": null,
+        "credited_through": null,
+        "tz": "Asia/Amman",
+        "created_at": "2026-11-13T12:00:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z"
+      }
+    ],
+    "expected": {
+      "local_date": "2026-11-13",
+      "status": "excused",
+      "earned_status": null,
+      "reason": "travel",
+      "excuse_updated_at": "2026-11-13T12:00:00.000Z",
+      "minimum_met": 0,
+      "full_met": 0,
+      "manzil_cycle_completed": 0,
+      "source_session_id": null,
+      "credited_through": null,
+      "tz": "Asia/Amman",
+      "created_at": "2026-11-13T12:00:00.000Z",
+      "updated_at": "2026-11-13T12:00:00Z"
+    }
+  },
+  {
+    "name": "same instant spelled differently, reason before spelling",
+    "rows": [
+      {
+        "local_date": "2026-11-13",
+        "status": "excused",
+        "earned_status": null,
+        "reason": "travel",
+        "excuse_updated_at": "2026-11-13T12:00:00Z",
+        "minimum_met": 0,
+        "full_met": 0,
+        "manzil_cycle_completed": 0,
+        "source_session_id": null,
+        "credited_through": null,
+        "tz": "Asia/Amman",
+        "created_at": "2026-11-13T12:00:00Z",
+        "updated_at": "2026-11-13T12:00:00Z"
+      },
+      {
+        "local_date": "2026-11-13",
+        "status": "excused",
+        "earned_status": null,
+        "reason": "illness",
+        "excuse_updated_at": "2026-11-13T12:00:00.000Z",
+        "minimum_met": 0,
+        "full_met": 0,
+        "manzil_cycle_completed": 0,
+        "source_session_id": null,
+        "credited_through": null,
+        "tz": "Asia/Amman",
+        "created_at": "2026-11-13T12:00:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z"
+      }
+    ],
+    "expected": {
+      "local_date": "2026-11-13",
+      "status": "excused",
+      "earned_status": null,
+      "reason": "travel",
+      "excuse_updated_at": "2026-11-13T12:00:00Z",
+      "minimum_met": 0,
+      "full_met": 0,
+      "manzil_cycle_completed": 0,
+      "source_session_id": null,
+      "credited_through": null,
+      "tz": "Asia/Amman",
+      "created_at": "2026-11-13T12:00:00.000Z",
+      "updated_at": "2026-11-13T12:00:00Z"
+    }
+  },
+  {
+    "name": "same instant spelled differently, excuse beats withdrawal",
+    "rows": [
+      {
+        "local_date": "2026-11-13",
+        "status": null,
+        "earned_status": null,
+        "reason": null,
+        "excuse_updated_at": "2026-11-13T12:00:00.000Z",
+        "minimum_met": 0,
+        "full_met": 0,
+        "manzil_cycle_completed": 0,
+        "source_session_id": null,
+        "credited_through": null,
+        "tz": "Asia/Amman",
+        "created_at": "2026-11-13T12:00:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z"
+      },
+      {
+        "local_date": "2026-11-13",
+        "status": "excused",
+        "earned_status": null,
+        "reason": "other",
+        "excuse_updated_at": "2026-11-13T12:00:00Z",
+        "minimum_met": 0,
+        "full_met": 0,
+        "manzil_cycle_completed": 0,
+        "source_session_id": null,
+        "credited_through": null,
+        "tz": "Asia/Amman",
+        "created_at": "2026-11-13T12:00:00Z",
+        "updated_at": "2026-11-13T12:00:00Z"
+      }
+    ],
+    "expected": {
+      "local_date": "2026-11-13",
+      "status": "excused",
+      "earned_status": null,
+      "reason": "other",
+      "excuse_updated_at": "2026-11-13T12:00:00Z",
+      "minimum_met": 0,
+      "full_met": 0,
+      "manzil_cycle_completed": 0,
+      "source_session_id": null,
+      "credited_through": null,
+      "tz": "Asia/Amman",
+      "created_at": "2026-11-13T12:00:00.000Z",
+      "updated_at": "2026-11-13T12:00:00Z"
+    }
+  },
+  {
     "name": "nothing recorded stays uncovered",
     "rows": [
       {

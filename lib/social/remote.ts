@@ -26,12 +26,31 @@ const SOCIAL_REJECTION_CODES = [
   "nickname_required",
   "invalid_nickname",
   "invalid_privacy",
+  "invalid_week_start",
 ] as const;
+/**
+ * The account a halaqa or board request belongs to. The Supabase client is shared, so a request
+ * started for one account could otherwise run with another account's credentials after a switch,
+ * cache that account's groups under the first one's key, or apply an old draft to it. Each request
+ * sends this owner's own access token, and its result is used only while the same account and
+ * session are still signed in. Built on the auth coordinator's owner tickets, as sync is.
+ */
+export type SocialOwner = Readonly<{
+  userId: string;
+  isCurrent: () => boolean;
+  /** Throws an "account_changed" failure once another account or session has taken over. */
+  requireCurrent: () => void;
+  /** The access token of this owner's session, refreshed by the client as usual. */
+  accessToken: () => Promise<string>;
+}>;
+
 export type SocialRejectionCode = (typeof SOCIAL_REJECTION_CODES)[number];
 
 export type SocialFailure =
   | { kind: "unconfigured" }
   | { kind: "offline" }
+  // The account that started the request is no longer the signed-in one.
+  | { kind: "account_changed" }
   | { kind: "rejected"; code: SocialRejectionCode }
   | { kind: "invalid_response" }
   | { kind: "failed"; message: string };
@@ -69,15 +88,26 @@ export function classifyRemoteError(error: unknown): SocialFailure {
 /** A remote read: the RPC, its arguments and the schema its result must pass. */
 export type SocialRead<T> = Readonly<{ fn: string; args: Record<string, unknown>; schema: z.ZodType<T> }>;
 
-/** Calls a SECURITY DEFINER RPC and returns its unvalidated payload. Callers must parse it. */
-export async function callSocialRpcRaw(fn: string, args: Record<string, unknown>): Promise<unknown> {
+/**
+ * Calls a SECURITY DEFINER RPC and returns its unvalidated payload. Callers must parse it. With an
+ * owner, the request carries that account's token rather than whatever session the shared client
+ * holds at dispatch, and its result is refused once that account is no longer signed in.
+ */
+export async function callSocialRpcRaw(
+  fn: string,
+  args: Record<string, unknown>,
+  owner?: SocialOwner,
+): Promise<unknown> {
   if (!isSupabaseConfigured()) throw socialError({ kind: "unconfigured" });
+  const token = owner ? await owner.accessToken() : null;
   let result: { data: unknown; error: unknown };
   try {
-    result = await supabase.rpc(fn, args);
+    const request = supabase.rpc(fn, args);
+    result = await (token === null ? request : request.setHeader("Authorization", `Bearer ${token}`));
   } catch (error) {
     throw socialError(classifyRemoteError(error));
   }
+  owner?.requireCurrent();
   if (result.error) throw socialError(classifyRemoteError(result.error));
   return result.data;
 }
@@ -89,12 +119,17 @@ export function parseSocialPayload<T>(schema: z.ZodType<T>, payload: unknown): T
 }
 
 /** Calls a SECURITY DEFINER RPC and validates its result before any caller sees it. */
-export async function callSocialRpc<T>(fn: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
-  return parseSocialPayload(schema, await callSocialRpcRaw(fn, args));
+export async function callSocialRpc<T>(
+  fn: string,
+  args: Record<string, unknown>,
+  schema: z.ZodType<T>,
+  owner?: SocialOwner,
+): Promise<T> {
+  return parseSocialPayload(schema, await callSocialRpcRaw(fn, args, owner));
 }
 
-export function readSocial<T>(read: SocialRead<T>): Promise<T> {
-  return callSocialRpc(read.fn, read.args, read.schema);
+export function readSocial<T>(read: SocialRead<T>, owner?: SocialOwner): Promise<T> {
+  return callSocialRpc(read.fn, read.args, read.schema, owner);
 }
 
 export const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);

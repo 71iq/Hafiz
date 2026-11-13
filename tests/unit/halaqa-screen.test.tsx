@@ -8,6 +8,7 @@ import HalaqaScreen from "@/app/(tabs)/halaqa";
 import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { flattenStyle } from "../rtl/rtl-test-utils";
+import { bearerSubject, signedIn, signedOut, type FakeAuthState } from "./social-test-auth";
 
 jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
@@ -27,7 +28,11 @@ const mockSettings = {
     surfaceBright: "#FFFFFF",
   },
 };
-const mockAuth: { user: { id: string } | null } = { user: null };
+const mockAuth: FakeAuthState = signedOut();
+const mockHeaders: Record<string, string> = {};
+function signIn(userId: string) {
+  Object.assign(mockAuth, signedIn(userId));
+}
 const mockNet = { isConnected: true as boolean | null, isInternetReachable: true as boolean | null };
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
 let mockConfigured = true;
@@ -40,11 +45,17 @@ jest.mock("@/lib/settings/context", () => {
   return { ...actual, useSettings: () => mockSettings };
 });
 jest.mock("@/lib/auth/store", () => ({
-  useAuthStore: (selector: (state: typeof mockAuth) => unknown) => selector(mockAuth),
+  useAuthStore: Object.assign((selector: (state: typeof mockAuth) => unknown) => selector(mockAuth), {
+    getState: () => mockAuth,
+  }),
 }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => mockConfigured,
-  supabase: { rpc: (fn: string, args: Record<string, unknown>) => mockRpc(fn, args) },
+  supabase: {
+    rpc: (fn: string, args: Record<string, unknown>) =>
+      require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
+    auth: { getSession: async () => ({ data: { session: mockAuth.session }, error: null }) },
+  },
 }));
 jest.mock("@react-native-community/netinfo", () => ({
   useNetInfo: () => mockNet,
@@ -129,7 +140,8 @@ function respond(handlers: Record<string, unknown>) {
 beforeEach(async () => {
   mockSettings.isRTL = false;
   mockSettings.uiLanguage = "en";
-  mockAuth.user = null;
+  Object.assign(mockAuth, signedOut());
+  for (const key of Object.keys(mockHeaders)) delete mockHeaders[key];
   mockConfigured = true;
   mockNet.isConnected = true;
   mockNet.isInternetReachable = true;
@@ -159,14 +171,14 @@ describe("Halaqa tab", () => {
 
   it("says when the account service is not part of this build", () => {
     mockConfigured = false;
-    mockAuth.user = { id: USER };
+    signIn(USER);
     const screen = renderScreen();
     expect(screen.getByText(strings.en.socialUnconfigured)).toBeTruthy();
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it("offers create, join by code and a matched halaqa when the reader has none", async () => {
-    mockAuth.user = { id: USER };
+    signIn(USER);
     respond({ get_my_halaqas: [], join_matched_halaqa: { ...summary, kind: "matched", name: null, invite_code: null } });
     const screen = renderScreen();
 
@@ -181,10 +193,12 @@ describe("Halaqa tab", () => {
         p_utc_offset_minutes: 180,
       }),
     );
+    // The join runs as the account this screen belongs to.
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
   });
 
   it("shows the shared goal and only what each member shared, with no ranking", async () => {
-    mockAuth.user = { id: USER };
+    signIn(USER);
     respond({ get_my_halaqas: [summary], get_halaqa_detail: detail, send_halaqa_encouragement: { id: GROUP } });
     const screen = renderScreen();
 
@@ -212,7 +226,7 @@ describe("Halaqa tab", () => {
   it("mirrors the week dots for Arabic readers", async () => {
     mockSettings.isRTL = true;
     mockSettings.uiLanguage = "ar";
-    mockAuth.user = { id: USER };
+    signIn(USER);
     respond({ get_my_halaqas: [summary], get_halaqa_detail: detail });
     const screen = renderScreen();
 
@@ -221,7 +235,7 @@ describe("Halaqa tab", () => {
   });
 
   it("shows the last saved state with its date while offline", async () => {
-    mockAuth.user = { id: USER };
+    signIn(USER);
     respond({ get_my_halaqas: [summary], get_halaqa_detail: detail });
     const online = renderScreen();
     expect(await online.findByText("Family halaqa")).toBeTruthy();
@@ -236,7 +250,7 @@ describe("Halaqa tab", () => {
   });
 
   it("keeps wird features unblocked: offline with nothing saved is a calm note", async () => {
-    mockAuth.user = { id: USER };
+    signIn(USER);
     mockNet.isConnected = false;
     const screen = renderScreen();
     expect(await screen.findByText(strings.en.socialOfflineEmpty)).toBeTruthy();

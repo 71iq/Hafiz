@@ -4,7 +4,8 @@
 # container, and removes each container when it is done.
 #
 # 1. Migration path: schema.sql at BASE_REF, the review-aggregate migrations it lacks, then this
-#    migration. Runs learning_consistency.test.sql there (merge parity, RLS as several users, every RPC).
+#    migration. Runs learning_consistency.test.sql there (merge parity, RLS as several users, every RPC),
+#    then learning_consistency_races.sh (two-session races on the board, halaqa and encouragement locks).
 # 2. Parity: a second pristine container built from the current schema.sql must dump the same public
 #    and private schemas, including privileges.
 #
@@ -82,6 +83,8 @@ echo "== SQL tests"
 docker cp "$ROOT/supabase/tests/habit-merge-cases.json" "$MIGRATED:/tmp/habit-merge-cases.json" >/dev/null
 # Query results go to /dev/null; assertion notices and failures arrive on stderr.
 pg "$MIGRATED" <"$ROOT/supabase/tests/learning_consistency.test.sql" >/dev/null
+echo "== race tests"
+bash "$ROOT/supabase/tests/learning_consistency_races.sh" "$MIGRATED"
 docker rm -f "$MIGRATED" >/dev/null
 
 FRESH="$PREFIX-fresh"

@@ -22,6 +22,8 @@ export function socialFailureMessage(error: unknown, s: UIStrings): string {
       return s.socialUnconfigured;
     case "offline":
       return s.socialErrorOffline;
+    case "account_changed":
+      return s.socialErrorAccountChanged;
     case "invalid_response":
       return s.socialErrorInvalidResponse;
     case "rejected": {

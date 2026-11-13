@@ -1,14 +1,24 @@
 import * as fc from "fast-check";
+import type { DatabaseExecutor } from "@/lib/database/types";
+import { loadPageCards, type PageCard } from "@/lib/hifz/pages";
+import { DEFAULT_HIFZ_PLAN, parseHifzPlan } from "@/lib/hifz/plan";
 import {
   approximatePagesFromAyahs,
   deviceUtcOffsetMinutes,
   LEVEL_BANDS,
   levelBand,
+  memorizedPagesFromCards,
+  newPagesPerDay,
   offsetBand,
   paceBand,
-  newPerDayFromPlan,
   socialBands,
 } from "@/lib/social/bands";
+import { readLocalBoardInputs, readLocalSocialBands } from "@/lib/social/queries";
+
+jest.mock("@/lib/hifz/pages", () => ({
+  ...jest.requireActual<typeof import("@/lib/hifz/pages")>("@/lib/hifz/pages"),
+  loadPageCards: jest.fn(),
+}));
 
 describe("level band (8.13)", () => {
   it.each([
@@ -86,19 +96,87 @@ describe("local inputs", () => {
     expect(approximatePagesFromAyahs(-3)).toBe(0);
   });
 
-  it("treats a missing or unreadable plan as maintenance", () => {
-    expect(newPerDayFromPlan(null)).toBe(0);
-    expect(newPerDayFromPlan("not json")).toBe(0);
-    expect(newPerDayFromPlan('{"method":"page"}')).toBe(0);
-    expect(newPerDayFromPlan('{"new_per_day":-1}')).toBe(0);
-    expect(newPerDayFromPlan('{"new_per_day":0.5,"cycle_days":30}')).toBe(0.5);
+  it("treats a missing, unreadable or review-only plan as maintenance", () => {
+    expect(newPagesPerDay(parseHifzPlan(null))).toBe(0);
+    expect(newPagesPerDay(parseHifzPlan("not json"))).toBe(0);
+    expect(newPagesPerDay(parseHifzPlan('{"method":"page"}'))).toBe(0);
+    expect(newPagesPerDay(parseHifzPlan(JSON.stringify({ ...DEFAULT_HIFZ_PLAN, method: "review_only" })))).toBe(0);
+  });
+
+  it("reads the stored camelCase plan, so the default plan is half a page a day", () => {
+    expect(paceBand(newPagesPerDay(parseHifzPlan(JSON.stringify(DEFAULT_HIFZ_PLAN))))).toBe("half_page");
+    expect(paceBand(newPagesPerDay(parseHifzPlan('{"newPerDay":1}')))).toBe("page_plus");
+    // The old hand-read snake_case field means nothing to the plan schema.
+    expect(newPagesPerDay(parseHifzPlan('{"new_per_day":2}'))).toBe(DEFAULT_HIFZ_PLAN.newPerDay);
+  });
+
+  it("counts page learners by pages and converts only ayah cards", () => {
+    expect(levelBand(memorizedPagesFromCards({ memorizedPageCards: 604, memorizedAyahCards: 0 }))).toBe("hafiz");
+    expect(levelBand(memorizedPagesFromCards({ memorizedPageCards: 20, memorizedAyahCards: 0 }))).toBe("juz_amma");
+    expect(levelBand(memorizedPagesFromCards({ memorizedPageCards: 0, memorizedAyahCards: 6236 }))).toBe("hafiz");
+    expect(memorizedPagesFromCards({ memorizedPageCards: 30, memorizedAyahCards: 103 })).toBe(30);
+    expect(memorizedPagesFromCards({ memorizedPageCards: Number.NaN, memorizedAyahCards: -1 })).toBe(0);
   });
 
   it("combines the inputs into bands", () => {
-    expect(socialBands({ memorizedAyahs: 600, newPerDayPages: 0.5, utcOffsetMinutes: 180 })).toEqual({
+    expect(socialBands({ memorizedPages: 58, newPerDayPages: 0.5, utcOffsetMinutes: 180 })).toEqual({
       levelBand: "juz_amma",
       paceBand: "half_page",
       utcOffsetMinutes: 180,
     });
+  });
+});
+
+describe("local bands from the device (8.13)", () => {
+  function pageCard(page: number, tier: PageCard["tier"], rating: number): PageCard {
+    return { page, tier, row: { id: `page:madani15:${page}` }, history: { grades: [{ date: "2026-11-01", rating }] } } as unknown as PageCard;
+  }
+
+  function fakeDb(options: { plan: unknown; ayahCards: number; settings?: Record<string, string> }): DatabaseExecutor {
+    return {
+      getFirstAsync: async (sql: string) =>
+        sql.includes("hifz_plan")
+          ? options.plan === null
+            ? null
+            : { value: JSON.stringify(options.plan) }
+          : { count: options.ayahCards },
+      getAllAsync: async () => Object.entries(options.settings ?? {}).map(([key, value]) => ({ key, value })),
+    } as unknown as DatabaseExecutor;
+  }
+
+  beforeEach(() => jest.mocked(loadPageCards).mockReset());
+
+  it("puts a page learner with all 604 pages memorized in the hafiz band at the plan's pace", async () => {
+    jest.mocked(loadPageCards).mockResolvedValue([
+      ...Array.from({ length: 604 }, (_, i) => pageCard(i + 1, "manzil", 3)),
+      pageCard(1, "sabaq", 4),
+    ]);
+    const bands = await readLocalSocialBands(fakeDb({ plan: DEFAULT_HIFZ_PLAN, ayahCards: 0 }), new Date("2026-11-13T12:00:00Z"));
+    expect(bands).toMatchObject({ levelBand: "hafiz", paceBand: "half_page" });
+  });
+
+  it("uses the shared memorized definition: unverified pages and weak last grades do not count", async () => {
+    jest.mocked(loadPageCards).mockResolvedValue([
+      ...Array.from({ length: 20 }, (_, i) => pageCard(i + 1, "sabqi", 3)),
+      ...Array.from({ length: 300 }, (_, i) => pageCard(i + 21, "manzil.unverified", 4)),
+      ...Array.from({ length: 100 }, (_, i) => pageCard(i + 321, "manzil", 2)),
+    ]);
+    const bands = await readLocalSocialBands(fakeDb({ plan: null, ayahCards: 0 }));
+    expect(bands).toMatchObject({ levelBand: "juz_amma", paceBand: "maintenance" });
+  });
+
+  it("converts an ayah learner's cards", async () => {
+    jest.mocked(loadPageCards).mockResolvedValue([]);
+    const bands = await readLocalSocialBands(fakeDb({ plan: null, ayahCards: 6236 }));
+    expect(bands.levelBand).toBe("hafiz");
+  });
+
+  it("sends the week start the wird settings use (STR-28)", async () => {
+    jest.mocked(loadPageCards).mockResolvedValue([]);
+    await expect(readLocalBoardInputs(fakeDb({ plan: null, ayahCards: 0 }), "ar")).resolves.toMatchObject({ weekStart: 6 });
+    await expect(readLocalBoardInputs(fakeDb({ plan: null, ayahCards: 0 }), "en")).resolves.toMatchObject({ weekStart: 1 });
+    await expect(
+      readLocalBoardInputs(fakeDb({ plan: null, ayahCards: 0, settings: { habit_week_start: "0" } }), "ar"),
+    ).resolves.toMatchObject({ weekStart: 0 });
   });
 });

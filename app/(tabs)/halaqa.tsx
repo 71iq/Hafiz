@@ -35,6 +35,7 @@ import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { fetchProfilePrivacy, profilePrivacyKeys, saveProfilePrivacy } from "@/lib/profile/privacy";
 import { useSettings } from "@/lib/settings/context";
 import { socialFailureMessage } from "@/lib/social/messages";
+import { requireSocialOwner } from "@/lib/social/owner";
 import { readLocalSocialBands } from "@/lib/social/queries";
 import { formatSocialDate } from "@/lib/social/text";
 import { useIsOffline, useSocialQuery } from "@/lib/social/use-social-query";
@@ -42,7 +43,9 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 
 /**
  * Halaqa tab (spec 5.7.1). An online feature: offline it shows the last saved state with its date,
- * and wird, streak and plan never wait on it (SB-01).
+ * and wird, streak and plan never wait on it (SB-01). Every request runs as the account this screen
+ * belongs to (lib/social/owner.ts), so a switch of account mid-request can neither show nor change
+ * the other account's halaqas.
  */
 export default function HalaqaScreen() {
   const s = useStrings();
@@ -111,7 +114,7 @@ function HalaqaContent({ userId }: { userId: string }) {
 
   const privacy = useQuery({
     queryKey: profilePrivacyKeys.mine(userId),
-    queryFn: fetchProfilePrivacy,
+    queryFn: () => fetchProfilePrivacy(requireSocialOwner(userId)),
     enabled: sharingOpen && !offline,
     retry: false,
     networkMode: "always",
@@ -119,7 +122,7 @@ function HalaqaContent({ userId }: { userId: string }) {
 
   const teacherView = useQuery({
     queryKey: halaqaKeys.teacher(userId, active?.id ?? "none", teacherTarget?.userId ?? "none", today),
-    queryFn: () => fetchTeacherView(active?.id ?? "", teacherTarget?.userId ?? "", today),
+    queryFn: () => fetchTeacherView(active?.id ?? "", teacherTarget?.userId ?? "", today, requireSocialOwner(userId)),
     enabled: Boolean(active && teacherTarget) && !offline,
     retry: false,
     networkMode: "always",
@@ -130,13 +133,14 @@ function HalaqaContent({ userId }: { userId: string }) {
 
   const join = useMutation({
     mutationFn: async (action: { kind: "create"; name: string; asTeacher: boolean } | { kind: "code"; code: string } | { kind: "matched" }) => {
+      const owner = requireSocialOwner(userId);
       switch (action.kind) {
         case "create":
-          return createInviteHalaqa(action.name, action.asTeacher);
+          return createInviteHalaqa(action.name, action.asTeacher, owner);
         case "code":
-          return joinHalaqaByCode(action.code);
+          return joinHalaqaByCode(action.code, owner);
         case "matched":
-          return joinMatchedHalaqa(await readLocalSocialBands(db));
+          return joinMatchedHalaqa(await readLocalSocialBands(db), owner);
       }
     },
     onSuccess: async (group) => {
@@ -158,13 +162,16 @@ function HalaqaContent({ userId }: { userId: string }) {
 
   const encourage = useMutation({
     mutationFn: (choice: { templateId: EncouragementTemplateId | null; body: string | null }) =>
-      sendEncouragement({
-        groupId: active?.id ?? "",
-        toUserId: encourageTarget?.userId ?? "",
-        templateId: choice.templateId,
-        body: choice.body,
-        today,
-      }),
+      sendEncouragement(
+        {
+          groupId: active?.id ?? "",
+          toUserId: encourageTarget?.userId ?? "",
+          templateId: choice.templateId,
+          body: choice.body,
+          today,
+        },
+        requireSocialOwner(userId),
+      ),
     onSuccess: async () => {
       setEncourageTarget(null);
       await refreshAll();
@@ -175,8 +182,10 @@ function HalaqaContent({ userId }: { userId: string }) {
   const saveSharing = useMutation({
     mutationFn: async (input: { sharing: HalaqaSharing; visibility: ProfileVisibility | null }) => {
       if (!active) return;
-      await setHalaqaSharing(active.id, input.sharing);
-      if (input.visibility) await saveProfilePrivacy(input.visibility);
+      // One owner for both writes: the second is refused before it is sent if the account changed.
+      const owner = requireSocialOwner(userId);
+      await setHalaqaSharing(active.id, input.sharing, owner);
+      if (input.visibility) await saveProfilePrivacy(input.visibility, owner);
     },
     onSuccess: async () => {
       setSharingOpen(false);
@@ -187,7 +196,7 @@ function HalaqaContent({ userId }: { userId: string }) {
   });
 
   const leave = useMutation({
-    mutationFn: () => leaveHalaqa(active?.id ?? ""),
+    mutationFn: () => leaveHalaqa(active?.id ?? "", requireSocialOwner(userId)),
     onSuccess: async () => {
       setLeaveOpen(false);
       setSelectedId(null);
