@@ -324,5 +324,8 @@ describe("RTL higher-level component contracts", () => {
       expect(getStyleValue(row, "direction")).toBe("ltr");
       expect(getStyleValue(row, "flexDirection")).toBe("row-reverse");
     }
+    // Digits follow the interface language, not the device locale.
+    expect(getByText(`Total Cards: ${toArabicNumber(7)}`)).toBeTruthy();
+    expect(getByText(`\u2066${toArabicNumber(7)} / ${toArabicNumber(7)}\u2069`)).toBeTruthy();
   });
 });

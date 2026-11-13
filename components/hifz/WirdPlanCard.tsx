@@ -48,7 +48,7 @@ export function WirdPlanCard({ wird, inboxCount, language, isDark, s, onStartRev
               {s.hifzSetupBody}
             </Text>
             <View className="mt-2" style={{ alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}>
-              <Button size="sm" label={s.hifzSetupAction} onPress={onSetup} />
+              <Button size="sm" className="h-11" label={s.hifzSetupAction} onPress={onSetup} />
             </View>
           </View>
         </MirroredRow>

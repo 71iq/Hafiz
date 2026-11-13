@@ -42,7 +42,7 @@ export type DayTimesInput = Readonly<{
 const AT_RISK_MINUTES = 21 * 60;
 const AT_RISK_AFTER_ISHA_MINUTES = 20;
 const AT_RISK_LATEST_MINUTES = 22 * 60 + 45;
-const LATE_REMINDER_MINUTES = 23 * 60 + 15;
+export const LATE_REMINDER_MINUTES = 23 * 60 + 15;
 /** NOT-08 with prayer times: quiet from Isha + 1 hour until 30 minutes before Fajr. */
 const QUIET_AFTER_ISHA_MINUTES = 60;
 const QUIET_BEFORE_FAJR_MINUTES = 30;

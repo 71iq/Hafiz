@@ -304,6 +304,27 @@ describe("ProgressScreen RTL behavior", () => {
     expect(view.queryByRole("button", { name: "تسجيل الدخول" })).toBeNull();
   });
 
+  it("writes tile numbers in the interface's digits whatever the device locale", async () => {
+    // 4 of 10 cards memorized, 2 reviews on 1 day, 2 of 2 achievements.
+    const arabic = renderProgress();
+
+    await waitFor(() => expect(arabic.getByText("٤٠٪")).toBeTruthy());
+    expect(arabic.getByText("⁦٢ / ٢⁩")).toBeTruthy();
+    expect(arabic.getAllByText("٢").length).toBeGreaterThan(0);
+    expect(arabic.queryByText("40%")).toBeNull();
+
+    arabic.unmount();
+    mockSettings.isRTL = false;
+    mockSettings.uiLanguage = "en";
+    const english = renderProgress();
+
+    await waitFor(() => expect(english.getByText("40%")).toBeTruthy());
+    expect(english.getByText("⁦2 / 2⁩")).toBeTruthy();
+    for (const label of ["Total memorized", "Daily average", "Active days", "Total reviews"]) {
+      expect(english.getByText(label)).toBeTruthy();
+    }
+  });
+
   it("renders RTL achievement rows with explicit LTR layout direction, mirrored order, and horizontal recent content", async () => {
     const rtl = renderProgress();
 

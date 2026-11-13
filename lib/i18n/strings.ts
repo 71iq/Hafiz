@@ -360,9 +360,9 @@ export const strings = {
     progressDailyReminder: "Daily Reminder",
     progressHadith: "\"خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ\"",
     progressHadithTranslation: "\"The best among you are those who learn the Quran and teach it.\"",
-    progressTotalMemorized: "Total Memorized",
+    progressTotalMemorized: "Total memorized",
     progressRetention: "Retention",
-    progressAvgDaily: "Avg Daily",
+    progressAvgDaily: "Daily average",
     progressLongestStreak: "Longest streak",
     progressActivity: "Memorization Activity",
     progressDefaultDecks: "Default Deck Progress",
@@ -433,8 +433,8 @@ export const strings = {
     "achievement.first_mutashabih_pair.description": "Review a mutashabih pair.",
     // Heatmap
     heatmapReviews: "reviews",
-    heatmapActiveDays: "active days",
-    heatmapTotalReviews: "total reviews",
+    heatmapActiveDays: "Active days",
+    heatmapTotalReviews: "Total reviews",
     // Surah progress
     surahProgressEmpty: "No surahs tracked yet",
     surahProgressEmptyDesc: "Create a deck to start tracking your memorization progress",

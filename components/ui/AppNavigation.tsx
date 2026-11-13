@@ -24,7 +24,12 @@ import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
-import { PERSISTENT_SIDEBAR_BREAKPOINT, PERSISTENT_SIDEBAR_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import {
+  PERSISTENT_SIDEBAR_BREAKPOINT,
+  PERSISTENT_SIDEBAR_WIDTH,
+  SIDEBAR_BREAKPOINT,
+  VIEWPORT_BREAKPOINTS,
+} from "@/lib/ui/viewport";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
 import { textStartStyle } from "@/lib/ui/direction";
 
@@ -79,6 +84,7 @@ function BottomTabItem({
   onPress,
   onLongPress,
   isDark,
+  compact,
 }: {
   route: any;
   descriptor: any;
@@ -86,6 +92,7 @@ function BottomTabItem({
   onPress: () => void;
   onLongPress: () => void;
   isDark: boolean;
+  compact: boolean;
 }) {
   const scale = useSharedValue(1);
   const reduceMotion = useReducedMotionPreference();
@@ -118,11 +125,14 @@ function BottomTabItem({
       style={[
         animatedStyle,
         styles.bottomTabItem,
+        compact && styles.bottomTabItemCompact,
         isFocused && styles.bottomTabItemActive,
       ]}
     >
       {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
-      <Text style={[styles.bottomLabel, { color: iconColor }]}>{label}</Text>
+      <Text numberOfLines={1} style={[styles.bottomLabel, { color: iconColor }]}>
+        {label}
+      </Text>
     </AnimatedPressable>
   );
 }
@@ -130,8 +140,10 @@ function BottomTabItem({
 function BottomBar(props: BottomTabBarProps) {
   const { state, descriptors, navigation } = props;
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { isDark, themeSurface } = useSettings();
   const visibleRoutes = getVisibleRoutes(state, descriptors);
+  const compact = width < VIEWPORT_BREAKPOINTS.phoneCompact;
   const { visible, immersive } = useChrome();
   const chromeVisible = visible && !immersive;
   const barBackground = withThemeOpacity(themeSurface, 0.8);
@@ -159,6 +171,7 @@ function BottomBar(props: BottomTabBarProps) {
       pointerEvents={chromeVisible ? "auto" : "none"}
       style={[
         styles.bottomContainer,
+        compact && styles.bottomContainerCompact,
         {
           position: Platform.OS === "web" ? ("fixed" as any) : "absolute",
           bottom: Math.max(insets.bottom, 10),
@@ -199,6 +212,7 @@ function BottomBar(props: BottomTabBarProps) {
             onPress={onPress}
             onLongPress={onLongPress}
             isDark={isDark}
+            compact={compact}
           />
         );
       })}
@@ -633,13 +647,24 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 8,
   },
+  // Six English labels at 10 px measure about 204 px. With 8 px item padding they fit the 320 px
+  // bar of a 360 px phone; below that the bar and items tighten so they still fit at 320 px.
+  // flexShrink, minWidth 0 and the one-line label keep any longer translation inside the bar.
+  bottomContainerCompact: {
+    paddingHorizontal: 4,
+  },
   bottomTabItem: {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 11,
+    flexShrink: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 9999,
+  },
+  bottomTabItemCompact: {
+    paddingHorizontal: 6,
   },
   bottomTabItemActive: {
     backgroundColor: ACTIVE_BG,

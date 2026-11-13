@@ -279,7 +279,13 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
             label={s.habitExcuseSave}
           />
         ) : pauseActive ? (
-          <Button className="flex-1" variant="outline" disabled={busy} onPress={() => run(() => endHabitPause(db))} label={s.habitPauseEnd} />
+          <Button
+            className="flex-1 border border-warm-300 dark:border-neutral-700"
+            variant="outline"
+            disabled={busy}
+            onPress={() => run(() => endHabitPause(db))}
+            label={s.habitPauseEnd}
+          />
         ) : (
           <Button
             className="flex-1"

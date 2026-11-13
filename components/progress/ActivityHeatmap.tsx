@@ -5,6 +5,7 @@ import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
 import { toArabicNumber } from "@/lib/arabic";
+import { formatNumber } from "@/lib/i18n/count";
 import type { DayStatus } from "@/lib/habit/types";
 
 type DayData = { date: string; count: number };
@@ -23,6 +24,8 @@ type Props = {
    * passed only on the owner's own Progress screen and never on a public profile.
    */
   dayStatuses?: ReadonlyMap<string, DayStatus>;
+  /** First day of each column, 0 is Sunday. The owner's Progress screen passes the effective week start. */
+  weekStart?: number;
 };
 
 const STATUS_ORDER: readonly DayStatus[] = ["done", "made_up", "earned_back", "excused", "paused", "grace"];
@@ -45,11 +48,12 @@ function statusLabel(status: DayStatus, s: UIStrings): string {
 }
 
 /**
- * Calm, distinct styles: recited days stay teal, protected days take soft tones. In light mode the
- * excused and grace fills also carry a 1 px edge, since a pale fill alone read as an empty day.
+ * Calm, distinct styles: recited days stay teal, protected days take muted tones with a 1 px edge.
+ * A protected day must not outshine a recited one, so in dark mode its fill stays darker than the
+ * lowest teal step and the edge carries the hue.
  */
 function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
-  const recitedFill = count > 0 ? undefined : isDark ? "#134e4a" : "#99f6e4";
+  const recitedFill = count > 0 ? undefined : isDark ? "#0f766e" : "#99f6e4";
   switch (status) {
     case "done":
       return { backgroundColor: recitedFill };
@@ -59,7 +63,7 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
       return { backgroundColor: recitedFill, borderWidth: 2, borderColor: isDark ? "#5eead4" : "#0f766e", borderStyle: "dashed" as const };
     case "excused":
       return isDark
-        ? { backgroundColor: "#a16207" }
+        ? { backgroundColor: "#713f12", borderWidth: 1, borderColor: "#a16207" }
         : { backgroundColor: "#fcd34d", borderWidth: 1, borderColor: "#d97706" };
     case "paused":
       // A dashed edge in light mode, where a plain grey fill would read as an empty day.
@@ -68,7 +72,7 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
         : { backgroundColor: "#d4d4d8", borderWidth: 1, borderColor: "#a1a1aa", borderStyle: "dashed" as const };
     case "grace":
       return isDark
-        ? { backgroundColor: "#1d4ed8" }
+        ? { backgroundColor: "#1e3a8a", borderWidth: 1, borderColor: "#3b82f6" }
         : { backgroundColor: "#93c5fd", borderWidth: 1, borderColor: "#3b82f6" };
   }
 }
@@ -79,9 +83,9 @@ const SUMMARY_BREAKPOINT = 560;
 
 function getColor(count: number, isDark: boolean, emptyColor: string): string {
   if (count === 0) return emptyColor;
-  if (count <= 10) return isDark ? "#134e4a" : "#99f6e4";
-  if (count <= 25) return isDark ? "#0f766e" : "#2dd4bf";
-  return isDark ? "#14b8a6" : "#0d9488";
+  if (count <= 10) return isDark ? "#0f766e" : "#99f6e4";
+  if (count <= 25) return isDark ? "#14b8a6" : "#2dd4bf";
+  return isDark ? "#2dd4bf" : "#0d9488";
 }
 
 function getMonthLabel(date: Date, isArabic: boolean): string {
@@ -91,11 +95,11 @@ function getMonthLabel(date: Date, isArabic: boolean): string {
   return months[date.getMonth()];
 }
 
-function getDayLabel(dayIndex: number, isArabic: boolean): string | null {
-  // Show Mon, Wed, Fri (indices 1, 3, 5 in 0=Sun grid)
-  if (dayIndex === 1) return isArabic ? "الاثنين" : "Mon";
-  if (dayIndex === 3) return isArabic ? "الأربعاء" : "Wed";
-  if (dayIndex === 5) return isArabic ? "الجمعة" : "Fri";
+/** Mon, Wed and Fri are labelled on whichever rows they fall; they are never on adjacent rows. */
+function getDayLabel(dayOfWeek: number, isArabic: boolean): string | null {
+  if (dayOfWeek === 1) return isArabic ? "الاثنين" : "Mon";
+  if (dayOfWeek === 3) return isArabic ? "الأربعاء" : "Wed";
+  if (dayOfWeek === 5) return isArabic ? "الجمعة" : "Fri";
   return null;
 }
 
@@ -126,6 +130,7 @@ export function ActivityHeatmap({
   showSummaryStats = true,
   size = "compact",
   dayStatuses,
+  weekStart = 0,
 }: Props) {
   const { themeColors } = useSettings();
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
@@ -169,7 +174,8 @@ export function ActivityHeatmap({
 
   const startRaw = new Date(today);
   startRaw.setDate(startRaw.getDate() - (TOTAL_WEEKS - 1) * 7);
-  startRaw.setDate(startRaw.getDate() - startRaw.getDay());
+  // Back up to the week start, so each column is one of the user's weeks and today sits in the last.
+  startRaw.setDate(startRaw.getDate() - ((startRaw.getDay() - weekStart + 7) % 7));
 
   const weeks: { date: Date; dateStr: string; count: number }[][] = [];
   const cursor = new Date(startRaw);
@@ -221,7 +227,7 @@ export function ActivityHeatmap({
   const contentWidth = heatmapWidth + DAY_LABEL_WIDTH;
   const reviewActiveDays = activeDays ?? data.filter((d) => d.count > 0).length;
   const reviewTotal = totalReviews ?? data.reduce((sum, d) => sum + d.count, 0);
-  const formatCount = (value: number) => value > 0 ? value.toLocaleString() : "—";
+  const formatCount = (value: number) => value > 0 ? formatNumber(value, isArabic ? "ar" : "en") : "—";
   const summaryItems = [
     { value: reviewActiveDays, label: s.heatmapActiveDays },
     { value: reviewTotal, label: s.heatmapTotalReviews },
@@ -281,7 +287,7 @@ export function ActivityHeatmap({
           {/* Day labels */}
           <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start", alignItems: isRTL ? "flex-start" : "flex-end" }}>
             {Array.from({ length: 7 }, (_, i) => {
-              const label = getDayLabel(i, isArabic);
+              const label = getDayLabel((weekStart + i) % 7, isArabic);
               return (
                 <View
                   key={i}

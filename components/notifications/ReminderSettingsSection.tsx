@@ -15,6 +15,7 @@ import type { UIStringKey } from "@/lib/i18n/strings";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { exportWirdCalendar } from "@/lib/notifications/calendar";
 import { deviceClock, formatClockMinutesForDisplay } from "@/lib/notifications/clock";
+import { LATE_REMINDER_MINUTES } from "@/lib/notifications/day-times";
 import {
   getNotificationPermission,
   openNotificationSystemSettings,
@@ -339,10 +340,14 @@ export function ReminderSettingsSection() {
           {NOTIFICATION_TYPES.map((type) => {
             if (isWeb && type === "remind_later") return null;
             const [labelKey, hintKey] = TYPE_LABELS[type];
+            const label =
+              type === "late_reminder"
+                ? interpolate(s[labelKey], { time: formatClockMinutesForDisplay(LATE_REMINDER_MINUTES, uiLanguage) })
+                : s[labelKey];
             return (
               <SwitchRow
                 key={type}
-                label={s[labelKey]}
+                label={label}
                 hint={s[hintKey]}
                 value={prefs.types[type]}
                 onValueChange={(value) => void update({ kind: "type", type, value })}

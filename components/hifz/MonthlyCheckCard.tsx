@@ -20,10 +20,16 @@ export function MonthlyCheckCard({ language, s, onStart, onDecline }: Props) {
       </Text>
       <MirroredRow dir={dir} className="mt-3 gap-2">
         <View className="flex-1">
-          <Button size="sm" label={s.hifzMonthlyStart} onPress={onStart} />
+          <Button size="sm" className="h-11" label={s.hifzMonthlyStart} onPress={onStart} />
         </View>
         <View className="flex-1">
-          <Button size="sm" variant="outline" label={s.hifzNotNow} onPress={onDecline} />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-11 border border-warm-300 dark:border-neutral-700"
+            label={s.hifzNotNow}
+            onPress={onDecline}
+          />
         </View>
       </MirroredRow>
     </Card>

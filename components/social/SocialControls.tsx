@@ -41,7 +41,12 @@ export function SocialNotice({
           {message}
         </Text>
         {actionLabel && onAction ? (
-          <Button variant="outline" className="h-11 px-4" label={actionLabel} onPress={onAction} />
+          <Button
+            variant="outline"
+            className="h-11 px-4 border border-warm-300 dark:border-neutral-700"
+            label={actionLabel}
+            onPress={onAction}
+          />
         ) : null}
       </View>
     </Card>

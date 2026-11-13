@@ -44,7 +44,17 @@ export const CALCULATION_METHOD_LABEL_KEYS: Readonly<Record<CalculationMethodKey
 /** Outline buttons and the coordinate fields need a visible edge on the light card. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
-type Status = { kind: "idle" } | { kind: "locating" } | { kind: "message"; text: string; tone: "info" | "error" };
+/**
+ * Where a message shows: under "Use my location", or under "Save coordinates" for typed coordinates.
+ * The second spot sits low on the card, so only messages about typed coordinates go there.
+ */
+type StatusPlace = "location" | "coordinates";
+type Status =
+  | { kind: "idle" }
+  | { kind: "locating" }
+  | { kind: "message"; text: string; tone: "info" | "error"; place: StatusPlace };
+
+const STATUS_TEXT = "text-warm-700 dark:text-neutral-300";
 
 export type PrayerTimesSetupProps = {
   /** Called after the location is saved or removed. */
@@ -90,24 +100,24 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
   }, [db]);
 
   const save = useCallback(
-    async (next: PrayerLocation | null) => {
+    async (next: PrayerLocation | null, place: StatusPlace = "location") => {
       try {
         await writePrayerLocation(db, next);
         setLocation(next);
         onChange?.(next);
-        setStatus(next ? { kind: "message", text: s.notifLocationSaved, tone: "info" } : { kind: "idle" });
+        setStatus(next ? { kind: "message", text: s.notifLocationSaved, tone: "info", place } : { kind: "idle" });
         // Dhuhr moves the make-up cutoff (STR-07), so open streak views reload too.
         emitHabitChanged();
         rescheduleReminders(db).catch(() => {});
       } catch {
-        setStatus({ kind: "message", text: s.notifSaveFailed, tone: "error" });
+        setStatus({ kind: "message", text: s.notifSaveFailed, tone: "error", place });
       }
     },
     [db, onChange, s.notifLocationSaved, s.notifSaveFailed],
   );
 
   const saveCoordinates = (coordinates: Coordinates, source: PrayerLocation["source"]) =>
-    save({ ...coordinates, method, madhab, source });
+    save({ ...coordinates, method, madhab, source }, source === "manual" ? "coordinates" : "location");
 
   const useDeviceLocation = async () => {
     setStatus({ kind: "locating" });
@@ -120,19 +130,20 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
         setStatus({
           kind: "message",
           text: result.kind === "denied" ? s.notifLocationDenied : s.notifLocationUnavailable,
-          tone: "error",
+          tone: "info",
+          place: "location",
         });
       }
     } catch {
       setCoordinatesOpen(true);
-      setStatus({ kind: "message", text: s.notifLocationUnavailable, tone: "error" });
+      setStatus({ kind: "message", text: s.notifLocationUnavailable, tone: "info", place: "location" });
     }
   };
 
   const saveManual = () => {
     const coordinates = parseManualCoordinates(latitudeText, longitudeText);
     if (!coordinates) {
-      setStatus({ kind: "message", text: s.notifCoordinatesInvalid, tone: "error" });
+      setStatus({ kind: "message", text: s.notifCoordinatesInvalid, tone: "error", place: "coordinates" });
       return;
     }
     void saveCoordinates(coordinates, "manual");
@@ -149,6 +160,10 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
     if (location) void save({ ...location, madhab: next });
   };
 
+  const locationStatus =
+    status.kind === "locating" ? s.notifLocating : status.kind === "message" && status.place === "location" ? status.text : null;
+  const coordinatesStatus = status.kind === "message" && status.place === "coordinates" ? status : null;
+
   const todayTimes = useMemo(() => {
     if (!location) return null;
     return computePrayerTimes(location, deviceClock.dateOf(new Date()));
@@ -158,13 +173,20 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
     <View className="gap-4">
       <Text variant="body-sm">{s.notifPrayerTimesIntro}</Text>
 
-      <Button
-        variant="outline"
-        className={OUTLINE_BORDER}
-        onPress={useDeviceLocation}
-        disabled={status.kind === "locating"}
-        label={s.notifUseMyLocation}
-      />
+      <View className="gap-2">
+        <Button
+          variant="outline"
+          className={OUTLINE_BORDER}
+          onPress={useDeviceLocation}
+          disabled={status.kind === "locating"}
+          label={s.notifUseMyLocation}
+        />
+        {locationStatus ? (
+          <Text variant="body-sm" accessibilityLiveRegion="polite" className={STATUS_TEXT}>
+            {locationStatus}
+          </Text>
+        ) : null}
+      </View>
 
       <View className="gap-2">
         <DisclosureRow
@@ -213,19 +235,18 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
               </View>
             </MirroredRow>
             <Button variant="outline" className={OUTLINE_BORDER} onPress={saveManual} label={s.notifSaveCoordinates} />
+            {coordinatesStatus ? (
+              <Text
+                variant="body-sm"
+                accessibilityLiveRegion="polite"
+                className={coordinatesStatus.tone === "error" ? "text-red-600 dark:text-red-400" : STATUS_TEXT}
+              >
+                {coordinatesStatus.text}
+              </Text>
+            ) : null}
           </>
         ) : null}
       </View>
-
-      {status.kind !== "idle" && (
-        <Text
-          variant="body-sm"
-          accessibilityLiveRegion="polite"
-          className={status.kind === "message" && status.tone === "error" ? "text-red-600 dark:text-red-400" : undefined}
-        >
-          {status.kind === "locating" ? s.notifLocating : status.text}
-        </Text>
-      )}
 
       <View className="gap-2">
         <Text variant="title-sm">{s.notifCalculationMethod}</Text>

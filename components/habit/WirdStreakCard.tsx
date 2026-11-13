@@ -109,12 +109,16 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
   const tomorrowTier = streak.doneToday && isEveOfStreakTier(streak.length);
   // With no goal, grace or tier line, the break link sits under the message instead of alone in a row.
   const hasFooterNotes = goal !== null || overview.graceHeld > 0 || tomorrowTier;
-  // The link keeps a 44 pt target, which centers its text with about 13 px above and below. When it
-  // ends the card, the card's own bottom padding shrinks so the space under it matches the space above.
-  const breakLinkIsLast = hasFooterNotes || (headline.kind !== "earn_back" && !showMinimum && !showGraceNote);
-  const breakLink = (
-    <Pressable onPress={onOpenBreak} accessibilityRole="button" className="min-h-[44px] justify-center">
-      <Text dir={dir} className="text-primary-muted dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+  // The link keeps a 44 pt target around its 18 px line. Negative margins take the extra 13 px above
+  // and below out of the layout, so the card's padding holds whether the link or a wrapped note is
+  // the tallest item in the last row. Under the message it keeps a 6 px gap above its text.
+  const renderBreakLink = (margins: string) => (
+    <Pressable onPress={onOpenBreak} accessibilityRole="button" className={`min-h-[44px] justify-center ${margins}`}>
+      <Text
+        dir={dir}
+        className="text-primary-muted dark:text-primary-bright"
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, lineHeight: 18 }}
+      >
         {s.habitTakeBreak}
       </Text>
     </Pressable>
@@ -122,7 +126,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
 
   return (
     <View
-      className={`mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 pt-3 ${breakLinkIsLast ? "pb-0.5" : "pb-3"}`}
+      className="mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 pt-3 pb-3"
       accessibilityRole="summary"
       accessibilityLabel={`${s.habitStreakLabel}: ${formatDays(streak.length, language)}. ${headlineMessage(overview, language, s)}`}
     >
@@ -142,7 +146,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
           >
             {headlineMessage(overview, language, s)}
           </Text>
-          {hasFooterNotes ? null : breakLink}
+          {hasFooterNotes ? null : renderBreakLink("-mt-[7px] -mb-[13px]")}
         </View>
       </MirroredRow>
 
@@ -213,7 +217,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
             </Text>
           ) : null}
         </MirroredRow>
-        {breakLink}
+        {renderBreakLink("-my-[13px]")}
       </MirroredRow>
       ) : null}
     </View>

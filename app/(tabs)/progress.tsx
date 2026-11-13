@@ -28,6 +28,7 @@ import { HifzProgressCard } from "@/components/hifz/HifzProgressCard";
 import { loadHifzProgress, type HifzProgress } from "@/lib/hifz/progress";
 import { countSteadyWeeks, toDayMap } from "@/lib/habit/streak";
 import { effectiveWeekStart } from "@/lib/habit/settings";
+import { formatNumber } from "@/lib/i18n/count";
 import type { DayStatus } from "@/lib/habit/types";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
@@ -126,23 +127,24 @@ export default function ProgressScreen() {
   );
 
   const showSyncPrompt = isSupabaseConfigured() && authInitialized && !authLoading && !user;
-  const formatStat = (val: number) => val.toLocaleString();
+  // The interface language picks the digits; toLocaleString would follow the device locale.
+  const formatStat = (val: number) => formatNumber(val, uiLanguage);
   const masteryPct = totalAyahCards > 0 ? Math.round((memorizedAyahCards / totalAyahCards) * 100) : 0;
+  const formattedMastery = `${formatStat(masteryPct)}${uiLanguage === "ar" ? "\u066a" : "%"}`;
   // PTS-01: neutral counts instead of a points total.
   const dayStatuses = useMemo(() => {
     const map = new Map<string, DayStatus>();
     for (const day of habit?.days ?? []) map.set(day.localDate, day.status);
     return map;
   }, [habit?.days]);
+  // STR-28: the heatmap columns and "Steady weeks" both follow the week start chosen in Settings.
+  const weekStart = effectiveWeekStart(habit?.settings ?? { weekStart: null }, uiLanguage);
   const steadyWeeks = useMemo(
-    () =>
-      habit
-        ? countSteadyWeeks(toDayMap(habit.days), habit.today, effectiveWeekStart(habit.settings, uiLanguage))
-        : 0,
-    [habit, uiLanguage],
+    () => (habit ? countSteadyWeeks(toDayMap(habit.days), habit.today, weekStart) : 0),
+    [habit, weekStart],
   );
   const statItems = [
-    { value: `${masteryPct}%`, label: s.progressRetention },
+    { value: formattedMastery, label: s.progressRetention },
     { value: formatStat(memorizedAyahCards), label: s.progressTotalMemorized },
     { value: formatStat(habit?.streak.length ?? 0), label: s.wirdCurrent },
     { value: formatStat(habit?.longest ?? 0), label: s.progressLongestStreak },
@@ -153,6 +155,10 @@ export default function ProgressScreen() {
     direction: "ltr" as const,
     flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const),
   };
+  // A bidi isolate keeps Arabic "٥ / ٥٣" in order instead of "٥٣ / ٥".
+  const achievementCount = achievementDashboard
+    ? `\u2066${formatStat(achievementDashboard.unlockedCount)} / ${formatStat(achievementDashboard.totalCount)}\u2069`
+    : "";
   const recentAchievementItems: AchievementDashboard["items"] = [];
   if (achievementDashboard) {
     for (const unlock of achievementDashboard.recentUnlocks) {
@@ -246,6 +252,7 @@ export default function ProgressScreen() {
                 showSummaryStats={false}
                 size="expanded"
                 dayStatuses={dayStatuses}
+                weekStart={weekStart}
               />
             </View>
             <CompactProgressStats
@@ -307,12 +314,11 @@ export default function ProgressScreen() {
                   >
                     {s.achievementsTitle}
                   </Text>
-                  {/* The count is a bidi isolate so Arabic text keeps "5 / 53" in order instead of "53 / 5". */}
                   <Text
                     className="mt-1 text-warm-400 dark:text-neutral-500"
                     style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                   >
-                    {`\u2066${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}\u2069`}
+                    {achievementCount}
                   </Text>
                 </View>
               </View>
@@ -373,7 +379,7 @@ export default function ProgressScreen() {
         <ResponsiveModal open={achievementsModalOpen} onClose={() => setAchievementsModalOpen(false)} maxWidth={760}>
           <OverlayHeader
             title={s.achievementsTitle}
-            subtitle={`\u2066${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}\u2069`}
+            subtitle={achievementCount}
             isRTL={isRTL}
             onClose={() => setAchievementsModalOpen(false)}
             leading={

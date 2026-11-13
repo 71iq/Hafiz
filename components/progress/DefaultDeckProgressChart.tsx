@@ -2,6 +2,7 @@ import { Text, View } from "react-native";
 import { BarChart3 } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { useSettings } from "@/lib/settings/context";
+import { formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import type { DefaultDeckProgressItem, DefaultDeckProgressKey } from "@/lib/profile/progress";
 import { textStartStyle } from "@/lib/ui/direction";
@@ -46,6 +47,8 @@ export function DefaultDeckProgressChart({
     reasonsOfRevelation: s.smartDeckReasonsTitle,
     vocabulary: s["achievementCategory.vocab"] ?? s.vocabDeckTitle,
   };
+  // Digits follow the interface language; toLocaleString would follow the device locale.
+  const { uiLanguage } = useSettings();
   const totalCards = items.reduce((sum, item) => sum + item.total, 0);
   const rowFlexStyle = {
     direction: "ltr" as const,
@@ -72,7 +75,7 @@ export function DefaultDeckProgressChart({
             className="mt-1 text-warm-400 dark:text-neutral-500"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           >
-            {`${s.flashcardsTotalCards}: ${totalCards.toLocaleString()}`}
+            {`${s.flashcardsTotalCards}: ${formatNumber(totalCards, uiLanguage)}`}
           </Text>
         </View>
       </View>
@@ -119,7 +122,7 @@ function DefaultDeckProgressRow({
   isRTL: boolean;
   s: DefaultDeckProgressStrings;
 }) {
-  const { themeColors } = useSettings();
+  const { themeColors, uiLanguage } = useSettings();
   const startedPct = item.total > 0 ? Math.round((item.startedCount / item.total) * 100) : 0;
   const barWidth = `${startedPct}%` as `${number}%`;
   const rowFlexStyle = {
@@ -140,7 +143,8 @@ function DefaultDeckProgressRow({
           className="text-warm-500 dark:text-neutral-400"
           style={{ fontFamily: "Manrope_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] }}
         >
-          {`${item.startedCount.toLocaleString()} / ${item.total.toLocaleString()}`}
+          {/* A bidi isolate keeps Arabic "٥ / ٥٣" in order, as on the achievements count. */}
+          {`\u2066${formatNumber(item.startedCount, uiLanguage)} / ${formatNumber(item.total, uiLanguage)}\u2069`}
         </Text>
       </View>
       <View
@@ -179,7 +183,7 @@ function DeckMetric({
   value: number;
   isRTL: boolean;
 }) {
-  const { themeColors } = useSettings();
+  const { themeColors, uiLanguage } = useSettings();
   const rowFlexStyle = {
     direction: "ltr" as const,
     flexDirection: isRTL ? "row-reverse" as const : "row" as const,
@@ -193,7 +197,7 @@ function DeckMetric({
         className="text-charcoal dark:text-neutral-200"
         style={{ fontFamily: "Manrope_700Bold", fontSize: 11, fontVariant: ["tabular-nums"] }}
       >
-        {value.toLocaleString()}
+        {formatNumber(value, uiLanguage)}
       </Text>
       <Text
         className="text-warm-500 dark:text-neutral-500"
