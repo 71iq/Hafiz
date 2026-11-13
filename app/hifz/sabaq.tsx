@@ -94,6 +94,8 @@ function SabaqScreen() {
    * check to show a failed save, which would otherwise reach a departed screen.
    */
   const leaveWhenSaved = useRef(false);
+  /** Set once the screen leaves on purpose, so the back guard below lets that navigation through. */
+  const exiting = useRef(false);
   const step: Step = habitResult ? "done" : STEPS[stepIndex];
 
   const load = useCallback(async () => {
@@ -158,11 +160,23 @@ function SabaqScreen() {
   };
 
   const exit = () => {
+    exiting.current = true;
     stop();
     const session = sessionRef.current;
     if (session && !habitResult) endReviewSession(db, { session }).catch(console.warn);
     returnToTabs(navigation.getState(), "/(tabs)/home");
   };
+
+  // Hardware back or a back gesture during an unresolved grade waits for it, the same as Close.
+  useEffect(
+    () =>
+      navigation.addListener("beforeRemove", (event) => {
+        if (exiting.current || saveLock.current !== "saving") return;
+        event.preventDefault();
+        leaveWhenSaved.current = true;
+      }),
+    [navigation],
+  );
 
   /** Leave now, or once the check's unresolved grade settles (see leaveWhenSaved). */
   const leave = () => {

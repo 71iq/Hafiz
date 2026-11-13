@@ -43,9 +43,27 @@ const mockAudio = {
   togglePause: jest.fn(),
 };
 
+type BeforeRemove = { preventDefault: () => void };
+const mockBackListeners = new Set<(event: BeforeRemove) => void>();
+// Stable, so the screens subscribe once; `back` stands in for a hardware back press or gesture.
+const mockNavigation = {
+  getState: () => undefined,
+  addListener: (name: string, listener: (event: BeforeRemove) => void) => {
+    if (name !== "beforeRemove") return () => {};
+    mockBackListeners.add(listener);
+    return () => mockBackListeners.delete(listener);
+  },
+};
+/** Fire beforeRemove as a back press would. Returns whether the screen kept itself open. */
+function back(): boolean {
+  let prevented = false;
+  for (const listener of mockBackListeners) listener({ preventDefault: () => (prevented = true) });
+  return prevented;
+}
+
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
-  useNavigation: () => ({ getState: () => undefined }),
+  useNavigation: () => mockNavigation,
 }));
 jest.mock("@/lib/navigation/return-to-tabs", () => ({ returnToTabs: jest.fn() }));
 jest.mock("@/lib/database/provider", () => ({
@@ -186,6 +204,7 @@ function grading(): GradingProps {
 
 let warnings: jest.SpyInstance;
 beforeEach(() => {
+  mockBackListeners.clear();
   jest.clearAllMocks();
   mockParams = {};
   mockGrading = null;
@@ -303,6 +322,27 @@ describe("hifz review screen", () => {
     expect(endReviewSession).toHaveBeenCalled();
   });
 
+  it("holds a back press during an unresolved save, then leaves once it is saved", async () => {
+    const save = deferred<typeof saved>();
+    jest.mocked(savePageGrade).mockReturnValue(save.promise);
+    const buttons = await openCheck();
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    expect(back()).toBe(true);
+    expect(returnToTabs).not.toHaveBeenCalled();
+    await act(async () => save.resolve(saved));
+    await flush();
+    expect(returnToTabs).toHaveBeenCalledTimes(1);
+    // The screen's own exit is not held.
+    expect(back()).toBe(false);
+  });
+
+  it("lets a back press through when nothing is saving", async () => {
+    await openCheck();
+    expect(back()).toBe(false);
+  });
+
   it("stays on the page to show a failed save when Close was pressed while it was unresolved", async () => {
     const save = deferred<typeof saved>();
     jest.mocked(savePageGrade).mockReturnValueOnce(save.promise).mockResolvedValueOnce(saved);
@@ -410,6 +450,21 @@ describe("sabaq screen", () => {
     await flush();
     expect(returnToTabs).toHaveBeenCalledTimes(1);
     expect(endReviewSession).toHaveBeenCalled();
+  });
+
+  it("holds a back press during the check's unresolved grade, and stays to show a failure", async () => {
+    const save = deferred<ChunkSave>();
+    jest.mocked(completeSabaqChunk).mockReturnValue(save.promise);
+    const buttons = await openSabaqCheck();
+    expect(back()).toBe(false);
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    expect(back()).toBe(true);
+    await act(async () => save.reject(new Error("disk full")));
+    await flush();
+    expect(returnToTabs).not.toHaveBeenCalled();
+    expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
   });
 
   it("stays on the check to show a failed grade when Close was pressed while it was unresolved", async () => {

@@ -190,6 +190,8 @@ function HifzReviewScreen() {
    * stays with the item open to show a failed save, which would otherwise reach a departed screen.
    */
   const leaveWhenSettled = useRef(false);
+  /** Set once the screen leaves on purpose, so the back guard below lets that navigation through. */
+  const exiting = useRef(false);
   // Pages the user holds, declared or reviewed: a seam leads only into one of them.
   const [heldPages, setHeldPages] = useState<ReadonlySet<number>>(new Set());
   const [seamText, setSeamText] = useState<AyahText | null>(null);
@@ -623,10 +625,22 @@ function HifzReviewScreen() {
   };
 
   const exit = () => {
+    exiting.current = true;
     const session = sessionRef.current;
     if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
     returnToTabs(navigation.getState(), "/(tabs)/home");
   };
+
+  // Hardware back or a back gesture during an unresolved save waits for it, the same as Close.
+  useEffect(
+    () =>
+      navigation.addListener("beforeRemove", (event) => {
+        if (exiting.current || !actionLock.current) return;
+        event.preventDefault();
+        leaveWhenSettled.current = true;
+      }),
+    [navigation],
+  );
 
   /** Leave now, or once the action holding the lock settles (see leaveWhenSettled). */
   const leave = () => {
