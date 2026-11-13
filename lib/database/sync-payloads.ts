@@ -25,6 +25,11 @@ const jsonText = z.string().refine((value) => {
   }
 });
 const jsonContainer = z.union([jsonText, z.array(z.json()), z.record(z.string(), z.json())]);
+// SQLite stores flags as 0/1 and the server as booleans; accept both on the wire.
+const flag = z.union([z.boolean(), z.literal(0), z.literal(1)]);
+const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const nonNegative = integer.min(0);
+const tier = z.enum(["sabaq", "sabqi", "manzil", "manzil.needs_work", "manzil.unverified"]);
 
 const setting = z.object({
   ...wireMetadata,
@@ -58,6 +63,8 @@ const card = z.object({
   suspended_at: optionalTimestamp,
   buried_until: optionalTimestamp,
   marked_at: optionalTimestamp,
+  tier: tier.nullish(),
+  tier_changed_at: optionalTimestamp,
   created_at: timestamp,
 });
 const log = z.object({
@@ -72,6 +79,14 @@ const log = z.object({
   elapsed_days: integer,
   scheduled_days: integer,
   reviewed_at: timestamp,
+  session_id: z.string().nullish(),
+  duration_ms: nonNegative.nullish(),
+  support_level: integer.min(0).max(4).nullish(),
+  proposed_rating: integer.min(0).max(4).nullish(),
+  grader: z.enum(["self", "teacher", "salah", "asr"]).nullish(),
+  local_date: localDate.nullish(),
+  tz: z.string().nullish(),
+  error_count: nonNegative.nullish(),
 });
 const bookmark = z.object({
   ...wireMetadata,
@@ -128,6 +143,89 @@ const achievement = z.object({
   public_payload: jsonContainer.optional(),
 });
 
+const habitDay = z.object({
+  ...wireMetadata,
+  local_date: localDate,
+  status: z.enum(["done", "made_up", "earned_back", "excused", "paused", "grace"]).nullable(),
+  earned_status: z.enum(["done", "made_up", "earned_back", "paused", "grace"]).nullable(),
+  reason: z.enum(["illness", "travel", "menstruation", "other"]).nullable(),
+  excuse_updated_at: optionalTimestamp,
+  minimum_met: flag,
+  full_met: flag,
+  manzil_cycle_completed: flag,
+  source_session_id: z.string().nullish(),
+  credited_through: optionalTimestamp,
+  tz: z.string().nullish(),
+  created_at: timestamp,
+  updated_at: timestamp,
+});
+const reviewSession = z.object({
+  ...wireMetadata,
+  id: identity,
+  kind: z.enum([
+    "cards",
+    "wird",
+    "sabaq",
+    "mistakes",
+    "juz_check",
+    "portion_check",
+    "welcome_back",
+    "seams",
+    "mutashabihat",
+    "listening",
+    "full_juz",
+    "salah",
+  ]),
+  deck_id: z.string().nullish(),
+  started_at: timestamp,
+  ended_at: optionalTimestamp,
+  duration_ms: nonNegative,
+  local_date: localDate,
+  tz: z.string(),
+  cards_reviewed: nonNegative,
+  pages_reviewed: nonNegative,
+  new_lines: nonNegative,
+  clean_pages: nonNegative,
+  errors: nonNegative,
+  minimum_met: flag,
+  full_met: flag,
+  source: z.enum(["app", "salah", "listener"]),
+  created_at: timestamp,
+  updated_at: timestamp,
+  deleted_at: optionalTimestamp,
+});
+const recitationError = z.object({
+  ...wireMetadata,
+  id: identity,
+  card_id: identity,
+  session_id: z.string().nullish(),
+  surah: position,
+  ayah: position.nullish(),
+  word: position.nullish(),
+  type: z.enum([
+    "skip_word",
+    "wrong_word",
+    "added_word",
+    "harakah",
+    "skip_ayah",
+    "seam",
+    "mutashabih_drift",
+    "hesitation",
+    "tajweed",
+    "waqf_ibtida",
+  ]),
+  severity: z.enum(["jali", "khafi"]),
+  corrected: z.enum(["self", "tanbih", "fath", "none"]),
+  sibling_ref: z.string().nullish(),
+  local_date: localDate,
+  clean_count: nonNegative,
+  last_clean_date: localDate.nullish(),
+  resolved_at: optionalTimestamp,
+  created_at: timestamp,
+  updated_at: timestamp,
+  deleted_at: optionalTimestamp,
+});
+
 const schemas = {
   user_settings: setting,
   user_word_meanings: meaning,
@@ -138,6 +236,9 @@ const schemas = {
   private_notes: note,
   reflection_journey_entries: journey,
   achievement_unlocks: achievement,
+  habit_days: habitDay,
+  review_sessions: reviewSession,
+  recitation_errors: recitationError,
 };
 const tableName = z.enum([
   "user_settings",
@@ -149,6 +250,9 @@ const tableName = z.enum([
   "private_notes",
   "reflection_journey_entries",
   "achievement_unlocks",
+  "habit_days",
+  "review_sessions",
+  "recitation_errors",
 ]);
 export type SyncTable = z.infer<typeof tableName>;
 
@@ -206,6 +310,9 @@ const incomingSchemas = {
   private_notes: note.passthrough(),
   reflection_journey_entries: journey.passthrough(),
   achievement_unlocks: achievement.passthrough(),
+  habit_days: habitDay.passthrough(),
+  review_sessions: reviewSession.passthrough(),
+  recitation_errors: recitationError.passthrough(),
 };
 export type SyncRows = { [K in SyncTable]: z.infer<(typeof incomingSchemas)[K]> };
 
@@ -261,6 +368,9 @@ const outgoingSchemas = {
   private_notes: note.strict(),
   reflection_journey_entries: journey.strict(),
   achievement_unlocks: achievement.strict(),
+  habit_days: habitDay.strict(),
+  review_sessions: reviewSession.strict(),
+  recitation_errors: recitationError.strict(),
 };
 const deleteSchemas = {
   user_settings: setting.partial().strict(),
@@ -272,6 +382,9 @@ const deleteSchemas = {
   private_notes: note.partial().strict(),
   reflection_journey_entries: journey.partial().strict(),
   achievement_unlocks: achievement.partial().strict(),
+  habit_days: habitDay.partial().strict(),
+  review_sessions: reviewSession.partial().strict(),
+  recitation_errors: recitationError.partial().strict(),
 };
 
 function canonicalHighlight(row: Record<string, unknown>): string {
@@ -295,7 +408,12 @@ function requireIdentity(table: SyncTable, rowId: string, data: Record<string, u
       break;
     case "study_cards":
     case "private_notes":
+    case "review_sessions":
+    case "recitation_errors":
       expected = data.id;
+      break;
+    case "habit_days":
+      expected = data.local_date;
       break;
     case "reflection_journey_entries":
       expected = data.level_id;

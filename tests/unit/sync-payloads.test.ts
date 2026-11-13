@@ -269,7 +269,8 @@ beforeEach(async () => {
     getAllAsync: async (source: string, params: SQLInputValue[] = []) => {
       const rows = sql.prepare(source).all(...params);
       const normalizedSql = source.replace(/\s+/g, " ").trim().toLowerCase();
-      if (normalizedSql.includes("from study_log") && normalizedSql.includes("reviewed_at")) {
+      // The per-card timestamp candidate scan, not the one-pass wird-day reconcile after restore.
+      if (normalizedSql.startsWith("select reviewed_at from study_log where card_id")) {
         studyLogTimestampCandidateQueries += 1;
         studyLogTimestampCandidateRowsLoaded += rows.length;
       }
@@ -301,6 +302,7 @@ beforeEach(async () => {
   await createSchema(db);
   putSetting(`sync_initial_backfill_${USER_ID}_20260525_sync_v1`, "true");
   putSetting(`sync_user_settings_backfill_${USER_ID}_20260528_user_settings_v1`, "true");
+  putSetting(`sync_habit_backfill_${USER_ID}_20261113_habit_v1`, "true");
   putSetting("last_pull_at", OLD);
   putCard({ ...card(), updated_at: OLD });
   sql
@@ -607,8 +609,22 @@ it("preserves historical duplicate reviews when an equivalent incremental event 
 
   const rows = sql.prepare("SELECT * FROM study_log WHERE card_id='historical-duplicates' ORDER BY id").all();
   const stats = await getReviewStats(db);
+  // Rows written before review detail existed keep empty detail columns.
+  const noDetail = {
+    session_id: null,
+    duration_ms: null,
+    support_level: null,
+    proposed_rating: null,
+    grader: null,
+    local_date: null,
+    tz: null,
+    error_count: 0,
+  };
   expect({ rows, totalReviews: stats.totalReviews }).toEqual({
-    rows: [first, second],
+    rows: [
+      { ...first, ...noDetail },
+      { ...second, ...noDetail },
+    ],
     totalReviews: 2,
   });
 });

@@ -61,6 +61,8 @@ import {
   type DueCardsForReviewOptions,
 } from "./smart-decks";
 import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
+import { deviceTimeZone, localDateOf } from "@/lib/habit/dates";
+import type { Grader } from "@/lib/hifz/grading";
 
 type ReviewActivityDay = { date: string; count: number };
 
@@ -105,6 +107,8 @@ function cardToSyncData(card: StudyCardRow): Record<string, any> {
     created_at: card.created_at,
     updated_at: card.updated_at,
     deleted_at: card.deleted_at ?? null,
+    // Only page cards carry a tier; leaving the keys out keeps other cards' uploads unchanged.
+    ...(card.tier ? { tier: card.tier, tier_changed_at: card.tier_changed_at ?? null } : {}),
   };
 }
 
@@ -1223,15 +1227,41 @@ export type StudyLogInput = {
   elapsedDays: number;
   scheduledDays: number;
   reviewedAt: string;
+  /** The review session, when the review came from one. */
+  sessionId?: string | null;
+  /** Time from showing the card to grading it. */
+  durationMs?: number | null;
+  /** 4.5.1 support level the card was recited at; null for cards without a ladder. */
+  supportLevel?: number | null;
+  /** GRD-02: the rubric's proposal, logged beside the final rating. */
+  proposedRating?: number | null;
+  grader?: Grader;
+  errorCount?: number;
 };
 
-/** Record one review and queue its upload with the given executor. */
+/**
+ * Record one review and queue its upload with the given executor. Its local date and zone are fixed
+ * when it happens (DAY-01), so travel never moves a past review to another day.
+ */
 export async function putStudyLogRow(db: DatabaseExecutor, log: StudyLogInput): Promise<void> {
   const { cardId, rating, state, due, stability, difficulty, elapsedDays, scheduledDays, reviewedAt } = log;
+  const reviewedAtDate = new Date(reviewedAt);
+  const localDate = localDateOf(reviewedAtDate);
+  const tz = deviceTimeZone(reviewedAtDate);
+  const sessionId = log.sessionId ?? null;
+  const durationMs = log.durationMs == null ? null : Math.max(0, Math.round(log.durationMs));
+  const supportLevel = log.supportLevel ?? null;
+  const proposedRating = log.proposedRating ?? null;
+  const grader = log.grader ?? "self";
+  const errorCount = log.errorCount ?? 0;
   await db.runAsync(
-    `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-    [cardId, rating, state, due, stability, difficulty, elapsedDays, scheduledDays, reviewedAt]
+    `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, sync_status,
+       session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      cardId, rating, state, due, stability, difficulty, elapsedDays, scheduledDays, reviewedAt,
+      sessionId, durationMs, supportLevel, proposedRating, grader, localDate, tz, errorCount,
+    ]
   );
   await enqueueSync(db, "study_log", "INSERT", `${cardId}:${reviewedAt}`, {
     card_id: cardId,
@@ -1243,6 +1273,14 @@ export async function putStudyLogRow(db: DatabaseExecutor, log: StudyLogInput): 
     elapsed_days: elapsedDays,
     scheduled_days: scheduledDays,
     reviewed_at: reviewedAt,
+    session_id: sessionId,
+    duration_ms: durationMs,
+    support_level: supportLevel,
+    proposed_rating: proposedRating,
+    grader,
+    local_date: localDate,
+    tz,
+    error_count: errorCount,
   });
 }
 

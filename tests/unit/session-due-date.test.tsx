@@ -165,6 +165,16 @@ jest.mock("@/lib/fsrs/smart-decks", () => ({
   getSmartCardContent: jest.fn(),
 }));
 
+// The wird day is written inside the grade transaction; its rules are covered by habit-wird-progress.
+jest.mock("@/lib/habit/queries", () => ({
+  recordWirdProgress: jest.fn(async () => ({ kind: "none" })),
+}));
+// Inbox resolution is covered by habit-wird-progress against a real schema.
+jest.mock("@/lib/hifz/errors", () => ({
+  insertRecitationErrors: jest.fn(async () => []),
+  recordCleanRecitation: jest.fn(async () => 0),
+}));
+
 jest.mock("@/lib/fsrs/scoring", () => ({
   addTodayPoints: jest.fn(),
   computeReviewPoints: jest.fn(() => 0),
@@ -1731,6 +1741,12 @@ describe("Flashcard session due-date editor characterization", () => {
         elapsedDays: record.elapsedDays,
         scheduledDays: record.scheduledDays,
         reviewedAt: record.reviewedAt,
+        sessionId: null,
+        durationMs: null,
+        supportLevel: null,
+        proposedRating: null,
+        grader: "self",
+        errorCount: 0,
       });
       await act(async () => logWrite.resolve());
       await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());

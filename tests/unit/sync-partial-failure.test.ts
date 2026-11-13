@@ -204,6 +204,7 @@ beforeEach(async () => {
   await createSchema(db);
   putSetting(`sync_initial_backfill_${USER_ID}_20260525_sync_v1`, "true");
   putSetting(`sync_user_settings_backfill_${USER_ID}_20260528_user_settings_v1`, "true");
+  putSetting(`sync_habit_backfill_${USER_ID}_20261113_habit_v1`, "true");
   putSetting(`sync_account_restore_${USER_ID}_20260614_account_restore_v1`, "true");
   putSetting("last_pull_at", OLD);
   putLocalNote();

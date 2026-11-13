@@ -1,0 +1,111 @@
+import { addDays, diffDays, type LocalDate } from "@/lib/habit/dates";
+import { COUNTS_TOWARD_LENGTH, RECITED_STATUSES, type DayStatus, type HabitDay } from "@/lib/habit/types";
+
+export type DayMap = ReadonlyMap<LocalDate, HabitDay>;
+
+export function toDayMap(days: readonly HabitDay[]): Map<LocalDate, HabitDay> {
+  return new Map(days.map((day) => [day.localDate, day]));
+}
+
+export type StreakView = Readonly<{
+  /** Days that count toward the streak, through today or the open day before it. */
+  length: number;
+  /** First day of the current run, or null when there is no streak. */
+  startDay: LocalDate | null;
+  /** Latest covered day of the current run. */
+  lastCoveredDay: LocalDate | null;
+  todayStatus: DayStatus | null;
+  /** Today is a wird day earned by recitation (STR-04). */
+  doneToday: boolean;
+  /** The streak is alive but today has no wird yet (STR-03). */
+  atRisk: boolean;
+  /** Yesterday is missed but can still be made up before Dhuhr today (STR-07). */
+  makeUpPending: boolean;
+}>;
+
+/**
+ * STR-03: a streak stays alive while the last covered day is today or yesterday, and shows its full
+ * length during the at-risk day. When yesterday was missed but its make-up window is still open,
+ * the streak is pending instead of broken.
+ */
+export function computeStreak(days: DayMap, today: LocalDate, options: { makeUpOpen: boolean }): StreakView {
+  const todayStatus = days.get(today)?.status ?? null;
+  const yesterday = addDays(today, -1);
+  let cursor: LocalDate = todayStatus ? today : yesterday;
+  let makeUpPending = false;
+  if (!todayStatus && !days.has(yesterday)) {
+    if (options.makeUpOpen && days.has(addDays(today, -2))) {
+      makeUpPending = true;
+      cursor = addDays(today, -2);
+    } else {
+      return {
+        length: 0,
+        startDay: null,
+        lastCoveredDay: null,
+        todayStatus,
+        doneToday: false,
+        atRisk: false,
+        makeUpPending: false,
+      };
+    }
+  }
+  const lastCoveredDay = cursor;
+  let length = 0;
+  let startDay: LocalDate = cursor;
+  while (days.has(cursor)) {
+    const status = days.get(cursor)!.status;
+    if (COUNTS_TOWARD_LENGTH[status]) length += 1;
+    startDay = cursor;
+    cursor = addDays(cursor, -1);
+  }
+  const protectedToday = todayStatus !== null;
+  return {
+    length,
+    startDay,
+    lastCoveredDay,
+    todayStatus,
+    doneToday: todayStatus === "done",
+    atRisk: !protectedToday,
+    makeUpPending,
+  };
+}
+
+/** Length of the run that ends on `lastDay`, counted the way the streak counts. */
+export function runLengthEndingOn(days: DayMap, lastDay: LocalDate): number {
+  let length = 0;
+  let cursor = lastDay;
+  while (days.has(cursor)) {
+    if (COUNTS_TOWARD_LENGTH[days.get(cursor)!.status]) length += 1;
+    cursor = addDays(cursor, -1);
+  }
+  return length;
+}
+
+/** The longest run in the history, through `today`. Future excused days are ignored. */
+export function longestStreak(days: DayMap, today: LocalDate): number {
+  const dates = [...days.keys()].filter((date) => date <= today).sort();
+  let longest = 0;
+  let run = 0;
+  let previous: LocalDate | null = null;
+  for (const date of dates) {
+    if (previous === null || diffDays(previous, date) !== 1) run = 0;
+    if (COUNTS_TOWARD_LENGTH[days.get(date)!.status]) run += 1;
+    longest = Math.max(longest, run);
+    previous = date;
+  }
+  return longest;
+}
+
+/** The latest covered day strictly before `before`, or null. */
+export function lastCoveredBefore(days: DayMap, before: LocalDate): LocalDate | null {
+  let latest: LocalDate | null = null;
+  for (const date of days.keys()) {
+    if (date < before && (latest === null || date > latest)) latest = date;
+  }
+  return latest;
+}
+
+/** Recited days (done or made up), used by grace awards and earn-back progress. */
+export function isRecited(day: HabitDay | undefined): boolean {
+  return day !== undefined && RECITED_STATUSES.has(day.status);
+}

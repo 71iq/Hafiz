@@ -1,3 +1,4 @@
+import { createId } from "@/lib/id";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
@@ -68,7 +69,7 @@ export async function createPrivateNote(
   input: CreatePrivateNoteInput
 ): Promise<PrivateNote> {
   const now = new Date().toISOString();
-  const id = createId();
+  const id = createId("note");
   const content = input.content.trim();
   assertQfNoteContent(content);
   const rangesJson = JSON.stringify([buildQfRange(input.surah, input.ayahStart, input.ayahEnd)]);
@@ -300,10 +301,3 @@ function safeJson(value: string): unknown {
   }
 }
 
-function createId(): string {
-  const maybeCrypto = globalThis.crypto as { randomUUID?: () => string } | undefined;
-  if (maybeCrypto && typeof maybeCrypto.randomUUID === "function") {
-    return maybeCrypto.randomUUID();
-  }
-  return `note_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}

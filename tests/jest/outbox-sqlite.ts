@@ -1,6 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { createConnectionOwner } from "@/lib/database/connection-owner";
-import { createSchema } from "@/lib/database/schema";
+import { createSchema, migrateUserSchema } from "@/lib/database/schema";
 import type { AppDatabase } from "@/lib/database/types";
 
 /**
@@ -64,6 +64,7 @@ export async function openOutboxDatabase(): Promise<OutboxDatabase> {
     closeAsync: async () => sql.close(),
   });
   await createSchema(owner.database);
+  await migrateUserSchema(owner.database);
   return {
     db: owner.database,
     sql,

@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import { createSchema, createTextSearchIndex, migrateUserSchema } from "./schema";
+import { reconcileLegacyHabitDaysOnce } from "@/lib/habit/reconcile";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
 import { mapRowsToCanonicalWords, type CanonicalWord } from "@/lib/database/word-mapping";
 import {
@@ -1141,6 +1142,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
   await createSchema(db);
   await migrateUserSchema(db);
   await ensureQfUserSyncSchema(db);
+  await db.withTransactionAsync((tx) => reconcileLegacyHabitDaysOnce(tx));
 
   const importState = await resolveContentImportState(db);
   if (importState === "resume") {

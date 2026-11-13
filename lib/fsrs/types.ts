@@ -21,6 +21,9 @@ export interface StudyCardRow {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  /** Cached hifz tier of a page card (TIER-01). Derived from history, never the source of truth. */
+  tier?: string | null;
+  tier_changed_at?: string | null;
 }
 
 export type DeckCardListItem = StudyCardRow & {

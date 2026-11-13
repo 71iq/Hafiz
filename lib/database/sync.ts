@@ -24,6 +24,10 @@ import {
 import { backfillAchievements, insertRemoteAchievementUnlock } from "@/lib/achievements/queries";
 import { isSyncableUserSetting, userSettingToSyncData } from "@/lib/database/user-settings";
 import { errorMessage } from "@/lib/error-message";
+import { applyRemoteHabitDay, habitDaySyncData } from "@/lib/habit/queries";
+import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
+import type { HabitDayRow } from "@/lib/habit/types";
+import { deviceTimeZone, localDateOf } from "@/lib/habit/dates";
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
 
@@ -48,6 +52,7 @@ function captureSyncOwner(): SyncOwner | null {
 const INITIAL_BACKFILL_VERSION = "20260525_sync_v1";
 const USER_SETTINGS_BACKFILL_VERSION = "20260528_user_settings_v1";
 const ACCOUNT_RESTORE_VERSION = "20260614_account_restore_v1";
+const HABIT_BACKFILL_VERSION = "20261113_habit_v1";
 const REMOTE_RESTORE_TABLES = [
   "user_settings",
   "user_word_meanings",
@@ -58,6 +63,9 @@ const REMOTE_RESTORE_TABLES = [
   "private_notes",
   "reflection_journey_entries",
   "achievement_unlocks",
+  "habit_days",
+  "review_sessions",
+  "recitation_errors",
 ] as const;
 
 type RemoteAccountRows = { [K in SyncTable]: SyncRows[K][] };
@@ -99,6 +107,8 @@ async function pushSyncQueue(db: AppDatabase, owner: SyncOwner): Promise<PushRes
   await enqueueInitialLocalDataForSync(db, userId);
   owner.requireCurrent();
   await enqueueSyncableUserSettingsForSync(db, userId);
+  owner.requireCurrent();
+  await enqueueHabitDataForSync(db, userId);
   owner.requireCurrent();
 
   const entries = await getPendingSyncEntries(db, 10000);
@@ -206,6 +216,11 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     // Pull public badge unlocks. Pulled badges are already seen locally.
     await pullTable(db, "achievement_unlocks", userId, lastPullAt, upsertAchievementUnlock, owner, onPageApplied);
 
+    // Wird days merge by status precedence; sessions and errors keep the newer row.
+    await pullTable(db, "habit_days", userId, lastPullAt, upsertHabitDay, owner, onPageApplied);
+    await pullTable(db, "review_sessions", userId, lastPullAt, upsertReviewSession, owner, onPageApplied);
+    await pullTable(db, "recitation_errors", userId, lastPullAt, upsertRecitationError, owner, onPageApplied);
+
     owner.requireCurrent();
     await backfillAchievements(db, { notify: false });
     owner.requireCurrent();
@@ -274,6 +289,7 @@ function isSyncInternalSetting(key: string): boolean {
     key === "last_pull_at" ||
     key.startsWith("sync_initial_backfill_") ||
     key.startsWith("sync_user_settings_backfill_") ||
+    key.startsWith("sync_habit_backfill_") ||
     key.startsWith("sync_account_restore_")
   );
 }
@@ -308,6 +324,11 @@ async function markAccountRestoreComplete(
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
     [`sync_initial_backfill_${userId}_${INITIAL_BACKFILL_VERSION}`, now],
+  );
+  owner.requireCurrent();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
+    [habitBackfillKey(userId), now],
   );
   owner.requireCurrent();
   await db.runAsync(
@@ -347,6 +368,9 @@ async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Pr
     const studyLogKeysByCard = new Map<string, Set<string>>();
     await applyRemoteAccountRows(tx, remoteRows, studyLogKeysByCard);
     owner.requireCurrent();
+    // Reviews from app versions before wird days were synced still count for their days.
+    await reconcileHabitDaysFromLogs(tx, { now: new Date() });
+    owner.requireCurrent();
     await markAccountRestoreComplete(tx, userId, true, snapshotStartedAt, owner);
     owner.requireCurrent();
   });
@@ -370,6 +394,9 @@ async function fetchRemoteAccountRows(userId: string, owner: SyncOwner): Promise
     private_notes: await fetchRemoteRows("private_notes", userId, owner),
     reflection_journey_entries: await fetchRemoteRows("reflection_journey_entries", userId, owner),
     achievement_unlocks: await fetchRemoteRows("achievement_unlocks", userId, owner),
+    habit_days: await fetchRemoteRows("habit_days", userId, owner),
+    review_sessions: await fetchRemoteRows("review_sessions", userId, owner),
+    recitation_errors: await fetchRemoteRows("recitation_errors", userId, owner),
   };
 }
 
@@ -400,7 +427,20 @@ async function fetchRemoteRows<K extends SyncTable>(
 }
 
 async function hasLocalSyncableData(db: DatabaseExecutor): Promise<boolean> {
-  const [settings, cards, logs, bookmarks, highlights, notes, journeyEntries, achievements, wordMeanings] =
+  const [
+    settings,
+    cards,
+    logs,
+    bookmarks,
+    highlights,
+    notes,
+    journeyEntries,
+    achievements,
+    wordMeanings,
+    habitDays,
+    reviewSessions,
+    recitationErrors,
+  ] =
     await Promise.all([
       db.getAllAsync<{ key: string }>("SELECT key FROM user_settings"),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_cards"),
@@ -411,11 +451,26 @@ async function hasLocalSyncableData(db: DatabaseExecutor): Promise<boolean> {
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM reflection_journey_entries"),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM achievement_unlocks"),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM user_word_meanings"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM habit_days"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM review_sessions"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM recitation_errors"),
     ]);
 
   return (
     settings.some((row) => isSyncableUserSetting(row.key)) ||
-    [cards, logs, bookmarks, highlights, notes, journeyEntries, achievements, wordMeanings].some(
+    [
+      cards,
+      logs,
+      bookmarks,
+      highlights,
+      notes,
+      journeyEntries,
+      achievements,
+      wordMeanings,
+      habitDays,
+      reviewSessions,
+      recitationErrors,
+    ].some(
       (row) => (row?.count ?? 0) > 0,
     )
   );
@@ -430,6 +485,9 @@ async function clearLocalSyncableData(db: DatabaseExecutor): Promise<void> {
   await db.runAsync("DELETE FROM reflection_journey_entries");
   await db.runAsync("DELETE FROM achievement_unlocks");
   await db.runAsync("DELETE FROM user_word_meanings");
+  await db.runAsync("DELETE FROM habit_days");
+  await db.runAsync("DELETE FROM review_sessions");
+  await db.runAsync("DELETE FROM recitation_errors");
   await db.runAsync("DELETE FROM sync_queue");
   await db.runAsync("DELETE FROM qf_sync_queue");
 
@@ -455,6 +513,9 @@ async function applyRemoteAccountRows(
   for (const row of rows.private_notes) await upsertPrivateNote(db, row);
   for (const row of rows.reflection_journey_entries) await upsertReflectionJourneyEntry(db, row);
   for (const row of rows.achievement_unlocks) await upsertAchievementUnlock(db, row);
+  for (const row of rows.habit_days) await upsertHabitDay(db, row);
+  for (const row of rows.review_sessions) await upsertReviewSession(db, row);
+  for (const row of rows.recitation_errors) await upsertRecitationError(db, row);
 }
 
 function groupByTable(entries: SyncQueueEntry[]): Map<string, SyncQueueEntry[]> {
@@ -518,11 +579,15 @@ async function pushUpsert(tableName: SyncTable, data: Record<string, any>, userI
     case "achievement_unlocks":
       onConflict = "user_id,achievement_id";
       break;
+    case "habit_days":
+      onConflict = "user_id,local_date";
+      break;
     default:
       onConflict = "user_id,id";
   }
 
-  if (await remoteIsNewer(tableName, row, userId)) return;
+  // Habit days merge on the server (private.merge_habit_day), so an older upload still contributes.
+  if (tableName !== "habit_days" && (await remoteIsNewer(tableName, row, userId))) return;
 
   const { error } = await supabase.from(tableName).upsert(row, { onConflict });
 
@@ -563,7 +628,9 @@ function normalizeRemoteRow(tableName: SyncTable, row: Record<string, any>): Rec
     tableName === "study_cards" ||
     tableName === "highlights" ||
     tableName === "user_settings" ||
-    tableName === "user_word_meanings"
+    tableName === "user_word_meanings" ||
+    tableName === "review_sessions" ||
+    tableName === "recitation_errors"
   ) {
     row.deleted_at = row.deleted_at ?? null;
   }
@@ -955,10 +1022,14 @@ async function upsertStudyLog(
     if (sameCardRows.some((local) => syncTimestampKey(local.reviewed_at) === incomingKey)) return;
   }
 
+  // A review from an app version before local dates were recorded takes this device's date for its
+  // instant, as the old streak did.
+  const reviewedAt = new Date(row.reviewed_at);
   await db.runAsync(
     `INSERT INTO study_log
-     (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+     (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, sync_status,
+      session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.card_id,
       row.rating,
@@ -969,9 +1040,109 @@ async function upsertStudyLog(
       row.elapsed_days,
       row.scheduled_days,
       row.reviewed_at,
+      row.session_id ?? null,
+      row.duration_ms ?? null,
+      row.support_level ?? null,
+      row.proposed_rating ?? null,
+      row.grader ?? null,
+      row.local_date ?? localDateOf(reviewedAt),
+      row.tz ?? (row.local_date ? null : deviceTimeZone(reviewedAt)),
+      row.error_count ?? 0,
     ],
   );
   rememberRestoreKey();
+}
+
+function syncFlag(value: boolean | 0 | 1 | null | undefined): number {
+  return value === true || value === 1 ? 1 : 0;
+}
+
+/** DB-02: a pulled wird day merges with the local one by status precedence. */
+async function upsertHabitDay(db: DatabaseExecutor, row: SyncRows["habit_days"]): Promise<void> {
+  const remote: HabitDayRow = {
+    local_date: row.local_date,
+    status: row.status,
+    earned_status: row.earned_status,
+    reason: row.reason,
+    excuse_updated_at: row.excuse_updated_at ?? null,
+    minimum_met: syncFlag(row.minimum_met),
+    full_met: syncFlag(row.full_met),
+    manzil_cycle_completed: syncFlag(row.manzil_cycle_completed),
+    source_session_id: row.source_session_id ?? null,
+    credited_through: row.credited_through ?? null,
+    tz: row.tz ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+  await applyRemoteHabitDay(db, remote);
+}
+
+/** DB-03: sessions keep the newer row by updated_at. */
+async function upsertReviewSession(db: DatabaseExecutor, row: SyncRows["review_sessions"]): Promise<void> {
+  const local = await db.getFirstAsync<{ updated_at: string }>("SELECT updated_at FROM review_sessions WHERE id = ?", [
+    row.id,
+  ]);
+  if (local && compareSyncTimestamps(local.updated_at, row.updated_at) >= 0) return;
+  await db.runAsync(
+    `INSERT OR REPLACE INTO review_sessions
+      (id, kind, deck_id, started_at, ended_at, duration_ms, local_date, tz, cards_reviewed, pages_reviewed, new_lines,
+       clean_pages, errors, minimum_met, full_met, source, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.id,
+      row.kind,
+      row.deck_id ?? null,
+      row.started_at,
+      row.ended_at ?? null,
+      row.duration_ms,
+      row.local_date,
+      row.tz,
+      row.cards_reviewed,
+      row.pages_reviewed,
+      row.new_lines,
+      row.clean_pages,
+      row.errors,
+      syncFlag(row.minimum_met),
+      syncFlag(row.full_met),
+      row.source,
+      row.created_at,
+      row.updated_at,
+      row.deleted_at ?? null,
+    ],
+  );
+}
+
+/** DB-03: recitation errors keep the newer row by updated_at, so inbox progress converges. */
+async function upsertRecitationError(db: DatabaseExecutor, row: SyncRows["recitation_errors"]): Promise<void> {
+  const local = await db.getFirstAsync<{ updated_at: string }>("SELECT updated_at FROM recitation_errors WHERE id = ?", [
+    row.id,
+  ]);
+  if (local && compareSyncTimestamps(local.updated_at, row.updated_at) >= 0) return;
+  await db.runAsync(
+    `INSERT OR REPLACE INTO recitation_errors
+      (id, card_id, session_id, surah, ayah, word, type, severity, corrected, sibling_ref, local_date, clean_count,
+       last_clean_date, resolved_at, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.id,
+      row.card_id,
+      row.session_id ?? null,
+      row.surah,
+      row.ayah ?? null,
+      row.word ?? null,
+      row.type,
+      row.severity,
+      row.corrected,
+      row.sibling_ref ?? null,
+      row.local_date,
+      row.clean_count,
+      row.last_clean_date ?? null,
+      row.resolved_at ?? null,
+      row.created_at,
+      row.updated_at,
+      row.deleted_at ?? null,
+    ],
+  );
 }
 
 async function upsertBookmark(db: DatabaseExecutor, row: SyncRows["bookmarks"]): Promise<void> {
@@ -1178,7 +1349,8 @@ async function enqueueInitialLocalRows(
       ),
       db.getAllAsync<Record<string, any>>("SELECT * FROM study_cards"),
       db.getAllAsync<Record<string, any>>(
-        `SELECT card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at
+        `SELECT card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
+              session_id, duration_ms, support_level, proposed_rating, grader, local_date, tz, error_count
        FROM study_log`,
       ),
       db.getAllAsync<Record<string, any>>("SELECT * FROM bookmarks"),
@@ -1252,6 +1424,41 @@ async function enqueueInitialLocalRows(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
     [settingsBackfillKey, new Date().toISOString()],
   );
+}
+
+function habitBackfillKey(userId: string): string {
+  return `sync_habit_backfill_${userId}_${HABIT_BACKFILL_VERSION}`;
+}
+
+/**
+ * Queue wird days, sessions and recitation errors once per account, for local rows written before
+ * sign-in or before these tables were synced. Restored accounts mark this done because their rows
+ * came from the server.
+ */
+async function enqueueHabitDataForSync(database: AppDatabase, userId: string): Promise<void> {
+  const backfillKey = habitBackfillKey(userId);
+  if (await isBackfillComplete(database, backfillKey)) return;
+  await database.withTransactionAsync(async (db) => {
+    if (await isBackfillComplete(db, backfillKey)) return;
+    const [days, sessions, errors] = await Promise.all([
+      db.getAllAsync<HabitDayRow>("SELECT * FROM habit_days"),
+      db.getAllAsync<Record<string, any>>("SELECT * FROM review_sessions"),
+      db.getAllAsync<Record<string, any>>("SELECT * FROM recitation_errors"),
+    ]);
+    for (const day of days) await enqueueSync(db, "habit_days", "UPDATE", day.local_date, habitDaySyncData(day));
+    for (const session of sessions) {
+      await enqueueSync(db, "review_sessions", "UPDATE", session.id, {
+        ...session,
+        minimum_met: session.minimum_met === 1,
+        full_met: session.full_met === 1,
+      });
+    }
+    for (const error of errors) await enqueueSync(db, "recitation_errors", "UPDATE", error.id, error);
+    await db.runAsync(
+      "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
+      [backfillKey, new Date().toISOString()],
+    );
+  });
 }
 
 async function isBackfillComplete(db: DatabaseExecutor, key: string): Promise<boolean> {

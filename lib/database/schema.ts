@@ -1,4 +1,5 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
+import { deviceTimeZone, localDateOf } from "@/lib/habit/dates";
 
 export async function createSchema(db: DatabaseExecutor): Promise<void> {
   await db.execAsync(`
@@ -339,7 +340,9 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       marked_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      deleted_at TEXT
+      deleted_at TEXT,
+      tier TEXT,
+      tier_changed_at TEXT
     );
 
     -- Study review log
@@ -354,7 +357,90 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       elapsed_days INTEGER NOT NULL,
       scheduled_days INTEGER NOT NULL,
       reviewed_at TEXT NOT NULL,
-      sync_status TEXT DEFAULT 'pending'
+      sync_status TEXT DEFAULT 'pending',
+      session_id TEXT,
+      duration_ms INTEGER,
+      support_level INTEGER,
+      proposed_rating INTEGER,
+      grader TEXT,
+      local_date TEXT,
+      tz TEXT,
+      error_count INTEGER NOT NULL DEFAULT 0
+    );
+
+    -- Review sessions (synced owner-only). One row per session, updated as cards are graded.
+    CREATE TABLE IF NOT EXISTS review_sessions (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      deck_id TEXT,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      duration_ms INTEGER NOT NULL DEFAULT 0,
+      local_date TEXT NOT NULL,
+      tz TEXT NOT NULL,
+      cards_reviewed INTEGER NOT NULL DEFAULT 0,
+      pages_reviewed INTEGER NOT NULL DEFAULT 0,
+      new_lines INTEGER NOT NULL DEFAULT 0,
+      clean_pages INTEGER NOT NULL DEFAULT 0,
+      errors INTEGER NOT NULL DEFAULT 0,
+      minimum_met INTEGER NOT NULL DEFAULT 0,
+      full_met INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'app',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    );
+
+    -- Recitation errors (synced owner-only). Open rows feed the mistake inbox until resolved.
+    CREATE TABLE IF NOT EXISTS recitation_errors (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      session_id TEXT,
+      surah INTEGER NOT NULL,
+      ayah INTEGER,
+      word INTEGER,
+      type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      corrected TEXT NOT NULL,
+      sibling_ref TEXT,
+      local_date TEXT NOT NULL,
+      clean_count INTEGER NOT NULL DEFAULT 0,
+      last_clean_date TEXT,
+      resolved_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    );
+
+    -- Wird habit days (synced owner-only). The earned status only rises; the excuse is last write wins.
+    CREATE TABLE IF NOT EXISTS habit_days (
+      local_date TEXT PRIMARY KEY,
+      status TEXT CHECK (status IS NULL OR status IN ('done', 'made_up', 'earned_back', 'excused', 'paused', 'grace')),
+      earned_status TEXT CHECK (earned_status IS NULL OR earned_status IN ('done', 'made_up', 'earned_back', 'paused', 'grace')),
+      reason TEXT CHECK (reason IS NULL OR reason IN ('illness', 'travel', 'menstruation', 'other')),
+      excuse_updated_at TEXT,
+      minimum_met INTEGER NOT NULL DEFAULT 0,
+      full_met INTEGER NOT NULL DEFAULT 0,
+      manzil_cycle_completed INTEGER NOT NULL DEFAULT 0,
+      source_session_id TEXT,
+      credited_through TEXT,
+      tz TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- Scheduled reminders on this device. Never synced or restored.
+    CREATE TABLE IF NOT EXISTS notification_log (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      template_id TEXT NOT NULL,
+      local_date TEXT NOT NULL,
+      scheduled_for TEXT NOT NULL,
+      os_id TEXT,
+      delivered_at TEXT,
+      opened_at TEXT,
+      converted INTEGER NOT NULL DEFAULT 0,
+      cancelled_at TEXT
     );
 
     -- User bookmarks
@@ -561,6 +647,17 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   await addColumnIfMissing(db, "mutashabihat_refs", "pre_text", "pre_text TEXT");
   await addColumnIfMissing(db, "mutashabihat_refs", "similar_text", "similar_text TEXT");
   await addColumnIfMissing(db, "mutashabihat_refs", "post_text", "post_text TEXT");
+  // Learning and consistency: session and grading detail on each review (spec 7.1).
+  await addColumnIfMissing(db, "study_log", "session_id", "session_id TEXT");
+  await addColumnIfMissing(db, "study_log", "duration_ms", "duration_ms INTEGER");
+  await addColumnIfMissing(db, "study_log", "support_level", "support_level INTEGER");
+  await addColumnIfMissing(db, "study_log", "proposed_rating", "proposed_rating INTEGER");
+  await addColumnIfMissing(db, "study_log", "grader", "grader TEXT");
+  await addColumnIfMissing(db, "study_log", "local_date", "local_date TEXT");
+  await addColumnIfMissing(db, "study_log", "tz", "tz TEXT");
+  await addColumnIfMissing(db, "study_log", "error_count", "error_count INTEGER NOT NULL DEFAULT 0");
+  await addColumnIfMissing(db, "study_cards", "tier", "tier TEXT");
+  await addColumnIfMissing(db, "study_cards", "tier_changed_at", "tier_changed_at TEXT");
 
   await db.execAsync(`
     UPDATE study_cards
@@ -590,6 +687,28 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   `);
 
   await createUserMigrationIndexes(db);
+  await backfillStudyLogLocalDates(db);
+}
+
+/**
+ * Reviews saved before local dates were recorded get the device's date for their instant, the same
+ * date the old streak used. New reviews store their own date and zone when they happen (DAY-01).
+ */
+async function backfillStudyLogLocalDates(db: DatabaseExecutor): Promise<void> {
+  const rows = await db.getAllAsync<{ id: number; reviewed_at: string }>(
+    "SELECT id, reviewed_at FROM study_log WHERE local_date IS NULL",
+  );
+  if (rows.length === 0) return;
+  const zone = deviceTimeZone();
+  for (const row of rows) {
+    const reviewedAt = new Date(row.reviewed_at);
+    if (Number.isNaN(reviewedAt.getTime())) continue;
+    await db.runAsync("UPDATE study_log SET local_date = ?, tz = COALESCE(tz, ?) WHERE id = ?", [
+      localDateOf(reviewedAt),
+      zone,
+      row.id,
+    ]);
+  }
 }
 
 async function addColumnIfMissing(
@@ -618,6 +737,13 @@ async function createUserMigrationIndexes(db: DatabaseExecutor): Promise<void> {
     "CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_completed ON reflection_journey_entries(completed_at)",
     "CREATE INDEX IF NOT EXISTS idx_user_settings_updated ON user_settings(updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_user_word_meanings_updated ON user_word_meanings(updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_study_log_local_date ON study_log(local_date)",
+    "CREATE INDEX IF NOT EXISTS idx_study_log_session ON study_log(session_id)",
+    "CREATE INDEX IF NOT EXISTS idx_study_cards_tier ON study_cards(tier)",
+    "CREATE INDEX IF NOT EXISTS idx_review_sessions_local_date ON review_sessions(local_date)",
+    "CREATE INDEX IF NOT EXISTS idx_recitation_errors_open ON recitation_errors(resolved_at, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_recitation_errors_card ON recitation_errors(card_id)",
+    "CREATE INDEX IF NOT EXISTS idx_notification_log_date ON notification_log(local_date)",
   ];
 
   for (const statement of statements) {

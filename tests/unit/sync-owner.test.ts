@@ -136,7 +136,9 @@ function first(source: string, ...params: unknown[]): Promise<unknown> {
     return Promise.resolve(mockRestored ? { value: "true" } : null);
   if (
     typeof key === "string" &&
-    (key.startsWith("sync_initial_backfill_") || key.startsWith("sync_user_settings_backfill_"))
+    (key.startsWith("sync_initial_backfill_") ||
+      key.startsWith("sync_user_settings_backfill_") ||
+      key.startsWith("sync_habit_backfill_"))
   )
     return Promise.resolve({ value: "true" });
   return Promise.resolve(null);
@@ -288,7 +290,8 @@ it.each([false, true])("preserves a current-owner restore and subsequent phases,
     localDataReplaced: false,
   });
   expect(mockPending).toHaveBeenCalledTimes(1);
-  expect(operations.filter((operation) => operation.incremental)).toHaveLength(9);
+  // Nine original tables plus wird days, review sessions and recitation errors.
+  expect(operations.filter((operation) => operation.incremental)).toHaveLength(12);
   expect(operations.every((operation) => operation.userId === A)).toBe(true);
   expect(statements.every((statement) => statement.userId === A)).toBe(true);
   expect(statements.some((statement) => statement.source.startsWith("DELETE FROM"))).toBe(nonempty);
