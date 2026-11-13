@@ -267,6 +267,8 @@ export async function settleHabitDays(
 
 export type HabitOverview = HabitSnapshot & {
   settings: HabitSettings;
+  /** Every covered day, in date order, for the calendar. */
+  days: readonly HabitDay[];
   /** Progress toward today's minimum, 0 to 1, from reviews not credited to a make-up. */
   minimumProgressToday: number;
 };
@@ -296,6 +298,7 @@ export async function loadHabitOverview(
   return {
     ...snapshot,
     settings,
+    days,
     minimumProgressToday: snapshot.streak.doneToday ? 1 : minimumProgress(ownTally, settings.minimum),
   };
 }
@@ -364,4 +367,15 @@ export async function setStreakGoal(
     if (target === null) await removeUserSetting(db, HABIT_SETTING_KEYS.goal);
     else await putUserSetting(db, HABIT_SETTING_KEYS.goal, JSON.stringify({ target, start: localDateOf(now) }));
   });
+}
+
+export type ExcusedDay = Readonly<{ localDate: LocalDate; reason: ExcuseReason; covered: boolean }>;
+
+/** Excused days in a range, for the break sheet. `covered` is false when another status shows instead. */
+export async function readExcusedDays(db: DatabaseExecutor, from: LocalDate, to: LocalDate): Promise<ExcusedDay[]> {
+  const rows = await db.getAllAsync<{ local_date: LocalDate; reason: ExcuseReason; status: string | null }>(
+    "SELECT local_date, reason, status FROM habit_days WHERE reason IS NOT NULL AND local_date >= ? AND local_date <= ? ORDER BY local_date",
+    [from, to],
+  );
+  return rows.map((row) => ({ localDate: row.local_date, reason: row.reason, covered: row.status === "excused" }));
 }

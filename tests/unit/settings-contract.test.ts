@@ -114,6 +114,11 @@ describe("settings contracts", () => {
       "review_settings_default",
       "smart_deck_filter_retention",
       "card_answer_2:255",
+      "onboarding_completed",
+      "hifz_plan",
+      "hifz_minimum_wird",
+      "habit_streak_goal",
+      "fsrs_weights_hifz-pages",
     ]) {
       expect(isSyncableUserSetting(key)).toBe(true);
     }
@@ -123,8 +128,10 @@ describe("settings contracts", () => {
       "ui_language",
       "quran_font_style",
       "translation_language",
-      "onboarding_completed",
       "hifz_auto_delay_ms",
+      "hifz_auto_advance_page",
+      "device_habit_grace_note_seen",
+      "notif_prayer_location",
     ]) {
       expect(isSyncableUserSetting(key)).toBe(false);
     }

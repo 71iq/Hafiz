@@ -6,7 +6,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import {
   Play,
   Layers,
-  CalendarCheck2,
   Search,
   Languages,
   UserPlus,
@@ -34,11 +33,14 @@ import { AchievementUnlockToast } from "@/components/achievements/AchievementUnl
 import {
   getDeckTodayStats,
   getMemorizedAyahCardCount,
-  getWirdStatus,
   readDeckReviewSettings,
   MEANINGS_DECK_ID,
 } from "@/lib/fsrs/queries";
-import type { WirdStatus } from "@/lib/fsrs/queries";
+import { WirdStreakCard } from "@/components/habit/WirdStreakCard";
+import { HabitBreakSheet } from "@/components/habit/HabitBreakSheet";
+import { useHabitOverview } from "@/lib/habit/use-habit-overview";
+import { markFullWirdIfComplete } from "@/lib/habit/queries";
+import { putUserSetting } from "@/lib/database/user-settings";
 import {
   migrateLegacyRetentionDecks,
   readSmartDeckFilter,
@@ -78,6 +80,8 @@ type DeckCardsTarget = {
   title: string;
 };
 
+const GRACE_NOTE_SEEN_KEY = "device_habit_grace_note_seen";
+
 function formatArabicDate(date: Date): string {
   return [date.getDate(), date.getMonth() + 1, date.getFullYear()].map(toArabicNumber).join("/");
 }
@@ -106,13 +110,10 @@ export default function HomeScreen() {
     vocabStats.dueCount + vocabStats.newCount,
   );
   const [memorizedCards, setMemorizedCards] = useState(0);
-  const [wirdStatus, setWirdStatus] = useState<WirdStatus>({
-    currentDays: 0,
-    longestDays: 0,
-    maintainedToday: false,
-    lastReviewDate: null,
-    state: "empty",
-  });
+  const { overview: habit } = useHabitOverview(db);
+  const [habitBreakOpen, setHabitBreakOpen] = useState(false);
+  const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
+  const [dueLoaded, setDueLoaded] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -203,12 +204,12 @@ export default function HomeScreen() {
       );
 
       const vocabSettings = await readDeckReviewSettings(db, MEANINGS_DECK_ID);
-      const [memorizedTotal, nextWirdStatus, vocabTodayStats, reflectionJourneySummary] =
+      const [memorizedTotal, vocabTodayStats, reflectionJourneySummary, graceSeen] =
         await Promise.all([
           getMemorizedAyahCardCount(db),
-          getWirdStatus(db),
           getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
           getReflectionJourneySummary(db),
+          db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [GRACE_NOTE_SEEN_KEY]),
         ]);
       const currentLevelTitle = reflectionJourneySummary.currentLevelTitle
         ? localizeReflectionJourneyText(reflectionJourneySummary.currentLevelTitle, uiLanguage)
@@ -219,8 +220,9 @@ export default function HomeScreen() {
       setSurahNames(nameMap);
       setSmartDecks(smartDisplays);
       setMemorizedCards(memorizedTotal);
-      setWirdStatus(nextWirdStatus);
+      setGraceNoteSeen(graceSeen?.value ?? null);
       setVocabStats(vocabTodayStats);
+      setDueLoaded(true);
       loadLatestUnlock();
       setJourneySummary({
         totalLevels: reflectionJourneySummary.totalLevels,
@@ -354,11 +356,18 @@ export default function HomeScreen() {
     return s.smartDeckFilterAll;
   };
 
-  const getWirdMessage = (): string => {
-    if (wirdStatus.maintainedToday) return s.wirdMaintained;
-    if (wirdStatus.state === "open_today") return s.wirdOpenToday;
-    return s.wirdBeginToday;
-  };
+  // GOAL-04: once the minimum is met and every Home deck is clear, today's full wird is complete.
+  useEffect(() => {
+    if (!dueLoaded || !habit?.streak.doneToday || totalDue > 0) return;
+    markFullWirdIfComplete(db, { now: new Date(), remaining: totalDue }).catch(console.warn);
+  }, [db, dueLoaded, habit?.streak.doneToday, totalDue]);
+
+  const dismissGraceNote = useCallback(() => {
+    const seen = habit?.recentGraceDay;
+    if (!seen) return;
+    setGraceNoteSeen(seen);
+    putUserSetting(db, GRACE_NOTE_SEEN_KEY, seen).catch(console.warn);
+  }, [db, habit?.recentGraceDay]);
 
   return (
     <Screen>
@@ -474,40 +483,17 @@ export default function HomeScreen() {
               </Pressable>
             )}
           </View>
-          <View
-            className={`flex-row items-center justify-between mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 ${isRTL ? "flex-row-reverse" : ""}`}
-            style={mirroredRowStyle}
-          >
-            <View
-              className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}
-              style={mirroredRowStyle}
-            >
-              <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
-              <Text
-                className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}
-              >
-                {localNumber(wirdStatus.currentDays)}
-              </Text>
-              <Text
-                className="text-warm-400 dark:text-neutral-500"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-              >
-                {s.homeStreak}
-              </Text>
-            </View>
-            <Text
-              className="text-warm-500 dark:text-neutral-400 flex-shrink"
-              style={{
-                fontFamily: "Manrope_500Medium",
-                fontSize: 12,
-                ...textEndStyle(isRTL),
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {getWirdMessage()}
-            </Text>
-          </View>
+          {habit ? (
+            <WirdStreakCard
+              overview={habit}
+              language={uiLanguage}
+              isDark={isDark}
+              s={s}
+              graceNoteDismissed={habit.recentGraceDay !== null && graceNoteSeen === habit.recentGraceDay}
+              onDismissGraceNote={dismissGraceNote}
+              onOpenBreak={() => setHabitBreakOpen(true)}
+            />
+          ) : null}
         </View>
 
         {resume && (
@@ -724,6 +710,16 @@ export default function HomeScreen() {
         deckTitle={deckCardsTarget?.title ?? ""}
         onClose={() => setDeckCardsTarget(null)}
         onChanged={loadData}
+      />
+
+      <HabitBreakSheet
+        open={habitBreakOpen}
+        onClose={() => setHabitBreakOpen(false)}
+        db={db}
+        pause={habit?.settings.pause ?? null}
+        language={uiLanguage}
+        isDark={isDark}
+        s={s}
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}

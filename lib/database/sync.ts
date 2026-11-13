@@ -22,7 +22,7 @@ import {
   type SyncQueueEntry,
 } from "./sync-queue";
 import { backfillAchievements, insertRemoteAchievementUnlock } from "@/lib/achievements/queries";
-import { isSyncableUserSetting, userSettingToSyncData } from "@/lib/database/user-settings";
+import { isSyncableUserSetting, putUserSetting, userSettingToSyncData } from "@/lib/database/user-settings";
 import { errorMessage } from "@/lib/error-message";
 import { applyRemoteHabitDay, habitDaySyncData } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
@@ -363,10 +363,16 @@ async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Pr
   owner.requireCurrent();
   await db.withTransactionAsync(async (tx) => {
     owner.requireCurrent();
+    // A device that finished onboarding stays past it even when the account predates the synced flag.
+    const onboarded =
+      (await tx.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'onboarding_completed'"))
+        ?.value === "true";
     await clearLocalSyncableData(tx);
     owner.requireCurrent();
     const studyLogKeysByCard = new Map<string, Set<string>>();
     await applyRemoteAccountRows(tx, remoteRows, studyLogKeysByCard);
+    owner.requireCurrent();
+    if (onboarded) await putUserSetting(tx, "onboarding_completed", "true");
     owner.requireCurrent();
     // Reviews from app versions before wird days were synced still count for their days.
     await reconcileHabitDaysFromLogs(tx, { now: new Date() });

@@ -1,4 +1,4 @@
-import { addDays, diffDays, type LocalDate } from "@/lib/habit/dates";
+import { addDays, diffDays, startOfWeek, type LocalDate } from "@/lib/habit/dates";
 import { COUNTS_TOWARD_LENGTH, RECITED_STATUSES, type DayStatus, type HabitDay } from "@/lib/habit/types";
 
 export type DayMap = ReadonlyMap<LocalDate, HabitDay>;
@@ -108,4 +108,28 @@ export function lastCoveredBefore(days: DayMap, before: LocalDate): LocalDate | 
 /** Recited days (done or made up), used by grace awards and earn-back progress. */
 export function isRecited(day: HabitDay | undefined): boolean {
   return day !== undefined && RECITED_STATUSES.has(day.status);
+}
+
+const STEADY_STATUSES: ReadonlySet<DayStatus> = new Set<DayStatus>(["done", "made_up", "excused"]);
+
+/**
+ * STR-27: a steady week has all 7 days earned by recitation or excused. Grace and paused days do not
+ * count. Only weeks that have ended, or end today with today recited, are counted.
+ */
+export function countSteadyWeeks(days: DayMap, today: LocalDate, weekStart: number): number {
+  let earliest: LocalDate | null = null;
+  for (const date of days.keys()) if (earliest === null || date < earliest) earliest = date;
+  if (earliest === null) return 0;
+  let count = 0;
+  for (let weekFirst = startOfWeek(earliest, weekStart); weekFirst <= today; weekFirst = addDays(weekFirst, 7)) {
+    const weekLast = addDays(weekFirst, 6);
+    if (weekLast > today) break;
+    let steady = true;
+    for (let offset = 0; offset < 7 && steady; offset += 1) {
+      const status = days.get(addDays(weekFirst, offset))?.status;
+      steady = status !== undefined && STEADY_STATUSES.has(status);
+    }
+    if (steady) count += 1;
+  }
+  return count;
 }

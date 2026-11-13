@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -22,8 +22,11 @@ import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount, getWirdStatus } from "@/lib/fsrs/queries";
-import { getTotalScore } from "@/lib/fsrs/scoring";
+import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount } from "@/lib/fsrs/queries";
+import { useHabitOverview } from "@/lib/habit/use-habit-overview";
+import { countSteadyWeeks, toDayMap } from "@/lib/habit/streak";
+import { effectiveWeekStart } from "@/lib/habit/settings";
+import type { DayStatus } from "@/lib/habit/types";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
 import { getAchievementDefinition } from "@/lib/achievements/catalog";
@@ -41,7 +44,7 @@ type HeatmapDay = { date: string; count: number };
 
 export default function ProgressScreen() {
   const s = useStrings();
-  const { isDark, isRTL } = useSettings();
+  const { isDark, isRTL, uiLanguage } = useSettings();
   const db = useDatabase();
   const user = useAuthStore((state) => state.user);
   const authLoading = useAuthStore((state) => state.isLoading);
@@ -50,12 +53,10 @@ export default function ProgressScreen() {
 
   const [totalAyahCards, setTotalAyahCards] = useState(0);
   const [memorizedAyahCards, setMemorizedAyahCards] = useState(0);
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [longestStreak, setLongestStreak] = useState(0);
+  const { overview: habit } = useHabitOverview(db);
   const [avgDailyReviews, setAvgDailyReviews] = useState(0);
   const [activeReviewDays, setActiveReviewDays] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
-  const [totalScore, setTotalScore] = useState(0);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<ProfileSurahProgress[]>([]);
   const [defaultDeckProgress, setDefaultDeckProgress] = useState<DefaultDeckProgressItem[]>([]);
@@ -64,7 +65,7 @@ export default function ProgressScreen() {
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [cards, memorized, reviewStats, wirdStatus, score, achievements, defaultDecks, surahs] = await Promise.all([
+    const [cards, memorized, reviewStats, achievements, defaultDecks, surahs] = await Promise.all([
       getTotalAyahCardCount(db).catch((error) => {
         console.warn("[Progress] Failed to load total ayah cards:", error);
         return 0;
@@ -76,20 +77,6 @@ export default function ProgressScreen() {
       getReviewStats(db).catch((error) => {
         console.warn("[Progress] Failed to load review stats:", error);
         return { activity: [], activeDays: 0, totalReviews: 0, averageDailyReviews: 0, longestStreak: 0 };
-      }),
-      getWirdStatus(db).catch((error) => {
-        console.warn("[Progress] Failed to load wird status:", error);
-        return {
-          currentDays: 0,
-          longestDays: 0,
-          maintainedToday: false,
-          lastReviewDate: null,
-          state: "empty" as const,
-        };
-      }),
-      getTotalScore(db).catch((error) => {
-        console.warn("[Progress] Failed to load score:", error);
-        return 0;
       }),
       getAchievementDashboard(db).catch((error) => {
         console.warn("[Progress] Failed to load achievements:", error);
@@ -106,12 +93,9 @@ export default function ProgressScreen() {
     ]);
     setTotalAyahCards(cards);
     setMemorizedAyahCards(memorized);
-    setCurrentStreak(wirdStatus.currentDays);
-    setLongestStreak(reviewStats.longestStreak);
     setAvgDailyReviews(reviewStats.averageDailyReviews);
     setActiveReviewDays(reviewStats.activeDays);
     setTotalReviews(reviewStats.totalReviews);
-    setTotalScore(score);
     setHeatmapData(reviewStats.activity);
     setDefaultDeckProgress(defaultDecks);
     setAchievementDashboard(achievements);
@@ -136,13 +120,26 @@ export default function ProgressScreen() {
   const showSyncPrompt = isSupabaseConfigured() && authInitialized && !authLoading && !user;
   const formatStat = (val: number) => val.toLocaleString();
   const masteryPct = totalAyahCards > 0 ? Math.round((memorizedAyahCards / totalAyahCards) * 100) : 0;
+  // PTS-01: neutral counts instead of a points total.
+  const dayStatuses = useMemo(() => {
+    const map = new Map<string, DayStatus>();
+    for (const day of habit?.days ?? []) map.set(day.localDate, day.status);
+    return map;
+  }, [habit?.days]);
+  const steadyWeeks = useMemo(
+    () =>
+      habit
+        ? countSteadyWeeks(toDayMap(habit.days), habit.today, effectiveWeekStart(habit.settings, uiLanguage))
+        : 0,
+    [habit, uiLanguage],
+  );
   const statItems = [
     { value: `${masteryPct}%`, label: s.progressRetention },
     { value: formatStat(memorizedAyahCards), label: s.progressTotalMemorized },
-    { value: formatStat(currentStreak), label: s.wirdCurrent },
-    { value: formatStat(longestStreak), label: s.progressLongestStreak },
+    { value: formatStat(habit?.streak.length ?? 0), label: s.wirdCurrent },
+    { value: formatStat(habit?.longest ?? 0), label: s.progressLongestStreak },
     { value: formatStat(avgDailyReviews), label: s.progressAvgDaily },
-    { value: formatStat(totalScore), label: s.leaderboardPoints },
+    { value: formatStat(steadyWeeks), label: s.habitSteadyWeeksLabel },
   ];
   const mirroredRowStyle = {
     direction: "ltr" as const,
@@ -240,6 +237,7 @@ export default function ProgressScreen() {
                 totalReviews={totalReviews}
                 showSummaryStats={false}
                 size="expanded"
+                dayStatuses={dayStatuses}
               />
             </View>
             <CompactProgressStats

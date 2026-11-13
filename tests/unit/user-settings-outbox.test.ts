@@ -68,12 +68,21 @@ describe("RF-172 user setting writes and their upload queue", () => {
   });
 
   it("saves local-only settings without queueing an upload", async () => {
-    await writeUserSetting(store.db, "onboarding_completed", "true");
-    await deleteUserSetting(store.db, "onboarding_completed");
+    await writeUserSetting(store.db, "device_habit_grace_note_seen", "2026-11-12");
+    await deleteUserSetting(store.db, "device_habit_grace_note_seen");
+    await writeUserSetting(store.db, "notif_prayer_location", "{}");
     await writeUserSetting(store.db, "theme", "dark");
 
     expect(setting("theme")).toBe("dark");
     expect(queued()).toEqual([]);
+  });
+
+  it("queues the plan, habit and onboarding settings (spec 7.6, ONB-05)", async () => {
+    await writeUserSetting(store.db, "onboarding_completed", "true");
+    await writeUserSetting(store.db, "hifz_minimum_wird", JSON.stringify({ pages: 1, minutes: 5 }));
+    await writeUserSetting(store.db, "habit_week_start", "6");
+
+    expect(queued()).toEqual(["UPDATE:onboarding_completed", "UPDATE:hifz_minimum_wird", "UPDATE:habit_week_start"]);
   });
 
   it("writes every deck filter or none when a later queue write fails", async () => {

@@ -4,6 +4,7 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
+import type { DayStatus } from "@/lib/habit/types";
 
 type DayData = { date: string; count: number };
 
@@ -16,7 +17,50 @@ type Props = {
   totalReviews?: number;
   showSummaryStats?: boolean;
   size?: "compact" | "expanded";
+  /**
+   * STR-26: the owner's wird status per local date. Each status has its own style; excused days are
+   * passed only on the owner's own Progress screen and never on a public profile.
+   */
+  dayStatuses?: ReadonlyMap<string, DayStatus>;
 };
+
+const STATUS_ORDER: readonly DayStatus[] = ["done", "made_up", "earned_back", "excused", "paused", "grace"];
+
+function statusLabel(status: DayStatus, s: UIStrings): string {
+  switch (status) {
+    case "done":
+      return s.habitLegendDone;
+    case "made_up":
+      return s.habitLegendMadeUp;
+    case "earned_back":
+      return s.habitLegendEarnedBack;
+    case "excused":
+      return s.habitLegendExcused;
+    case "paused":
+      return s.habitLegendPaused;
+    case "grace":
+      return s.habitLegendGrace;
+  }
+}
+
+/** Calm, distinct styles: recited days stay teal, protected days take soft neutral tones. */
+function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
+  const recitedFill = count > 0 ? undefined : isDark ? "#134e4a" : "#99f6e4";
+  switch (status) {
+    case "done":
+      return { backgroundColor: recitedFill };
+    case "made_up":
+      return { backgroundColor: recitedFill, borderWidth: 2, borderColor: isDark ? "#FDDC91" : "#b7791f" };
+    case "earned_back":
+      return { backgroundColor: recitedFill, borderWidth: 2, borderColor: isDark ? "#5eead4" : "#0f766e", borderStyle: "dashed" as const };
+    case "excused":
+      return { backgroundColor: isDark ? "#4a4030" : "#efe2c6" };
+    case "paused":
+      return { backgroundColor: isDark ? "#3f3f46" : "#e4e4e7" };
+    case "grace":
+      return { backgroundColor: isDark ? "#1e3a5f" : "#dbeafe" };
+  }
+}
 
 const BASE_CELL_SIZE = 13;
 const TOTAL_WEEKS = 13;
@@ -60,6 +104,7 @@ export function ActivityHeatmap({
   totalReviews,
   showSummaryStats = true,
   size = "compact",
+  dayStatuses,
 }: Props) {
   const { themeColors } = useSettings();
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
@@ -253,17 +298,21 @@ export function ActivityHeatmap({
                     return <View key={day.dateStr} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
                   }
                   const isToday = day.dateStr === todayKey;
+                  const status = dayStatuses?.get(day.dateStr);
+                  const statusStyle = status ? statusCellStyle(status, day.count, isDark) : null;
                   return (
                     <Pressable
                       key={day.dateStr}
                       onPress={() => setTooltip(tooltip?.date === day.dateStr ? null : { date: day.dateStr, count: day.count })}
+                      accessibilityLabel={status ? `${day.dateStr}: ${statusLabel(status, s)}` : undefined}
                       style={{
                         width: CELL_SIZE,
                         height: CELL_SIZE,
                         borderRadius: 3,
-                        backgroundColor: getColor(day.count, isDark, themeColors.surfaceHigh),
-                        borderWidth: isToday ? 1 : 0,
-                        borderColor: isToday ? (isDark ? "#FDDC91" : "#785F22") : "transparent",
+                        backgroundColor: statusStyle?.backgroundColor ?? getColor(day.count, isDark, themeColors.surfaceHigh),
+                        borderWidth: isToday ? 1 : (statusStyle?.borderWidth ?? 0),
+                        borderColor: isToday ? (isDark ? "#FDDC91" : "#785F22") : (statusStyle?.borderColor ?? "transparent"),
+                        borderStyle: isToday ? "solid" : (statusStyle?.borderStyle ?? "solid"),
                       }}
                     />
                   );
@@ -281,6 +330,7 @@ export function ActivityHeatmap({
           >
             <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#d4d4d4" : "#6e5a47" }}>
               {tooltip.count} {s.heatmapReviews} — {tooltip.date}
+              {dayStatuses?.get(tooltip.date) ? ` — ${statusLabel(dayStatuses.get(tooltip.date)!, s)}` : ""}
             </Text>
           </View>
         )}
@@ -296,6 +346,31 @@ export function ActivityHeatmap({
             width: heatmapWidth,
           }}
         >
+          {dayStatuses ? (
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 6 }}>
+              {STATUS_ORDER.map((status) => {
+                const style = statusCellStyle(status, 0, isDark);
+                return (
+                  <View key={status} style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4 }}>
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 2,
+                        backgroundColor: style.backgroundColor,
+                        borderWidth: style.borderWidth ? 1.5 : 0,
+                        borderColor: style.borderColor,
+                        borderStyle: style.borderStyle ?? "solid",
+                      }}
+                    />
+                    <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 10, color: isDark ? "#a3a3a3" : "#8B8178" }}>
+                      {statusLabel(status, s)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             {[0, 1, 2, 3].map((l) => (
               <View
@@ -309,6 +384,7 @@ export function ActivityHeatmap({
               />
             ))}
           </View>
+          )}
         </View>
       </View>
       {showSummary && (

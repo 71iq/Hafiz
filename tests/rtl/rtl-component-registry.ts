@@ -113,6 +113,30 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Filter sheet controls and list rows mirror; Quran labels keep natural direction.",
   ),
   entry(
+    "components/habit/HabitBreakSheet.tsx",
+    "overlay",
+    "rntl",
+    "Sheet rows and chip groups mirror through MirroredRow; text follows the interface direction.",
+  ),
+  entry(
+    "components/habit/SessionHabitCards.tsx",
+    "card",
+    "rntl",
+    "Session-end streak and prompt cards mirror icon rows; counts use the interface digits.",
+  ),
+  entry(
+    "components/habit/WirdSettingsSection.tsx",
+    "form-field",
+    "rntl",
+    "Settings rows mirror through MirroredRow and ToggleGroup direction; the chevron flips with the interface.",
+  ),
+  entry(
+    "components/habit/WirdStreakCard.tsx",
+    "card",
+    "rntl",
+    "Home streak card mirrors its rows and the progress fill direction follows the interface.",
+  ),
+  entry(
     "components/mushaf/AyahBlock.tsx",
     "mushaf-reading",
     "source",

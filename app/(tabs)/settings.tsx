@@ -40,6 +40,7 @@ import {
   type ViewMode,
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
+import { WirdSettingsSection } from "@/components/habit/WirdSettingsSection";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
 import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
@@ -598,6 +599,9 @@ export default function SettingsScreen() {
               </SettingsControlRow>
             </View>
           </Card>
+
+          <SectionLabel>{s.habitSettingsTitle}</SectionLabel>
+          <WirdSettingsSection db={db} language={uiLanguage} isDark={isDark} s={s} />
         </>
       )}
 

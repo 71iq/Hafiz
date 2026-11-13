@@ -8,7 +8,7 @@ import { isEveOfStreakTier, isStreakMilestone, nextStreakMilestone, streakTier }
 import { meetsMinimum, minimumProgress, PAGE_UNITS, tallyReviews } from "@/lib/habit/minimum";
 import { isMakeUpOpen, planSettlement } from "@/lib/habit/settle";
 import { buildHabitSnapshot } from "@/lib/habit/snapshot";
-import { computeStreak, longestStreak, toDayMap } from "@/lib/habit/streak";
+import { computeStreak, countSteadyWeeks, longestStreak, toDayMap } from "@/lib/habit/streak";
 import { EARNED_STATUSES, effectiveStatus, type DayStatus, type HabitDay, type HabitDayRow } from "@/lib/habit/types";
 import { userState } from "@/lib/habit/user-state";
 
@@ -379,5 +379,18 @@ describe("user state (6.1)", () => {
     expect(userState(active([2]), "2026-01-01", TODAY)).toBe("at_risk_weekly");
     expect(userState(active([12]), "2026-01-01", TODAY)).toBe("at_risk_monthly");
     expect(userState(active([45]), "2026-01-01", TODAY)).toBe("dormant");
+  });
+});
+
+describe("steady weeks (STR-27)", () => {
+  it("counts ended weeks whose 7 days were recited or excused, never grace", () => {
+    // 2026-11-07 is a Saturday.
+    const full = run("2026-11-13", 7);
+    expect(countSteadyWeeks(toDayMap(full), "2026-11-13", 6)).toBe(1);
+    expect(countSteadyWeeks(toDayMap(full), "2026-11-12", 6)).toBe(0);
+    const withExcuse = [...run("2026-11-12", 6), day("2026-11-13", "excused")];
+    expect(countSteadyWeeks(toDayMap(withExcuse), "2026-11-14", 6)).toBe(1);
+    const withGrace = [...run("2026-11-12", 6), day("2026-11-13", "grace")];
+    expect(countSteadyWeeks(toDayMap(withGrace), "2026-11-14", 6)).toBe(0);
   });
 });

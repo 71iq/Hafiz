@@ -114,6 +114,11 @@ jest.mock("@/components/flashcards/SmartDeckFilterSheet", () => ({
   },
 }));
 jest.mock("@/components/SearchCommand", () => ({ SearchCommand: () => null }));
+// The wird card and break sheet have their own tests; this file covers the deck rows.
+jest.mock("@/lib/habit/use-habit-overview", () => ({
+  useHabitOverview: () => ({ overview: null, failed: false, refresh: async () => {} }),
+}));
+jest.mock("@/components/habit/HabitBreakSheet", () => ({ HabitBreakSheet: () => null }));
 jest.mock("@/components/ui/Toast", () => ({ Toast: () => null }));
 jest.mock("@/components/achievements/AchievementUnlockToast", () => ({ AchievementUnlockToast: () => null }));
 

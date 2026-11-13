@@ -62,14 +62,15 @@ export function buildHabitSnapshot(input: SnapshotInput): HabitSnapshot {
   const longest = longestStreak(days, today);
   const earnBack = findEarnBack(days, today, { makeUpOpen });
 
+  // An open earn-back leads: it spans several days, and today's wird is one step of it.
   let headline: HabitHeadline;
   const todayStatus = streak.todayStatus;
-  if (todayStatus === "done") headline = { kind: "done_today", length: streak.length };
+  if (earnBack && !earnBack.succeeded) headline = { kind: "earn_back", earnBack };
+  else if (todayStatus === "done") headline = { kind: "done_today", length: streak.length };
   else if (todayStatus === "excused") headline = { kind: "excused_today", length: streak.length };
   else if (todayStatus === "paused" || (pause && pause.start <= today && today <= pause.end)) {
     headline = { kind: "paused", length: streak.length, until: pause?.end ?? today };
-  } else if (earnBack && !earnBack.succeeded) headline = { kind: "earn_back", earnBack };
-  else if (streak.makeUpPending) headline = { kind: "make_up_open", length: streak.length, cutoff: makeUpCutoff };
+  } else if (streak.makeUpPending) headline = { kind: "make_up_open", length: streak.length, cutoff: makeUpCutoff };
   else if (streak.length > 0) headline = { kind: "at_risk", length: streak.length };
   else if (longest > 0) headline = { kind: "fresh_start", longest };
   else headline = { kind: "empty" };

@@ -1,8 +1,29 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 
-const SYNCABLE_SETTING_PREFIXES = ["deck_", "review_settings_", "smart_deck_filter_", "card_answer_"];
-const SYNCABLE_SETTING_KEYS = new Set(["daily_review_limit", "last_mushaf_position"]);
+// Spec 7.6: plan, habit and personal-weight settings sync. Hifz plan keys are listed one by one
+// because hifz_auto_delay_ms and hifz_auto_advance_page are reader preferences that stay on the device.
+// Device-only keys use "device_" or "notif_" names outside these lists (the prayer location never
+// leaves the device).
+const SYNCABLE_SETTING_PREFIXES = [
+  "deck_",
+  "review_settings_",
+  "smart_deck_filter_",
+  "card_answer_",
+  "habit_",
+  "fsrs_weights_",
+];
+const SYNCABLE_SETTING_KEYS = new Set([
+  "daily_review_limit",
+  "last_mushaf_position",
+  "onboarding_completed",
+  "hifz_plan",
+  "hifz_minimum_wird",
+  "hifz_meanings_count",
+  "hifz_t_new",
+  "hifz_t_rev",
+  "hifz_manzil_cycle_start",
+]);
 
 export type UserSettingRow = {
   key: string;

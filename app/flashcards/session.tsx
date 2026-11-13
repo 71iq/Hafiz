@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useNavigation } from "expo-router";
-import type { DatabaseExecutor } from "@/lib/database/types";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
@@ -25,8 +25,6 @@ import type { Grade } from "@/lib/fsrs/scheduler";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { persistReviewTransition } from "@/lib/fsrs/persist-review";
 import {
-  getStudyStreak,
-  getWirdStatus,
   MUTASHABIHAT_DECK_ID,
   loadReviewQueue,
   deleteStudyCard,
@@ -39,11 +37,9 @@ import {
 } from "@/lib/fsrs/queries";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
-import { computeReviewPoints, addTodayPoints } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
-import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import type { DeckReviewSettings, StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
 import {
@@ -67,6 +63,16 @@ import { QiraatBlocks } from "@/components/mushaf/QiraatBlocks";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
+import { endReviewSession, startReviewSession, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
+import { loadHabitOverview } from "@/lib/habit/queries";
+import {
+  SessionHabitCards,
+  showsCommitment,
+  strongerWirdEvent,
+  type SessionHabitInput,
+} from "@/components/habit/SessionHabitCards";
+import { Toast } from "@/components/ui/Toast";
+import { formatDays, formatNumber } from "@/lib/i18n/count";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -123,9 +129,14 @@ type SessionSummary = {
   relearningCount: number;
   durationMs: number;
   nextReviewDate: string | null;
-  wirdDays: number;
-  wirdMaintainedToday: boolean;
+  habit: SessionHabitInput;
 };
+
+const NO_HABIT_RESULT: SessionHabitInput = { event: null, overview: null, againCount: 0, total: 0, durationMs: 0 };
+
+function emptySummary(): SessionSummary {
+  return { total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, habit: NO_HABIT_RESULT };
+}
 
 type SmartTestMode = "smartRefs" | "qiraatReading" | "asbabReading";
 type ReviewMode = TestMode | WordTestMode | SmartTestMode;
@@ -174,7 +185,7 @@ export default function FlashcardSessionScreenWrapper() {
 
 function FlashcardSessionScreen() {
   const db = useDatabase();
-  const { isDark, isRTL, fontSize, lineHeight, tafseerSource, themeSurface, isLoaded: settingsLoaded } = useSettings();
+  const { isDark, isRTL, fontSize, lineHeight, tafseerSource, themeSurface, uiLanguage, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
   const navigation = useNavigation();
@@ -192,8 +203,13 @@ function FlashcardSessionScreen() {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [gradingBusy, setGradingBusy] = useState(false);
   const sessionStartRef = useRef(Date.now());
-  const streakRef = useRef(0);
-  const sessionPointsRef = useRef(0);
+  // The review session row is written on the first grade, so an empty session leaves nothing behind.
+  const sessionRef = useRef<ReviewSessionRef | null>(null);
+  const cardShownAtRef = useRef(Date.now());
+  const wirdEventRef = useRef<SessionHabitInput["event"]>(null);
+  const againCountRef = useRef(0);
+  const [wirdNotice, setWirdNotice] = useState<string | null>(null);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const reviewedCountsRef = useRef({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 });
   // A learning card can come back several times in one session; the summary counts each card once, by
   // the state it had when first graded, so "cards reviewed" is not the number of grades.
@@ -215,7 +231,10 @@ function FlashcardSessionScreen() {
     gradingInFlightRef.current = false;
     setGradingBusy(false);
     setSessionError(null);
-    sessionPointsRef.current = 0;
+    wirdEventRef.current = null;
+    againCountRef.current = 0;
+    setWirdNotice(null);
+    setExitConfirmOpen(false);
     reviewedCountsRef.current = { total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 };
     reviewedCardIdsRef.current = new Set();
     setCards([]);
@@ -244,13 +263,12 @@ function FlashcardSessionScreen() {
       setSummary(null);
       setPhase("loading");
       try {
-        // Pre-load streak for scoring
-        streakRef.current = await getStudyStreak(db);
+        sessionRef.current = startReviewSession("cards", { deckId: normalizedDeckId ?? null });
         const queue = await loadReviewQueue(db, normalizedDeckId);
         if (cancelled) return;
         if (queue.length === 0) {
           resetSessionProgress();
-          setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, wirdDays: 0, wirdMaintainedToday: false });
+          setSummary(emptySummary());
           setPhase("summary");
           return;
         }
@@ -395,7 +413,7 @@ function FlashcardSessionScreen() {
         if (cancelled) return;
         if (loaded.length === 0) {
           resetSessionProgress();
-          setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, wirdDays: 0, wirdMaintainedToday: false });
+          setSummary(emptySummary());
           setPhase("summary");
           return;
         }
@@ -412,7 +430,7 @@ function FlashcardSessionScreen() {
         console.warn("[FlashcardSession] Failed to load session:", e);
         resetSessionProgress();
         setSessionError(s.genericActionFailed);
-        setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, wirdDays: 0, wirdMaintainedToday: false });
+        setSummary(emptySummary());
         setPhase("summary");
       }
     }
@@ -435,6 +453,10 @@ function FlashcardSessionScreen() {
   ]);
 
   const currentCard = cards[currentIndex] ?? null;
+  // Time on a card runs from when its front is shown to its grade (study_log.duration_ms).
+  useEffect(() => {
+    if (phase === "front") cardShownAtRef.current = Date.now();
+  }, [phase, currentIndex]);
   const gradePreviews = useMemo(
     () => currentCard ? getGradeSchedulePreviews(currentCard.card, currentCard.settings, isRTL) : {},
     [currentCard, isRTL]
@@ -497,31 +519,32 @@ function FlashcardSessionScreen() {
   };
 
   const buildSummary = useCallback(async (): Promise<SessionSummary> => {
-    const [nextReviewDate, wirdStatus] = await Promise.all([
+    const session = sessionRef.current;
+    const [nextReviewDate, overview] = await Promise.all([
       getNextEligibleReviewDate(db),
-      getWirdStatus(db),
+      loadHabitOverview(db).catch((error) => {
+        console.warn("[FlashcardSession] Habit overview failed:", error);
+        return null;
+      }),
+      session ? endReviewSession(db, { session }).catch((error) => console.warn("[FlashcardSession] Session end failed:", error)) : null,
     ]);
     const counts = reviewedCountsRef.current;
+    const durationMs = Date.now() - sessionStartRef.current;
     return {
       total: counts.total,
       newCount: counts.newCount,
       reviewCount: counts.reviewCount,
       relearningCount: counts.relearningCount,
-      durationMs: Date.now() - sessionStartRef.current,
+      durationMs,
       nextReviewDate,
-      wirdDays: wirdStatus.currentDays,
-      wirdMaintainedToday: wirdStatus.maintainedToday,
+      habit: { event: wirdEventRef.current, overview, againCount: againCountRef.current, total: counts.total, durationMs },
     };
   }, [db]);
 
   const finishSessionWithSummary = useCallback(async () => {
     setSummary(await buildSummary());
     setPhase("summary");
-    if (reviewedCountsRef.current.total > 0) {
-      syncDailyScore(db).catch(console.warn);
-      updateProfileStats(db).catch(console.warn);
-    }
-  }, [buildSummary, db]);
+  }, [buildSummary]);
 
   const advanceAfterRemovingCurrentCard = useCallback(async () => {
     setSessionError(null);
@@ -708,7 +731,28 @@ function FlashcardSessionScreen() {
         reviewPolicy: currentCard.settings,
       });
 
-      await persistReviewTransition({ db, cardId: currentCard.card.id, transition });
+      const saved = await persistReviewTransition({
+        db,
+        cardId: currentCard.card.id,
+        transition,
+        context: {
+          session: sessionRef.current,
+          firstGradeInSession: !reviewedCardIdsRef.current.has(currentCard.card.id),
+          durationMs: reviewedAt.getTime() - cardShownAtRef.current,
+          supportLevel: null,
+          proposedRating: null,
+          grader: "self",
+          errors: [],
+        },
+      });
+      if (rating === Rating.Again) againCountRef.current += 1;
+      wirdEventRef.current = strongerWirdEvent(wirdEventRef.current, saved.wird);
+      if (saved.wird.kind === "minimum_met") setWirdNotice(s.habitMinimumMet);
+      else if (saved.wird.kind === "made_up") {
+        setWirdNotice(interpolate(s.habitMadeUp, { n: formatNumber(saved.wird.length, uiLanguage), days: formatDays(saved.wird.length, uiLanguage) }));
+      } else if (saved.wird.kind === "earned_back") {
+        setWirdNotice(interpolate(s.habitEarnedBack, { days: formatDays(saved.wird.length, uiLanguage) }));
+      }
       const requeuedCard = transition.shouldRequeueInSession
         ? { ...currentCard, card: transition.updatedCard }
         : null;
@@ -722,18 +766,6 @@ function FlashcardSessionScreen() {
           pairId: currentCard.card.id,
           reviewedAt: reviewRecord.reviewedAt,
         }).catch(console.warn);
-      }
-
-      // Compute and store leaderboard points
-      const points = computeReviewPoints(
-        rating,
-        streakRef.current,
-        currentCard.card.difficulty,
-        currentCard.card.stability
-      );
-      if (points > 0) {
-        sessionPointsRef.current += points;
-        addTodayPoints(db, points).catch(console.warn);
       }
 
       if (requeuedCard) {
@@ -760,11 +792,22 @@ function FlashcardSessionScreen() {
     }
   };
 
-  const handleEndSession = () => {
+  const leaveSession = () => {
+    const session = sessionRef.current;
+    if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
     resetSessionProgress();
     setSummary(null);
     setPhase("loading");
     returnToTabs(navigation.getState(), "/(tabs)/home");
+  };
+
+  // SES-02: leaving mid-session asks once. Every grade is already saved, so this only confirms.
+  const handleEndSession = () => {
+    if (phase !== "summary" && reviewedCardIdsRef.current.size > 0) {
+      setExitConfirmOpen(true);
+      return;
+    }
+    leaveSession();
   };
 
   // ─── Render ────────────────────────────────────────────────
@@ -788,7 +831,15 @@ function FlashcardSessionScreen() {
   if (phase === "summary") {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        <SessionSummaryView summary={summary!} onDone={handleEndSession} isDark={isDark} s={s} error={sessionError} />
+        <SessionSummaryView
+          summary={summary!}
+          onDone={handleEndSession}
+          isDark={isDark}
+          s={s}
+          error={sessionError}
+          db={db}
+          language={uiLanguage}
+        />
       </SafeAreaView>
     );
   }
@@ -814,6 +865,8 @@ function FlashcardSessionScreen() {
           >
             <Pressable
               onPress={handleEndSession}
+              accessibilityRole="button"
+              accessibilityLabel={s.genericClose}
               className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
             >
               <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
@@ -1064,6 +1117,21 @@ function FlashcardSessionScreen() {
         }}
         onConfirm={handleConfirmCardAction}
       />
+      <ConfirmDialog
+        visible={exitConfirmOpen}
+        title={s.habitExitTitle}
+        message={s.habitExitBody}
+        cancelLabel={s.habitExitStay}
+        confirmLabel={s.habitExitLeave}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => setExitConfirmOpen(false)}
+        onConfirm={() => {
+          setExitConfirmOpen(false);
+          leaveSession();
+        }}
+      />
+      {wirdNotice ? <Toast message={wirdNotice} onDismiss={() => setWirdNotice(null)} duration={3500} announce /> : null}
     </SafeAreaView>
   );
 }
@@ -1911,18 +1979,37 @@ function CardStateBadge({ state, s }: { state: number; s: UIStrings }) {
 
 // ─── Session Summary ─────────────────────────────────────────
 
-function SessionSummaryView({ summary, onDone, isDark, s, error }: { summary: SessionSummary; onDone: () => void; isDark: boolean; s: UIStrings; error?: string | null }) {
+function SessionSummaryView({
+  summary,
+  onDone,
+  isDark,
+  s,
+  error,
+  db,
+  language,
+}: {
+  summary: SessionSummary;
+  onDone: () => void;
+  isDark: boolean;
+  s: UIStrings;
+  error?: string | null;
+  db: AppDatabase;
+  language: "en" | "ar";
+}) {
   const { width, height } = useWindowDimensions();
   const durationMin = Math.max(1, Math.round(summary.durationMs / 60000));
   const nextReview = formatNextReviewDate(summary.nextReviewDate, s);
   const compact = width < 430 || height < 760;
 
+  // Scrolls so the habit cards never push the Done button off a small screen.
   return (
-    <View
-      className="flex-1 px-5"
-      style={{
+    <ScrollView
+      className="flex-1"
+      contentContainerStyle={{
+        flexGrow: 1,
         alignItems: "center",
         justifyContent: "center",
+        paddingHorizontal: 20,
         paddingTop: compact ? 12 : 32,
         paddingBottom: compact ? 16 : 40,
       }}
@@ -1956,13 +2043,6 @@ function SessionSummaryView({ summary, onDone, isDark, s, error }: { summary: Se
 
       <View className="w-full max-w-sm" style={{ gap: compact ? 10 : 14 }}>
         <SummaryRow label={s.flashcardsSummaryReviewed} value={String(summary.total)} compact={compact} />
-        {summary.total > 0 && (
-          <SummaryRow
-            label={summary.wirdMaintainedToday ? s.wirdMaintained : s.wirdConsistency}
-            value={interpolate(s.wirdDays, { n: summary.wirdDays.toLocaleString() })}
-            compact={compact}
-          />
-        )}
         <View className="flex-row" style={{ gap: compact ? 8 : 12 }}>
           <SummaryCard label={s.flashcardsSummaryNew} value={String(summary.newCount)} color="#3b82f6" compact={compact} />
           <SummaryCard label={s.flashcardsSummaryReview} value={String(summary.reviewCount)} color="#22c55e" compact={compact} />
@@ -1972,10 +2052,18 @@ function SessionSummaryView({ summary, onDone, isDark, s, error }: { summary: Se
         <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} compact={compact} />
       </View>
 
+      {summary.total > 0 ? (
+        <View className="w-full items-center" style={{ marginTop: compact ? 10 : 14 }}>
+          <SessionHabitCards input={summary.habit} db={db} language={language} isDark={isDark} s={s} />
+        </View>
+      ) : null}
+
       <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
-        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 15 : 16, color: "#fff" }}>{s.flashcardsSummaryDone}</Text>
+        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 15 : 16, color: "#fff" }}>
+          {showsCommitment(summary.habit) ? s.habitCommitTomorrow : s.flashcardsSummaryDone}
+        </Text>
       </Button>
-    </View>
+    </ScrollView>
   );
 }
 

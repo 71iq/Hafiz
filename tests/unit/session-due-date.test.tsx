@@ -15,14 +15,14 @@ import type { DeckReviewSettings, StudyCardRow } from "@/lib/fsrs/types";
 import type { SmartCardContent, SmartDeckRef } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
 import { DEFAULT_TAFSIR_SOURCE } from "@/lib/tafsir/sources";
-import { addTodayPoints, computeReviewPoints } from "@/lib/fsrs/scoring";
+import { endReviewSession, recordSessionProgress, startReviewSession } from "@/lib/fsrs/review-sessions";
+import { loadHabitOverview, recordWirdProgress } from "@/lib/habit/queries";
+import { recordCleanRecitation } from "@/lib/hifz/errors";
 import { getSmartCardContent } from "@/lib/fsrs/smart-decks";
 import {
   deleteStudyCard,
   setStudyCardBuried,
   getNextEligibleReviewDate,
-  getStudyStreak,
-  getWirdStatus,
   loadReviewQueue,
   putStudyLogRow,
   resetStudyCardProgress,
@@ -34,7 +34,6 @@ import {
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { hapticMedium } from "@/lib/haptics";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
-import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import {
   isQuranPageFontLoaded,
@@ -147,8 +146,6 @@ jest.mock("@/lib/fonts/loader", () => ({
 jest.mock("@/lib/fsrs/queries", () => ({
   deleteStudyCard: jest.fn(),
   getNextEligibleReviewDate: jest.fn(),
-  getStudyStreak: jest.fn(),
-  getWirdStatus: jest.fn(),
   publishReviewLogged: jest.fn(),
   putStudyLogRow: jest.fn(),
   loadReviewQueue: jest.fn(),
@@ -167,17 +164,27 @@ jest.mock("@/lib/fsrs/smart-decks", () => ({
 
 // The wird day is written inside the grade transaction; its rules are covered by habit-wird-progress.
 jest.mock("@/lib/habit/queries", () => ({
-  recordWirdProgress: jest.fn(async () => ({ kind: "none" })),
+  recordWirdProgress: jest.fn(),
+  loadHabitOverview: jest.fn(),
 }));
 // Inbox resolution is covered by habit-wird-progress against a real schema.
 jest.mock("@/lib/hifz/errors", () => ({
-  insertRecitationErrors: jest.fn(async () => []),
-  recordCleanRecitation: jest.fn(async () => 0),
+  insertRecitationErrors: jest.fn(),
+  recordCleanRecitation: jest.fn(),
 }));
 
-jest.mock("@/lib/fsrs/scoring", () => ({
-  addTodayPoints: jest.fn(),
-  computeReviewPoints: jest.fn(() => 0),
+const fixtureSession = {
+  id: "fixture-session",
+  kind: "cards",
+  deckId: "fixture-session-deck",
+  startedAt: "2026-11-02T10:00:00.000Z",
+  source: "app",
+} as const;
+
+jest.mock("@/lib/fsrs/review-sessions", () => ({
+  startReviewSession: jest.fn(),
+  recordSessionProgress: jest.fn(),
+  endReviewSession: jest.fn(),
 }));
 
 jest.mock("@/lib/haptics", () => ({
@@ -189,10 +196,6 @@ jest.mock("@/lib/achievements/queries", () => ({
   recordAchievementEvent: jest.fn(),
 }));
 
-jest.mock("@/lib/fsrs/leaderboard-sync", () => ({
-  syncDailyScore: jest.fn(),
-  updateProfileStats: jest.fn(),
-}));
 
 jest.mock("@/lib/database/user-settings", () => ({
   deleteUserSetting: jest.fn(),
@@ -623,21 +626,25 @@ function expectNoUnrelatedCardActionServiceCalls(): void {
   expect(setStudyCardBuried).not.toHaveBeenCalled();
   expect(setStudyCardMarked).not.toHaveBeenCalled();
   expect(setStudyCardDueDate).not.toHaveBeenCalled();
-  expect(computeReviewPoints).not.toHaveBeenCalled();
+  expect(recordSessionProgress).not.toHaveBeenCalled();
   expect(putStudyLogRow).not.toHaveBeenCalled();
   expect(putCardRow).not.toHaveBeenCalled();
-  expect(addTodayPoints).not.toHaveBeenCalled();
   expect(recordAchievementEvent).not.toHaveBeenCalled();
-  expect(syncDailyScore).not.toHaveBeenCalled();
-  expect(updateProfileStats).not.toHaveBeenCalled();
+  expect(endReviewSession).not.toHaveBeenCalled();
   expect(mockRouterReplace).not.toHaveBeenCalled();
   expect(getNextEligibleReviewDate).not.toHaveBeenCalled();
-  expect(getWirdStatus).not.toHaveBeenCalled();
+  expect(loadHabitOverview).not.toHaveBeenCalled();
 }
 
 describe("Flashcard session due-date editor characterization", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(startReviewSession).mockReturnValue(fixtureSession);
+    jest.mocked(recordSessionProgress).mockResolvedValue({} as never);
+    jest.mocked(endReviewSession).mockResolvedValue(null);
+    jest.mocked(loadHabitOverview).mockResolvedValue(null as never);
+    jest.mocked(recordWirdProgress).mockResolvedValue({ kind: "none" });
+    jest.mocked(recordCleanRecitation).mockResolvedValue(0);
     // Restore the React Native preset clock cleared by the fixture mock reset.
     jest.mocked(performance.now).mockImplementation(Date.now);
     configureSettings("ar", false);
@@ -645,11 +652,9 @@ describe("Flashcard session due-date editor characterization", () => {
       window: { width: 390, height: 844, scale: 1, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 1, fontScale: 1 },
     });
-    jest.mocked(getStudyStreak).mockResolvedValue(0);
     jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard, secondCard]));
     jest.mocked(getSmartCardContent).mockImplementation(async (_db, cardId) => smartContentById.get(cardId) ?? null);
     jest.mocked(setStudyCardDueDate).mockResolvedValue(firstCard);
-    jest.mocked(computeReviewPoints).mockReturnValue(0);
     jest.mocked(loadQuranPageFont).mockResolvedValue();
     jest.mocked(isQuranPageFontLoaded).mockReturnValue(true);
     jest.mocked(quranPageFontName).mockReturnValue("QCF2_fixture");
@@ -766,12 +771,10 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(mockRouterReplace).not.toHaveBeenCalled();
       expect(putStudyLogRow).not.toHaveBeenCalled();
       expect(putCardRow).not.toHaveBeenCalled();
-      expect(addTodayPoints).not.toHaveBeenCalled();
       expect(recordAchievementEvent).not.toHaveBeenCalled();
-      expect(syncDailyScore).not.toHaveBeenCalled();
-      expect(updateProfileStats).not.toHaveBeenCalled();
+      expect(endReviewSession).not.toHaveBeenCalled();
       expect(getNextEligibleReviewDate).not.toHaveBeenCalled();
-      expect(getWirdStatus).not.toHaveBeenCalled();
+      expect(loadHabitOverview).not.toHaveBeenCalled();
       expect(loadQuranPageFont).not.toHaveBeenCalled();
     } finally {
       deferred.resolve(firstCard);
@@ -885,12 +888,10 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(hapticMedium).toHaveBeenCalledTimes(1);
         expect(putStudyLogRow).not.toHaveBeenCalled();
         expect(putCardRow).not.toHaveBeenCalled();
-        expect(addTodayPoints).not.toHaveBeenCalled();
         expect(recordAchievementEvent).not.toHaveBeenCalled();
-        expect(syncDailyScore).not.toHaveBeenCalled();
-        expect(updateProfileStats).not.toHaveBeenCalled();
+        expect(endReviewSession).not.toHaveBeenCalled();
         expect(getNextEligibleReviewDate).not.toHaveBeenCalled();
-        expect(getWirdStatus).not.toHaveBeenCalled();
+        expect(loadHabitOverview).not.toHaveBeenCalled();
 
         fireEvent.press(getTextButton(view, s.flashcardsCancel));
         await waitFor(() => expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull());
@@ -1606,16 +1607,14 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(resetStudyCardProgress).not.toHaveBeenCalled();
           expect(writeUserSetting).not.toHaveBeenCalled();
           expect(deleteUserSetting).not.toHaveBeenCalled();
-          expect(computeReviewPoints).not.toHaveBeenCalled();
+          expect(recordSessionProgress).not.toHaveBeenCalled();
           expect(putStudyLogRow).not.toHaveBeenCalled();
           expect(putCardRow).not.toHaveBeenCalled();
-          expect(addTodayPoints).not.toHaveBeenCalled();
           expect(recordAchievementEvent).not.toHaveBeenCalled();
-          expect(syncDailyScore).not.toHaveBeenCalled();
-          expect(updateProfileStats).not.toHaveBeenCalled();
+          expect(endReviewSession).not.toHaveBeenCalled();
           expect(mockRouterReplace).not.toHaveBeenCalled();
           expect(getNextEligibleReviewDate).not.toHaveBeenCalled();
-          expect(getWirdStatus).not.toHaveBeenCalled();
+          expect(loadHabitOverview).not.toHaveBeenCalled();
           expect(view.queryByText(s.cardActionFailed)).toBeNull();
 
           if (action === "mark") {
@@ -1650,18 +1649,9 @@ describe("Flashcard session due-date editor characterization", () => {
       jest.setSystemTime(new Date(2026, 10, 2, 12, 0, 0));
       jest.mocked(putCardRow).mockResolvedValue(undefined);
       jest.mocked(putStudyLogRow).mockResolvedValue(undefined);
-      jest.mocked(addTodayPoints).mockResolvedValue(undefined);
       jest.mocked(recordAchievementEvent).mockResolvedValue(undefined);
-      jest.mocked(syncDailyScore).mockResolvedValue(undefined);
-      jest.mocked(updateProfileStats).mockResolvedValue(undefined);
       jest.mocked(getNextEligibleReviewDate).mockResolvedValue(null);
-      jest.mocked(getWirdStatus).mockResolvedValue({
-        currentDays: 3,
-        maintainedToday: true,
-        longestDays: 3,
-        lastReviewDate: null,
-        state: "maintained_today",
-      });
+      jest.mocked(loadHabitOverview).mockResolvedValue(null as never);
     });
 
     afterEach(() => {
@@ -1698,11 +1688,9 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(new Date(transition.updatedCard.due).getTime() - new Date(reviewedAt).getTime()).toBe(7 * 60 * 1000);
     });
 
-    it("awaits card then log persistence, rejects duplicate grades, and scores the original card", async () => {
+    it("awaits card then log persistence, rejects duplicate grades, and records session progress once", async () => {
       const card = { ...firstCard, state: State.Review, reps: 5, stability: 12, difficulty: 6 };
       jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([card, secondCard]));
-      jest.mocked(getStudyStreak).mockResolvedValue(7);
-      jest.mocked(computeReviewPoints).mockReturnValue(9);
       const cardWrite = createDeferred<void>();
       const logWrite = createDeferred<void>();
       jest.mocked(putCardRow).mockReturnValueOnce(cardWrite.promise);
@@ -1716,11 +1704,11 @@ describe("Flashcard session due-date editor characterization", () => {
       });
       expect(putCardRow).toHaveBeenCalledTimes(1);
       expect(putStudyLogRow).not.toHaveBeenCalled();
-      expect(computeReviewPoints).not.toHaveBeenCalled();
+      expect(recordSessionProgress).not.toHaveBeenCalled();
       expect(view.queryByText(secondCue)).toBeNull();
       await act(async () => cardWrite.resolve());
       expect(putStudyLogRow).toHaveBeenCalledTimes(1);
-      expect(computeReviewPoints).not.toHaveBeenCalled();
+      expect(recordSessionProgress).not.toHaveBeenCalled();
       expect(view.queryByText(secondCue)).toBeNull();
       const reviewedAt = jest.mocked(putStudyLogRow).mock.calls[0][1].reviewedAt;
       const transition = calculateReviewTransition({
@@ -1741,8 +1729,8 @@ describe("Flashcard session due-date editor characterization", () => {
         elapsedDays: record.elapsedDays,
         scheduledDays: record.scheduledDays,
         reviewedAt: record.reviewedAt,
-        sessionId: null,
-        durationMs: null,
+        sessionId: "fixture-session",
+        durationMs: expect.any(Number),
         supportLevel: null,
         proposedRating: null,
         grader: "self",
@@ -1750,19 +1738,17 @@ describe("Flashcard session due-date editor characterization", () => {
       });
       await act(async () => logWrite.resolve());
       await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
-      expect(computeReviewPoints).toHaveBeenCalledWith(Rating.Easy, 7, 6, 12);
-      expect(addTodayPoints).toHaveBeenCalledWith(mockDatabase, 9);
+      expect(recordSessionProgress).toHaveBeenCalledTimes(1);
       expect(recordAchievementEvent).toHaveBeenCalledWith(mockDatabase, {
         type: "mutashabih_pair_reviewed",
         pairId: card.id,
         reviewedAt,
       });
-      expect(syncDailyScore).not.toHaveBeenCalled();
-      expect(updateProfileStats).not.toHaveBeenCalled();
+      expect(endReviewSession).not.toHaveBeenCalled();
       expect(putCardRow).toHaveBeenCalledTimes(1);
     });
 
-    it("requeues a same-day card with its updated row then finishes and syncs once", async () => {
+    it("requeues a same-day card with its updated row then finishes and closes the session once", async () => {
       jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
       const view = renderSession();
       await reveal(view);
@@ -1770,7 +1756,7 @@ describe("Flashcard session due-date editor characterization", () => {
       await waitFor(() => expect(view.getByText(s.flashcardsReveal)).toBeTruthy());
       expect(view.getByText(firstCue)).toBeTruthy();
       expect(view.queryByText(s.flashcardsSummaryTitle)).toBeNull();
-      expect(syncDailyScore).not.toHaveBeenCalled();
+      expect(endReviewSession).not.toHaveBeenCalled();
       const updated = jest.mocked(putCardRow).mock.calls[0][1];
       expect(updated.reps).toBe(firstCard.reps + 1);
       expect(updated.state).toBe(State.Learning);
@@ -1783,10 +1769,8 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(within(row).getByText("1")).toBeTruthy();
       expect(jest.mocked(putCardRow).mock.calls[1][1].reps).toBe(updated.reps + 1);
       expect(jest.mocked(putStudyLogRow).mock.calls[1][1].state).toBe(State.Learning);
-      expect(computeReviewPoints).toHaveBeenCalledTimes(2);
-      expect(addTodayPoints).not.toHaveBeenCalled();
-      expect(syncDailyScore).toHaveBeenCalledTimes(1);
-      expect(updateProfileStats).toHaveBeenCalledTimes(1);
+      expect(recordSessionProgress).toHaveBeenCalledTimes(2);
+      expect(endReviewSession).toHaveBeenCalledTimes(1);
       fireEvent.press(getTextButton(view, s.flashcardsSummaryDone));
       expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
     });
@@ -1803,7 +1787,7 @@ describe("Flashcard session due-date editor characterization", () => {
         fireEvent.press(getTextButton(view, s.flashcardsEasy));
         await waitFor(() => expect(view.getByText(s.flashcardsReviewSaveFailed)).toBeTruthy());
         expect(view.queryByText(secondCue)).toBeNull();
-        expect(computeReviewPoints).not.toHaveBeenCalled();
+        expect(recordSessionProgress).not.toHaveBeenCalled();
         expect(recordAchievementEvent).not.toHaveBeenCalled();
         expect(putStudyLogRow).toHaveBeenCalledTimes(stage === "card" ? 0 : 1);
         expect(warning).toHaveBeenCalledWith("[FlashcardSession] Failed to grade card:", failure);
@@ -1811,7 +1795,7 @@ describe("Flashcard session due-date editor characterization", () => {
         await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
         expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
         expect(putCardRow).toHaveBeenCalledTimes(2);
-        expect(computeReviewPoints).toHaveBeenCalledTimes(1);
+        expect(recordSessionProgress).toHaveBeenCalledTimes(1);
       },
     );
 
@@ -1825,7 +1809,7 @@ describe("Flashcard session due-date editor characterization", () => {
       await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
       expect(view.getByText(s.cardDeletedSkipped)).toBeTruthy();
       expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
-      expect(computeReviewPoints).not.toHaveBeenCalled();
+      expect(recordSessionProgress).not.toHaveBeenCalled();
     });
 
     it("shows the deleted-card notice on the summary when the deleted card was the last one (RF-183)", async () => {
@@ -1872,11 +1856,9 @@ describe("Flashcard session due-date editor characterization", () => {
       });
     });
 
-    it("reports optional score and achievement failures while advancing after durable writes", async () => {
+    it("reports an optional achievement failure while advancing after durable writes", async () => {
       const failure = new Error("synthetic optional failure");
       const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-      jest.mocked(computeReviewPoints).mockReturnValue(4);
-      jest.mocked(addTodayPoints).mockRejectedValueOnce(failure);
       jest.mocked(recordAchievementEvent).mockRejectedValueOnce(failure);
       const view = renderSession();
       await reveal(view);
@@ -1885,6 +1867,54 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(putStudyLogRow).toHaveBeenCalledTimes(1);
       expect(warning).toHaveBeenCalledWith(failure);
       expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
+    });
+
+    it("leaves at once before any grade, and asks once after one (SES-02)", async () => {
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(view.getByLabelText(s.genericClose));
+      expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
+
+    it("confirms leaving after a grade, keeps reviewing on Stay, and closes the session on Leave", async () => {
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+      await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+      fireEvent.press(view.getByLabelText(s.genericClose));
+      await waitFor(() => expect(view.getByText(s.habitExitTitle)).toBeTruthy());
+      fireEvent.press(getTextButton(view, s.habitExitStay));
+      await waitFor(() => expect(view.queryByText(s.habitExitTitle)).toBeNull());
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+      fireEvent.press(view.getByLabelText(s.genericClose));
+      await waitFor(() => expect(view.getByText(s.habitExitLeave)).toBeTruthy());
+      fireEvent.press(getTextButton(view, s.habitExitLeave));
+      expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
+      expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
+
+    it("announces the day's minimum wird and ends the first week with a commitment (STR-20)", async () => {
+      jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
+      jest.mocked(recordWirdProgress).mockResolvedValueOnce({ kind: "minimum_met", length: 2 });
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+      await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+      expect(view.getAllByText(s.habitMinimumMet).length).toBeGreaterThan(0);
+      expect(view.getByText("Day 2")).toBeTruthy();
+      expect(getTextButton(view, s.habitCommitTomorrow)).toBeTruthy();
+      expect(view.queryByText(s.flashcardsSummaryDone)).toBeNull();
+    });
+
+    it("marks a streak milestone quietly at the session end (STR-23)", async () => {
+      jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
+      jest.mocked(recordWirdProgress).mockResolvedValueOnce({ kind: "made_up", madeUpDay: "2026-11-01", length: 7 });
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+      await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+      expect(view.getByText("7 days of wird")).toBeTruthy();
+      expect(view.getAllByText("Yesterday's wird is made up. Your 7-day streak continues.").length).toBeGreaterThan(0);
     });
 
     it("cancels pending queue loading before fetching card content after unmount", async () => {
@@ -1909,7 +1939,7 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(warning).toHaveBeenCalledWith("[FlashcardSession] Failed to load session:", failure);
       expect(putCardRow).not.toHaveBeenCalled();
       expect(putStudyLogRow).not.toHaveBeenCalled();
-      expect(syncDailyScore).not.toHaveBeenCalled();
+      expect(endReviewSession).not.toHaveBeenCalled();
     });
   });
 });
