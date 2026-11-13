@@ -375,7 +375,7 @@
           "title": "Hifz setup: goal, tracks, pace, when",
           "kind": "screen",
           "cases": ["START-02"],
-          "uses": ["hifz.setup.memorized"],
+          "uses": ["hifz.setup.memorized", "reminders.prayer"],
           "native": false,
           "children": []
         },
@@ -398,6 +398,15 @@
       "uses": [],
       "native": false,
       "children": [
+        {
+          "id": "home.reminder",
+          "title": "In-app reminder banner",
+          "kind": "widget",
+          "cases": [],
+          "uses": ["reminders.banner"],
+          "native": false,
+          "children": []
+        },
         {
           "id": "home.wird",
           "title": "Wird streak card and minimum progress",
@@ -932,6 +941,70 @@
       ]
     },
     {
+      "id": "reminders",
+      "title": "Reminders and prayer times",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "reminders.settings",
+          "title": "Reminder settings",
+          "kind": "widget",
+          "cases": ["REMIND-01"],
+          "uses": ["reminders.prayer"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reminders.prayer",
+          "title": "Prayer times setup",
+          "kind": "widget",
+          "cases": ["REMIND-02"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reminders.permission",
+          "title": "Permission card after a session",
+          "kind": "widget",
+          "cases": ["REMIND-03"],
+          "uses": ["wird.sessioncards"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reminders.delivery",
+          "title": "Scheduled local reminders",
+          "kind": "transition",
+          "cases": ["REMIND-04"],
+          "uses": ["wird.settle"],
+          "native": true,
+          "children": []
+        },
+        {
+          "id": "reminders.tap",
+          "title": "Tap routing and remind later",
+          "kind": "transition",
+          "cases": ["REMIND-05"],
+          "uses": ["hifz.review", "review.session"],
+          "native": true,
+          "children": []
+        },
+        {
+          "id": "reminders.banner",
+          "title": "Home banner and calendar export",
+          "kind": "widget",
+          "cases": ["REMIND-06"],
+          "uses": [],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
       "id": "hifz",
       "title": "Hifz plan and recitation",
       "kind": "group",
@@ -1126,13 +1199,105 @@
       ]
     },
     {
-      "id": "leaderboard",
-      "title": "Leaderboard",
+      "id": "halaqa",
+      "title": "Halaqa",
       "kind": "screen",
-      "cases": ["RANK-01", "RANK-02", "RANK-03"],
-      "uses": ["profile.public", "auth.login"],
+      "cases": ["HALAQA-01"],
+      "uses": ["auth.login"],
       "native": false,
-      "children": []
+      "children": [
+        {
+          "id": "halaqa.start",
+          "title": "Create, join by code, or join matched",
+          "kind": "widget",
+          "cases": ["HALAQA-02", "HALAQA-03"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "halaqa.group",
+          "title": "Group view: goal, members, received encouragement",
+          "kind": "widget",
+          "cases": ["HALAQA-04"],
+          "uses": ["wird.sync"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "halaqa.encourage",
+          "title": "Encouragement sheet",
+          "kind": "widget",
+          "cases": ["HALAQA-05"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "halaqa.sharing",
+          "title": "What this halaqa sees, profile visibility",
+          "kind": "widget",
+          "cases": ["HALAQA-06"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "halaqa.teacher",
+          "title": "Teacher view",
+          "kind": "widget",
+          "cases": ["HALAQA-07"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "halaqa.manage",
+          "title": "Share code, leave, another halaqa, offline copy",
+          "kind": "transition",
+          "cases": ["HALAQA-08"],
+          "uses": ["shared.confirm"],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "board",
+      "title": "Board: weekly consistency cohort",
+      "kind": "screen",
+      "cases": ["BOARD-01"],
+      "uses": ["auth.login"],
+      "native": false,
+      "children": [
+        {
+          "id": "board.join",
+          "title": "Intention, nickname and minor choice, join",
+          "kind": "widget",
+          "cases": ["BOARD-02"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "board.standings",
+          "title": "Cohort standings and points",
+          "kind": "widget",
+          "cases": ["BOARD-03"],
+          "uses": ["wird.sync"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "board.leave",
+          "title": "Leave and gathering state",
+          "kind": "transition",
+          "cases": ["BOARD-04"],
+          "uses": ["shared.confirm"],
+          "native": false,
+          "children": []
+        }
+      ]
     },
     {
       "id": "community",
@@ -1324,6 +1489,15 @@
           "kind": "widget",
           "cases": ["SET-16"],
           "uses": ["hifz.setup"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "settings.reminders",
+          "title": "Reminders section",
+          "kind": "widget",
+          "cases": [],
+          "uses": ["reminders.settings"],
           "native": false,
           "children": []
         },
