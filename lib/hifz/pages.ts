@@ -126,6 +126,31 @@ function pageHistory(
   };
 }
 
+/**
+ * One page card as it is now, with its history and derived tier (TIER-01), read with the caller's
+ * executor. A grade reads it inside its own transaction, since sync can merge reviews from another
+ * device after the screen loaded the page. Null when the card is gone.
+ */
+export async function loadPageCard(
+  db: DatabaseExecutor,
+  cardId: string,
+  { today, plan }: { today: LocalDate; plan: Pick<HifzPlan, "sabqiDays"> },
+): Promise<PageCard | null> {
+  const unit = parsePageUnit(cardId);
+  if (unit?.kind !== "page") return null;
+  const [row, sabaq, logs] = await Promise.all([
+    db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [cardId]),
+    readSabaqPages(db),
+    db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
+      "SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id = ? ORDER BY reviewed_at",
+      [cardId],
+    ),
+  ]);
+  if (!row) return null;
+  const history = pageHistory(row, unit.page, sabaq, gradesByCard(logs));
+  return { row, page: unit.page, history, tier: tierFor(history, today, plan) };
+}
+
 /** Every page card with its derived tier (TIER-01). The tier is recomputed from history, never read from the cache. */
 export async function loadPageCards(db: DatabaseExecutor, { today, plan }: { today: LocalDate; plan: HifzPlan }): Promise<PageCard[]> {
   const [rows, sabaq, grades] = await Promise.all([readPageRows(db), readSabaqPages(db), readPageGrades(db)]);

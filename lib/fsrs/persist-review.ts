@@ -1,6 +1,7 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { publishReviewLogged, putCardRow, putStudyLogRow, type StudyLogInput } from "@/lib/fsrs/queries";
 import type { ReviewTransition } from "@/lib/fsrs/review-transition";
+import type { StudyCardRow } from "@/lib/fsrs/types";
 import { recordSessionProgress, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import type { DhuhrResolver } from "@/lib/habit/cutoff";
 import { localDateOf } from "@/lib/habit/dates";
@@ -34,7 +35,21 @@ export const DEFAULT_REVIEW_SAVE_CONTEXT: ReviewSaveContext = {
   errors: [],
 };
 
-export type ReviewSaveResult = Readonly<{ wird: WirdProgressEvent; resolvedInboxItems: number }>;
+export type ReviewSaveResult = Readonly<{
+  wird: WirdProgressEvent;
+  resolvedInboxItems: number;
+  /** The transition that was saved, calculated from the card as it was inside the transaction. */
+  transition: ReviewTransition;
+}>;
+
+/**
+ * The card as it is now, for a transition calculated inside the grade's transaction. A screen's copy
+ * can be older: sync or another grade may have updated the card since its queue was loaded. Null when
+ * the card is gone; saving a transition for it then fails with StudyCardDeletedError.
+ */
+export async function readCurrentCard(tx: DatabaseExecutor, cardId: string): Promise<StudyCardRow | null> {
+  return tx.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [cardId]);
+}
 
 /** ERR-03: only a Good or Easy recall at the hidden level with no new errors counts; salah has no check. */
 function isCleanRecall(rating: number, context: ReviewSaveContext): boolean {
@@ -47,8 +62,9 @@ function isCleanRecall(rating: number, context: ReviewSaveContext): boolean {
  * a failed grade leaves the streak, the inbox and the card as they were. Achievements and review
  * listeners run only after the commit.
  *
- * `transition` can be a function of the transaction, for a caller whose card another grade may have
- * changed since it was read: it then reads the card and calculates inside the same transaction.
+ * `transition` can be a function of the transaction, for a caller whose card sync or another grade may
+ * have changed since it was read: it then reads the card and calculates inside the same transaction.
+ * The result carries the transition that was saved.
  */
 export async function persistReviewTransition({
   db,
@@ -67,8 +83,7 @@ export async function persistReviewTransition({
   /** Writes that must exist before the card is saved, such as creating it, run first in the transaction. */
   beforeWork?: (tx: DatabaseExecutor) => Promise<void>;
 }): Promise<ReviewSaveResult> {
-  let result: ReviewSaveResult = { wird: { kind: "none" }, resolvedInboxItems: 0 };
-  let log: StudyLogInput | null = null;
+  let saved = null as { result: ReviewSaveResult; log: StudyLogInput } | null;
   await db.withTransactionAsync(async (tx) => {
     if (beforeWork) await beforeWork(tx);
     const resolved = typeof transition === "function" ? await transition(tx) : transition;
@@ -130,9 +145,9 @@ export async function persistReviewTransition({
         reviewedAt,
       );
     }
-    log = entry;
-    result = { wird, resolvedInboxItems };
+    saved = { result: { wird, resolvedInboxItems, transition: resolved }, log: entry };
   });
-  if (log) publishReviewLogged(db, log);
-  return result;
+  if (!saved) throw new Error("The review transaction ended without saving the grade.");
+  publishReviewLogged(db, saved.log);
+  return saved.result;
 }

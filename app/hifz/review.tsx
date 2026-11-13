@@ -185,6 +185,11 @@ function HifzReviewScreen() {
   const actionLock = useRef(false);
   /** The queue index actions may act on. It moves past an item once its save succeeds, so a stale handler for that item does nothing. */
   const actionIndex = useRef(0);
+  /**
+   * Close was pressed while an action held the lock. The screen leaves once the action succeeds, or
+   * stays with the item open to show a failed save, which would otherwise reach a departed screen.
+   */
+  const leaveWhenSettled = useRef(false);
   // Pages the user holds, declared or reviewed: a seam leads only into one of them.
   const [heldPages, setHeldPages] = useState<ReadonlySet<number>>(new Set());
   const [seamText, setSeamText] = useState<AyahText | null>(null);
@@ -445,10 +450,15 @@ function HifzReviewScreen() {
         final = await save();
       } catch (saveError) {
         console.warn(`[HifzReview] ${label} failed:`, saveError);
+        leaveWhenSettled.current = false;
         setError(s.hifzSaveFailed);
         return;
       }
-      await advance(from, final);
+      if (!leaveWhenSettled.current) await advance(from, final);
+      if (leaveWhenSettled.current) {
+        leaveWhenSettled.current = false;
+        exit();
+      }
     } finally {
       actionLock.current = false;
       setBusy(false);
@@ -612,10 +622,16 @@ function HifzReviewScreen() {
     setMarkingKey(null);
   };
 
-  const leave = () => {
+  const exit = () => {
     const session = sessionRef.current;
     if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
     returnToTabs(navigation.getState(), "/(tabs)/home");
+  };
+
+  /** Leave now, or once the action holding the lock settles (see leaveWhenSettled). */
+  const leave = () => {
+    if (actionLock.current) leaveWhenSettled.current = true;
+    else exit();
   };
 
   const close = () => {

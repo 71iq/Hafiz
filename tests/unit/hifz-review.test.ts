@@ -18,6 +18,7 @@ import {
   type Attempt,
   type AttemptMark,
 } from "@/lib/hifz/review";
+import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { Rating } from "@/lib/fsrs/scheduler";
 import { pageCardId } from "@/lib/hifz/units";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
@@ -123,6 +124,43 @@ describe("saving a page grade", () => {
     expect(log).toEqual({ rating: Rating.Hard, support_level: 1, proposed_rating: Rating.Hard, error_count: 1 });
     expect(store.sql.prepare("SELECT tier FROM study_cards WHERE id = ?").get(page.row.id)).toEqual({ tier: "manzil" });
     expect(await countMistakeInbox(store.db, TODAY)).toBe(1);
+  });
+
+  it("grades from the card and history sync merged after the page was loaded, not the screen's copy", async () => {
+    const yesterday = addDays(TODAY, -1);
+    await declareMemorizedPages(store.db, { pages: [5], cycleDays: 30, now: atLocalTime(yesterday, 500) });
+    const loaded = await card(5, atLocalTime(TODAY, 540));
+    // Sync then merges another device's Again from yesterday: its card row and its review log.
+    const synced = calculateReviewTransition({ card: loaded.row, rating: Rating.Again, reviewedAt: atLocalTime(yesterday, 600) }).updatedCard;
+    store.sql
+      .prepare("UPDATE study_cards SET due = ?, stability = ?, difficulty = ?, reps = ?, lapses = ?, state = ?, last_review = ?, updated_at = ? WHERE id = ?")
+      .run(synced.due, synced.stability, synced.difficulty, synced.reps, synced.lapses, synced.state, synced.last_review, synced.updated_at, synced.id);
+    store.sql
+      .prepare(
+        `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, local_date)
+         VALUES (?, 1, 0, ?, ?, ?, 0, 0, ?, ?)`,
+      )
+      .run(synced.id, synced.due, synced.stability, synced.difficulty, synced.last_review, yesterday);
+
+    const result = await savePageGrade(store.db, {
+      card: loaded.row,
+      history: loaded.history,
+      plan,
+      attempt: emptyAttempt(4),
+      rating: Rating.Good,
+      firstToken: tokens[0],
+      session: null,
+      durationMs: 60_000,
+      now: atLocalTime(TODAY, 600),
+    });
+    expect(store.sql.prepare("SELECT reps, lapses FROM study_cards WHERE id = ?").get(synced.id)).toEqual({
+      reps: synced.reps + 1,
+      lapses: synced.lapses,
+    });
+    // After an Again, one Good grade is not yet two in a row, so the page still needs work.
+    expect(result.tier).toBe("manzil.needs_work");
+    expect(store.sql.prepare("SELECT tier FROM study_cards WHERE id = ?").get(synced.id)).toEqual({ tier: "manzil.needs_work" });
+    expect(result.transition.updatedCard.reps).toBe(synced.reps + 1);
   });
 
   it("logs a page recited in salah as Good with no support level or errors (REV-02)", async () => {

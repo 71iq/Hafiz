@@ -4,7 +4,7 @@ import { loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { completeSabaqChunk, newPageOrder, nextSabaqTarget } from "@/lib/hifz/sabaq";
 import { chunkCardId, PAGE_COUNT, pageCardId } from "@/lib/hifz/units";
-import { Rating } from "@/lib/fsrs/scheduler";
+import { Rating, type Grade } from "@/lib/fsrs/scheduler";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 const TODAY = "2026-11-13";
@@ -118,6 +118,18 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(passed.pageAdded).toBe(true);
     expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_cards WHERE id LIKE 'chunk:%'").get()).toEqual({ count: 1 });
     expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null })).toBeNull();
+  });
+
+  it("applies two saves of the same chunk queued at once, each from the card the other left", async () => {
+    const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords: () => null }))!;
+    const id = chunkCardId(target.page, target.fromLine, target.toLine);
+    const save = (rating: Grade, minute: number) =>
+      completeSabaqChunk(store.db, { target, plan, rating, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60 + minute) });
+    // Both read the chunk before either transaction runs; neither may calculate from that read.
+    const [first, second] = await Promise.all([save(Rating.Again, 0), save(Rating.Good, 1)]);
+    expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_log WHERE card_id = ?").get(id)).toEqual({ count: 2 });
+    expect(store.sql.prepare("SELECT reps, lapses FROM study_cards WHERE id = ?").get(id)).toEqual({ reps: 2, lapses: 0 });
+    expect(second.transition.updatedCard.reps).toBe(first.transition.updatedCard.reps + 1);
   });
 
   it("counts overlapping chunks passed on two devices once per line", async () => {

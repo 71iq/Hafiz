@@ -46,9 +46,11 @@ import {
 import { expectTextAlignStart, expectWritingDirection, flattenStyle } from "../rtl/rtl-test-utils";
 
 const NativeModal = ReactNative.Modal;
-// Review persistence runs its card and log writes inside one transaction on this database.
+// Review persistence runs its card and log writes inside one transaction on this database. A grade
+// reads the card there first; with no row it grades the queued copy.
 const mockDatabase = Object.freeze({
   identity: "session-due-date-database",
+  getFirstAsync: jest.fn(async (): Promise<unknown> => null),
   withTransactionAsync: async (task: (transaction: unknown) => Promise<void>) => task(mockDatabase),
 });
 const mockRouterReplace = jest.fn();
@@ -645,6 +647,7 @@ function expectNoUnrelatedCardActionServiceCalls(): void {
 describe("Flashcard session due-date editor characterization", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockDatabase.getFirstAsync.mockResolvedValue(null);
     jest.mocked(startReviewSession).mockReturnValue(fixtureSession);
     jest.mocked(recordSessionProgress).mockResolvedValue({} as never);
     jest.mocked(endReviewSession).mockResolvedValue(null);
@@ -1710,7 +1713,9 @@ describe("Flashcard session due-date editor characterization", () => {
         fireEvent.press(gradeButton);
         fireEvent.press(gradeButton);
       });
-      expect(putCardRow).toHaveBeenCalledTimes(1);
+      // The card write follows the grade's read of the current card inside the transaction.
+      await waitFor(() => expect(putCardRow).toHaveBeenCalledTimes(1));
+      expect(mockDatabase.getFirstAsync).toHaveBeenCalledTimes(1);
       expect(putStudyLogRow).not.toHaveBeenCalled();
       expect(recordSessionProgress).not.toHaveBeenCalled();
       expect(view.queryByText(secondCue)).toBeNull();
@@ -1782,6 +1787,37 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(endReviewSession).toHaveBeenCalledTimes(1);
       fireEvent.press(getTextButton(view, s.flashcardsSummaryDone));
       expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
+
+    it("grades the card as sync left it after the queue loaded, and requeues the row that was saved", async () => {
+      jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
+      // Another device's Good review reached this device after the queue was loaded.
+      const synced = calculateReviewTransition({
+        card: firstCard,
+        rating: Rating.Good,
+        reviewedAt: new Date(2026, 10, 2, 11, 0, 0),
+        reviewPolicy: reviewSettings,
+      }).updatedCard;
+      mockDatabase.getFirstAsync.mockResolvedValueOnce(synced);
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsAgain));
+      await waitFor(() => expect(putStudyLogRow).toHaveBeenCalledTimes(1));
+      const reviewedAt = jest.mocked(putStudyLogRow).mock.calls[0][1].reviewedAt;
+      const saved = calculateReviewTransition({
+        card: synced,
+        rating: Rating.Again,
+        reviewedAt: new Date(reviewedAt),
+        reviewPolicy: reviewSettings,
+      });
+      expect(putCardRow).toHaveBeenCalledWith(mockDatabase, saved.updatedCard);
+      expect(saved.updatedCard.reps).toBe(synced.reps + 1);
+      // The requeued card is the saved row: graded again with no row to read, it continues from it.
+      await waitFor(() => expect(view.getByText(s.flashcardsReveal)).toBeTruthy());
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+      await waitFor(() => expect(putCardRow).toHaveBeenCalledTimes(2));
+      expect(jest.mocked(putCardRow).mock.calls[1][1].reps).toBe(saved.updatedCard.reps + 1);
     });
 
     it.each(["card", "log"] as const)(

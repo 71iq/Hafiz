@@ -20,6 +20,7 @@ import { completeSabaqChunk, nextSabaqTarget, type SabaqTarget } from "@/lib/hif
 import { similarGroupsForAyahs, withMemorizedSiblings } from "@/lib/hifz/similar";
 import { refreshWeakSpots } from "@/lib/hifz/use-weak-spots";
 import { strings } from "@/lib/i18n/strings";
+import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 
 type GradingProps = React.ComponentProps<typeof GradingButtons>;
 
@@ -286,6 +287,44 @@ describe("hifz review screen", () => {
     expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
   });
 
+  it("waits for an unresolved save before leaving on Close, then leaves once it is saved", async () => {
+    const save = deferred<typeof saved>();
+    jest.mocked(savePageGrade).mockReturnValue(save.promise);
+    const buttons = await openCheck();
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    // Nothing is counted yet, so Close would leave at once without asking.
+    fireEvent.press(screen.getByRole("button", { name: s.genericClose }));
+    expect(returnToTabs).not.toHaveBeenCalled();
+    await act(async () => save.resolve(saved));
+    await flush();
+    expect(returnToTabs).toHaveBeenCalledTimes(1);
+    expect(endReviewSession).toHaveBeenCalled();
+  });
+
+  it("stays on the page to show a failed save when Close was pressed while it was unresolved", async () => {
+    const save = deferred<typeof saved>();
+    jest.mocked(savePageGrade).mockReturnValueOnce(save.promise).mockResolvedValueOnce(saved);
+    const buttons = await openCheck();
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    fireEvent.press(screen.getByRole("button", { name: s.genericClose }));
+    await act(async () => save.reject(new Error("disk full")));
+    await flush();
+    expect(returnToTabs).not.toHaveBeenCalled();
+    expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
+    // The page is still open, and the cancelled Close does not carry over to the retry.
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    expect(savePageGrade).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
+    expect(returnToTabs).not.toHaveBeenCalled();
+  });
+
   it("dismisses a drill once and refreshes the reader's weak-spot markers (ERR-06)", async () => {
     mockParams = { mode: "mistakes" };
     jest.mocked(readMistakeInbox).mockResolvedValue([inboxItem]);
@@ -331,10 +370,11 @@ describe("sabaq screen", () => {
   });
 
   const press = (name: string) => fireEvent.press(screen.getByRole("button", { name }));
+  type ChunkSave = Awaited<ReturnType<typeof completeSabaqChunk>>;
+  const chunkSaved = { wird: { kind: "none" }, pageAdded: false } as unknown as ChunkSave;
 
-  it("saves the chunk once when the fluent check is graded twice, and not again after it is saved", async () => {
-    const save = deferred<Awaited<ReturnType<typeof completeSabaqChunk>>>();
-    jest.mocked(completeSabaqChunk).mockReturnValue(save.promise);
+  /** Walk the session to its graded fluent check and return its grade buttons. */
+  async function openSabaqCheck() {
     render(<SabaqRoute />, { wrapper: Wrapper });
     await flush();
     // Intention, listening and meaning, then ten readings while looking.
@@ -347,13 +387,63 @@ describe("sabaq screen", () => {
       press(s.hifzSabaqClean);
     }
     press(s.hifzDrillShow);
-    const buttons = grading();
+    return grading();
+  }
+
+  it("does not show the page and lines again under the intention heading", async () => {
+    render(<SabaqRoute />, { wrapper: Wrapper });
+    await flush();
+    expect(screen.getByText(s.hifzSabaqIntention)).toBeTruthy();
+    expect(screen.getAllByText(`Page 5 · Lines 1 to 1`)).toHaveLength(1);
+  });
+
+  it("waits for the check's unresolved grade before leaving on Close, then leaves once it is saved", async () => {
+    const save = deferred<ChunkSave>();
+    jest.mocked(completeSabaqChunk).mockReturnValue(save.promise);
+    const buttons = await openSabaqCheck();
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    press(s.genericClose);
+    expect(returnToTabs).not.toHaveBeenCalled();
+    await act(async () => save.resolve(chunkSaved));
+    await flush();
+    expect(returnToTabs).toHaveBeenCalledTimes(1);
+    expect(endReviewSession).toHaveBeenCalled();
+  });
+
+  it("stays on the check to show a failed grade when Close was pressed while it was unresolved", async () => {
+    const save = deferred<ChunkSave>();
+    jest.mocked(completeSabaqChunk).mockReturnValueOnce(save.promise).mockResolvedValueOnce(chunkSaved);
+    const buttons = await openSabaqCheck();
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    press(s.genericClose);
+    await act(async () => save.reject(new Error("disk full")));
+    await flush();
+    expect(returnToTabs).not.toHaveBeenCalled();
+    expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
+    // The check is still open, and the cancelled Close does not carry over to the retry.
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    expect(completeSabaqChunk).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(s.hifzSabaqDoneTitle)).toBeTruthy();
+    expect(returnToTabs).not.toHaveBeenCalled();
+  });
+
+  it("saves the chunk once when the fluent check is graded twice, and not again after it is saved", async () => {
+    const save = deferred<ChunkSave>();
+    jest.mocked(completeSabaqChunk).mockReturnValue(save.promise);
+    const buttons = await openSabaqCheck();
     await act(async () => {
       void buttons.onGrade(3);
       void buttons.onGrade(3);
     });
     expect(completeSabaqChunk).toHaveBeenCalledTimes(1);
-    await act(async () => save.resolve({ wird: { kind: "none" }, pageAdded: false } as never));
+    await act(async () => save.resolve(chunkSaved));
     await flush();
     await act(async () => {
       void buttons.onGrade(3);

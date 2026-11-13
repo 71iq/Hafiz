@@ -23,7 +23,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { Rating, State } from "@/lib/fsrs/scheduler";
 import type { Grade } from "@/lib/fsrs/scheduler";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
-import { persistReviewTransition } from "@/lib/fsrs/persist-review";
+import { persistReviewTransition, readCurrentCard } from "@/lib/fsrs/persist-review";
 import {
   MUTASHABIHAT_DECK_ID,
   loadReviewQueue,
@@ -725,17 +725,18 @@ function FlashcardSessionScreen() {
     try {
       hapticMedium();
       const reviewedAt = new Date();
-      const transition = calculateReviewTransition({
-        card: currentCard.card,
-        rating,
-        reviewedAt,
-        reviewPolicy: currentCard.settings,
-      });
-
       const saved = await persistReviewTransition({
         db,
         cardId: currentCard.card.id,
-        transition,
+        // The queued row can be older than the card: sync may have applied another device's review
+        // since the queue loaded. Calculate from the card as it is inside the grade's transaction.
+        transition: async (tx) =>
+          calculateReviewTransition({
+            card: (await readCurrentCard(tx, currentCard.card.id)) ?? currentCard.card,
+            rating,
+            reviewedAt,
+            reviewPolicy: currentCard.settings,
+          }),
         context: {
           session: sessionRef.current,
           firstGradeInSession: !reviewedCardIdsRef.current.has(currentCard.card.id),
@@ -754,6 +755,8 @@ function FlashcardSessionScreen() {
       } else if (saved.wird.kind === "earned_back") {
         setWirdNotice(interpolate(s.habitEarnedBack, { days: formatDays(saved.wird.length, uiLanguage) }));
       }
+      // The same-day requeue carries the row that was saved, not one calculated from the queued copy.
+      const { transition } = saved;
       const requeuedCard = transition.shouldRequeueInSession
         ? { ...currentCard, card: transition.updatedCard }
         : null;

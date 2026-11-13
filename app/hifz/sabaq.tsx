@@ -83,7 +83,17 @@ function SabaqScreen() {
   );
   const sessionRef = useRef<ReviewSessionRef | null>(null);
   const startedAt = useRef(Date.now());
-  const saveLock = useRef(false);
+  /**
+   * The fluent check's grade: "open" until it is graded, "saving" while the save is unresolved, then
+   * "saved" for good, since the check is over. Taken before React renders `busy`, so a second tap
+   * cannot grade the chunk again; a failed save opens it again so the user can retry.
+   */
+  const saveLock = useRef<"open" | "saving" | "saved">("open");
+  /**
+   * Close was pressed while the grade was saving. The screen leaves once it is saved, or stays on the
+   * check to show a failed save, which would otherwise reach a departed screen.
+   */
+  const leaveWhenSaved = useRef(false);
   const step: Step = habitResult ? "done" : STEPS[stepIndex];
 
   const load = useCallback(async () => {
@@ -147,19 +157,22 @@ function SabaqScreen() {
     setStepIndex((value) => Math.min(STEPS.length - 1, value + 1));
   };
 
-  const leave = () => {
+  const exit = () => {
     stop();
     const session = sessionRef.current;
     if (session && !habitResult) endReviewSession(db, { session }).catch(console.warn);
     returnToTabs(navigation.getState(), "/(tabs)/home");
   };
 
+  /** Leave now, or once the check's unresolved grade settles (see leaveWhenSaved). */
+  const leave = () => {
+    if (saveLock.current === "saving") leaveWhenSaved.current = true;
+    else exit();
+  };
+
   const finish = async (rating: Grade) => {
-    if (!target || !plan || saveLock.current) return;
-    // Taken before React renders `busy`, so a second tap cannot grade the chunk again. A saved chunk
-    // keeps the lock, since the check is over; a failed save releases it so the user can retry.
-    saveLock.current = true;
-    let saved = false;
+    if (!target || !plan || saveLock.current !== "open") return;
+    saveLock.current = "saving";
     setBusy(true);
     setError(null);
     try {
@@ -170,7 +183,12 @@ function SabaqScreen() {
         session: sessionRef.current,
         durationMs: Date.now() - startedAt.current,
       });
-      saved = true;
+      saveLock.current = "saved";
+      if (leaveWhenSaved.current) {
+        emitHabitChanged();
+        exit();
+        return;
+      }
       const session = sessionRef.current;
       const [overview] = await Promise.all([
         loadHabitOverview(db).catch(() => null),
@@ -186,9 +204,10 @@ function SabaqScreen() {
       });
     } catch (saveError) {
       console.warn("[Sabaq] Save failed:", saveError);
+      leaveWhenSaved.current = false;
       setError(s.hifzSaveFailed);
     } finally {
-      if (!saved) saveLock.current = false;
+      if (saveLock.current === "saving") saveLock.current = "open";
       setBusy(false);
     }
   };
@@ -288,27 +307,28 @@ function SabaqScreen() {
           >
             {stepTitle[step]}
           </Text>
-          <Text dir={dir} align={centered ? "center" : undefined} variant="muted" style={{ lineHeight: 20 }}>
-            {step === "intention"
-              ? portion
-              : step === "listen"
-              ? s.hifzSabaqListenHint
-              : step === "looking"
-                ? s.hifzSabaqLookingHint
-                : step === "ayah"
-                  ? s.hifzSabaqAyahHint
-                  : step === "chunk"
-                    ? s.hifzSabaqChunkHint
-                    : step === "link"
-                      ? s.hifzSabaqLinkHint
-                      : step === "check"
-                        ? s.hifzSabaqCheckHint
-                        : step === "similar"
-                          ? s.hifzSimilarHint
-                        : step === "done"
-                          ? s.hifzSabaqDone
-                          : ""}
-          </Text>
+          {/* The header already names the page and lines, so the intention has no caption. */}
+          {step !== "intention" ? (
+            <Text dir={dir} align={centered ? "center" : undefined} variant="muted" style={{ lineHeight: 20 }}>
+              {step === "listen"
+                ? s.hifzSabaqListenHint
+                : step === "looking"
+                  ? s.hifzSabaqLookingHint
+                  : step === "ayah"
+                    ? s.hifzSabaqAyahHint
+                    : step === "chunk"
+                      ? s.hifzSabaqChunkHint
+                      : step === "link"
+                        ? s.hifzSabaqLinkHint
+                        : step === "check"
+                          ? s.hifzSabaqCheckHint
+                          : step === "similar"
+                            ? s.hifzSimilarHint
+                            : step === "done"
+                              ? s.hifzSabaqDone
+                              : ""}
+            </Text>
+          ) : null}
           {step === "done" ? (
             <Text dir={dir} align="center" variant="caption" style={{ lineHeight: 18 }}>
               {s.hifzSabaqSecondLook}

@@ -13,7 +13,7 @@ import type { RecitationErrorInput, RecitationErrorType } from "@/lib/hifz/error
 import { capRating, proposeRating, type AttemptEvents, type Rating, type SupportLevel } from "@/lib/hifz/grading";
 import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import type { HifzPlan } from "@/lib/hifz/plan";
-import { derivePageTiers, ensureManzilCycleStart, MANZIL_CYCLE_START_KEY, T_REV_KEY } from "@/lib/hifz/pages";
+import { derivePageTiers, ensureManzilCycleStart, loadPageCard, MANZIL_CYCLE_START_KEY, T_REV_KEY } from "@/lib/hifz/pages";
 import { isManzil, pagePolicy, tierFor, type PageHistory, type Tier } from "@/lib/hifz/tiers";
 import { errorHalf, hasSeamAfter, remediateHalf, remediationPolicy, reviewSeam, type Half } from "@/lib/hifz/remediation";
 import { HIFZ_PAGES_DECK_ID, parsePageUnit } from "@/lib/hifz/units";
@@ -169,6 +169,7 @@ async function completeManzilCycleIfDone(
 }
 
 export type PageGradeInput = Readonly<{
+  /** The page as the screen loaded it. The grade reads the current card and history in its transaction. */
   card: StudyCardRow;
   history: PageHistory;
   plan: HifzPlan;
@@ -200,20 +201,9 @@ export async function savePageGrade(
   const today: LocalDate = localDateOf(now);
   const level = input.attempt.level;
   const rating = input.grader === "salah" ? input.rating : (capRating(input.rating as Rating, level) as Grade);
-  const before = tierFor(input.history, today, input.plan);
   const base = await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID);
-  const transition = calculateReviewTransition({
-    card: input.card,
-    rating,
-    reviewedAt: now,
-    reviewPolicy: pagePolicy(before, input.plan, base),
-  });
-  const after = tierFor({ ...input.history, grades: [...input.history.grades, { date: today, rating }] }, today, input.plan);
-  const updatedCard: StudyCardRow = {
-    ...transition.updatedCard,
-    tier: after,
-    tier_changed_at: after === input.card.tier ? (input.card.tier_changed_at ?? null) : now.toISOString(),
-  };
+  /** The page's tier after this grade, derived inside the transaction from its current history. */
+  let after = null as Tier | null;
   const proposed = input.grader === "salah" ? null : proposedRating(input.attempt);
   const recited = input.grader !== "salah";
   const page = parsePageUnit(input.card.id);
@@ -234,7 +224,28 @@ export async function savePageGrade(
   const result = await persistReviewTransition({
     db,
     cardId: input.card.id,
-    transition: { ...transition, updatedCard },
+    // The queued page can be stale: sync may have merged another device's review of it since the
+    // queue was loaded. Read the card and its history and calculate inside the grade's transaction,
+    // so the newer schedule and tier are built on rather than overwritten.
+    transition: async (tx) => {
+      const current = await loadPageCard(tx, input.card.id, { today, plan: input.plan });
+      const card = current?.row ?? input.card;
+      const history = current?.history ?? input.history;
+      const transition = calculateReviewTransition({
+        card,
+        rating,
+        reviewedAt: now,
+        reviewPolicy: pagePolicy(tierFor(history, today, input.plan), input.plan, base),
+      });
+      const tier = tierFor({ ...history, grades: [...history.grades, { date: today, rating }] }, today, input.plan);
+      after = tier;
+      const updatedCard: StudyCardRow = {
+        ...transition.updatedCard,
+        tier,
+        tier_changed_at: tier === card.tier ? (card.tier_changed_at ?? null) : now.toISOString(),
+      };
+      return { ...transition, updatedCard };
+    },
     context: {
       session: input.session,
       firstGradeInSession: true,
@@ -246,7 +257,7 @@ export async function savePageGrade(
       dhuhr: input.dhuhr,
     },
     extraWork: async (tx) => {
-      if (isManzil(after)) await completeManzilCycleIfDone(tx, now, input.plan);
+      if (after !== null && isManzil(after)) await completeManzilCycleIfDone(tx, now, input.plan);
       if (half && pageNumber !== null) await remediateHalf(tx, { page: pageNumber, half, now });
       if (seam && pageNumber !== null) await reviewSeam(tx, { page: pageNumber, clean: seam === "clean", now });
       // SCH-07, MUT-04: a drift into a similar verse brings that pair's cards due within a day.
@@ -257,6 +268,7 @@ export async function savePageGrade(
       }
     },
   });
+  if (after === null) throw new Error("The page grade was saved without its tier.");
   return { ...result, tier: after, remediation: { half: pageNumber === null ? null : half, seam } };
 }
 

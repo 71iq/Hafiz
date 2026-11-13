@@ -1,10 +1,9 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { insertNewStudyCard, newStudyCardRow, readDeckReviewSettings } from "@/lib/fsrs/queries";
-import { persistReviewTransition, type ReviewSaveResult } from "@/lib/fsrs/persist-review";
+import { persistReviewTransition, readCurrentCard, type ReviewSaveResult } from "@/lib/fsrs/persist-review";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import type { ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import type { Grade } from "@/lib/fsrs/scheduler";
-import type { StudyCardRow } from "@/lib/fsrs/types";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { loadRecitationPage, type PageLine, type PageWordsLines, type RecitationPage } from "@/lib/hifz/page-data";
 import type { HifzPlan } from "@/lib/hifz/plan";
@@ -153,23 +152,25 @@ export async function completeSabaqChunk(
 ): Promise<ReviewSaveResult & { pageAdded: boolean }> {
   const at = now.toISOString();
   const id = chunkCardId(target.page, Math.max(1, target.fromLine), Math.min(LINES_PER_PAGE, target.toLine));
-  // A chunk that failed its fluent check before is checked again on the same card. A new chunk is
-  // created in the grade's own transaction, so a failed save leaves nothing behind.
-  const existing = await db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [id]);
-  const card = existing ?? newStudyCardRow({ id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
   const base = await readDeckReviewSettings(db, HIFZ_SABAQ_DECK_ID);
-  const transition = calculateReviewTransition({ card, rating, reviewedAt: now, reviewPolicy: pagePolicy("sabaq", plan, base) });
   const addsPage = target.completesPage && rating >= 3;
   let pageAdded = false;
   const result = await persistReviewTransition({
     db,
     cardId: id,
-    transition,
-    beforeWork: existing
-      ? undefined
-      : async (tx) => {
-          await insertNewStudyCard(tx, { id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
-        },
+    // A chunk that failed its fluent check before is checked again on the same card. A new chunk is
+    // created in the grade's own transaction, so a failed save leaves nothing behind; creating it does
+    // nothing when the card already exists.
+    beforeWork: async (tx) => {
+      await insertNewStudyCard(tx, { id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
+    },
+    // Read inside the transaction: sync or another save of this chunk may have graded it since the
+    // check started, and calculating from an earlier read would overwrite that newer schedule.
+    transition: async (tx) => {
+      const card =
+        (await readCurrentCard(tx, id)) ?? newStudyCardRow({ id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
+      return calculateReviewTransition({ card, rating, reviewedAt: now, reviewPolicy: pagePolicy("sabaq", plan, base) });
+    },
     context: {
       session,
       firstGradeInSession: true,
