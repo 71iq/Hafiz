@@ -68,13 +68,13 @@ describe("higher-level RTL source contracts", () => {
       "style={mirroredRowStyle}",
     ]);
 
-    expectSourceContainsAll("app/(tabs)/leaderboard.tsx", [
-      "export function LeaderboardRow({",
-      "isRTL={isRTL}",
-      "isRTL: boolean;",
-      'direction: "ltr"',
-      'flexDirection: isRTL ? "row-reverse" : "row"',
+    // Halaqa and Board rows share one mirrored row style.
+    expectSourceContainsAll("components/social/SocialControls.tsx", [
+      "export function socialRowStyle(isRTL: boolean): ViewStyle {",
+      'return { direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" };',
     ]);
+    expectSourceContainsAll("components/social/BoardStandings.tsx", ["style={socialRowStyle(isRTL)}"]);
+    expectSourceContainsAll("components/social/HalaqaGroup.tsx", ["socialRowStyle(isRTL)"]);
 
     expectSourceContainsAll("components/achievements/PublicBadgesGrid.tsx", [
       'style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}',

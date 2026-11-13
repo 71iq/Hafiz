@@ -1,20 +1,17 @@
-import {
-  fetchPublicAchievementUnlocks,
-  fetchPublicReviewActivity,
-  fetchPublicSurahProgress,
-  fetchStreakLeaderboard,
-} from "@/lib/leaderboard/api";
+import { fetchPublicAchievementUnlocks, fetchPublicProfile, fetchPublicSurahProgress } from "@/lib/leaderboard/api";
 
-const mockTables = new Map<string, { data: unknown; error: null }>();
+const mockTables = new Map<string, { data: unknown; error: unknown }>();
+const mockSelections: Array<{ table: string; columns: string }> = [];
 function mockQuery(table: string) {
   const result = mockTables.get(table) ?? { data: [], error: null };
   const query = Object.assign(Promise.resolve(result), {
     maybeSingle: () => Promise.resolve(result),
-    select: () => query,
+    select: (columns: string) => {
+      mockSelections.push({ table, columns });
+      return query;
+    },
     eq: () => query,
-    gte: () => query,
     order: () => query,
-    limit: () => query,
   });
   return query;
 }
@@ -26,24 +23,50 @@ jest.mock("@/lib/supabase", () => ({
 const USER = "00000000-0000-4000-8000-000000000001";
 
 beforeEach(() => {
-  jest.useFakeTimers();
-  jest.setSystemTime(new Date("2026-11-03T12:00:00Z"));
   mockTables.clear();
+  mockSelections.length = 0;
 });
-afterEach(() => jest.useRealTimers());
+afterEach(() => jest.restoreAllMocks());
 
-describe("RF-191 leaderboard and public stats rows are validated", () => {
-  it("rejects a review count that is not a number instead of concatenating it", async () => {
-    mockTables.set("public_review_activity", { data: [{ date: "2026-11-02", reviews_count: "5" }], error: null });
-    mockTables.set("public_review_stats", { data: null, error: null });
+describe("RF-191 public profile rows are validated", () => {
+  it("reads identity only, never totals or streaks the server no longer publishes", async () => {
+    mockTables.set("profiles", {
+      data: { id: USER, username: "amina", display_name: null, avatar_url: null, bio: "Hi", country: null },
+      error: null,
+    });
 
-    await expect(fetchPublicReviewActivity(USER, 7)).rejects.toThrow();
+    await expect(fetchPublicProfile(USER)).resolves.toEqual({
+      id: USER,
+      username: "amina",
+      display_name: null,
+      avatar_url: null,
+      bio: "Hi",
+      country: null,
+    });
+    expect(mockSelections).toEqual([{ table: "profiles", columns: "id, username, display_name, avatar_url, bio, country" }]);
   });
 
-  it("rejects malformed public stats instead of showing undefined totals", async () => {
-    mockTables.set("public_review_stats", { data: { total_reviews: "many" }, error: null });
+  it("falls back to the identity columns when bio and country are missing from the server", async () => {
+    let calls = 0;
+    mockTables.set("profiles", { data: null, error: { code: "PGRST204", message: "column profiles.bio does not exist" } });
+    const fallback = { data: { id: USER, username: "amina", display_name: "A", avatar_url: null }, error: null };
+    const original = mockTables.get.bind(mockTables);
+    jest.spyOn(mockTables, "get").mockImplementation((table) => (table === "profiles" && calls++ > 0 ? fallback : original(table)));
 
-    await expect(fetchPublicReviewActivity(USER, 7)).rejects.toThrow();
+    await expect(fetchPublicProfile(USER)).resolves.toEqual({
+      id: USER,
+      username: "amina",
+      display_name: "A",
+      avatar_url: null,
+      bio: null,
+      country: null,
+    });
+  });
+
+  it("rejects a profile whose username is not text", async () => {
+    mockTables.set("profiles", { data: { id: USER, username: 7 }, error: null });
+
+    await expect(fetchPublicProfile(USER)).rejects.toThrow();
   });
 
   it("rejects a surah progress row without a numeric surah", async () => {
@@ -58,21 +81,7 @@ describe("RF-191 leaderboard and public stats rows are validated", () => {
     await expect(fetchPublicAchievementUnlocks(USER)).rejects.toThrow();
   });
 
-  it("rejects a streak row without a date", async () => {
-    mockTables.set("daily_scores", { data: [{ user_id: USER, profiles: null }], error: null });
-
-    await expect(fetchStreakLeaderboard()).rejects.toThrow();
-  });
-
   it("keeps the null fallbacks for valid rows", async () => {
-    mockTables.set("public_review_activity", { data: [{ date: "2026-11-02", reviews_count: null }], error: null });
-    mockTables.set("public_review_stats", {
-      data: { total_reviews: 4, active_days: null, current_streak: 1, longest_streak: null, last_review_date: null },
-      error: null,
-    });
-    mockTables.set("daily_scores", { data: [{ date: "2026-11-02", reviews_count: 2 }], error: null });
-
-    await expect(fetchPublicReviewActivity(USER, 7)).resolves.toMatchObject({ totalReviews: 4 });
     mockTables.set("public_surah_progress", {
       data: [{ surah: 2, total_cards: null, memorized_cards: 1 }],
       error: null,

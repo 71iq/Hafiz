@@ -148,45 +148,6 @@ type ComposedSkeletonProps = ViewProps & {
   isDark?: boolean;
 };
 
-export const LeaderboardSkeleton = React.memo(function LeaderboardSkeleton({
-  isDark = false,
-  className,
-  ...props
-}: ComposedSkeletonProps) {
-  return (
-    <View className={cn("px-4 pt-4", className)} {...props}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <View
-          key={i}
-          className="flex-row items-center py-3"
-          style={{ gap: 12 }}
-        >
-          {/* Rank badge */}
-          <SkeletonCircle isDark={isDark} size={28} />
-          {/* Avatar */}
-          <SkeletonCircle isDark={isDark} size={40} />
-          {/* Name + secondary text */}
-          <View className="flex-1" style={{ gap: 6 }}>
-            <SkeletonText
-              isDark={isDark}
-              width={i % 2 === 0 ? "60%" : "45%"}
-              lineHeight={14}
-            />
-            <SkeletonText isDark={isDark} width="30%" lineHeight={10} />
-          </View>
-          {/* Score */}
-          <Skeleton
-            isDark={isDark}
-            width={48}
-            height={20}
-            borderRadius={10}
-          />
-        </View>
-      ))}
-    </View>
-  );
-});
-
 // ---------------------------------------------------------------------------
 // Pre-composed: ReflectionsSkeleton
 // 3 reflection card placeholders

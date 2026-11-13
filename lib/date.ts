@@ -22,10 +22,6 @@ export function formatLocalDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function formatUtcDateKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 export function dayIndexFromLocalDateKey(dateKey: string): number {
   const [year, month, day] = dateKey.split("-").map(Number);
   const localDate = new Date(year, (month || 1) - 1, day || 1);

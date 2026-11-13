@@ -1,13 +1,12 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { authCommands } from "@/lib/auth/commands";
-import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
+import { getAuthSessionIdentity, isAccountId } from "@/lib/auth/session-identity";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Check, ChevronDown, MapPin, Pencil, Save, Search, Trash2, UserRound, X, type LucideIcon } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { isAccountId } from "@/lib/auth/session-identity";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { DefaultDeckProgressChart } from "@/components/progress/DefaultDeckProgressChart";
@@ -21,19 +20,20 @@ import { getRecentUnlocks } from "@/lib/achievements/queries";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabase } from "@/lib/database/provider";
-import { getWirdStatus, getReviewStats } from "@/lib/fsrs/queries";
+import { getReviewStats } from "@/lib/fsrs/queries";
+import { loadHabitOverview } from "@/lib/habit/queries";
+import { longestStreak, toDayMap } from "@/lib/habit/streak";
 import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
-import { getTotalScore } from "@/lib/fsrs/scoring";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { useStrings } from "@/lib/i18n/useStrings";
 import {
   fetchPublicAchievementUnlocks,
   fetchPublicProfile,
-  fetchPublicReviewActivity,
   fetchPublicSurahProgress,
   type PublicProfile,
 } from "@/lib/leaderboard/api";
 import { uploadProfileAvatar } from "@/lib/profile/avatar";
+import { fetchProfileSummary, profilePrivacyKeys } from "@/lib/profile/privacy";
 import {
   attachSurahNames,
   getDefaultDeckProgress,
@@ -60,7 +60,6 @@ type ProfileStatsSnapshot = {
   currentStreak: number;
   longestStreak: number;
   cardsReviewed: number;
-  totalScore: number;
 };
 
 type ReviewSnapshot = {
@@ -164,13 +163,6 @@ function getLocalizedCountryValue(value: string, language: UILanguage): string {
   return findCountryOptionByValue(value, options)?.label ?? value;
 }
 
-function chooseRicherReview(local: ReviewSnapshot, remote: ReviewSnapshot | null | undefined): ReviewSnapshot {
-  if (!remote) return local;
-  if (remote.totalReviews > local.totalReviews) return remote;
-  if (remote.totalReviews === local.totalReviews && remote.activeDays > local.activeDays) return remote;
-  return local;
-}
-
 function chooseRicherSurahProgress(local: ProfileSurahProgress[], remote: ProfileSurahProgress[]): ProfileSurahProgress[] {
   if (remote.length === 0) return local;
   const localSummary = summarizeSurahProgress(local);
@@ -270,10 +262,11 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     staleTime: 1000 * 60 * 2,
   });
 
+  // Signed-in viewers see only the juz completions a shared halaqa has; signed-out viewers see none.
   const publicBadgesQuery = useQuery({
-    queryKey: ["publicAchievementUnlocks", requestedUserId],
+    queryKey: ["publicAchievementUnlocks", user?.id ?? "signed-out", requestedUserId],
     queryFn: () => fetchPublicAchievementUnlocks(requestedUserId),
-    enabled: hasValidRequestedUserId && !isOwnProfile,
+    enabled: hasValidRequestedUserId && !isOwnProfile && !!user,
     staleTime: 1000 * 60 * 2,
   });
 
@@ -284,17 +277,19 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     staleTime: 1000 * 60,
   });
 
-  const publicActivityQuery = useQuery({
-    queryKey: ["publicReviewActivity", requestedUserId],
-    queryFn: () => fetchPublicReviewActivity(requestedUserId),
-    enabled: hasValidRequestedUserId && !isSignedOutOwnProfile,
+  // Another person's streak and juz completions, only where they shared them (SOC-01).
+  const profileSummaryQuery = useQuery({
+    queryKey: profilePrivacyKeys.summary(user?.id ?? null, requestedUserId),
+    queryFn: () => fetchProfileSummary(requestedUserId),
+    enabled: hasValidRequestedUserId && !isOwnProfile && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
   });
 
+  // The server copy of surah progress is readable only by its owner; it fills in other devices' cards.
   const publicSurahProgressQuery = useQuery({
     queryKey: ["publicSurahProgress", requestedUserId],
     queryFn: async () => attachSurahNames(db, await fetchPublicSurahProgress(requestedUserId)),
-    enabled: hasValidRequestedUserId && !isSignedOutOwnProfile,
+    enabled: hasValidRequestedUserId && isOwnProfile,
     staleTime: 1000 * 60 * 2,
   });
 
@@ -319,11 +314,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           avatar_url: profile.avatar_url,
           bio: profile.bio,
           country: profile.country,
-          total_score: profile.total_score,
-          current_streak: profile.current_streak,
-          longest_streak: profile.longest_streak,
-          cards_reviewed: profile.cards_reviewed,
-          last_review_date: profile.last_review_date,
         }
       : null
     : publicProfile;
@@ -358,35 +348,32 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const saveProfileBackgroundColor = saveProfileDisabled && !profileSaving
     ? themeColors.surfaceHigh
     : isDark ? "#0f766e" : "#0d9488";
-  const localStatsSnapshot = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0, totalScore: 0 };
-  const today = new Date().toISOString().slice(0, 10);
-  const remoteReview = publicActivityQuery.data ?? null;
-  const review = isOwnProfile
-    ? chooseRicherReview(localReview, remoteReview)
-    : remoteReview ?? { activity: [], activeDays: 0, totalReviews: 0 };
-  const ownRemoteCurrentStreak = visibleProfile?.last_review_date?.slice(0, 10) === today ? visibleProfile?.current_streak ?? 0 : 0;
-  const ownStats = {
-    currentStreak: Math.max(localStatsSnapshot.currentStreak, ownRemoteCurrentStreak),
-    longestStreak: Math.max(localStatsSnapshot.longestStreak, visibleProfile?.longest_streak ?? 0),
-    cardsReviewed: Math.max(localStatsSnapshot.cardsReviewed, visibleProfile?.cards_reviewed ?? 0, review.totalReviews),
-    totalScore: Math.max(localStatsSnapshot.totalScore, visibleProfile?.total_score ?? 0),
-  };
-  const publicCardsReviewed = Math.max(visibleProfile?.cards_reviewed ?? 0, review.totalReviews);
+  const localStatsSnapshot = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0 };
+  // Activity and progress are private (SOC-01): the owner sees this device's history, others see only
+  // the streak and juz completions the person chose to share.
+  const review = localReview;
   const remoteSurahProgress = publicSurahProgressQuery.data ?? [];
-  const surahProgress = isOwnProfile ? chooseRicherSurahProgress(localSurahProgress, remoteSurahProgress) : remoteSurahProgress;
+  const surahProgress = isOwnProfile ? chooseRicherSurahProgress(localSurahProgress, remoteSurahProgress) : [];
   const surahSummary = summarizeSurahProgress(surahProgress);
   const averageDailyReviews = review.activeDays > 0 ? Math.round(review.totalReviews / review.activeDays) : 0;
-  const stats = [
-    { label: s.progressRetention, value: `${surahSummary.retentionPct}%` },
-    { label: s.progressTotalMemorized, value: surahSummary.memorized },
-    { label: s.wirdCurrent, value: isOwnProfile ? ownStats.currentStreak : visibleProfile?.current_streak ?? 0 },
-    { label: s.wirdLongest, value: isOwnProfile ? ownStats.longestStreak : visibleProfile?.longest_streak ?? 0 },
-    { label: s.progressAvgDaily, value: averageDailyReviews },
-    { label: s.flashcardsSummaryReviewed, value: isOwnProfile ? ownStats.cardsReviewed : publicCardsReviewed },
-    { label: s.leaderboardPoints, value: isOwnProfile ? ownStats.totalScore : visibleProfile?.total_score ?? 0 },
-    { label: s.heatmapActiveDays, value: review.activeDays },
-    { label: s.heatmapTotalReviews, value: review.totalReviews },
-  ];
+  const sharedSummary = profileSummaryQuery.data ?? null;
+  const stats: { label: string; value: number | string }[] = isOwnProfile
+    ? [
+        { label: s.progressRetention, value: `${surahSummary.retentionPct}%` },
+        { label: s.progressTotalMemorized, value: surahSummary.memorized },
+        { label: s.wirdCurrent, value: localStatsSnapshot.currentStreak },
+        { label: s.wirdLongest, value: localStatsSnapshot.longestStreak },
+        { label: s.progressAvgDaily, value: averageDailyReviews },
+        { label: s.flashcardsSummaryReviewed, value: localStatsSnapshot.cardsReviewed },
+        { label: s.heatmapActiveDays, value: review.activeDays },
+        { label: s.heatmapTotalReviews, value: review.totalReviews },
+      ]
+    : [
+        ...(sharedSummary?.streak != null ? [{ label: s.wirdCurrent, value: sharedSummary.streak }] : []),
+        ...(sharedSummary?.juzCompleted != null
+          ? [{ label: s.socialProfileJuzCompleted, value: sharedSummary.juzCompleted.length }]
+          : []),
+      ];
   const publicBadges = isOwnProfile ? ownBadgesQuery.data ?? [] : publicBadgesQuery.data ?? [];
   const loadingPublic = !isOwnProfile && !isSignedOutOwnProfile && publicProfileQuery.isLoading;
   const publicProfileMissing =
@@ -404,17 +391,16 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
   const loadLocalOverview = useCallback(async () => {
     if (!user) return;
-    const [wirdStatus, totalScore, cardsReviewedRow, reviewStats] = await Promise.all([
-      getWirdStatus(db),
-      getTotalScore(db),
+    // The wird streak is the same one Home and Progress show (lib/habit), not a count of review days.
+    const [habit, cardsReviewedRow, reviewStats] = await Promise.all([
+      loadHabitOverview(db),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
       getReviewStats(db),
     ]);
     setLocalStats({
-      currentStreak: wirdStatus.currentDays,
-      longestStreak: wirdStatus.longestDays,
+      currentStreak: habit.streak.length,
+      longestStreak: longestStreak(toDayMap(habit.days), habit.today),
       cardsReviewed: cardsReviewedRow?.count ?? 0,
-      totalScore,
     });
     setLocalReview({
       activity: reviewStats.activity,
@@ -438,7 +424,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
   const invalidateProfileSurfaces = useCallback((isCurrent: () => boolean) => {
     const keys = [["publicProfile"], reflectionQueryKeys.feed.all, reflectionQueryKeys.reflections.all,
-      reflectionQueryKeys.comments.all, ["leaderboard"]];
+      reflectionQueryKeys.comments.all, ["halaqa"], ["board"]];
     for (const queryKey of keys) {
       if (!isCurrent()) return;
       queryClient.invalidateQueries({ queryKey });
@@ -456,7 +442,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     return subscribeReviewActivity(() => {
       loadLocalOverview().catch(console.warn);
       updateProfileStats(db).catch(console.warn);
-      queryClient.invalidateQueries({ queryKey: ["publicReviewActivity", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["publicSurahProgress", user?.id] });
     });
   }, [db, isOwnProfile, loadLocalOverview, queryClient, user?.id]);
@@ -661,6 +646,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                   publicBadges={publicBadges}
                   numberLocale={numberLocale}
                   isOwnProfile={isOwnProfile}
+                  sharedSummaryLoading={profileSummaryQuery.isLoading}
                   isDark={isDark}
                   isRTL={isRTL}
                 />
@@ -1164,6 +1150,7 @@ function ProfileOverview({
   publicBadges,
   numberLocale,
   isOwnProfile,
+  sharedSummaryLoading,
   isDark,
   isRTL,
 }: {
@@ -1176,6 +1163,7 @@ function ProfileOverview({
   publicBadges: any[];
   numberLocale: string;
   isOwnProfile: boolean;
+  sharedSummaryLoading: boolean;
   isDark: boolean;
   isRTL: boolean;
 }) {
@@ -1236,6 +1224,30 @@ function ProfileOverview({
         </Card>
       ) : null}
 
+      {!isOwnProfile ? (
+        <Card elevation="low" className="p-5">
+          <Text
+            className="mb-3 text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.progressActivity}
+          </Text>
+          {stats.length > 0 ? (
+            <ProfileActivityStats items={stats} numberLocale={numberLocale} isDark={isDark} isWide={isWideActivity} isRTL={isRTL} />
+          ) : sharedSummaryLoading ? (
+            <ActivityIndicator color={isDark ? "#5eead4" : "#003638"} />
+          ) : (
+            <Text
+              className="text-warm-700 dark:text-neutral-300"
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+            >
+              {s.socialProfilePrivateNote}
+            </Text>
+          )}
+        </Card>
+      ) : null}
+
+      {isOwnProfile ? (
       <Card elevation="low" className="p-5">
         <Text
           className="mb-4 text-charcoal dark:text-neutral-100"
@@ -1270,6 +1282,7 @@ function ProfileOverview({
           />
         </View>
       </Card>
+      ) : null}
 
       {isOwnProfile ? (
         <DefaultDeckProgressChart
@@ -1281,15 +1294,17 @@ function ProfileOverview({
         />
       ) : null}
 
-      <View>
-        <Text
-          className="mb-3 text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
-        >
-          {s.progressSurahProgress}
-        </Text>
-        <SurahProgressList data={surahProgress} isDark={isDark} isRTL={isRTL} previewLimit={8} readOnly={!isOwnProfile} s={s} />
-      </View>
+      {isOwnProfile ? (
+        <View>
+          <Text
+            className="mb-3 text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.progressSurahProgress}
+          </Text>
+          <SurahProgressList data={surahProgress} isDark={isDark} isRTL={isRTL} previewLimit={8} readOnly={false} s={s} />
+        </View>
+      ) : null}
 
       <Card elevation="low" className="p-5">
         <Text

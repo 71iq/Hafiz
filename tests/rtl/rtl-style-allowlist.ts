@@ -6,11 +6,6 @@ export type RtlStyleAllowlistEntry = {
 
 export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
   {
-    file: "app/(tabs)/leaderboard.tsx",
-    pattern: /left|right|ml-/,
-    reason: "Existing leaderboard accents and score chip spacing are covered by later route-level RTL checks.",
-  },
-  {
     file: "app/(tabs)/mushaf.tsx",
     pattern: /left|right|marginLeft|marginRight|borderLeftWidth|borderRightWidth/,
     reason: "Reader route contains full-width overlays, page-spread coordinates, and Quran-specific geometry for later Playwright coverage.",

@@ -1,24 +1,17 @@
 import { DatabaseSync } from "node:sqlite";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { dayIndexFromLocalDateKey, dayIndexFromUtcDateKey } from "@/lib/date";
-import { getStudyStreak, getWirdStatus, getReviewStats } from "@/lib/fsrs/queries";
-import { fetchStreakLeaderboard } from "@/lib/leaderboard/api";
+import { getReviewStats } from "@/lib/fsrs/queries";
 
-const mockRows: {
-  user_id: string;
-  date: string;
-  profiles: { username: string; display_name: null; avatar_url: null } | null;
-}[] = [];
-const mockFrom = jest.fn((table: string) => {
-  if (table !== "daily_scores") throw new Error(`Unexpected table ${table}`);
-  return Object.assign(Promise.resolve({ data: mockRows, error: null }), {
-    select: jest.fn().mockReturnThis(),
-    order: jest.fn().mockReturnThis(),
-  });
-});
+// Review stats never read the network; the public streak board and daily_scores were retired. The wird
+// streak itself lives in lib/habit and is tested in habit-core and habit-wird-progress.
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
-  supabase: { from: (table: string) => mockFrom(table) },
+  supabase: {
+    from: (table: string) => {
+      throw new Error(`Unexpected table ${table}`);
+    },
+  },
 }));
 jest.mock("@/lib/database/sync-queue", () => ({ enqueueSync: jest.fn(async () => undefined) }));
 
@@ -58,9 +51,9 @@ describe("local calendar ordinals", () => {
 });
 
 describe.each([
-  { dates: ["2026-03-28", "2026-03-29", "2026-03-30", "2026-03-31"], next: "2026-04-01" },
-  { dates: ["2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27"], next: "2026-10-28" },
-])("actual caller streaks for $dates", ({ dates, next }) => {
+  { dates: ["2026-03-28", "2026-03-29", "2026-03-30", "2026-03-31"] },
+  { dates: ["2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27"] },
+])("review stats across daylight saving for $dates", ({ dates }) => {
   let sql: DatabaseSync;
   let db: SQLiteDatabase;
 
@@ -75,8 +68,6 @@ describe.each([
     // Match the established Node SQLite fixture pattern. Only getAllAsync is
     // implemented; an unexpected native method fails instead of being faked.
     db = adapter as unknown as SQLiteDatabase;
-    mockRows.length = 0;
-    mockFrom.mockClear();
   });
 
   afterEach(() => {
@@ -90,17 +81,9 @@ describe.each([
     for (const key of keys) statement.run(`${key}T12:00:00`);
   }
 
-  it("keeps actual SQLite study/wird/stats at four consecutive days, ignoring duplicate and invalid rows", async () => {
+  it("keeps actual SQLite review stats at four consecutive days, ignoring duplicate and invalid rows", async () => {
     insert([...dates, dates[0]]);
     sql.prepare("INSERT INTO study_log VALUES (?)").run("invalid");
-    await expect(getStudyStreak(db)).resolves.toBe(4);
-    await expect(getWirdStatus(db)).resolves.toEqual({
-      currentDays: 4,
-      longestDays: 4,
-      maintainedToday: true,
-      lastReviewDate: `${dates[3]}T12:00:00`,
-      state: "maintained_today",
-    });
     await expect(getReviewStats(db, 4)).resolves.toEqual({
       activity: dates.map((date, i) => ({ date, count: i === 0 ? 2 : 1 })),
       activeDays: 4,
@@ -109,44 +92,5 @@ describe.each([
       longestStreak: 4,
     });
     expect(sql.prepare("SELECT COUNT(*) AS count FROM study_log").get()).toEqual({ count: 6 });
-  });
-
-  it("keeps yesterday open with zero current streak and unchanged last review", async () => {
-    insert(dates);
-    jest.setSystemTime(new Date(`${next}T12:00:00`));
-    await expect(getStudyStreak(db)).resolves.toBe(0);
-    await expect(getWirdStatus(db)).resolves.toEqual({
-      currentDays: 0,
-      longestDays: 4,
-      maintainedToday: false,
-      lastReviewDate: `${dates[3]}T12:00:00`,
-      state: "open_today",
-    });
-  });
-
-  it("keeps an actual two-day calendar gap in fresh_start", async () => {
-    insert([dates[1]]);
-    await expect(getWirdStatus(db)).resolves.toMatchObject({ currentDays: 0, longestDays: 1, state: "fresh_start" });
-  });
-
-  it("keeps public streak ranking, duplicate dates and missing profile fallbacks", async () => {
-    jest.setSystemTime(new Date(`${dates[3]}T12:00:00Z`));
-    for (const date of [...dates, dates[1]])
-      mockRows.push({
-        user_id: "four-days",
-        date,
-        profiles: { username: "four", display_name: null, avatar_url: null },
-      });
-    mockRows.push({
-      user_id: "one-day",
-      date: dates[3],
-      profiles: null,
-    });
-    await expect(fetchStreakLeaderboard()).resolves.toEqual([
-      { user_id: "four-days", username: "four", display_name: null, avatar_url: null, score: 4, rank: 1 },
-      { user_id: "one-day", username: "unknown", display_name: null, avatar_url: null, score: 1, rank: 2 },
-    ]);
-    expect(mockFrom).toHaveBeenCalledTimes(1);
-    expect(mockFrom).toHaveBeenCalledWith("daily_scores");
   });
 });

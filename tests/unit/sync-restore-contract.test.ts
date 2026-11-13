@@ -64,34 +64,26 @@ describe("account sync restore contract", () => {
     }
   });
 
-  it("does not let leaderboard aggregates write before account restore is complete", () => {
+  it("does not repair server surah progress before account restore is complete", () => {
     const source = read("lib/fsrs/leaderboard-sync.ts");
-    const syncDailyScore = functionBody(source, "syncDailyScore");
     const updateProfileStats = functionBody(source, "updateProfileStats");
 
-    expect(syncDailyScore.indexOf("canWriteAccountDerivedStats")).toBeLessThan(syncDailyScore.indexOf("getTodayScore"));
-    expect(updateProfileStats.indexOf("canWriteAccountDerivedStats")).toBeLessThan(updateProfileStats.indexOf("getTotalScore"));
+    expect(updateProfileStats.indexOf("canWriteAccountDerivedStats")).toBeLessThan(
+      updateProfileStats.indexOf("getLocalSurahProgress"),
+    );
   });
 
-  it("keeps public aggregate progress monotonic when local SQLite has fewer rows", () => {
-    const source = read("lib/fsrs/leaderboard-sync.ts");
-    const syncDailyScore = functionBody(source, "syncDailyScore");
-    const updateProfileStats = functionBody(source, "updateProfileStats");
+  it("keeps server surah progress monotonic when local SQLite has fewer rows", () => {
+    const updateProfileStats = functionBody(read("lib/fsrs/leaderboard-sync.ts"), "updateProfileStats");
 
-    expect(syncDailyScore).toContain("Math.max(score, existing?.score ?? 0)");
-    expect(syncDailyScore).toContain("Math.max(reviewsCount, existing?.reviews_count ?? 0)");
-    expect(updateProfileStats).toContain("fetchDailyScoreSummary");
-    expect(updateProfileStats).toContain("Math.max(totalScore, remoteDailySummary.totalScore, profile?.total_score ?? 0)");
-    expect(updateProfileStats).toContain("localReviewSummary.totalReviews");
-    expect(updateProfileStats).toContain("remotePublicReviewSummary?.totalReviews");
-    expect(updateProfileStats).toContain("upsertPublicReviewSummary");
+    expect(updateProfileStats).toContain("Math.max(row.totalCards, existing?.total_cards ?? 0)");
+    expect(updateProfileStats).toContain("Math.max(row.memorized, existing?.memorized_cards ?? 0)");
   });
 
-  it("uses account-backed public activity as the owner profile fallback", () => {
+  it("uses the owner's server surah progress only on their own profile", () => {
     const source = read("components/profile/ProfileModalContent.tsx");
 
-    expect(source).toContain("chooseRicherReview(localReview, remoteReview)");
     expect(source).toContain("chooseRicherSurahProgress(localSurahProgress, remoteSurahProgress)");
-    expect(source.match(/enabled: hasValidRequestedUserId && !isSignedOutOwnProfile/g)).toHaveLength(2);
+    expect(source).toContain("enabled: hasValidRequestedUserId && isOwnProfile,");
   });
 });

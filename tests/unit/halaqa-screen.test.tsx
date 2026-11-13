@@ -1,0 +1,245 @@
+import React from "react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import HalaqaScreen from "@/app/(tabs)/halaqa";
+import { strings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
+import { flattenStyle } from "../rtl/rtl-test-utils";
+
+jest.mock("@react-native-async-storage/async-storage", () =>
+  require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
+);
+
+const mockSettings = {
+  isDark: false,
+  isRTL: false,
+  isLoaded: true,
+  uiLanguage: "en" as "en" | "ar",
+  themeColors: {
+    surface: "#FFF8F1",
+    surfaceLow: "#F9F3EB",
+    surfaceMid: "#F0EBE3",
+    surfaceHigh: "#E8E1DA",
+    surfaceDim: "#DFD9D1",
+    surfaceBright: "#FFFFFF",
+  },
+};
+const mockAuth: { user: { id: string } | null } = { user: null };
+const mockNet = { isConnected: true as boolean | null, isInternetReachable: true as boolean | null };
+const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
+let mockConfigured = true;
+
+jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useRouter: () => ({ push: jest.fn() }) }));
+jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn(async () => true) }));
+jest.mock("@/lib/database/provider", () => ({ useDatabase: () => ({ name: "synthetic" }) }));
+jest.mock("@/lib/settings/context", () => {
+  const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
+  return { ...actual, useSettings: () => mockSettings };
+});
+jest.mock("@/lib/auth/store", () => ({
+  useAuthStore: (selector: (state: typeof mockAuth) => unknown) => selector(mockAuth),
+}));
+jest.mock("@/lib/supabase", () => ({
+  isSupabaseConfigured: () => mockConfigured,
+  supabase: { rpc: (fn: string, args: Record<string, unknown>) => mockRpc(fn, args) },
+}));
+jest.mock("@react-native-community/netinfo", () => ({
+  useNetInfo: () => mockNet,
+  addEventListener: () => () => undefined,
+  fetch: async () => mockNet,
+}));
+jest.mock("@/lib/social/queries", () => ({
+  readLocalSocialBands: async () => ({ levelBand: "juz_amma", paceBand: "light", utcOffsetMinutes: 180 }),
+}));
+
+const USER = "00000000-0000-4000-8000-00000000000a";
+const OTHER = "00000000-0000-4000-8000-00000000000b";
+const GROUP = "00000000-0000-4000-8000-0000000000aa";
+const summary = {
+  id: GROUP,
+  kind: "invite",
+  name: "Family halaqa",
+  invite_code: "ABCD2345",
+  member_count: 2,
+  role: "member",
+  is_creator: false,
+  share_consistency: true,
+  share_juz: true,
+  share_plan_with_teachers: false,
+  share_grades_with_teachers: false,
+};
+const detail = {
+  group: summary,
+  goal: { week_start: "2026-11-09", contributors: 2, target: 10, wird_days: 3 },
+  encouraged_today: false,
+  members: [
+    {
+      user_id: USER,
+      name: "Amina",
+      username: "amina",
+      avatar_url: null,
+      role: "member",
+      is_me: true,
+      week: [true, true, false, false, false, false, false],
+      streak: 4,
+      juz_completions: 1,
+      encouraged_today: false,
+      teacher_view: false,
+    },
+    {
+      user_id: OTHER,
+      name: "Yusuf",
+      username: "yusuf",
+      avatar_url: null,
+      role: "member",
+      is_me: false,
+      week: null,
+      streak: null,
+      juz_completions: null,
+      encouraged_today: false,
+      teacher_view: false,
+    },
+  ],
+  received: [],
+};
+
+const queryClients: QueryClient[] = [];
+function renderScreen() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  queryClients.push(client);
+  return render(
+    <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
+      <QueryClientProvider client={client}>
+        <HalaqaScreen />
+      </QueryClientProvider>
+    </SafeAreaProvider>,
+  );
+}
+
+function respond(handlers: Record<string, unknown>) {
+  mockRpc.mockImplementation(async (fn) => {
+    if (!(fn in handlers)) throw new Error(`Unexpected RPC ${fn}`);
+    return { data: handlers[fn], error: null };
+  });
+}
+
+beforeEach(async () => {
+  mockSettings.isRTL = false;
+  mockSettings.uiLanguage = "en";
+  mockAuth.user = null;
+  mockConfigured = true;
+  mockNet.isConnected = true;
+  mockNet.isInternetReachable = true;
+  mockRpc.mockReset();
+  jest.mocked(router.push).mockClear();
+  await AsyncStorage.clear();
+});
+
+afterEach(() => {
+  cleanup();
+  for (const client of queryClients.splice(0)) client.clear();
+});
+
+describe("Halaqa tab", () => {
+  it("explains and offers sign-in to a signed-out reader in Arabic RTL", () => {
+    mockSettings.isRTL = true;
+    mockSettings.uiLanguage = "ar";
+    const screen = renderScreen();
+
+    expect(screen.getByText(strings.ar.halaqaSignInTitle)).toBeTruthy();
+    expect(screen.getByText(strings.ar.halaqaSignInBody)).toBeTruthy();
+    const button = screen.getByRole("button", { name: strings.ar.socialSignIn });
+    fireEvent.press(button);
+    expect(router.push).toHaveBeenCalledWith("/auth/login");
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("says when the account service is not part of this build", () => {
+    mockConfigured = false;
+    mockAuth.user = { id: USER };
+    const screen = renderScreen();
+    expect(screen.getByText(strings.en.socialUnconfigured)).toBeTruthy();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("offers create, join by code and a matched halaqa when the reader has none", async () => {
+    mockAuth.user = { id: USER };
+    respond({ get_my_halaqas: [], join_matched_halaqa: { ...summary, kind: "matched", name: null, invite_code: null } });
+    const screen = renderScreen();
+
+    expect(await screen.findByText(strings.en.halaqaEmptyTitle)).toBeTruthy();
+    expect(screen.getByText(strings.en.halaqaJoinCode)).toBeTruthy();
+    expect(screen.getByText(strings.en.halaqaCreate)).toBeTruthy();
+    fireEvent.press(screen.getByRole("button", { name: strings.en.halaqaJoinMatched }));
+    await waitFor(() =>
+      expect(mockRpc).toHaveBeenCalledWith("join_matched_halaqa", {
+        p_level_band: "juz_amma",
+        p_pace_band: "light",
+        p_utc_offset_minutes: 180,
+      }),
+    );
+  });
+
+  it("shows the shared goal and only what each member shared, with no ranking", async () => {
+    mockAuth.user = { id: USER };
+    respond({ get_my_halaqas: [summary], get_halaqa_detail: detail, send_halaqa_encouragement: { id: GROUP } });
+    const screen = renderScreen();
+
+    expect(await screen.findByText("Family halaqa")).toBeTruthy();
+    expect(screen.getByText(interpolate(strings.en.halaqaGoalProgress, { done: "3", target: "10" }))).toBeTruthy();
+    expect(screen.getByLabelText(interpolate(strings.en.halaqaWeekA11y, { n: "2" }))).toBeTruthy();
+    expect(screen.getByText(interpolate(strings.en.halaqaStreak, { days: "4 days" }))).toBeTruthy();
+    expect(screen.getByText(strings.en.halaqaNotShared)).toBeTruthy();
+    expect(screen.getByText("ABCD2345")).toBeTruthy();
+    // No member is ranked: there are no standalone position numbers.
+    expect(screen.queryByText(/^#?\d+$/)).toBeNull();
+    // The reader cannot encourage themselves.
+    expect(screen.queryByRole("button", { name: interpolate(strings.en.halaqaEncourageA11y, { name: "Amina" }) })).toBeNull();
+
+    fireEvent.press(screen.getByRole("button", { name: interpolate(strings.en.halaqaEncourageA11y, { name: "Yusuf" }) }));
+    fireEvent.press(await screen.findByRole("button", { name: strings.en.halaqaEncourageDua }));
+    await waitFor(() =>
+      expect(mockRpc).toHaveBeenCalledWith(
+        "send_halaqa_encouragement",
+        expect.objectContaining({ p_group_id: GROUP, p_to_user: OTHER, p_template_id: "dua", p_body: null }),
+      ),
+    );
+  });
+
+  it("mirrors the week dots for Arabic readers", async () => {
+    mockSettings.isRTL = true;
+    mockSettings.uiLanguage = "ar";
+    mockAuth.user = { id: USER };
+    respond({ get_my_halaqas: [summary], get_halaqa_detail: detail });
+    const screen = renderScreen();
+
+    const dots = await screen.findByLabelText(interpolate(strings.ar.halaqaWeekA11y, { n: "٢" }));
+    expect(flattenStyle(dots.props.style)).toMatchObject({ direction: "ltr", flexDirection: "row-reverse" });
+  });
+
+  it("shows the last saved state with its date while offline", async () => {
+    mockAuth.user = { id: USER };
+    respond({ get_my_halaqas: [summary], get_halaqa_detail: detail });
+    const online = renderScreen();
+    expect(await online.findByText("Family halaqa")).toBeTruthy();
+    online.unmount();
+
+    mockNet.isConnected = false;
+    mockRpc.mockReset();
+    const offline = renderScreen();
+    expect(await offline.findByText("Family halaqa")).toBeTruthy();
+    expect(offline.getByText(/^Offline\. Showing what you last saw on /)).toBeTruthy();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps wird features unblocked: offline with nothing saved is a calm note", async () => {
+    mockAuth.user = { id: USER };
+    mockNet.isConnected = false;
+    const screen = renderScreen();
+    expect(await screen.findByText(strings.en.socialOfflineEmpty)).toBeTruthy();
+    await act(async () => undefined);
+  });
+});

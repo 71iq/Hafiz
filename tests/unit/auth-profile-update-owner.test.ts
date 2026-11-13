@@ -102,11 +102,6 @@ const profile = (id: string, name = id): Profile => ({
   avatar_url: null,
   bio: null,
   country: null,
-  total_score: 0,
-  current_streak: 0,
-  longest_streak: 0,
-  cards_reviewed: 0,
-  last_review_date: null,
   created_at: "2026-01-01",
 });
 function deferred() {
@@ -258,7 +253,7 @@ it.each(["wrong-owner", "missing"])(
     const work = useAuthStore.getState().updateProfile({ displayName: "changed" });
     await flush();
 
-    const newer = { ...initial, display_name: "newer", total_score: 900, cards_reviewed: 70 };
+    const newer = { ...initial, display_name: "newer", country: "JO", bio: "newer bio" };
     const wrong = profile("b", "wrong-b");
     const observed: Array<Profile | null> = [];
     useAuthStore.setState({ profile: newer });
@@ -290,11 +285,6 @@ it.each(["metadata", "token-refresh"])("keeps current profile completion through
   const work = useAuthStore.getState().updateProfile({ bio: "value" });
   await flush();
   const stats = {
-    total_score: 900,
-    cards_reviewed: 70,
-    current_streak: 8,
-    longest_streak: 9,
-    last_review_date: "2026-11-06",
   };
   const interim = { ...profile("a", "interim"), ...stats };
   if (kind === "metadata")
@@ -379,11 +369,6 @@ it("merges explicit nullable edits while preserving omitted fields and newer sta
     .updateProfile({ displayName: null, avatarUrl: null, bio: undefined, country: null });
   await flush();
   const stats = {
-    total_score: 900,
-    cards_reviewed: 70,
-    current_streak: 8,
-    longest_streak: 9,
-    last_review_date: "2026-11-06",
   };
   useAuthStore.setState({ profile: { ...initial, ...stats, bio: "newer unrequested bio" } });
   pending.resolve({ data: { ...initial, display_name: null, avatar_url: null, country: null }, error: null });

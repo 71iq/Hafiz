@@ -85,11 +85,6 @@ const profile = (id: string, name = id): Profile => ({
   avatar_url: null,
   bio: null,
   country: null,
-  total_score: 0,
-  current_streak: 0,
-  longest_streak: 0,
-  cards_reviewed: 0,
-  last_review_date: null,
   created_at: "2026-01-01",
 });
 function deferred() {
@@ -365,7 +360,7 @@ it.each(
   if (action === "ensureProfile" && outcome === "empty")
     mockInserts.push(Promise.resolve({ data: profile("a", "inserted"), error: null }));
   const work = useAuthStore.getState()[action]();
-  const newer = { ...profile("a", "newer"), total_score: 900, bio: null };
+  const newer = { ...profile("a", "newer"), country: "JO", bio: null };
   useAuthStore.setState({ profile: newer });
   finish(pending, outcome);
   const result = await work;
@@ -384,7 +379,7 @@ it.each(["success", "empty", "error", "rejection"])(
     const work = useAuthStore.getState().ensureProfile();
     await Promise.resolve();
     expect(mockInsert).toHaveBeenCalledTimes(1);
-    const newer = { ...profile("a", "newer"), total_score: 900 };
+    const newer = { ...profile("a", "newer"), country: "JO" };
     useAuthStore.setState({ profile: newer });
     finish(pending, outcome);
     expect(await work).toBe(newer);

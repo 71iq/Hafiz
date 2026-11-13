@@ -1,547 +1,157 @@
-import { useState, useCallback, useEffect } from "react";
-import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, RefreshControl } from "react-native";
 import { router } from "expo-router";
-import { Trophy, CalendarCheck2, Medal } from "lucide-react-native";
-import { AccountSyncPrompt, type AccountSyncPromptProps } from "@/components/auth/AccountSyncPrompt";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSettings } from "@/lib/settings/context";
-import { useDatabase } from "@/lib/database/provider";
-import { useStrings } from "@/lib/i18n/useStrings";
-import type { UIStrings } from "@/lib/i18n/strings";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CloudOff, Trophy } from "lucide-react-native";
+import { BoardJoin } from "@/components/social/BoardJoin";
+import { BoardStandings } from "@/components/social/BoardStandings";
+import { SocialGate, SocialNotice } from "@/components/social/SocialControls";
+import { SocialScreen } from "@/components/social/SocialScreen";
 import { useAuthStore } from "@/lib/auth/store";
+import { boardKeys, boardRead, joinBoard, leaveBoard } from "@/lib/board/api";
+import { useDatabase } from "@/lib/database/provider";
+import { localDateOf } from "@/lib/habit/dates";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
+import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
+import { useSettings } from "@/lib/settings/context";
+import { socialFailureMessage } from "@/lib/social/messages";
+import { readLocalSocialBands } from "@/lib/social/queries";
+import { formatSocialDate } from "@/lib/social/text";
+import { useIsOffline, useSocialQuery } from "@/lib/social/use-social-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
-import { LeaderboardSkeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Screen, TAB_SCREEN_BOTTOM_INSET, useScreenContentLayout } from "@/components/ui/ScreenContent";
-import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
-import {
-  fetchDailyLeaderboard,
-  fetchWeeklyLeaderboard,
-  fetchAllTimeLeaderboard,
-  fetchStreakLeaderboard,
-  type LeaderboardEntry,
-} from "@/lib/leaderboard/api";
-import { LEADERBOARD_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
-import { cn } from "@/lib/utils";
-import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
 
-type Tab = "daily" | "weekly" | "alltime" | "streak";
-
-export default function LeaderboardScreen() {
-  const { isDark, isRTL, themeColors } = useSettings();
-  const db = useDatabase();
+/**
+ * Board tab (spec 5.7.2): an opt-in weekly cohort ranked by consistency points the server computes.
+ * Opening the tab places a joined user in this week's cohort. Offline it shows the last saved
+ * standings with their date (SB-01).
+ */
+export default function BoardScreen() {
   const s = useStrings();
-  const { contentContainerStyle, railStyle, isLaptop } = useScreenContentLayout({
-    maxWidth: LEADERBOARD_CONTENT_MAX_WIDTH,
-  });
-  const user = useAuthStore((s) => s.user);
+  const user = useAuthStore((state) => state.user);
+
+  if (!isSupabaseConfigured()) {
+    return (
+      <SocialScreen title={s.boardTitle} subtitle={s.boardSubtitle}>
+        <SocialGate icon={Trophy} title={s.boardTitle} body={s.socialUnconfigured} />
+      </SocialScreen>
+    );
+  }
+  if (!user) {
+    return (
+      <SocialScreen title={s.boardTitle} subtitle={s.boardSubtitle}>
+        <SocialGate
+          icon={Trophy}
+          title={s.boardSignInTitle}
+          body={s.boardSignInBody}
+          signInLabel={s.socialSignIn}
+          onSignIn={() => router.push("/auth/login" as never)}
+        />
+      </SocialScreen>
+    );
+  }
+  return <BoardContent key={user.id} userId={user.id} />;
+}
+
+function BoardContent({ userId }: { userId: string }) {
+  const s = useStrings();
+  const db = useDatabase();
+  const { isDark, uiLanguage } = useSettings();
+  const language = uiLanguage === "ar" ? "ar" : "en";
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<Tab>("daily");
+  const offline = useIsOffline();
+  const today = localDateOf(new Date());
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
 
-  const configured = isSupabaseConfigured();
-
-  const userId = user?.id ?? null;
-
-  // Upload this account's stats in the background and refresh the boards once it lands. Reads
-  // never wait for it, so a failed upload cannot hide the leaderboard. The sync helpers bind
-  // each write to the signed-in account that started it.
-  const syncInBackground = useCallback(() => {
-    if (!configured || !userId) return;
-    void (async () => {
-      try {
-        await syncDailyScore(db);
-        await updateProfileStats(db);
-      } catch (syncError) {
-        console.warn("[Leaderboard] Failed to sync this account's stats:", syncError);
-        return;
-      }
-      await queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
-    })();
-  }, [configured, db, queryClient, userId]);
-
-  useEffect(() => {
-    syncInBackground();
-  }, [syncInBackground]);
-
-  const queryFn = useCallback(() => {
-    switch (activeTab) {
-      case "daily":
-        return fetchDailyLeaderboard();
-      case "weekly":
-        return fetchWeeklyLeaderboard();
-      case "alltime":
-        return fetchAllTimeLeaderboard();
-      case "streak":
-        return fetchStreakLeaderboard();
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (!configured || !userId) return;
-    const loaders: Record<Tab, () => Promise<LeaderboardEntry[]>> = {
-      daily: fetchDailyLeaderboard,
-      weekly: fetchWeeklyLeaderboard,
-      alltime: fetchAllTimeLeaderboard,
-      streak: fetchStreakLeaderboard,
-    };
-    (Object.keys(loaders) as Tab[]).forEach((tab) => {
-      queryClient
-        .prefetchQuery({
-          queryKey: ["leaderboard", tab],
-          queryFn: loaders[tab],
-          staleTime: 1000 * 60 * 2,
-        })
-        .catch(console.warn);
-    });
-  }, [configured, queryClient, userId]);
-
-  const {
-    data: entries = [],
-    isLoading,
-    error: leaderboardError,
-    refetch,
-    isRefetching,
-  } = useQuery({
-    queryKey: ["leaderboard", activeTab],
-    queryFn,
-    enabled: configured,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+  // Bands come from the local plan and memorized cards (8.13); the server picks the cohort.
+  const bands = useQuery({
+    queryKey: ["socialBands", userId, today],
+    queryFn: () => readLocalSocialBands(db),
+    staleTime: 5 * 60_000,
   });
 
-  const mutedColor = isDark ? "#737373" : "#A39B93";
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "daily", label: s.leaderboardDaily },
-    { key: "weekly", label: s.leaderboardWeekly },
-    { key: "alltime", label: s.leaderboardAllTime },
-    { key: "streak", label: s.leaderboardStreak },
-  ];
+  const board = useSocialQuery({
+    queryKey: bands.data ? boardKeys.view(userId, today, bands.data) : boardKeys.all(userId),
+    userId,
+    cacheName: "board",
+    read: bands.data ? boardRead(bands.data, today) : null,
+  });
+  const view = board.data?.data ?? null;
 
-  const scoreUnit = activeTab === "streak" ? s.leaderboardDays : s.leaderboardPoints;
-  const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label ?? "";
-  const visibleEntries = user ? entries : entries.slice(0, 10);
-  const featuredEntries = isLaptop
-    ? [visibleEntries[1], visibleEntries[0], visibleEntries[2]].filter((entry): entry is LeaderboardEntry =>
-        Boolean(entry),
-      )
-    : [];
-  const rowEntries = isLaptop ? visibleEntries.slice(3) : visibleEntries;
-  const openProfile = useCallback(
-    (userId: string) => {
-      router.push(userId === user?.id ? ("/profile" as any) : (`/profile/${userId}` as any));
+  const privacy = useQuery({
+    queryKey: profilePrivacyKeys.mine(userId),
+    queryFn: fetchProfilePrivacy,
+    enabled: view?.status === "not_joined" && !offline,
+    retry: false,
+    networkMode: "always",
+  });
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) });
+
+  const join = useMutation({
+    mutationFn: (choice: { nickname: string | null; isMinor: boolean }) => {
+      if (!bands.data) throw new Error("Bands are not ready");
+      return joinBoard({ ...choice, bands: bands.data, today });
     },
-    [user?.id],
-  );
+    onSuccess: async () => {
+      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) })]);
+    },
+    onError: (error) => setJoinError(socialFailureMessage(error, s)),
+  });
+
+  const leave = useMutation({
+    mutationFn: leaveBoard,
+    onSuccess: async () => {
+      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) })]);
+    },
+    onError: (error) => setLeaveError(socialFailureMessage(error, s)),
+  });
+
+  const savedAt = board.data?.source === "cache" ? board.data.savedAt : null;
+  const loading = bands.isLoading || board.isLoading;
 
   return (
-    <Screen>
-      <View className="mb-5" style={[contentContainerStyle, { paddingTop: 16 }]}>
-        <View
-          className="flex-row rounded-full p-1.5"
-          style={[
-            railStyle,
-            {
-              backgroundColor: themeColors.surfaceMid,
-              direction: "ltr",
-              flexDirection: isRTL ? "row-reverse" : "row",
-            },
-          ]}
-        >
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                className="flex-1 h-10 rounded-full items-center justify-center"
-                style={{
-                  backgroundColor: isActive ? (isDark ? "#1B4D4F" : "#003638") : "transparent",
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                    fontSize: 13,
-                    color: isActive ? "#FDDC91" : mutedColor,
-                    textAlign: "center",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+    <SocialScreen
+      title={s.boardTitle}
+      subtitle={s.boardSubtitle}
+      refreshControl={<RefreshControl refreshing={board.isRefetching} onRefresh={() => void refresh()} />}
+    >
+      {savedAt ? (
+        <SocialNotice icon={CloudOff} message={interpolate(s.socialCachedAt, { date: formatSocialDate(savedAt, language, true) })} />
+      ) : null}
+      {leaveError ? <SocialNotice message={leaveError} actionLabel={s.socialDismiss} onAction={() => setLeaveError(null)} /> : null}
 
-      {/* Content */}
-      {!configured ? (
-        <View className="flex-1 justify-center" style={contentContainerStyle}>
-          <View style={railStyle}>
-            <EmptyState
-              icon={Trophy}
-              title={s.leaderboardTitle}
-              subtitle={s.leaderboardNotConfigured}
-              isDark={isDark}
-            />
-          </View>
-        </View>
-      ) : isLoading ? (
-        <View className="flex-1" style={contentContainerStyle}>
-          <View style={railStyle}>
-            <LeaderboardSkeleton isDark={isDark} className="flex-1" />
-          </View>
-        </View>
-      ) : leaderboardError ? (
-        <View className="flex-1 justify-center" style={contentContainerStyle}>
-          <View style={railStyle}>
-            <EmptyState
-              icon={Trophy}
-              title={s.leaderboardLoadFailed}
-              actionLabel={s.errorTryAgain}
-              onAction={() => refetch()}
-              isDark={isDark}
-            />
-          </View>
-        </View>
-      ) : entries.length === 0 ? (
-        <View className="flex-1 justify-center" style={contentContainerStyle}>
-          <View style={railStyle}>
-            <EmptyState
-              icon={Trophy}
-              title={s.leaderboardEmpty}
-              subtitle={s.emptyLeaderboardSubtitle}
-              isDark={isDark}
-            />
-            {!user && (
-              <LeaderboardSignInPrompt
-                label={s.leaderboardSignInPrompt}
-                buttonLabel={s.authLogin}
-                isDark={isDark}
-                isRTL={isRTL}
-                onPress={() => router.push("/auth/login" as any)}
-              />
-            )}
-          </View>
-        </View>
+      {loading ? (
+        <ActivityIndicator color={isDark ? "#2dd4bf" : "#0d9488"} accessibilityLabel={s.boardTitle} />
+      ) : !view ? (
+        <SocialNotice
+          icon={offline ? CloudOff : undefined}
+          message={offline ? s.socialOfflineEmpty : board.error ? socialFailureMessage(board.error, s) : s.socialLoadFailed}
+          actionLabel={offline ? undefined : s.socialTryAgain}
+          onAction={offline ? undefined : () => void refresh()}
+        />
+      ) : view.status === "not_joined" ? (
+        <BoardJoin
+          key={privacy.dataUpdatedAt}
+          initialNickname={privacy.data?.boardNickname ?? null}
+          initialIsMinor={privacy.data?.isMinor ?? false}
+          pending={join.isPending || !bands.data}
+          error={joinError}
+          onJoin={(choice) => {
+            setJoinError(null);
+            join.mutate(choice);
+          }}
+        />
       ) : (
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={[contentContainerStyle, { paddingBottom: TAB_SCREEN_BOTTOM_INSET }]}
-          contentInsetAdjustmentBehavior="automatic"
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => {
-                syncInBackground();
-                void refetch();
-              }}
-            />
-          }
-        >
-          <View style={railStyle}>
-            {featuredEntries.length > 0 && (
-              <View
-                className="mb-7 justify-center gap-5"
-                style={{ flexDirection: isRTL ? "row-reverse" : "row", direction: "ltr" }}
-              >
-                {featuredEntries.map((entry) => (
-                  <LeaderboardPodiumCard
-                    key={entry.user_id}
-                    entry={entry}
-                    isCurrentUser={entry.user_id === user?.id}
-                    isDark={isDark}
-                    unit={scoreUnit}
-                    s={s}
-                    onPress={() => openProfile(entry.user_id)}
-                  />
-                ))}
-              </View>
-            )}
-            <View
-              className="mb-3 flex-row items-end justify-between"
-              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              <Text
-                style={{
-                  fontFamily: "Manrope_600SemiBold",
-                  fontSize: 10,
-                  letterSpacing: 2,
-                  textTransform: "uppercase",
-                  color: mutedColor,
-                  ...textStartStyle(isRTL),
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {`${activeTabLabel}`}
-              </Text>
-              <Text
-                style={{
-                  fontFamily: "Manrope_500Medium",
-                  fontSize: 11,
-                  color: mutedColor,
-                  ...textEndStyle(isRTL),
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {`${entries.length} ${s.leaderboardPlayers}`}
-              </Text>
-            </View>
-            {rowEntries.map((entry) => (
-              <LeaderboardRow
-                key={entry.user_id}
-                entry={entry}
-                isCurrentUser={entry.user_id === user?.id}
-                isDark={isDark}
-                unit={scoreUnit}
-                isStreak={activeTab === "streak"}
-                isRTL={isRTL}
-                s={s}
-                onPress={() => openProfile(entry.user_id)}
-              />
-            ))}
-            {!user && (
-              <LeaderboardSignInPrompt
-                label={s.leaderboardSignInPrompt}
-                buttonLabel={s.authLogin}
-                isDark={isDark}
-                isRTL={isRTL}
-                onPress={() => router.push("/auth/login" as any)}
-              />
-            )}
-          </View>
-        </ScrollView>
-      )}
-    </Screen>
-  );
-}
-
-function LeaderboardSignInPrompt({
-  isDark,
-  isRTL,
-  ...props
-}: AccountSyncPromptProps) {
-  return (
-    <View
-      className="mt-4 rounded-3xl px-4 py-4"
-      style={{
-        backgroundColor: isDark ? "rgba(45, 212, 191, 0.10)" : "rgba(13, 148, 136, 0.08)",
-        borderColor: isDark ? "rgba(45, 212, 191, 0.22)" : "rgba(13, 148, 136, 0.18)",
-        borderWidth: 1,
-      }}
-    >
-      <AccountSyncPrompt {...props} isDark={isDark} isRTL={isRTL} />
-    </View>
-  );
-}
-
-function LeaderboardPodiumCard({
-  entry,
-  isCurrentUser,
-  isDark,
-  unit,
-  s,
-  onPress,
-}: {
-  entry: LeaderboardEntry;
-  isCurrentUser: boolean;
-  isDark: boolean;
-  unit: string;
-  s: UIStrings;
-  onPress: () => void;
-}) {
-  const { themeColors } = useSettings();
-  const displayName = entry.display_name || entry.username;
-  const isFirst = entry.rank === 1;
-  const rankColor = entry.rank === 1 ? "#F5C24B" : entry.rank === 2 ? "#B7BECF" : "#C49A62";
-  const cardBg = isDark ? (isFirst ? "#172B28" : themeColors.surfaceLow) : isFirst ? "#FFF3D8" : themeColors.surfaceLow;
-  const scoreBg = isDark
-    ? entry.rank === 1
-      ? "rgba(245, 194, 75, 0.13)"
-      : entry.rank === 2
-        ? "rgba(183, 190, 207, 0.14)"
-        : "rgba(196, 154, 98, 0.15)"
-    : entry.rank === 1
-      ? "rgba(245, 194, 75, 0.20)"
-      : entry.rank === 2
-        ? "rgba(183, 190, 207, 0.24)"
-        : "rgba(196, 154, 98, 0.24)";
-  const scoreColor = isDark ? (isFirst ? "#FDDC91" : "#F5F5F4") : isFirst ? "#2D2419" : "#1D1D1B";
-  return (
-    <Pressable
-      onPress={onPress}
-      className="flex-1 items-center overflow-hidden rounded-4xl px-4 py-5"
-      style={({ pressed }) => ({
-        backgroundColor: cardBg,
-        borderColor: isFirst ? rankColor : "transparent",
-        borderWidth: isFirst ? 1 : 0,
-        marginTop: entry.rank === 1 ? 0 : 18,
-        opacity: pressed ? 0.82 : 1,
-        transform: [{ scale: pressed ? 0.98 : 1 }],
-      })}
-    >
-      <View style={{ position: "absolute", left: 0, right: 0, top: 0, height: 5, backgroundColor: rankColor }} />
-      <View
-        className={`mb-3 h-9 min-w-9 items-center justify-center rounded-full px-2 ${isFirst ? "flex-row gap-1" : ""}`}
-        style={{ backgroundColor: rankColor }}
-      >
-        {isFirst && <Trophy size={13} color="#4A4034" />}
-        <Text style={{ color: "#4A4034", fontFamily: "Manrope_700Bold", fontSize: 12 }}>{entry.rank}</Text>
-      </View>
-      <ProfileIdentity
-        displayName={displayName}
-        username={entry.username}
-        avatarUrl={entry.avatar_url}
-        isDark={isDark}
-        avatarSize={56}
-        nameSize={15}
-        handleSize={10}
-        centered
-      />
-      {isCurrentUser && (
-        <Text
-          className="mt-1 text-primary-accent dark:text-primary-bright"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 10 }}
-        >
-          {s.leaderboardYou}
-        </Text>
-      )}
-      <View className="mt-3 min-w-[118px] items-center rounded-3xl px-4 py-2.5" style={{ backgroundColor: scoreBg }}>
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{
-            color: scoreColor,
-            fontFamily: "NotoSerif_700Bold",
-            fontSize: isFirst ? 34 : 30,
-            lineHeight: isFirst ? 40 : 36,
+        <BoardStandings
+          view={view}
+          leaving={leave.isPending}
+          onLeave={() => {
+            setLeaveError(null);
+            leave.mutate();
           }}
-        >
-          {entry.score.toLocaleString()}
-        </Text>
-        <Text
-          style={{
-            color: isDark ? "#BFB6A8" : "#8B8178",
-            fontFamily: "Manrope_700Bold",
-            fontSize: 9,
-            letterSpacing: 1.1,
-            textTransform: "uppercase",
-          }}
-        >
-          {unit}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-export function LeaderboardRow({
-  entry,
-  isCurrentUser,
-  isDark,
-  unit,
-  isStreak,
-  isRTL,
-  s,
-  onPress,
-}: {
-  entry: LeaderboardEntry;
-  isCurrentUser: boolean;
-  isDark: boolean;
-  unit: string;
-  isStreak: boolean;
-  isRTL: boolean;
-  s: UIStrings;
-  onPress: () => void;
-}) {
-  const { themeColors } = useSettings();
-  const displayName = entry.display_name || entry.username;
-  const mutedColor = isDark ? "#737373" : "#A39B93";
-
-  const medalColor = entry.rank === 1 ? "#F5C24B" : entry.rank === 2 ? "#B7BECF" : "#C49A62";
-  const hasMedal = entry.rank <= 3;
-  const rankColor = hasMedal ? (isDark ? "#F5EBD7" : "#4A4034") : mutedColor;
-  const scoreColor = isDark ? "#F3F2EF" : "#1D1D1B";
-  const rowBg = isCurrentUser
-    ? isDark
-      ? "rgba(45, 212, 191, 0.12)"
-      : "rgba(13, 148, 136, 0.08)"
-    : themeColors.surfaceLow;
-  const scoreBg = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,54,56,0.045)";
-  const rankBg = hasMedal
-    ? entry.rank === 1
-      ? "rgba(245, 194, 75, 0.16)"
-      : entry.rank === 2
-        ? "rgba(183, 190, 207, 0.18)"
-        : "rgba(196, 154, 98, 0.18)"
-    : isDark
-      ? "rgba(255,255,255,0.05)"
-      : "rgba(45,45,45,0.04)";
-
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`mb-2.5 flex-row items-center gap-3 rounded-3xl px-4 py-3.5 ${isRTL ? "flex-row-reverse" : ""}`}
-      style={{
-        direction: "ltr",
-        flexDirection: isRTL ? "row-reverse" : "row",
-        backgroundColor: rowBg,
-        borderColor: isCurrentUser ? (isDark ? "rgba(45, 212, 191, 0.22)" : "rgba(13, 148, 136, 0.18)") : "transparent",
-        borderWidth: isCurrentUser ? 1 : 0,
-      }}
-    >
-      <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: rankBg }}>
-        <Text style={{ fontFamily: "NotoSerif_700Bold", fontSize: 16, color: rankColor }}>{entry.rank}</Text>
-      </View>
-
-      <View className="min-w-0 flex-1">
-        <View
-          className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
-          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-        >
-          <View className="min-w-0 flex-1">
-            <ProfileIdentity
-              displayName={displayName}
-              username={entry.username}
-              avatarUrl={entry.avatar_url}
-              isDark={isDark}
-              isRTL={isRTL}
-              avatarSize={40}
-              nameSize={14}
-              handleSize={11}
-            />
-          </View>
-          {isCurrentUser && (
-            <View className="px-2 py-0.5 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 9 }}
-              >
-                {s.leaderboardYou}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      <View
-        className={cn("min-w-[112px] rounded-2xl px-3 py-2", isRTL ? "items-start" : "items-end")}
-        style={{ backgroundColor: scoreBg }}
-      >
-        <View
-          className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}
-          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-        >
-          {hasMedal && <Medal size={15} color={medalColor} />}
-          {isStreak && <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />}
-          <Text style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24, lineHeight: 30, color: scoreColor }}>
-            {entry.score.toLocaleString()}
-          </Text>
-        </View>
-        <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 10, color: mutedColor }}>{unit}</Text>
-      </View>
-    </Pressable>
+        />
+      )}
+    </SocialScreen>
   );
 }

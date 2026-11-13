@@ -57,7 +57,7 @@ function hasPendingProfileWrite(userId: string): boolean {
   return pending;
 }
 
-export function beginProfileWrite(userId: string, owner: AuthOwner) {
+function beginProfileWrite(userId: string, owner: AuthOwner) {
   const hadPendingWrite = hasPendingProfileWrite(userId);
   const write = { userId, owner };
   pendingProfileWrites.add(write);
@@ -106,11 +106,6 @@ function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
     avatar_url: null,
     bio: null,
     country: null,
-    total_score: 0,
-    current_streak: 0,
-    longest_streak: 0,
-    cards_reviewed: 0,
-    last_review_date: null,
     created_at: user.created_at,
   };
 }

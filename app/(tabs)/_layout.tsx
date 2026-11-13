@@ -1,6 +1,6 @@
 import { View } from "react-native";
 import { Tabs } from "expo-router";
-import { Sparkles, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked } from "lucide-react-native";
+import { Sparkles, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked, Users } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -125,7 +125,8 @@ function TabsWithStrings() {
             ),
           }}
         />
-        {/* Visible tabs after Home: Mushaf, Leaderboard, Progress, Settings */}
+        {/* Visible tabs after Home: Mushaf, Halaqa, Board, Progress, Settings. Halaqa is the main social
+            tab and comes before the secondary Board (spec 5.7). The Board keeps the leaderboard route. */}
         <Tabs.Screen
           name="mushaf"
           options={{
@@ -141,9 +142,23 @@ function TabsWithStrings() {
           }}
         />
         <Tabs.Screen
+          name="halaqa"
+          options={{
+            title: s.tabHalaqa,
+            tabBarIcon: ({ color, size }) => (
+              <Users
+                size={size}
+                color={color}
+                fill="none"
+                strokeWidth={2}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="leaderboard"
           options={{
-            title: s.tabLeaderboard,
+            title: s.tabBoard,
             tabBarIcon: ({ color, size }) => (
               <Trophy
                 size={size}

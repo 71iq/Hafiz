@@ -59,13 +59,6 @@ jest.mock("@/lib/fsrs/queries", () => ({
   getDeckTodayStats: jest.fn(),
   readDeckReviewSettings: jest.fn(),
   getMemorizedAyahCardCount: jest.fn(async () => 0),
-  getWirdStatus: jest.fn(async () => ({
-    currentDays: 0,
-    longestDays: 0,
-    maintainedToday: false,
-    lastReviewDate: null,
-    state: "empty",
-  })),
 }));
 jest.mock("@/lib/fsrs/smart-decks", () => ({
   ...jest.requireActual<typeof import("@/lib/fsrs/smart-decks")>("@/lib/fsrs/smart-decks"),

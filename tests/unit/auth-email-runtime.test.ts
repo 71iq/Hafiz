@@ -22,11 +22,6 @@ const profile = (id: string): Profile => ({
   avatar_url: null,
   bio: null,
   country: null,
-  total_score: 0,
-  current_streak: 0,
-  longest_streak: 0,
-  cards_reviewed: 0,
-  last_review_date: null,
   created_at: "2026-01-01",
 });
 jest.mock("@/lib/supabase", () => ({

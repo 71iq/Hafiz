@@ -71,18 +71,19 @@ jest.mock("@/lib/settings/context", () => ({
 }));
 jest.mock("@/lib/achievements/queries", () => ({ getRecentUnlocks: async () => [] }));
 jest.mock("@/lib/fsrs/queries", () => ({
-  getWirdStatus: async () => ({ currentDays: 0, longestDays: 0, lastReviewDate: null }),
   getReviewStats: async () => ({ activity: [], activeDays: 0, totalReviews: 0 }),
 }));
-jest.mock("@/lib/fsrs/scoring", () => ({ getTotalScore: async () => 0 }));
 jest.mock("@/lib/fsrs/leaderboard-sync", () => ({ updateProfileStats: async () => undefined }));
 jest.mock("@/lib/fsrs/review-events", () => ({ subscribeReviewActivity: () => () => undefined }));
 jest.mock("@/lib/sync/events", () => ({ subscribeSyncCompleted: () => () => undefined }));
 jest.mock("@/lib/leaderboard/api", () => ({
   fetchPublicProfile: async () => null,
   fetchPublicAchievementUnlocks: async () => [],
-  fetchPublicReviewActivity: async () => null,
   fetchPublicSurahProgress: async () => [],
+}));
+jest.mock("@/lib/profile/privacy", () => ({
+  fetchProfileSummary: async () => null,
+  profilePrivacyKeys: { summary: (viewer: string | null, target: string) => ["profileSummary", viewer, target] },
 }));
 jest.mock("@/lib/profile/avatar", () => ({
   uploadProfileAvatar: (id: string, asset: unknown) => mockUpload(id, asset),
@@ -166,11 +167,6 @@ const profile = (id: string, name = `Name-${id}`): Profile => ({
   avatar_url: null,
   bio: null,
   country: null,
-  total_score: 0,
-  current_streak: 0,
-  longest_streak: 0,
-  cards_reviewed: 0,
-  last_review_date: null,
   created_at: "2026-01-01",
 });
 function activate(value: Session | null, current: Profile | null) {
@@ -622,11 +618,6 @@ it.each(["name", "remove-avatar"])(
     fireEvent.press(screen.getByTestId("save"));
     await waitFor(() => expect(mockWrite).toHaveBeenCalledTimes(1));
     const stats = {
-      total_score: 900,
-      cards_reviewed: 70,
-      current_streak: 8,
-      longest_streak: 9,
-      last_review_date: "2026-11-06",
     };
     await act(async () => {
       const current = mockAuthStore.getState().profile;
@@ -649,11 +640,6 @@ it.each(["name", "remove-avatar"])(
 
 it("caches newer same-owner stats published synchronously during the save notification", async () => {
   const stats = {
-    total_score: 900,
-    cards_reviewed: 70,
-    current_streak: 8,
-    longest_streak: 9,
-    last_review_date: "2026-11-06",
   };
   mockWrite.mockResolvedValue({ data: profile("a", "Changed A"), error: null });
   const screen = await open();

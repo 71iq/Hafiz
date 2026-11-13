@@ -39,6 +39,7 @@ const PANEL_WIDTH = 248;
 const SIDEBAR_PRIMARY_ROUTES = [
   "home",
   "mushaf",
+  "halaqa",
   "leaderboard",
   "progress",
   "reflection-feed",

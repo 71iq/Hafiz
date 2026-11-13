@@ -8,11 +8,6 @@ export type Profile = {
   avatar_url: string | null;
   bio: string | null;
   country: string | null;
-  total_score: number;
-  current_streak: number;
-  longest_streak: number;
-  cards_reviewed: number;
-  last_review_date: string | null;
   created_at: string;
 };
 

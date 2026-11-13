@@ -74,14 +74,6 @@ type ReviewStats = {
   longestStreak: number;
 };
 
-export type WirdStatus = {
-  currentDays: number;
-  longestDays: number;
-  maintainedToday: boolean;
-  lastReviewDate: string | null;
-  state: "empty" | "maintained_today" | "open_today" | "fresh_start";
-};
-
 const SMART_CARD_SQL = `deck_id IN (${Object.values(SMART_DECK_IDS).map((id) => `'${id}'`).join(", ")})`;
 const NON_SMART_CARD_SQL = `NOT ${SMART_CARD_SQL}`;
 const ACTIVE_CARD_SQL = "deleted_at IS NULL";
@@ -124,31 +116,6 @@ function rowWithDefaultStatus(row: StudyCardRow): StudyCardRow {
 
 function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
   return !row.deleted_at && !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
-}
-
-
-
-function calculateCurrentStreak(dateKeysDesc: string[], todayIndex: number): number {
-  if (dateKeysDesc.length === 0) return 0;
-
-  const firstIndex = dayIndexFromDateKey(dateKeysDesc[0]);
-
-  if (firstIndex !== todayIndex) return 0;
-
-  let streak = 0;
-  let expectedIndex = firstIndex;
-
-  for (const dateKey of dateKeysDesc) {
-    const dayIndex = dayIndexFromDateKey(dateKey);
-    if (dayIndex === expectedIndex) {
-      streak++;
-      expectedIndex--;
-    } else {
-      break;
-    }
-  }
-
-  return streak;
 }
 
 export const MEANINGS_DECK_ID = "meanings";
@@ -1350,64 +1317,6 @@ export function publishReviewLogged(db: AppDatabase, log: StudyLogInput): void {
     reviewedAt: log.reviewedAt,
   }).catch(console.warn);
   emitReviewActivity();
-}
-
-export async function getStudyStreak(db: DatabaseExecutor): Promise<number> {
-  const rows = await db.getAllAsync<{ reviewed_at: string }>(
-    `SELECT reviewed_at FROM study_log ORDER BY reviewed_at DESC`
-  );
-  if (rows.length === 0) return 0;
-
-  const reviewDates = [...buildLocalReviewCounts(rows).keys()].sort().reverse();
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayIdx = dayIndexFromDateKey(formatLocalDateKey(today));
-  return calculateCurrentStreak(reviewDates, todayIdx);
-}
-
-export async function getWirdStatus(db: DatabaseExecutor): Promise<WirdStatus> {
-  const rows = await db.getAllAsync<{ reviewed_at: string }>(
-    `SELECT reviewed_at FROM study_log ORDER BY reviewed_at DESC`
-  );
-  const counts = buildLocalReviewCounts(rows);
-  const dateKeys = [...counts.keys()].sort();
-
-  if (dateKeys.length === 0) {
-    return {
-      currentDays: 0,
-      longestDays: 0,
-      maintainedToday: false,
-      lastReviewDate: null,
-      state: "empty",
-    };
-  }
-
-  const reviewDatesDesc = [...dateKeys].reverse();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayIndex = dayIndexFromDateKey(formatLocalDateKey(today));
-  const latestDateKey = reviewDatesDesc[0];
-  const latestIndex = dayIndexFromDateKey(latestDateKey);
-  const currentDays = calculateCurrentStreak(reviewDatesDesc, todayIndex);
-  const state: WirdStatus["state"] =
-    latestIndex === todayIndex
-      ? "maintained_today"
-      : latestIndex === todayIndex - 1
-        ? "open_today"
-        : "fresh_start";
-  const latestRow = rows.find((row) => {
-    const reviewedAt = new Date(row.reviewed_at);
-    return !Number.isNaN(reviewedAt.getTime()) && formatLocalDateKey(reviewedAt) === latestDateKey;
-  });
-
-  return {
-    currentDays,
-    longestDays: calculateLongestStreak(dateKeys),
-    maintainedToday: state === "maintained_today",
-    lastReviewDate: latestRow?.reviewed_at ?? latestDateKey,
-    state,
-  };
 }
 
 export async function getReviewStats(db: DatabaseExecutor, activityDays = 90): Promise<ReviewStats> {
