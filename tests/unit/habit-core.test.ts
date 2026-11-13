@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { addDays, atLocalTime, datesBetween, diffDays, isLocalDate, startOfWeek, weekdayOf } from "@/lib/habit/dates";
 import { makeUpCutoffFor } from "@/lib/habit/cutoff";
+import { chooseExtras, completeExtra, emptyExtrasState, EXTRAS_PER_DAY, hideExtra, parseExtrasState, type ExtraKind } from "@/lib/habit/extras";
 import { findEarnBack } from "@/lib/habit/earn-back";
 import { graceBalance } from "@/lib/habit/grace";
 import { mergeHabitDays } from "@/lib/habit/merge";
@@ -392,5 +393,40 @@ describe("steady weeks (STR-27)", () => {
     expect(countSteadyWeeks(toDayMap(withExcuse), "2026-11-14", 6)).toBe(1);
     const withGrace = [...run("2026-11-12", 6), day("2026-11-13", "grace")];
     expect(countSteadyWeeks(toDayMap(withGrace), "2026-11-14", 6)).toBe(0);
+  });
+});
+
+describe("wird extras (5.4)", () => {
+  const context = (overrides: Partial<Parameters<typeof chooseExtras>[1]> = {}) => ({
+    today: TODAY,
+    inboxCount: 2,
+    hasMemorizedPages: true,
+    sabaqToday: true,
+    doneToday: new Set<ExtraKind>(),
+    ...overrides,
+  });
+
+  it("offers at most 2 eligible extras and skips ones that do not apply", () => {
+    const state = emptyExtrasState(TODAY);
+    expect(chooseExtras(state, context())).toHaveLength(EXTRAS_PER_DAY);
+    expect(chooseExtras(state, context({ inboxCount: 0, hasMemorizedPages: false, sabaqToday: false }))).toEqual([]);
+    expect(chooseExtras(state, context({ inboxCount: 0, hasMemorizedPages: false }))).toEqual(["deepen"]);
+  });
+
+  it("hides an extra for the day and snoozes it for 2 weeks after 3 skips in a row (QST-03)", () => {
+    let state = emptyExtrasState(TODAY);
+    state = hideExtra(state, "salah");
+    expect(chooseExtras(state, context())).not.toContain("salah");
+    let next = parseExtrasState(JSON.stringify(state), addDays(TODAY, 1));
+    expect(next.hidden).toEqual([]);
+    next = hideExtra(hideExtra(next, "salah"), "salah");
+    expect(next.snoozedUntil.salah).toBe(addDays(TODAY, 15));
+    const later = parseExtrasState(JSON.stringify(next), addDays(TODAY, 10));
+    expect(chooseExtras(later, context({ today: addDays(TODAY, 10) }))).not.toContain("salah");
+    expect(completeExtra(next, "salah").skips.salah).toBe(0);
+  });
+
+  it("starts fresh from a malformed saved state", () => {
+    expect(parseExtrasState("{bad", TODAY)).toEqual(emptyExtrasState(TODAY));
   });
 });

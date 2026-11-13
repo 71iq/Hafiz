@@ -131,6 +131,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Session-end streak and prompt cards mirror icon rows; counts use the interface digits.",
   ),
   entry(
+    "components/habit/WirdExtras.tsx",
+    "card",
+    "source",
+    "Extra rows mirror their icon and hide button through MirroredRow; text aligns to the reading side.",
+  ),
+  entry(
     "components/habit/WirdSettingsSection.tsx",
     "form-field",
     "rntl",

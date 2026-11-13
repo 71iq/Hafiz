@@ -42,6 +42,7 @@ import { useHabitOverview } from "@/lib/habit/use-habit-overview";
 import { markFullWirdIfComplete } from "@/lib/habit/queries";
 import { WirdPlanCard } from "@/components/hifz/WirdPlanCard";
 import { WelcomeBackCard } from "@/components/hifz/WelcomeBackCard";
+import { WirdExtras } from "@/components/habit/WirdExtras";
 import { diffDays } from "@/lib/habit/dates";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { putUserSetting } from "@/lib/database/user-settings";
@@ -534,6 +535,18 @@ export default function HomeScreen() {
             onStartSabaq={() => router.push("/hifz/sabaq" as Href)}
             onSetup={() => router.push("/hifz/setup" as Href)}
             onDrill={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}
+          />
+        ) : null}
+
+        {wird ? (
+          <WirdExtras
+            db={db}
+            inboxCount={inboxCount}
+            hasMemorizedPages={wird.memorizedPages > 0}
+            sabaqToday={wird.sabaqDoneToday}
+            language={uiLanguage}
+            isDark={isDark}
+            s={s}
           />
         ) : null}
 
