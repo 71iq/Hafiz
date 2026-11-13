@@ -3,7 +3,7 @@ import { readHabitDayRow } from "@/lib/habit/queries";
 import { countMistakeInbox, recordDrillResult, readMistakeInbox } from "@/lib/hifz/errors";
 import { proposeRating } from "@/lib/hifz/grading";
 import type { PageLine, PageToken } from "@/lib/hifz/page-data";
-import { declareMemorizedPages, loadPageCards } from "@/lib/hifz/pages";
+import { declareMemorizedPages, derivePageTiers, loadPageCard, loadPageCards } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
 import {
   attemptErrors,
@@ -290,5 +290,61 @@ describe("saving a page grade", () => {
     expect(store.sql.prepare("SELECT value FROM user_settings WHERE key = 'hifz_t_rev'").get()).toEqual({ value: "3.4" });
     await recordReviewPace(store.db, { minutes: 0, pages: 4, current: 3.4 });
     expect(store.sql.prepare("SELECT value FROM user_settings WHERE key = 'hifz_t_rev'").get()).toEqual({ value: "3.4" });
+  });
+});
+
+describe("page history from the review log", () => {
+  let store: OutboxDatabase;
+  beforeEach(async () => {
+    store = await openOutboxDatabase();
+  });
+  afterEach(async () => {
+    await store.db.getFirstAsync("SELECT 1");
+    await store.close();
+  });
+
+  function insertLog(cardId: string, rating: number, reviewedAt: string, localDate: string) {
+    store.sql
+      .prepare(
+        `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
+          local_date, grader) VALUES (?, ?, 2, ?, 1, 1, 0, 1, ?, ?, 'self')`,
+      )
+      .run(cardId, rating, reviewedAt, reviewedAt, localDate);
+  }
+
+  it("orders grades by instant when synced timestamps carry different offsets", async () => {
+    await declareMemorizedPages(store.db, { pages: [5], cycleDays: 30, now: atLocalTime(addDays(TODAY, -3), 600) });
+    const id = pageCardId(5);
+    // 10:00+02:00 is 08:00Z: the lapse came first, then two clean reviews.
+    insertLog(id, Rating.Again, `${addDays(TODAY, -1)}T10:00:00.000+02:00`, addDays(TODAY, -1));
+    insertLog(id, Rating.Good, `${addDays(TODAY, -1)}T08:10:00.000Z`, addDays(TODAY, -1));
+    insertLog(id, Rating.Good, `${addDays(TODAY, -1)}T08:20:00.000Z`, addDays(TODAY, -1));
+    const plan = DEFAULT_HIFZ_PLAN;
+    const [all] = await loadPageCards(store.db, { today: TODAY, plan });
+    const one = await loadPageCard(store.db, id, { today: TODAY, plan });
+    const derived = await derivePageTiers(store.db, [id], { today: TODAY, plan });
+    expect(all.history.grades.map((grade) => grade.rating)).toEqual([Rating.Again, Rating.Good, Rating.Good]);
+    expect(one?.history.grades.map((grade) => grade.rating)).toEqual([Rating.Again, Rating.Good, Rating.Good]);
+    expect(all.tier).toBe("manzil");
+    expect(one?.tier).toBe("manzil");
+    expect(derived.get(id)).toBe("manzil");
+  });
+
+  it("reads only the graded page's sabaq chunks inside a grade", async () => {
+    await declareMemorizedPages(store.db, { pages: [5], cycleDays: 30, now: atLocalTime(TODAY, 600) });
+    const queries: string[] = [];
+    const recording = new Proxy(store.db, {
+      get(target, key) {
+        const value = Reflect.get(target, key);
+        if (typeof value !== "function") return value;
+        return (sql: string, ...rest: unknown[]) => {
+          if (typeof sql === "string") queries.push(sql);
+          return value.call(target, sql, ...rest);
+        };
+      },
+    });
+    const one = await loadPageCard(recording, pageCardId(5), { today: TODAY, plan: DEFAULT_HIFZ_PLAN });
+    expect(one?.history.declared).toBe(true);
+    expect(queries.some((sql) => sql.includes("LIKE 'chunk:%'"))).toBe(false);
   });
 });

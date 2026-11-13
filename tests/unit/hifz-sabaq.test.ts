@@ -1,6 +1,6 @@
 import { atLocalTime } from "@/lib/habit/dates";
 import { readHabitDayRow } from "@/lib/habit/queries";
-import { loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
+import { loadPageCard, loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { completeSabaqChunk, newPageOrder, nextSabaqTarget } from "@/lib/hifz/sabaq";
 import { chunkCardId, PAGE_COUNT, pageCardId } from "@/lib/hifz/units";
@@ -94,6 +94,9 @@ describe("sabaq chunks (SBQ-02)", () => {
 
     const cards = await loadPageCards(store.db, { today: TODAY, plan });
     expect(cards.map((card) => [card.row.id, card.tier])).toEqual([[pageCardId(1), "sabqi"]]);
+    // A grade's own read of the page, limited to its chunks, sees the same sabaq history.
+    const one = await loadPageCard(store.db, pageCardId(1), { today: TODAY, plan });
+    expect(one).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: TODAY } });
     expect(await nextSabaqTarget(store.db, { plan: { ...plan, direction: "from_fatiha" }, wantLines: 4, pageWords })).toBeNull();
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
   });

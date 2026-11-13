@@ -1606,6 +1606,63 @@ it("removes the cloze card when another device's dismissal takes the word below 
   expect(liveClozeCards()).toEqual([]);
 });
 
+/** A trained cloze card for 2:255 word 4, as another device uploads it. */
+function clozeCard(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { ...card("cloze:2:255:4"), deck_id: "hifz-pages", reps: 7, state: State.Review, updated_at: NEW, ...overrides };
+}
+const later = (minutes: number) => new Date(Date.parse(NEW) + minutes * 60_000).toISOString();
+
+it("keeps a trained cloze card when this device has fewer of its errors than the device that made it", async () => {
+  restoreComplete();
+  mockTableRows.set("study_cards:incremental", [clozeCard()]);
+  mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2)]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+  expect(sql.prepare("SELECT reps FROM study_cards WHERE id = 'cloze:2:255:4'").get()).toEqual({ reps: 7 });
+});
+
+it("keeps the cloze card when a pulled dismissal leaves a word this device never held as weak", async () => {
+  restoreComplete();
+  mockTableRows.set("study_cards:incremental", [clozeCard()]);
+  mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2)]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  mockTableRows.set("study_cards:incremental", []);
+  mockTableRows.set("recitation_errors:incremental", [
+    { ...weakSpotError(2, { updated_at: later(5), deleted_at: later(5) }), synced_at: "2099-01-01T00:00:00.000Z" },
+  ]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+});
+
+it("brings back a cloze card another device deleted while the word is still weak here", async () => {
+  restoreComplete();
+  mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+  const deletedAt = new Date(Date.now() + 60_000).toISOString();
+  mockTableRows.set("recitation_errors:incremental", []);
+  mockTableRows.set("study_cards:incremental", [
+    // Deleted after this device made its card, so the deletion applies here first.
+    { ...clozeCard({ updated_at: deletedAt, deleted_at: deletedAt }), synced_at: "2099-01-01T00:00:00.000Z" },
+  ]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+});
+
+it("removes a restored cloze card whose weak spot a restored dismissal ended", async () => {
+  mockTableRows.set("study_cards:restore", [clozeCard()]);
+  mockTableRows.set("recitation_errors:restore", [weakSpotError(1), weakSpotError(2), weakSpotError(3, { deleted_at: NEW })]);
+  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  expect(liveClozeCards()).toEqual([]);
+});
+
+it("keeps a restored cloze card when only errors not yet uploaded are missing", async () => {
+  mockTableRows.set("study_cards:restore", [clozeCard()]);
+  mockTableRows.set("recitation_errors:restore", [weakSpotError(1), weakSpotError(2)]);
+  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+});
+
 it("keeps committed page counts and the cursor when a later incremental page is malformed, then retries", async () => {
   restoreComplete();
   putQueueRow();

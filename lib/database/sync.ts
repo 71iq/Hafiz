@@ -26,7 +26,13 @@ import { isSyncableUserSetting, putUserSetting, userSettingToSyncData } from "@/
 import { errorMessage } from "@/lib/error-message";
 import { applyRemoteHabitDay, habitDaySyncData } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
-import { createWeakSpotCards, removeClearedWeakSpotCards } from "@/lib/hifz/weak-spots";
+import {
+  createWeakSpotCards,
+  parseClozeCardId,
+  removeClearedWeakSpotCards,
+  removeDismissedWeakSpotCards,
+  weakSpotIds,
+} from "@/lib/hifz/weak-spots";
 import type { HabitDayRow } from "@/lib/habit/types";
 import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 
@@ -188,11 +194,24 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       console.warn("[Sync] Pull user_word_meanings skipped:", errorMessage(err));
     }
 
-    // Pull study_cards
-    await pullTable(db, "study_cards", userId, lastPullAt, upsertStudyCard, owner, onPageApplied);
+    // Pull study_cards. A cloze card deleted on another device is checked again once the errors are
+    // in: a device missing some of a weak spot's errors can delete a card that should stay.
+    const deletedClozeLocations: { surah: number; ayah: number; word: number }[] = [];
+    await pullTable(
+      db,
+      "study_cards",
+      userId,
+      lastPullAt,
+      async (tx, row) => {
+        await upsertStudyCard(tx, row);
+        const cloze = row.deleted_at ? parseClozeCardId(row.id) : null;
+        if (cloze) deletedClozeLocations.push(cloze);
+      },
+      owner,
+      onPageApplied,
+    );
 
-    // Wird days come before the review log: a make-up reservation (credited_through) must be in place
-    // before the reviews it reserves, or a grade between the two pulls could count them for today.
+    // Wird days come before the review log, so reconciling pulled reviews sees the merged days.
     // Wird days merge by status precedence; sessions and errors keep the newer row. These tables are
     // newer than the shared cursor, so each account pulls them in full once: rows another device
     // uploaded before this device's last pull would otherwise never arrive.
@@ -201,27 +220,40 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     const habitSince = habitTablesPulled ? lastPullAt : PULL_EPOCH;
     await pullTable(db, "habit_days", userId, habitSince, upsertHabitDay, owner, onPageApplied);
     await pullTable(db, "review_sessions", userId, habitSince, upsertReviewSession, owner, onPageApplied);
-    // ERR-06: errors from other devices can make a weak spot here, so their locations get cloze cards.
-    const pulledErrorLocations: { surah: number; ayah: number | null; word: number | null }[] = [];
+    // ERR-06: errors from other devices can make a weak spot here, so their locations get cloze
+    // cards, and a dismissal from another device can end one. Each page settles its own locations in
+    // its transaction. A card is deleted only when a pulled dismissal ends a weak spot this device
+    // held, never because this device has fewer of its errors than the device that made the card.
+    let pageErrorLocations: ErrorLocationRow[] = [];
+    let pageEndedWeakSpots: ErrorLocationRow[] = [];
     await pullTable(
       db,
       "recitation_errors",
       userId,
       habitSince,
       async (tx, row) => {
-        pulledErrorLocations.push({ surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null });
+        const location = { surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null };
+        const endsWeakSpot =
+          row.deleted_at != null && (await isLiveRecitationError(tx, row.id)) && (await weakSpotIds(tx, [location])).size > 0;
         await upsertRecitationError(tx, row);
+        pageErrorLocations.push(location);
+        if (endsWeakSpot && !(await isLiveRecitationError(tx, row.id))) pageEndedWeakSpots.push(location);
       },
       owner,
       onPageApplied,
+      async (tx) => {
+        const [locations, ended] = [pageErrorLocations, pageEndedWeakSpots];
+        pageErrorLocations = [];
+        pageEndedWeakSpots = [];
+        await createWeakSpotCards(tx, locations, new Date());
+        await removeClearedWeakSpotCards(tx, ended);
+      },
     );
-    if (pulledErrorLocations.length > 0) {
+    if (deletedClozeLocations.length > 0) {
       owner.requireCurrent();
       await db.withTransactionAsync(async (tx) => {
         owner.requireCurrent();
-        await createWeakSpotCards(tx, pulledErrorLocations, new Date());
-        // A dismissal from another device can take a word below three sessions; its card goes too.
-        await removeClearedWeakSpotCards(tx, pulledErrorLocations);
+        await createWeakSpotCards(tx, deletedClozeLocations, new Date());
       });
     }
 
@@ -435,11 +467,16 @@ async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Pr
     // Reviews from app versions before wird days were synced still count for their days.
     await reconcileHabitDaysFromLogs(tx, { now: new Date() });
     owner.requireCurrent();
-    // ERR-06: weak spots that formed across devices get their cloze card from the restored errors.
-    await createWeakSpotCards(
+    // ERR-06: weak spots that formed across devices get their cloze card from the restored errors,
+    // and a card whose weak spot restored dismissals ended goes.
+    const restoredErrors = remoteRows.recitation_errors.map((row) => ({
+      location: { surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null },
+      dismissed: row.deleted_at != null,
+    }));
+    await createWeakSpotCards(tx, restoredErrors.map((error) => error.location), new Date());
+    await removeDismissedWeakSpotCards(
       tx,
-      remoteRows.recitation_errors.map((row) => ({ surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null })),
-      new Date(),
+      restoredErrors.filter((error) => error.dismissed).map((error) => error.location),
     );
     owner.requireCurrent();
     await markAccountRestoreComplete(tx, userId, true, snapshotStartedAt, owner);
@@ -901,6 +938,8 @@ async function pullTable<K extends SyncTable>(
   upsertFn: (db: DatabaseExecutor, row: SyncRows[K]) => Promise<void>,
   owner: SyncOwner,
   onPageApplied: (count: number) => void,
+  /** Runs in each page's transaction after its rows, so derived state commits with them. */
+  afterPage?: (db: DatabaseExecutor) => Promise<void>,
 ): Promise<void> {
   const timeCol = "synced_at";
   const batchSize = 500;
@@ -928,6 +967,8 @@ async function pullTable<K extends SyncTable>(
         await upsertFn(tx, row);
         owner.requireCurrent();
       }
+      if (afterPage) await afterPage(tx);
+      owner.requireCurrent();
     });
 
     owner.requireCurrent();
@@ -1205,6 +1246,12 @@ async function upsertReviewSession(db: DatabaseExecutor, row: SyncRows["review_s
       row.deleted_at ?? null,
     ],
   );
+}
+
+type ErrorLocationRow = { surah: number; ayah: number | null; word: number | null };
+
+async function isLiveRecitationError(db: DatabaseExecutor, id: string): Promise<boolean> {
+  return (await db.getFirstAsync("SELECT 1 FROM recitation_errors WHERE id = ? AND deleted_at IS NULL", [id])) != null;
 }
 
 /** DB-03: recitation errors keep the newer row by updated_at, so inbox progress converges. */

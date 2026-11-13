@@ -441,6 +441,13 @@ describe("habit snapshot headlines", () => {
     });
   });
 
+  it("shows yesterday's makeable grace day ahead of today's finished wird while its window is open (STR-07)", () => {
+    // Another device with an earlier cutoff settled yesterday as grace and recorded today's wird.
+    const days = [...run(addDays(TODAY, -2), 3), day(addDays(TODAY, -1), "grace"), day(TODAY)];
+    expect(buildHabitSnapshot(input(days, morning)).headline).toMatchObject({ kind: "make_up_open", length: 5 });
+    expect(buildHabitSnapshot(input(days)).headline).toEqual({ kind: "done_today", length: 5 });
+  });
+
   it("reports goal progress within the current run and the grace days held", () => {
     const snapshot = buildHabitSnapshot({ ...input(run(TODAY, 12)), goal: { target: 7, start: addDays(TODAY, -4) } });
     expect(snapshot.goal).toEqual({ target: 7, done: 5, reached: false });

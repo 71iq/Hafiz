@@ -7,7 +7,8 @@ import { addDays, atLocalTime, localDateOf, weekdayOf, type LocalDate } from "@/
 import { buildDailyPlan, type DailyPlan, type PlanPage } from "@/lib/hifz/daily-plan";
 import { isStudyDay, readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { tierFor, type GradeEvent, type PageHistory, type Tier } from "@/lib/hifz/tiers";
-import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID, isValidPage, pageCardId, parsePageUnit } from "@/lib/hifz/units";
+import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
+import { chunkCardPrefix, HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID, isValidPage, pageCardId, parsePageUnit } from "@/lib/hifz/units";
 
 /** PLN-05 seeds: 30 minutes per new page and 3 per review page, then learned per user. */
 const SEED_MINUTES_PER_NEW_PAGE = 30;
@@ -39,14 +40,28 @@ async function readPageRows(db: DatabaseExecutor): Promise<StudyCardRow[]> {
  * as its last chunk's passing grade, so that grade's stored local date is the page's fluent date,
  * and travel later does not move it.
  */
-async function readSabaqPages(db: DatabaseExecutor): Promise<{ pages: Set<number>; passedOn: Map<number, LocalDate> }> {
+async function readSabaqPages(
+  db: DatabaseExecutor,
+  onlyPages?: readonly number[],
+): Promise<{ pages: Set<number>; passedOn: Map<number, LocalDate> }> {
+  // A grade reads only its own pages' chunks, through the id indexes; the full scan is for loading
+  // every page. Each page's chunk ids sort between its prefix and the prefix with ':' raised to ';'.
+  const ranges = onlyPages?.map((page) => {
+    const prefix = chunkCardPrefix(page);
+    return [prefix, `${prefix.slice(0, -1)};`] as const;
+  });
+  const idFilter = (column: string) =>
+    ranges ? `(${ranges.map(() => `(${column} >= ? AND ${column} < ?)`).join(" OR ")})` : `${column} LIKE 'chunk:%'`;
+  const rangeArgs = ranges?.flatMap(([from, to]) => [from, to]) ?? [];
+  if (ranges?.length === 0) return { pages: new Set(), passedOn: new Map() };
   const [rows, passes] = await Promise.all([
     db.getAllAsync<{ id: string }>(
-      "SELECT id FROM study_cards WHERE deck_id = ? AND id LIKE 'chunk:%' AND deleted_at IS NULL",
-      [HIFZ_SABAQ_DECK_ID],
+      `SELECT id FROM study_cards WHERE deck_id = ? AND ${idFilter("id")} AND deleted_at IS NULL`,
+      [HIFZ_SABAQ_DECK_ID, ...rangeArgs],
     ),
     db.getAllAsync<{ reviewed_at: string; local_date: LocalDate | null }>(
-      "SELECT reviewed_at, local_date FROM study_log WHERE card_id LIKE 'chunk:%' AND rating >= 3 AND local_date IS NOT NULL",
+      `SELECT reviewed_at, local_date FROM study_log WHERE ${idFilter("card_id")} AND rating >= 3 AND local_date IS NOT NULL`,
+      rangeArgs,
     ),
   ]);
   const pages = new Set<number>();
@@ -65,16 +80,24 @@ async function readSabaqPages(db: DatabaseExecutor): Promise<{ pages: Set<number
 async function readPageGrades(db: DatabaseExecutor): Promise<Map<string, GradeEvent[]>> {
   return gradesByCard(
     await db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
-      "SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id LIKE 'page:%' ORDER BY reviewed_at",
+      "SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id LIKE 'page:%'",
     ),
   );
 }
 
+/**
+ * Each card's grades in the order they happened. Stored timestamps can carry different offsets after
+ * sync, so the order is by instant, never by the text: "10:00+02:00" comes before "08:10Z".
+ */
 function gradesByCard(
   rows: readonly { card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }[],
 ): Map<string, GradeEvent[]> {
+  const ordered = rows
+    .map((row) => ({ row, at: Date.parse(row.reviewed_at) }))
+    // Millisecond order first; equal or unparsable instants fall back to the exact comparison.
+    .sort((a, b) => a.at - b.at || compareSyncTimestamps(a.row.reviewed_at, b.row.reviewed_at));
   const grades = new Map<string, GradeEvent[]>();
-  for (const row of rows) {
+  for (const { row } of ordered) {
     if (row.rating < 1 || row.rating > 4) continue;
     const list = grades.get(row.card_id) ?? [];
     list.push({ date: row.local_date ?? localDateOf(new Date(row.reviewed_at)), rating: row.rating as GradeEvent["rating"] });
@@ -97,9 +120,9 @@ export async function derivePageTiers(
   const placeholders = cardIds.map(() => "?").join(", ");
   const [rows, sabaq, logs] = await Promise.all([
     db.getAllAsync<StudyCardRow>(`SELECT * FROM study_cards WHERE id IN (${placeholders}) AND deleted_at IS NULL`, [...cardIds]),
-    readSabaqPages(db),
+    readSabaqPages(db, pagesOf(cardIds)),
     db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
-      `SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id IN (${placeholders}) ORDER BY reviewed_at`,
+      `SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id IN (${placeholders})`,
       [...cardIds],
     ),
   ]);
@@ -110,6 +133,16 @@ export async function derivePageTiers(
     tiers.set(row.id, tierFor(pageHistory(row, unit.page, sabaq, grades), today, plan));
   }
   return tiers;
+}
+
+/** The page numbers of page card ids. */
+function pagesOf(cardIds: readonly string[]): number[] {
+  const pages = new Set<number>();
+  for (const id of cardIds) {
+    const unit = parsePageUnit(id);
+    if (unit?.kind === "page") pages.add(unit.page);
+  }
+  return [...pages];
 }
 
 function pageHistory(
@@ -140,9 +173,9 @@ export async function loadPageCard(
   if (unit?.kind !== "page") return null;
   const [row, sabaq, logs] = await Promise.all([
     db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [cardId]),
-    readSabaqPages(db),
+    readSabaqPages(db, [unit.page]),
     db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
-      "SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id = ? ORDER BY reviewed_at",
+      "SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id = ?",
       [cardId],
     ),
   ]);

@@ -57,13 +57,24 @@ async function liveClozeIds(db: DatabaseExecutor, ids: readonly string[]): Promi
   return live;
 }
 
-/** The cloze ids of the locations wrong in WEAK_SPOT_SESSIONS or more sessions, in one grouped query per batch. */
-async function weakLocationIds(db: DatabaseExecutor, locations: readonly WordLocation[]): Promise<Set<string>> {
+/** WEAK_SPOT_ERROR_SQL with dismissed errors counted too: what a location held before its dismissals. */
+const WEAK_SPOT_ERROR_WITH_DISMISSED_SQL = "type NOT IN ('tajweed', 'hesitation') AND corrected != 'self'";
+
+/**
+ * The cloze ids of the locations wrong in WEAK_SPOT_SESSIONS or more sessions, in one grouped query
+ * per batch. With `includeDismissed`, dismissed errors count as well.
+ */
+async function weakLocationIds(
+  db: DatabaseExecutor,
+  locations: readonly WordLocation[],
+  { includeDismissed = false }: { includeDismissed?: boolean } = {},
+): Promise<Set<string>> {
   const weak = new Set<string>();
+  const filter = includeDismissed ? WEAK_SPOT_ERROR_WITH_DISMISSED_SQL : WEAK_SPOT_ERROR_SQL;
   for (const batch of batches(locations)) {
     const rows = await db.getAllAsync<{ surah: number; ayah: number; word: number }>(
       `SELECT surah, ayah, word FROM recitation_errors
-        WHERE ${WEAK_SPOT_ERROR_SQL} AND (${batch.map(() => "(surah = ? AND ayah = ? AND word = ?)").join(" OR ")})
+        WHERE ${filter} AND (${batch.map(() => "(surah = ? AND ayah = ? AND word = ?)").join(" OR ")})
         GROUP BY surah, ayah, word
        HAVING COUNT(DISTINCT COALESCE(session_id, id)) >= ?`,
       [...batch.flatMap((location) => [location.surah, location.ayah, location.word]), WEAK_SPOT_SESSIONS],
@@ -97,6 +108,12 @@ export async function createWeakSpotCards(db: DatabaseExecutor, errors: readonly
   return created;
 }
 
+/** The cloze ids of the word locations among `errors` that are weak spots now. */
+export async function weakSpotIds(db: DatabaseExecutor, errors: readonly ErrorLocation[]): Promise<Set<string>> {
+  const locations = wordLocations(errors);
+  return locations.length === 0 ? new Set() : weakLocationIds(db, locations);
+}
+
 /**
  * Soft-delete the cloze card of each word location among `errors` that is no longer a weak spot,
  * for example after an error there was dismissed as logged by mistake. Each delete queues its
@@ -112,6 +129,31 @@ export async function removeClearedWeakSpotCards(db: DatabaseExecutor, errors: r
   let removed = 0;
   for (const location of carded) {
     if (weak.has(location.id)) continue;
+    await deleteStudyCardRow(db, HIFZ_PAGES_DECK_ID, location.id);
+    removed += 1;
+  }
+  return removed;
+}
+
+/**
+ * After a full restore: soft-delete the cloze card of each location among `errors` whose dismissals
+ * took it below 3 sessions, that is wrong in 3 or more sessions counting dismissed errors and in
+ * fewer counting only live ones. A location that merely lacks errors another device has not uploaded
+ * yet keeps its card, since it never reached 3 here. Pass the restored dismissed errors.
+ */
+export async function removeDismissedWeakSpotCards(db: DatabaseExecutor, errors: readonly ErrorLocation[]): Promise<number> {
+  const locations = wordLocations(errors);
+  if (locations.length === 0) return 0;
+  const existing = await liveClozeIds(db, locations.map((location) => location.id));
+  const carded = locations.filter((location) => existing.has(location.id));
+  if (carded.length === 0) return 0;
+  const [weakNow, weakBefore] = await Promise.all([
+    weakLocationIds(db, carded),
+    weakLocationIds(db, carded, { includeDismissed: true }),
+  ]);
+  let removed = 0;
+  for (const location of carded) {
+    if (weakNow.has(location.id) || !weakBefore.has(location.id)) continue;
     await deleteStudyCardRow(db, HIFZ_PAGES_DECK_ID, location.id);
     removed += 1;
   }

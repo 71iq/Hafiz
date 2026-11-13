@@ -66,10 +66,11 @@ export function buildHabitSnapshot(input: SnapshotInput): HabitSnapshot {
   let headline: HabitHeadline;
   const todayStatus = streak.todayStatus;
   if (earnBack && !earnBack.succeeded) headline = { kind: "earn_back", earnBack };
-  else if (todayStatus === "done") headline = { kind: "done_today", length: streak.length };
-  // Yesterday's open make-up comes before today's excuse or pause: the excuse covers today only,
-  // and the make-up is what can still keep the streak (STR-07).
+  // Yesterday's open make-up comes before today's state: an excuse or pause covers today only, and
+  // today's wird can be done on a device whose cutoff came earlier while this one can still make up
+  // yesterday's grace day. Reviews graded now go to yesterday, so Home shows that progress (STR-07).
   else if (streak.makeUpPending) headline = { kind: "make_up_open", length: streak.length, cutoff: makeUpCutoff };
+  else if (todayStatus === "done") headline = { kind: "done_today", length: streak.length };
   else if (todayStatus === "excused") headline = { kind: "excused_today", length: streak.length };
   else if (todayStatus === "paused" || (pause && pause.start <= today && today <= pause.end)) {
     headline = { kind: "paused", length: streak.length, until: pause?.end ?? today };

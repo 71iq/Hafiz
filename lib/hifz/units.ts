@@ -34,7 +34,12 @@ export function seamCardId(page: number): string {
 }
 
 export function chunkCardId(page: number, fromLine: number, toLine: number): string {
-  return `chunk:${PAGE_LAYOUT}:${page}:${fromLine}-${toLine}`;
+  return `${chunkCardPrefix(page)}${fromLine}-${toLine}`;
+}
+
+/** The id prefix every chunk card of a page shares. */
+export function chunkCardPrefix(page: number): string {
+  return `chunk:${PAGE_LAYOUT}:${page}:`;
 }
 
 export function parsePageUnit(cardId: string): PageUnit | null {
