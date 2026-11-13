@@ -20,7 +20,8 @@ import type { Grade } from "@/lib/fsrs/scheduler";
 import { loadHabitOverview } from "@/lib/habit/queries";
 import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
 import type { PageToken } from "@/lib/hifz/page-data";
-import { loadTodayWird } from "@/lib/hifz/pages";
+import { loadTodayWird, readMemorizedPageNumbers } from "@/lib/hifz/pages";
+import { similarGroupsForAyahs, withMemorizedSiblings, type SimilarGroup, type SimilarRef } from "@/lib/hifz/similar";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import { completeSabaqChunk, nextSabaqTarget, type SabaqTarget } from "@/lib/hifz/sabaq";
 import { formatAyahRef } from "@/lib/arabic";
@@ -29,9 +30,9 @@ import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { useSettings } from "@/lib/settings/context";
 
-/** 4.4.1 steps after the optional intention. */
-type Step = "intention" | "listen" | "meaning" | "looking" | "ayah" | "chunk" | "link" | "check" | "done";
-const STEPS: readonly Step[] = ["intention", "listen", "meaning", "looking", "ayah", "chunk", "link", "check"];
+/** 4.4.1 steps after the optional intention. "similar" appears only when MUT-01 applies. */
+type Step = "intention" | "listen" | "meaning" | "similar" | "looking" | "ayah" | "chunk" | "link" | "check" | "done";
+const BASE_STEPS: readonly Step[] = ["intention", "listen", "meaning", "looking", "ayah", "chunk", "link", "check"];
 
 /** SBQ-01: the "10 looking, then from memory" practice. */
 const LOOKING_TARGET = 10;
@@ -67,6 +68,11 @@ export default function SabaqScreen() {
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
   const [pageAdded, setPageAdded] = useState(false);
   const [surahNames, setSurahNames] = useState<Map<number, string>>(new Map());
+  const [similar, setSimilar] = useState<SimilarGroup[]>([]);
+  const STEPS: readonly Step[] = useMemo(
+    () => (similar.length > 0 ? ["intention", "listen", "meaning", "similar", "looking", "ayah", "chunk", "link", "check"] : BASE_STEPS),
+    [similar.length],
+  );
   const sessionRef = useRef<ReviewSessionRef | null>(null);
   const startedAt = useRef(Date.now());
   const step: Step = habitResult ? "done" : STEPS[stepIndex];
@@ -102,6 +108,9 @@ export default function SabaqScreen() {
           }),
         );
         setMeanings(rows);
+        // MUT-01: before memorizing, show siblings the user already knows, with the difference marked.
+        const [groups, memorizedPages] = await Promise.all([similarGroupsForAyahs(db, next.ayahs), readMemorizedPageNumbers(db)]);
+        setSimilar(withMemorizedSiblings(groups, memorizedPages));
       }
       sessionRef.current = startReviewSession("sabaq");
       startedAt.current = Date.now();
@@ -200,6 +209,7 @@ export default function SabaqScreen() {
     chunk: s.hifzSabaqStepChunk,
     link: s.hifzSabaqStepLink,
     check: s.hifzSabaqStepCheck,
+    similar: s.hifzSimilarTitle,
     done: s.hifzSabaqDone,
   };
   const hidden = step === "ayah" || step === "chunk" || step === "link" || step === "check";
@@ -240,6 +250,8 @@ export default function SabaqScreen() {
                       ? s.hifzSabaqLinkHint
                       : step === "check"
                         ? s.hifzSabaqCheckHint
+                        : step === "similar"
+                          ? s.hifzSimilarHint
                         : step === "done"
                           ? s.hifzSabaqSecondLook
                           : ""}
@@ -266,7 +278,20 @@ export default function SabaqScreen() {
           </Card>
         ) : null}
 
-        {step !== "intention" && step !== "meaning" && step !== "done" ? (
+        {step === "similar" ? (
+          <View style={{ width: pageWidth - 16, gap: 10 }}>
+            {similar.map((group) => (
+              <Card key={`${group.groupId}-${group.self.surah}:${group.self.ayah}`} elevation="low" className="p-4" style={{ gap: 10 }}>
+                <SimilarLine reference={group.self} isRTL={isRTL} accent={accent} />
+                {group.siblings.map((sibling) => (
+                  <SimilarLine key={`${sibling.surah}:${sibling.ayah}`} reference={sibling} isRTL={isRTL} accent={accent} muted />
+                ))}
+              </Card>
+            ))}
+          </View>
+        ) : null}
+
+        {step !== "intention" && step !== "meaning" && step !== "similar" && step !== "done" ? (
           <Card elevation="low" className="py-4 rounded-3xl" style={{ width: pageWidth - 16 }}>
             <RecitationPage
               page={target.pageData}
@@ -327,7 +352,7 @@ export default function SabaqScreen() {
           </>
         ) : null}
 
-        {step === "meaning" ? <Button label={s.hifzSabaqNext} onPress={goNext} /> : null}
+        {step === "meaning" || step === "similar" ? <Button label={s.hifzSabaqNext} onPress={goNext} /> : null}
 
         {step === "looking" ? (
           <>
@@ -397,5 +422,24 @@ export default function SabaqScreen() {
         ) : null}
       </View>
     </SafeAreaView>
+  );
+}
+
+/** One similar verse with its reference and the shared wording marked (MUT-01, MUT-05). */
+function SimilarLine({ reference, isRTL, accent, muted = false }: { reference: SimilarRef; isRTL: boolean; accent: string; muted?: boolean }) {
+  return (
+    <View style={{ gap: 4 }}>
+      <Text dir={isRTL ? "rtl" : "ltr"} variant="caption">
+        {`${reference.surahName} ${formatAyahRef(isRTL, reference.surah, reference.ayah)}`}
+      </Text>
+      <Text
+        style={{ writingDirection: "rtl", textAlign: "right", fontSize: 19, lineHeight: 34, opacity: muted ? 0.85 : 1 }}
+        className="text-charcoal dark:text-neutral-100"
+      >
+        {reference.pre ? `${reference.pre} ` : ""}
+        <Text style={{ color: accent, fontWeight: "700" }}>{reference.similar}</Text>
+        {reference.post ? ` ${reference.post}` : ""}
+      </Text>
+    </View>
   );
 }

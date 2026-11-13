@@ -16,6 +16,7 @@ import type { HifzPlan } from "@/lib/hifz/plan";
 import { T_REV_KEY } from "@/lib/hifz/pages";
 import { isManzil, pagePolicy, tierFor, type PageHistory, type Tier } from "@/lib/hifz/tiers";
 import { HIFZ_PAGES_DECK_ID } from "@/lib/hifz/units";
+import { bringSimilarCardsForward } from "@/lib/hifz/similar";
 
 /** One location in a recitation attempt, as the user marked or revealed it. */
 export type AttemptMark = Readonly<{ token: PageToken; type: RecitationErrorType }>;
@@ -186,7 +187,15 @@ export async function savePageGrade(db: AppDatabase, input: PageGradeInput): Pro
       errors: input.grader === "salah" ? [] : attemptErrors(input.attempt, input.firstToken),
       dhuhr: input.dhuhr,
     },
-    extraWork: isManzil(after) ? async (tx) => void (await completeManzilCycleIfDone(tx, now)) : undefined,
+    extraWork: async (tx) => {
+      if (isManzil(after)) await completeManzilCycleIfDone(tx, now);
+      // SCH-07, MUT-04: a drift into a similar verse brings that pair's cards due within a day.
+      if (input.grader !== "salah") {
+        for (const mark of input.attempt.marks.values()) {
+          if (mark.type === "mutashabih_drift") await bringSimilarCardsForward(tx, { surah: mark.token.surah, ayah: mark.token.ayah, now });
+        }
+      }
+    },
   });
   return { ...result, tier: after };
 }
