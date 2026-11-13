@@ -371,29 +371,20 @@
       "native": false,
       "children": [
         {
-          "id": "onboarding.surahs",
-          "title": "Memorized-surah selection and search",
-          "kind": "widget",
+          "id": "onboarding.setup",
+          "title": "Hifz setup: goal, tracks, pace, when",
+          "kind": "screen",
           "cases": ["START-02"],
-          "uses": [],
-          "native": false,
-          "children": []
-        },
-        {
-          "id": "onboarding.summary",
-          "title": "Deck summary and creation",
-          "kind": "widget",
-          "cases": ["START-03"],
-          "uses": [],
+          "uses": ["hifz.setup.memorized"],
           "native": false,
           "children": []
         },
         {
           "id": "onboarding.finish",
-          "title": "Start review / Continue / Skip",
+          "title": "Save setup and open the first session, or skip",
           "kind": "transition",
           "cases": ["START-04", "START-05"],
-          "uses": ["review.session", "home"],
+          "uses": ["hifz.review", "hifz.sabaq", "review.session", "home"],
           "native": false,
           "children": []
         }
@@ -407,6 +398,60 @@
       "uses": [],
       "native": false,
       "children": [
+        {
+          "id": "home.wird",
+          "title": "Wird streak card and minimum progress",
+          "kind": "widget",
+          "cases": ["WIRD-01"],
+          "uses": ["wird.settle"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.wird.break",
+          "title": "Excuse or pause sheet",
+          "kind": "widget",
+          "cases": ["WIRD-05", "WIRD-06"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.extras",
+          "title": "Wird extras: complete or hide",
+          "kind": "widget",
+          "cases": ["WIRD-09"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.hifzplan",
+          "title": "Today's hifz plan card",
+          "kind": "widget",
+          "cases": ["PLAN-01"],
+          "uses": ["hifz.review", "hifz.sabaq", "hifz.review.drills"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.welcomeback",
+          "title": "Welcome-back review offer",
+          "kind": "widget",
+          "cases": ["PLAN-09"],
+          "uses": ["hifz.review"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.monthlycheck",
+          "title": "Monthly check offer",
+          "kind": "widget",
+          "cases": ["PLAN-10"],
+          "uses": ["hifz.review"],
+          "native": false,
+          "children": []
+        },
         {
           "id": "home.resume",
           "title": "Reading-position card -> Mushaf",
@@ -805,7 +850,7 @@
               "title": "Session summary and Done",
               "kind": "screen",
               "cases": ["REVIEW-11"],
-              "uses": [],
+              "uses": ["wird.sessioncards"],
               "native": false,
               "children": []
             }
@@ -817,6 +862,172 @@
           "kind": "screen",
           "cases": ["REVIEW-12"],
           "uses": [],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "wird",
+      "title": "Wird days and streak",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "wird.minimum",
+          "title": "Meeting the minimum wird on grade",
+          "kind": "transition",
+          "cases": ["WIRD-02"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "wird.makeup",
+          "title": "Making up yesterday before Dhuhr",
+          "kind": "transition",
+          "cases": ["WIRD-03"],
+          "uses": ["wird.minimum"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "wird.settle",
+          "title": "Settling grace, pause and earned-back days",
+          "kind": "transition",
+          "cases": ["WIRD-04"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "wird.earnback",
+          "title": "Earning a broken streak back",
+          "kind": "transition",
+          "cases": ["WIRD-07"],
+          "uses": ["wird.minimum"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "wird.sessioncards",
+          "title": "Session-end wird cards and Zayt",
+          "kind": "widget",
+          "cases": ["WIRD-08"],
+          "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "wird.sync",
+          "title": "Merging wird days across devices",
+          "kind": "transition",
+          "cases": ["WIRD-10"],
+          "uses": ["shell.restore"],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "hifz",
+      "title": "Hifz plan and recitation",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "hifz.setup",
+          "title": "Hifz setup from Settings",
+          "kind": "screen",
+          "cases": [],
+          "uses": ["onboarding.setup"],
+          "native": false,
+          "children": [
+            {
+              "id": "hifz.setup.memorized",
+              "title": "Memorized portion picker: by juz or surah",
+              "kind": "widget",
+              "cases": ["START-03"],
+              "uses": [],
+              "native": false,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "hifz.review",
+          "title": "Wird review: support levels",
+          "kind": "screen",
+          "cases": ["PLAN-02"],
+          "uses": [],
+          "native": false,
+          "children": [
+            {
+              "id": "hifz.review.recite",
+              "title": "Peek, Show me, Slip, Done reciting",
+              "kind": "widget",
+              "cases": ["PLAN-03"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "hifz.review.check",
+              "title": "Check: mistake marks, seam, proposed grade",
+              "kind": "widget",
+              "cases": ["PLAN-04"],
+              "uses": ["shared.overlay"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "hifz.review.grade",
+              "title": "Grade, salah and listener",
+              "kind": "transition",
+              "cases": ["PLAN-05"],
+              "uses": ["wird.minimum"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "hifz.review.remediation",
+              "title": "Half pages and seams",
+              "kind": "transition",
+              "cases": ["PLAN-06"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "hifz.review.drills",
+              "title": "Mistake inbox drills",
+              "kind": "screen",
+              "cases": ["PLAN-07"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "hifz.review.summary",
+              "title": "Exit confirmation and summary",
+              "kind": "screen",
+              "cases": ["PLAN-12"],
+              "uses": ["wird.sessioncards", "shared.overlay"],
+              "native": false,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "hifz.sabaq",
+          "title": "Sabaq: new lines",
+          "kind": "screen",
+          "cases": ["PLAN-08"],
+          "uses": ["wird.minimum", "wird.sessioncards"],
           "native": false,
           "children": []
         }
@@ -900,6 +1111,15 @@
           "kind": "widget",
           "cases": ["PROGRESS-06"],
           "uses": ["auth.login"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "progress.hifz",
+          "title": "Hifz progress and steady weeks",
+          "kind": "widget",
+          "cases": ["PLAN-11"],
+          "uses": [],
           "native": false,
           "children": []
         }
@@ -1095,6 +1315,15 @@
           "kind": "widget",
           "cases": ["SET-02", "SET-07"],
           "uses": ["reader.settings"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "settings.wird",
+          "title": "Wird settings and hifz plan link",
+          "kind": "widget",
+          "cases": ["SET-16"],
+          "uses": ["hifz.setup"],
           "native": false,
           "children": []
         },

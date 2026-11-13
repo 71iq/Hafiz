@@ -24,7 +24,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - NAV-03. On a desktop-width screen, use the persistent sidebar. It also links to the reflection feed, reflection journey, and own profile. Wide Mushaf reading hides the sidebar and provides its own Home control.
 - NAV-04. Open `/flashcards` or `/search` directly. Both replace themselves with Home. Search and deck review start through Home's controls.
 - NAV-05. Open an unknown URL. Read the not-found message and follow its Home link through the normal root-entry flow.
-- HOME-01. Enter Home. View today's due count, memorized count, wird streak, smart-deck counts, and journey progress. Returning from study or receiving synced records refreshes the displayed data.
+- HOME-01. Enter Home. View today's due count, memorized pages or ayat, the wird streak card, today's hifz plan, smart-deck counts, and journey progress. Returning from study, a wird-day change, or synced records refreshes the displayed data.
 - HOME-02. Select the saved reading-position card when present. Open Mushaf at its restored reading position.
 - HOME-03. As a guest, use Home's account banner to open Login or Signup, or dismiss the banner for the current Home instance.
 - HOME-04. Dismiss an achievement announcement. Mark that achievement as seen and show the next unseen announcement when one exists.
@@ -46,11 +46,11 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 
 ## Onboarding
 
-- START-01. Begin onboarding. Move through Welcome, memorized-surah selection, and the deck summary with animated transitions. Go back before the deck has been saved.
-- START-02. Search the surah list by number or Arabic/English name. Select or deselect surahs, select all, or clear all. Update the selected-surah and ayah totals. No matches shows an empty list.
-- START-03. Continue with at least one selected surah. Review the totals, then create the smart-deck scope. Show saving, saved confirmation, or a retryable save error. Empty selection disables Continue.
-- START-04. After creation, choose Start review. Save onboarding completion and open the review session. Alternatively, choose Continue to enter Home.
-- START-05. Skip from either later onboarding step. Save onboarding completion and enter Home without requiring deck creation. A completion-save failure leaves the step open with an error.
+- START-01. Begin onboarding from Welcome. Get Started opens the hifz setup; Skip for now saves onboarding completion and enters Home. A completion-save failure keeps Welcome open with an error.
+- START-02. In setup, choose a goal: memorize, keep what is memorized, or both. Continue through what is memorized, review tracks, pace, and when to review. Back returns one step, and Not now skips an optional step with its defaults.
+- START-03. Choose what is memorized by juz (five columns, Juz 30 and 29 first) or by surah with search. The caption counts the selected juz and surahs. Saving declares those pages memorized and spreads their first checks over the first cycle.
+- START-04. Save the setup. Save onboarding completion and open the first session at once: page review when pages were declared, sabaq when new memorization is planned, the ayah review in ayah mode, or Home otherwise. A save failure keeps the last step open with an error.
+- START-05. Open onboarding again after completing it on a restored account. Completion is synced, so a restored account with completed onboarding enters Home.
 
 ## Mushaf reading and movement
 
@@ -138,9 +138,37 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - REVIEW-07. Delete or reset the current card through confirmation. Cancel leaves it unchanged. Delete advances; reset returns the same card to its front with reset progress.
 - REVIEW-08. Edit the current/first available answer mode. Save personal nonblank answer text, save blank text to restore its default, or cancel and return to the card.
 - REVIEW-09. Set a valid due date of today or later for the current card. Save and remove it from this session, then advance or finish. Invalid input stays in the editor.
-- REVIEW-10. Press X during an active session. Return directly to Home without an exit confirmation or partial-session summary. Already saved grades and card changes remain.
-- REVIEW-11. Finish the queue. Read reviewed/new/review/relearning totals, duration, next review, and wird status, then choose Done to return Home.
+- REVIEW-10. Press X during an active session. With no grade saved yet, return to Home. After a grade, confirm leaving first; Stay returns to the card. Already saved grades and card changes remain.
+- REVIEW-11. Finish the queue. Read reviewed/new/review/relearning totals, duration, and next review, then the wird cards (WIRD-08). Choose Done, or "I'll be back tomorrow" during the first week, to return Home.
 - REVIEW-12. Open `/flashcards/vocab` directly. Load due vocabulary cards, or all vocabulary cards when none is due. Reveal, rate, and advance to its summary. Back/X exits immediately; Delete removes the current card without confirmation. Save/delete errors retain the card, while initial load failure falls through to its summary.
+
+## Wird days and streak
+
+- WIRD-01. View the Home streak card. It shows the streak length and today's state: no wird yet, done today, excused, paused, at risk, yesterday still open to make up, an earn-back in progress, or a fresh start. Progress toward today's minimum shows until it is met.
+- WIRD-02. Grade reviews until today's minimum wird is met: one page of recitation or five minutes of graded review by default. The review that meets it marks the day done once and shows a notice. Study cards count only when meanings count toward the wird.
+- WIRD-03. Miss a day and recite the minimum before Dhuhr the next day, or 12:30 without prayer times. The reviews that meet it make up yesterday, and only later reviews count for today.
+- WIRD-04. Miss a day after the make-up window closes while holding a grace day. A grace day covers it automatically, and Home mentions it the next morning. Grace days are earned after 3 wird days, then every 7, holding at most 2.
+- WIRD-05. Open Excuse or pause on Home and mark excused days from 3 days back to 30 ahead with a reason. Excused days keep the streak without counting toward it. Withdraw an excuse from the same sheet; a recited day keeps its status.
+- WIRD-06. Pause the streak for up to 60 days, then end the pause early from the same sheet. Paused days neither break nor extend the streak.
+- WIRD-07. After a broken streak, recite on each of the 3 days after the missed day, or complete the full wird on 2 of them. The streak is earned back with the missed days restored, and the session or Home says so.
+- WIRD-08. Finish a session that met the minimum, made up a day, or earned a streak back. A streak card shows the day or milestone, then at most one prompt: a streak goal offer, a rest suggestion after 45 minutes, or encouragement after a hard session. Zayt appears unless turned off.
+- WIRD-09. On Home, view up to 3 optional extras for today. Complete one to mark it done, or hide it for today. Extras never affect the streak.
+- WIRD-10. Use the wird on several devices. Wird days merge so a recited day is never lost to an excuse or pause written elsewhere, and both devices settle to the same streak after sync.
+
+## Hifz plan and recitation
+
+- PLAN-01. View today's plan card on Home: pages left with their kind and minutes, progress, Start review, Memorize new lines when sabaq is planned, and spots to strengthen with Drill now. A complete plan says so.
+- PLAN-02. Start the wird review. Recite each planned page at a support level: hidden, swipe to reveal, line by line, first letters, or full text. The level starts from the page's recall, and full text is practice only.
+- PLAN-03. While reciting, Peek reveals the next word, Show me reveals the rest of the line, and Slip counts a self-corrected slip. Done reciting reveals the page for checking.
+- PLAN-04. Check the page. Tap a word to mark a mistake by type, change or remove it. When the next page is also memorized, check the continuation into it as clean or stumbled. The rubric proposes a grade, and the support level caps it.
+- PLAN-05. Grade the page. Save the grade, errors, and support level in one step and move to the next page. Recited in salah grades the page Good without a check. With a teacher or partner listening, the grade records them as the grader.
+- PLAN-06. Grade a page Again with every error in one half. That half returns in 10 minutes and the next day. A stumble into the next page brings back its seam the same way. Both appear after the pages and count as spots to strengthen.
+- PLAN-07. Drill the mistake inbox from Home. Recite each noted ayah, check it, and mark it clean or still needing work. An item clears after clean recalls on two later days and expires after 28 days.
+- PLAN-08. Memorize new lines in sabaq. Set an intention, listen, read the meaning and any similar verses, look over the lines, then recite each ayah, the chunk, and its link to the lines before it from memory, and grade the check. The chunk joins the daily review.
+- PLAN-09. Return after 7 or more days away. Home offers a welcome-back review that starts with the strongest pages at a chosen support level.
+- PLAN-10. Accept or decline the monthly check on Home. It reviews 5 memorized pages not seen in two weeks and reports how many were clean.
+- PLAN-11. View hifz progress: memorized pages, how many are steady, fair, or need review, completed juz, and steady weeks.
+- PLAN-12. Leave a hifz review after grading a page. Confirm leaving first, then read the summary with pages, clean pages, spots marked, half pages and seams, minutes, and the wird cards.
 
 ## Reflection journey
 
@@ -155,7 +183,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 ## Progress and achievements
 
 - PROGRESS-01. Open Progress or own profile Overview. View available local study totals, wird, activity, default-deck progress, surah progress, and achievements. Refresh relevant figures after saved review activity or pulled sync records.
-- PROGRESS-02. Press an activity-heatmap day. Show its date and review count. Press the same day to hide the tooltip, or another day to replace it.
+- PROGRESS-02. Press an activity-heatmap day. Show its date, review count, and wird status (done, made up, earned back, excused, paused, or grace). Excused days are visible only to the user. Press the same day to hide the tooltip, or another day to replace it.
 - PROGRESS-03. Browse own surah progress and select a surah to open Mushaf at ayah 1. From Progress, use View all to open the full surah list, then select or dismiss it.
 - PROGRESS-04. Open View all achievements from Progress. Browse grouped unlocked badges and locked progress, then dismiss. Individual charts, statistics, and badges remain read-only.
 - PROGRESS-05. View empty study history. Show zero/empty progress or dedicated empty text. Some failed local queries also fall back to empty values; no general progress Retry control appears.
@@ -234,6 +262,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - SET-13. After a successful connection, run the initial sync. Show connected, linked-without-sync, disconnected, or reauthentication-needed status with its result message. Connection callbacks clear their temporary URL parameters.
 - SET-14. From a connected account, run manual Quran Foundation sync or disconnect it. Disable actions while pending, update connection status/result feedback, and allow reconnection when required.
 - SET-15. Open About settings to reach About, Privacy, Terms, Credits, or GitHub issue reporting. A failed external launch shows feedback. Become a Donor opens an information dialog that can be dismissed.
+- SET-16. In General, open the Wird section. Choose the minimum wird in pages and minutes, whether meanings count toward it, the week start, and whether Zayt appears. Open the hifz plan to change the setup.
 
 ## Public and direct-access pages
 
