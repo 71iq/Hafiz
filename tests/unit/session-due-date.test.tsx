@@ -148,12 +148,25 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ deckId: "fixture-session-deck" }),
 }));
 
-jest.mock("@react-navigation/native", () => ({
-  ...jest.requireActual<typeof import("@react-navigation/native")>("@react-navigation/native"),
-  usePreventRemove: (prevent: boolean, callback: PreventRemove["callback"]) => {
-    mockPreventRemove = { prevent, callback };
-  },
-}));
+/** Screen focus for useIsFocused; a test takes it away and gives it back like a screen pushed on top. */
+const mockFocus = { focused: true, listeners: new Set<() => void>() };
+jest.mock("@react-navigation/native", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  return {
+    ...jest.requireActual<typeof import("@react-navigation/native")>("@react-navigation/native"),
+    usePreventRemove: (prevent: boolean, callback: PreventRemove["callback"]) => {
+      mockPreventRemove = { prevent, callback };
+    },
+    useIsFocused: () =>
+      React.useSyncExternalStore(
+        (listener: () => void) => {
+          mockFocus.listeners.add(listener);
+          return () => mockFocus.listeners.delete(listener);
+        },
+        () => mockFocus.focused,
+      ),
+  };
+});
 
 jest.mock("@/lib/database/provider", () => ({
   useDatabase: () => mockDatabase,
@@ -2349,6 +2362,101 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(mockRouterReplace).toHaveBeenCalledTimes(1);
         expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
         expect(putStudyLogRow).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // Review time counts toward the daily minimum, so time away from the screen must not.
+    describe("time away from the screen", () => {
+      const MINUTE = 60_000;
+      const appStateListeners = new Set<(state: ReactNative.AppStateStatus) => void>();
+      // React Native's Jest mock leaves currentState as a function; the screen reads it as a state.
+      const appState = ReactNative.AppState as { currentState: unknown };
+      const mockedCurrentState = appState.currentState;
+      // The same mock serves every test, so each test puts its default subscription back.
+      const addAppStateListener = jest.mocked(ReactNative.AppState.addEventListener);
+      const mockedAddAppStateListener = addAppStateListener.getMockImplementation();
+      type Away = "background" | "blur";
+
+      /** Change AppState as the platform does: the current state first, then the change event. */
+      function setAppState(state: ReactNative.AppStateStatus) {
+        appState.currentState = state;
+        for (const listener of [...appStateListeners]) listener(state);
+      }
+      function setFocused(focused: boolean) {
+        mockFocus.focused = focused;
+        for (const listener of [...mockFocus.listeners]) listener();
+      }
+      /** Time away from the screen: the app in the background, or another screen on top. */
+      function stayAway(how: Away, ms: number) {
+        act(() => (how === "background" ? setAppState("background") : setFocused(false)));
+        act(() => {
+          jest.setSystemTime(Date.now() + ms);
+        });
+        act(() => (how === "background" ? setAppState("active") : setFocused(true)));
+      }
+      function wait(ms: number) {
+        act(() => {
+          jest.setSystemTime(Date.now() + ms);
+        });
+      }
+
+      beforeEach(() => {
+        mockFocus.focused = true;
+        appStateListeners.clear();
+        appState.currentState = "active";
+        addAppStateListener.mockImplementation((_type, listener) => {
+          appStateListeners.add(listener as (state: ReactNative.AppStateStatus) => void);
+          return {
+            remove: () => appStateListeners.delete(listener as (state: ReactNative.AppStateStatus) => void),
+          } as ReturnType<typeof ReactNative.AppState.addEventListener>;
+        });
+      });
+      afterEach(() => {
+        if (mockedAddAppStateListener) addAppStateListener.mockImplementation(mockedAddAppStateListener);
+        appState.currentState = mockedCurrentState;
+        mockFocus.focused = true;
+      });
+
+      it.each<[string, Away]>([
+        ["the app is in the background", "background"],
+        ["another screen covers it", "blur"],
+      ])("counts only time on screen toward the card and the summary when %s", async (_label, how) => {
+        jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
+        const view = renderSession();
+        await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+        wait(MINUTE);
+        stayAway(how, 6 * MINUTE);
+        wait(2 * MINUTE);
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+        // Three minutes on screen (waitFor moves the fake clock a little), not the nine since the card was shown.
+        const duration = jest.mocked(putStudyLogRow).mock.calls[0][1].durationMs ?? 0;
+        expect(duration).toBeGreaterThanOrEqual(3 * MINUTE);
+        expect(duration).toBeLessThan(3 * MINUTE + 10_000);
+        expect(view.getByText(s.flashcardsSummaryMinutes.replace("{{n}}", "3"))).toBeTruthy();
+      });
+
+      it("starts a requeued card's time when it is shown again, while the session counts both", async () => {
+        jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
+        const view = renderSession();
+        await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+        wait(MINUTE);
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsAgain));
+        // The same card comes back at the end of the queue.
+        await waitFor(() => expect(view.getByText(s.flashcardsReveal)).toBeTruthy());
+        stayAway("background", 6 * MINUTE);
+        wait(2 * MINUTE);
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+        const [first, second] = jest.mocked(putStudyLogRow).mock.calls.map(([, log]) => log.durationMs ?? 0);
+        expect(first).toBeGreaterThanOrEqual(MINUTE);
+        expect(first).toBeLessThan(MINUTE + 10_000);
+        expect(second).toBeGreaterThanOrEqual(2 * MINUTE);
+        expect(second).toBeLessThan(2 * MINUTE + 10_000);
+        expect(view.getByText(s.flashcardsSummaryMinutes.replace("{{n}}", "3"))).toBeTruthy();
       });
     });
 

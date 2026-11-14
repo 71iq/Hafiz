@@ -16,21 +16,32 @@ import { GradingButtons } from "@/components/flashcards/GradingButtons";
 import { SessionHabitCards, showsCommitment, strongerWirdEvent, type SessionHabitInput } from "@/components/habit/SessionHabitCards";
 import { ZaytMood } from "@/components/habit/ZaytMood";
 import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
+import { SabaqSecondLook } from "@/components/hifz/SabaqSecondLook";
 import { loadPageWordsData } from "@/components/mushaf/MushafPage";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { endReviewSession, startReviewSession, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import type { Grade } from "@/lib/fsrs/scheduler";
 import { loadHabitOverview } from "@/lib/habit/queries";
+import { useActiveClock } from "@/lib/habit/use-active-clock";
 import { readHabitSettings } from "@/lib/habit/settings";
 import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
 import type { PageToken } from "@/lib/hifz/page-data";
 import { loadTodayWird, readMemorizedPageNumbers } from "@/lib/hifz/pages";
 import { similarGroupsForAyahs, withMemorizedSiblings, type SimilarGroup, type SimilarRef } from "@/lib/hifz/similar";
 import type { HifzPlan } from "@/lib/hifz/plan";
-import { completeSabaqChunk, nextSabaqTarget, type SabaqTarget } from "@/lib/hifz/sabaq";
+import {
+  completeSabaqChunk,
+  loadSecondLooks,
+  nextSabaqTarget,
+  saveSecondLook,
+  type SabaqTarget,
+  type SecondLook,
+  type SecondLooks,
+} from "@/lib/hifz/sabaq";
 import { formatAyahRef } from "@/lib/arabic";
 import { formatNumber } from "@/lib/i18n/count";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -48,6 +59,13 @@ const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 const LOOKING_TARGET = 10;
 const CLEAN_IN_A_ROW = 3;
 const LISTEN_REPEATS = 3;
+
+const NO_SECOND_LOOKS: SecondLooks = { due: [], nextAt: null };
+
+/** A wall-clock time with the locale's digits, as the wird card shows its make-up cutoff. */
+function formatClockTime(at: Date, language: "en" | "ar"): string {
+  return at.toLocaleTimeString(language === "ar" ? "ar-u-nu-arab" : "en", { hour: "numeric", minute: "2-digit" });
+}
 
 /**
  * Sabaq, new memorization (4.4.1): intention, listening, meaning, reading while looking, ayah by
@@ -82,12 +100,21 @@ function SabaqScreen() {
   const [showZayt, setShowZayt] = useState(false);
   const [surahNames, setSurahNames] = useState<Map<number, string>>(new Map());
   const [similar, setSimilar] = useState<SimilarGroup[]>([]);
+  /** SBQ-03: today's due second looks, offered one by one before new lines; an index past the end means done or skipped. */
+  const [looks, setLooks] = useState<readonly SecondLook[]>([]);
+  const [lookIndex, setLookIndex] = useState(0);
+  const [looksSaved, setLooksSaved] = useState(0);
+  /** When the next of today's second looks comes due, as loaded, for the screen with no new lines. */
+  const [nextLookAt, setNextLookAt] = useState<Date | null>(null);
+  /** What the saved fluent check means for the done step's copy. */
+  const [outcome, setOutcome] = useState<{ passed: boolean; partial: boolean; secondLookAt: Date | null } | null>(null);
   const STEPS: readonly Step[] = useMemo(
     () => (similar.length > 0 ? ["intention", "listen", "meaning", "similar", "looking", "ayah", "chunk", "link", "check"] : BASE_STEPS),
     [similar.length],
   );
   const sessionRef = useRef<ReviewSessionRef | null>(null);
-  const startedAt = useRef(Date.now());
+  // The lesson's time counts only while it is on screen with the app active.
+  const lessonClock = useActiveClock();
   /**
    * The fluent check's grade: "open" until it is graded, "saving" while the save is unresolved, then
    * "saved" for good, since the check is over. Taken before React renders `busy`, so a second tap
@@ -130,12 +157,23 @@ function SabaqScreen() {
         return;
       }
       setPlan(wird.plan);
-      const next = await nextSabaqTarget(db, {
-        plan: wird.plan,
-        // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
-        wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
-        pageWords: (page) => words?.[page - 1] ?? null,
-      });
+      const pageWords = (page: number) => words?.[page - 1] ?? null;
+      const [next, secondLooks] = await Promise.all([
+        nextSabaqTarget(db, {
+          plan: wird.plan,
+          // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
+          wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
+          pageWords,
+        }),
+        // A second look that cannot be read is left for the next visit; new lines still load.
+        loadSecondLooks(db, { pageWords }).catch((lookError) => {
+          console.warn("[Sabaq] Failed to load second looks:", lookError);
+          return NO_SECOND_LOOKS;
+        }),
+      ]);
+      setLooks(secondLooks.due);
+      setLookIndex(0);
+      setNextLookAt(secondLooks.nextAt);
       setTarget(next);
       if (next) {
         const rows = await Promise.all(
@@ -153,14 +191,14 @@ function SabaqScreen() {
         setSimilar(withMemorizedSiblings(groups, memorizedPages));
       }
       sessionRef.current = startReviewSession("sabaq");
-      startedAt.current = Date.now();
+      lessonClock.reset();
     } catch (loadError) {
       console.warn("[Sabaq] Failed to load:", loadError);
       setError(s.hifzLoadFailed);
     } finally {
       setLoading(false);
     }
-  }, [db, s.hifzLoadFailed, uiLanguage]);
+  }, [db, lessonClock, s.hifzLoadFailed, uiLanguage]);
 
   useEffect(() => {
     load();
@@ -231,6 +269,62 @@ function SabaqScreen() {
     else leave();
   };
 
+  /** Past the current second look. The lesson's own time starts once the looks are over. */
+  const nextLook = () => {
+    lessonClock.reset();
+    setLookIndex((value) => value + 1);
+  };
+
+  /** Go on to new lines. Nothing is written, so the skipped looks stay due for the rest of the day. */
+  const skipLooks = () => {
+    if (saveLock.current !== "open") return;
+    setError(null);
+    lessonClock.reset();
+    setLookIndex(looks.length);
+  };
+
+  /**
+   * SBQ-03: save the current second look as a review of its chunk card. It shares the check's save
+   * lock and leave handling: a second tap is ignored, leaving waits for the save, and a failed save
+   * stays on the look to retry. The lock opens again afterwards, since the lesson's check is still ahead.
+   */
+  const gradeLook = async (rating: Grade) => {
+    const look = looks[lookIndex];
+    if (!look || !plan || saveLock.current !== "open") return;
+    saveLock.current = "saving";
+    setSaving(true);
+    setBusy(true);
+    setError(null);
+    try {
+      await saveSecondLook(db, { cardId: look.cardId, plan, rating, session: sessionRef.current, durationMs: lessonClock.elapsedMs() });
+      saveLock.current = "open";
+      setSaving(false);
+      emitHabitChanged();
+      if (leaveWhenSaved.current) {
+        exit();
+        return;
+      }
+      setLooksSaved((value) => value + 1);
+      nextLook();
+    } catch (saveError) {
+      leaveWhenSaved.current = false;
+      pendingBack.current = null;
+      setLeavePending(false);
+      // A chunk deleted since the screen loaded, such as by sync, has nothing left to review.
+      if (saveError instanceof StudyCardDeletedError) nextLook();
+      else {
+        console.warn("[Sabaq] Second look save failed:", saveError);
+        setError(s.hifzSaveFailed);
+      }
+    } finally {
+      if (saveLock.current === "saving") {
+        saveLock.current = "open";
+        setSaving(false);
+      }
+      setBusy(false);
+    }
+  };
+
   const finish = async (rating: Grade) => {
     if (!target || !plan || saveLock.current !== "open") return;
     saveLock.current = "saving";
@@ -243,11 +337,13 @@ function SabaqScreen() {
         plan,
         rating,
         session: sessionRef.current,
-        durationMs: Date.now() - startedAt.current,
+        durationMs: lessonClock.elapsedMs(),
       });
       saveLock.current = "saved";
       setSaving(false);
       setLessonSaved(true);
+      // SBQ-02: only Good or Easy memorizes the lines; a lower grade offers them again next time.
+      setOutcome({ passed: rating >= 3, partial: rating >= 3 && !target.completesPage, secondLookAt: result.secondLookAt ?? null });
       if (leaveWhenSaved.current) {
         emitHabitChanged();
         exit();
@@ -264,7 +360,7 @@ function SabaqScreen() {
         overview,
         againCount: rating === 1 ? 1 : 0,
         total: 1,
-        durationMs: Date.now() - startedAt.current,
+        durationMs: lessonClock.elapsedMs(),
       });
     } catch (saveError) {
       console.warn("[Sabaq] Save failed:", saveError);
@@ -296,10 +392,40 @@ function SabaqScreen() {
     );
   }
 
+  const look = looks[lookIndex];
+  if (look && plan) {
+    return (
+      <SabaqSecondLook
+        key={look.cardId}
+        look={look}
+        index={lookIndex}
+        total={looks.length}
+        busy={busy}
+        error={error}
+        closePending={leavePending}
+        surahNames={surahNames}
+        isDark={isDark}
+        isRTL={isRTL}
+        language={uiLanguage}
+        s={s}
+        onClose={close}
+        onGrade={(rating) => gradeLook(rating)}
+        onSkip={skipLooks}
+      />
+    );
+  }
+
   if (!target || !plan) {
+    // Opened early for a second look, the screen says when it comes due rather than nothing.
+    const laterLook = !error && nextLookAt && nextLookAt.getTime() > Date.now() ? nextLookAt : null;
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center px-6">
-        <EmptyState icon={error ? RotateCcw : BookOpenCheck} title={error ?? s.hifzSabaqNoNew} isDark={isDark} />
+        <EmptyState
+          icon={error ? RotateCcw : BookOpenCheck}
+          title={error ?? (looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
+          subtitle={laterLook ? interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(laterLook, uiLanguage) }) : undefined}
+          isDark={isDark}
+        />
         <View className="w-full max-w-sm" style={{ gap: 10 }}>
           {error ? <Button label={s.homeLoadRetry} onPress={load} /> : null}
           <Button
@@ -382,7 +508,7 @@ function SabaqScreen() {
             style={{ fontFamily: "NotoSerif_700Bold", fontSize: 21, lineHeight: 30 }}
             className="text-charcoal dark:text-neutral-100"
           >
-            {stepTitle[step]}
+            {step === "done" && outcome?.passed === false ? s.hifzSabaqNotFluentTitle : stepTitle[step]}
           </Text>
           {/* The header already names the page and lines, so the intention has no caption. */}
           {step !== "intention" ? (
@@ -402,13 +528,23 @@ function SabaqScreen() {
                           : step === "similar"
                             ? s.hifzSimilarHint
                             : step === "done"
-                              ? s.hifzSabaqDone
+                              ? outcome?.passed === false
+                                ? s.hifzSabaqNotFluent
+                                : outcome?.partial
+                                  ? s.hifzSabaqDonePartial
+                                  : s.hifzSabaqDone
                               : ""}
             </Text>
           ) : null}
-          {step === "done" ? (
+          {/* SBQ-03: only a second look that will be offered today is promised, with its time. */}
+          {step === "done" && outcome?.secondLookAt ? (
             <Text dir={dir} align="center" variant="caption" style={{ lineHeight: 18 }}>
-              {s.hifzSabaqSecondLook}
+              {interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })}
+            </Text>
+          ) : null}
+          {step === "intention" && looksSaved > 0 ? (
+            <Text dir={dir} align="center" variant="caption">
+              {s.hifzSecondLookSaved}
             </Text>
           ) : null}
           {step === "ayah" && currentAyah ? (

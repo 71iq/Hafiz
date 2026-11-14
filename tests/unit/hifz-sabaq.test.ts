@@ -1,9 +1,13 @@
-import { atLocalTime } from "@/lib/habit/dates";
+import { addDays, atLocalTime } from "@/lib/habit/dates";
 import { readHabitDayRow } from "@/lib/habit/queries";
-import { loadPageCard, loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
+import { declareMemorizedPages, derivePageTiers, loadPageCard, loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
-import { completeSabaqChunk, newPageOrder, nextSabaqTarget } from "@/lib/hifz/sabaq";
+import { countDueRemediation } from "@/lib/hifz/remediation";
+import { completeSabaqChunk, countSecondLooks, loadSecondLooks, newPageOrder, nextSabaqTarget, saveSecondLook } from "@/lib/hifz/sabaq";
+import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { chunkCardId, PAGE_COUNT, pageCardId } from "@/lib/hifz/units";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
+import { getDeckTodayStats, loadReviewQueue, readDeckReviewSettings, REVIEW_DECK_IDS } from "@/lib/fsrs/queries";
 import { Rating, type Grade } from "@/lib/fsrs/scheduler";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
@@ -160,5 +164,189 @@ describe("sabaq chunks (SBQ-02)", () => {
     ).rejects.toThrow("Synthetic sync_queue write failure");
     expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_cards WHERE id LIKE 'chunk:%'").get()).toEqual({ count: 0 });
     expect(await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords: () => null })).toMatchObject({ fromLine: target.fromLine });
+  });
+
+  describe("page provenance (SBQ-02)", () => {
+    const pageWords = () => null;
+    const tierOf = async (today = TODAY) => {
+      const [all, one, derived] = await Promise.all([
+        loadPageCards(store.db, { today, plan }),
+        loadPageCard(store.db, pageCardId(1), { today, plan }),
+        derivePageTiers(store.db, [pageCardId(1)], { today, plan }),
+      ]);
+      expect(all.map((card) => card.tier)).toEqual([one?.tier]);
+      expect(derived.get(pageCardId(1))).toBe(one?.tier);
+      return one;
+    };
+
+    it("keeps a page declared after a failed partial chunk on it", async () => {
+      const partial = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      expect(partial.completesPage).toBe(false);
+      await completeSabaqChunk(store.db, { target: partial, plan, rating: Rating.Again, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60) });
+      await declareMemorizedPages(store.db, { pages: [1], cycleDays: 30, now: atLocalTime(TODAY, 10 * 60) });
+
+      expect(await tierOf()).toMatchObject({ tier: "manzil.unverified", history: { declared: true, firstFluentDate: null } });
+    });
+
+    it("keeps a page declared after a passing chunk that did not complete it", async () => {
+      const partial = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      await completeSabaqChunk(store.db, { target: partial, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60) });
+      await declareMemorizedPages(store.db, { pages: [1], cycleDays: 30, now: atLocalTime(addDays(TODAY, 1), 8 * 60) });
+
+      expect(await tierOf(addDays(TODAY, 1))).toMatchObject({ tier: "manzil.unverified", history: { declared: true, firstFluentDate: null } });
+    });
+
+    it("derives sabqi from the chunk that completed the page, dated by that chunk's pass", async () => {
+      const day2 = addDays(TODAY, 1);
+      const first = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      await completeSabaqChunk(store.db, { target: first, plan, rating: Rating.Again, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60) });
+      await completeSabaqChunk(store.db, { target: first, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60 + 15) });
+      const last = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      expect(last.completesPage).toBe(true);
+      const saved = await completeSabaqChunk(store.db, { target: last, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: atLocalTime(day2, 9 * 60) });
+      expect(saved.pageAdded).toBe(true);
+
+      expect(await tierOf(day2)).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: day2 } });
+      // The review history decides, so the page stays sabqi when its chunk cards are gone.
+      store.sql.prepare("UPDATE study_cards SET deleted_at = ? WHERE id LIKE 'chunk:%'").run(atLocalTime(day2, 10 * 60).toISOString());
+      expect(await tierOf(day2)).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: day2 } });
+    });
+
+    it("treats a sabaq page removed and declared again as declared", async () => {
+      const whole = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords }))!;
+      await completeSabaqChunk(store.db, { target: whole, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60) });
+      store.sql.prepare("UPDATE study_cards SET deleted_at = ? WHERE id = ?").run(atLocalTime(TODAY, 10 * 60).toISOString(), pageCardId(1));
+      await declareMemorizedPages(store.db, { pages: [1], cycleDays: 30, now: atLocalTime(TODAY, 11 * 60) });
+
+      expect(await tierOf()).toMatchObject({ tier: "manzil.unverified", history: { declared: true } });
+    });
+  });
+
+  describe("second look (SBQ-03)", () => {
+    const pageWords = () => null;
+    const at = (minutes: number, date = TODAY) => atLocalTime(date, minutes);
+
+    /** Pass the first 4 lines of page 1 at 9:00 today and return the chunk's id and its next due. */
+    async function passPartialChunk(rating: Grade = Rating.Good) {
+      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const saved = await completeSabaqChunk(store.db, { target, plan, rating, session: null, durationMs: 600_000, now: at(9 * 60) });
+      return { id: chunkCardId(1, target.fromLine, target.toLine), due: new Date(saved.transition.updatedCard.due), saved };
+    }
+    const logCount = (id: string) => (store.sql.prepare("SELECT COUNT(*) AS count FROM study_log WHERE card_id = ?").get(id) as { count: number }).count;
+
+    it("offers a chunk that passed today once it is due, and says when before that", async () => {
+      const { id, due, saved } = await passPartialChunk();
+      // Good on a new chunk takes the sabaq policy's second learning step, later today.
+      expect(due.getTime()).toBeGreaterThan(at(9 * 60 + 30).getTime());
+      expect(saved.secondLookAt).toEqual(due);
+
+      expect(await loadSecondLooks(store.db, { now: at(9 * 60 + 5), pageWords })).toEqual({ due: [], nextAt: due });
+      const looks = await loadSecondLooks(store.db, { now: due, pageWords });
+      expect(looks.nextAt).toBeNull();
+      expect(looks.due).toHaveLength(1);
+      expect(looks.due[0]).toMatchObject({ cardId: id, page: 1, fromLine: 2, toLine: 5 });
+      expect([...looks.due[0].lineNumbers]).toEqual([2, 3, 4, 5]);
+    });
+
+    it("counts due looks for Home's cue and says when the next is offered", async () => {
+      const { due } = await passPartialChunk();
+      const offeredAt = new Date(due.getTime() - REVIEW_LEARN_AHEAD_MS);
+      expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toEqual({ due: 0, offeredAt });
+      // The moment it is offered, sabaq shows it and Home counts it.
+      expect(await countSecondLooks(store.db, offeredAt)).toEqual({ due: 1, offeredAt: null });
+      expect((await loadSecondLooks(store.db, { now: offeredAt, pageWords })).due).toHaveLength(1);
+    });
+
+    it("saves a graded look as a logged review of the chunk card that counts for the day", async () => {
+      const { id, due } = await passPartialChunk();
+      const before = store.sql.prepare("SELECT reps, state, due FROM study_cards WHERE id = ?").get(id) as { reps: number; state: number; due: string };
+      const result = await saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Good, session: null, durationMs: 90_000, now: due });
+
+      expect(logCount(id)).toBe(2);
+      expect(store.sql.prepare("SELECT rating, local_date, duration_ms, support_level FROM study_log WHERE card_id = ? ORDER BY reviewed_at DESC LIMIT 1").get(id)).toEqual({
+        rating: Rating.Good,
+        local_date: TODAY,
+        duration_ms: 90_000,
+        support_level: 4,
+      });
+      const after = store.sql.prepare("SELECT reps, state, due, last_review FROM study_cards WHERE id = ?").get(id) as { reps: number; state: number; due: string; last_review: string };
+      expect(after.reps).toBe(before.reps + 1);
+      expect(after.last_review).toBe(due.toISOString());
+      expect(result.transition.updatedCard.due).toBe(after.due);
+      expect(Date.parse(after.due)).toBeGreaterThan(Date.parse(before.due));
+      expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
+      // Graduated past today, the chunk has no further look.
+      expect(await loadSecondLooks(store.db, { now: at(23 * 60), pageWords })).toEqual({ due: [], nextAt: null });
+    });
+
+    it("keeps a skipped look for the rest of the day", async () => {
+      const { id, due } = await passPartialChunk();
+      expect((await loadSecondLooks(store.db, { now: due, pageWords })).due.map((look) => look.cardId)).toEqual([id]);
+      // Skipping writes nothing; the look is still offered in the evening.
+      expect(logCount(id)).toBe(1);
+      expect((await loadSecondLooks(store.db, { now: at(21 * 60), pageWords })).due.map((look) => look.cardId)).toEqual([id]);
+    });
+
+    it("does not offer a chunk on a later day, though FSRS still has it due", async () => {
+      const { id } = await passPartialChunk();
+      const tomorrow = at(8 * 60, addDays(TODAY, 1));
+      expect(Date.parse((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(id) as { due: string }).due)).toBeLessThan(tomorrow.getTime());
+      expect(await loadSecondLooks(store.db, { now: tomorrow, pageWords })).toEqual({ due: [], nextAt: null });
+    });
+
+    it("offers no look for a failed check, and promises none past today", async () => {
+      const failed = await passPartialChunk(Rating.Again);
+      expect(failed.saved.secondLookAt).toBeNull();
+      expect(await loadSecondLooks(store.db, { now: at(10 * 60), pageWords })).toEqual({ due: [], nextAt: null });
+
+      // Passed late in the evening, the next step falls after midnight, so no second look is promised.
+      const late = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const lateSave = await completeSabaqChunk(store.db, { target: late, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: at(23 * 60 + 30) });
+      expect(lateSave.secondLookAt).toBeNull();
+    });
+
+    it("does not grade a chunk deleted since the screen loaded", async () => {
+      const { id, due } = await passPartialChunk();
+      store.sql.prepare("UPDATE study_cards SET deleted_at = ? WHERE id = ?").run(due.toISOString(), id);
+      await expect(saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: due })).rejects.toBeInstanceOf(
+        StudyCardDeletedError,
+      );
+      expect(logCount(id)).toBe(1);
+      expect(store.sql.prepare("SELECT deleted_at IS NOT NULL AS deleted FROM study_cards WHERE id = ?").get(id)).toEqual({ deleted: 1 });
+    });
+
+    it("leaves chunk cards out of every due count and queue once their day is over", async () => {
+      await writeHifzPlan(store.db, plan);
+      const { id } = await passPartialChunk();
+      const tomorrow = at(8 * 60, addDays(TODAY, 1));
+      jest.useFakeTimers({ now: tomorrow, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+      try {
+        /** Every count and queue a flow shows: Review all, Home's deck rows, remediation and the wird. */
+        const counts = async () => {
+          const deckStats = [];
+          for (const deckId of REVIEW_DECK_IDS) {
+            deckStats.push(await getDeckTodayStats(store.db, deckId, await readDeckReviewSettings(store.db, deckId)));
+          }
+          const wird = (await loadTodayWird(store.db, tomorrow))!;
+          return {
+            // New cards come shuffled, so the queue is compared as a set.
+            reviewAll: (await loadReviewQueue(store.db)).map((item) => item.card.id).sort(),
+            deckStats,
+            remediation: await countDueRemediation(store.db, tomorrow),
+            wird: [...wird.todo.map((page) => page.cardId), ...wird.done.map((page) => page.cardId), ...wird.cards.map((card) => card.row.id)],
+          };
+        };
+        expect(REVIEW_DECK_IDS).not.toContain("hifz-sabaq");
+        const withChunk = await counts();
+        expect(withChunk.reviewAll).not.toContain(id);
+        expect(withChunk.wird).not.toContain(id);
+        expect(withChunk.remediation).toBe(0);
+        // The due chunk adds nothing: every count is the same without it.
+        store.sql.prepare("UPDATE study_cards SET deleted_at = ? WHERE id = ?").run(tomorrow.toISOString(), id);
+        expect(await counts()).toEqual(withChunk);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

@@ -191,6 +191,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Quran lines are always right to left in the page font; hidden words keep their place and the layout never mirrors with the interface.",
   ),
   entry(
+    "components/hifz/SabaqSecondLook.tsx",
+    "card",
+    "rntl",
+    "Second look header mirrors through MirroredRow and its text follows the interface direction; the chunk's Quran lines stay right to left.",
+  ),
+  entry(
     "components/hifz/WelcomeBackCard.tsx",
     "card",
     "source",

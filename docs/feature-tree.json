@@ -1111,7 +1111,17 @@
           "cases": ["PLAN-08"],
           "uses": ["wird.minimum", "wird.sessioncards"],
           "native": false,
-          "children": []
+          "children": [
+            {
+              "id": "hifz.sabaq.secondlook",
+              "title": "Same-day second look before new lines",
+              "kind": "widget",
+              "cases": [],
+              "uses": ["wird.minimum"],
+              "native": false,
+              "children": []
+            }
+          ]
         }
       ]
     },

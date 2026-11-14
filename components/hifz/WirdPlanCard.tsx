@@ -1,5 +1,5 @@
 import { Pressable, View } from "react-native";
-import { BookOpenCheck, ChevronLeft, ChevronRight, PenLine, Sparkles } from "lucide-react-native";
+import { BookOpenCheck, ChevronLeft, ChevronRight, Eye, PenLine, Sparkles } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MirroredRow } from "@/components/ui/MirroredRow";
@@ -13,6 +13,8 @@ import { interpolate } from "@/lib/i18n/useStrings";
 type Props = {
   wird: TodayWird | null;
   inboxCount: number;
+  /** SBQ-03: chunks memorized earlier today whose second look is due now. */
+  secondLooksDue?: number;
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
@@ -27,7 +29,18 @@ type Props = {
  * the time left, and a clear "Wird complete" state with nothing more asked. Without a plan it offers
  * setup instead.
  */
-export function WirdPlanCard({ wird, inboxCount, language, isDark, s, onStartReview, onStartSabaq, onSetup, onDrill }: Props) {
+export function WirdPlanCard({
+  wird,
+  inboxCount,
+  secondLooksDue = 0,
+  language,
+  isDark,
+  s,
+  onStartReview,
+  onStartSabaq,
+  onSetup,
+  onDrill,
+}: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   // Teal text under 14 px uses the darker token in light mode.
@@ -155,6 +168,29 @@ export function WirdPlanCard({ wird, inboxCount, language, isDark, s, onStartRev
           ) : null}
         </View>
       )}
+
+      {/* SBQ-03: the second look is offered even with a backlog or a complete wird; sabaq shows it first. */}
+      {secondLooksDue > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${s.hifzSecondLookReady}, ${s.hifzSecondLookAction}`}
+          onPress={onStartSabaq}
+          className="mt-3 min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4"
+        >
+          <MirroredRow dir={dir} className="items-center justify-between gap-3">
+            <MirroredRow dir={dir} className="flex-shrink items-center gap-2">
+              <Eye size={15} color={accent} />
+              <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="flex-shrink text-charcoal dark:text-neutral-200">
+                {s.hifzSecondLookReady}
+              </Text>
+            </MirroredRow>
+            <MirroredRow dir={dir} className="items-center gap-1">
+              <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 13, color: accentText }}>{s.hifzSecondLookAction}</Text>
+              <Chevron size={16} color={accentText} />
+            </MirroredRow>
+          </MirroredRow>
+        </Pressable>
+      ) : null}
 
       {inboxCount > 0 ? (
         <Pressable

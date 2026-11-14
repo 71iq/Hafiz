@@ -66,6 +66,7 @@ import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-setting
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 import { endReviewSession, startReviewSession, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import { loadHabitOverview } from "@/lib/habit/queries";
+import { useActiveClock } from "@/lib/habit/use-active-clock";
 import {
   SessionHabitCards,
   showsCommitment,
@@ -215,10 +216,11 @@ function FlashcardSessionScreen() {
   const [mutationBusy, setMutationBusy] = useState(false);
   /** A card action (not a grade) is saving: only then does the card menu dim, so it does not blink on every grade. */
   const [cardActionBusy, setCardActionBusy] = useState(false);
-  const sessionStartRef = useRef(Date.now());
+  // Session and card times count only while the session is on screen with the app active.
+  const sessionClock = useActiveClock();
   // The review session row is written on the first grade, so an empty session leaves nothing behind.
   const sessionRef = useRef<ReviewSessionRef | null>(null);
-  const cardShownAtRef = useRef(Date.now());
+  const cardClock = useActiveClock();
   const wirdEventRef = useRef<SessionHabitInput["event"]>(null);
   const againCountRef = useRef(0);
   const [wirdNotice, setWirdNotice] = useState<string | null>(null);
@@ -447,7 +449,7 @@ function FlashcardSessionScreen() {
           return;
         }
 
-        sessionStartRef.current = Date.now();
+        sessionClock.reset();
         setCurrentIndex(0);
         setSessionCardTotal(loaded.length);
         setCurrentSideIndex(0);
@@ -473,6 +475,7 @@ function FlashcardSessionScreen() {
     tafseerSource,
     settingsLoaded,
     resetSessionProgress,
+    sessionClock,
     s.smartDeckMutashabihatTitle,
     s.smartDeckSimilarTailsTitle,
     s.smartDeckQiraatTitle,
@@ -482,13 +485,13 @@ function FlashcardSessionScreen() {
   ]);
 
   const currentCard = cards[currentIndex] ?? null;
-  // Time on a card runs from when its front is shown to its grade (study_log.duration_ms). A card
-  // removed unrevealed (buried, suspended) leaves the index where it was, so the next card's id starts
-  // its own time too.
+  // Time on a card runs from when its front is shown to its grade (study_log.duration_ms), counting
+  // only while it is on screen. A card removed unrevealed (buried, suspended) leaves the index where
+  // it was, so the next card's id starts its own time too.
   const currentCardId = currentCard?.card.id ?? null;
   useEffect(() => {
-    if (phase === "front") cardShownAtRef.current = Date.now();
-  }, [phase, currentIndex, currentCardId]);
+    if (phase === "front") cardClock.reset();
+  }, [cardClock, phase, currentIndex, currentCardId]);
   const gradePreviews = useMemo(
     () => currentCard ? getGradeSchedulePreviews(currentCard.card, currentCard.settings, isRTL) : {},
     [currentCard, isRTL]
@@ -568,7 +571,7 @@ function FlashcardSessionScreen() {
       session ? endReviewSession(db, { session }).catch((error) => console.warn("[FlashcardSession] Session end failed:", error)) : null,
     ]);
     const counts = reviewedCountsRef.current;
-    const durationMs = Date.now() - sessionStartRef.current;
+    const durationMs = sessionClock.elapsedMs();
     return {
       total: counts.total,
       newCount: counts.newCount,
@@ -578,7 +581,7 @@ function FlashcardSessionScreen() {
       nextReviewDate,
       habit: { event: wirdEventRef.current, overview, againCount: againCountRef.current, total: counts.total, durationMs },
     };
-  }, [db]);
+  }, [db, sessionClock]);
 
   const finishSessionWithSummary = useCallback(async () => {
     setSummary(await buildSummary());
@@ -858,7 +861,7 @@ function FlashcardSessionScreen() {
         context: {
           session: sessionRef.current,
           firstGradeInSession: !reviewedCardIdsRef.current.has(item.card.id),
-          durationMs: reviewedAt.getTime() - cardShownAtRef.current,
+          durationMs: cardClock.elapsedMs(reviewedAt.getTime()),
           supportLevel: null,
           proposedRating: null,
           grader: "self",

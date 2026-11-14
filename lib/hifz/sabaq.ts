@@ -1,10 +1,12 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { insertNewStudyCard, newStudyCardRow, readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { persistReviewTransition, readCurrentCard, type ReviewSaveResult } from "@/lib/fsrs/persist-review";
-import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
+import { calculateReviewTransition, REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import type { ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import type { Grade } from "@/lib/fsrs/scheduler";
-import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
+import type { StudyCardRow } from "@/lib/fsrs/types";
+import { addDays, atLocalTime, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { loadRecitationPage, type PageLine, type PageWordsLines, type RecitationPage } from "@/lib/hifz/page-data";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import { pagePolicy } from "@/lib/hifz/tiers";
@@ -17,6 +19,7 @@ import {
   pageCardId,
   pagesOfJuz,
   parsePageUnit,
+  type PageUnit,
 } from "@/lib/hifz/units";
 
 /**
@@ -136,8 +139,177 @@ export async function nextSabaqTarget(
 }
 
 /**
+ * SBQ-03: the second look. A chunk card's reviews belong to the local day its fluent check first
+ * passed. The sabaq policy's learning steps (10m, 1h) give a chunk passed Good a review about an hour
+ * later, and the sabaq screen offers it as a short second look before new lines. After that day the
+ * chunk card is never offered again, whatever FSRS scheduled: once the page is complete its page
+ * card carries the review (SBQ-02), and until then the page is still being memorized. So the flows
+ * that show cards leave chunk cards out: Review all and Home's deck counts read the review decks, the
+ * wird reads page cards, and remediation reads half pages, seams and gap cards.
+ */
+export type SecondLook = Readonly<{
+  cardId: string;
+  page: number;
+  fromLine: number;
+  toLine: number;
+  pageData: RecitationPage;
+  /** The chunk's ayah lines, as the lesson showed them. */
+  lineNumbers: ReadonlySet<number>;
+}>;
+
+export type SecondLooks = Readonly<{
+  /** Today's chunks that are due now, the earliest due first. */
+  due: readonly SecondLook[];
+  /** When the next of today's chunks comes due, while that is still today; null when none will. */
+  nextAt: Date | null;
+}>;
+
+/**
+ * A chunk's second look comes due at `due` (a review queue's learn-ahead window early), offered only
+ * while it is still the day of `now`. Null when it is due already or only on a later day.
+ */
+function laterToday(due: Date, now: Date): Date | null {
+  return due.getTime() - REVIEW_LEARN_AHEAD_MS > now.getTime() && localDateOf(due) === localDateOf(now) ? due : null;
+}
+
+/**
+ * The live chunk cards whose fluent check first passed on `today` (see SecondLook). A chunk that also
+ * passed on an earlier day belongs to that day, and one that only failed today is not memorized yet:
+ * the next sabaq offers it again as new lines.
+ */
+async function readTodaysChunks(db: DatabaseExecutor, today: LocalDate, now: Date): Promise<{ id: string; due: string }[]> {
+  return db.getAllAsync<{ id: string; due: string }>(
+    `SELECT c.id, c.due FROM study_cards AS c
+      WHERE c.deck_id = ? AND c.id LIKE 'chunk:%' AND c.deleted_at IS NULL AND c.suspended_at IS NULL
+        AND (c.buried_until IS NULL OR c.buried_until <= ?)
+        AND EXISTS (SELECT 1 FROM study_log AS l WHERE l.card_id = c.id AND l.rating >= 3 AND l.local_date = ?)
+        AND NOT EXISTS (SELECT 1 FROM study_log AS l WHERE l.card_id = c.id AND l.rating >= 3 AND l.local_date < ?)`,
+    [HIFZ_SABAQ_DECK_ID, now.toISOString(), today, today],
+  );
+}
+
+/**
+ * Today's second looks (SBQ-03): the chunks that passed today and are due now, as a review queue
+ * counts due (within its learn-ahead window), and when the next one comes due later today. A look
+ * that is skipped is not written anywhere, so it stays due and is offered again for the rest of the day.
+ */
+type DueChunk = { id: string; unit: Extract<PageUnit, { kind: "chunk" }>; at: number };
+
+/** Today's chunks split into those due now, earliest first, and when the next comes due later today. */
+async function readSecondLookSchedule(db: DatabaseExecutor, now: Date): Promise<{ due: DueChunk[]; nextAt: Date | null }> {
+  const rows = await readTodaysChunks(db, localDateOf(now), now);
+  const due: DueChunk[] = [];
+  let nextAt: Date | null = null;
+  for (const row of rows) {
+    const unit = parsePageUnit(row.id);
+    const at = new Date(row.due);
+    if (unit?.kind !== "chunk" || !Number.isFinite(at.getTime())) continue;
+    if (at.getTime() <= now.getTime() + REVIEW_LEARN_AHEAD_MS) due.push({ id: row.id, unit, at: at.getTime() });
+    else {
+      const later = laterToday(at, now);
+      if (later && (!nextAt || later < nextAt)) nextAt = later;
+    }
+  }
+  due.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return { due, nextAt };
+}
+
+/**
+ * How many second looks are due now and when the next one is offered later today, for Home's cue.
+ * `offeredAt` is a review queue's learn-ahead window before that chunk's due time, the moment
+ * loadSecondLooks starts offering it.
+ */
+export async function countSecondLooks(
+  db: DatabaseExecutor,
+  now = new Date(),
+): Promise<{ due: number; offeredAt: Date | null }> {
+  const { due, nextAt } = await readSecondLookSchedule(db, now);
+  return { due: due.length, offeredAt: nextAt ? new Date(nextAt.getTime() - REVIEW_LEARN_AHEAD_MS) : null };
+}
+
+export async function loadSecondLooks(
+  db: DatabaseExecutor,
+  { now = new Date(), pageWords }: { now?: Date; pageWords: (page: number) => PageWordsLines | null },
+): Promise<SecondLooks> {
+  const { due, nextAt } = await readSecondLookSchedule(db, now);
+  const pages = new Map<number, RecitationPage>();
+  const looks: SecondLook[] = [];
+  for (const { id, unit } of due) {
+    const pageData = pages.get(unit.page) ?? (await loadRecitationPage(db, unit.page, pageWords(unit.page)));
+    pages.set(unit.page, pageData);
+    const lineNumbers = new Set(
+      ayahLines(pageData)
+        .filter((line) => line.lineNumber >= unit.fromLine && line.lineNumber <= unit.toLine)
+        .map((line) => line.lineNumber),
+    );
+    looks.push({ cardId: id, page: unit.page, fromLine: unit.fromLine, toLine: unit.toLine, pageData, lineNumbers });
+  }
+  return { due: looks, nextAt };
+}
+
+/**
+ * Save one grade of a chunk card through the review path every card uses (DB-01): the card, its
+ * review log, the wird day and its make-up attribution commit together. The card is read inside the
+ * transaction, since sync or another save of this chunk may have graded it since the screen loaded,
+ * and calculating from an earlier read would overwrite that newer schedule. With `create`, a missing
+ * card is created in the same transaction, so a failed save leaves nothing behind.
+ */
+async function saveChunkGrade(
+  db: AppDatabase,
+  {
+    id,
+    plan,
+    rating,
+    session,
+    durationMs,
+    now,
+    create,
+    extraWork,
+  }: {
+    id: string;
+    plan: HifzPlan;
+    rating: Grade;
+    session: ReviewSessionRef | null;
+    durationMs: number;
+    now: Date;
+    create: boolean;
+    extraWork?: (tx: DatabaseExecutor) => Promise<void>;
+  },
+): Promise<ReviewSaveResult> {
+  const at = now.toISOString();
+  const base = await readDeckReviewSettings(db, HIFZ_SABAQ_DECK_ID);
+  const created = (): StudyCardRow => newStudyCardRow({ id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
+  return persistReviewTransition({
+    db,
+    cardId: id,
+    // Creating it does nothing when the card already exists.
+    beforeWork: create
+      ? async (tx) => {
+          await insertNewStudyCard(tx, { id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
+        }
+      : undefined,
+    transition: async (tx) => {
+      const current = await readCurrentCard(tx, id);
+      if (!current && !create) throw new StudyCardDeletedError();
+      return calculateReviewTransition({ card: current ?? created(), rating, reviewedAt: now, reviewPolicy: pagePolicy("sabaq", plan, base) });
+    },
+    context: {
+      session,
+      firstGradeInSession: true,
+      durationMs,
+      supportLevel: 4,
+      proposedRating: null,
+      grader: "self",
+      errors: [],
+    },
+    extraWork,
+  });
+}
+
+/**
  * SBQ-02: after the fluent check, the chunk becomes a sabaq card with that grade as its first review,
  * and the page joins review (sabqi, due tomorrow) once its last chunk passes. One transaction.
+ * `secondLookAt` is when the chunk's second look comes due, while that is still today (SBQ-03).
  */
 export async function completeSabaqChunk(
   db: AppDatabase,
@@ -149,37 +321,19 @@ export async function completeSabaqChunk(
     durationMs,
     now = new Date(),
   }: { target: SabaqTarget; plan: HifzPlan; rating: Grade; session: ReviewSessionRef | null; durationMs: number; now?: Date },
-): Promise<ReviewSaveResult & { pageAdded: boolean }> {
-  const at = now.toISOString();
+): Promise<ReviewSaveResult & { pageAdded: boolean; secondLookAt: Date | null }> {
   const id = chunkCardId(target.page, Math.max(1, target.fromLine), Math.min(LINES_PER_PAGE, target.toLine));
-  const base = await readDeckReviewSettings(db, HIFZ_SABAQ_DECK_ID);
   const addsPage = target.completesPage && rating >= 3;
   let pageAdded = false;
-  const result = await persistReviewTransition({
-    db,
-    cardId: id,
-    // A chunk that failed its fluent check before is checked again on the same card. A new chunk is
-    // created in the grade's own transaction, so a failed save leaves nothing behind; creating it does
-    // nothing when the card already exists.
-    beforeWork: async (tx) => {
-      await insertNewStudyCard(tx, { id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
-    },
-    // Read inside the transaction: sync or another save of this chunk may have graded it since the
-    // check started, and calculating from an earlier read would overwrite that newer schedule.
-    transition: async (tx) => {
-      const card =
-        (await readCurrentCard(tx, id)) ?? newStudyCardRow({ id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
-      return calculateReviewTransition({ card, rating, reviewedAt: now, reviewPolicy: pagePolicy("sabaq", plan, base) });
-    },
-    context: {
-      session,
-      firstGradeInSession: true,
-      durationMs,
-      supportLevel: 4,
-      proposedRating: null,
-      grader: "self",
-      errors: [],
-    },
+  // A chunk that failed its fluent check before is checked again on the same card.
+  const result = await saveChunkGrade(db, {
+    id,
+    plan,
+    rating,
+    session,
+    durationMs,
+    now,
+    create: true,
     extraWork: addsPage
       ? async (tx) => {
           pageAdded = await insertNewStudyCard(tx, {
@@ -187,10 +341,32 @@ export async function completeSabaqChunk(
             deckId: HIFZ_PAGES_DECK_ID,
             due: atLocalTime(addDays(localDateOf(now), 1), 0),
             tier: "sabqi",
-            now: at,
+            now: now.toISOString(),
           });
         }
       : undefined,
   });
-  return { ...result, pageAdded };
+  const secondLookAt = rating >= 3 ? laterToday(new Date(result.transition.updatedCard.due), now) : null;
+  return { ...result, pageAdded, secondLookAt };
+}
+
+/**
+ * Grade a second look (SBQ-03) as a review of its chunk card, through the same save as the fluent
+ * check: it is logged, counts toward the wird and its make-up, and moves the chunk to its next step.
+ * The chunk is not created again: a chunk deleted since the screen loaded fails with
+ * StudyCardDeletedError.
+ */
+export async function saveSecondLook(
+  db: AppDatabase,
+  {
+    cardId,
+    plan,
+    rating,
+    session,
+    durationMs,
+    now = new Date(),
+  }: { cardId: string; plan: HifzPlan; rating: Grade; session: ReviewSessionRef | null; durationMs: number; now?: Date },
+): Promise<ReviewSaveResult> {
+  if (parsePageUnit(cardId)?.kind !== "chunk") throw new Error(`Not a sabaq chunk: ${cardId}`);
+  return saveChunkGrade(db, { id: cardId, plan, rating, session, durationMs, now, create: false });
 }

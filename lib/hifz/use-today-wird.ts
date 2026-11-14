@@ -9,41 +9,51 @@ import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird, type TodayWird } from "@/lib/hifz/pages";
 import { monthlyCheckDueFor } from "@/lib/hifz/progress";
 import { countDueRemediation } from "@/lib/hifz/remediation";
+import { countSecondLooks } from "@/lib/hifz/sabaq";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
 /**
- * Today's hifz wird and the count of spots to strengthen (inbox items, plus half pages and seams that
- * are relearning) for a screen, refreshed on focus, after reviews, after sync, after plan changes, on
- * return to the foreground and at local midnight (useDayBoundaryRefresh). Nothing here depends on the
- * make-up cutoff, so it does not reload then. `wird` is null when no plan is set up; undefined while
- * loading.
+ * Today's hifz wird, the count of spots to strengthen (inbox items, plus half pages and seams that
+ * are relearning) and the second looks due now (SBQ-03) for a screen, refreshed on focus, after
+ * reviews, after sync, after plan changes, on return to the foreground, when the next second look is
+ * offered, and at local midnight (useDayBoundaryRefresh). Nothing here depends on the make-up cutoff,
+ * so it does not reload then. `wird` is null when no plan is set up; undefined while loading.
  */
 export function useTodayWird(db: AppDatabase) {
   const [wird, setWird] = useState<TodayWird | null | undefined>(undefined);
   const [inboxCount, setInboxCount] = useState(0);
   const [monthlyCheckDue, setMonthlyCheckDue] = useState(false);
+  const [secondLooksDue, setSecondLooksDue] = useState(0);
   const [boundary, setBoundary] = useState<number | null>(null);
   const latest = useRef(0);
 
   const refresh = useCallback(async () => {
     const load = ++latest.current;
     const now = new Date();
+    let nextBoundary = nextLocalMidnight(now).getTime();
     try {
-      const [next, inbox, remediation] = await Promise.all([
+      const [next, inbox, remediation, looks] = await Promise.all([
         loadTodayWird(db, now),
         countMistakeInbox(db, localDateOf(now)),
         countDueRemediation(db, now),
+        // The cue is extra: a failed count leaves it off rather than failing the wird.
+        countSecondLooks(db, now).catch((error) => {
+          console.warn("[Hifz] Second looks failed to load:", error);
+          return { due: 0, offeredAt: null };
+        }),
       ]);
       const monthly = next ? await monthlyCheckDueFor(db, next.cards, now) : false;
+      if (looks.offeredAt) nextBoundary = Math.min(nextBoundary, looks.offeredAt.getTime());
       if (load !== latest.current) return;
       setWird(next);
       setInboxCount(inbox + remediation);
       setMonthlyCheckDue(monthly);
+      setSecondLooksDue(next ? looks.due : 0);
     } catch (error) {
       console.warn("[Hifz] Today's wird failed to load:", error);
       if (load === latest.current) setWird((current) => current ?? null);
     } finally {
-      if (load === latest.current) setBoundary(nextLocalMidnight(now).getTime());
+      if (load === latest.current) setBoundary(nextBoundary);
     }
   }, [db]);
 
@@ -73,5 +83,5 @@ export function useTodayWird(db: AppDatabase) {
   );
   useDayBoundaryRefresh(boundary, refreshIfFocused);
 
-  return { wird, inboxCount, monthlyCheckDue, refresh };
+  return { wird, inboxCount, monthlyCheckDue, secondLooksDue, refresh };
 }

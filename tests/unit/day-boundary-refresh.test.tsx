@@ -9,6 +9,7 @@ import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird } from "@/lib/hifz/pages";
 import { monthlyCheckDueFor } from "@/lib/hifz/progress";
 import { countDueRemediation } from "@/lib/hifz/remediation";
+import { countSecondLooks } from "@/lib/hifz/sabaq";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { readDhuhrResolver } from "@/lib/prayer/settings";
 
@@ -49,6 +50,7 @@ jest.mock("@/lib/hifz/pages", () => ({ loadTodayWird: jest.fn() }));
 jest.mock("@/lib/hifz/errors", () => ({ countMistakeInbox: jest.fn() }));
 jest.mock("@/lib/hifz/remediation", () => ({ countDueRemediation: jest.fn() }));
 jest.mock("@/lib/hifz/progress", () => ({ monthlyCheckDueFor: jest.fn() }));
+jest.mock("@/lib/hifz/sabaq", () => ({ countSecondLooks: jest.fn() }));
 
 const db = {} as AppDatabase;
 const NO_PRAYER_TIMES: DhuhrResolver = () => null;
@@ -139,6 +141,7 @@ beforeEach(() => {
   jest.mocked(countMistakeInbox).mockResolvedValue(0);
   jest.mocked(countDueRemediation).mockResolvedValue(0);
   jest.mocked(monthlyCheckDueFor).mockResolvedValue(false);
+  jest.mocked(countSecondLooks).mockResolvedValue({ due: 0, offeredAt: null });
 });
 
 afterEach(() => {
@@ -253,6 +256,30 @@ describe("useTodayWird across a day boundary", () => {
     expect(wirdLoads()).toBe(2);
     await advanceTo(at(16, 0));
     expect(wirdLoads()).toBe(3);
+  });
+
+  it("reloads when the next second look is offered, so Home's cue appears without a focus change (SBQ-03)", async () => {
+    jest
+      .mocked(countSecondLooks)
+      .mockResolvedValueOnce({ due: 0, offeredAt: at(14, 22) })
+      .mockResolvedValue({ due: 1, offeredAt: null });
+    const { result } = renderHook(() => useTodayWird(db));
+    await flush();
+    expect(result.current.secondLooksDue).toBe(0);
+    await advanceTo(at(14, 21, 59));
+    expect(wirdLoads()).toBe(1);
+    await advanceTo(at(14, 22));
+    expect(wirdLoads()).toBe(2);
+    expect(result.current.secondLooksDue).toBe(1);
+  });
+
+  it("keeps the wird when the second-look count fails, with no cue", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.mocked(countSecondLooks).mockRejectedValue(new Error("synthetic count failure"));
+    const { result } = renderHook(() => useTodayWird(db));
+    await flush();
+    expect(loadedFor(result.current.wird)).toBe("2026-11-14");
+    expect(result.current.secondLooksDue).toBe(0);
   });
 
   it("clears its timer and AppState listener on unmount", async () => {

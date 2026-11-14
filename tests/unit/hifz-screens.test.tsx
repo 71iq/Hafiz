@@ -1,5 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { AppState, type AppStateStatus } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import HifzReviewRoute from "@/app/hifz/review";
 import SabaqRoute from "@/app/hifz/sabaq";
@@ -74,12 +75,25 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
   useNavigation: () => mockNavigation,
 }));
-jest.mock("@react-navigation/native", () => ({
-  ...jest.requireActual<typeof import("@react-navigation/native")>("@react-navigation/native"),
-  usePreventRemove: (prevent: boolean, callback: PreventRemove["callback"]) => {
-    mockPreventRemove = { prevent, callback };
-  },
-}));
+/** Screen focus for useIsFocused; a test takes it away and gives it back like a screen pushed on top. */
+const mockFocus = { focused: true, listeners: new Set<() => void>() };
+jest.mock("@react-navigation/native", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  return {
+    ...jest.requireActual<typeof import("@react-navigation/native")>("@react-navigation/native"),
+    usePreventRemove: (prevent: boolean, callback: PreventRemove["callback"]) => {
+      mockPreventRemove = { prevent, callback };
+    },
+    useIsFocused: () =>
+      React.useSyncExternalStore(
+        (listener: () => void) => {
+          mockFocus.listeners.add(listener);
+          return () => mockFocus.listeners.delete(listener);
+        },
+        () => mockFocus.focused,
+      ),
+  };
+});
 jest.mock("@/lib/navigation/return-to-tabs", () => ({ returnToTabs: jest.fn() }));
 jest.mock("@/lib/database/provider", () => ({
   useDatabase: () => mockDatabase,
@@ -159,7 +173,13 @@ jest.mock("@/lib/hifz/review", () => ({
   saveRemediationGrade: jest.fn(),
   recordReviewPace: jest.fn(),
 }));
-jest.mock("@/lib/hifz/sabaq", () => ({ completeSabaqChunk: jest.fn(), nextSabaqTarget: jest.fn() }));
+jest.mock("@/lib/hifz/sabaq", () => ({
+  completeSabaqChunk: jest.fn(),
+  nextSabaqTarget: jest.fn(),
+  // No second look is due in these lessons; tests/unit/hifz-second-look-screen.test.tsx covers them.
+  loadSecondLooks: jest.fn(async () => ({ due: [], nextAt: null })),
+  saveSecondLook: jest.fn(),
+}));
 jest.mock("@/lib/hifz/similar", () => ({ similarGroupsForAyahs: jest.fn(), withMemorizedSiblings: jest.fn() }));
 jest.mock("@/lib/hifz/use-weak-spots", () => ({ refreshWeakSpots: jest.fn() }));
 
@@ -215,6 +235,61 @@ async function flush() {
 function grading(): GradingProps {
   if (!mockGrading) throw new Error("Grading buttons are not shown");
   return mockGrading;
+}
+
+const MINUTE = 60_000;
+/** The device clock while a lifecycle test runs: Date.now reads it, and only the test moves it. */
+let deviceTime = 0;
+const appStateListeners = new Set<(state: AppStateStatus) => void>();
+// React Native's Jest mock leaves currentState as a function; the screens read it as a state.
+const appState = AppState as { currentState: unknown };
+const mockedCurrentState = appState.currentState;
+// The same mock serves every test, so a lifecycle test puts its default subscription back.
+const addAppStateListener = jest.mocked(AppState.addEventListener);
+const mockedAddAppStateListener = addAppStateListener.getMockImplementation();
+
+/** Change AppState as the platform does: the current state first, then the change event. */
+function setAppState(state: AppStateStatus) {
+  appState.currentState = state;
+  for (const listener of [...appStateListeners]) listener(state);
+}
+function setFocused(focused: boolean) {
+  mockFocus.focused = focused;
+  for (const listener of [...mockFocus.listeners]) listener();
+}
+/** Six minutes, or any other time, away from the screen: the app in the background, or another screen on top. */
+type Away = "background" | "blur";
+const AWAY_CASES: [string, Away][] = [
+  ["the app is in the background", "background"],
+  ["another screen covers it", "blur"],
+];
+function stayAway(how: Away, ms: number) {
+  act(() => (how === "background" ? setAppState("background") : setFocused(false)));
+  deviceTime += ms;
+  act(() => (how === "background" ? setAppState("active") : setFocused(true)));
+}
+/** Hand Date.now, AppState and screen focus to the tests in the calling describe block. */
+function controlDeviceLifecycle() {
+  let nowSpy: jest.SpyInstance;
+  beforeEach(() => {
+    deviceTime = new Date(2026, 10, 14, 9, 0).getTime();
+    nowSpy = jest.spyOn(Date, "now").mockImplementation(() => deviceTime);
+    mockFocus.focused = true;
+    appStateListeners.clear();
+    appState.currentState = "active";
+    addAppStateListener.mockImplementation((_type, listener) => {
+      appStateListeners.add(listener as (state: AppStateStatus) => void);
+      return {
+        remove: () => appStateListeners.delete(listener as (state: AppStateStatus) => void),
+      } as ReturnType<typeof AppState.addEventListener>;
+    });
+  });
+  afterEach(() => {
+    nowSpy.mockRestore();
+    if (mockedAddAppStateListener) addAppStateListener.mockImplementation(mockedAddAppStateListener);
+    appState.currentState = mockedCurrentState;
+    mockFocus.focused = true;
+  });
 }
 
 let warnings: jest.SpyInstance;
@@ -493,6 +568,66 @@ describe("hifz review screen", () => {
     expect(dismissInboxItem).toHaveBeenCalledTimes(1);
     mockDatabase.getFirstAsync.mockResolvedValue(null);
   });
+
+  // Review time counts toward the daily minimum, so time away from the screen must not.
+  describe("time away from the screen", () => {
+    controlDeviceLifecycle();
+
+    it.each(AWAY_CASES)("counts only time on screen toward the page, the pace and the summary when %s", async (_label, how) => {
+      jest.mocked(savePageGrade).mockResolvedValue(saved);
+      await openCheck();
+      deviceTime += MINUTE;
+      stayAway(how, 6 * MINUTE);
+      deviceTime += 2 * MINUTE;
+      await act(async () => {
+        void grading().onGrade(3);
+      });
+      await flush();
+      // Three minutes on screen, not the nine since the page was shown.
+      expect(jest.mocked(savePageGrade).mock.calls[0][1].durationMs).toBe(3 * MINUTE);
+      expect(jest.mocked(recordReviewPace).mock.calls[0][1].minutes).toBe(3);
+      expect(mockHabitInput?.durationMs).toBe(3 * MINUTE);
+    });
+
+    it("starts each page's time when it is shown, while the session counts them all", async () => {
+      const row6 = { ...row, id: "page:madani15:6" } as StudyCardRow;
+      jest.mocked(loadTodayWird).mockResolvedValue({
+        plan: DEFAULT_HIFZ_PLAN,
+        minutesPerReviewPage: 3,
+        done: [],
+        todo: [5, 6].map((page) => ({
+          cardId: `page:madani15:${page}`,
+          page,
+          tier: "manzil",
+          lastReviewDate: null,
+          reviewedToday: false,
+          dueDate: "2026-11-13",
+          retrievability: 0.95,
+        })),
+      } as never);
+      jest.mocked(loadPageCards).mockResolvedValue([pageCard, { ...pageCard, row: row6, page: 6 }]);
+      jest.mocked(savePageGrade).mockResolvedValue(saved);
+      await openCheck();
+      deviceTime += MINUTE;
+      stayAway("background", 6 * MINUTE);
+      deviceTime += MINUTE;
+      await act(async () => {
+        await grading().onGrade(3);
+      });
+      await flush();
+      deviceTime += MINUTE;
+      fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
+      await flush();
+      deviceTime += MINUTE;
+      await act(async () => {
+        void grading().onGrade(3);
+      });
+      await flush();
+      expect(jest.mocked(savePageGrade).mock.calls.map(([, input]) => input.durationMs)).toEqual([2 * MINUTE, 2 * MINUTE]);
+      expect(jest.mocked(recordReviewPace).mock.calls[0][1]).toMatchObject({ minutes: 4, pages: 2 });
+      expect(mockHabitInput?.durationMs).toBe(4 * MINUTE);
+    });
+  });
 });
 
 describe("sabaq screen", () => {
@@ -649,6 +784,19 @@ describe("sabaq screen", () => {
     expect(returnToTabs).not.toHaveBeenCalled();
   });
 
+  it("does not call the lines memorized after a failed fluent check (SBQ-02)", async () => {
+    jest.mocked(completeSabaqChunk).mockResolvedValueOnce(chunkSaved);
+    const buttons = await openSabaqCheck();
+    await act(async () => {
+      void buttons.onGrade(1);
+    });
+    await flush();
+    expect(screen.getByText(s.hifzSabaqNotFluentTitle)).toBeTruthy();
+    expect(screen.getByText(s.hifzSabaqNotFluent)).toBeTruthy();
+    expect(screen.queryByText(s.hifzSabaqDoneTitle)).toBeNull();
+    expect(screen.queryByText(s.hifzSabaqDone)).toBeNull();
+  });
+
   it("saves the chunk once when the fluent check is graded twice, and not again after it is saved", async () => {
     const save = deferred<ChunkSave>();
     jest.mocked(completeSabaqChunk).mockReturnValue(save.promise);
@@ -664,5 +812,25 @@ describe("sabaq screen", () => {
       void buttons.onGrade(3);
     });
     expect(completeSabaqChunk).toHaveBeenCalledTimes(1);
+  });
+
+  // The lesson's time counts toward the daily minimum, so time away from the screen must not.
+  describe("time away from the screen", () => {
+    controlDeviceLifecycle();
+
+    it.each(AWAY_CASES)("counts only time on screen toward the chunk and the summary when %s", async (_label, how) => {
+      jest.mocked(completeSabaqChunk).mockResolvedValue(chunkSaved);
+      await openSabaqCheck();
+      deviceTime += MINUTE;
+      stayAway(how, 6 * MINUTE);
+      deviceTime += 2 * MINUTE;
+      await act(async () => {
+        void grading().onGrade(3);
+      });
+      await flush();
+      // Three minutes on screen, not the nine since the lesson loaded.
+      expect(jest.mocked(completeSabaqChunk).mock.calls[0][1].durationMs).toBe(3 * MINUTE);
+      expect(mockHabitInput?.durationMs).toBe(3 * MINUTE);
+    });
   });
 });

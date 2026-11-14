@@ -39,6 +39,7 @@ import { Rating, type Grade } from "@/lib/fsrs/scheduler";
 import type { DeckReviewSettings } from "@/lib/fsrs/types";
 import { localDateOf } from "@/lib/habit/dates";
 import { loadHabitOverview, type WirdProgressEvent } from "@/lib/habit/queries";
+import { useActiveClock } from "@/lib/habit/use-active-clock";
 import { dismissInboxItem, INBOX_ITEMS_PER_REVIEW, readMistakeInbox, recordDrillResult, type InboxItem, type RecitationErrorType } from "@/lib/hifz/errors";
 import { GRADE_CAP, defaultSupportLevel, isGradable, SUPPORT_LEVELS, type SupportLevel } from "@/lib/hifz/grading";
 import { loadRecitationPage, type PageToken, type RecitationPage as PageData } from "@/lib/hifz/page-data";
@@ -204,8 +205,9 @@ function HifzReviewScreen() {
   const [planProgress, setPlanProgress] = useState<{ done: number; total: number } | null>(null);
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
   const sessionRef = useRef<ReviewSessionRef | null>(null);
-  const startedAt = useRef(Date.now());
-  const shownAt = useRef(Date.now());
+  // Session and item times count only while the review is on screen with the app active.
+  const sessionClock = useActiveClock();
+  const itemClock = useActiveClock();
   const wirdEvent = useRef<SessionHabitInput["event"]>(null);
   const againCount = useRef(0);
   const minutesPerPage = useRef(3);
@@ -285,7 +287,7 @@ function HifzReviewScreen() {
       sessionRef.current = startReviewSession(
         drillsOnly ? "mistakes" : welcomeBack ? "welcome_back" : monthlyCheck ? "portion_check" : "wird",
       );
-      startedAt.current = Date.now();
+      sessionClock.reset();
       actionIndex.current = 0;
       totalsRef.current = NO_TOTALS;
       setTotals(NO_TOTALS);
@@ -296,7 +298,7 @@ function HifzReviewScreen() {
       console.warn("[HifzReview] Failed to load:", loadError);
       setPhase("error");
     }
-  }, [db, drillsOnly, monthlyCheck, welcomeBack]);
+  }, [db, drillsOnly, monthlyCheck, sessionClock, welcomeBack]);
 
   useEffect(() => {
     load();
@@ -310,7 +312,7 @@ function HifzReviewScreen() {
       setPageData(null);
       if (current) {
         setAttempt(emptyAttempt(4));
-        shownAt.current = Date.now();
+        itemClock.reset();
       }
       return;
     }
@@ -325,7 +327,7 @@ function HifzReviewScreen() {
     setReveal(HIDDEN);
     setError(null);
     setPageData(null);
-    shownAt.current = Date.now();
+    itemClock.reset();
     loadPageWordsData()
       .catch(() => null)
       .then((words) => loadRecitationPage(db, pageNumber, words?.[pageNumber - 1] ?? null))
@@ -339,7 +341,7 @@ function HifzReviewScreen() {
     return () => {
       cancelled = true;
     };
-  }, [current, db, s.hifzLoadFailed, welcomeLevel]);
+  }, [current, db, itemClock, s.hifzLoadFailed, welcomeLevel]);
 
   useEffect(() => {
     setDrillShown(false);
@@ -387,7 +389,7 @@ function HifzReviewScreen() {
   const finish = useCallback(
     async (final: Totals) => {
       const session = sessionRef.current;
-      const durationMs = Date.now() - startedAt.current;
+      const durationMs = sessionClock.elapsedMs();
       const [overview] = await Promise.all([
         loadHabitOverview(db).catch(() => null),
         session ? endReviewSession(db, { session }).catch(console.warn) : null,
@@ -409,7 +411,7 @@ function HifzReviewScreen() {
       });
       setPhase("summary");
     },
-    [db, monthlyCheck],
+    [db, monthlyCheck, sessionClock],
   );
 
   /** Move past the item at `from`, or finish after the last one. Resolves once the summary is ready. */
@@ -539,7 +541,7 @@ function HifzReviewScreen() {
         attempt: usedAttempt,
         firstToken,
         session: sessionRef.current,
-        durationMs: Date.now() - shownAt.current,
+        durationMs: itemClock.elapsedMs(),
         grader: listener ? "teacher" : "self",
       });
       if (rating === Rating.Again) againCount.current += 1;
@@ -575,7 +577,7 @@ function HifzReviewScreen() {
         rating,
         firstToken: firstToken ?? { glyph: "", surah: 1, ayah: 1, wordPos: null, isMarker: true, firstLetter: null },
         session: sessionRef.current,
-        durationMs: Date.now() - shownAt.current,
+        durationMs: itemClock.elapsedMs(),
         grader,
         page: pageData,
       });
