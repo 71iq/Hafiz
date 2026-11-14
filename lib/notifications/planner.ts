@@ -89,7 +89,6 @@ export type SkipReason =
   | "cap"
   | "no_template"
   | "state_changed"
-  | "late_hour"
   | "sent";
 export type SkippedSlot = Readonly<{ type: NotificationType; localDate: LocalDate; at: Date; reason: SkipReason }>;
 export type PlanResult = Readonly<{ slots: PlannedSlot[]; skipped: SkippedSlot[] }>;
@@ -106,6 +105,8 @@ type Candidate = {
   backoff: boolean;
   late: boolean;
   times: ReminderDayTimes;
+  /** See PlannedSlot.existingOnly. */
+  existingOnly?: boolean;
 };
 
 /** NOT-05b: the streak state a remind-later follow-up was scheduled under. */
@@ -322,28 +323,27 @@ export function planNotifications(input: PlannerInput): PlanResult {
       }
     }
 
-    // Late reminder: opt-in, exempt from quiet hours, skipped when planning at 23:00 or later.
+    // Late reminder: opt-in and exempt from quiet hours. Planning at 23:00 or later schedules no new
+    // one for today, but keeps one already set, so a replan late in the evening does not cancel it.
     if (prefs.types.late_reminder) {
       const lateDay = project(date, times.lateAt).snapshot;
       if (lateDay.headline.kind === "at_risk" && lateDay.streak.length >= 2) {
-        if (date === today && clock.minutesOf(now) >= 23 * 60) {
-          skipped.push({ type: "late_reminder", localDate: date, at: times.lateAt, reason: "late_hour" });
-        } else {
-          add({
-            type: "late_reminder",
-            at: times.lateAt,
-            vars: {
-              ...base,
-              n: lateDay.streak.length,
-              cutoff: input.prayers(addDays(date, 1)) ? "dhuhr" : "12:30",
-            },
-            route: "wird",
-            priority: 5,
-            exemptQuiet: true,
-            backoff: true,
-            late: true,
-          });
-        }
+        const lateHour = date === today && clock.minutesOf(now) >= 23 * 60;
+        add({
+          existingOnly: lateHour || undefined,
+          type: "late_reminder",
+          at: times.lateAt,
+          vars: {
+            ...base,
+            n: lateDay.streak.length,
+            cutoff: input.prayers(addDays(date, 1)) ? "dhuhr" : "12:30",
+          },
+          route: "wird",
+          priority: 5,
+          exemptQuiet: true,
+          backoff: true,
+          late: true,
+        });
       }
     }
 
@@ -461,6 +461,7 @@ export function planNotifications(input: PlannerInput): PlanResult {
       templateId: template.id,
       vars,
       route: candidate.route,
+      ...(candidate.existingOnly ? { existingOnly: true } : {}),
     });
   }
   return { slots, skipped };

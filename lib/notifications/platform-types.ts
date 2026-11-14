@@ -40,6 +40,8 @@ export type ReminderRequest = Readonly<{
 export type ReminderResponse = Readonly<{
   data: ReminderData;
   action: "open" | "remind_later";
+  /** The notification acted on, so the remind-later action can take it out of the tray. */
+  osId?: string;
 }>;
 
 /**

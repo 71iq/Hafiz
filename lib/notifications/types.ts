@@ -99,6 +99,12 @@ export type PlannedSlot = Readonly<{
   templateId: string;
   vars: Readonly<Record<string, string | number>>;
   route: ReminderRoute;
+  /**
+   * Keep a reminder of this type and date already scheduled, but schedule none new: today's late
+   * reminder planned at 23:00 or later. It passed the same checks as any slot (completion, settings,
+   * cap, back-off), so an alarm set earlier stays unless one of them now says no.
+   */
+  existingOnly?: boolean;
 }>;
 
 /** A notification_log row (spec 7.2). Device-local, never synced. */

@@ -318,13 +318,26 @@ export function reconcileReminders(
   skipped: readonly SkippedSlot[] = [],
 ): { keep: ScheduledReminder[]; cancel: ScheduledReminder[]; create: DesiredReminder[] } {
   const nearFireBy = now.getTime() + NEAR_FIRE_MS;
-  const remaining = [...desired];
   const keep: ScheduledReminder[] = [];
   const cancel: ScheduledReminder[] = [];
   const later: ScheduledReminder[] = [];
   const sameSlot = (item: ScheduledReminder) => (slot: Pick<PlannedSlot, "type" | "localDate">) =>
     slot.type === item.data.type && slot.localDate === item.data.localDate;
+  // A slot the plan keeps only if it is already set (PlannedSlot.existingOnly) keeps the reminder of
+  // its type and date as it is, whatever its wording, and is never created.
+  const existingOnly = desired.filter((wanted) => wanted.slot.existingOnly);
+  const remaining = desired.filter((wanted) => !wanted.slot.existingOnly);
+  const pending: ScheduledReminder[] = [];
   for (const item of scheduled) {
+    const index = existingOnly.findIndex((wanted) => sameSlot(item)(wanted.slot));
+    if (index >= 0) {
+      keep.push(item);
+      existingOnly.splice(index, 1);
+    } else {
+      pending.push(item);
+    }
+  }
+  for (const item of pending) {
     if (item.data.at > nearFireBy) {
       later.push(item);
       continue;
@@ -756,6 +769,11 @@ export async function requestRemindLater(
     return true;
   });
   if (!recorded) return false;
+  // NOT-05b: the follow-up replaces the reminder it was asked from. Android keeps a notification in the
+  // tray when one of its action buttons is pressed (iOS removes it), and a later swipe there is never
+  // reported to the app, so the original is taken out here: the follow-up never outlives an original
+  // the person cleared. A refused follow-up leaves the original where it is.
+  if (response.osId) await reminderPlatform.dismiss([response.osId]).catch(() => undefined);
   // Any run queued before the write has started by now, so this is a new run that reads it.
   const result = await rescheduleReminders(db, { now });
   return result.plan?.slots.some((slot) => slot.type === "remind_later") ?? false;

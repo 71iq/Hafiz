@@ -253,6 +253,17 @@ describe("rescheduleReminders", () => {
     expect(fake.scheduled.map((item) => item.osId).sort()).toEqual(ids);
   });
 
+  it("keeps tonight's late reminder when it replans after 23:00 with the wird still open", async () => {
+    await seed(lastDays(5));
+    await writeReminderPref(store.db, { kind: "type", type: "late_reminder", value: true });
+    await rescheduleReminders(store.db, { now: at(TODAY, 22), language: "en" });
+    const lateId = fake.scheduled.find((item) => item.data.type === "late_reminder" && item.data.localDate === TODAY)?.osId;
+    expect(lateId).toBeDefined();
+    osFires(at(TODAY, 23, 1));
+    await rescheduleReminders(store.db, { now: at(TODAY, 23, 1), language: "en" });
+    expect(fake.scheduled.filter((item) => item.data.type === "late_reminder" && item.data.localDate === TODAY).map((item) => item.osId)).toEqual([lateId]);
+  });
+
   it("cancels today's wird reminders once the day is done and tidies the tray (NOT-05)", async () => {
     await seed(lastDays(5));
     await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
@@ -310,10 +321,15 @@ describe("rescheduleReminders", () => {
     await seed(lastDays(5));
     await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
     const original = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
-    const response: ReminderResponse = { data: original.data, action: "remind_later" };
+    // It showed, and stays in the tray after its action button is pressed, as on Android.
+    osFires(at(TODAY, 5, 21));
+    fake.presented = [...fake.presented, { osId: original.osId, data: original.data }];
+    const response: ReminderResponse = { data: original.data, action: "remind_later", osId: original.osId };
     expect(await requestRemindLater(store.db, response, { now: at(TODAY, 5, 30) })).toBe(true);
     const followUp = fake.scheduled.find((item) => item.data.type === "remind_later");
     expect(followUp?.data.at).toBe(at(TODAY, 6, 30).getTime());
+    // NOT-05b: the follow-up replaces the original, which leaves the tray.
+    expect(fake.presented.some((item) => item.osId === original.osId)).toBe(false);
 
     await seed([TODAY]);
     await rescheduleReminders(store.db, { now: at(TODAY, 6), language: "en" });
@@ -727,6 +743,17 @@ describe("reconcileReminders", () => {
     expect(result.keep.map((item) => item.osId)).toEqual(["soon"]);
     expect(result.cancel.map((item) => item.osId)).toEqual(["evening"]);
     expect(result.create.map((item) => item.slot.type)).toEqual(["streak_at_risk"]);
+  });
+
+  it("keeps a late reminder already set when a replan after 23:00 keeps it, and creates none", () => {
+    const late = { ...scheduledAt("late", "streak_at_risk", at(TODAY, 23, 15)), data: { ...scheduledAt("late", "streak_at_risk", at(TODAY, 23, 15)).data, type: "late_reminder" as const } };
+    const keepOnly = { ...desiredAt("streak_at_risk", at(TODAY, 23, 15)), slot: { ...desiredAt("streak_at_risk", at(TODAY, 23, 15)).slot, type: "late_reminder" as const, existingOnly: true } };
+    const kept = reconcileReminders([late], [keepOnly], at(TODAY, 23, 1));
+    expect(kept.keep.map((item) => item.osId)).toEqual(["late"]);
+    expect(kept.cancel).toEqual([]);
+    expect(kept.create).toEqual([]);
+    // With nothing set, a keep-only slot schedules nothing.
+    expect(reconcileReminders([], [keepOnly], at(TODAY, 23, 1)).create).toEqual([]);
   });
 
   it("cancels a reminder about to fire that the plan no longer has, and clears one already due", () => {

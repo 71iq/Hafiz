@@ -49,7 +49,9 @@ function toPermission(response: Notifications.NotificationPermissionsStatus): Pe
 function toResponse(response: Notifications.NotificationResponse): ReminderResponse | null {
   const data = response.notification.request.content.data;
   if (!isReminderData(data)) return null;
-  if (response.actionIdentifier === REMIND_LATER_ACTION) return { data, action: "remind_later" };
+  if (response.actionIdentifier === REMIND_LATER_ACTION) {
+    return { data, action: "remind_later", osId: response.notification.request.identifier };
+  }
   if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) return { data, action: "open" };
   return null;
 }

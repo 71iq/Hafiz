@@ -224,11 +224,22 @@ describe("planNotifications", () => {
     ]);
   });
 
-  it("skips the late reminder when planning at 23:00 or later", () => {
+  it("plans no new late reminder at 23:00 or later, only keeps one already set", () => {
     const prefs = prefsWith({ types: { late_reminder: true } });
     const result = planNotifications(input({ prefs, now: RIYADH.at(TODAY, 23 * 60 + 5) }));
-    expect(result.slots.some((slot) => slot.localDate === TODAY)).toBe(false);
-    expect(result.skipped).toContainEqual(expect.objectContaining({ type: "late_reminder", localDate: TODAY, reason: "late_hour" }));
+    expect(result.slots.filter((slot) => slot.localDate === TODAY)).toEqual([
+      expect.objectContaining({ type: "late_reminder", existingOnly: true }),
+    ]);
+    // Earlier in the day it is an ordinary slot.
+    const evening = planNotifications(input({ prefs, now: RIYADH.at(TODAY, 22 * 60) }));
+    expect(evening.slots.find((slot) => slot.type === "late_reminder" && slot.localDate === TODAY)?.existingOnly).toBeUndefined();
+  });
+
+  it("keeps no late reminder after 23:00 once today's wird is done", () => {
+    const prefs = prefsWith({ types: { late_reminder: true } });
+    const habit = { days: days({ ...streak(5), [TODAY]: "done" }), pause: null };
+    const result = planNotifications(input({ prefs, habit, now: RIYADH.at(TODAY, 23 * 60 + 5) }));
+    expect(result.slots.some((slot) => slot.type === "late_reminder" && slot.localDate === TODAY)).toBe(false);
   });
 
   it("counts reminders that already fired toward the daily cap (NOT-07)", () => {
