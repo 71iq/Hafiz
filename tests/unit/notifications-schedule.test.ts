@@ -20,6 +20,7 @@ import {
   requestNotificationPermission,
   shouldOfferNotificationPrompt,
 } from "@/lib/notifications/permission";
+import { reminderPlatform } from "@/lib/notifications/platform";
 import { openReminderRoute, resolveReminderHref } from "@/lib/notifications/reminder-route";
 import {
   configureReminderPlatform,
@@ -906,5 +907,39 @@ describe("hifz cards in the surah named by reminder copy (NOT-14)", () => {
     const context = await loadReminderContext(store.db, { now: at(TODAY, 3), language: "en" });
 
     expect(context.input.facts(TODAY)).toEqual({ surah: 2 });
+  });
+});
+
+describe("a remind-later request during a reschedule (NOT-05b)", () => {
+  it("keeps today's follow-up when a run that read yesterday's spent one finishes after the request", async () => {
+    await seed(lastDays(5));
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    const original = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
+    const yesterday = addDays(TODAY, -1);
+    await putUserSetting(
+      store.db,
+      LOCAL_KEYS.remindLater,
+      JSON.stringify({ at: at(yesterday, 20).toISOString(), local_date: yesterday, fingerprint: "synthetic-old" }),
+    );
+    // A foreground run reads that spent follow-up, then waits on the OS.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let reached!: () => void;
+    const paused = new Promise<void>((resolve) => (reached = resolve));
+    jest.spyOn(reminderPlatform, "getPermission").mockImplementationOnce(async () => {
+      reached();
+      await gate;
+      return fake.permission;
+    });
+    const run = rescheduleReminders(store.db, { now: at(TODAY, 5, 30), language: "en" });
+    await paused;
+
+    const request = requestRemindLater(store.db, { data: original.data, action: "remind_later" }, { now: at(TODAY, 5, 30) });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    release();
+    await run;
+
+    expect(await request).toBe(true);
+    expect(fake.scheduled.find((item) => item.data.type === "remind_later")?.data.at).toBe(at(TODAY, 6, 30).getTime());
   });
 });

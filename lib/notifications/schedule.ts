@@ -421,8 +421,16 @@ async function recordOutcomes(db: DatabaseExecutor, context: ReminderContext, no
   await pruneLog(db, now);
 }
 
+/**
+ * Drops the follow-up this run read once the plan no longer holds it. Only that one: a newer request
+ * written since the run read its context is left for the next run (requestRemindLater also writes
+ * through the same queue, so this is a second guard).
+ */
 async function clearSpentRemindLater(db: DatabaseExecutor, context: ReminderContext, plan: PlanResult): Promise<void> {
-  if (context.input.remindLater && !plan.slots.some((slot) => slot.type === "remind_later")) {
+  const spent = context.input.remindLater;
+  if (spent && !plan.slots.some((slot) => slot.type === "remind_later")) {
+    const stored = await readLocalSetting(db, LOCAL_KEYS.remindLater, remindLaterSchema);
+    if (!stored || stored.at !== spent.at || stored.local_date !== spent.local_date || stored.fingerprint !== spent.fingerprint) return;
     await writeLocalSetting(db, LOCAL_KEYS.remindLater, null);
   }
 }
@@ -721,24 +729,31 @@ export async function requestRemindLater(
   response: ReminderResponse,
   { now = new Date(), clock = deviceClock }: { now?: Date; clock?: DayClock } = {},
 ): Promise<boolean> {
-  const context = await loadReminderContext(db, { now, clock });
-  if (!context.prefs.enabled || !context.prefs.types.remind_later) return false;
-  const at = new Date(now.getTime() + REMIND_LATER_DELAY_MS);
-  const date = clock.dateOf(now);
-  if (response.data.localDate !== date || clock.dateOf(at) !== date) return false;
-  const times = buildDayTimes(
-    {
-      clock,
-      prayers: context.input.prayers,
-      anchor: context.prefs.anchor,
-      ramadanAnchor: context.prefs.ramadanAnchor,
-      isRamadan: context.input.isRamadan,
-    },
-    date,
-  );
-  if (isQuietAt(times, at)) return false;
-  const fingerprint = streakFingerprint(projectHabit(context.input, date, now).snapshot);
-  await writeLocalSetting(db, LOCAL_KEYS.remindLater, { at: at.toISOString(), local_date: date, fingerprint });
+  // Written in the reschedule queue, never alongside a run: a run that read the previous follow-up
+  // and is about to drop it as spent would otherwise erase this one.
+  const recorded = await serialized(async () => {
+    const context = await loadReminderContext(db, { now, clock });
+    if (!context.prefs.enabled || !context.prefs.types.remind_later) return false;
+    const at = new Date(now.getTime() + REMIND_LATER_DELAY_MS);
+    const date = clock.dateOf(now);
+    if (response.data.localDate !== date || clock.dateOf(at) !== date) return false;
+    const times = buildDayTimes(
+      {
+        clock,
+        prayers: context.input.prayers,
+        anchor: context.prefs.anchor,
+        ramadanAnchor: context.prefs.ramadanAnchor,
+        isRamadan: context.input.isRamadan,
+      },
+      date,
+    );
+    if (isQuietAt(times, at)) return false;
+    const fingerprint = streakFingerprint(projectHabit(context.input, date, now).snapshot);
+    await writeLocalSetting(db, LOCAL_KEYS.remindLater, { at: at.toISOString(), local_date: date, fingerprint });
+    return true;
+  });
+  if (!recorded) return false;
+  // Any run queued before the write has started by now, so this is a new run that reads it.
   const result = await rescheduleReminders(db, { now });
   return result.plan?.slots.some((slot) => slot.type === "remind_later") ?? false;
 }
