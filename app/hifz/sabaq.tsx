@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "expo-router";
+import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { BookOpenCheck, Pause, Play, RotateCcw, X } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -90,12 +91,21 @@ function SabaqScreen() {
    */
   const saveLock = useRef<"open" | "saving" | "saved">("open");
   /**
+   * The rendered copy of `saveLock === "saving"`, for the remove guard below. Unlike `busy` it ends as
+   * soon as the grade is saved, so leaving while the summary loads is not held.
+   */
+  const [saving, setSaving] = useState(false);
+  /**
    * Close was pressed while the grade was saving. The screen leaves once it is saved, or stays on the
    * check to show a failed save, which would otherwise reach a departed screen.
    */
   const leaveWhenSaved = useRef(false);
-  /** Set once the screen leaves on purpose, so the back guard below lets that navigation through. */
+  /** Set once the screen leaves on purpose, so the remove guard below lets that navigation through. */
   const exiting = useRef(false);
+  /** A back press or gesture held for the unresolved grade; leaving carries it out. */
+  const pendingBack = useRef<NavigationAction | null>(null);
+  /** The rendered copy of leaveWhenSaved, so Close shows that its press is waiting for the save. */
+  const [leavePending, setLeavePending] = useState(false);
   const step: Step = habitResult ? "done" : STEPS[stepIndex];
 
   const load = useCallback(async () => {
@@ -164,29 +174,48 @@ function SabaqScreen() {
     stop();
     const session = sessionRef.current;
     if (session && !habitResult) endReviewSession(db, { session }).catch(console.warn);
-    returnToTabs(navigation.getState(), "/(tabs)/home");
+    // A held back press goes where it was going; Close returns to the tabs.
+    const back = pendingBack.current;
+    pendingBack.current = null;
+    if (back) navigation.dispatch(back);
+    else returnToTabs(navigation.getState(), "/(tabs)/home");
   };
 
-  // Hardware back or a back gesture during an unresolved grade waits for it, the same as Close.
+  // Leaving by any route that ends the screen without exit() still ends the session.
   useEffect(
-    () =>
-      navigation.addListener("beforeRemove", (event) => {
-        if (exiting.current || saveLock.current !== "saving") return;
-        event.preventDefault();
-        leaveWhenSaved.current = true;
-      }),
-    [navigation],
+    () => () => {
+      const session = sessionRef.current;
+      if (session) endReviewSession(db, { session }).catch(console.warn);
+    },
+    [db],
   );
+
+  // Hardware back, a back gesture or the iOS swipe during an unresolved grade waits for it, the same as
+  // Close. usePreventRemove, unlike a bare beforeRemove listener, also tells native-stack to block the
+  // native dismissal, so the swipe cannot take the screen away while the grade is still saving.
+  usePreventRemove(saving, ({ data }) => {
+    // The screen's own exit goes on, as does a back press after a save this render has not caught up
+    // with; React Navigation marks the action as already checked for this screen.
+    if (exiting.current || saveLock.current !== "saving") navigation.dispatch(data.action);
+    else {
+      pendingBack.current = data.action;
+      leaveWhenSaved.current = true;
+      setLeavePending(true);
+    }
+  });
 
   /** Leave now, or once the check's unresolved grade settles (see leaveWhenSaved). */
   const leave = () => {
-    if (saveLock.current === "saving") leaveWhenSaved.current = true;
-    else exit();
+    if (saveLock.current === "saving") {
+      leaveWhenSaved.current = true;
+      setLeavePending(true);
+    } else exit();
   };
 
   const finish = async (rating: Grade) => {
     if (!target || !plan || saveLock.current !== "open") return;
     saveLock.current = "saving";
+    setSaving(true);
     setBusy(true);
     setError(null);
     try {
@@ -198,6 +227,7 @@ function SabaqScreen() {
         durationMs: Date.now() - startedAt.current,
       });
       saveLock.current = "saved";
+      setSaving(false);
       if (leaveWhenSaved.current) {
         emitHabitChanged();
         exit();
@@ -219,9 +249,14 @@ function SabaqScreen() {
     } catch (saveError) {
       console.warn("[Sabaq] Save failed:", saveError);
       leaveWhenSaved.current = false;
+      pendingBack.current = null;
+      setLeavePending(false);
       setError(s.hifzSaveFailed);
     } finally {
-      if (saveLock.current === "saving") saveLock.current = "open";
+      if (saveLock.current === "saving") {
+        saveLock.current = "open";
+        setSaving(false);
+      }
       setBusy(false);
     }
   };
@@ -287,7 +322,15 @@ function SabaqScreen() {
       <View className="items-center">
         <View style={{ width: "100%", maxWidth: pageWidth }}>
           <MirroredRow dir={dir} className="items-center justify-between px-5 pt-3 pb-2">
-            <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel={s.genericClose} className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center">
+            {/* Dimmed while Close waits for the grade it was pressed during. */}
+            <Pressable
+              onPress={leave}
+              disabled={leavePending}
+              accessibilityRole="button"
+              accessibilityLabel={s.genericClose}
+              accessibilityState={{ disabled: leavePending }}
+              className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${leavePending ? "opacity-50" : ""}`}
+            >
               <X size={18} color={muted} />
             </Pressable>
             <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="text-warm-600 dark:text-neutral-400">

@@ -43,27 +43,42 @@ const mockAudio = {
   togglePause: jest.fn(),
 };
 
-type BeforeRemove = { preventDefault: () => void };
-const mockBackListeners = new Set<(event: BeforeRemove) => void>();
-// Stable, so the screens subscribe once; `back` stands in for a hardware back press or gesture.
-const mockNavigation = {
-  getState: () => undefined,
-  addListener: (name: string, listener: (event: BeforeRemove) => void) => {
-    if (name !== "beforeRemove") return () => {};
-    mockBackListeners.add(listener);
-    return () => mockBackListeners.delete(listener);
-  },
-};
-/** Fire beforeRemove as a back press would. Returns whether the screen kept itself open. */
-function back(): boolean {
-  let prevented = false;
-  for (const listener of mockBackListeners) listener({ preventDefault: () => (prevented = true) });
-  return prevented;
+type RemoveAction = { type: string };
+type PreventRemove = { prevent: boolean; callback: (options: { data: { action: RemoveAction } }) => void };
+/** What the screen last passed to usePreventRemove. The prevent flag is what native-stack uses to block the iOS swipe. */
+let mockPreventRemove: PreventRemove | null = null;
+const mockNavigation = { getState: () => undefined, dispatch: jest.fn() };
+/** A hardware back press, a back gesture, or the pop native-stack sends after it blocks the iOS swipe. */
+const BACK: RemoveAction = { type: "GO_BACK" };
+/** The navigation returnToTabs dispatches when the screen leaves on purpose. */
+const EXIT: RemoveAction = { type: "POP_TO" };
+
+/**
+ * Remove the screen as React Navigation does: when the latest render prevents removal, the action is
+ * stopped and handed to the callback, which may continue it with navigation.dispatch. Returns whether
+ * the screen stayed.
+ */
+function remove(action: RemoveAction): boolean {
+  const guard = mockPreventRemove;
+  if (!guard?.prevent) return false;
+  const before = mockNavigation.dispatch.mock.calls.length;
+  guard.callback({ data: { action } });
+  return !mockNavigation.dispatch.mock.calls.slice(before).some(([dispatched]) => dispatched === action);
 }
+const back = () => remove(BACK);
+const preventing = () => mockPreventRemove?.prevent ?? false;
+/** Each time the screen left on purpose, whether React Navigation let it go or held it. */
+let exits: ("left" | "held")[] = [];
 
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
   useNavigation: () => mockNavigation,
+}));
+jest.mock("@react-navigation/native", () => ({
+  ...jest.requireActual<typeof import("@react-navigation/native")>("@react-navigation/native"),
+  usePreventRemove: (prevent: boolean, callback: PreventRemove["callback"]) => {
+    mockPreventRemove = { prevent, callback };
+  },
 }));
 jest.mock("@/lib/navigation/return-to-tabs", () => ({ returnToTabs: jest.fn() }));
 jest.mock("@/lib/database/provider", () => ({
@@ -204,8 +219,12 @@ function grading(): GradingProps {
 
 let warnings: jest.SpyInstance;
 beforeEach(() => {
-  mockBackListeners.clear();
+  mockPreventRemove = null;
+  exits = [];
   jest.clearAllMocks();
+  jest.mocked(returnToTabs).mockImplementation(() => {
+    exits.push(remove(EXIT) ? "held" : "left");
+  });
   mockParams = {};
   mockGrading = null;
   mockHabitInput = null;
@@ -318,8 +337,32 @@ describe("hifz review screen", () => {
     expect(returnToTabs).not.toHaveBeenCalled();
     await act(async () => save.resolve(saved));
     await flush();
-    expect(returnToTabs).toHaveBeenCalledTimes(1);
+    // The screen leaves while removal is still prevented; its own exit goes through.
+    expect(exits).toEqual(["left"]);
     expect(endReviewSession).toHaveBeenCalled();
+  });
+
+  it("prevents removal, the native swipe included, exactly while a save is unresolved", async () => {
+    const first = deferred<typeof saved>();
+    const second = deferred<typeof saved>();
+    jest.mocked(savePageGrade).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const buttons = await openCheck();
+    expect(preventing()).toBe(false);
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    expect(preventing()).toBe(true);
+    await act(async () => first.reject(new Error("disk full")));
+    await flush();
+    expect(preventing()).toBe(false);
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    expect(preventing()).toBe(true);
+    await act(async () => second.resolve(saved));
+    await flush();
+    expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
+    expect(preventing()).toBe(false);
   });
 
   it("holds a back press during an unresolved save, then leaves once it is saved", async () => {
@@ -329,13 +372,76 @@ describe("hifz review screen", () => {
     await act(async () => {
       void buttons.onGrade(3);
     });
-    expect(back()).toBe(true);
-    expect(returnToTabs).not.toHaveBeenCalled();
+    let held = false;
+    act(() => {
+      held = back();
+    });
+    expect(held).toBe(true);
+    // Close is dimmed while the leave waits for the save.
+    expect(screen.getByRole("button", { name: s.genericClose }).props.accessibilityState).toMatchObject({ disabled: true });
     await act(async () => save.resolve(saved));
     await flush();
-    expect(returnToTabs).toHaveBeenCalledTimes(1);
-    // The screen's own exit is not held.
-    expect(back()).toBe(false);
+    // The held back press goes on to where it was going, not to the tabs.
+    expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK);
+    expect(returnToTabs).not.toHaveBeenCalled();
+    expect(endReviewSession).toHaveBeenCalled();
+  });
+
+  it("asks before a back press leaves graded pages, and goes back once confirmed", async () => {
+    // Two pages, so grading the first leaves the session open with graded work in it.
+    const row6 = { ...row, id: "page:madani15:6" } as StudyCardRow;
+    jest.mocked(loadTodayWird).mockResolvedValue({
+      plan: DEFAULT_HIFZ_PLAN,
+      minutesPerReviewPage: 3,
+      done: [],
+      todo: [5, 6].map((page) => ({
+        cardId: `page:madani15:${page}`,
+        page,
+        tier: "manzil",
+        lastReviewDate: null,
+        reviewedToday: false,
+        dueDate: "2026-11-13",
+        retrievability: 0.95,
+      })),
+    } as never);
+    jest.mocked(loadPageCards).mockResolvedValue([pageCard, { ...pageCard, row: row6, page: 6 }]);
+    jest.mocked(savePageGrade).mockResolvedValue(saved);
+    const buttons = await openCheck();
+    await act(async () => {
+      await buttons.onGrade(3);
+    });
+    await flush();
+    // The page is saved, so leaving now would leave graded work: the screen holds the press and asks.
+    let held = false;
+    act(() => {
+      held = back();
+    });
+    expect(held).toBe(true);
+    expect(screen.getByText(s.habitExitTitle)).toBeTruthy();
+    fireEvent.press(screen.getByText(s.habitExitLeave));
+    await flush();
+    expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK);
+    expect(endReviewSession).toHaveBeenCalled();
+  });
+
+  it("holds a back press during an unresolved save, and stays to show a failure without carrying the leave over", async () => {
+    const save = deferred<typeof saved>();
+    jest.mocked(savePageGrade).mockReturnValueOnce(save.promise).mockResolvedValueOnce(saved);
+    const buttons = await openCheck();
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    expect(back()).toBe(true);
+    await act(async () => save.reject(new Error("disk full")));
+    await flush();
+    expect(returnToTabs).not.toHaveBeenCalled();
+    expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
+    expect(returnToTabs).not.toHaveBeenCalled();
   });
 
   it("lets a back press through when nothing is saving", async () => {
@@ -448,13 +554,35 @@ describe("sabaq screen", () => {
     expect(returnToTabs).not.toHaveBeenCalled();
     await act(async () => save.resolve(chunkSaved));
     await flush();
-    expect(returnToTabs).toHaveBeenCalledTimes(1);
+    // The screen leaves while removal is still prevented; its own exit goes through.
+    expect(exits).toEqual(["left"]);
     expect(endReviewSession).toHaveBeenCalled();
   });
 
-  it("holds a back press during the check's unresolved grade, and stays to show a failure", async () => {
+  it("prevents removal, the native swipe included, only while the check's grade is unresolved", async () => {
     const save = deferred<ChunkSave>();
     jest.mocked(completeSabaqChunk).mockReturnValue(save.promise);
+    const overview = deferred<null>();
+    jest.mocked(loadHabitOverview).mockReturnValue(overview.promise as never);
+    const buttons = await openSabaqCheck();
+    expect(preventing()).toBe(false);
+    await act(async () => {
+      void buttons.onGrade(3);
+    });
+    expect(preventing()).toBe(true);
+    await act(async () => save.resolve(chunkSaved));
+    await flush();
+    // Saved; the summary is still loading, and leaving now is not held.
+    expect(preventing()).toBe(false);
+    expect(back()).toBe(false);
+    await act(async () => overview.resolve(null));
+    await flush();
+    expect(preventing()).toBe(false);
+  });
+
+  it("holds a back press during the check's unresolved grade, and stays to show a failure without carrying the leave over", async () => {
+    const save = deferred<ChunkSave>();
+    jest.mocked(completeSabaqChunk).mockReturnValueOnce(save.promise).mockResolvedValueOnce(chunkSaved);
     const buttons = await openSabaqCheck();
     expect(back()).toBe(false);
     await act(async () => {
@@ -465,6 +593,13 @@ describe("sabaq screen", () => {
     await flush();
     expect(returnToTabs).not.toHaveBeenCalled();
     expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
+    expect(preventing()).toBe(false);
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    expect(screen.getByText(s.hifzSabaqDoneTitle)).toBeTruthy();
+    expect(returnToTabs).not.toHaveBeenCalled();
   });
 
   it("stays on the check to show a failed grade when Close was pressed while it was unresolved", async () => {

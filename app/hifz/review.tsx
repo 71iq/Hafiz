@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useNavigation } from "expo-router";
+import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { BookOpenCheck, Eye, Moon, PenLine, Plus, RotateCcw, ScanText, X } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -190,8 +191,12 @@ function HifzReviewScreen() {
    * stays with the item open to show a failed save, which would otherwise reach a departed screen.
    */
   const leaveWhenSettled = useRef(false);
-  /** Set once the screen leaves on purpose, so the back guard below lets that navigation through. */
+  /** Set once the screen leaves on purpose, so the remove guard below lets that navigation through. */
   const exiting = useRef(false);
+  /** A back press or gesture held for the leave confirmation or a save; leaving carries it out. */
+  const pendingBack = useRef<NavigationAction | null>(null);
+  /** The rendered copy of leaveWhenSettled, so Close shows that its press is waiting for the save. */
+  const [leavePending, setLeavePending] = useState(false);
   // Pages the user holds, declared or reviewed: a seam leads only into one of them.
   const [heldPages, setHeldPages] = useState<ReadonlySet<number>>(new Set());
   const [seamText, setSeamText] = useState<AyahText | null>(null);
@@ -453,6 +458,8 @@ function HifzReviewScreen() {
       } catch (saveError) {
         console.warn(`[HifzReview] ${label} failed:`, saveError);
         leaveWhenSettled.current = false;
+        pendingBack.current = null;
+        setLeavePending(false);
         setError(s.hifzSaveFailed);
         return;
       }
@@ -628,28 +635,52 @@ function HifzReviewScreen() {
     exiting.current = true;
     const session = sessionRef.current;
     if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
-    returnToTabs(navigation.getState(), "/(tabs)/home");
+    // A held back press goes where it was going; Close returns to the tabs.
+    const back = pendingBack.current;
+    pendingBack.current = null;
+    if (back) navigation.dispatch(back);
+    else returnToTabs(navigation.getState(), "/(tabs)/home");
   };
 
-  // Hardware back or a back gesture during an unresolved save waits for it, the same as Close.
+  // Leaving by any route that ends the screen without exit() still ends the session.
   useEffect(
-    () =>
-      navigation.addListener("beforeRemove", (event) => {
-        if (exiting.current || !actionLock.current) return;
-        event.preventDefault();
-        leaveWhenSettled.current = true;
-      }),
-    [navigation],
+    () => () => {
+      const session = sessionRef.current;
+      if (session) endReviewSession(db, { session }).catch(console.warn);
+    },
+    [db],
   );
+
+  /** Graded work would be left behind, so leaving asks first (the same check as Close). */
+  const hasProgress = phase !== "summary" && totals.pages + totals.extra > 0;
+
+  // Back presses, gestures and the iOS swipe behave like Close: with progress they ask first, and
+  // during an unresolved save they wait for it. usePreventRemove, unlike a bare beforeRemove listener,
+  // also tells native-stack to block the native dismissal. `busy` is the rendered copy of the lock.
+  usePreventRemove(busy || hasProgress, ({ data }) => {
+    // The screen's own exit goes on, as does a back press this render has not caught up with; React
+    // Navigation marks the action as already checked for this screen.
+    if (exiting.current) navigation.dispatch(data.action);
+    else if (hasProgress) {
+      pendingBack.current = data.action;
+      setExitOpen(true);
+    } else if (actionLock.current) {
+      pendingBack.current = data.action;
+      leaveWhenSettled.current = true;
+      setLeavePending(true);
+    } else navigation.dispatch(data.action);
+  });
 
   /** Leave now, or once the action holding the lock settles (see leaveWhenSettled). */
   const leave = () => {
-    if (actionLock.current) leaveWhenSettled.current = true;
-    else exit();
+    if (actionLock.current) {
+      leaveWhenSettled.current = true;
+      setLeavePending(true);
+    } else exit();
   };
 
   const close = () => {
-    if (phase !== "summary" && totals.pages + totals.extra > 0) setExitOpen(true);
+    if (hasProgress) setExitOpen(true);
     else leave();
   };
 
@@ -800,9 +831,12 @@ function HifzReviewScreen() {
         >
           <Pressable
             onPress={close}
+            disabled={leavePending}
             accessibilityRole="button"
             accessibilityLabel={s.genericClose}
-            className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+            accessibilityState={{ disabled: leavePending }}
+            // Dimmed while Close waits for the save it was pressed during.
+            className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${leavePending ? "opacity-50" : ""}`}
           >
             <X size={18} color={muted} />
           </Pressable>
@@ -1275,7 +1309,10 @@ function HifzReviewScreen() {
         confirmLabel={s.habitExitLeave}
         isDark={isDark}
         isRTL={isRTL}
-        onCancel={() => setExitOpen(false)}
+        onCancel={() => {
+          setExitOpen(false);
+          pendingBack.current = null;
+        }}
         onConfirm={() => {
           setExitOpen(false);
           leave();
