@@ -8,11 +8,14 @@ import type {
   ReflectionJuzRange,
 } from "./types";
 import { parseCommentRow, parseCommentRows, parseReflectionRow, parseReflectionRows, parseSavedRow } from "./rows";
+import { reflectionWriteError } from "./errors";
 
 const PAGE_SIZE = 5;
 const FEED_PAGE_SIZE = 10;
 const COMMENT_PAGE_SIZE = 20;
 const MAX_SEARCH_LENGTH = 120;
+const REFLECTION_SELECT = "*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)";
+const COMMENT_SELECT = "*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name, avatar_url)";
 
 function pageBounds(page: number, pageSize: number) {
   const from = page * pageSize;
@@ -37,9 +40,6 @@ function hasNamedMissingColumn(error: CompatibilityError, column: string): boole
   if (error.code === "PGRST204") return postgrest;
   if (error.code === "42703") return postgres;
   return !error.code && (postgrest || postgres);
-}
-function isMissingJuzColumnsError(error: CompatibilityError): boolean {
-  return hasNamedMissingColumn(error, "juz_start") || hasNamedMissingColumn(error, "juz_end");
 }
 function isMissingColumnError(error: CompatibilityError, column: string): boolean {
   return hasNamedMissingColumn(error, column);
@@ -121,7 +121,7 @@ export async function fetchReflections(
 
   const { data, error } = await supabase
     .from("reflections")
-    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
+    .select(REFLECTION_SELECT)
     .eq("surah", surah)
     .lte("ayah_start", ayah)
     .gte("ayah_end", ayah)
@@ -159,7 +159,7 @@ export async function fetchReflectionFeed({
 
   let query = supabase
     .from("reflections")
-    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
+    .select(REFLECTION_SELECT)
     .eq("status", "active");
 
   if (filter.type === "surah") {
@@ -229,7 +229,15 @@ export async function fetchReflectionCount(surah: number, ayah: number): Promise
   return count ?? 0;
 }
 
-/** Create a new reflection */
+// Reflections, comments and likes are written only through server functions, which lock in the same
+// order as minority changes and account deletion. Each names the account it writes for, and the
+// server refuses it when another account is signed in by then.
+
+/**
+ * Create a new reflection. `promisedPrivate` is whether the composer told the author it is visible only
+ * to them (ETH-07). The server refuses such a post with ReflectionPrivacyChangedError once the account
+ * is no longer marked as under 18, so stale privacy on this device never publishes it.
+ */
 export async function createReflection(
   userId: string,
   surah: number,
@@ -238,54 +246,38 @@ export async function createReflection(
   juzStart: number,
   juzEnd: number,
   content: string,
+  promisedPrivate: boolean,
   canContinue: () => boolean = () => true,
 ): Promise<Reflection> {
   if (!canContinue()) throw new Error("Reflection creation superseded");
-  const insertPayload = {
-    user_id: userId,
-    surah,
-    ayah_start: ayahStart,
-    ayah_end: ayahEnd,
-    juz_start: juzStart,
-    juz_end: juzEnd,
-    content,
-  };
   const { data, error } = await supabase
-    .from("reflections")
-    .insert(insertPayload)
-    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
+    .rpc("create_reflection", {
+      p_user_id: userId,
+      p_surah: surah,
+      p_ayah_start: ayahStart,
+      p_ayah_end: ayahEnd,
+      p_juz_start: juzStart,
+      p_juz_end: juzEnd,
+      p_content: content,
+      p_private: promisedPrivate,
+    })
+    .select(REFLECTION_SELECT)
     .single();
 
-  if (isMissingJuzColumnsError(error) && canContinue()) {
-    const fallback = await supabase
-      .from("reflections")
-      .insert({ user_id: userId, surah, ayah_start: ayahStart, ayah_end: ayahEnd, content })
-      .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
-      .single();
-
-    if (fallback.error) throw fallback.error;
-    return { ...parseSavedRow("reflection", parseReflectionRow, fallback.data), juz_start: juzStart, juz_end: juzEnd };
-  }
-
-  if (error) throw error;
+  if (error) throw reflectionWriteError(error);
   return parseSavedRow("reflection", parseReflectionRow, data);
 }
 
 /** Toggle like on a reflection */
 export async function toggleLike(userId: string, reflectionId: string, currentlyLiked: boolean): Promise<boolean> {
-  if (currentlyLiked) {
-    const { error } = await supabase
-      .from("reflection_likes")
-      .delete()
-      .eq("user_id", userId)
-      .eq("reflection_id", reflectionId);
-    if (error) throw error;
-    return false;
-  } else {
-    const { error } = await supabase.from("reflection_likes").insert({ user_id: userId, reflection_id: reflectionId });
-    if (error) throw error;
-    return true;
-  }
+  const liked = !currentlyLiked;
+  const { error } = await supabase.rpc("set_reflection_like", {
+    p_user_id: userId,
+    p_reflection_id: reflectionId,
+    p_liked: liked,
+  });
+  if (error) throw error;
+  return liked;
 }
 
 /** Fetch comments for a reflection */
@@ -301,7 +293,7 @@ export async function fetchComments(
   const buildQuery = () =>
     supabase
       .from("reflection_comments")
-      .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name, avatar_url)")
+      .select(COMMENT_SELECT)
       .eq("reflection_id", reflectionId);
 
   const applySort = (query: ReturnType<typeof buildQuery>, nextSort: ReflectionCommentSort, usePopularity: boolean) => {
@@ -327,33 +319,37 @@ export async function fetchComments(
   return { ...result, data: await attachUserCommentLikes(result.data, userId) };
 }
 
-/** Add a comment to a reflection */
-export async function addComment(userId: string, reflectionId: string, content: string): Promise<ReflectionComment> {
+/** Add a comment to a reflection. `promisedPrivate` works as in createReflection. */
+export async function addComment(
+  userId: string,
+  reflectionId: string,
+  content: string,
+  promisedPrivate: boolean,
+): Promise<ReflectionComment> {
   const { data, error } = await supabase
-    .from("reflection_comments")
-    .insert({ user_id: userId, reflection_id: reflectionId, content })
-    .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name, avatar_url)")
+    .rpc("add_reflection_comment", {
+      p_user_id: userId,
+      p_reflection_id: reflectionId,
+      p_content: content,
+      p_private: promisedPrivate,
+    })
+    .select(COMMENT_SELECT)
     .single();
 
-  if (error) throw error;
+  if (error) throw reflectionWriteError(error);
   return { ...parseSavedRow("comment", parseCommentRow, data), user_has_liked: false };
 }
 
 /** Toggle like on a comment */
 export async function toggleCommentLike(userId: string, commentId: string, currentlyLiked: boolean): Promise<boolean> {
-  if (currentlyLiked) {
-    const { error } = await supabase
-      .from("reflection_comment_likes")
-      .delete()
-      .eq("user_id", userId)
-      .eq("comment_id", commentId);
-    if (error) throw error;
-    return false;
-  }
-
-  const { error } = await supabase.from("reflection_comment_likes").insert({ user_id: userId, comment_id: commentId });
+  const liked = !currentlyLiked;
+  const { error } = await supabase.rpc("set_reflection_comment_like", {
+    p_user_id: userId,
+    p_comment_id: commentId,
+    p_liked: liked,
+  });
   if (error) throw error;
-  return true;
+  return liked;
 }
 
 /** Report a reflection */

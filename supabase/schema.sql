@@ -298,60 +298,14 @@ ALTER TABLE reflection_comment_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 
 GRANT SELECT ON reflection_comment_likes TO anon, authenticated;
-GRANT INSERT, DELETE ON reflection_comment_likes TO authenticated;
 
--- ─── Reflections: readable (active only) unless the author is a minor, writable by author. The read
--- policies of the reflection tables need profile privacy, so they are created with it below.
-CREATE POLICY "Users can insert own reflections"
-  ON reflections FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
+-- ─── Reflections, likes and comments: readable unless the author is a minor (active reflections
+-- only), and created or deleted only through the reflection write RPCs, which are defined with
+-- profile privacy below, as are the read policies. Authors may still update their reflections.
 CREATE POLICY "Users can update own reflections"
   ON reflections FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own reflections"
-  ON reflections FOR DELETE
-  USING (auth.uid() = user_id);
-
--- ─── Reflection Likes: visible with their reflection, auth required to write
--- Child policies look up the parent under its own RLS, so discussion follows reflection visibility.
--- Likes are only added or removed, never updated: owner-rights counters fire on insert and delete.
-CREATE POLICY "Users can insert own likes"
-  ON reflection_likes FOR INSERT
-  WITH CHECK (
-    (SELECT auth.uid()) = user_id
-    AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
-  );
-
-CREATE POLICY "Users can delete own likes"
-  ON reflection_likes FOR DELETE
-  USING (auth.uid() = user_id);
-
--- ─── Reflection Comments: visible with their reflection, auth required to write
-CREATE POLICY "Users can insert own comments"
-  ON reflection_comments FOR INSERT
-  WITH CHECK (
-    (SELECT auth.uid()) = user_id
-    AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
-  );
-
-CREATE POLICY "Users can delete own comments"
-  ON reflection_comments FOR DELETE
-  USING (auth.uid() = user_id);
-
--- ─── Reflection Comment Likes: visible with their comment, auth required to write
-CREATE POLICY "Users can insert own comment likes"
-  ON reflection_comment_likes FOR INSERT
-  WITH CHECK (
-    (SELECT auth.uid()) = user_id
-    AND EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id)
-  );
-
-CREATE POLICY "Users can delete own comment likes"
-  ON reflection_comment_likes FOR DELETE
-  USING ((SELECT auth.uid()) = user_id);
 
 -- ─── Reports: only author can see own, insert requires auth
 CREATE POLICY "Users can see own reports"
@@ -543,10 +497,12 @@ CREATE POLICY "Users can delete own avatar images"
     AND (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- ─── Trigger: auto-update likes_count on reflections ────────
--- Counts leave out a minor's likes and comments (ETH-07). The private recount helpers are defined
--- with profile privacy below. When the parent itself is being deleted, its likes and comments go with
--- it and there is nothing left to count, so they return before taking any lock.
+-- ─── Triggers: like and comment counts ──────────────────────
+-- Counts leave out a minor's likes and comments (ETH-07). The private helpers they call are defined
+-- with profile privacy below. The triggers run once per statement, with the changed rows in
+-- `changed`, and as their owner, so a reaction to another author's post still updates its count
+-- under RLS. A parent that is being deleted takes its likes and comments with it, so they are
+-- skipped before any lock is taken.
 CREATE OR REPLACE FUNCTION public.update_reflection_likes_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -554,34 +510,40 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  target UUID;
+  parent UUID;
   author UUID;
+  step INTEGER;
 BEGIN
-  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_likes' THEN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_likes' OR TG_LEVEL <> 'STATEMENT' THEN
     RAISE EXCEPTION 'update_reflection_likes_count only maintains public.reflection_likes';
   END IF;
-  IF TG_OP = 'INSERT' THEN
-    target := NEW.reflection_id;
-    author := NEW.user_id;
-  ELSE
-    target := OLD.reflection_id;
-    author := OLD.user_id;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = target) THEN
+  IF (SELECT count(*) FROM changed) = 1 THEN
+    SELECT c.reflection_id, c.user_id INTO parent, author FROM changed AS c;
+    IF NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = parent) THEN
+      RETURN NULL;
+    END IF;
+    step := private.visible_step(author, CASE TG_OP WHEN 'INSERT' THEN 1 ELSE -1 END);
+    IF step IS NULL THEN
+      PERFORM private.recount_reflection(parent);
+    ELSIF step <> 0 THEN
+      UPDATE public.reflections SET likes_count = likes_count + step WHERE id = parent;
+    END IF;
     RETURN NULL;
   END IF;
-  PERFORM private.lock_activity_author(author);
-  PERFORM private.recount_reflection(target);
+  IF TG_OP = 'INSERT' THEN
+    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c));
+  END IF;
+  FOR parent IN
+    SELECT DISTINCT c.reflection_id FROM changed AS c
+    WHERE EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = c.reflection_id)
+    ORDER BY 1
+  LOOP
+    PERFORM private.recount_reflection(parent);
+  END LOOP;
   RETURN NULL;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_reflection_likes_count ON reflection_likes;
-CREATE TRIGGER trg_reflection_likes_count
-  AFTER INSERT OR DELETE ON reflection_likes
-  FOR EACH ROW EXECUTE FUNCTION update_reflection_likes_count();
-
--- ─── Trigger: auto-update comments_count on reflections ─────
 CREATE OR REPLACE FUNCTION public.update_reflection_comments_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -589,34 +551,40 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  target UUID;
+  parent UUID;
   author UUID;
+  step INTEGER;
 BEGIN
-  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comments' THEN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comments' OR TG_LEVEL <> 'STATEMENT' THEN
     RAISE EXCEPTION 'update_reflection_comments_count only maintains public.reflection_comments';
   END IF;
-  IF TG_OP = 'INSERT' THEN
-    target := NEW.reflection_id;
-    author := NEW.user_id;
-  ELSE
-    target := OLD.reflection_id;
-    author := OLD.user_id;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = target) THEN
+  IF (SELECT count(*) FROM changed) = 1 THEN
+    SELECT c.reflection_id, c.user_id INTO parent, author FROM changed AS c;
+    IF NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = parent) THEN
+      RETURN NULL;
+    END IF;
+    step := private.visible_step(author, CASE TG_OP WHEN 'INSERT' THEN 1 ELSE -1 END);
+    IF step IS NULL THEN
+      PERFORM private.recount_reflection(parent);
+    ELSIF step <> 0 THEN
+      UPDATE public.reflections SET comments_count = comments_count + step WHERE id = parent;
+    END IF;
     RETURN NULL;
   END IF;
-  PERFORM private.lock_activity_author(author);
-  PERFORM private.recount_reflection(target);
+  IF TG_OP = 'INSERT' THEN
+    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c));
+  END IF;
+  FOR parent IN
+    SELECT DISTINCT c.reflection_id FROM changed AS c
+    WHERE EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = c.reflection_id)
+    ORDER BY 1
+  LOOP
+    PERFORM private.recount_reflection(parent);
+  END LOOP;
   RETURN NULL;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_reflection_comments_count ON reflection_comments;
-CREATE TRIGGER trg_reflection_comments_count
-  AFTER INSERT OR DELETE ON reflection_comments
-  FOR EACH ROW EXECUTE FUNCTION update_reflection_comments_count();
-
--- ─── Trigger: auto-update likes_count on reflection comments
 CREATE OR REPLACE FUNCTION public.update_reflection_comment_likes_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -624,35 +592,65 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  target UUID;
+  parent UUID;
   author UUID;
+  step INTEGER;
 BEGIN
-  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comment_likes' THEN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comment_likes' OR TG_LEVEL <> 'STATEMENT' THEN
     RAISE EXCEPTION 'update_reflection_comment_likes_count only maintains public.reflection_comment_likes';
   END IF;
-  IF TG_OP = 'INSERT' THEN
-    target := NEW.comment_id;
-    author := NEW.user_id;
-  ELSE
-    target := OLD.comment_id;
-    author := OLD.user_id;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.reflection_comments WHERE id = target) THEN
+  IF (SELECT count(*) FROM changed) = 1 THEN
+    SELECT c.comment_id, c.user_id INTO parent, author FROM changed AS c;
+    IF NOT EXISTS (SELECT 1 FROM public.reflection_comments WHERE id = parent) THEN
+      RETURN NULL;
+    END IF;
+    step := private.visible_step(author, CASE TG_OP WHEN 'INSERT' THEN 1 ELSE -1 END);
+    IF step IS NULL THEN
+      PERFORM private.recount_comment(parent);
+    ELSIF step <> 0 THEN
+      UPDATE public.reflection_comments SET likes_count = likes_count + step WHERE id = parent;
+    END IF;
     RETURN NULL;
   END IF;
-  PERFORM private.lock_activity_author(author);
-  PERFORM private.recount_comment(target);
+  IF TG_OP = 'INSERT' THEN
+    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c));
+  END IF;
+  FOR parent IN
+    SELECT DISTINCT c.comment_id FROM changed AS c
+    WHERE EXISTS (SELECT 1 FROM public.reflection_comments AS rc WHERE rc.id = c.comment_id)
+    ORDER BY 1
+  LOOP
+    PERFORM private.recount_comment(parent);
+  END LOOP;
   RETURN NULL;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_reflection_comment_likes_count ON reflection_comment_likes;
-CREATE TRIGGER trg_reflection_comment_likes_count
-  AFTER INSERT OR DELETE ON reflection_comment_likes
-  FOR EACH ROW EXECUTE FUNCTION update_reflection_comment_likes_count();
+DROP TRIGGER IF EXISTS trg_reflection_likes_count ON public.reflection_likes;
+DROP TRIGGER IF EXISTS trg_reflection_likes_count_insert ON public.reflection_likes;
+DROP TRIGGER IF EXISTS trg_reflection_likes_count_delete ON public.reflection_likes;
+CREATE TRIGGER trg_reflection_likes_count_insert AFTER INSERT ON public.reflection_likes
+  REFERENCING NEW TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION public.update_reflection_likes_count();
+CREATE TRIGGER trg_reflection_likes_count_delete AFTER DELETE ON public.reflection_likes
+  REFERENCING OLD TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION public.update_reflection_likes_count();
 
--- Counter triggers run as their owner so a reaction to another author's post still updates its
--- count under RLS. They are never called directly.
+DROP TRIGGER IF EXISTS trg_reflection_comments_count ON public.reflection_comments;
+DROP TRIGGER IF EXISTS trg_reflection_comments_count_insert ON public.reflection_comments;
+DROP TRIGGER IF EXISTS trg_reflection_comments_count_delete ON public.reflection_comments;
+CREATE TRIGGER trg_reflection_comments_count_insert AFTER INSERT ON public.reflection_comments
+  REFERENCING NEW TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION public.update_reflection_comments_count();
+CREATE TRIGGER trg_reflection_comments_count_delete AFTER DELETE ON public.reflection_comments
+  REFERENCING OLD TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION public.update_reflection_comments_count();
+
+DROP TRIGGER IF EXISTS trg_reflection_comment_likes_count ON public.reflection_comment_likes;
+DROP TRIGGER IF EXISTS trg_reflection_comment_likes_count_insert ON public.reflection_comment_likes;
+DROP TRIGGER IF EXISTS trg_reflection_comment_likes_count_delete ON public.reflection_comment_likes;
+CREATE TRIGGER trg_reflection_comment_likes_count_insert AFTER INSERT ON public.reflection_comment_likes
+  REFERENCING NEW TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION public.update_reflection_comment_likes_count();
+CREATE TRIGGER trg_reflection_comment_likes_count_delete AFTER DELETE ON public.reflection_comment_likes
+  REFERENCING OLD TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION public.update_reflection_comment_likes_count();
+
+-- Likes are only added or removed, never updated. The counter triggers are never called directly.
 REVOKE UPDATE ON public.reflection_likes FROM PUBLIC, anon, authenticated;
 REVOKE UPDATE ON public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.update_reflection_likes_count() FROM PUBLIC, anon, authenticated;
@@ -1425,9 +1423,10 @@ $$;
 --   update to commit and then clears its photo. A photo update that comes later waits on the row,
 --   and profiles_minor_photo then reads the committed minority. FOR NO KEY UPDATE conflicts with that
 --   update but not with the key-share locks that foreign keys take, so an encouragement, membership
---   or sync insert that references this profile does not wait on it. A like or comment by this user
---   takes the row FOR SHARE (private.lock_activity_author), so it either commits first and is
---   recounted here (private.recount_minor_activity), or waits and is counted by the committed value.
+--   or sync insert that references this profile does not wait on it. A reflection write by this user
+--   takes the row FOR SHARE (private.lock_activity_writer, private.visible_step), so it either commits
+--   first and is recounted here (private.recount_minor_activity), or waits and reads the committed
+--   minority.
 --   Account deletion locks the row too, so a board join waits for it rather than deadlocking with it.
 -- - The user's halaqa lock, which join_matched_halaqa takes before it checks minority. A matched join
 --   either commits first, and private.apply_minor_privacy then leaves that halaqa, or reads the
@@ -1494,12 +1493,12 @@ CREATE TRIGGER profiles_minor_photo BEFORE INSERT OR UPDATE OF avatar_url ON pub
   FOR EACH ROW EXECUTE FUNCTION private.profiles_minor_photo();
 
 -- ETH-07: like and comment counts are public, so they count only likes and comments that others can
--- read, never a minor's. Each change recounts instead of adding or subtracting one: recording or
--- withdrawing minority then recounts what the person touched, and deleting an account, whose
--- privacy row may already be gone when its likes are removed, cannot subtract a like that was never
--- counted. The row lock comes first, in its own statement, so the count reads every like and comment
--- committed before it, and a later change waits for this one. The counter triggers that call these
--- are defined with the reflection tables above.
+-- read, never a minor's. A single new or deleted like or comment adds or subtracts one when its author
+-- is not a minor (private.visible_step). A statement that changes several rows, a cascade from a
+-- deleted account, and recording or withdrawing minority recount each count they affect once
+-- instead. A recount locks its row first, in its own statement, so the count reads every like and
+-- comment committed before it, and a later change waits for this one. The counter triggers that call
+-- these are defined with the reflection tables above.
 CREATE OR REPLACE FUNCTION private.recount_reflection(target UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1535,22 +1534,44 @@ BEGIN
 END;
 $$;
 
--- A like or comment trigger takes its author's profiles row FOR SHARE before the parent row it
--- recounts. Recording or withdrawing minority holds that row FOR NO KEY UPDATE
--- (private.lock_minor_change), so the two serialize and a count never keeps a minor's like.
-CREATE OR REPLACE FUNCTION private.lock_activity_author(author UUID)
-RETURNS VOID
+-- How one like or comment by `author` moves a public count: by `step` when others can read it, not
+-- at all when the author is a minor. The author's profiles row stays locked FOR SHARE until commit,
+-- and recording or withdrawing minority holds it FOR NO KEY UPDATE (private.lock_minor_change), so
+-- the minority read here holds until the count commits, and a minority write after it recounts.
+-- NULL means the author's profile was deleted in this transaction: their privacy row may already be
+-- gone, so the caller recounts instead.
+CREATE OR REPLACE FUNCTION private.visible_step(author UUID, step INTEGER)
+RETURNS INTEGER
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
   PERFORM 1 FROM public.profiles WHERE id = author FOR SHARE;
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+  RETURN CASE WHEN private.is_minor(author) THEN 0 ELSE step END;
+END;
+$$;
+
+-- A recount reads the minority of the authors of new rows, and a minority write in flight cannot see
+-- those rows until they commit, so it would not recount them. Their profiles rows are therefore
+-- locked FOR SHARE first, in id order, as in private.visible_step. Rows being deleted stay visible to
+-- a minority write until the deletion commits, so a recount after a deletion needs no author lock.
+CREATE OR REPLACE FUNCTION private.lock_activity_authors(authors UUID[])
+RETURNS VOID
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.profiles WHERE id = ANY (authors) ORDER BY id FOR SHARE;
 END;
 $$;
 
 -- Recording minority, or withdrawing it, changes which of the person's likes and comments the
--- public counts include, so every count they touched is recounted, in id order. The callers hold
--- private.lock_minor_change, so none of the person's own likes or comments is in flight.
+-- public counts include, so every count they touched is recounted once: reflections in id order,
+-- then comments in id order. The callers hold private.lock_minor_change, so none of the person's
+-- own likes or comments is in flight.
 CREATE OR REPLACE FUNCTION private.recount_minor_activity()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -1582,6 +1603,272 @@ $$;
 DROP TRIGGER IF EXISTS profile_privacy_activity_counts ON public.profile_privacy;
 CREATE TRIGGER profile_privacy_activity_counts AFTER INSERT OR UPDATE OF is_minor ON public.profile_privacy
   FOR EACH ROW EXECUTE FUNCTION private.recount_minor_activity();
+
+-- Deleting an account deletes the person's reflections, likes and comments with it, and the counter
+-- triggers recount what they touched (private.visible_step returns NULL once the profile is gone).
+-- The profiles row is locked before this trigger runs, so it takes the rest in the order every other
+-- path uses: each reflection the cascade deletes or recounts, in id order, then each such comment, in
+-- id order. Reached one table at a time, the cascade could lock a comment before its reflection, or
+-- reflections out of order, and deadlock with a minority write or a reflection write.
+CREATE OR REPLACE FUNCTION private.lock_account_activity()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.reflections AS r
+  WHERE r.user_id = OLD.id
+    OR r.id IN (SELECT l.reflection_id FROM public.reflection_likes AS l WHERE l.user_id = OLD.id)
+    OR r.id IN (SELECT c.reflection_id FROM public.reflection_comments AS c WHERE c.user_id = OLD.id)
+  ORDER BY r.id
+  FOR NO KEY UPDATE;
+  PERFORM 1 FROM public.reflection_comments AS c
+  WHERE c.user_id = OLD.id
+    OR c.id IN (SELECT cl.comment_id FROM public.reflection_comment_likes AS cl WHERE cl.user_id = OLD.id)
+    OR c.reflection_id IN (SELECT r.id FROM public.reflections AS r WHERE r.user_id = OLD.id)
+  ORDER BY c.id
+  FOR NO KEY UPDATE;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_lock_activity ON public.profiles;
+CREATE TRIGGER profiles_lock_activity BEFORE DELETE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION private.lock_account_activity();
+
+-- Reflection writes. Clients add and remove reflections, comments and likes only through the RPCs
+-- below, which lock in the order recording minority and account deletion use: the writer's profiles
+-- row FOR SHARE, then the reflection, then the comment, then the row itself. A direct delete locks
+-- its row first and its counter trigger the profile after it, which deadlocks with a minority write
+-- that holds the profile and then recounts that row, or with an account deletion that holds the
+-- profile and then deletes the row. A direct insert key-shares its parent before the profile.
+REVOKE INSERT, DELETE ON public.reflections, public.reflection_likes, public.reflection_comments,
+  public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
+
+-- The signed-in writer. Their profiles row stays locked FOR SHARE until commit, so a minority write
+-- either commits first and the write reads it, or waits and then recounts the write. The client names
+-- the account it writes for, so a request that arrives after an account switch is refused instead of
+-- being written for the other account.
+CREATE OR REPLACE FUNCTION private.lock_activity_writer(expected UUID)
+RETURNS UUID
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.require_user();
+BEGIN
+  IF expected IS DISTINCT FROM uid THEN
+    RAISE EXCEPTION 'account_mismatch';
+  END IF;
+  PERFORM 1 FROM public.profiles WHERE id = uid FOR SHARE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'not_authenticated' USING ERRCODE = '42501';
+  END IF;
+  RETURN uid;
+END;
+$$;
+
+-- ETH-07: the composer and the comment input tell a stated minor that what they write is visible only
+-- to them, from a cached copy of their privacy that another device may have changed. Each write
+-- carries what the screen promised, and its caller holds the writer's profiles row
+-- (private.lock_activity_writer), so this reads the committed minority. A write promised to stay
+-- private is refused once the writer is no longer a minor, and the app reloads their privacy so they
+-- can decide again. Writing as an adult when the server has a minor only makes the text more private.
+CREATE OR REPLACE FUNCTION private.check_promised_visibility(author UUID, promised_private BOOLEAN)
+RETURNS VOID
+LANGUAGE plpgsql
+STABLE
+SET search_path = ''
+AS $$
+BEGIN
+  IF promised_private IS NULL THEN
+    RAISE EXCEPTION 'invalid_visibility';
+  END IF;
+  IF promised_private AND NOT private.is_minor(author) THEN
+    RAISE EXCEPTION 'privacy_changed';
+  END IF;
+END;
+$$;
+
+-- Locks a reflection the caller may react to, which is one the read policy shows them: active, and not
+-- a minor's unless it is the caller's own.
+CREATE OR REPLACE FUNCTION private.lock_readable_reflection(target UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  author UUID;
+  state TEXT;
+BEGIN
+  SELECT r.user_id, r.status INTO author, state FROM public.reflections AS r WHERE r.id = target FOR NO KEY UPDATE;
+  IF NOT FOUND OR state IS DISTINCT FROM 'active' OR NOT rls.profile_identity_visible(author) THEN
+    RAISE EXCEPTION 'reflection_not_found';
+  END IF;
+END;
+$$;
+
+-- Locks a comment the caller may like, which is one the read policies show them. A comment like
+-- changes only the comment's count, so the reflection is read without a lock.
+CREATE OR REPLACE FUNCTION private.lock_readable_comment(target UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  author UUID;
+  parent UUID;
+BEGIN
+  SELECT c.user_id, c.reflection_id INTO author, parent
+  FROM public.reflection_comments AS c WHERE c.id = target FOR NO KEY UPDATE;
+  IF NOT FOUND OR NOT rls.profile_identity_visible(author) OR NOT EXISTS (
+    SELECT 1 FROM public.reflections AS r
+    WHERE r.id = parent AND r.status = 'active' AND rls.profile_identity_visible(r.user_id)
+  ) THEN
+    RAISE EXCEPTION 'comment_not_found';
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.create_reflection(
+  p_user_id UUID,
+  p_surah INTEGER,
+  p_ayah_start INTEGER,
+  p_ayah_end INTEGER,
+  p_juz_start INTEGER,
+  p_juz_end INTEGER,
+  p_content TEXT,
+  p_private BOOLEAN
+)
+RETURNS public.reflections
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.lock_activity_writer(p_user_id);
+  created public.reflections;
+BEGIN
+  PERFORM private.check_promised_visibility(uid, p_private);
+  INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
+  VALUES (uid, p_surah, p_ayah_start, p_ayah_end, p_juz_start, p_juz_end, p_content)
+  RETURNING * INTO created;
+  RETURN created;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.add_reflection_comment(
+  p_user_id UUID,
+  p_reflection_id UUID,
+  p_content TEXT,
+  p_private BOOLEAN
+)
+RETURNS public.reflection_comments
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.lock_activity_writer(p_user_id);
+  created public.reflection_comments;
+BEGIN
+  PERFORM private.check_promised_visibility(uid, p_private);
+  PERFORM private.lock_readable_reflection(p_reflection_id);
+  INSERT INTO public.reflection_comments (reflection_id, user_id, content)
+  VALUES (p_reflection_id, uid, p_content)
+  RETURNING * INTO created;
+  RETURN created;
+END;
+$$;
+
+-- Likes and unlikes are idempotent: the result is the state the caller asked for.
+CREATE OR REPLACE FUNCTION public.set_reflection_like(p_user_id UUID, p_reflection_id UUID, p_liked BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.lock_activity_writer(p_user_id);
+BEGIN
+  IF p_liked IS NULL THEN
+    RAISE EXCEPTION 'invalid_like';
+  END IF;
+  IF p_liked THEN
+    PERFORM private.lock_readable_reflection(p_reflection_id);
+    INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (uid, p_reflection_id) ON CONFLICT DO NOTHING;
+  ELSE
+    PERFORM 1 FROM public.reflections WHERE id = p_reflection_id FOR NO KEY UPDATE;
+    DELETE FROM public.reflection_likes WHERE user_id = uid AND reflection_id = p_reflection_id;
+  END IF;
+  RETURN p_liked;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.set_reflection_comment_like(p_user_id UUID, p_comment_id UUID, p_liked BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.lock_activity_writer(p_user_id);
+BEGIN
+  IF p_liked IS NULL THEN
+    RAISE EXCEPTION 'invalid_like';
+  END IF;
+  IF p_liked THEN
+    PERFORM private.lock_readable_comment(p_comment_id);
+    INSERT INTO public.reflection_comment_likes (user_id, comment_id) VALUES (uid, p_comment_id) ON CONFLICT DO NOTHING;
+  ELSE
+    PERFORM 1 FROM public.reflection_comments WHERE id = p_comment_id FOR NO KEY UPDATE;
+    DELETE FROM public.reflection_comment_likes WHERE user_id = uid AND comment_id = p_comment_id;
+  END IF;
+  RETURN p_liked;
+END;
+$$;
+
+-- Deletes the caller's own comment, with its likes. False when there is no such comment.
+CREATE OR REPLACE FUNCTION public.delete_reflection_comment(p_user_id UUID, p_comment_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.lock_activity_writer(p_user_id);
+  parent UUID;
+BEGIN
+  SELECT c.reflection_id INTO parent FROM public.reflection_comments AS c WHERE c.id = p_comment_id AND c.user_id = uid;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+  PERFORM 1 FROM public.reflections WHERE id = parent FOR NO KEY UPDATE;
+  DELETE FROM public.reflection_comments WHERE id = p_comment_id AND user_id = uid;
+  RETURN FOUND;
+END;
+$$;
+
+-- Deletes the caller's own reflection with its comments and likes. The comments it deletes are
+-- locked first, in id order, as a minority write or an account deletion would lock them.
+CREATE OR REPLACE FUNCTION public.delete_reflection(p_user_id UUID, p_reflection_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.lock_activity_writer(p_user_id);
+BEGIN
+  PERFORM 1 FROM public.reflections WHERE id = p_reflection_id AND user_id = uid FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+  PERFORM 1 FROM public.reflection_comments WHERE reflection_id = p_reflection_id ORDER BY id FOR UPDATE;
+  DELETE FROM public.reflections WHERE id = p_reflection_id;
+  RETURN true;
+END;
+$$;
 
 -- ─── Halaqa (5.7.1) ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.halaqa_groups (
@@ -3188,8 +3475,14 @@ REVOKE ALL ON FUNCTION
   private.apply_minor_privacy(),
   private.recount_reflection(UUID),
   private.recount_comment(UUID),
-  private.lock_activity_author(UUID),
+  private.visible_step(UUID, INTEGER),
+  private.lock_activity_authors(UUID[]),
   private.recount_minor_activity(),
+  private.lock_account_activity(),
+  private.lock_activity_writer(UUID),
+  private.check_promised_visibility(UUID, BOOLEAN),
+  private.lock_readable_reflection(UUID),
+  private.lock_readable_comment(UUID),
   private.require_user(),
   private.checked_local_date(TEXT),
   private.local_today(TEXT),
@@ -3223,6 +3516,12 @@ REVOKE ALL ON FUNCTION
 FROM PUBLIC, anon, authenticated;
 
 REVOKE ALL ON FUNCTION
+  public.create_reflection(UUID, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, TEXT, BOOLEAN),
+  public.add_reflection_comment(UUID, UUID, TEXT, BOOLEAN),
+  public.set_reflection_like(UUID, UUID, BOOLEAN),
+  public.set_reflection_comment_like(UUID, UUID, BOOLEAN),
+  public.delete_reflection_comment(UUID, UUID),
+  public.delete_reflection(UUID, UUID),
   public.get_profile_privacy(),
   public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN),
   public.get_profile_summary(UUID),
@@ -3245,6 +3544,12 @@ REVOKE ALL ON FUNCTION
 FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION
+  public.create_reflection(UUID, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, TEXT, BOOLEAN),
+  public.add_reflection_comment(UUID, UUID, TEXT, BOOLEAN),
+  public.set_reflection_like(UUID, UUID, BOOLEAN),
+  public.set_reflection_comment_like(UUID, UUID, BOOLEAN),
+  public.delete_reflection_comment(UUID, UUID),
+  public.delete_reflection(UUID, UUID),
   public.get_profile_privacy(),
   public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN),
   public.get_profile_summary(UUID),

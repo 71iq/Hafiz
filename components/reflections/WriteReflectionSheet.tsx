@@ -8,6 +8,7 @@ import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { createReflection } from "@/lib/reflections/api";
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
+import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 import { useDatabase } from "@/lib/database/provider";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -48,7 +49,8 @@ export function WriteReflectionSheet({
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   // ETH-07: a stated minor's reflections and comments are visible only to them. The account's own
-  // privacy comes from the cache the app-wide minor check keeps (useMinorPhotoCleanup).
+  // privacy comes from the cache the app-wide minor check keeps (useMinorPhotoCleanup). The post
+  // carries what this screen showed, so a copy made stale by another device cannot publish it.
   const ownPrivacy = useQuery({
     queryKey: profilePrivacyKeys.mine(user?.id ?? null),
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
@@ -103,6 +105,7 @@ export function WriteReflectionSheet({
         Math.min(juzStart, juzEnd),
         Math.max(juzStart, juzEnd),
         content.trim(),
+        isMinor,
         lease.isCurrent,
       );
       if (!lease.isCurrent()) return;
@@ -116,10 +119,18 @@ export function WriteReflectionSheet({
       }).catch(console.warn);
       finishPosted();
     } catch (error) {
+      const privacyChanged = error instanceof ReflectionPrivacyChangedError;
+      // The account is no longer a minor on the server: reload its privacy so this screen stops
+      // promising privacy, and post nothing until the person submits again.
+      if (privacyChanged) void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user.id) });
       if (!lease.isCurrent()) return;
       if (error instanceof SavedRowUnreadableError) {
         // Posted, but the reply could not be read: refresh instead of offering a duplicate retry.
         finishPosted();
+        return;
+      }
+      if (privacyChanged) {
+        setError(s.reflectionPrivacyChanged);
         return;
       }
       const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
@@ -144,12 +155,14 @@ export function WriteReflectionSheet({
     ayahStart,
     ayahEnd,
     content,
+    isMinor,
     queryClient,
     onClose,
     onSuccess,
     db,
     s.reflectionSetupRequired,
     s.reflectionPostFailed,
+    s.reflectionPrivacyChanged,
   ]);
 
   const handleClose = useCallback(() => {

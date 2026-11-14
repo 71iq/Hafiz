@@ -13,6 +13,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { formatRelativeTime } from "@/lib/i18n/relative-time";
 import { fetchComments, addComment, toggleCommentLike } from "@/lib/reflections/api";
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
+import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 import type { Reflection, ReflectionComment, ReflectionCommentSort } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Input } from "@/components/ui/Input";
@@ -64,7 +65,8 @@ export function CommentsSheet({
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   // ETH-07: a stated minor's comments are visible only to them, read from the cache the app-wide
-  // minor check keeps (useMinorPhotoCleanup).
+  // minor check keeps (useMinorPhotoCleanup). A comment carries what this screen showed, so a copy
+  // made stale by another device cannot publish it.
   const ownPrivacy = useQuery({
     queryKey: profilePrivacyKeys.mine(user?.id ?? null),
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
@@ -81,15 +83,17 @@ export function CommentsSheet({
   const [commentLikeOverrides, setCommentLikeOverrides] = useState<
     Record<string, { source: ReflectionComment; lease: ReflectionMutationLease; liked: boolean; likesCount: number }>
   >({});
-  const [failure, setFailure] = useState<"load" | "post" | "like" | null>(null);
+  const [failure, setFailure] = useState<"load" | "post" | "privacy" | "like" | null>(null);
   const error =
     failure === "load"
       ? s.commentLoadFailed
       : failure === "post"
         ? s.commentPostFailed
-        : failure === "like"
-          ? s.reflectionLikeFailed
-          : null;
+        : failure === "privacy"
+          ? s.commentPrivacyChanged
+          : failure === "like"
+            ? s.reflectionLikeFailed
+            : null;
   const handleClose = useCallback(() => {
     if (retire()) onClose();
   }, [retire, onClose]);
@@ -164,15 +168,23 @@ export function CommentsSheet({
       onCommentAdded(reflectionId);
     };
     try {
-      const comment = await addComment(user.id, reflectionId, submitted.trim());
+      const comment = await addComment(user.id, reflectionId, submitted.trim(), isMinor);
       if (!lease.isCurrent()) return;
       setLocalComments((prev) => [...prev, comment]);
       finishPosted();
     } catch (error) {
+      const privacyChanged = error instanceof ReflectionPrivacyChangedError;
+      // The account is no longer a minor on the server: reload its privacy so the note goes away, and
+      // post nothing until the person sends again.
+      if (privacyChanged) void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user.id) });
       if (!lease.isCurrent()) return;
       // Posted, but the reply could not be read: the refetch shows it instead of a duplicate retry.
       if (error instanceof SavedRowUnreadableError) {
         finishPosted();
+        return;
+      }
+      if (privacyChanged) {
+        setFailure("privacy");
         return;
       }
       console.warn("[Comments] Failed to add:", error);
@@ -180,7 +192,7 @@ export function CommentsSheet({
     } finally {
       lease.release();
     }
-  }, [user, reflectionId, text, begin, onCommentAdded, queryClient]);
+  }, [user, reflectionId, text, isMinor, begin, onCommentAdded, queryClient]);
 
   const handleLoadMore = useCallback(async () => {
     if (!reflectionId || !commentsQuery.hasNextPage) return;

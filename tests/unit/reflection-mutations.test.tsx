@@ -22,6 +22,7 @@ import {
 } from "@/lib/reflections/api";
 import type { Reflection, ReflectionComment } from "@/lib/reflections/types";
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
+import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 import { reflectionQueryKeys as keys } from "@/lib/reflections/query-keys";
 import { strings } from "@/lib/i18n/strings";
 import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
@@ -129,6 +130,13 @@ const comment = (id = "comment", count = 17): ReflectionComment => ({
   user_has_liked: false,
   created_at: "2026-01-01",
 });
+const minorPrivacy = {
+  boardJoined: false,
+  boardNickname: null,
+  showStreak: false,
+  showJuzCompletions: false,
+  isMinor: true,
+};
 const index: MushafIndex = {
   juzRows: [{ juz: 3, surah: 2, ayah_start: 1, ayah_end: 286 }],
   hizbRows: [],
@@ -305,7 +313,7 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       fireEvent(input, "keyPress", { nativeEvent: { key: "Enter" } });
     });
     expect(addComment).toHaveBeenCalledTimes(1);
-    expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "New comment");
+    expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "New comment", false);
     jest.mocked(fetchComments).mockResolvedValue({ data: [comment(), comment("new")], hasMore: false });
     pending.resolve(comment("new"));
     await flush();
@@ -363,6 +371,7 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       3,
       3,
       "Synthetic public reflection",
+      false,
       expect.any(Function),
     );
     expect(recordAchievementEvent).toHaveBeenCalledTimes(1);
@@ -384,6 +393,46 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     const minor = render(sheet, { wrapper });
     expect(minor.getByText(strings[locale].reflectionMinorPrivate)).toBeTruthy();
     expect(minor.getByPlaceholderText(strings[locale].reflectionPlaceholderPrivate)).toBeTruthy();
+  });
+  it("sends the privacy the composer promised and posts nothing when the account is no longer a minor (ETH-07)", async () => {
+    const privacyKey = profilePrivacyKeys.mine(user(1).id);
+    client.setQueryData(privacyKey, minorPrivacy);
+    jest.mocked(createReflection).mockRejectedValue(new ReflectionPrivacyChangedError());
+    const close = jest.fn(),
+      success = jest.fn();
+    const view = render(
+      <WriteReflectionSheet open surah={2} ayahStart={1} ayahEnd={2} onClose={close} onSuccess={success} />,
+      { wrapper },
+    );
+    fireEvent.changeText(view.getByPlaceholderText(strings[locale].reflectionPlaceholderPrivate), "A private thought");
+    fireEvent.press(view.getByText(strings[locale].reflectionSubmit));
+    await flush();
+    expect(createReflection).toHaveBeenCalledWith(user(1).id, 2, 1, 2, 3, 3, "A private thought", true, expect.any(Function));
+    expect(view.getByText(strings[locale].reflectionPrivacyChanged)).toBeTruthy();
+    expect(client.getQueryState(privacyKey)?.isInvalidated).toBe(true);
+    expect(view.getByDisplayValue("A private thought")).toBeTruthy();
+    expect(close).not.toHaveBeenCalled();
+    expect(success).not.toHaveBeenCalled();
+    expect(recordAchievementEvent).not.toHaveBeenCalled();
+  });
+  it("sends the privacy the comment input promised and posts nothing when the account is no longer a minor (ETH-07)", async () => {
+    const privacyKey = profilePrivacyKeys.mine(user(1).id);
+    client.setQueryData(privacyKey, minorPrivacy);
+    jest.mocked(addComment).mockRejectedValue(new ReflectionPrivacyChangedError());
+    const added = jest.fn();
+    const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={added} />, { wrapper });
+    await waitFor(() => expect(view.getByText("Synthetic comment")).toBeTruthy());
+    expect(view.getByText(strings[locale].reflectionMinorPrivate)).toBeTruthy();
+    const input = view.getByPlaceholderText(strings[locale].reflectionAddComment);
+    fireEvent.changeText(input, "A private comment");
+    fireEvent(input, "submitEditing");
+    await flush();
+    expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "A private comment", true);
+    expect(view.getByText(strings[locale].commentPrivacyChanged)).toBeTruthy();
+    expect(view.queryByText(strings[locale].commentPostFailed)).toBeNull();
+    expect(client.getQueryState(privacyKey)?.isInvalidated).toBe(true);
+    expect(view.getByDisplayValue("A private comment")).toBeTruthy();
+    expect(added).not.toHaveBeenCalled();
   });
   it("does not dispatch a public post after its index wait loses the source", async () => {
     const pending = deferred(index);
@@ -463,7 +512,7 @@ it.each(["account", "ABA", "target", "close", "database", "unmount"] as const)(
     if (retirement === "unmount") view.unmount();
     if (retirement !== "unmount")
       fireEvent.changeText(view.getByPlaceholderText(strings.en.reflectionPlaceholder), "Current replacement draft");
-    expect(jest.mocked(createReflection).mock.calls[0][7]?.()).toBe(false);
+    expect(jest.mocked(createReflection).mock.calls[0][8]?.()).toBe(false);
     pending.resolve(post("new"));
     await flush();
     expect(recordAchievementEvent).not.toHaveBeenCalled();
@@ -558,7 +607,7 @@ it("comments preserve newly typed text while a prior submitted snapshot finishes
   pending.resolve(comment("new"));
   await flush();
   expect(input.props.value).toBe("Next draft");
-  expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "Submitted draft");
+  expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "Submitted draft", false);
 });
 
 it("comment likes restore new canonical query rows after failure and invalidate only that post on success", async () => {

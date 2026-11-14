@@ -1,8 +1,18 @@
-import { createReflection, fetchComments, fetchReflectionFeed, fetchReflections } from "@/lib/reflections/api";
+import {
+  addComment,
+  createReflection,
+  fetchComments,
+  fetchReflectionFeed,
+  fetchReflections,
+  toggleCommentLike,
+  toggleLike,
+} from "@/lib/reflections/api";
+import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 
 const mockFrom = jest.fn();
+const mockRpc = jest.fn();
 jest.mock("@/lib/supabase", () => ({
-  supabase: { from: (...args: unknown[]) => mockFrom(...args) },
+  supabase: { from: (...args: unknown[]) => mockFrom(...args), rpc: (...args: unknown[]) => mockRpc(...args) },
   isSupabaseConfigured: () => true,
 }));
 
@@ -85,6 +95,7 @@ beforeEach(() => {
   builders.length = 0;
   results = [];
   mockFrom.mockReset().mockImplementation((table: string) => makeBuilder(table));
+  mockRpc.mockReset().mockImplementation(() => makeBuilder("rpc"));
 });
 
 describe("reflection API page service behavior", () => {
@@ -103,27 +114,6 @@ describe("reflection API page service behavior", () => {
     results = [{ data: null, error }];
     await expect(fetchComments("post", 0, "popular", "viewer")).rejects.toBe(error);
     expect(builders).toHaveLength(shouldFallback ? 3 : 1);
-  });
-
-  it.each([
-    [{ code: "PGRST204", message: "Could not find the 'juz_start' column of 'reflections' in the schema cache" }, true],
-    [{ code: "42703", message: "column reflections.juz_end does not exist" }, true],
-    [{ code: "PGRST204", message: "unrelated schema cache error" }, false],
-    [{ code: "PGRST205", message: "Could not find the table 'public.reflections' in the schema cache" }, false],
-    [{ code: "42501", message: "juz_start is not permitted" }, false],
-    [{ code: "42703", message: "column unrelated does not exist", hint: "query includes juz_start" }, false],
-  ])("retries create only for a specifically missing juz column %#", async (error, shouldFallback) => {
-    const saved = reflection("new");
-    results = shouldFallback ? [{ data: null, error }, { data: saved }] : [{ data: null, error }];
-    const call = createReflection("viewer", 2, 1, 2, 1, 1, "safe content");
-    if (shouldFallback) {
-      await expect(call).resolves.toMatchObject({ juz_start: 1, juz_end: 1 });
-      expect(builders).toHaveLength(2);
-      expect(builders[1].calls).not.toContainEqual(["insert", expect.objectContaining({ juz_start: 1 })]);
-    } else {
-      await expect(call).rejects.toBe(error);
-      expect(builders).toHaveLength(1);
-    }
   });
 
   it("retries popular comment sort for a named missing likes_count and preserves fallback error identity", async () => {
@@ -226,12 +216,6 @@ describe("reflection API page service behavior", () => {
 });
 
 describe("missing-object errors name the exact compatibility target", () => {
-  it.each(["PGRST205", "42501"])("does not treat incompatible %s as a missing Juz column", async (code) => {
-    const error = { code, message: "column juz_start does not exist" };
-    results = [{ data: null, error }];
-    await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content")).rejects.toBe(error);
-    expect(builders).toHaveLength(1);
-  });
   it.each(["PGRST205", "42P01", "42501"])("rejects a different comment-likes table under %s", async (code) => {
     const error = {
       code,
@@ -242,17 +226,6 @@ describe("missing-object errors name the exact compatibility target", () => {
     };
     results = [{ data: [comment("c1")] }, { data: null, error }];
     await expect(fetchComments("post", 0, "oldest", "viewer")).rejects.toBe(error);
-  });
-  it("preserves genuine PostgreSQL insert-column compatibility", async () => {
-    results = [
-      { data: null, error: { code: "42703", message: 'column "juz_start" of relation "reflections" does not exist' } },
-      { data: reflection("new") },
-    ];
-    await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content")).resolves.toMatchObject({
-      id: "new",
-      juz_start: 1,
-    });
-    expect(builders).toHaveLength(2);
   });
   it("preserves genuine PostgreSQL relation-qualified sort-column fallback", async () => {
     results = [
@@ -267,27 +240,86 @@ describe("missing-object errors name the exact compatibility target", () => {
   });
 });
 
-it("retired creation cannot issue its missing-column fallback INSERT", async () => {
-  let finish!: (result: Result) => void;
-  const first = new Promise<Result>((resolve) => {
-    finish = resolve;
+describe("reflection writes go through the server functions", () => {
+  it.each([true, false])("creates a reflection with the visibility the composer showed (%s)", async (promised) => {
+    results = [{ data: reflection("new") }];
+    await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content", promised)).resolves.toMatchObject({
+      id: "new",
+    });
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith("create_reflection", {
+      p_user_id: "viewer",
+      p_surah: 2,
+      p_ayah_start: 1,
+      p_ayah_end: 2,
+      p_juz_start: 1,
+      p_juz_end: 1,
+      p_content: "safe content",
+      p_private: promised,
+    });
+    expect(builders[0].calls[0]).toEqual([
+      "select",
+      "*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)",
+    ]);
   });
-  const error = {
-    code: "PGRST204",
-    message: "Could not find the 'juz_start' column of 'reflections' in the schema cache",
-  };
-  let current = true;
-  results = [first, { data: reflection("new") }];
-  const request = createReflection("viewer", 2, 1, 2, 1, 1, "safe content", () => current);
-  expect(builders).toHaveLength(1);
-  current = false;
-  finish({ data: null, error });
-  await expect(request).rejects.toBe(error);
-  expect(builders).toHaveLength(1);
+
+  it("adds a comment with the visibility the comment input showed", async () => {
+    results = [{ data: comment("new") }];
+    await expect(addComment("viewer", "post", "safe comment", true)).resolves.toMatchObject({
+      id: "new",
+      user_has_liked: false,
+    });
+    expect(mockRpc).toHaveBeenCalledWith("add_reflection_comment", {
+      p_user_id: "viewer",
+      p_reflection_id: "post",
+      p_content: "safe comment",
+      p_private: true,
+    });
+  });
+
+  it("reports a refused privacy promise as its own error and passes other errors through", async () => {
+    results = [{ data: null, error: { code: "P0001", message: "privacy_changed" } }];
+    await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content", true)).rejects.toBeInstanceOf(
+      ReflectionPrivacyChangedError,
+    );
+    results = [{ data: null, error: { code: "P0001", message: "privacy_changed" } }];
+    await expect(addComment("viewer", "post", "safe comment", true)).rejects.toBeInstanceOf(
+      ReflectionPrivacyChangedError,
+    );
+    const other = { code: "P0001", message: "reflection_not_found" };
+    results = [{ data: null, error: other }];
+    await expect(addComment("viewer", "post", "safe comment", false)).rejects.toBe(other);
+  });
+
+  it("likes and unlikes through the server functions with the requested state", async () => {
+    results = [{ data: true }, { data: false }];
+    await expect(toggleLike("viewer", "post", false)).resolves.toBe(true);
+    await expect(toggleCommentLike("viewer", "comment", true)).resolves.toBe(false);
+    expect(mockRpc).toHaveBeenNthCalledWith(1, "set_reflection_like", {
+      p_user_id: "viewer",
+      p_reflection_id: "post",
+      p_liked: true,
+    });
+    expect(mockRpc).toHaveBeenNthCalledWith(2, "set_reflection_comment_like", {
+      p_user_id: "viewer",
+      p_comment_id: "comment",
+      p_liked: false,
+    });
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("propagates a refused like", async () => {
+    const error = { code: "P0001", message: "reflection_not_found" };
+    results = [{ data: null, error }];
+    await expect(toggleLike("viewer", "post", false)).rejects.toBe(error);
+  });
 });
 
-it("creation refuses an already retired caller before the first INSERT", async () => {
-  await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content", () => false)).rejects.toThrow("superseded");
+it("creation refuses an already retired caller before calling the server", async () => {
+  await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content", false, () => false)).rejects.toThrow(
+    "superseded",
+  );
   expect(mockFrom).not.toHaveBeenCalled();
+  expect(mockRpc).not.toHaveBeenCalled();
   expect(builders).toHaveLength(0);
 });

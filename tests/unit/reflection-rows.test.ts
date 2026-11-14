@@ -2,8 +2,9 @@ import { addComment, createReflection, fetchComments, fetchReflectionFeed } from
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 
 const mockFrom = jest.fn();
+const mockRpc = jest.fn();
 jest.mock("@/lib/supabase", () => ({
-  supabase: { from: (...args: unknown[]) => mockFrom(...args) },
+  supabase: { from: (...args: unknown[]) => mockFrom(...args), rpc: (...args: unknown[]) => mockRpc(...args) },
   isSupabaseConfigured: () => true,
 }));
 
@@ -55,6 +56,7 @@ const feed = () => fetchReflectionFeed({ filter: { type: "all" }, sort: "newest"
 beforeEach(() => {
   results = [];
   mockFrom.mockReset().mockImplementation(() => makeBuilder());
+  mockRpc.mockReset().mockImplementation(() => makeBuilder());
 });
 
 describe("RF-192 reflection rows from the server", () => {
@@ -89,7 +91,7 @@ describe("RF-192 reflection rows from the server", () => {
   it("reports a created reflection that comes back malformed as saved but unreadable", async () => {
     results = [{ data: reflection({ ayah_start: "255" }) }];
 
-    await expect(createReflection("author", 2, 255, 255, 3, 3, "A sanitized reflection")).rejects.toBeInstanceOf(
+    await expect(createReflection("author", 2, 255, 255, 3, 3, "A sanitized reflection", false)).rejects.toBeInstanceOf(
       SavedRowUnreadableError,
     );
   });
@@ -110,6 +112,8 @@ describe("RF-192 reflection rows from the server", () => {
   it("reports an added comment that comes back malformed as saved but unreadable", async () => {
     results = [{ data: comment({ id: null }) }];
 
-    await expect(addComment("author", "r1", "A sanitized comment")).rejects.toBeInstanceOf(SavedRowUnreadableError);
+    await expect(addComment("author", "r1", "A sanitized comment", false)).rejects.toBeInstanceOf(
+      SavedRowUnreadableError,
+    );
   });
 });

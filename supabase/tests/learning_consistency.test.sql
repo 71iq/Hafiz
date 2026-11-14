@@ -1464,28 +1464,23 @@ DECLARE
   minor_reflection UUID;
 BEGIN
   PERFORM hz_test.login('00000000-0000-4000-8008-000000000002');
-  INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (auth.uid(), adult_reflection);
-  INSERT INTO public.reflection_comments (user_id, reflection_id, content)
-  VALUES (auth.uid(), adult_reflection, 'An adult comment') RETURNING id INTO adult_comment;
+  PERFORM public.set_reflection_like(auth.uid(), adult_reflection, true);
+  adult_comment := (public.add_reflection_comment(auth.uid(), adult_reflection, 'An adult comment', false)).id;
 
   PERFORM hz_test.login('00000000-0000-4000-8008-000000000001');
-  INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
-  VALUES (auth.uid(), 1, 3, 3, 1, 1, 'Written before minority');
-  INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (auth.uid(), adult_reflection);
-  INSERT INTO public.reflection_comments (user_id, reflection_id, content)
-  VALUES (auth.uid(), adult_reflection, 'Said before minority');
-  INSERT INTO public.reflection_comment_likes (user_id, comment_id) VALUES (auth.uid(), adult_comment);
+  PERFORM public.create_reflection(auth.uid(), 1, 3, 3, 1, 1, 'Written before minority', false);
+  PERFORM public.set_reflection_like(auth.uid(), adult_reflection, true);
+  PERFORM public.add_reflection_comment(auth.uid(), adult_reflection, 'Said before minority', false);
+  PERFORM public.set_reflection_comment_like(auth.uid(), adult_comment, true);
   PERFORM hz_test.eq('an adult''s activity is counted', hz_test.adult_counts(), '2 likes, 2 comments, comment liked 1');
 
   -- Stating minority recounts what they touched. A minor still writes, and reads what they wrote.
   PERFORM public.set_profile_privacy(false, false, true);
   PERFORM hz_test.eq('stating minority leaves their activity out of the counts', hz_test.adult_counts(),
     '1 likes, 1 comments, comment liked 0');
-  INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
-  VALUES (auth.uid(), 1, 4, 4, 1, 1, 'Written as a minor') RETURNING id INTO minor_reflection;
+  minor_reflection := (public.create_reflection(auth.uid(), 1, 4, 4, 1, 1, 'Written as a minor', true)).id;
   INSERT INTO hz_test.state VALUES ('minor_reflection', minor_reflection::TEXT);
-  INSERT INTO public.reflection_comments (user_id, reflection_id, content)
-  VALUES (auth.uid(), adult_reflection, 'Said as a minor');
+  PERFORM public.add_reflection_comment(auth.uid(), adult_reflection, 'Said as a minor', true);
   PERFORM hz_test.eq('a minor''s new comment is not counted', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
   PERFORM hz_test.eq('the minor reads their own reflections', (
     SELECT string_agg(content, '; ' ORDER BY content) FROM public.reflections WHERE user_id = auth.uid()
@@ -1532,10 +1527,10 @@ BEGIN
   PERFORM hz_test.eq('a signed-in stranger reads no words of a minor', visible ~ 'minority|as a minor|by a minor', false);
   PERFORM hz_test.eq('a signed-in stranger reads counts without the minor', hz_test.adult_counts(),
     '1 likes, 1 comments, comment liked 0');
-  PERFORM hz_test.expect_error(format($q$INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (%L, %L)$q$,
-    auth.uid(), minor_reflection), 'row-level security');
-  PERFORM hz_test.expect_error(format($q$INSERT INTO public.reflection_comments (user_id, reflection_id, content)
-    VALUES (%L, %L, 'Hello there')$q$, auth.uid(), minor_reflection), 'row-level security');
+  PERFORM hz_test.expect_error(format('SELECT public.set_reflection_like(%L, %L, true)', auth.uid(), minor_reflection),
+    'reflection_not_found');
+  PERFORM hz_test.expect_error(format($q$SELECT public.add_reflection_comment(%L, %L, 'Hello there', false)$q$,
+    auth.uid(), minor_reflection), 'reflection_not_found');
 END $$;
 RESET ROLE;
 
@@ -1550,7 +1545,7 @@ BEGIN
     '2 likes, 3 comments, comment liked 1');
   PERFORM public.set_profile_privacy(false, false, true);
   PERFORM hz_test.eq('stating it again leaves it out again', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
-  DELETE FROM public.reflection_likes WHERE user_id = auth.uid();
+  PERFORM public.set_reflection_like(auth.uid(), (SELECT value FROM hz_test.state WHERE key = 'adult_reflection')::UUID, false);
   PERFORM hz_test.eq('removing a minor''s like changes no count', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
 END $$;
 RESET ROLE;
@@ -1563,10 +1558,260 @@ SELECT hz_test.login('00000000-0000-4000-8008-000000000002');
 SET ROLE authenticated;
 DO $$
 BEGIN
-  DELETE FROM public.reflection_likes WHERE user_id = auth.uid();
+  PERFORM public.set_reflection_like(auth.uid(), (SELECT value FROM hz_test.state WHERE key = 'adult_reflection')::UUID, false);
   PERFORM hz_test.eq('an adult''s unlike still counts down', hz_test.adult_counts(), '0 likes, 1 comments, comment liked 0');
 END $$;
 RESET ROLE;
+
+-- Stored counts that differ from a full recount, as text, or 'none'.
+CREATE FUNCTION hz_test.count_drift() RETURNS TEXT LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(string_agg(drift, '; ' ORDER BY drift), 'none') FROM (
+    SELECT format('reflection %s: %s likes stored, %s counted; %s comments stored, %s counted',
+      r.content, r.likes_count, likes.n, r.comments_count, comments.n) AS drift
+    FROM public.reflections AS r
+    CROSS JOIN LATERAL (SELECT count(*) AS n FROM public.reflection_likes AS l
+      WHERE l.reflection_id = r.id AND NOT private.is_minor(l.user_id)) AS likes
+    CROSS JOIN LATERAL (SELECT count(*) AS n FROM public.reflection_comments AS c
+      WHERE c.reflection_id = r.id AND NOT private.is_minor(c.user_id)) AS comments
+    WHERE r.likes_count IS DISTINCT FROM likes.n OR r.comments_count IS DISTINCT FROM comments.n
+    UNION ALL
+    SELECT format('comment %s: %s likes stored, %s counted', c.content, c.likes_count, likes.n)
+    FROM public.reflection_comments AS c
+    CROSS JOIN LATERAL (SELECT count(*) AS n FROM public.reflection_comment_likes AS cl
+      WHERE cl.comment_id = c.id AND NOT private.is_minor(cl.user_id)) AS likes
+    WHERE c.likes_count IS DISTINCT FROM likes.n
+  ) AS d
+$$;
+-- Scans and row updates of a public table so far in this transaction.
+CREATE FUNCTION hz_test.scans(rel TEXT) RETURNS BIGINT LANGUAGE sql VOLATILE AS $$
+  SELECT COALESCE(seq_scan, 0) + COALESCE(idx_scan, 0) FROM pg_stat_xact_user_tables
+  WHERE schemaname = 'public' AND relname = rel
+$$;
+CREATE FUNCTION hz_test.updates(rel TEXT) RETURNS BIGINT LANGUAGE sql VOLATILE AS $$
+  SELECT n_tup_upd FROM pg_stat_xact_user_tables WHERE schemaname = 'public' AND relname = rel
+$$;
+GRANT EXECUTE ON FUNCTION hz_test.scans(TEXT), hz_test.updates(TEXT) TO authenticated;
+
+DO $$
+BEGIN
+  PERFORM hz_test.eq('counts so far match a full recount', hz_test.count_drift(), 'none');
+END $$;
+
+-- Fifth review, finding 1: the composer and the comment input promise a stated minor privacy from a
+-- cached copy that another device may have changed. A write carries that promise, and one promised
+-- private is refused once the writer is no longer a minor, so nothing is published that the screen
+-- said would stay private. 8010-1 records minority and withdraws it as another device would.
+SELECT hz_test.make_user(('00000000-0000-4000-8010-' || lpad(i::TEXT, 12, '0'))::UUID, 'fifth_user_' || i, 'Fifth ' || i)
+FROM generate_series(1, 6) AS i;
+INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
+VALUES ('00000000-0000-4000-8010-000000000002', 2, 1, 1, 1, 1, 'A reflection by fifth user two');
+INSERT INTO hz_test.state SELECT 'fifth_reflection', id::TEXT FROM public.reflections WHERE content = 'A reflection by fifth user two';
+
+SELECT hz_test.login('00000000-0000-4000-8010-000000000001');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  target UUID := (SELECT value FROM hz_test.state WHERE key = 'fifth_reflection')::UUID;
+BEGIN
+  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.create_reflection(auth.uid(), 2, 2, 2, 1, 1, 'Kept private as promised', true);
+  PERFORM public.add_reflection_comment(auth.uid(), target, 'A comment kept private as promised', true);
+
+  -- Another device withdraws minority while this screen still promises privacy.
+  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM hz_test.expect_error(format($q$SELECT public.create_reflection(%L, 2, 3, 3, 1, 1,
+    'Promised private after the withdrawal', true)$q$, auth.uid()), 'privacy_changed');
+  PERFORM hz_test.expect_error(format($q$SELECT public.add_reflection_comment(%L, %L,
+    'Promised private after the withdrawal', true)$q$, auth.uid(), target), 'privacy_changed');
+  PERFORM hz_test.eq('a refused write stores nothing', (
+    SELECT count(*) FROM public.reflections WHERE content = 'Promised private after the withdrawal'
+  ) + (SELECT count(*) FROM public.reflection_comments WHERE content = 'Promised private after the withdrawal'), 0::BIGINT);
+  -- Shown as public to an adult, it posts.
+  PERFORM public.create_reflection(auth.uid(), 2, 4, 4, 1, 1, 'Shown as public to an adult', false);
+
+  -- The reverse: the screen shows an adult, another device recorded minority. The text only becomes
+  -- more private, so it is accepted.
+  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.create_reflection(auth.uid(), 2, 5, 5, 1, 1, 'Shown as public, kept private for a minor', false);
+  PERFORM public.add_reflection_comment(auth.uid(), target, 'Shown as public, kept private for a minor', false);
+
+  -- Every write states what the screen showed, for the signed-in account only, and only through the RPCs.
+  PERFORM hz_test.expect_error(format($q$SELECT public.create_reflection(%L, 2, 6, 6, 1, 1, 'No promise given', NULL)$q$,
+    auth.uid()), 'invalid_visibility');
+  PERFORM hz_test.expect_error(format($q$SELECT public.add_reflection_comment(%L, %L, 'Written for another account', false)$q$,
+    '00000000-0000-4000-8010-000000000002', target), 'account_mismatch');
+  PERFORM hz_test.expect_error(format($q$INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start,
+    juz_end, content) VALUES (%L, 2, 7, 7, 1, 1, 'A direct insert skips the promise')$q$, auth.uid()), 'permission denied');
+  PERFORM hz_test.expect_error(format($q$INSERT INTO public.reflection_comments (user_id, reflection_id, content)
+    VALUES (%L, %L, 'A direct insert skips the promise')$q$, auth.uid(), target), 'permission denied');
+  PERFORM hz_test.expect_error(format($q$INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (%L, %L)$q$,
+    auth.uid(), target), 'permission denied');
+  PERFORM hz_test.expect_error('DELETE FROM public.reflection_comments WHERE user_id = auth.uid()', 'permission denied');
+  PERFORM hz_test.expect_error('DELETE FROM public.reflections WHERE user_id = auth.uid()', 'permission denied');
+  PERFORM hz_test.eq('the minor reads what they wrote', (
+    SELECT string_agg(content, '; ' ORDER BY content) FROM public.reflections WHERE user_id = auth.uid()
+  ), 'Kept private as promised; Shown as public to an adult; Shown as public, kept private for a minor');
+END $$;
+RESET ROLE;
+
+SELECT hz_test.login(NULL);
+SET ROLE anon;
+DO $$
+DECLARE
+  visible TEXT := hz_test.public_activity();
+BEGIN
+  PERFORM hz_test.eq('anon reads nothing 8010-1 wrote', position('00000000-0000-4000-8010-000000000001' IN visible)
+    + position('promised' IN visible) + position('kept private' IN visible), 0);
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('promised writes leave the counts exact', hz_test.count_drift(), 'none');
+END $$;
+
+-- Fifth review, findings 3 and 4. A single like or comment moves its count by one and never reads the
+-- rest of the discussion; a statement or cascade that changes many rows recounts each parent once;
+-- and through likes, unlikes, comments, deletions, minority changes and account deletion every count
+-- matches a full recount. 8010-3 wrote a reflection with many comments by 8010-4.
+INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
+VALUES ('00000000-0000-4000-8010-000000000003', 2, 10, 10, 1, 1, 'A busy reflection'),
+  ('00000000-0000-4000-8010-000000000003', 2, 11, 11, 1, 1, 'A reflection its author deletes');
+INSERT INTO hz_test.state SELECT 'busy', id::TEXT FROM public.reflections WHERE content = 'A busy reflection';
+INSERT INTO hz_test.state SELECT 'doomed', id::TEXT FROM public.reflections WHERE content = 'A reflection its author deletes';
+INSERT INTO public.reflection_comments (reflection_id, user_id, content)
+SELECT (SELECT value FROM hz_test.state WHERE key = 'busy')::UUID, '00000000-0000-4000-8010-000000000004', 'Busy comment ' || i
+FROM generate_series(1, 200) AS i;
+INSERT INTO public.reflection_likes (user_id, reflection_id)
+SELECT ('00000000-0000-4000-8008-' || lpad(i::TEXT, 12, '0'))::UUID, (SELECT value FROM hz_test.state WHERE key = 'busy')::UUID
+FROM generate_series(2, 2) AS i;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('a many-row insert is counted', (
+    SELECT likes_count || '/' || comments_count FROM public.reflections WHERE content = 'A busy reflection'
+  ), '1/200');
+END $$;
+
+SELECT hz_test.login('00000000-0000-4000-8010-000000000005');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  busy UUID := (SELECT value FROM hz_test.state WHERE key = 'busy')::UUID;
+  comment_scans BIGINT := hz_test.scans('reflection_comments');
+  like_scans BIGINT;
+  updates BIGINT := hz_test.updates('reflections');
+  mine UUID;
+BEGIN
+  PERFORM public.set_reflection_like(auth.uid(), busy, true);
+  PERFORM hz_test.eq('a single like reads none of the 200 comments', hz_test.scans('reflection_comments') - comment_scans, 0::BIGINT);
+  PERFORM hz_test.eq('a single like updates its reflection once', hz_test.updates('reflections') - updates, 1::BIGINT);
+  like_scans := hz_test.scans('reflection_likes');
+  mine := (public.add_reflection_comment(auth.uid(), busy, 'A comment by fifth user five', false)).id;
+  PERFORM hz_test.eq('a single comment reads none of the likes', hz_test.scans('reflection_likes') - like_scans, 0::BIGINT);
+  PERFORM hz_test.eq('a like and a comment count one each', (
+    SELECT likes_count || '/' || comments_count FROM public.reflections WHERE id = busy
+  ), '2/201');
+  INSERT INTO hz_test.state VALUES ('five_comment', mine::TEXT);
+  PERFORM hz_test.eq('liking twice is one like', public.set_reflection_like(auth.uid(), busy, true), true);
+  PERFORM public.set_reflection_comment_like(auth.uid(), mine, true);
+  PERFORM public.set_reflection_comment_like(auth.uid(), (SELECT id FROM public.reflection_comments WHERE content = 'Busy comment 1'), true);
+  PERFORM public.set_reflection_like(auth.uid(), (SELECT value FROM hz_test.state WHERE key = 'doomed')::UUID, true);
+  PERFORM public.add_reflection_comment(auth.uid(), (SELECT value FROM hz_test.state WHERE key = 'doomed')::UUID,
+    'A comment on a reflection that goes away', false);
+  PERFORM hz_test.eq('another account''s comment is not deleted', public.delete_reflection_comment(auth.uid(),
+    (SELECT id FROM public.reflection_comments WHERE content = 'Busy comment 2')), false);
+  PERFORM hz_test.eq('another account''s reflection is not deleted', public.delete_reflection(auth.uid(), busy), false);
+END $$;
+
+SELECT hz_test.login('00000000-0000-4000-8010-000000000006');
+DO $$
+DECLARE
+  busy UUID := (SELECT value FROM hz_test.state WHERE key = 'busy')::UUID;
+  five_comment UUID := (SELECT value FROM hz_test.state WHERE key = 'five_comment')::UUID;
+  mine UUID;
+BEGIN
+  PERFORM public.set_reflection_like(auth.uid(), busy, true);
+  mine := (public.add_reflection_comment(auth.uid(), busy, 'A comment fifth user six deletes', false)).id;
+  PERFORM public.set_reflection_comment_like(auth.uid(), mine, true);
+  PERFORM public.set_reflection_comment_like(auth.uid(), five_comment, true);
+  PERFORM public.add_reflection_comment(auth.uid(), busy, 'A comment fifth user six keeps', false);
+  PERFORM hz_test.eq('likes and comments are counted', (
+    SELECT likes_count || '/' || comments_count FROM public.reflections WHERE id = busy
+  ), '3/203');
+  PERFORM hz_test.eq('an unlike counts down', public.set_reflection_like(auth.uid(), busy, false), false);
+  PERFORM hz_test.eq('deleting an own self-liked comment', public.delete_reflection_comment(auth.uid(), mine), true);
+  PERFORM hz_test.eq('the unlike and the deletion count down', (
+    SELECT likes_count || '/' || comments_count FROM public.reflections WHERE id = busy
+  ), '2/202');
+  PERFORM hz_test.eq('the deleted comment''s likes went with it', (
+    SELECT count(*) FROM public.reflection_comment_likes WHERE comment_id = mine
+  ), 0::BIGINT);
+  PERFORM hz_test.eq('a comment like counts', (SELECT likes_count FROM public.reflection_comments WHERE id = five_comment), 2);
+END $$;
+
+-- 8010-5 records minority and withdraws it, then records it again; each time the counts follow.
+SELECT hz_test.login('00000000-0000-4000-8010-000000000005');
+DO $$
+BEGIN
+  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM hz_test.eq('minority leaves 8010-5 out', (
+    SELECT likes_count || '/' || comments_count FROM public.reflections WHERE content = 'A busy reflection'
+  ), '1/201');
+  PERFORM public.set_reflection_comment_like(auth.uid(), (SELECT id FROM public.reflection_comments WHERE content = 'Busy comment 3'), true);
+  PERFORM public.set_reflection_comment_like(auth.uid(), (SELECT id FROM public.reflection_comments WHERE content = 'Busy comment 1'), false);
+  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM hz_test.eq('withdrawing counts 8010-5 again', (
+    SELECT likes_count || '/' || comments_count FROM public.reflections WHERE content = 'A busy reflection'
+  ), '2/202');
+  PERFORM public.set_profile_privacy(false, false, true);
+END $$;
+
+-- 8010-3 deletes their second reflection, with its comments and likes.
+SELECT hz_test.login('00000000-0000-4000-8010-000000000003');
+DO $$
+BEGIN
+  PERFORM hz_test.eq('an author deletes their reflection',
+    public.delete_reflection(auth.uid(), (SELECT value FROM hz_test.state WHERE key = 'doomed')::UUID), true);
+  PERFORM hz_test.eq('its comments and likes went with it', (
+    SELECT count(*) FROM public.reflection_comments WHERE content = 'A comment on a reflection that goes away'
+  ), 0::BIGINT);
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('likes, unlikes, comments, deletions and minority changes keep counts exact',
+    hz_test.count_drift(), 'none');
+END $$;
+
+-- One statement deleting 150 of 8010-4's comments recounts their reflection once, not once per row.
+DO $$
+DECLARE
+  updates BIGINT := hz_test.updates('reflections');
+BEGIN
+  DELETE FROM public.reflection_comments
+  WHERE user_id = '00000000-0000-4000-8010-000000000004' AND substring(content FROM '[0-9]+$')::INTEGER > 50;
+  PERFORM hz_test.eq('150 deleted comments, one recount', hz_test.updates('reflections') - updates, 1::BIGINT);
+  PERFORM hz_test.eq('the bulk deletion is counted', (
+    SELECT comments_count FROM public.reflections WHERE content = 'A busy reflection'
+  ), 51);
+END $$;
+
+-- Deleting the accounts of 8010-4 (an adult with 50 comments and their likes) and 8010-5 (a minor
+-- with likes, a comment and comment likes) recounts once per cascade, and leaves every count exact.
+DO $$
+DECLARE
+  updates BIGINT := hz_test.updates('reflections');
+BEGIN
+  DELETE FROM public.profiles WHERE id = '00000000-0000-4000-8010-000000000004';
+  PERFORM hz_test.eq('an account with 50 comments recounts its reflection once', hz_test.updates('reflections') - updates, 1::BIGINT);
+END $$;
+DELETE FROM public.profiles WHERE id = '00000000-0000-4000-8010-000000000005';
+DO $$
+BEGIN
+  PERFORM hz_test.eq('the counts after both deletions', (
+    SELECT likes_count || '/' || comments_count FROM public.reflections WHERE content = 'A busy reflection'
+  ), '1/1');
+  PERFORM hz_test.eq('account deletion keeps every count exact', hz_test.count_drift(), 'none');
+END $$;
 
 SELECT hz_test.login(NULL);
 SET client_min_messages = warning;

@@ -874,6 +874,10 @@ export const strings = {
     reflectionCharCount: "{{n}} / 5000",
     reflectionMinChars: "Min {{n}} characters",
     reflectionMinorPrivate: "You said you are under 18, so your reflections and comments are visible only to you.",
+    reflectionPrivacyChanged:
+      "Your account no longer says you are under 18, so this reflection would be visible to everyone. It was not posted. Submit it again if you want to share it.",
+    commentPrivacyChanged:
+      "Your account no longer says you are under 18, so this comment would be visible to everyone. It was not posted. Send it again if you want to share it.",
     reflectionPlaceholderPrivate: "Write your thoughts on this ayah...",
     reflectionAyahLabel: "Ayah",
     reflectionThreadLabel: "Thread",
@@ -1829,6 +1833,10 @@ export const strings = {
     reflectionCharCount: "{{n}} / 5000",
     reflectionMinChars: "الحد الأدنى {{n}} أحرف",
     reflectionMinorPrivate: "ذكرتَ أن عمرك دون الثامنة عشرة، فلا يرى تأملاتك وتعليقاتك أحدٌ غيرك.",
+    reflectionPrivacyChanged:
+      "لم يعد حسابك يذكر أن عمرك دون الثامنة عشرة، فسيظهر هذا التأمل للجميع. لم يُنشر، فأرسله مرة أخرى إن أردت مشاركته.",
+    commentPrivacyChanged:
+      "لم يعد حسابك يذكر أن عمرك دون الثامنة عشرة، فسيظهر هذا التعليق للجميع. لم يُنشر، فأرسله مرة أخرى إن أردت مشاركته.",
     reflectionPlaceholderPrivate: "اكتب تأملك في هذه الآية...",
     reflectionAyahLabel: "الآية",
     reflectionThreadLabel: "النقاش",

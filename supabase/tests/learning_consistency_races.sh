@@ -106,9 +106,9 @@ uid() { printf '00000000-0000-4000-8009-%012d' "$1"; }
 
 admin >/dev/null <<SQL
 INSERT INTO auth.users (id, email) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race' || i || '@example.invalid'
-FROM generate_series(1, 19) AS i;
+FROM generate_series(1, 23) AS i;
 INSERT INTO public.profiles (id, username) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race_user_' || i
-FROM generate_series(1, 19) AS i;
+FROM generate_series(1, 23) AS i;
 SQL
 
 TODAY="$(admin -c "SELECT to_char((now() AT TIME ZONE 'UTC')::DATE, 'YYYY-MM-DD')")"
@@ -303,15 +303,15 @@ deadlocks() { cat "$WORK"/* | grep -c 'deadlock detected' || true; }
 
 # ─── Fourth review, finding 2: a like in flight cannot keep a minor in the public count ─────────
 # User 18 likes user 19's reflection in a transaction that stays open until user 18's minority write
-# is blocked. The like trigger holds user 18's profiles row FOR SHARE, so recording minority waits
-# for the like to commit and then recounts it out. Without that lock the minority write would commit
-# first without seeing the like, and the like would then commit counted.
+# is blocked. The like holds user 18's profiles row FOR SHARE, so recording minority waits for the
+# like to commit and then recounts it out. Without that lock the minority write would commit first
+# without seeing the like, and the like would then commit counted.
 rm -f "$WORK"/*
 admin -c "INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
   VALUES ('$(uid 19)', 2, 1, 1, 1, 1, 'A race reflection by an adult')" >/dev/null
 REFLECTION="$(admin -c "SELECT id FROM public.reflections WHERE user_id = '$(uid 19)'")"
 session like_hold "$(uid 18)" "BEGIN;
-INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES ('$(uid 18)', '$REFLECTION');
+SELECT public.set_reflection_like('$(uid 18)', '$REFLECTION', true);
 RESET ROLE;
 DO \$\$ BEGIN
   FOR i IN 1 .. 200 LOOP
@@ -455,5 +455,90 @@ check "the group stays for the sender without a creator" \
   "$(admin -c "SELECT (created_by IS NULL)::TEXT || '/' || (deleted_at IS NULL)::TEXT FROM public.halaqa_groups WHERE id = '$RGROUP'")" true/true
 check "the encouragement went with the recipient" \
   "$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE to_user = '$(uid 16)'")" 0
+
+# ─── Fifth review, finding 1: a withdrawal in flight cannot let a promised-private write publish ──
+# User 20 is a minor. Another device withdraws minority in a transaction that stays open until this
+# device's write, whose screen still promised privacy, is blocked. The write checks the promise while
+# holding user 20's profiles row FOR SHARE, so it waits for the withdrawal and is refused. A check
+# that read the minority without that lock would pass on the uncommitted state, and the reflection
+# would become public when the withdrawal commits.
+rm -f "$WORK"/*
+admin -c "INSERT INTO public.profile_privacy (user_id, is_minor) VALUES ('$(uid 20)', true)" >/dev/null
+session withdraw_hold "$(uid 20)" "BEGIN;
+SELECT public.set_profile_privacy(false, false, false)->>'is_minor';
+RESET ROLE;
+DO \$\$ BEGIN
+  FOR i IN 1 .. 200 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    EXIT WHEN (SELECT count(*) FROM pg_stat_activity WHERE application_name = 'race_promised' AND wait_event_type = 'Lock') >= 1;
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+END \$\$;
+COMMIT;"
+wait_for_hold withdraw_hold
+session promised "$(uid 20)" "SELECT public.create_reflection('$(uid 20)', 2, 1, 1, 1, 1, 'Promised private during a withdrawal', true);"
+wait
+check "withdrawal finished" "$(tail -1 "$WORK/withdraw_hold")" ok
+check "the promised-private write is refused" "$(grep -c privacy_changed "$WORK/promised" || true)" 1
+check "nothing was published" "$(admin -c "SELECT count(*) FROM public.reflections WHERE user_id = '$(uid 20)'")" 0
+
+# Reflection counts compared with a full recount, as "stored/counted" pairs for likes and comments.
+recount() {
+  admin -c "SELECT r.likes_count || '/' || (SELECT count(*) FROM public.reflection_likes AS l
+      WHERE l.reflection_id = r.id AND NOT private.is_minor(l.user_id))
+    || ' ' || r.comments_count || '/' || (SELECT count(*) FROM public.reflection_comments AS c
+      WHERE c.reflection_id = r.id AND NOT private.is_minor(c.user_id))
+    FROM public.reflections AS r WHERE r.id = '$1'"
+}
+
+# ─── Fifth review, finding 3: recording minority while deleting a self-liked comment ───────────
+# User 21 comments on user 22's reflection and likes the comment. The controller holds the
+# reflection, so the minority write waits on it while holding user 21's profiles row; recounting the
+# likes it then needs the comment. The deletion starts meanwhile. It takes the profiles row before
+# the reflection and the comment, so it waits for the minority write. A deletion that locked the
+# comment first and the profile in its counter trigger would deadlock with it.
+rm -f "$WORK"/*
+admin -c "INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
+  VALUES ('$(uid 22)', 2, 2, 2, 1, 1, 'A race reflection for deletions')" >/dev/null
+DREFLECTION="$(admin -c "SELECT id FROM public.reflections WHERE content = 'A race reflection for deletions'")"
+DCOMMENT="$(as_user "$(uid 21)" "SELECT (public.add_reflection_comment('$(uid 21)', '$DREFLECTION', 'A self-liked race comment', false)).id;" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
+as_user "$(uid 21)" "SELECT public.set_reflection_comment_like('$(uid 21)', '$DCOMMENT', true);" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
+controller minor_delete "SELECT 1 FROM public.reflections WHERE id = '$DREFLECTION' FOR NO KEY UPDATE;" 2
+wait_for_controller minor_delete
+session md_minor "$(uid 21)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+wait_for_waiters 1
+session md_delete "$(uid 21)" "SELECT public.delete_reflection_comment('$(uid 21)', '$DCOMMENT');"
+wait
+check "no deadlock between a minority write and deleting a self-liked comment" "$(deadlocks)" 0
+check "minority write finished" "$(tail -1 "$WORK/md_minor")" ok
+check "deletion finished" "$(tail -1 "$WORK/md_delete")" ok
+check "the comment and its like are gone" \
+  "$(admin -c "SELECT count(*) FROM public.reflection_comments WHERE id = '$DCOMMENT'")/$(admin -c "SELECT count(*) FROM public.reflection_comment_likes WHERE comment_id = '$DCOMMENT'")" 0/0
+check "the counts match a recount" "$(recount "$DREFLECTION")" "0/0 0/0"
+
+# ─── Fifth review, finding 3: deleting an account while it deletes its own comment ─────────────
+# User 23 comments on user 22's reflection. The controller holds one of user 23's user_settings rows,
+# which the account deletion reaches after it has locked the profile and, in its BEFORE DELETE
+# trigger, the reflection and the comment. The comment deletion starts then and waits on the profile.
+# Without that order, the deletion would hold the profile and wait on the comment while the comment
+# deletion held the comment and waited on the profile in its counter trigger.
+rm -f "$WORK"/*
+OCOMMENT="$(as_user "$(uid 23)" "SELECT (public.add_reflection_comment('$(uid 23)', '$DREFLECTION', 'A race comment by a deleted account', false)).id;" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
+admin -c "INSERT INTO public.user_settings (user_id, key, value) VALUES ('$(uid 23)', 'race', '1')" >/dev/null
+controller del_comment "SELECT 1 FROM public.user_settings WHERE user_id = '$(uid 23)' FOR UPDATE;" 2
+wait_for_controller del_comment
+admin_session dc_delete "DELETE FROM auth.users WHERE id = '$(uid 23)';"
+wait_for_waiters 1
+session dc_comment "$(uid 23)" "SELECT public.delete_reflection_comment('$(uid 23)', '$OCOMMENT');"
+wait
+check "no deadlock between account deletion and deleting its comment" "$(deadlocks)" 0
+check "account deletion finished" "$(tail -1 "$WORK/dc_delete")" ok
+check "the comment deletion finished or found the account gone" \
+  "$(if [ "$(tail -1 "$WORK/dc_comment")" = ok ] || grep -q not_authenticated "$WORK/dc_comment"; then echo yes; else echo no; fi)" yes
+check "the comment is gone" "$(admin -c "SELECT count(*) FROM public.reflection_comments WHERE id = '$OCOMMENT'")" 0
+check "the counts match a recount" "$(recount "$DREFLECTION")" "0/0 0/0"
 
 echo "learning_consistency_races.sh: all races passed"
