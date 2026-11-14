@@ -7,7 +7,7 @@ import { BoardJoin } from "@/components/social/BoardJoin";
 import { BoardStandings } from "@/components/social/BoardStandings";
 import { SocialGate, SocialNotice } from "@/components/social/SocialControls";
 import { SocialScreen } from "@/components/social/SocialScreen";
-import { StandingsSkeleton } from "@/components/social/SocialSkeletons";
+import { BoardJoinSkeleton, StandingsSkeleton } from "@/components/social/SocialSkeletons";
 import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys, boardRead, joinBoard, leaveBoard } from "@/lib/board/api";
 import { useDatabase } from "@/lib/database/provider";
@@ -127,7 +127,16 @@ function BoardContent({ userId }: { userId: string }) {
     <SocialScreen
       title={s.boardTitle}
       subtitle={s.boardSubtitle}
-      refreshControl={<RefreshControl refreshing={board.isRefetching} onRefresh={() => void refresh()} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={board.isRefetching}
+          onRefresh={() => {
+            void refresh();
+            // A failed read of the stored age choice is retried with the rest of the screen.
+            if (!privacy.data && view?.status === "not_joined") void privacy.refetch();
+          }}
+        />
+      }
     >
       {savedAt ? (
         <SocialNotice icon={CloudOff} message={interpolate(s.socialCachedAt, { date: formatSocialDate(savedAt, language, true) })} />
@@ -150,7 +159,8 @@ function BoardContent({ userId }: { userId: string }) {
         // waits for a successful read.
         privacy.data ? (
           <BoardJoin
-            key={privacy.dataUpdatedAt}
+            // A refetch that returns the same stored choices keeps what the person has typed.
+            key={`${privacy.data.isMinor}:${privacy.data.boardNickname ?? ""}`}
             initialNickname={privacy.data.boardNickname}
             initialIsMinor={privacy.data.isMinor}
             pending={join.isPending || !inputs.data}
@@ -162,14 +172,14 @@ function BoardContent({ userId }: { userId: string }) {
           />
         ) : offline ? (
           <SocialNotice icon={CloudOff} message={s.socialOfflineEmpty} />
-        ) : privacy.error ? (
+        ) : privacy.error && !privacy.isFetching ? (
           <SocialNotice
             message={socialFailureMessage(privacy.error, s)}
             actionLabel={s.socialTryAgain}
             onAction={() => void privacy.refetch()}
           />
         ) : (
-          <StandingsSkeleton label={s.loading} />
+          <BoardJoinSkeleton label={s.loading} />
         )
       ) : (
         <BoardStandings

@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -7,6 +7,7 @@ import { router } from "expo-router";
 import BoardScreen from "@/app/(tabs)/leaderboard";
 import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import { flattenStyle } from "../rtl/rtl-test-utils";
 import { bearerSubject, signedIn, signedOut, type FakeAuthState } from "./social-test-auth";
 
@@ -200,9 +201,11 @@ describe("Board tab", () => {
     signIn(USER);
     const base = mockRpc.getMockImplementation()!;
     let privacyFails = true;
+    let releaseRetry: (() => void) | undefined;
     mockRpc.mockImplementation(async (fn, args) => {
       if (fn !== "get_profile_privacy") return base(fn, args);
       if (privacyFails) return { data: null, error: { message: "synthetic privacy failure" } };
+      await new Promise<void>((resolve) => (releaseRetry = resolve));
       return { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null };
     });
     const screen = renderScreen();
@@ -212,7 +215,27 @@ describe("Board tab", () => {
 
     privacyFails = false;
     fireEvent.press(retry);
+    // The retry shows that it is working instead of leaving the same notice up.
+    await waitFor(() => expect(releaseRetry).toBeDefined());
+    expect(screen.queryByRole("button", { name: strings.en.socialTryAgain })).toBeNull();
+    expect(screen.getByLabelText(strings.en.loading)).toBeTruthy();
+    releaseRetry!();
     expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
+    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+  });
+
+  it("keeps a typed nickname when the stored choices are read again unchanged", async () => {
+    signIn(USER);
+    const screen = renderScreen();
+    await screen.findByText(strings.en.boardIntentionTitle);
+    fireEvent.press(screen.getByRole("switch", { name: strings.en.boardMinorToggle }));
+    fireEvent.changeText(screen.getByLabelText(strings.en.boardNicknameLabel), "Little Star");
+    const client = queryClients[queryClients.length - 1];
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
+    });
+    expect(mockRpc.mock.calls.filter(([fn]) => fn === "get_profile_privacy").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
     expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
   });
 

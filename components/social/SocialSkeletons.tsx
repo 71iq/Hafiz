@@ -46,6 +46,28 @@ export function HalaqaSkeleton({ label }: { label: string }) {
   );
 }
 
+/** The Board join form while the account's stored choices load: the intention, a field, two toggles and Join. */
+export function BoardJoinSkeleton({ label }: { label: string }) {
+  const { isRTL } = useSettings();
+  return (
+    <LoadingBlock label={label}>
+      <Card elevation="low" className="gap-3 p-5">
+        <SkeletonText width="50%" lineHeight={22} />
+        <SkeletonText width="90%" lineHeight={14} />
+        <SkeletonText width="70%" lineHeight={14} />
+      </Card>
+      <Skeleton height={48} borderRadius={16} />
+      {[0, 1].map((index) => (
+        <View key={index} className="items-center justify-between gap-3 py-2" style={socialRowStyle(isRTL)}>
+          <SkeletonText width={index === 0 ? "55%" : "45%"} lineHeight={14} />
+          <Skeleton width={44} height={26} borderRadius={13} />
+        </View>
+      ))}
+      <Skeleton height={48} borderRadius={24} />
+    </LoadingBlock>
+  );
+}
+
 /** Board standings while they load: rank, avatar, name and points, like StandingRow. */
 export function StandingsSkeleton({ label }: { label: string }) {
   const { isRTL } = useSettings();
