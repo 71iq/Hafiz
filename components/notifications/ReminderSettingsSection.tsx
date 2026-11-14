@@ -1,12 +1,12 @@
 import { Minus, Plus } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { AppState, Platform, Pressable, View } from "react-native";
+import { AppState, Platform, View } from "react-native";
 import { PrayerTimesSetup, CALCULATION_METHOD_LABEL_KEYS } from "@/components/notifications/PrayerTimesSetup";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
-import { Switch } from "@/components/ui/Switch";
+import { SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { useDatabase } from "@/lib/database/provider";
@@ -60,7 +60,7 @@ type RamadanChoice = RamadanAnchor | "usual";
 /** Outline buttons need a visible edge; the shared outline variant is transparent only. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
-type SwitchRowProps = {
+type ReminderSwitchRowProps = {
   label: string;
   hint?: string;
   value: boolean;
@@ -69,14 +69,14 @@ type SwitchRowProps = {
 };
 
 /** The whole row is the 44 pt target and the accessible switch; the visual switch is decorative. */
-function SwitchRow({ label, hint, value, onValueChange, disabled }: SwitchRowProps) {
+function ReminderSwitchRow({ label, hint, value, onValueChange, disabled }: ReminderSwitchRowProps) {
   return (
-    <Pressable
-      onPress={() => !disabled && onValueChange(!value)}
-      accessibilityRole="switch"
-      accessibilityLabel={label}
-      accessibilityHint={hint}
-      accessibilityState={{ checked: value, disabled }}
+    <SwitchRow
+      label={label}
+      hint={hint}
+      value={value}
+      onValueChange={onValueChange}
+      disabled={disabled}
       style={{ minHeight: 44, justifyContent: "center", paddingVertical: 6 }}
     >
       <MirroredRow className="items-center gap-3">
@@ -84,11 +84,9 @@ function SwitchRow({ label, hint, value, onValueChange, disabled }: SwitchRowPro
           <Text variant="title-md">{label}</Text>
           {hint ? <Text variant="caption">{hint}</Text> : null}
         </View>
-        <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-          <Switch value={value} onValueChange={onValueChange} disabled={disabled} />
-        </View>
+        <SwitchTrack value={value} disabled={disabled} />
       </MirroredRow>
-    </Pressable>
+    </SwitchRow>
   );
 }
 
@@ -224,7 +222,7 @@ export function ReminderSettingsSection() {
   return (
     <View className="gap-4">
       <Card elevation="low" className="p-5 gap-3">
-        <SwitchRow
+        <ReminderSwitchRow
           label={s.notifMasterLabel}
           hint={s.notifMasterHint}
           value={prefs.enabled}
@@ -345,7 +343,7 @@ export function ReminderSettingsSection() {
                 ? interpolate(s[labelKey], { time: formatClockMinutesForDisplay(LATE_REMINDER_MINUTES, uiLanguage) })
                 : s[labelKey];
             return (
-              <SwitchRow
+              <ReminderSwitchRow
                 key={type}
                 label={label}
                 hint={s[hintKey]}
@@ -355,7 +353,7 @@ export function ReminderSettingsSection() {
             );
           })}
           {!isWeb && (
-            <SwitchRow
+            <ReminderSwitchRow
               label={s.notifBadgeLabel}
               hint={s.notifBadgeHint}
               value={prefs.badge}

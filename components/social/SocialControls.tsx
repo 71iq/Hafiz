@@ -1,8 +1,8 @@
-import { Pressable, View, type ViewStyle } from "react-native";
+import { View, type ViewStyle } from "react-native";
 import { Info, LogIn, type LucideIcon } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Switch } from "@/components/ui/Switch";
+import { SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
@@ -118,13 +118,12 @@ export function SocialToggleRow({
 }) {
   const { isRTL } = useSettings();
   return (
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityLabel={label}
-      accessibilityHint={hint}
-      accessibilityState={{ checked: value, disabled }}
+    <SwitchRow
+      label={label}
+      hint={hint}
+      value={value}
+      onValueChange={onValueChange}
       disabled={disabled}
-      onPress={() => onValueChange(!value)}
       className="min-h-11 items-center gap-3 py-2"
       style={socialRowStyle(isRTL)}
     >
@@ -132,10 +131,8 @@ export function SocialToggleRow({
         <Text variant="title-sm">{label}</Text>
         {hint ? <Text variant="caption">{hint}</Text> : null}
       </View>
-      <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-        <Switch value={value} onValueChange={onValueChange} disabled={disabled} />
-      </View>
-    </Pressable>
+      <SwitchTrack value={value} disabled={disabled} />
+    </SwitchRow>
   );
 }
 

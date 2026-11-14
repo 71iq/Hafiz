@@ -4,7 +4,7 @@ import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions
 import { Check, ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
-import { Switch } from "@/components/ui/Switch";
+import { Switch, SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
@@ -271,25 +271,20 @@ export function ReadingSettingsSheet({
             />
             <Divider />
             {/* The whole row is the switch, so its target is the row, not the 24 px track. */}
-            <Pressable
-              onPress={() => setMarkSimilarVerses(!markSimilarVerses)}
-              accessibilityRole="switch"
-              accessibilityLabel={s.hifzSimilarMarkSetting}
-              accessibilityHint={s.hifzSimilarMarkSettingHint}
-              accessibilityState={{ checked: markSimilarVerses }}
+            <SwitchRow
+              label={s.hifzSimilarMarkSetting}
+              hint={s.hifzSimilarMarkSettingHint}
+              value={markSimilarVerses}
+              onValueChange={setMarkSimilarVerses}
             >
               <SettingsActionRow
                 title={s.hifzSimilarMarkSetting}
                 subtitle={s.hifzSimilarMarkSettingHint}
                 isRTL={isRTL}
-                trailing={
-                  <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-                    <Switch value={markSimilarVerses} onValueChange={setMarkSimilarVerses} />
-                  </View>
-                }
+                trailing={<SwitchTrack value={markSimilarVerses} />}
                 compact={compactRows}
               />
-            </Pressable>
+            </SwitchRow>
           </View>
 
           <SettingsSectionLabel label={s.tafseer} isRTL={isRTL} />

@@ -4,7 +4,7 @@ import { View, Text, Pressable, ActivityIndicator, Linking, StyleSheet, useWindo
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
-import { Switch } from "@/components/ui/Switch";
+import { SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { Toast } from "@/components/ui/Toast";
@@ -603,12 +603,11 @@ export default function SettingsScreen() {
               </SettingsControlRow>
 
               {/* The whole row is the switch, so its target is the row, not the 24 px track. */}
-              <Pressable
-                onPress={() => setMarkSimilarVerses(!markSimilarVerses)}
-                accessibilityRole="switch"
-                accessibilityLabel={s.hifzSimilarMarkSetting}
-                accessibilityHint={s.hifzSimilarMarkSettingHint}
-                accessibilityState={{ checked: markSimilarVerses }}
+              <SwitchRow
+                label={s.hifzSimilarMarkSetting}
+                hint={s.hifzSimilarMarkSettingHint}
+                value={markSimilarVerses}
+                onValueChange={setMarkSimilarVerses}
                 className="items-center justify-between gap-3"
                 style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row", minHeight: 44 }}
               >
@@ -636,10 +635,8 @@ export default function SettingsScreen() {
                     {s.hifzSimilarMarkSettingHint}
                   </Text>
                 </View>
-                <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-                  <Switch value={markSimilarVerses} onValueChange={setMarkSimilarVerses} />
-                </View>
-              </Pressable>
+                <SwitchTrack value={markSimilarVerses} />
+              </SwitchRow>
             </View>
           </Card>
 
