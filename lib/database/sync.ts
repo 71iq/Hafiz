@@ -24,6 +24,7 @@ import {
 } from "./sync-queue";
 import { backfillAchievements, insertRemoteAchievementUnlock } from "@/lib/achievements/queries";
 import { isSyncableUserSetting, putUserSetting, userSettingToSyncData } from "@/lib/database/user-settings";
+import { isRetiredSimilarCard, retireSimilarCards } from "@/lib/database/mutashabihat-rows";
 import { errorMessage } from "@/lib/error-message";
 import { applyRemoteHabitDay, habitDaySyncData } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
@@ -1114,7 +1115,7 @@ const NULLABLE_CARD_COLUMNS: ReadonlySet<string> = new Set([
  * The merge is not queued for upload: the server already holds the pulled version and merges this
  * device's pending upload the same way.
  */
-async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"]): Promise<void> {
+async function mergeStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"]): Promise<void> {
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
   if (!remoteUpdatedAt) throw new Error("Invalid synced study_cards payload");
   const local = await db.getFirstAsync<{ updated_at: string; last_review: string | null }>(
@@ -1147,6 +1148,18 @@ async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"
   }
   if (assignments.length === 0) return;
   await db.runAsync(`UPDATE study_cards SET ${assignments.join(", ")} WHERE id = ?`, [...values, row.id]);
+}
+
+/**
+ * A card from the account, restored or pulled, merged with this device's copy (mergeStudyCard). A
+ * card of a retired similar-verse slot (lib/database/mutashabihat-rows.ts) that arrives live, made on
+ * the old rows before this device refreshed or by a device still on them, is deleted in the same
+ * transaction with its upload queued. A pull never makes a deleted card live again, so it stays
+ * deleted here.
+ */
+async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"]): Promise<void> {
+  await mergeStudyCard(db, row);
+  if (isRetiredSimilarCard(row.id)) await retireSimilarCards(db, [row.id]);
 }
 
 /** A pulled card this device does not hold yet. */

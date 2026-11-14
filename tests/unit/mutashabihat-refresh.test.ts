@@ -184,6 +184,27 @@ describe("the similar-verse rows refresh", () => {
     expect(pair?.sibling).toMatchObject({ ayah: 265, similar: words(265, 0, 4) });
   });
 
+  it("deletes a retired slot's card that arrived after the version was recorded, and no other card", async () => {
+    await refreshMutashabihatRows(store.db, async () => rowsFile());
+    // The card comes back live, as from a device still on the old rows, after this version was recorded.
+    store.sql.prepare("DELETE FROM study_cards WHERE id = ?").run(`mutashabihat:${GROUP}:1`);
+    seedCard(`mutashabihat:${GROUP}:1`, 0);
+    store.sql.exec("DELETE FROM sync_queue");
+    const kept = card(`mutashabihat:${GROUP}:0`);
+    const load = jest.fn(async () => rowsFile());
+
+    await expect(refreshMutashabihatRows(store.db, load)).resolves.toEqual({
+      replaced: false,
+      retiredCards: [`mutashabihat:${GROUP}:1`],
+    });
+    expect(load).not.toHaveBeenCalled();
+    expect(card(`mutashabihat:${GROUP}:1`).deleted_at).toEqual(expect.any(String));
+    expect(queue()).toEqual([{ table_name: "study_cards", operation: "DELETE", row_id: `mutashabihat:${GROUP}:1` }]);
+    expect(logCount(`mutashabihat:${GROUP}:1`)).toBe(3);
+    expect(card(`mutashabihat:${GROUP}:0`)).toEqual(kept);
+    expect(card("2:255").deleted_at).toBeNull();
+  });
+
   it("does nothing once the database holds this version, without reading the file", async () => {
     await refreshMutashabihatRows(store.db, async () => rowsFile());
     const queued = queue().length;

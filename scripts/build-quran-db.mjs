@@ -12,12 +12,17 @@ const DATA_DIR = path.join(ROOT, "assets", "data");
 const DB_PATH = path.join(DATA_DIR, "quran.db");
 const SCHEMA_PATH = path.join(ROOT, "lib", "database", "schema.ts");
 const MUTASHABIHAT_ROWS_FILE = path.join("mutashabihat", "nourquran_hafiz_rows.json");
+const MUTASHABIHAT_RETIRED_FILE = path.join("mutashabihat", "nourquran_hafiz_retired_cards.json");
 
 const ARABIC_DIACRITICS_RE = /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
 const NON_ARABIC_RE = /[^\u0600-\u06FF]/g;
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(DATA_DIR, relativePath), "utf8"));
+}
+
+function readJsonIfExists(relativePath) {
+  return fs.existsSync(path.join(DATA_DIR, relativePath)) ? readJson(relativePath) : null;
 }
 
 function stripHtml(html) {
@@ -342,16 +347,18 @@ function buildQiraatRows(data) {
  * similar-kind ref's pre, similar and post segments are rebuilt from the Uthmani text around its ayah
  * (scripts/mutashabihat-align.mjs). Study card ids are built from a group's id and a ref's sort
  * order (lib/fsrs/smart-decks.ts), so a ref that changes ayah must not keep its sort order:
- * - a ref whose text is another ayah's is relabelled to that ayah and takes the next free sort order
- *   after the group's source refs, in source order;
+ * - a ref whose text, or whose words in common with its group, are another ayah's is relabelled to
+ *   that ayah and takes the next free sort order after the group's source refs, in source order;
  * - it is left out instead when that ayah is already in its group;
  * - the other refs keep their source sort orders, gaps included.
  * The build refuses a ref the rule cannot align, or one left without similar words. Tail-only groups
- * carry no segments.
+ * carry no segments. `sourceSlots` are the card ids of the source sort orders with their source ayat,
+ * the slots of the rows before any relabelling (retiredSimilarCards).
  */
 function buildMutashabihatRows(data, quran) {
   const groupRows = [];
   const refRows = [];
+  const sourceSlots = [];
   const tally = { rebuilt: 0, relabelled: 0, dropped: 0 };
   const surahNames = new Map();
   for (const group of [...(data.similar_groups ?? []), ...(data.tail_groups ?? [])]) {
@@ -374,6 +381,9 @@ function buildMutashabihatRows(data, quran) {
       if (!id || typeof cue !== "string" || cue.trim().length === 0) continue;
 
       groupRows.push([id, kind, cue.trim(), String(group.source ?? data.source?.name ?? "nourquran"), sortOrder++]);
+      validRefs.forEach((ref, index) => {
+        sourceSlots.push([similarCardId(kind, id, index), `${ref.surah}:${ref.ayah}`]);
+      });
       const placed = validRefs.map((ref, index) => {
         const row = {
           index,
@@ -386,7 +396,11 @@ function buildMutashabihatRows(data, quran) {
         };
         const hasSegments = [ref.pre_text, ref.similar_text, ref.post_text].some((text) => typeof text === "string");
         if (kind !== "similar" || !hasSegments) return row;
-        const rebuilt = rebuildRef(ref, quran);
+        const siblings = validRefs
+          .filter((_, other) => other !== index)
+          .map((other) => other.similar_text)
+          .filter((text) => typeof text === "string");
+        const rebuilt = rebuildRef(ref, quran, siblings);
         if (rebuilt.status === "kept") {
           throw new Error(
             `Similar-verse ref ${id}:${index} (${ref.surah}:${ref.ayah}) is not aligned: ${rebuilt.notes.join("; ")}`,
@@ -440,7 +454,53 @@ function buildMutashabihatRows(data, quran) {
 
   appendGroups(Array.isArray(data.similar_groups) ? data.similar_groups : [], "similar");
   appendGroups(Array.isArray(data.tail_groups) ? data.tail_groups : [], "tail");
-  return { groupRows, refRows, tally };
+  return { groupRows, refRows, sourceSlots, tally };
+}
+
+/** A ref's study card id, as lib/fsrs/smart-decks.ts builds it. */
+function similarCardId(kind, groupId, sortOrder) {
+  return `${kind === "tail" ? "similar-tail" : "mutashabihat"}:${groupId}:${sortOrder}`;
+}
+
+/** Each slot's card id with the ayah it holds ("surah:ayah"), from groups and refs rows. */
+function slotsOf(groupRows, refRows) {
+  const kinds = new Map(groupRows.map((row) => [row[0], row[1]]));
+  return new Map(refRows.map((row) => [similarCardId(kinds.get(row[0]), row[0], row[1]), `${row[2]}:${row[3]}`]));
+}
+
+/**
+ * The study card ids of the slots (a group id and a sort order) that held a verse and hold none now.
+ * The app deletes their cards wherever they come from (lib/database/mutashabihat-rows.ts), so a slot
+ * listed here must never hold a ref again. The list only grows: it keeps the ids already written and
+ * adds the source sort orders (every build's slots before relabelling) and the previous rows file's
+ * slots that hold no ref now. Read before the rows file is rewritten. A slot that would show another
+ * verse than it did, or a listed slot that holds a ref again, stops the build.
+ */
+function retiredSimilarCards(mutashabihat) {
+  const live = slotsOf(mutashabihat.groupRows, mutashabihat.refRows);
+  const before = new Map(mutashabihat.sourceSlots);
+  const previous = readJsonIfExists(MUTASHABIHAT_ROWS_FILE);
+  if (previous) for (const [id, verse] of slotsOf(previous.groups, previous.refs)) before.set(id, verse);
+  const retired = new Set(readJsonIfExists(MUTASHABIHAT_RETIRED_FILE)?.cards ?? []);
+  for (const [id, verse] of before) {
+    const now = live.get(id);
+    if (now === undefined) retired.add(id);
+    else if (now !== verse) throw new Error(`Similar-verse card ${id} would show ${now} instead of ${verse}`);
+  }
+  const reused = [...retired].filter((id) => live.has(id));
+  if (reused.length > 0) throw new Error(`Retired similar-verse cards would hold a ref again: ${reused.join(", ")}`);
+  return [...retired].sort();
+}
+
+function writeRetiredSimilarCardsFile(cards) {
+  const text = [
+    "{",
+    `  "about": "Generated by scripts/build-quran-db.mjs. Study card ids of similar-verse slots that held a verse and hold none now; the app deletes their cards. Do not edit.",`,
+    `  "cards": [\n${cards.map((id) => `    ${JSON.stringify(id)}`).join(",\n")}\n  ]`,
+    "}",
+    "",
+  ].join("\n");
+  fs.writeFileSync(path.join(DATA_DIR, MUTASHABIHAT_RETIRED_FILE), text);
 }
 
 /**
@@ -633,7 +693,10 @@ async function main() {
   console.log(
     `Similar-verse refs: ${rebuilt} rebuilt from the Uthmani text, ${relabelled} relabelled to the ayah whose text they hold, ${dropped} left out as already in their group`,
   );
+  const retiredCards = retiredSimilarCards(mutashabihat);
   console.log(`Wrote ${MUTASHABIHAT_ROWS_FILE}, version ${writeMutashabihatRowsFile(mutashabihat)}`);
+  writeRetiredSimilarCardsFile(retiredCards);
+  console.log(`Wrote ${MUTASHABIHAT_RETIRED_FILE}, ${retiredCards.length} retired card ids`);
   await db.insertRows("mutashabihat_groups", ["id", "kind", "cue", "source", "sort_order"], mutashabihat.groupRows);
   await db.insertRows("mutashabihat_refs", ["group_id", "sort_order", "surah", "ayah", "surah_name_ar", "tail_5", "pre_text", "similar_text", "post_text"], mutashabihat.refRows, 100);
 

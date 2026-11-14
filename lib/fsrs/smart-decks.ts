@@ -1179,11 +1179,33 @@ function buildSegmentedMutashabihatPrompt(
 /**
  * Where the similar words end in the ayah, matched word for word against its Uthmani text. The bundled
  * segments are built from the Uthmani text, whose spelling the plain text does not always share
- * ("أَزْوَٰجًا", "أَزْوَاجًا"), so this is tried when the plain text does not hold them.
+ * ("أَزْوَٰجًا", "أَزْوَاجًا"), so this is tried when the plain text does not hold them. Similar words
+ * that cross an ayah end are only partly in the ayah (crossingSimilarEnd).
  */
 function uthmaniSegmentEnd(ref: SmartDeckRef): number {
   const keys = (text: string) => splitQuranWords(text).map((word) => normalizeArabicWords(word).join(""));
-  return findSegmentPromptWordCount(keys(ref.textUthmani), keys(ref.preText ?? ""), keys(ref.similarText ?? ""));
+  const ayahWords = keys(ref.textUthmani);
+  const similarWords = keys(ref.similarText ?? "");
+  return (
+    findSegmentPromptWordCount(ayahWords, keys(ref.preText ?? ""), similarWords) ||
+    crossingSimilarEnd(ayahWords, similarWords)
+  );
+}
+
+/**
+ * The prompt end for similar words that cross an ayah end, or 0: ones that start in the ayah and run
+ * on into the next (101:6's "فَأَمَّا مَن ثَقُلَتْ مَوَٰزِينُهُۥ" into 101:7) end with the ayah; ones that
+ * run in from the ayah before end at their last word here. The longest overlap counts, and it takes
+ * two words, so a word that merely recurs does not (a one-word ayah such as "طسٓمٓ" keeps the prompt
+ * buildMutashabihatPrompt gives it).
+ */
+function crossingSimilarEnd(ayahWords: string[], similarWords: string[]): number {
+  for (let overlap = Math.min(ayahWords.length, similarWords.length - 1); overlap >= 2; overlap--) {
+    const tail = ayahWords.slice(ayahWords.length - overlap);
+    if (similarWords.slice(0, overlap).every((word, k) => word === tail[k])) return ayahWords.length;
+    if (similarWords.slice(similarWords.length - overlap).every((word, k) => word === ayahWords[k])) return overlap;
+  }
+  return 0;
 }
 
 function findSegmentPromptWordCount(

@@ -33,9 +33,12 @@
  *    the passage ends where the kept words end.
  * 5. A ref whose passage reads as another ayah's (its similar words read there, at least 80% of its
  *    words fit there, and more than here) is relabelled to that ayah and rebuilt around it by the
- *    same steps. The build drops it instead when that ayah is already in its group, and gives a
- *    relabelled ref a new sort order (scripts/build-quran-db.mjs), since study card ids are built
- *    from sort orders and a card must not move to another verse.
+ *    same steps. So is a ref whose similar words cross an ayah end and whose words in common with
+ *    its group's other similar words all lie in the ayah beside its own (101:7 holds 101:6's
+ *    "فَأَمَّا مَن ثَقُلَتْ مَوَٰزِينُهُۥ", as its siblings 7:8 and 23:102 hold "فَمَن ثَقُلَتْ مَوَٰزِينُهُۥ"):
+ *    the words that make it similar are that ayah's. The build drops a relabelled ref instead when
+ *    that ayah is already in its group, and gives it a new sort order (scripts/build-quran-db.mjs),
+ *    since study card ids are built from sort orders and a card must not move to another verse.
  * 6. A ref that fits none of these with certainty, or whose similar words fit two places equally,
  *    is "kept" as the source has it; the build refuses to write such a ref.
  */
@@ -452,6 +455,22 @@ function similarElsewhere(quran, similar) {
   return found;
 }
 
+/**
+ * Rule step 5, second case: the ayah beside `ayah` into which the placed similar words cross, when
+ * every word they share with `siblings` (the group's other source similar texts, compared by
+ * consonants) lies there and none lies in `ayah`; otherwise null. The basmala is not an ayah to
+ * relabel to.
+ */
+function ayahOfSharedWords(place, context, ayah, siblings) {
+  const run = context.slice(place.start, place.end);
+  const beside = [...new Set(run.map((word) => word.ayah))].filter((other) => other !== ayah);
+  if (beside.length !== 1 || beside[0] < 1) return null;
+  const key = (word) => word.skeleton || word.letters;
+  const shared = new Set(siblings.flatMap((text) => sourceWords(text).map((word) => key(keyed(word)))));
+  const sharedIn = (where) => run.filter((word) => word.ayah === where && shared.has(key(word))).length;
+  return sharedIn(ayah) === 0 && sharedIn(beside[0]) > 0 ? beside[0] : null;
+}
+
 /** The full rebuild of one ref around a placement of its similar words. */
 function rebuildAround(place, segments, context, all) {
   const [pre, similar, post] = segments;
@@ -581,9 +600,9 @@ function changeOf(rebuilt) {
  * surah and ayah whose text it holds) or "kept"; the new `segments`; the source's `old` segments; the
  * `marks` removed; and for the report the `change` made and `notes`. `quran` gives
  * `ayahWords(surah, ayah)`, `ayahCount(surah)`, `basmala` (words) and `allAyat()` ([surah, ayah,
- * words] for every ayah).
+ * words] for every ayah). `siblings` are the source similar texts of the other refs in its group.
  */
-export function rebuildRef(ref, quran) {
+export function rebuildRef(ref, quran, siblings = []) {
   const marks = {};
   const raw = [ref.pre_text, ref.similar_text, ref.post_text].map((text) => sourceWords(text, marks));
   const segments = raw.map((words) => words.map(keyed));
@@ -631,6 +650,29 @@ export function rebuildRef(ref, quran) {
   }
   if (tied) return kept("similar words fit more than one place in its own ayah equally");
   if (best.similarSkip > MAX_FILL) return kept("its similar words skip a long stretch of its ayah");
+
+  // Rule step 5, second case: are the words that make it similar the next or previous ayah's?
+  const beside = ayahOfSharedWords(best.place, context, ref.ayah, siblings);
+  if (beside !== null) {
+    const note = `the similar words it shares with its group are ${ref.surah}:${beside}'s`;
+    const besideContext = contextOf(quran, ref.surah, beside);
+    const found = bestRebuild(placeSimilar(segments[1], besideContext, beside), segments, besideContext, all);
+    const sure =
+      found.best &&
+      !found.tied &&
+      found.best.place.dropped <= Math.floor(segments[1].length / 3) &&
+      found.best.similarSkip <= MAX_FILL;
+    if (!sure) return kept(`${note}, but they do not rebuild there with certainty`);
+    return {
+      ...base,
+      status: "relabelled",
+      relabel: { surah: ref.surah, ayah: beside },
+      kinds: ["relabelled"],
+      notes: [note],
+      segments: segmentsOf(found.best, besideContext),
+      change: changeOf(found.best),
+    };
+  }
   return {
     ...base,
     status: "rebuilt",

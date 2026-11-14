@@ -33,9 +33,14 @@ const source = JSON.parse(fs.readFileSync(root + "/assets/data/mutashabihat/nour
 const words = (key, from, to) => verses.get(key).slice(from, to).join(" ");
 const out = cases.map((c) => {
   let ref = c.ref;
-  if (c.source) ref = source.similar_groups.find((g) => g.id === c.source[0]).refs[c.source[1]];
+  let siblings = [];
+  if (c.source) {
+    const refs = source.similar_groups.find((g) => g.id === c.source[0]).refs;
+    ref = refs[c.source[1]];
+    siblings = refs.filter((other) => other !== ref).map((other) => other.similar_text);
+  }
   if (c.made) ref = { surah: c.made.surah, ayah: c.made.ayah, ...Object.fromEntries(Object.entries(c.made.parts).map(([k, v]) => [k + "_text", v.map((p) => words(...p)).join(" ")])) };
-  const r = rebuildRef(ref, quran);
+  const r = rebuildRef(ref, quran, siblings);
   return { status: r.status, relabel: r.relabel, segments: r.segments, change: r.change, words: c.expect ? Object.fromEntries(Object.entries(c.expect).map(([k, p]) => [k, p.map((q) => words(...q)).join(" ")])) : null };
 });
 console.log(JSON.stringify(out));
@@ -90,6 +95,14 @@ describe("the similar-verse alignment rule", () => {
       source: ["nq-sim-6b0cb090bae7db", 1],
       expect: { pre: [["2:264", 18]], similar: [["2:265", 0, 4]], post: [["2:265", 4, 13]] },
     },
+    // 101:7's similar words run from 101:6 into 101:7, and the ones its siblings 7:8 and 23:102 share
+    // ("ثَقُلَتْ مَوَٰزِينُهُۥ") are all 101:6's.
+    {
+      source: ["nq-sim-7d0576c830de2e", 2],
+      expect: { pre: [["101:5"]], similar: [["101:6"], ["101:7"]], post: [["101:8"], ["101:9"]] },
+    },
+    // 26:1's similar words run from طسٓمٓ into 26:2, but طسٓمٓ itself is shared with 28:1.
+    { source: ["nq-sim-8e5f9a9baad24c", 0], expect: { similar: [["26:1"], ["26:2"]] } },
   ]);
 
   it("fills a skip of 12 words or fewer with the Quran's own words", () => {
@@ -125,5 +138,14 @@ describe("the similar-verse alignment rule", () => {
     expect(ref.status).toBe("relabelled");
     expect(ref.relabel).toEqual({ surah: 2, ayah: 265 });
     expect(ref.segments).toEqual(ref.words);
+  });
+
+  it("relabels a ref to the ayah beside it when the similar words it shares with its group are all there", () => {
+    const [moved, kept] = results.slice(5);
+    expect(moved.status).toBe("relabelled");
+    expect(moved.relabel).toEqual({ surah: 101, ayah: 6 });
+    expect(moved.segments).toEqual(moved.words);
+    expect(kept.status).toBe("rebuilt");
+    expect(kept.segments.similar).toBe(kept.words!.similar);
   });
 });

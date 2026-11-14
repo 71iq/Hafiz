@@ -966,9 +966,9 @@ async function runNewTabImports(db: AppDatabase, onProgress: ProgressCallback): 
   // whose passages are not aligned with the Quran text (lib/database/mutashabihat-rows.ts).
   await safeImport("mutashabihat", async () => {
     const refresh = await refreshMutashabihatRows(db, () => loadData(MUTASHABIHAT_ROWS_FILE));
-    if (refresh.replaced) {
+    if (refresh.replaced || refresh.retiredCards.length > 0) {
       console.log(
-        `[Import] similar-verse rows refreshed; ${refresh.retiredCards.length} cards without their verse deleted`,
+        `[Import] similar-verse rows ${refresh.replaced ? "refreshed" : "current"}; ${refresh.retiredCards.length} cards of retired slots deleted`,
       );
     }
   });

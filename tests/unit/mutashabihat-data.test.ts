@@ -14,7 +14,9 @@ import { MUTASHABIHAT_DATA_VERSION, parseMutashabihatRows } from "@/lib/database
  * - the Quran words a source passage skipped are filled when they are 12 or fewer, so a skip left
  *   between two segments is longer, and the app shows it as "…";
  * - study card ids are a group id and a sort order, so a sort order keeps its source ayah, and a ref
- *   relabelled to the ayah whose text it holds takes a new one.
+ *   relabelled to the ayah whose text it holds takes a new one;
+ * - the slots left without a ref are listed in assets/data/mutashabihat/nourquran_hafiz_retired_cards.json,
+ *   whose cards the app deletes wherever they arrive, and no listed slot holds a ref.
  */
 const ROOT = path.join(__dirname, "../..");
 const MAX_FILL = 12;
@@ -128,16 +130,21 @@ describe("the bundled similar-verse passages", () => {
       else if (was.surah !== ref.surah || was.ayah !== ref.ayah) moved.push(`${ref.group_id}#${ref.sort_order}`);
     }
     expect(moved).toEqual([]);
-    expect(relabelled).toHaveLength(19);
+    expect(relabelled).toHaveLength(20);
     expect(relabelled).toEqual(
       expect.arrayContaining([
         "nq-sim-6b0cb090bae7db#2 2:265",
         "nq-sim-f58bbe09e8ddf0#2 65:2",
         "nq-sim-1b532f39044afd#3 11:13",
+        // 101:7's similar words shared with 7:8 and 23:102 are 101:6's, so it is 101:6 as they are.
+        "nq-sim-7d0576c830de2e#3 7:8",
+        "nq-sim-7d0576c830de2e#4 23:102",
+        "nq-sim-7d0576c830de2e#5 101:6",
       ]),
     );
     // 2:264 held 2:265's text: its old sort order is gone, so its old card cannot show 2:265.
     expect(refs.some((ref) => ref.group_id === "nq-sim-6b0cb090bae7db" && ref.sort_order === 1)).toBe(false);
+    expect(refs.some((ref) => ref.group_id === "nq-sim-7d0576c830de2e" && ref.sort_order === 2)).toBe(false);
 
     const versesPerGroup = new Map<string, Set<string>>();
     for (const ref of similarRefs) {
@@ -147,6 +154,40 @@ describe("the bundled similar-verse passages", () => {
     }
     const lonely = [...versesPerGroup].filter(([, verses]) => verses.size < 2).map(([id]) => id);
     expect(lonely).toEqual([]);
+  });
+
+  it("list every source sort order left without its ayah as retired, and give no retired slot a ref", () => {
+    const source = JSON.parse(
+      fs.readFileSync(path.join(ROOT, "assets/data/mutashabihat/nourquran_hafiz.json"), "utf8"),
+    ) as { similar_groups: SourceGroup[]; tail_groups: SourceGroup[] };
+    const retired = new Set(
+      (
+        JSON.parse(
+          fs.readFileSync(path.join(ROOT, "assets/data/mutashabihat/nourquran_hafiz_retired_cards.json"), "utf8"),
+        ) as { cards: string[] }
+      ).cards,
+    );
+    const cardId = (groupId: string, sortOrder: number) =>
+      `${kinds.get(groupId) === "tail" ? "similar-tail" : "mutashabihat"}:${groupId}:${sortOrder}`;
+    const live = new Map(refs.map((ref) => [cardId(ref.group_id, ref.sort_order), `${ref.surah}:${ref.ayah}`]));
+    const unlisted: string[] = [];
+    for (const group of [...source.similar_groups, ...source.tail_groups]) {
+      if (!kinds.has(group.id)) continue;
+      const list = (group.refs ?? []).filter((ref) => Number.isInteger(ref.surah) && Number.isInteger(ref.ayah));
+      list.forEach((ref, sortOrder) => {
+        const id = cardId(group.id, sortOrder);
+        if (live.get(id) !== `${ref.surah}:${ref.ayah}` && !retired.has(id)) unlisted.push(id);
+      });
+    }
+    expect(unlisted).toEqual([]);
+    expect([...retired].filter((id) => live.has(id))).toEqual([]);
+    expect(
+      [...retired].filter((id) => !/^(mutashabihat|similar-tail):(.+):\d+$/.test(id) || !kinds.has(id.split(":")[1])),
+    ).toEqual([]);
+    expect([...retired]).toEqual(
+      expect.arrayContaining(["mutashabihat:nq-sim-6b0cb090bae7db:1", "mutashabihat:nq-sim-7d0576c830de2e:2"]),
+    );
+    expect(retired.size).toBe(20);
   });
 
   it("are the rows of the rows file the app refreshes from, at the version it expects", () => {

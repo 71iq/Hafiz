@@ -1,3 +1,4 @@
+import retiredCardsFile from "../../assets/data/mutashabihat/nourquran_hafiz_retired_cards.json";
 import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { deleteStudyCardRow } from "@/lib/fsrs/queries";
@@ -15,10 +16,43 @@ export const MUTASHABIHAT_ROWS_FILE = "mutashabihat/nourquran_hafiz_rows.json";
  * rows. tests/unit/mutashabihat-data.test.ts checks that they match, so rebuilt rows come with a new
  * version and installed apps refresh to them.
  */
-export const MUTASHABIHAT_DATA_VERSION = "985ba9352302d8e2";
+export const MUTASHABIHAT_DATA_VERSION = "0071dd8f83fae6bc";
 
 /** Device-only setting (lib/database/user-settings.ts): the version of the rows this database holds. */
 export const MUTASHABIHAT_VERSION_SETTING = "device_mutashabihat_data_version";
+
+/**
+ * The study card ids of the similar-verse slots (a group id and a sort order) that held a verse in an
+ * earlier version of the rows and hold none now, as scripts/build-quran-db.mjs writes them beside the
+ * rows file. A ref relabelled to the ayah whose words it holds takes a new sort order, so the card of
+ * its old one would stay with nothing to show. The build never gives a listed slot a ref again.
+ */
+const RETIRED_SIMILAR_CARDS: ReadonlySet<string> = new Set(retiredCardsFile.cards);
+
+export function isRetiredSimilarCard(cardId: string): boolean {
+  return RETIRED_SIMILAR_CARDS.has(cardId);
+}
+
+/**
+ * Deletes the live cards among `cardIds` (every retired id by default) whose slot is retired, in the
+ * caller's transaction, each with its upload queued (deleteStudyCardRow); no other card is touched.
+ * A card made on the old rows can reach a device after its refresh, from the account restore or a
+ * pull (lib/database/sync.ts), so this runs wherever cards arrive and at every launch. Review logs
+ * stay, as for any deleted card. Returns the ids deleted.
+ */
+export async function retireSimilarCards(
+  db: DatabaseExecutor,
+  cardIds: Iterable<string> = RETIRED_SIMILAR_CARDS,
+): Promise<string[]> {
+  const ids = [...new Set(cardIds)].filter(isRetiredSimilarCard);
+  if (ids.length === 0) return [];
+  const live = await db.getAllAsync<{ id: string; deck_id: string }>(
+    `SELECT id, deck_id FROM study_cards WHERE deleted_at IS NULL AND id IN (${ids.map(() => "?").join(", ")}) ORDER BY id`,
+    ids,
+  );
+  for (const card of live) await deleteStudyCardRow(db, card.deck_id, card.id);
+  return live.map((card) => card.id);
+}
 
 type GroupRow = readonly [id: string, kind: "similar" | "tail", cue: string, source: string, sortOrder: number];
 type RefRow = readonly [
@@ -96,15 +130,9 @@ type InstalledRef = {
   pre_text: string | null;
   similar_text: string | null;
   post_text: string | null;
-  kind: "similar" | "tail" | null;
 };
 
 const REF_COLUMNS = "group_id, sort_order, surah, ayah, surah_name_ar, tail_5, pre_text, similar_text, post_text";
-
-/** The study card id of a ref, as the smart decks build it (lib/fsrs/smart-decks.ts). */
-function cardIdOf(kind: "similar" | "tail", groupId: string, sortOrder: number): string {
-  return `${kind === "tail" ? "similar-tail" : "mutashabihat"}:${groupId}:${sortOrder}`;
-}
 
 /** Whether the database holds no similar-verse rows, or a similar ref without similar words. */
 async function isIncomplete(db: DatabaseExecutor): Promise<boolean> {
@@ -146,36 +174,20 @@ function sameRows(
   );
 }
 
-/**
- * The study cards of the installed refs whose place in a group (its id and sort order, which make
- * the card id) no longer holds the same verse: the ref was left out, or another verse took its sort
- * order. A ref relabelled to the verse whose text it holds gets a new sort order instead
- * (scripts/build-quran-db.mjs), so its old card would otherwise stay behind with nothing to show.
- */
-function cardsWithoutTheirVerse(installedRefs: readonly InstalledRef[], rows: MutashabihatRows): string[] {
-  const bundled = new Map(rows.refs.map((row) => [`${row[0]}\u0000${row[1]}`, row]));
-  return installedRefs.flatMap((ref) => {
-    if (ref.kind === null) return [];
-    const now = bundled.get(`${ref.group_id}\u0000${ref.sort_order}`);
-    if (now && now[2] === ref.surah && now[3] === ref.ayah) return [];
-    return [cardIdOf(ref.kind, ref.group_id, ref.sort_order)];
-  });
-}
-
 export type MutashabihatRefresh = Readonly<{ replaced: boolean; retiredCards: readonly string[] }>;
 
 /**
  * Brings the database's similar-verse rows to the version this app ships. importBundledDatabase keeps
  * an existing database on web and native, so an installed app holds the rows of the bundle it was
- * installed from, and an empty or incomplete table needs them too. Runs at every launch and reads
- * one setting once the database is current.
+ * installed from, and an empty or incomplete table needs them too. Runs at every launch; once the
+ * database is current it reads one setting and looks for live retired cards.
  *
- * The rows are replaced in one transaction, with the version setting. A study card whose ref no
- * longer holds its verse (cardsWithoutTheirVerse) is deleted in the same transaction, with its upload
- * queued, so no card shows another verse than the one it was reviewed as, and none is left behind
- * with nothing to show. Its review log stays, as for any deleted card. Recitation errors and drift
- * siblings name verses, not refs, and are left as they are: a drift's "Which one" pair is looked up
- * in the current groups (similarPair), so a pair the data no longer holds is not asked.
+ * The rows are replaced in one transaction, with the version setting. The live cards of retired
+ * slots (retireSimilarCards) are deleted in the same transaction, with their uploads queued, so no
+ * card shows another verse than the one it was reviewed as, and none is left behind with nothing to
+ * show. Review logs stay, as for any deleted card. Recitation errors and drift siblings name verses,
+ * not refs, and are left as they are: a drift's "Which one" pair is looked up in the current groups
+ * (similarPair), so a pair the data no longer holds is not asked.
  *
  * Throws when the file is malformed or is not this version (a stale cached copy); nothing is written
  * then, and the next launch tries again.
@@ -188,7 +200,7 @@ export async function refreshMutashabihatRows(
     MUTASHABIHAT_VERSION_SETTING,
   ]);
   if (stored?.value === MUTASHABIHAT_DATA_VERSION && !(await isIncomplete(db))) {
-    return { replaced: false, retiredCards: [] };
+    return { replaced: false, retiredCards: await retireLiveCards(db) };
   }
   const rows = parseMutashabihatRows(await load());
   if (rows.version !== MUTASHABIHAT_DATA_VERSION) {
@@ -204,20 +216,17 @@ export async function refreshMutashabihatRows(
     db.getAllAsync<{ id: string; kind: string; cue: string; source: string; sort_order: number }>(
       "SELECT id, kind, cue, source, sort_order FROM mutashabihat_groups",
     ),
-    db.getAllAsync<InstalledRef>(
-      `SELECT ${REF_COLUMNS.split(", ")
-        .map((column) => `r.${column}`)
-        .join(", ")}, g.kind
-         FROM mutashabihat_refs r LEFT JOIN mutashabihat_groups g ON g.id = r.group_id`,
-    ),
+    db.getAllAsync<InstalledRef>(`SELECT ${REF_COLUMNS} FROM mutashabihat_refs`),
   ]);
+  let retiredCards: string[] = [];
   if (sameRows(installedGroups, installedRefs, rows)) {
-    await writeVersion(db);
-    return { replaced: false, retiredCards: [] };
+    await db.withTransactionAsync(async (tx) => {
+      retiredCards = await retireSimilarCards(tx);
+      await writeVersion(tx);
+    });
+    return { replaced: false, retiredCards };
   }
 
-  const candidates = cardsWithoutTheirVerse(installedRefs, rows);
-  const retiredCards: string[] = [];
   await db.withTransactionAsync(async (tx) => {
     await tx.runAsync("DELETE FROM mutashabihat_refs");
     await tx.runAsync("DELETE FROM mutashabihat_groups");
@@ -231,16 +240,27 @@ export async function refreshMutashabihatRows(
       `INSERT INTO mutashabihat_refs (${REF_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       rows.refs.map((row) => [...row]),
     );
-    for (const id of candidates) {
-      const card = await tx.getFirstAsync<{ deck_id: string }>(
-        "SELECT deck_id FROM study_cards WHERE id = ? AND deleted_at IS NULL",
-        [id],
-      );
-      if (!card) continue;
-      await deleteStudyCardRow(tx, card.deck_id, id);
-      retiredCards.push(id);
-    }
+    retiredCards = await retireSimilarCards(tx);
     await writeVersion(tx);
   });
   return { replaced: true, retiredCards };
+}
+
+/**
+ * The launch check once the rows are current: a retired card that arrived by a path that missed it
+ * is deleted in its own transaction. Usually there is none, and nothing is written.
+ */
+async function retireLiveCards(db: AppDatabase): Promise<string[]> {
+  const ids = [...RETIRED_SIMILAR_CARDS];
+  if (ids.length === 0) return [];
+  const live = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM study_cards WHERE deleted_at IS NULL AND id IN (${ids.map(() => "?").join(", ")})`,
+    ids,
+  );
+  if (!live?.count) return [];
+  let retired: string[] = [];
+  await db.withTransactionAsync(async (tx) => {
+    retired = await retireSimilarCards(tx);
+  });
+  return retired;
 }
