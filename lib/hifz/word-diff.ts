@@ -28,11 +28,31 @@ export function differingWords(own: readonly string[], others: readonly (readonl
  * "الصَّلَاةَ"); a waw with its own vowel, as in "ٱلسَّمَٰوَٰتِ", stays a waw.
  */
 export function wordKey(word: string): string {
-  const spelled = word
-    .replace(/\u0649\u0670/g, "\u0649")
-    .replace(/\u0648\u0670/g, "ا")
-    .replace(/\u0670/g, "ا");
-  return normalizeArabicWord(spelled).replace(/ا+/g, "ا");
+  return remembered(wordKeys, word, () => {
+    const spelled = word
+      .replace(/\u0649\u0670/g, "\u0649")
+      .replace(/\u0648\u0670/g, "ا")
+      .replace(/\u0670/g, "ا");
+    return normalizeArabicWord(spelled).replace(/ا+/g, "ا");
+  });
+}
+
+/**
+ * The keys already worked out, by word. A page's similar verses compare the same few hundred words many
+ * times over (Sol round 19 measured 106 passes on page 501), so each word is normalized once. Bounded,
+ * since words from every page read in a session pass through.
+ */
+const wordKeys = new Map<string, string>();
+const skeletonKeys = new Map<string, string>();
+const REMEMBERED_MAX = 20_000;
+
+function remembered(store: Map<string, string>, word: string, make: () => string): string {
+  const known = store.get(word);
+  if (known !== undefined) return known;
+  if (store.size >= REMEMBERED_MAX) store.clear();
+  const key = make();
+  store.set(word, key);
+  return key;
 }
 
 /**
@@ -43,10 +63,12 @@ export function wordKey(word: string): string {
  * to tell single words apart, which wordKey does, so only runs of words are compared this way.
  */
 function skeleton(word: string): string {
-  return wordKey(word)
-    .replace(/[^ء-ي]/g, "")
-    .replace(/[اءويى]/g, "")
-    .replace(/(.)\1+/g, "$1");
+  return remembered(skeletonKeys, word, () =>
+    wordKey(word)
+      .replace(/[^ء-ي]/g, "")
+      .replace(/[اءويى]/g, "")
+      .replace(/(.)\1+/g, "$1"),
+  );
 }
 
 /** The skeletons of the words that have one; "يا", "أو" or ۩ have none and are skipped on both sides. */
