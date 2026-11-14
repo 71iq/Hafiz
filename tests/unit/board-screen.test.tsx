@@ -53,6 +53,17 @@ jest.mock("@/lib/supabase", () => ({
     rpc: (fn: string, args: Record<string, unknown>) =>
       require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
     auth: { getSession: async () => ({ data: { session: mockAuth.session }, error: null }) },
+    // Joining as a minor first deletes the account's stored photos; this account has none.
+    storage: {
+      from: () => {
+        const files = {
+          setHeader: () => files,
+          list: async () => ({ data: [], error: null }),
+          remove: async () => ({ data: [], error: null }),
+        };
+        return files;
+      },
+    },
   },
 }));
 jest.mock("@/lib/social/queries", () => ({

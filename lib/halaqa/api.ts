@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { parseHifzPlan } from "@/lib/hifz/plan";
 import type { SocialOwner } from "@/lib/social/owner";
-import { callSocialRpc, localDateSchema, readSocial, voidResult, type SocialRead } from "@/lib/social/remote";
+import { callSocialRpc, localDateSchema, readSocial, socialError, voidResult, type SocialRead } from "@/lib/social/remote";
 import type { SocialBands } from "@/lib/social/bands";
 
 /**
@@ -280,24 +280,43 @@ export function fetchTeacherView(groupId: string, memberId: string, today: strin
   );
 }
 
+/** One page of the inbox: at most 100 items, oldest first, and whether another page follows. */
+const receivedPageSchema = z.object({
+  items: z.array(z.object({ id: z.string().uuid(), created_at: z.string().min(1) })).max(100),
+  more: z.boolean(),
+  checked_at: z.string().min(1),
+});
+
+export type ReceivedEncouragements = Readonly<{
+  items: { id: string; createdAt: string }[];
+  checkedAt: string;
+}>;
+
+/**
+ * Seven days of every halaqa a reader can be in (10 groups of 50, one send per sender and day) stay
+ * under 4,000 items, which is 40 pages.
+ */
+const RECEIVED_MAX_PAGES = 50;
+
 /**
  * Encouragements the reader received in the last 7 days across the halaqas they are still in (5.8.2),
- * newest first and at most 50, each with its id for the device to acknowledge. `checkedAt` is the
- * server's time, for pruning acknowledged ids by age.
+ * each with its id for the device to acknowledge. Reads every page of the window, oldest first, so
+ * more arrivals than one page between checks are all listed. `checkedAt` is the server's time at the
+ * first page, for pruning acknowledged ids by age.
  */
-const receivedSchema = z
-  .object({
-    items: z.array(z.object({ id: z.string().uuid(), created_at: z.string().min(1) })).max(50),
-    checked_at: z.string().min(1),
-  })
-  .transform((row) => ({
-    items: row.items.map((item) => ({ id: item.id, createdAt: item.created_at })),
-    checkedAt: row.checked_at,
-  }));
-export type ReceivedEncouragements = z.output<typeof receivedSchema>;
-
-export function fetchReceivedEncouragements(owner: SocialOwner): Promise<ReceivedEncouragements> {
-  return callSocialRpc("get_received_encouragements", {}, receivedSchema, owner);
+export async function fetchReceivedEncouragements(owner: SocialOwner): Promise<ReceivedEncouragements> {
+  const items: ReceivedEncouragements["items"] = [];
+  let checkedAt: string | null = null;
+  let cursor: Record<string, string> = {};
+  for (let page = 0; page < RECEIVED_MAX_PAGES; page += 1) {
+    const result = await callSocialRpc("get_received_encouragements", cursor, receivedPageSchema, owner);
+    checkedAt ??= result.checked_at;
+    for (const item of result.items) items.push({ id: item.id, createdAt: item.created_at });
+    const last = result.items.at(-1);
+    if (!result.more || !last) return { items, checkedAt };
+    cursor = { p_after_created_at: last.created_at, p_after_id: last.id };
+  }
+  throw socialError({ kind: "failed", message: "received_page_limit" });
 }
 
 export function isEncouragementTemplateId(value: string | null): value is EncouragementTemplateId {

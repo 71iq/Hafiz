@@ -92,9 +92,9 @@ uid() { printf '00000000-0000-4000-8009-%012d' "$1"; }
 
 admin >/dev/null <<SQL
 INSERT INTO auth.users (id, email) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race' || i || '@example.invalid'
-FROM generate_series(1, 6) AS i;
+FROM generate_series(1, 9) AS i;
 INSERT INTO public.profiles (id, username) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race_user_' || i
-FROM generate_series(1, 6) AS i;
+FROM generate_series(1, 9) AS i;
 SQL
 
 TODAY="$(admin -c "SELECT to_char((now() AT TIME ZONE 'UTC')::DATE, 'YYYY-MM-DD')")"
@@ -210,5 +210,78 @@ check "the send is stored" \
   "$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE group_id = '$GROUP' AND from_user = '$(uid 5)'")" 1
 check "the sender has left" \
   "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE group_id = '$GROUP' AND user_id = '$(uid 5)' AND left_at IS NULL")" 0
+
+# Waits until the race session named `name` runs its holding DO block.
+wait_for_hold() {
+  admin -c "DO \$\$ BEGIN
+    FOR i IN 1 .. 200 LOOP
+      PERFORM pg_stat_clear_snapshot();
+      EXIT WHEN EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = 'race_$1' AND query LIKE 'DO %');
+      PERFORM pg_sleep(0.05);
+    END LOOP;
+  END \$\$;" >/dev/null
+}
+
+# ─── Third review, finding 2: a photo update in flight cannot outlive a minority write ──────────
+# User 7 is an adult without a photo. Their own session sets an outside photo URL and holds its
+# transaction open until the minority write is blocked. Recording minority locks the profile row
+# first, so it waits for the photo update and then clears the photo that update committed. A write
+# that only cleared photos it could already see would skip the row and leave the minor's photo.
+rm -f "$WORK"/*
+session photo_hold "$(uid 7)" "BEGIN;
+UPDATE public.profiles SET avatar_url = 'https://example.invalid/race7.png' WHERE id = '$(uid 7)';
+RESET ROLE;
+DO \$\$ BEGIN
+  FOR i IN 1 .. 200 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    EXIT WHEN (SELECT count(*) FROM pg_stat_activity WHERE application_name = 'race_photo_minor' AND wait_event_type = 'Lock') >= 1;
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+END \$\$;
+COMMIT;"
+wait_for_hold photo_hold
+session photo_minor "$(uid 7)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+wait
+check "photo update finished" "$(tail -1 "$WORK/photo_hold")" ok
+check "minority write finished" "$(tail -1 "$WORK/photo_minor")" ok
+check "recorded as a minor" "$(admin -c "SELECT is_minor FROM public.profile_privacy WHERE user_id = '$(uid 7)'")" t
+check "the minor has no photo" "$(admin -c "SELECT avatar_url IS NULL FROM public.profiles WHERE id = '$(uid 7)'")" t
+
+# ─── Third review, finding 3: a matched join racing a minority write leaves no matched membership ─
+# User 8 is an adult. The controller holds their halaqa lock; the matched join waits on it, and so
+# does the minority write once it holds the profile row. Whichever goes first, the user ends as a
+# minor without a matched halaqa: a join that commits first is left by the minority write, and a join
+# after it reads the minority and is refused. A minority write that neither took the halaqa lock nor
+# left matched halaqas would leave the minor matched with strangers.
+rm -f "$WORK"/*
+controller minor_join "SELECT pg_advisory_xact_lock(hashtextextended('hafiz:halaqa-user:$(uid 8)', 0));" 2
+wait_for_controller minor_join
+session mj_join "$(uid 8)" "SELECT public.join_matched_halaqa('juz_amma', 'light', 180)->>'id';"
+wait_for_waiters 1
+session mj_minor "$(uid 8)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+wait
+check "minority write finished" "$(tail -1 "$WORK/mj_minor")" ok
+check "the join committed first or was refused as a minor" \
+  "$(if [ "$(tail -1 "$WORK/mj_join")" = ok ] || grep -q minor_not_allowed "$WORK/mj_join"; then echo yes; else echo no; fi)" yes
+check "recorded as a minor" "$(admin -c "SELECT is_minor FROM public.profile_privacy WHERE user_id = '$(uid 8)'")" t
+check "no matched membership" \
+  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE user_id = '$(uid 8)' AND kind = 'matched' AND left_at IS NULL")" 0
+
+# The other order: the minority write holds user 9's halaqa lock while it waits for their
+# profile_privacy row, which the controller holds. A matched join that starts meanwhile waits on the
+# halaqa lock and then reads the committed minority. A join that checked minority before taking the
+# lock would pass as an adult and join after the minority write had committed.
+rm -f "$WORK"/*
+admin -c "INSERT INTO public.profile_privacy (user_id) VALUES ('$(uid 9)')" >/dev/null
+controller minor_first "SELECT 1 FROM public.profile_privacy WHERE user_id = '$(uid 9)' FOR UPDATE;" 2
+wait_for_controller minor_first
+session mf_minor "$(uid 9)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+wait_for_waiters 1
+session mf_join "$(uid 9)" "SELECT public.join_matched_halaqa('juz_amma', 'light', 180)->>'id';"
+wait
+check "minority write finished" "$(tail -1 "$WORK/mf_minor")" ok
+check "the join is refused" "$(grep -c minor_not_allowed "$WORK/mf_join" || true)" 1
+check "no matched membership" \
+  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE user_id = '$(uid 9)' AND kind = 'matched' AND left_at IS NULL")" 0
 
 echo "learning_consistency_races.sh: all races passed"

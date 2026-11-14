@@ -45,52 +45,84 @@ export function fetchProfilePrivacy(owner: SocialOwner): Promise<ProfilePrivacy>
 }
 
 /**
- * Saves the visibility choices. Once the account is recorded as a minor, the server has cleared the
- * profile photo and refuses new uploads, and the stored photo files are deleted here (ETH-07).
+ * Saves the visibility choices. Recording minority (ETH-07) deletes the stored photo files first and
+ * is not sent when that fails, so the save can be retried before anything is recorded. The server
+ * then clears the profile photo, refuses new uploads and leaves matched halaqas, and one more pass
+ * removes a photo another device uploaded in between.
  */
 export async function saveProfilePrivacy(
   input: { showStreak: boolean; showJuzCompletions: boolean; isMinor: boolean },
   owner: SocialOwner,
 ): Promise<ProfilePrivacy> {
+  if (input.isMinor) await deleteOwnAvatarFiles(owner);
   const saved = await callSocialRpc(
     "set_profile_privacy",
     { p_show_streak: input.showStreak, p_show_juz_completions: input.showJuzCompletions, p_is_minor: input.isMinor },
     profilePrivacySchema,
     owner,
   );
-  if (saved.isMinor) await deleteOwnAvatarFiles(owner);
+  if (saved.isMinor) await deleteAvatarFilesAfterMinority(owner);
   return saved;
+}
+
+/**
+ * The pass after minority is recorded. From then on the bucket refuses this account's uploads, so
+ * this removes any photo uploaded since the first pass. Best effort: the save has already succeeded,
+ * and useMinorPhotoCleanup tries again in each app session.
+ */
+export async function deleteAvatarFilesAfterMinority(owner: SocialOwner): Promise<void> {
+  try {
+    await deleteOwnAvatarFiles(owner);
+  } catch {
+    // Retried by useMinorPhotoCleanup.
+  }
 }
 
 /** lib/profile/avatar.ts uploads each photo as `${userId}/${time}.${extension}` in this public bucket. */
 const AVATAR_BUCKET = "avatars";
 const AVATAR_PAGE = 100;
-const AVATAR_MAX_PAGES = 20;
+/** List and remove requests for one cleanup. The app stores a few files in one folder. */
+const AVATAR_MAX_REQUESTS = 100;
 
 /**
- * ETH-07: deletes every photo this account stored in the public avatars bucket, as the owner's own
- * session. The avatars bucket serves files to anyone with the link, so clearing the profile's
- * avatar_url alone would leave a minor's photo published. Fails when a file could not be deleted, so
- * the save can be retried.
+ * ETH-07: deletes every photo this account stored in the public avatars bucket, nested folders
+ * included, as the owner's own session. The bucket serves files to anyone with the link, so clearing
+ * the profile's avatar_url alone would leave a minor's photo published. It lists everything first and
+ * then removes it, so an account with nothing stored costs one list request. Fails when a file could
+ * not be deleted or the account changed, so the caller can retry.
  */
 export async function deleteOwnAvatarFiles(owner: SocialOwner): Promise<number> {
-  let deleted = 0;
-  for (let page = 0; page < AVATAR_MAX_PAGES; page += 1) {
+  let requests = 0;
+  const bucket = async () => {
+    requests += 1;
+    if (requests > AVATAR_MAX_REQUESTS) throw socialError({ kind: "failed", message: "avatar_delete_incomplete" });
     const token = await owner.accessToken();
-    const files = supabase.storage.from(AVATAR_BUCKET).setHeader("Authorization", `Bearer ${token}`);
-    const listed = await files.list(owner.userId, { limit: AVATAR_PAGE });
-    owner.requireCurrent();
-    if (listed.error) throw socialError(classifyRemoteError(listed.error));
-    const paths = (listed.data ?? []).filter((item) => item.id !== null).map((item) => `${owner.userId}/${item.name}`);
-    if (paths.length === 0) return deleted;
-    const removed = await files.remove(paths);
+    return supabase.storage.from(AVATAR_BUCKET).setHeader("Authorization", `Bearer ${token}`);
+  };
+
+  const paths: string[] = [];
+  const folders = [owner.userId];
+  for (let folder = folders.pop(); folder !== undefined; folder = folders.pop()) {
+    for (let offset = 0; ; offset += AVATAR_PAGE) {
+      const listed = await (await bucket()).list(folder, { limit: AVATAR_PAGE, offset });
+      owner.requireCurrent();
+      if (listed.error) throw socialError(classifyRemoteError(listed.error));
+      const entries = listed.data ?? [];
+      // Storage lists a nested folder as an entry without an id.
+      for (const entry of entries) (entry.id === null ? folders : paths).push(`${folder}/${entry.name}`);
+      if (entries.length < AVATAR_PAGE) break;
+    }
+  }
+
+  for (let start = 0; start < paths.length; start += AVATAR_PAGE) {
+    const batch = paths.slice(start, start + AVATAR_PAGE);
+    const removed = await (await bucket()).remove(batch);
     owner.requireCurrent();
     if (removed.error) throw socialError(classifyRemoteError(removed.error));
     // Storage reports what it deleted; a policy refusal deletes nothing without an error.
-    if ((removed.data?.length ?? 0) < paths.length) throw socialError({ kind: "failed", message: "avatar_delete_incomplete" });
-    deleted += paths.length;
+    if ((removed.data?.length ?? 0) < batch.length) throw socialError({ kind: "failed", message: "avatar_delete_incomplete" });
   }
-  throw socialError({ kind: "failed", message: "avatar_delete_incomplete" });
+  return paths.length;
 }
 
 /**

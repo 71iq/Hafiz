@@ -18,6 +18,7 @@ import { SettingsProvider } from "@/lib/settings/context";
 import { useReminderResponses, useReminderScheduling } from "@/lib/notifications/use-reminder-scheduling";
 import { useGroupEncouragementChecks } from "@/lib/halaqa/encouragement-notifications";
 import { useBoardBandRefresh } from "@/lib/board/refresh";
+import { useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
 
 const queryClient = createAppQueryClient();
 
@@ -76,6 +77,12 @@ function EncouragementCheckRunner() {
   return null;
 }
 
+/** ETH-07: a minor account's leftover photo files are removed once per app session. */
+function MinorPhotoCleanup() {
+  useMinorPhotoCleanup();
+  return null;
+}
+
 function DatabaseNoticeBoundary({ children }: { children: React.ReactNode }) {
   const { db, isReady } = useDatabaseStatus();
   return <OperationNoticeProvider ready={Boolean(db && isReady)}>{children}</OperationNoticeProvider>;
@@ -130,6 +137,7 @@ export default function RootLayout() {
                 <StableDocumentTitle />
                 <ReminderLifecycle />
                 <EncouragementChecks />
+                <MinorPhotoCleanup />
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="about" />

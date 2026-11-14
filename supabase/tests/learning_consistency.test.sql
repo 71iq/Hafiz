@@ -526,13 +526,71 @@ SELECT hz_test.login('00000000-0000-4000-8000-00000000000b');
 SET ROLE authenticated;
 DO $$
 DECLARE
-  items JSONB := public.get_received_encouragements()->'items';
+  inbox JSONB := public.get_received_encouragements();
+  items JSONB := inbox->'items';
 BEGIN
   PERFORM hz_test.eq('late commit is listed', jsonb_array_length(items), 2);
-  PERFORM hz_test.eq('newest first', items->0->>'id', (SELECT value FROM hz_test.state WHERE key = 'first_encouragement'));
+  PERFORM hz_test.eq('oldest first', items->1->>'id', (SELECT value FROM hz_test.state WHERE key = 'first_encouragement'));
+  PERFORM hz_test.eq('a single page', (inbox->>'more')::BOOLEAN, false);
   PERFORM hz_test.eq('older than 7 days is not listed', (
     SELECT count(*) FROM jsonb_array_elements(items) AS i WHERE (i->>'created_at')::TIMESTAMPTZ < now() - INTERVAL '7 days'
   ), 0::BIGINT);
+END $$;
+RESET ROLE;
+
+-- Third review, finding 5: the inbox pages the whole 7-day window by a (created_at, id) cursor, so
+-- more arrivals than one page are all listed and the oldest is never stuck behind the newest. 230
+-- encouragements, three sharing the time that falls on the first page boundary.
+SELECT hz_test.make_user(('00000000-0000-4000-8007-' || lpad(i::TEXT, 12, '0'))::UUID, 'inbox_user_' || i, NULL)
+FROM generate_series(1, 2) AS i;
+SELECT hz_test.login('00000000-0000-4000-8007-000000000001');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  INSERT INTO hz_test.state VALUES ('inbox_code', public.create_invite_halaqa('Busy inbox')->>'invite_code');
+  PERFORM hz_test.login('00000000-0000-4000-8007-000000000002');
+  INSERT INTO hz_test.state VALUES ('inbox_group', public.join_halaqa_by_code((SELECT value FROM hz_test.state WHERE key = 'inbox_code'))->>'id');
+END $$;
+RESET ROLE;
+INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, local_date, sent_on, created_at)
+SELECT (SELECT value FROM hz_test.state WHERE key = 'inbox_group')::UUID, '00000000-0000-4000-8007-000000000001',
+  '00000000-0000-4000-8007-000000000002', 'dua', hz_test.d(hz_test.utc_today() - i), hz_test.utc_today() - i,
+  now() - (CASE WHEN i BETWEEN 129 AND 131 THEN 130 ELSE i END) * INTERVAL '30 seconds'
+FROM generate_series(1, 230) AS i;
+INSERT INTO hz_test.state
+SELECT 'inbox_oldest', id FROM public.halaqa_encouragements
+WHERE to_user = '00000000-0000-4000-8007-000000000002' ORDER BY created_at, id LIMIT 1;
+SELECT hz_test.login('00000000-0000-4000-8007-000000000002');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  page JSONB := public.get_received_encouragements();
+  item JSONB;
+  pages INTEGER := 0;
+  seen UUID[] := '{}';
+  last_at TIMESTAMPTZ;
+  last_id UUID;
+BEGIN
+  PERFORM hz_test.eq('a page holds 100', jsonb_array_length(page->'items'), 100);
+  PERFORM hz_test.eq('another page follows', (page->>'more')::BOOLEAN, true);
+  LOOP
+    pages := pages + 1;
+    FOR item IN SELECT value FROM jsonb_array_elements(page->'items') LOOP
+      IF last_at IS NOT NULL AND NOT (((item->>'created_at')::TIMESTAMPTZ, (item->>'id')::UUID) > (last_at, last_id)) THEN
+        RAISE EXCEPTION 'inbox pages out of cursor order at %', item;
+      END IF;
+      last_at := (item->>'created_at')::TIMESTAMPTZ;
+      last_id := (item->>'id')::UUID;
+      seen := seen || last_id;
+    END LOOP;
+    EXIT WHEN NOT (page->>'more')::BOOLEAN OR pages >= 10;
+    page := public.get_received_encouragements(last_at, last_id);
+  END LOOP;
+  PERFORM hz_test.eq('three pages', pages, 3);
+  PERFORM hz_test.eq('every encouragement listed once', (SELECT count(DISTINCT id) FROM unnest(seen) AS id), 230::BIGINT);
+  PERFORM hz_test.eq('no encouragement listed twice', cardinality(seen), 230);
+  PERFORM hz_test.eq('the oldest is listed first', seen[1], (SELECT value FROM hz_test.state WHERE key = 'inbox_oldest')::UUID);
+  PERFORM hz_test.expect_error('SELECT public.get_received_encouragements(now(), NULL)', 'invalid_cursor');
 END $$;
 RESET ROLE;
 
@@ -1257,6 +1315,95 @@ BEGIN
   ), 0::BIGINT);
 END $$;
 RESET ROLE;
+
+-- Third review, finding 3: recording minority leaves matched halaqas, whose members are strangers,
+-- the way leaving does, and keeps invite halaqas. 8006-1 is in a matched halaqa with 8006-2 and an
+-- invite halaqa with 8006-3; 8006-4 is alone in a matched halaqa and joins the board as a minor.
+SELECT hz_test.make_user(('00000000-0000-4000-8006-' || lpad(i::TEXT, 12, '0'))::UUID, 'third_user_' || i, 'Third ' || i,
+  'https://example.invalid/third' || i || '.png')
+FROM generate_series(1, 4) AS i;
+SET ROLE authenticated;
+DO $$
+DECLARE
+  matched JSONB;
+  invite JSONB;
+  detail JSONB;
+  member JSONB;
+BEGIN
+  PERFORM hz_test.login('00000000-0000-4000-8006-000000000001');
+  matched := public.join_matched_halaqa('juz_16_29', 'maintenance', 600);
+  invite := public.create_invite_halaqa('Third family');
+  PERFORM hz_test.login('00000000-0000-4000-8006-000000000002');
+  PERFORM hz_test.eq('a stranger is matched into the halaqa',
+    public.join_matched_halaqa('juz_16_29', 'maintenance', 600)->>'id', matched->>'id');
+  PERFORM hz_test.login('00000000-0000-4000-8006-000000000003');
+  PERFORM public.join_halaqa_by_code(invite->>'invite_code');
+  PERFORM hz_test.login('00000000-0000-4000-8006-000000000001');
+  PERFORM public.send_halaqa_encouragement((matched->>'id')::UUID, '00000000-0000-4000-8006-000000000002', 'together',
+    NULL, hz_test.today_text());
+  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM hz_test.eq('only the invite halaqa stays', (
+    SELECT string_agg(h->>'id', ',') FROM jsonb_array_elements(public.get_my_halaqas()) AS h
+  ), invite->>'id');
+  PERFORM hz_test.expect_error(format($q$SELECT public.get_halaqa_detail(%L, %L)$q$, matched->>'id', hz_test.today_text()),
+    'not_a_member');
+
+  -- The stranger keeps the encouragement but no longer sees who the minor is.
+  PERFORM hz_test.login('00000000-0000-4000-8006-000000000002');
+  detail := public.get_halaqa_detail((matched->>'id')::UUID, hz_test.today_text());
+  PERFORM hz_test.eq('the matched halaqa counts the stranger alone', (detail->'group'->>'member_count')::INTEGER, 1);
+  PERFORM hz_test.eq('the encouragement stays', jsonb_array_length(detail->'received'), 1);
+  PERFORM hz_test.eq('without the sender''s name', detail->'received'->0->'from_name', 'null'::JSONB);
+  PERFORM hz_test.eq('no minor id in the matched halaqa', position('00000000-0000-4000-8006-000000000001' IN detail::TEXT), 0);
+  PERFORM hz_test.eq('no minor username in the matched halaqa', position('third_user_1' IN detail::TEXT), 0);
+  PERFORM hz_test.eq('no minor name in the matched halaqa', position('Third 1' IN detail::TEXT), 0);
+
+  -- The invite halaqa keeps the minor, without a photo.
+  PERFORM hz_test.login('00000000-0000-4000-8006-000000000003');
+  SELECT m INTO member FROM jsonb_array_elements(public.get_halaqa_detail((invite->>'id')::UUID, hz_test.today_text())->'members') AS m
+  WHERE m->>'username' = 'third_user_1';
+  PERFORM hz_test.eq('the invite halaqa keeps the minor', member->>'name', 'Third 1');
+  PERFORM hz_test.eq('the invite halaqa shows no photo of the minor', member->'avatar_url', 'null'::JSONB);
+  INSERT INTO hz_test.state VALUES ('third_invite', invite->>'id');
+
+  -- Joining the board as a minor leaves a matched halaqa too, and closes it once it is empty.
+  PERFORM hz_test.login('00000000-0000-4000-8006-000000000004');
+  matched := public.join_matched_halaqa('starting', 'maintenance', -720);
+  INSERT INTO hz_test.state VALUES ('third_alone', matched->>'id');
+  PERFORM public.join_board('Quiet Kid', true, 'starting', 'maintenance', -720, hz_test.today_text(), 0);
+  PERFORM hz_test.eq('a board minor keeps no matched halaqa', public.get_my_halaqas(), '[]'::JSONB);
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('an emptied matched halaqa is closed', (
+    SELECT deleted_at IS NOT NULL FROM public.halaqa_groups WHERE id = (SELECT value FROM hz_test.state WHERE key = 'third_alone')::UUID
+  ), true);
+  PERFORM hz_test.eq('both minors have no photo', (
+    SELECT count(*) FROM public.profiles
+    WHERE id IN ('00000000-0000-4000-8006-000000000001', '00000000-0000-4000-8006-000000000004') AND avatar_url IS NOT NULL
+  ), 0::BIGINT);
+END $$;
+
+-- Third review, finding 2, defense in depth: even a photo stored for a minor by mistake (here with
+-- the profile trigger switched off) never reaches another member.
+ALTER TABLE public.profiles DISABLE TRIGGER profiles_minor_photo;
+UPDATE public.profiles SET avatar_url = 'https://example.invalid/stored-by-mistake.png'
+WHERE id = '00000000-0000-4000-8006-000000000001';
+ALTER TABLE public.profiles ENABLE TRIGGER profiles_minor_photo;
+SELECT hz_test.login('00000000-0000-4000-8006-000000000003');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('a stored photo of a minor is not returned', (
+    SELECT m->'avatar_url'
+    FROM jsonb_array_elements(public.get_halaqa_detail((SELECT value FROM hz_test.state WHERE key = 'third_invite')::UUID,
+      hz_test.today_text())->'members') AS m
+    WHERE m->>'username' = 'third_user_1'
+  ), 'null'::JSONB);
+END $$;
+RESET ROLE;
+UPDATE public.profiles SET avatar_url = NULL WHERE id = '00000000-0000-4000-8006-000000000001';
 
 -- A minor already on the board without a nickname cannot be recorded (BRD-07).
 SELECT hz_test.login('00000000-0000-4000-8003-000000000001');

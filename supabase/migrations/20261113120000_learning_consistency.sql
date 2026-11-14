@@ -6,8 +6,9 @@
 -- - profiles keeps only identity (username, display name, avatar, bio, country), which the public
 --   reflection feed needs. Totals and client-written streaks are dropped. A profile whose owner
 --   stated they are a minor is readable only by its owner; halaqa co-members see the name through
---   the halaqa RPCs and the board shows only the nickname (BRD-07). A minor has no photo: stating
---   it clears the avatar, and the public avatars bucket refuses their uploads.
+--   the halaqa RPCs and the board shows only the nickname (BRD-07). A minor has no photo and no
+--   matched halaqa: stating it clears the avatar and leaves matched halaqas, whose members are
+--   strangers, and the public avatars bucket refuses their uploads. Invite halaqas stay.
 -- - Helpers that RLS policies call live in the rls schema, which PostgREST does not expose, so a
 --   client cannot call them as RPCs.
 -- - Board and visibility choices live in profile_privacy, readable only by the owner, because
@@ -30,7 +31,9 @@
 -- Concurrency: each user's board placement, joining and leaving serialize on that user's
 -- profile_privacy row; cohort choice and capacity serialize on one advisory lock per board week.
 -- Halaqa joins serialize on one advisory lock per user. Joining, leaving and sending encouragement
--- lock the group row first and then a membership row.
+-- lock the group row first and then a membership row. Recording minority locks the user's profiles
+-- row, then their halaqa lock, then their profile_privacy row, and then leaves matched halaqas group
+-- row first (private.lock_minor_change).
 
 CREATE SCHEMA IF NOT EXISTS private;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;
@@ -424,7 +427,8 @@ DROP FUNCTION IF EXISTS public.profile_identity_visible(UUID);
 
 -- ETH-07: a minor's photo never goes public. The avatars bucket is public, so a stated minor may not
 -- upload or replace an avatar there (deleting stays allowed). Stating it clears the profile's photo
--- in the same transaction, and the app then deletes the stored files (lib/profile/privacy.ts).
+-- in the same transaction. The app deletes the stored files before it records minority, once more
+-- after, and once per app session while the account is a minor (lib/profile/privacy.ts).
 CREATE OR REPLACE FUNCTION rls.caller_is_minor()
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -461,24 +465,72 @@ CREATE POLICY "Users can update own avatar images"
     AND NOT rls.caller_is_minor()
   );
 
--- Covers every way is_minor is set: set_profile_privacy and join_board.
-CREATE OR REPLACE FUNCTION private.clear_minor_avatar()
-RETURNS TRIGGER
+-- Whether a person stated they are a minor, for definer functions that return someone else's details.
+CREATE OR REPLACE FUNCTION private.is_minor(member UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SET search_path = ''
+AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profile_privacy AS pp WHERE pp.user_id = member AND pp.is_minor);
+$$;
+
+-- Every write that records minority (set_profile_privacy, join_board) calls this before it writes
+-- and holds both locks until it commits:
+-- - The profiles row. A photo update in progress holds it, so the minority write waits for that
+--   update to commit and then clears its photo. A photo update that comes later waits on the row,
+--   and profiles_minor_photo then reads the committed minority. FOR NO KEY UPDATE conflicts with that
+--   update but not with the key-share locks that foreign keys take, so an encouragement, membership
+--   or sync insert that references this profile does not wait on it.
+-- - The user's halaqa lock, which join_matched_halaqa takes before it checks minority. A matched join
+--   either commits first, and private.apply_minor_privacy then leaves that halaqa, or reads the
+--   committed minority and is refused.
+-- Nothing takes these locks in the other order: halaqa joins take the halaqa lock and only key-share
+-- the profile, and board reads and writes take the profile_privacy row, which this write takes last.
+CREATE OR REPLACE FUNCTION private.lock_minor_change(member UUID)
+RETURNS VOID
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
-  UPDATE public.profiles SET avatar_url = NULL WHERE id = NEW.user_id AND avatar_url IS NOT NULL;
+  PERFORM 1 FROM public.profiles WHERE id = member FOR NO KEY UPDATE;
+  PERFORM private.lock_halaqa_user(member);
+END;
+$$;
+
+-- Runs for every write that sets is_minor, whichever path made it. The photo is cleared without
+-- checking it first, so the update waits on a photo update still in progress and clears the photo it
+-- commits. Matched halaqas are left as leave_halaqa leaves them (ETH-07): their members are
+-- strangers. Invite halaqas hold people the minor chose, and stay.
+CREATE OR REPLACE FUNCTION private.apply_minor_privacy()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  matched UUID;
+BEGIN
+  UPDATE public.profiles SET avatar_url = NULL WHERE id = NEW.user_id;
+  FOR matched IN
+    SELECT m.group_id FROM public.halaqa_members AS m
+    WHERE m.user_id = NEW.user_id AND m.kind = 'matched' AND m.left_at IS NULL
+  LOOP
+    PERFORM private.halaqa_leave(matched, NEW.user_id);
+  END LOOP;
   RETURN NULL;
 END;
 $$;
 
+-- Earlier drafts of this migration used these names.
 DROP TRIGGER IF EXISTS profile_privacy_minor_avatar ON public.profile_privacy;
-CREATE TRIGGER profile_privacy_minor_avatar AFTER INSERT OR UPDATE OF is_minor ON public.profile_privacy
-  FOR EACH ROW WHEN (NEW.is_minor) EXECUTE FUNCTION private.clear_minor_avatar();
+DROP FUNCTION IF EXISTS private.clear_minor_avatar();
+DROP TRIGGER IF EXISTS profile_privacy_minor ON public.profile_privacy;
+CREATE TRIGGER profile_privacy_minor AFTER INSERT OR UPDATE OF is_minor ON public.profile_privacy
+  FOR EACH ROW WHEN (NEW.is_minor) EXECUTE FUNCTION private.apply_minor_privacy();
 
 -- A minor's profile never keeps a photo, whatever URL a client writes (ETH-07): the avatars bucket
--- refuses their uploads, and this covers an outside image URL set directly on the profile.
+-- refuses their uploads, and this covers an outside image URL set directly on the profile. A BEFORE
+-- trigger runs once the row is locked, so an update that waited on a minority write reads it.
 CREATE OR REPLACE FUNCTION private.profiles_minor_photo()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -486,8 +538,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  IF NEW.avatar_url IS NOT NULL
-    AND EXISTS (SELECT 1 FROM public.profile_privacy AS pp WHERE pp.user_id = NEW.id AND pp.is_minor) THEN
+  IF NEW.avatar_url IS NOT NULL AND private.is_minor(NEW.id) THEN
     NEW.avatar_url := NULL;
   END IF;
   RETURN NEW;
@@ -577,7 +628,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_members_one_matched
   ON public.halaqa_members(user_id) WHERE kind = 'matched' AND left_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_halaqa_groups_matched
   ON public.halaqa_groups(level_band, pace_band, utc_offset_band) WHERE kind = 'matched' AND deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_halaqa_encouragements_to_user ON public.halaqa_encouragements(to_user, created_at DESC);
+-- Serves get_received_encouragements' (created_at, id) cursor.
+CREATE INDEX IF NOT EXISTS idx_halaqa_encouragements_to_user ON public.halaqa_encouragements(to_user, created_at, id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_encouragements_sender_day
   ON public.halaqa_encouragements(group_id, from_user, sent_on);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_review_partners_active_pair
@@ -976,6 +1028,10 @@ BEGIN
   IF p_show_streak IS NULL OR p_show_juz_completions IS NULL OR p_is_minor IS NULL THEN
     RAISE EXCEPTION 'invalid_privacy';
   END IF;
+  -- Recording minority clears the photo and leaves matched halaqas (private.apply_minor_privacy).
+  IF p_is_minor THEN
+    PERFORM private.lock_minor_change(uid);
+  END IF;
   SELECT * INTO current_row FROM public.profile_privacy WHERE user_id = uid;
   IF p_is_minor AND COALESCE(current_row.board_joined, false) AND current_row.board_nickname IS NULL THEN
     RAISE EXCEPTION 'nickname_required';
@@ -1247,7 +1303,30 @@ END;
 $$;
 
 -- Leaving takes the group row lock that joining takes before it changes membership or checks for an
--- empty group, so a join that is still committing is counted.
+-- empty group, so a join that is still committing is counted. False when the member was not in the
+-- group. leave_halaqa and recording minority (private.apply_minor_privacy) both leave through this.
+CREATE OR REPLACE FUNCTION private.halaqa_leave(target_group UUID, member UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.halaqa_groups WHERE id = target_group AND deleted_at IS NULL FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+  UPDATE public.halaqa_members SET left_at = now()
+  WHERE group_id = target_group AND user_id = member AND left_at IS NULL;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+  IF private.halaqa_active_count(target_group) = 0 THEN
+    UPDATE public.halaqa_groups SET deleted_at = now() WHERE id = target_group;
+  END IF;
+  RETURN true;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.leave_halaqa(p_group_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1257,18 +1336,17 @@ AS $$
 DECLARE
   uid UUID := private.require_user();
 BEGIN
-  PERFORM 1 FROM public.halaqa_groups WHERE id = p_group_id AND deleted_at IS NULL FOR UPDATE;
-  PERFORM private.require_halaqa_member(p_group_id, uid);
-  UPDATE public.halaqa_members SET left_at = now() WHERE group_id = p_group_id AND user_id = uid;
-  IF private.halaqa_active_count(p_group_id) = 0 THEN
-    UPDATE public.halaqa_groups SET deleted_at = now() WHERE id = p_group_id;
+  IF NOT private.halaqa_leave(p_group_id, uid) THEN
+    RAISE EXCEPTION 'not_a_member' USING ERRCODE = '42501';
   END IF;
 END;
 $$;
 
 -- SOC-04: a standing matched halaqa of about 20. Minors join only invite halaqas (ETH-07), and a
 -- re-match never returns the user to a halaqa they left. The per-user lock makes concurrent requests
--- by one user find each other's membership; idx_halaqa_members_one_matched backs it.
+-- by one user find each other's membership; idx_halaqa_members_one_matched backs it. Minority is
+-- checked under that lock, which recording minority also takes (private.lock_minor_change), so a join
+-- either commits before a minority write, which then leaves the halaqa, or is refused.
 CREATE OR REPLACE FUNCTION public.join_matched_halaqa(
   p_level_band TEXT,
   p_pace_band TEXT,
@@ -1284,10 +1362,10 @@ DECLARE
   chosen UUID;
 BEGIN
   PERFORM private.check_bands(p_level_band, p_pace_band, p_utc_offset_minutes);
-  IF COALESCE((SELECT is_minor FROM public.profile_privacy WHERE user_id = uid), false) THEN
+  PERFORM private.lock_halaqa_user(uid);
+  IF private.is_minor(uid) THEN
     RAISE EXCEPTION 'minor_not_allowed';
   END IF;
-  PERFORM private.lock_halaqa_user(uid);
   SELECT g.id INTO chosen
   FROM public.halaqa_members AS m
   JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
@@ -1451,7 +1529,8 @@ BEGIN
           'user_id', p.id,
           'name', private.member_name(p.id),
           'username', p.username,
-          'avatar_url', p.avatar_url,
+          -- A minor has no photo (ETH-07), even if one were ever stored.
+          'avatar_url', CASE WHEN NOT private.is_minor(p.id) THEN p.avatar_url END,
           'role', m.role,
           'is_me', m.user_id = uid,
           'week', CASE WHEN m.share_consistency OR m.user_id = uid THEN private.week_wird_days(m.user_id, week_start) END,
@@ -1471,7 +1550,9 @@ BEGIN
     'received', (
       SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'id', e.id,
-        'from_name', private.member_name(e.from_user),
+        -- A minor who has left this matched halaqa is not named to the strangers in it (ETH-07).
+        'from_name', CASE WHEN mine.kind = 'matched' AND private.is_minor(e.from_user) THEN NULL
+          ELSE private.member_name(e.from_user) END,
         'template_id', e.template_id,
         'body', e.body,
         'created_at', e.created_at
@@ -1548,10 +1629,17 @@ END;
 $$;
 
 -- 5.8.2 group_encouragement: what the caller received in the last 7 days in the halaqas they are
--- still in, newest first, at most 50 rows, read through idx_halaqa_encouragements_to_user. The
--- device acknowledges ids instead of keeping a time watermark, so a send that commits after a later
--- one is still announced. checked_at is the server's time, for pruning acknowledged ids by age.
-CREATE OR REPLACE FUNCTION public.get_received_encouragements()
+-- still in, oldest first by (created_at, id), one page of at most 100 after the cursor the previous
+-- page ended on; `more` says whether another page follows. The app reads every page at each check
+-- (lib/halaqa/api.ts), so a burst larger than a page is listed in full, and so is a send that commits
+-- after a later one. The device acknowledges ids instead of keeping a time watermark. checked_at is
+-- the server's time, for pruning acknowledged ids by age.
+-- It replaces a version without parameters, which would make a call without arguments ambiguous.
+DROP FUNCTION IF EXISTS public.get_received_encouragements();
+CREATE OR REPLACE FUNCTION public.get_received_encouragements(
+  p_after_created_at TIMESTAMPTZ DEFAULT NULL,
+  p_after_id UUID DEFAULT NULL
+)
 RETURNS JSONB
 LANGUAGE plpgsql
 STABLE
@@ -1560,23 +1648,31 @@ SET search_path = ''
 AS $$
 DECLARE
   uid UUID := private.require_user();
+  page_size CONSTANT INTEGER := 100;
+  page JSONB;
 BEGIN
+  IF (p_after_created_at IS NULL) <> (p_after_id IS NULL) THEN
+    RAISE EXCEPTION 'invalid_cursor';
+  END IF;
+  -- One row past the page tells whether another page follows; it is not returned.
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('id', listed.id, 'created_at', listed.created_at)
+    ORDER BY listed.created_at, listed.id), '[]'::JSONB)
+  INTO page
+  FROM (
+    SELECT e.id, e.created_at FROM public.halaqa_encouragements AS e
+    WHERE e.to_user = uid AND e.created_at > now() - INTERVAL '7 days'
+      AND (p_after_created_at IS NULL OR (e.created_at, e.id) > (p_after_created_at, p_after_id))
+      AND EXISTS (
+        SELECT 1 FROM public.halaqa_members AS m
+        JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
+        WHERE m.group_id = e.group_id AND m.user_id = uid AND m.left_at IS NULL
+      )
+    ORDER BY e.created_at, e.id
+    LIMIT page_size + 1
+  ) AS listed;
   RETURN jsonb_build_object(
-    'items', (
-      SELECT COALESCE(jsonb_agg(jsonb_build_object('id', recent.id, 'created_at', recent.created_at)
-        ORDER BY recent.created_at DESC, recent.id), '[]'::JSONB)
-      FROM (
-        SELECT e.id, e.created_at FROM public.halaqa_encouragements AS e
-        WHERE e.to_user = uid AND e.created_at > now() - INTERVAL '7 days'
-          AND EXISTS (
-            SELECT 1 FROM public.halaqa_members AS m
-            JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
-            WHERE m.group_id = e.group_id AND m.user_id = uid AND m.left_at IS NULL
-          )
-        ORDER BY e.created_at DESC
-        LIMIT 50
-      ) AS recent
-    ),
+    'items', page - page_size,
+    'more', jsonb_array_length(page) > page_size,
     'checked_at', now()
   );
 END;
@@ -1992,6 +2088,10 @@ BEGIN
   IF minor AND clean_nickname IS NULL THEN
     RAISE EXCEPTION 'nickname_required';
   END IF;
+  -- As in set_profile_privacy, recording minority clears the photo and leaves matched halaqas.
+  IF minor THEN
+    PERFORM private.lock_minor_change(uid);
+  END IF;
   INSERT INTO public.profile_privacy (user_id, board_joined, board_nickname, is_minor, board_week_start,
     board_level_band, board_pace_band, board_utc_offset_minutes, board_enrolled_week, updated_at)
   VALUES (uid, true, clean_nickname, minor, p_week_start, p_level_band, p_pace_band, p_utc_offset_minutes,
@@ -2034,7 +2134,9 @@ REVOKE ALL ON FUNCTION
   private.effective_habit_status(TEXT, TEXT),
   private.merge_habit_day(public.habit_days, public.habit_days),
   private.habit_days_before_write(),
-  private.clear_minor_avatar(),
+  private.is_minor(UUID),
+  private.lock_minor_change(UUID),
+  private.apply_minor_privacy(),
   private.require_user(),
   private.checked_local_date(TEXT),
   private.local_today(TEXT),
@@ -2054,6 +2156,7 @@ REVOKE ALL ON FUNCTION
   private.require_halaqa_member(UUID, UUID),
   private.check_halaqa_limit(UUID),
   private.lock_halaqa_user(UUID),
+  private.halaqa_leave(UUID, UUID),
   private.encouraged_today(UUID, UUID, DATE, UUID),
   private.halaqa_summary(UUID, UUID),
   private.new_invite_code(),
@@ -2080,7 +2183,7 @@ REVOKE ALL ON FUNCTION
   public.get_halaqa_goal(UUID, TEXT),
   public.get_halaqa_detail(UUID, TEXT),
   public.send_halaqa_encouragement(UUID, UUID, TEXT, TEXT, TEXT),
-  public.get_received_encouragements(),
+  public.get_received_encouragements(TIMESTAMPTZ, UUID),
   public.get_halaqa_teacher_view(UUID, UUID, TEXT),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
@@ -2102,7 +2205,7 @@ GRANT EXECUTE ON FUNCTION
   public.get_halaqa_goal(UUID, TEXT),
   public.get_halaqa_detail(UUID, TEXT),
   public.send_halaqa_encouragement(UUID, UUID, TEXT, TEXT, TEXT),
-  public.get_received_encouragements(),
+  public.get_received_encouragements(TIMESTAMPTZ, UUID),
   public.get_halaqa_teacher_view(UUID, UUID, TEXT),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),

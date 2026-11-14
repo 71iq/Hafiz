@@ -13,7 +13,7 @@ import {
 } from "@/lib/halaqa/api";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
 import { strings } from "@/lib/i18n/strings";
-import { fetchProfileSummary, saveProfilePrivacy } from "@/lib/profile/privacy";
+import { deleteOwnAvatarFiles, fetchProfileSummary, saveProfilePrivacy } from "@/lib/profile/privacy";
 import { loadWithSocialCache } from "@/lib/social/cache";
 import { encouragementText } from "@/lib/social/encouragements";
 import { socialFailureMessage } from "@/lib/social/messages";
@@ -30,8 +30,9 @@ const mockHeaders: Record<string, string> = {};
 let mockConfigured = true;
 // The avatars bucket: stored paths, and every list or remove call with the bearer it was sent with.
 const mockAvatarFiles = new Set<string>();
-const mockStorageCalls: { op: "list" | "remove"; bucket: string; auth: string | undefined }[] = [];
+const mockStorageCalls: { op: "list" | "remove"; bucket: string; auth: string | undefined; folder?: string }[] = [];
 let mockRemoveRefused = false;
+let mockOnRemove: () => void = () => undefined;
 // The store and the shared client's session are separate, as in the app: a switch can reach one first.
 let mockAuth: FakeAuthState;
 let mockClientSession: FakeAuthState["session"];
@@ -51,13 +52,22 @@ jest.mock("@/lib/supabase", () => ({
             headers[name] = value;
             return files;
           },
-          list: async (folder: string) => {
-            mockStorageCalls.push({ op: "list", bucket, auth: headers.Authorization });
-            const names = [...mockAvatarFiles].filter((path) => path.startsWith(`${folder}/`)).map((path) => path.slice(folder.length + 1));
-            return { data: names.map((name) => ({ id: `id-${name}`, name })), error: null };
+          // As Storage lists: the folder's own files with ids, nested folders once each with a null id,
+          // by name, a page at a time.
+          list: async (folder: string, options: { limit: number; offset?: number }) => {
+            mockStorageCalls.push({ op: "list", bucket, auth: headers.Authorization, folder });
+            const entries = new Map<string, string | null>();
+            for (const path of mockAvatarFiles) {
+              if (!path.startsWith(`${folder}/`)) continue;
+              const [name, ...rest] = path.slice(folder.length + 1).split("/");
+              entries.set(name, rest.length > 0 ? null : `id-${path}`);
+            }
+            const page = [...entries].sort(([a], [b]) => a.localeCompare(b)).slice(options.offset ?? 0, (options.offset ?? 0) + options.limit);
+            return { data: page.map(([name, id]) => ({ id, name })), error: null };
           },
           remove: async (paths: string[]) => {
             mockStorageCalls.push({ op: "remove", bucket, auth: headers.Authorization });
+            mockOnRemove();
             if (mockRemoveRefused) return { data: [], error: null };
             for (const path of paths) mockAvatarFiles.delete(path);
             return { data: paths.map((name) => ({ name })), error: null };
@@ -135,6 +145,7 @@ beforeEach(async () => {
   mockAvatarFiles.clear();
   mockStorageCalls.length = 0;
   mockRemoveRefused = false;
+  mockOnRemove = () => undefined;
   signIn(signedIn(USER));
   await AsyncStorage.clear();
 });
@@ -303,13 +314,82 @@ describe("a minor's photo (ETH-07)", () => {
     error: null,
   });
 
-  it("deletes the account's own photo files once it is saved as a minor, as that account", async () => {
+  it("deletes the account's own photo files before it records minority, as that account", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/2.png`).add(`${OTHER}/3.jpg`);
-    mockRpc.mockResolvedValue(privacy(true));
+    mockRpc.mockImplementation(async () => {
+      // Third review, finding 1: by the time minority is recorded, nothing is left to publish.
+      expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
+      return privacy(true);
+    });
     await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner());
     expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
+    // The pass before the save, and the one after it, which finds nothing left with one request.
     expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "remove", "list"]);
     expect(mockStorageCalls.every((call) => call.bucket === "avatars" && bearerSubject(call.auth) === USER)).toBe(true);
+  });
+
+  it("does not record minority when a photo could not be deleted, so the save can be retried", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRemoveRefused = true;
+    mockRpc.mockResolvedValue(privacy(true));
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner()),
+    ).rejects.toMatchObject({ failure: { kind: "failed" } });
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("deletes photos in nested folders too", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/old/2.jpg`).add(`${USER}/old/deeper/3.png`).add(`${OTHER}/old/4.jpg`);
+    await expect(deleteOwnAvatarFiles(owner())).resolves.toBe(3);
+    expect([...mockAvatarFiles]).toEqual([`${OTHER}/old/4.jpg`]);
+    expect(mockStorageCalls.filter((call) => call.op === "list").map((call) => call.folder)).toEqual([
+      USER,
+      `${USER}/old`,
+      `${USER}/old/deeper`,
+    ]);
+  });
+
+  it("deletes more files than one listing page", async () => {
+    for (let i = 0; i < 150; i += 1) mockAvatarFiles.add(`${USER}/${String(i).padStart(3, "0")}.jpg`);
+    await expect(deleteOwnAvatarFiles(owner())).resolves.toBe(150);
+    expect(mockAvatarFiles.size).toBe(0);
+    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "list", "remove", "remove"]);
+  });
+
+  it("costs one list request when nothing is stored", async () => {
+    await expect(deleteOwnAvatarFiles(owner())).resolves.toBe(0);
+    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]);
+  });
+
+  it("stops before deleting once the account changed", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    const listing = deleteOwnAvatarFiles(owner());
+    signIn(signedIn(OTHER));
+    await expect(listing).rejects.toMatchObject({ failure: { kind: "account_changed" } });
+    expect(mockAvatarFiles.has(`${USER}/1.jpg`)).toBe(true);
+    expect(mockStorageCalls.some((call) => call.op === "remove")).toBe(false);
+  });
+
+  it("removes a photo uploaded while minority was being recorded, once it is recorded", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRpc.mockImplementation(async () => {
+      // Another device uploads before the server starts refusing this account's uploads.
+      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
+      return privacy(true);
+    });
+    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner());
+    expect([...mockAvatarFiles]).toEqual([]);
+  });
+
+  it("keeps a recorded save when the pass after it fails", async () => {
+    mockRpc.mockImplementation(async () => {
+      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
+      mockRemoveRefused = true;
+      return privacy(true);
+    });
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner()),
+    ).resolves.toMatchObject({ isMinor: true });
   });
 
   it("leaves an adult's photos alone", async () => {
@@ -319,21 +399,28 @@ describe("a minor's photo (ETH-07)", () => {
     expect(mockStorageCalls).toEqual([]);
   });
 
-  it("deletes them after joining the board as a minor", async () => {
+  const gathering = { data: { status: "gathering", week_start: "2026-11-09", member_count: 1, min_members: 5 }, error: null };
+  const inputs = { bands: { levelBand: "juz_amma", paceBand: "light", utcOffsetMinutes: 180 }, weekStart: 6 } as const;
+
+  it("deletes them before joining the board as a minor, and once more after", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockResolvedValue({ data: { status: "gathering", week_start: "2026-11-09", member_count: 1, min_members: 5 }, error: null });
-    const inputs = { bands: { levelBand: "juz_amma", paceBand: "light", utcOffsetMinutes: 180 }, weekStart: 6 } as const;
+    mockRpc.mockImplementation(async () => {
+      expect(mockAvatarFiles.size).toBe(0);
+      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
+      return gathering;
+    });
     await joinBoard({ nickname: "Little Star", isMinor: true, inputs, today: "2026-11-13" }, owner());
     expect(mockAvatarFiles.size).toBe(0);
   });
 
-  it("fails the save when a photo could not be deleted, so it can be retried", async () => {
+  it("does not join the board as a minor when a photo could not be deleted", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
     mockRemoveRefused = true;
-    mockRpc.mockResolvedValue(privacy(true));
+    mockRpc.mockResolvedValue(gathering);
     await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner()),
+      joinBoard({ nickname: "Little Star", isMinor: true, inputs, today: "2026-11-13" }, owner()),
     ).rejects.toMatchObject({ failure: { kind: "failed" } });
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 });
 
@@ -485,7 +572,11 @@ describe("teacher view plan (SOC-03)", () => {
 describe("received encouragements (5.8.2)", () => {
   it("lists ids with the server's time, for the device to acknowledge", async () => {
     mockRpc.mockResolvedValue({
-      data: { items: [{ id: GROUP, created_at: "2026-11-13T08:00:00.123456+00:00" }], checked_at: "2026-11-13T09:00:00+00:00" },
+      data: {
+        items: [{ id: GROUP, created_at: "2026-11-13T08:00:00.123456+00:00" }],
+        more: false,
+        checked_at: "2026-11-13T09:00:00+00:00",
+      },
       error: null,
     });
     const result = await fetchReceivedEncouragements(owner());
@@ -494,6 +585,42 @@ describe("received encouragements (5.8.2)", () => {
       items: [{ id: GROUP, createdAt: "2026-11-13T08:00:00.123456+00:00" }],
       checkedAt: "2026-11-13T09:00:00+00:00",
     });
+  });
+
+  // Third review, finding 5: more arrivals than one page are all listed, oldest included.
+  const encouragementId = (n: number) => `00000000-0000-4000-8e00-${String(n).padStart(12, "0")}`;
+  const createdAt = (n: number) => `2026-11-13T08:00:00.${String(n).padStart(6, "0")}+00:00`;
+  const page = (from: number, to: number, more: boolean, checkedAt: string) => ({
+    data: {
+      items: Array.from({ length: to - from + 1 }, (_, i) => ({ id: encouragementId(from + i), created_at: createdAt(from + i) })),
+      more,
+      checked_at: checkedAt,
+    },
+    error: null,
+  });
+
+  it("reads every page of the window by the cursor the previous page ended on", async () => {
+    mockRpc
+      .mockResolvedValueOnce(page(1, 100, true, "2026-11-13T09:00:00+00:00"))
+      .mockResolvedValueOnce(page(101, 151, false, "2026-11-13T09:00:01+00:00"));
+    const result = await fetchReceivedEncouragements(owner());
+    expect(mockRpc.mock.calls).toEqual([
+      ["get_received_encouragements", {}],
+      ["get_received_encouragements", { p_after_created_at: createdAt(100), p_after_id: encouragementId(100) }],
+    ]);
+    expect(result.items).toHaveLength(151);
+    expect(result.items[0]).toEqual({ id: encouragementId(1), createdAt: createdAt(1) });
+    expect(new Set(result.items.map((item) => item.id)).size).toBe(151);
+    expect(result.checkedAt).toBe("2026-11-13T09:00:00+00:00");
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+  });
+
+  it("stops at a page limit instead of reading forever", async () => {
+    mockRpc.mockImplementation(async () => page(1, 1, true, "2026-11-13T09:00:00+00:00"));
+    await expect(fetchReceivedEncouragements(owner())).rejects.toMatchObject({
+      failure: { kind: "failed", message: "received_page_limit" },
+    });
+    expect(mockRpc).toHaveBeenCalledTimes(50);
   });
 });
 

@@ -52,7 +52,7 @@ jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDb }));
 jest.mock("@/lib/notifications/schedule", () => ({ notifyGroupEncouragement: jest.fn(async () => true) }));
 
 function inbox(...items: [id: string, createdAt: string][]) {
-  return { data: { items: items.map(([id, created_at]) => ({ id, created_at })), checked_at: CHECKED }, error: null };
+  return { data: { items: items.map(([id, created_at]) => ({ id, created_at })), more: false, checked_at: CHECKED }, error: null };
 }
 
 const key = encouragementAcksKey(USER);
