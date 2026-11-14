@@ -55,6 +55,20 @@ function verseWords(reference: SimilarRef): string[] {
   return [reference.pre, reference.similar, reference.post].join(" ").split(/\s+/).filter(Boolean);
 }
 
+const segmentWords = (text: string) => text.split(/\s+/).filter(Boolean);
+
+/**
+ * Which words differ from the other verses, compared part by part: the shared passages with each
+ * other, the words before with the words before, and the words after with the words after. Compared as
+ * one line, a passage that runs on into the sibling's own ayah would match the sibling's passage with
+ * the wrong words and underline words the two verses share.
+ */
+function differingParts(reference: SimilarRef, others: readonly SimilarRef[]): boolean[] {
+  const part = (pick: (ref: SimilarRef) => string) =>
+    differingWords(segmentWords(pick(reference)), others.map((other) => segmentWords(pick(other))));
+  return [...part((ref) => ref.pre), ...part((ref) => ref.similar), ...part((ref) => ref.post)];
+}
+
 /**
  * Where the passage leaves words of the Quran out (SimilarRef.gaps), a muted "…". A screen reader
  * reads the mark as a stray symbol or not at all, so it is named: on the web here, in its place; on
@@ -65,7 +79,7 @@ function GapMark({ label }: { label: string }) {
   return (
     <>
       <RNText className="text-warm-700 dark:text-neutral-400" aria-hidden={web}>
-        {" …"}
+        {"\u00A0…"}
       </RNText>
       {web ? <RNText style={SCREEN_READER_ONLY}>{` ${label} `}</RNText> : null}
     </>
@@ -142,7 +156,7 @@ export function SimilarVerseLine({
   const dir = isRTL ? "rtl" : "ltr";
   const context = reference.context;
   const words = verseWords(reference);
-  const differs = compareWith && compareWith.length > 0 ? differingWords(words, compareWith.map(verseWords)) : null;
+  const differs = compareWith && compareWith.length > 0 ? differingParts(reference, compareWith) : null;
   // The marked passage's positions in the verse: the words after the part before it.
   const sharedFrom = reference.pre.split(/\s+/).filter(Boolean).length;
   const sharedTo = sharedFrom + reference.similar.split(/\s+/).filter(Boolean).length;
@@ -208,7 +222,8 @@ export function SimilarVerseLine({
                 // The end of an ayah inside the passage, numbered as in the Mushaf, so the verse
                 // under the reference does not read as running on into the next.
                 <RNText className="text-warm-700 dark:text-neutral-400" style={AYAH_END_STYLE}>
-                  {` (${toArabicNumber(ayahEnd)})`}
+                  {/* A no-break space keeps the number with its ayah's last word, never starting a line. */}
+                  {`\u00A0(${toArabicNumber(ayahEnd)})`}
                 </RNText>
               ) : null}
               {gaps.has(index) ? <GapMark label={gapLabel} /> : null}

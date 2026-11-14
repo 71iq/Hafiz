@@ -114,6 +114,48 @@ describe("what the comparison underlines and how much it shows", () => {
     expect(style("ابدا").textDecorationLine).toBeUndefined();
   });
 
+  it("compares the shared passages with each other, so a passage running into its sibling's ayah keeps its shared words", () => {
+    // 9:98 runs on into 9:99, whose own passage it is compared with (the bundled text): as one line, the
+    // run-on words match the sibling's lead-in and passage, and the shared opening was underlined.
+    const own = verse(
+      "وَٱللَّهُ عَلِيمٌ حَكِيمٌ",
+      "وَمِنَ ٱلْأَعْرَابِ مَن يَتَّخِذُ مَا يُنفِقُ مَغْرَمًا",
+      "وَيَتَرَبَّصُ بِكُمُ ٱلدَّوَآئِرَ عَلَيْهِمْ دَآئِرَةُ ٱلسَّوْءِ وَٱللَّهُ سَمِيعٌ عَلِيمٌ وَمِنَ ٱلْأَعْرَابِ مَن يُؤْمِنُ بِٱللَّهِ وَٱلْيَوْمِ ٱلْـَٔاخِرِ",
+    );
+    const other = verse(
+      "وَٱللَّهُ سَمِيعٌ عَلِيمٌ",
+      "وَمِنَ ٱلْأَعْرَابِ مَن يُؤْمِنُ بِٱللَّهِ وَٱلْيَوْمِ ٱلْـَٔاخِرِ",
+      "وَٱلسَّٰبِقُونَ ٱلْأَوَّلُونَ مِنَ ٱلْمُهَٰجِرِينَ وَٱلْأَنصَارِ",
+      20,
+    );
+    render(<SimilarVerseLine reference={own} isRTL={false} accent="#0f766e" compareWith={[other]} />);
+    const style = (word: string) => StyleSheet.flatten(screen.getAllByText(word)[0].props.style) ?? {};
+    expect(style("وَمِنَ")).toMatchObject({ color: "#0f766e", fontWeight: "700" });
+    expect(style("ٱلْأَعْرَابِ")).toMatchObject({ color: "#0f766e", fontWeight: "700" });
+    expect(style("يَتَّخِذُ")).toMatchObject({ textDecorationLine: "underline" });
+  });
+
+  it("keeps each ayah number with the word before it, so it never starts a line", () => {
+    const ref: SimilarRef = {
+      surah: 79,
+      ayah: 33,
+      surahName: "النازعات",
+      page: 584,
+      pre: "والجبال ارساها",
+      similar: "متاعا لكم ولانعامكم",
+      post: "فاذا جاءت الطامة الكبرى",
+      ayahEnds: [
+        { after: 1, ayah: 32 },
+        { after: 4, ayah: 33 },
+      ],
+    };
+    render(<SimilarVerseLine reference={ref} isRTL accent="#0f766e" />);
+    // The default text matcher folds a no-break space into a plain one, so the raw text is compared.
+    const raw = { normalizer: (text: string) => text };
+    expect(screen.getByText("\u00A0(٣٣)", raw)).toBeTruthy();
+    expect(screen.queryByText(" (٣٣)", raw)).toBeNull();
+  });
+
   it("shows three siblings, then the rest on request, and each sibling's meaning on request", async () => {
     const siblings = [1, 2, 3, 4, 5].map((n) => verse("", "اخ", `ساق${n}`, 20 + n));
     const group: SimilarGroup = { groupId: "g", kind: "similar", self: verse("", "اخ", "اصل"), siblings };
@@ -179,8 +221,8 @@ describe("where an ayah ends inside a similar-verse passage", () => {
       ],
     };
     render(<SimilarVerseLine reference={ref} isRTL accent="#0f766e" />);
-    expect(screen.getByText(" (٤)")).toBeTruthy();
-    expect(screen.getByText(" (٥)")).toBeTruthy();
+    expect(screen.getByText("\u00A0(٤)")).toBeTruthy();
+    expect(screen.getByText("\u00A0(٥)")).toBeTruthy();
   });
 });
 

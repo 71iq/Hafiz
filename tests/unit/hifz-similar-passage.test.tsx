@@ -252,7 +252,7 @@ describe("the left-out words on screen", () => {
 
   it("shows a muted mark after the ayah end, and names it for a screen reader", () => {
     render(<SimilarVerseLine reference={ref} isRTL={false} accent="#0f766e" />);
-    expect(screen.getByText(" …").props.className).toContain("text-warm-700");
+    expect(screen.getByText("\u00A0…").props.className).toContain("text-warm-700");
     expect(screen.getByLabelText("فقال قال رب اني وهن العظم (٤), words left out, مني شيئا حقا ابدا")).toBeTruthy();
     screen.unmount();
     render(<SimilarVerseLine reference={ref} isRTL accent="#0f766e" />);
@@ -263,7 +263,7 @@ describe("the left-out words on screen", () => {
     const os = jest.replaceProperty(Platform, "OS", "web");
     try {
       render(<SimilarVerseLine reference={ref} isRTL={false} accent="#0f766e" />);
-      expect(screen.getByText(" …", { includeHiddenElements: true }).props["aria-hidden"]).toBe(true);
+      expect(screen.getByText("\u00A0…", { includeHiddenElements: true }).props["aria-hidden"]).toBe(true);
       expect(screen.getByText(" words left out ")).toBeTruthy();
     } finally {
       os.restore();
