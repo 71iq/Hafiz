@@ -212,12 +212,12 @@ it("preserves prevented tab press and long-press delivery", async () => {
   expect(longPressed).toHaveBeenCalledTimes(1);
   expect(view.getByText("Home screen")).toBeTruthy();
 });
-it("gives every tab an equal share of the bar as its press target, at least 44 px tall", async () => {
+it("gives every tab a press target at least 44 px wide and tall that grows with its label", async () => {
   const view = render(fixture());
   await preference(true);
   for (const name of ["Home", "Mushaf"]) {
     const style = StyleSheet.flatten(view.getByRole("button", { name }).props.style);
-    expect(style).toMatchObject({ flex: 1, minHeight: 44, minWidth: 0 });
+    expect(style).toMatchObject({ flexGrow: 1, flexBasis: "auto", minHeight: 44, minWidth: 44 });
   }
 });
 it("shares and releases the real preference observer", async () => {

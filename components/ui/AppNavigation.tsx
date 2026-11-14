@@ -651,11 +651,13 @@ const styles = StyleSheet.create({
   bottomContainerCompact: {
     paddingHorizontal: 4,
   },
-  // Each tab takes an equal share of the bar, at least 48 px wide on a 320 px phone, so short labels
-  // keep a 44 px target.
+  // Each tab is as wide as its label and pill, at least 44 px, and shares what is left of the bar, so
+  // short labels keep a 44 px target and long ones (Progress, Settings, الإعدادات) are not cut at 320 px.
   bottomTabSlot: {
-    flex: 1,
-    minWidth: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "auto",
+    minWidth: 44,
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
