@@ -259,6 +259,7 @@ export async function loadReminderContext(
     minimum: habitSettings.minimum,
     weekStart: effectiveWeekStart(habitSettings, lang),
     backoff: backoffLevel(ignored.count),
+    ignoredCount: ignored.count,
     delivered,
     late,
     remindLater,

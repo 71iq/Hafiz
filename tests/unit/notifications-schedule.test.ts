@@ -226,7 +226,15 @@ describe("rescheduleReminders", () => {
     const result = await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
     expect(result.status).toBe("scheduled");
     expect(scheduledTypes().slice(0, 2)).toEqual([`${TODAY} streak_at_risk`, `${TODAY} wird_reminder`]);
-    expect(new Set(fake.scheduled.map((item) => item.data.localDate)).size).toBe(7);
+    // Two counted reminders a day reach 7 unanswered by day 4, so from then on the batch sends every
+    // other day (NOT-09). Every day without a reminder was left out by that back-off and nothing else.
+    const dates = new Set(fake.scheduled.map((item) => item.data.localDate));
+    for (let offset = 0; offset < 4; offset += 1) expect(dates.has(addDays(TODAY, offset))).toBe(true);
+    const missing = Array.from({ length: 7 }, (_, offset) => addDays(TODAY, offset)).filter((date) => !dates.has(date));
+    expect(missing.length).toBeGreaterThan(0);
+    for (const date of missing) {
+      expect(result.plan?.skipped.filter((item) => item.localDate === date).every((item) => item.reason === "backoff")).toBe(true);
+    }
     expect(logCount()).toBe(fake.scheduled.length);
     const first = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
     expect(first.data.at).toBe(at(TODAY, 5, 20).getTime());

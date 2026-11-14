@@ -318,6 +318,20 @@ describe("planNotifications", () => {
     expect(weekly.map((slot) => RIYADH.weekdayOf(slot.localDate))).toEqual([1]);
   });
 
+  it("projects the ignored tally through the batch: the seventh unanswered reminder starts back-off (NOT-09)", () => {
+    // Six ignored since the latest session; a fresh week of daily reminders with no session.
+    const plain = planNotifications(input({ backoff: backoffLevel(6) })).slots.map((slot) => slot.localDate);
+    const projected = planNotifications(input({ backoff: backoffLevel(6), ignoredCount: 6 })).slots.map((slot) => slot.localDate);
+    // Without the projection every day keeps its reminders; with it, today's first reminder is the
+    // seventh, and from then on only every other day keeps one.
+    expect(new Set(plain).size).toBe(7);
+    expect(projected[0]).toBe(TODAY);
+    expect(new Set(projected).size).toBeLessThan(7);
+    expect(new Set(projected).size).toBeGreaterThanOrEqual(3);
+    // A session resets the tally (the next plan starts from 0): every day comes back.
+    expect(new Set(planNotifications(input({ backoff: 0, ignoredCount: 0, horizonDays: 2 })).slots.map((slot) => slot.localDate)).size).toBe(2);
+  });
+
   it("sends the earn-back reminder once, when the window opens", () => {
     // Excused days count toward the streak but earn no grace, so the break is not covered.
     const habit = { days: days(streak(10, -3, "excused")), pause: null };

@@ -30,6 +30,21 @@ const DEFAULT_TYPE_PREFS: Readonly<Record<NotificationType, boolean>> = {
   comeback: true,
 };
 
+/**
+ * Reminders that ask for a session, which count as ignored when no session follows within 2 hours
+ * (NOT-09). Kahf and halaqa messages are not counted. The planner projects the same set.
+ */
+export const COUNTED_FOR_BACKOFF: ReadonlySet<NotificationType> = new Set<NotificationType>([
+  "wird_reminder",
+  "streak_at_risk",
+  "remind_later",
+  "late_reminder",
+  "makeup_window",
+  "grace_used",
+  "earnback_open",
+  "comeback",
+]);
+
 /** Types that are about today's wird. They stop once the minimum is done (NOT-05) or the day is covered. */
 export const WIRD_TYPES: ReadonlySet<NotificationType> = new Set<NotificationType>([
   "wird_reminder",

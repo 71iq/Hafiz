@@ -1,5 +1,5 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
-import type { NotificationLogRow, NotificationType } from "@/lib/notifications/types";
+import { COUNTED_FOR_BACKOFF, type NotificationLogRow } from "@/lib/notifications/types";
 
 /**
  * "Ignored" means no session started within 2 hours of delivery (8.11). The same window marks a
@@ -13,17 +13,6 @@ const LOG_RETENTION_DAYS = 90;
 const LOG_COLUMNS =
   "id, type, template_id, local_date, scheduled_for, os_id, delivered_at, opened_at, converted, cancelled_at";
 
-/** Reminders that ask for a session. Kahf and halaqa messages are not counted as ignored. */
-const COUNTED_FOR_BACKOFF: ReadonlySet<string> = new Set<NotificationType>([
-  "wird_reminder",
-  "streak_at_risk",
-  "remind_later",
-  "late_reminder",
-  "makeup_window",
-  "grace_used",
-  "earnback_open",
-  "comeback",
-]);
 
 type FiredFields = Pick<NotificationLogRow, "scheduled_for" | "cancelled_at"> &
   Partial<Pick<NotificationLogRow, "id" | "delivered_at">>;
@@ -101,7 +90,7 @@ export function advanceIgnoredTally(
     // A cancelled reminder that never showed waits out the same 2 hours, so the cursor stays behind.
     const settlesAt = fired ? responseWindowOf(row).end : Date.parse(row.scheduled_for) + CONVERSION_WINDOW_MS;
     if (!(settlesAt <= now.getTime())) break;
-    if (fired && COUNTED_FOR_BACKOFF.has(row.type)) count += 1;
+    if (fired && (COUNTED_FOR_BACKOFF as ReadonlySet<string>).has(row.type)) count += 1;
     cursor = { at: row.scheduled_for, id: row.id };
   }
   return { count, since: latestSession, cursor };

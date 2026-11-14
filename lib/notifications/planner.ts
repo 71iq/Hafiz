@@ -8,7 +8,7 @@ import { buildDayTimes, isQuietAt, makeUpCutoff, type DayTimesInput, type Remind
 import { createHabitProjector, type HabitProjector } from "@/lib/notifications/habit-projection";
 import type { GroupPending, RemindLaterPending } from "@/lib/notifications/settings";
 import { chooseTemplate, type TemplateUse, type TemplateVars } from "@/lib/notifications/templates";
-import type { NotificationType, PlannedSlot, ReminderPrefs, ReminderRoute } from "@/lib/notifications/types";
+import { COUNTED_FOR_BACKOFF, type NotificationType, type PlannedSlot, type ReminderPrefs, type ReminderRoute } from "@/lib/notifications/types";
 
 /** NOT-04: individual dated notifications for the next 7 days. */
 export const PLAN_HORIZON_DAYS = 7;
@@ -59,6 +59,13 @@ export type PlannerInput = Readonly<{
   /** 0 is Sunday. Weekly back-off reminds on this day. */
   weekStart: number;
   backoff: BackoffLevel;
+  /**
+   * The ignored reminders in a row behind `backoff` (NOT-09). With it, the plan projects the tally
+   * through the batch: each planned reminder that counts toward back-off is taken as ignored before
+   * the next one, since any session reschedules with the tally reset. Without it, `backoff` holds
+   * for every day.
+   */
+  ignoredCount?: number;
   delivered: readonly DeliveredReminder[];
   /**
    * Reminders whose time passed that the OS still holds. They are not delivered yet, but will show, so
@@ -366,10 +373,16 @@ export function planNotifications(input: PlannerInput): PlanResult {
     candidate.type !== "remind_later" &&
     input.delivered.some((item) => item.type === candidate.type && item.localDate === candidate.localDate);
   const timed: Candidate[] = [];
-  for (const candidate of candidates) {
-    const reason = timingProblem(candidate, now, input.backoff, input.weekStart, clock) ?? (sent(candidate) ? "sent" : null);
+  let projectedIgnored = input.ignoredCount ?? null;
+  for (const candidate of [...candidates].sort((a, b) => a.at.getTime() - b.at.getTime())) {
+    const level = projectedIgnored === null ? input.backoff : backoffLevel(projectedIgnored);
+    const reason = timingProblem(candidate, now, level, input.weekStart, clock) ?? (sent(candidate) ? "sent" : null);
     if (reason) skipped.push({ type: candidate.type, localDate: candidate.localDate, at: candidate.at, reason });
-    else timed.push(candidate);
+    else {
+      timed.push(candidate);
+      // Unanswered until a session, which replans: the next reminders see it as ignored (NOT-09).
+      if (projectedIgnored !== null && COUNTED_FOR_BACKOFF.has(candidate.type)) projectedIgnored += 1;
+    }
   }
 
   // NOT-07 caps per date, counting everything that already fired that day, follow-ups and group
