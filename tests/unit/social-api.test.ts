@@ -14,6 +14,7 @@ import {
 } from "@/lib/halaqa/api";
 import {
   clearSabaqAssignment,
+  forgetMySabaqAssignment,
   loadMySabaqAssignment,
   parseAssignmentInput,
   setSabaqAssignment,
@@ -751,6 +752,31 @@ describe("a teacher's next sabaq (SOC-03)", () => {
     }
     mockRpc.mockRejectedValue(new TypeError("Network request failed"));
     await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 2, fromLine: 3, toLine: 9 });
+  });
+
+  it("drops the offline copy when this device ends assignments, and a read in flight cannot bring it back", async () => {
+    mockRpc.mockResolvedValueOnce({ data: stored, error: null });
+    await loadMySabaqAssignment(USER, false);
+    let answer: (value: { data: unknown; error: unknown }) => void = () => undefined;
+    mockRpc.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const inFlight = loadMySabaqAssignment(USER, false);
+    await forgetMySabaqAssignment(USER);
+    answer({ data: stored, error: null });
+    // The read started before sharing was withdrawn: its answer is not kept, and the lesson gets none.
+    await expect(inFlight).resolves.toBeNull();
+    await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
+  });
+
+  it("never saves an older read's answer over a newer one", async () => {
+    let older: (value: { data: unknown; error: unknown }) => void = () => undefined;
+    mockRpc.mockReturnValueOnce(new Promise((resolve) => (older = resolve)));
+    const first = loadMySabaqAssignment(USER, false);
+    // The teacher clears it; a newer read sees that first.
+    mockRpc.mockResolvedValueOnce({ data: null, error: null });
+    await expect(loadMySabaqAssignment(USER, false)).resolves.toBeNull();
+    older({ data: stored, error: null });
+    await expect(first).resolves.toBeNull();
+    await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
   });
 
   it("reads a typed range in Western or Arabic-Indic digits, inside the mushaf's pages and lines", () => {

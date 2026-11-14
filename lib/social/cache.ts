@@ -51,6 +51,22 @@ async function writeSocialCache(userId: string, name: string, payload: unknown, 
   }
 }
 
+/** Saves `payload` as this signed-in account's copy of `name`; "account_changed" once it is not. */
+export async function writeOwnSocialCache(userId: string, name: string, payload: unknown, savedAt: string): Promise<void> {
+  const owner = requireSocialOwner(userId);
+  await writeSocialCache(userId, name, payload, savedAt);
+  owner.requireCurrent();
+}
+
+/** Drops the account's copy of `name`. A store that cannot remove it leaves the copy. */
+export async function forgetSocialCache(userId: string, name: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(storageKey(userId, name));
+  } catch {
+    // The copy stays until the next read replaces it.
+  }
+}
+
 /** The saved copy of `name` for this signed-in account, or null; "account_changed" once it is not. */
 export async function readOwnSocialCache<T>(userId: string, name: string, schema: z.ZodType<T>): Promise<SocialSnapshot<T> | null> {
   const owner = requireSocialOwner(userId);

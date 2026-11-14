@@ -703,4 +703,30 @@ check "leave finished" "$(tail -1 "$WORK/sq_leave")" ok
 check "leaving deleted the assignment" \
   "$(admin -c "SELECT count(*) FROM public.halaqa_sabaq_assignments WHERE learner_id = '$(uid 31)'")" 0
 
+# ─── SOC-03: an assignment and deleting the learner's account cannot deadlock ─────
+# User 32 shares their plan in user 30's halaqa. The controller holds user 32's membership row; the
+# assignment waits on it, and the account deletion starts then. The assignment key-shared both
+# profiles first, so the deletion waits on the profile until the assignment commits, then cascades
+# and removes the assignment with the membership. An assignment that reached the profiles only at its
+# insert would wait on the deleted profile while the deletion waits on the membership it holds.
+rm -f "$WORK"/*
+admin >/dev/null <<SQL
+INSERT INTO auth.users (id, email) VALUES ('$(uid 32)', 'race32@example.invalid');
+INSERT INTO public.profiles (id, username) VALUES ('$(uid 32)', 'race_user_32');
+SQL
+as_user "$(uid 32)" "SELECT public.join_halaqa_by_code('$SABAQ_CODE');
+SELECT public.set_halaqa_sharing('$SABAQ_GROUP', true, true, true, false);" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
+controller sabaq_delete "SELECT 1 FROM public.halaqa_members WHERE group_id = '$SABAQ_GROUP' AND user_id = '$(uid 32)' FOR UPDATE;" 2
+wait_for_controller sabaq_delete
+session sd_assign "$(uid 30)" "SELECT public.set_halaqa_sabaq_assignment('$SABAQ_GROUP', '$(uid 32)', 582, 3, 9) IS NOT NULL;"
+wait_for_waiters 1
+admin_session sd_delete "DELETE FROM auth.users WHERE id = '$(uid 32)';"
+wait
+check "no deadlock between an assignment and account deletion" "$(deadlocks)" 0
+check "assignment finished" "$(tail -1 "$WORK/sd_assign")" ok
+check "deletion finished" "$(tail -1 "$WORK/sd_delete")" ok
+check "the account is gone with its assignment" \
+  "$(admin -c "SELECT count(*) FROM public.profiles WHERE id = '$(uid 32)'")/$(admin -c "SELECT count(*) FROM public.halaqa_sabaq_assignments WHERE learner_id = '$(uid 32)'")" 0/0
+
 echo "learning_consistency_races.sh: all races passed"

@@ -3267,9 +3267,10 @@ END;
 $$;
 
 -- SOC-03: a teacher sets a member's next sabaq, replacing any earlier one in this halaqa, while the member
--- shares their plan with teachers. The group is locked as leaving locks it, then both memberships, so a
--- concurrent leave, change of role or withdrawn sharing either commits first and refuses this, or waits
--- and then deletes what this wrote.
+-- shares their plan with teachers. Both profiles are key-shared first, as send_halaqa_encouragement does,
+-- since deleting an account locks its profile and then cascades to its memberships. Then the group is
+-- locked as leaving locks it, then both memberships, so a concurrent leave, change of role or withdrawn
+-- sharing either commits first and refuses this, or waits and then deletes what this wrote.
 CREATE OR REPLACE FUNCTION public.set_halaqa_sabaq_assignment(
   p_group_id UUID,
   p_member_id UUID,
@@ -3286,6 +3287,7 @@ DECLARE
   uid UUID := private.require_user();
   saved public.halaqa_sabaq_assignments;
 BEGIN
+  PERFORM 1 FROM public.profiles WHERE id IN (uid, p_member_id) ORDER BY id FOR KEY SHARE;
   PERFORM 1 FROM public.halaqa_groups WHERE id = p_group_id AND deleted_at IS NULL FOR SHARE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'not_a_member' USING ERRCODE = '42501';

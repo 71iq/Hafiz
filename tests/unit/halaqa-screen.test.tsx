@@ -719,6 +719,60 @@ describe("Halaqa tab", () => {
       expect(writes()[0][1]).toMatchObject({ p_page: 582, p_from_line: 3, p_to_line: 9 });
     });
 
+    it("shows a save's outcome only on the sheet of the member it was for", async () => {
+      signIn(USER);
+      const ZAYD = "00000000-0000-4000-8000-00000000000c";
+      const zayd = { ...detail.members[1], user_id: ZAYD, name: "Zayd", username: "zayd", teacher_view: true };
+      const threeMembers = { ...sharingDetail, members: [...sharingDetail.members, zayd] };
+      let finishSave: (value: { data: unknown; error: unknown }) => void = () => undefined;
+      mockRpc.mockImplementation(async (fn, args) => {
+        switch (fn) {
+          case "get_my_halaqas":
+            return { data: [teacherSummary], error: null };
+          case "get_halaqa_detail":
+            return { data: threeMembers, error: null };
+          case "get_halaqa_teacher_view": {
+            const name = args.p_member_id === ZAYD ? "Zayd" : "Yusuf";
+            const plan = { hifz_plan: null, tiers: {}, sabaq_assignment: null };
+            return { data: { name, plan, grades: null }, error: null };
+          }
+          case "set_halaqa_sabaq_assignment":
+            return new Promise((resolve) => (finishSave = resolve));
+          default:
+            throw new Error(`Unexpected RPC ${fn}`);
+        }
+      });
+      const screen = renderScreen();
+      await openView(screen);
+      fireEvent.changeText(await screen.findByLabelText(strings.en.teacherAssignPage), "582");
+      fireEvent.press(screen.getByRole("button", { name: strings.en.teacherAssignSave }));
+      // Yusuf's save is still running when the teacher moves on to Zayd.
+      fireEvent.press(screen.getByRole("button", { name: strings.en.genericClose }));
+      fireEvent.press(
+        await screen.findByRole("button", { name: interpolate(strings.en.halaqaTeacherViewA11y, { name: "Zayd" }) }),
+      );
+      expect(await screen.findByText(strings.en.teacherAssignNone)).toBeTruthy();
+      await act(async () => finishSave({ data: { ...assignment, page: 582 }, error: null }));
+      expect(screen.queryByText(strings.en.teacherAssignSaved)).toBeNull();
+    });
+
+    it("drops the offline copy of a teacher's next sabaq when plan sharing is saved off", async () => {
+      signIn(USER);
+      const key = `hafiz_social_cache_v1:${USER}:sabaq-assignment`;
+      await AsyncStorage.setItem(key, JSON.stringify({ savedAt: "2026-11-13T08:00:00.000Z", payload: assignment }));
+      respond({
+        get_my_halaqas: [summary],
+        get_halaqa_detail: detail,
+        get_profile_privacy: adultPrivacy,
+        set_halaqa_sharing: summary,
+      });
+      const screen = renderScreen();
+      fireEvent.press(await screen.findByLabelText(strings.en.halaqaSharingA11y));
+      fireEvent.press(await screen.findByRole("button", { name: strings.en.socialSave }));
+      expect(await screen.findByText(strings.en.socialSaved)).toBeTruthy();
+      expect(await AsyncStorage.getItem(key)).toBeNull();
+    });
+
     it("offers no assignment for a member who does not share their plan", async () => {
       signIn(USER);
       serveTeacherView(false);

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { AssignedSabaq } from "@/lib/hifz/sabaq";
 import { LINES_PER_PAGE, PAGE_COUNT } from "@/lib/hifz/units";
-import { loadWithSocialCache, readOwnSocialCache } from "@/lib/social/cache";
-import type { SocialOwner } from "@/lib/social/owner";
-import { callSocialRpc, socialFailureOf, voidResult, type SocialRead } from "@/lib/social/remote";
+import { forgetSocialCache, readOwnSocialCache, writeOwnSocialCache } from "@/lib/social/cache";
+import { requireSocialOwner, type SocialOwner } from "@/lib/social/owner";
+import { callSocialRpc, callSocialRpcRaw, parseSocialPayload, socialFailureOf, voidResult } from "@/lib/social/remote";
 
 /**
  * SOC-03: a teacher's next sabaq for a member, a page and a range of its lines. A teacher sets or clears
@@ -39,9 +39,50 @@ const mineSchema = sabaqAssignmentSchema.nullable();
 /** The offline copy's name under the account's social cache (lib/social/cache.ts). */
 const SABAQ_ASSIGNMENT_CACHE = "sabaq-assignment";
 
-/** The server's latest live assignment for the signed-in account, across its halaqas. */
-function mySabaqAssignmentRead(): SocialRead<SabaqAssignment | null> {
-  return { fn: "get_my_sabaq_assignment", args: {}, schema: mineSchema };
+/**
+ * Reads are numbered as they start. Per account, the number of the newest read whose answer was saved,
+ * or of the last forget: an older read's answer is never saved over it, so a slow read cannot bring back
+ * an assignment a newer read found cleared, or one the account ended by withdrawing sharing.
+ */
+let readCount = 0;
+const savedRead = new Map<string, number>();
+const changeListeners = new Set<() => void>();
+
+/** Called after forgetMySabaqAssignment, so a screen that keeps its own copy reads again. */
+export function subscribeSabaqAssignmentChanges(listener: () => void): () => void {
+  changeListeners.add(listener);
+  return () => {
+    changeListeners.delete(listener);
+  };
+}
+
+/**
+ * Drops the account's offline copy once this device has withdrawn plan sharing or left a halaqa, both
+ * of which end assignments on the server, so an offline lesson never applies one the account ended.
+ * The next online read brings back any assignment from another halaqa that still holds.
+ */
+export async function forgetMySabaqAssignment(userId: string): Promise<void> {
+  readCount += 1;
+  savedRead.set(userId, readCount);
+  await forgetSocialCache(userId, SABAQ_ASSIGNMENT_CACHE);
+  for (const listener of changeListeners) listener();
+}
+
+/**
+ * The server's latest live assignment for the account, across its halaqas, saved as the offline copy
+ * unless a newer read or a forget came first. `stale` says the answer was not saved.
+ */
+async function readFromServer(userId: string): Promise<{ data: SabaqAssignment | null; stale: boolean }> {
+  readCount += 1;
+  const read = readCount;
+  const owner = requireSocialOwner(userId);
+  const payload = await callSocialRpcRaw("get_my_sabaq_assignment", {}, owner);
+  const data = parseSocialPayload(mineSchema, payload);
+  owner.requireCurrent();
+  if (read < (savedRead.get(userId) ?? 0)) return { data, stale: true };
+  savedRead.set(userId, read);
+  await writeOwnSocialCache(userId, SABAQ_ASSIGNMENT_CACHE, payload, new Date().toISOString());
+  return { data, stale: false };
 }
 
 /** How long the sabaq screen waits for the server before it uses the saved copy. */
@@ -49,9 +90,9 @@ const LOAD_TIMEOUT_MS = 5_000;
 
 /**
  * The signed-in member's next sabaq from a teacher, for choosing a lesson's lines: the server's answer,
- * kept as the offline copy, or that copy when the server cannot answer in time. Null when signed out,
- * when the account changed meanwhile, or when nothing is assigned or saved. Never throws, so a lesson
- * always loads.
+ * kept as the offline copy, or that copy when offline, when the server cannot answer in time or fails,
+ * or when a newer read or a forget overtook this one. Null when signed out, when the account changed
+ * meanwhile, or when nothing is assigned or saved. Never throws, so a lesson always loads.
  */
 export async function loadMySabaqAssignment(userId: string | null, offline: boolean): Promise<AssignedSabaq | null> {
   if (!userId) return null;
@@ -64,7 +105,8 @@ export async function loadMySabaqAssignment(userId: string | null, offline: bool
   };
   let timer: ReturnType<typeof setTimeout> | null = null;
   try {
-    const fresh = loadWithSocialCache({ userId, name: SABAQ_ASSIGNMENT_CACHE, read: mySabaqAssignmentRead(), offline });
+    if (offline) return toAssigned(await saved());
+    const fresh = readFromServer(userId);
     const timeout = new Promise<"timeout">((resolve) => {
       timer = setTimeout(() => resolve("timeout"), LOAD_TIMEOUT_MS);
     });
@@ -74,7 +116,7 @@ export async function loadMySabaqAssignment(userId: string | null, offline: bool
       fresh.catch(() => undefined);
       return toAssigned(await saved());
     }
-    return toAssigned(result.data);
+    return toAssigned(result.stale ? await saved() : result.data);
   } catch (error) {
     if (socialFailureOf(error).kind === "account_changed") return null;
     return toAssigned(await saved());
