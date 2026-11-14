@@ -414,6 +414,12 @@ describe("minimum wird (STR-01)", () => {
 
   it("counts a page card or a finished sabaq chunk on its own", () => {
     expect(meetsMinimum(tallyReviews([{ cardId: "page:madani15:582", durationMs: 0 }], { studyCounts: false }), minimum)).toBe(true);
+    // A sabaq chunk counts by its share of the page's 15 lines (STR-01): a short second look on 4 lines
+    // is not a page, while a chunk that covers the whole page is.
+    expect(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(5);
+    expect(tallyReviews([{ cardId: "chunk:madani15:582:1-15", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(PAGE_UNITS);
+    expect(tallyReviews([{ cardId: "chunk:madani15:582:3-3", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(1);
+    expect(meetsMinimum(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 120_000 }], { studyCounts: false }), minimum)).toBe(false);
     expect(minimumProgress(tallyReviews([{ cardId: "half:madani15:582:a", durationMs: 0 }], { studyCounts: false }), minimum)).toBe(0.5);
   });
 });

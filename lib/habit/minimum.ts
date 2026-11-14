@@ -31,6 +31,9 @@ export function parseWirdMinimum(value: string | null | undefined): WirdMinimum 
  */
 export const PAGE_UNITS = 20;
 
+/** Lines on a Madani page (lib/hifz/units LINES_PER_PAGE): a sabaq chunk counts by its share of one. */
+const LINES_PER_PAGE = 15;
+
 /** A single review's time counts toward the minutes path up to this cap, so an idle screen cannot. */
 const MAX_COUNTED_REVIEW_MS = 10 * 60_000;
 
@@ -46,9 +49,22 @@ function cardRole(cardId: string): CardRole {
   return "recitation";
 }
 
+/**
+ * A sabaq chunk's weight, by its lines: its id ends in "from-to" (lib/hifz/units chunkCardId). Four
+ * lines are 5 twentieths, so a short second look (SBQ-03) is not a page of recitation (STR-01).
+ * Null for an id that does not end in its lines; it counts as a page, as before.
+ */
+function chunkUnits(cardId: string): number | null {
+  const match = /^(\d+)-(\d+)$/.exec(cardId.slice(cardId.lastIndexOf(":") + 1));
+  if (!match) return null;
+  const lines = Number(match[2]) - Number(match[1]) + 1;
+  return Math.max(1, Math.min(PAGE_UNITS, Math.round((lines * PAGE_UNITS) / LINES_PER_PAGE)));
+}
+
 export function recitationUnits(cardId: string): number {
   if (cardRole(cardId) === "study") return 0;
-  if (cardId.startsWith("page:") || cardId.startsWith("chunk:")) return PAGE_UNITS;
+  if (cardId.startsWith("chunk:")) return chunkUnits(cardId) ?? PAGE_UNITS;
+  if (cardId.startsWith("page:")) return PAGE_UNITS;
   if (cardId.startsWith("half:")) return PAGE_UNITS / 2;
   if (cardId.startsWith("seam:")) return PAGE_UNITS / 4;
   return PAGE_UNITS / 10;
@@ -88,9 +104,17 @@ export function minimumProgress(tally: WirdTally, minimum: WirdMinimum): number 
 
 const STUDY_SQL = "(card_id LIKE 'word:%' OR card_id LIKE 'qiraat:%' OR card_id LIKE 'asbab:%')";
 
+// chunkUnits in SQL. lines_seg is the id after its last ':' (the right trim stops at the last ':').
+// It is "from-to" when it is digits, one '-', digits.
+const LINES_SEG_SQL = "replace(card_id, rtrim(card_id, replace(card_id, ':', '')), '')";
+const CHUNK_LINES_OK_SQL =
+  "(lines_seg GLOB '[0-9]*-[0-9]*' AND NOT lines_seg GLOB '*[^-0-9]*' AND length(lines_seg) - length(replace(lines_seg, '-', '')) = 1)";
+const CHUNK_UNITS_SQL = `MAX(1, MIN(${PAGE_UNITS}, CAST(ROUND((CAST(substr(lines_seg, instr(lines_seg, '-') + 1) AS INTEGER) - CAST(substr(lines_seg, 1, instr(lines_seg, '-') - 1) AS INTEGER) + 1) * ${PAGE_UNITS}.0 / ${LINES_PER_PAGE}) AS INTEGER)))`;
+
 const TALLY_SELECT = `SELECT
   COALESCE(SUM(CASE
     WHEN ${STUDY_SQL} THEN 0
+    WHEN card_id LIKE 'chunk:%' AND ${CHUNK_LINES_OK_SQL} THEN ${CHUNK_UNITS_SQL}
     WHEN card_id LIKE 'page:%' OR card_id LIKE 'chunk:%' THEN ${PAGE_UNITS}
     WHEN card_id LIKE 'half:%' THEN ${PAGE_UNITS / 2}
     WHEN card_id LIKE 'seam:%' THEN ${PAGE_UNITS / 4}
@@ -98,7 +122,7 @@ const TALLY_SELECT = `SELECT
   COALESCE(SUM(CASE
     WHEN ${STUDY_SQL} AND ? = 0 THEN 0
     ELSE MIN(MAX(COALESCE(duration_ms, 0), 0), ${MAX_COUNTED_REVIEW_MS}) END), 0) AS counted_ms
-  FROM study_log`;
+  FROM (SELECT card_id, duration_ms, local_date, makeup_for, ${LINES_SEG_SQL} AS lines_seg FROM study_log)`;
 
 /**
  * The same tally as tallyReviews, computed by SQLite, so a grade does not load the day's rows. Keep

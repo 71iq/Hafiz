@@ -418,6 +418,42 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
       { numRuns: 60 },
     );
   });
+
+  it("weighs sabaq chunks by their lines, the same in SQL as in tallyReviews", async () => {
+    const chunkId = fc.oneof(
+      fc
+        .record({ page: fc.integer({ min: 1, max: 604 }), from: fc.integer({ min: 0, max: 20 }), to: fc.integer({ min: 0, max: 20 }) })
+        .map(({ page, from, to }) => `chunk:madani15:${page}:${from}-${to}`),
+      fc.constantFrom(
+        "chunk:madani15:5:3-",
+        "chunk:madani15:5:-4",
+        "chunk:madani15:5:a-4",
+        "chunk:madani15:5:3-4-5",
+        "chunk:madani15:5:3--4",
+        "chunk:madani15:5",
+        "chunk:7",
+        "chunk:madani15:5:07-09",
+      ),
+    );
+    await fc.assert(
+      fc.asyncProperty(fc.array(chunkId, { maxLength: 20 }), async (ids) => {
+        store.sql.prepare("DELETE FROM study_log").run();
+        const insert = store.sql.prepare(
+          `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days,
+            reviewed_at, local_date, duration_ms) VALUES (?, 3, 2, ?, 1, 1, 0, 1, ?, ?, 0)`,
+        );
+        const at = atLocalTime(TODAY, 600).toISOString();
+        for (const id of ids) insert.run(id, at, at, TODAY);
+        const row = await store.db.getFirstAsync<{ page_units: number }>(DAY_TALLY_SQL, [0, TODAY]);
+        const expected = tallyReviews(
+          ids.map((cardId) => ({ cardId, durationMs: 0 })),
+          { studyCounts: false },
+        );
+        expect(Number(row?.page_units)).toBe(expected.pageUnits);
+      }),
+      { numRuns: 80 },
+    );
+  });
 });
 
 describe("make-up attribution on each review (STR-08)", () => {
