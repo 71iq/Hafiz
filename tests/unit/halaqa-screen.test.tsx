@@ -42,6 +42,24 @@ let mockConfigured = true;
 jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useRouter: () => ({ push: jest.fn() }) }));
 jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn(async () => true) }));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => ({ name: "synthetic" }) }));
+// The next-sabaq form previews a range from the Quran tables, which this screen does not seed: every
+// range holds one ayah here. teacher-sabaq-preview.test.tsx covers the preview itself.
+jest.mock("@/lib/halaqa/sabaq-preview", () => {
+  const ayah = { surah: 1, ayah: 1, surahNameArabic: "الفاتحة", surahNameEnglish: "Al-Fatihah" };
+  return {
+    loadSabaqRangePreview: async () => ({
+      kind: "ayat",
+      first: ayah,
+      last: ayah,
+      firstLine: 2,
+      lastLine: 2,
+      startsMidAyah: false,
+      endsMidAyah: false,
+      opening: "",
+      openingContinues: false,
+    }),
+  };
+});
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   return { ...actual, useSettings: () => mockSettings };

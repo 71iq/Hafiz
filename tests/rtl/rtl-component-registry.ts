@@ -595,7 +595,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/social/TeacherSabaqAssignment.tsx",
     "form-field",
     "rntl",
-    "Next-sabaq form in the teacher view; the three number fields and buttons mirror, and digits follow the interface.",
+    "Next-sabaq form in the teacher view; the three number fields and buttons mirror, and digits follow the interface. The range preview's Uthmani opening reads RTL in both languages.",
   ),
   entry(
     "components/social/TeacherViewSheet.tsx",
