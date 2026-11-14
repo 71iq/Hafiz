@@ -69,7 +69,8 @@ export function HalaqaGroup({
           </Text>
           <Text variant="caption">
             {interpolate(s.halaqaMemberCount, { n: socialNumber(group.memberCount, language) })}
-            {group.role === "teacher" ? ` · ${s.halaqaYouTeach}` : ""}
+            {/* An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero. */}
+            {group.role === "teacher" ? `${language === "ar" ? "، " : " · "}${s.halaqaYouTeach}` : ""}
           </Text>
         </View>
 

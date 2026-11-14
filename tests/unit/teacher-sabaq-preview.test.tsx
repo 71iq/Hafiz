@@ -134,7 +134,7 @@ describe("the next sabaq preview (SOC-03)", () => {
     // its words cannot be matched to their glyphs.
     type("٥٦٢", "٦", "٩");
     expect(await screen.findByText("من سورة الملك ٦٧:٣ إلى سورة القلم ٦٨:١")).toBeTruthy();
-    expect(screen.getByText("ثالث رابع خامس سادس ٣")).toBeTruthy();
+    expect(screen.getByText("ثالث رابع خامس سادس (٣)")).toBeTruthy();
   });
 
   it("warns, without refusing, when the lines start or end inside an ayah", async () => {
@@ -147,7 +147,7 @@ describe("the next sabaq preview (SOC-03)", () => {
     type("562", "5", "5");
     expect(await screen.findByText("Al-Mulk 67:2 to 67:3")).toBeTruthy();
     // Line 5 opens with the end of 67:2, shown as its number.
-    expect(screen.getByText("تاسع ٢ عاشر حادي ثاني")).toBeTruthy();
+    expect(screen.getByText("تاسع (٢) عاشر حادي ثاني")).toBeTruthy();
     expect(screen.getByText(interpolate(strings.en.teacherAssignMidStart, { line: "5" }))).toBeTruthy();
     expect(screen.getByText(interpolate(strings.en.teacherAssignMidEnd, { line: "5" }))).toBeTruthy();
 
@@ -194,6 +194,11 @@ describe("the next sabaq preview (SOC-03)", () => {
     expect(screen.getByText(strings.en.teacherAssignInvalid)).toBeTruthy();
     await waitFor(() => expect(screen.queryByText(/Al-Mulk/)).toBeNull());
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("brackets an ayah end inside the opening, so it never reads as a letter", async () => {
+    const preview = await loadSabaqRangePreview(store.db, { page: 562, fromLine: 5, toLine: 6 });
+    expect(preview).toMatchObject({ kind: "ayat", opening: "تاسع (٢) عاشر حادي ثاني", startsMidAyah: true });
   });
 
   it("stops the opening before a word whose glyph position is unknown", async () => {

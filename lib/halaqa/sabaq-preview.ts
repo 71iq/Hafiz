@@ -121,7 +121,8 @@ export async function loadSabaqRangePreview(db: DatabaseExecutor, range: Assigne
   let words = 0;
   for (const token of cover.opening) {
     const ayahWords = wordsOf.get(`${token.surah}:${token.ayah}`);
-    const word = token.isMarker ? toArabicNumber(token.ayah) : ayahWords?.[(token.wordPos ?? 0) - 1];
+    // An ayah end in brackets, as the similar-verse cards show it, so it never reads as a letter.
+    const word = token.isMarker ? `(${toArabicNumber(token.ayah)})` : ayahWords?.[(token.wordPos ?? 0) - 1];
     if (word === undefined) break;
     parts.push(word);
     if (!token.isMarker) words += 1;

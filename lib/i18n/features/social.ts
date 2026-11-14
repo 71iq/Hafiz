@@ -284,7 +284,7 @@ export const socialStrings = {
     halaqaMatchedName: "حلقة مقترحة",
     halaqaMemberCount: "الأعضاء: {{n}}",
     halaqaTeacherBadge: "معلّم",
-    halaqaYouTeach: "أنت معلّم فيها",
+    halaqaYouTeach: "لك دور المعلّم فيها",
     halaqaYou: "أنت",
     halaqaWeeklyGoal: "هدف الحلقة هذا الأسبوع",
     halaqaGoalProgress: "أيام الوِرد معًا: {{done}} من {{target}}",
