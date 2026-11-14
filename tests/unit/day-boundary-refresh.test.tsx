@@ -4,6 +4,7 @@ import type { AppDatabase } from "@/lib/database/types";
 import type { DhuhrResolver } from "@/lib/habit/cutoff";
 import { atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { loadHabitOverview, settleHabitDays } from "@/lib/habit/queries";
+import { useLocalToday } from "@/lib/habit/use-day-boundary";
 import { useHabitOverview } from "@/lib/habit/use-habit-overview";
 import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird } from "@/lib/hifz/pages";
@@ -304,5 +305,28 @@ describe("useTodayWird across a day boundary", () => {
     expectNoBoundaryTimer();
     await advanceTo(at(16, 1));
     expect(wirdLoads()).toBe(1);
+  });
+});
+
+describe("useLocalToday across a day boundary (Board and Halaqa)", () => {
+  it("moves on to the new day at local midnight while the screen stays open", async () => {
+    jest.setSystemTime(at(15, 23, 59));
+    const { result } = renderHook(() => useLocalToday());
+    expect(result.current).toBe(localDateOf(at(15, 12)));
+    await advanceTo(at(16, 0, 1));
+    expect(result.current).toBe(localDateOf(at(16, 12)));
+  });
+
+  it("moves on when the app returns from the background on another day", async () => {
+    const { result } = renderHook(() => useLocalToday());
+    await resumeAt(at(15, 9), { timersRun: false });
+    expect(result.current).toBe(localDateOf(at(15, 12)));
+  });
+
+  it("clears its timer and AppState listener on unmount", async () => {
+    const { unmount } = renderHook(() => useLocalToday());
+    unmount();
+    expect(appStateListeners.size).toBe(0);
+    expectNoBoundaryTimer();
   });
 });

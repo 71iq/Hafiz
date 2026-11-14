@@ -17,7 +17,7 @@ import { Text } from "@/components/ui/Text";
 import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys } from "@/lib/board/api";
 import { useDatabase } from "@/lib/database/provider";
-import { localDateOf } from "@/lib/habit/dates";
+import { useLocalToday } from "@/lib/habit/use-day-boundary";
 import {
   createInviteHalaqa,
   fetchTeacherView,
@@ -89,7 +89,8 @@ function HalaqaContent({ userId }: { userId: string }) {
   const language = uiLanguage === "ar" ? "ar" : "en";
   const queryClient = useQueryClient();
   const offline = useIsOffline();
-  const today = localDateOf(new Date());
+  // Moves on at local midnight, so a tab left open overnight asks for the new day (BRD-01).
+  const today = useLocalToday();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);

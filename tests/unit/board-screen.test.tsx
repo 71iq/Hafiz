@@ -161,6 +161,28 @@ describe("Board tab", () => {
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
+  it("asks for the new day when left open past midnight, so the week resets (BRD-01)", async () => {
+    jest.useFakeTimers({ now: new Date(2026, 10, 15, 23, 59, 50) });
+    try {
+      signIn(USER);
+      renderScreen();
+      const days = () => mockRpc.mock.calls.filter(([fn]) => fn === "get_board").map(([, args]) => (args as { p_today: string }).p_today);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1_000);
+      });
+      expect(days()).toEqual(["2026-11-15"]);
+      // Past midnight: the new day's inputs load, then its board.
+      for (let tick = 0; tick < 3; tick += 1) {
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(10_000);
+        });
+      }
+      expect(days()).toEqual(["2026-11-15", "2026-11-16"]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("is opt-in, with the intention note before joining (BRD-04)", async () => {
     signIn(USER);
     const screen = renderScreen();

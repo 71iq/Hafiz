@@ -11,7 +11,7 @@ import { BoardJoinSkeleton, StandingsSkeleton } from "@/components/social/Social
 import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys, boardRead, joinBoard, leaveBoard } from "@/lib/board/api";
 import { useDatabase } from "@/lib/database/provider";
-import { localDateOf } from "@/lib/habit/dates";
+import { useLocalToday } from "@/lib/habit/use-day-boundary";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { fetchProfilePrivacy, ProfilePrivacyChangedError, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { useSettings } from "@/lib/settings/context";
@@ -62,7 +62,8 @@ function BoardContent({ userId }: { userId: string }) {
   const language = uiLanguage === "ar" ? "ar" : "en";
   const queryClient = useQueryClient();
   const offline = useIsOffline();
-  const today = localDateOf(new Date());
+  // Moves on at local midnight, so a tab left open overnight asks for the new day (BRD-01).
+  const today = useLocalToday();
   const [joinError, setJoinError] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
