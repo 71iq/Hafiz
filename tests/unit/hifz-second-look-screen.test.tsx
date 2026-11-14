@@ -288,6 +288,24 @@ describe("sabaq second look (SBQ-03)", () => {
     expect(nextSabaqTarget).toHaveBeenCalledTimes(1);
   });
 
+  it("offers more lines, not new ones, after a look once today's lines are done", async () => {
+    jest.mocked(loadTodayWird).mockResolvedValue({
+      plan: DEFAULT_HIFZ_PLAN,
+      newLines: 3,
+      sabaqLinesToday: 3,
+      sabaqDoneToday: true,
+      daily: { backlog: false },
+    } as never);
+    await open();
+    press(s.hifzDrillShow);
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    expect(screen.getByText(s.hifzSabaqMore)).toBeTruthy();
+    expect(screen.queryByText(s.hifzSabaqStart)).toBeNull();
+  });
+
   it("leaves from the end state without starting a lesson", async () => {
     await open();
     press(s.hifzDrillShow);

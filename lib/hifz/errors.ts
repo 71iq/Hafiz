@@ -277,6 +277,11 @@ export async function readDriftFollowUps(db: DatabaseExecutor, today: LocalDate)
 /** What one drift adds to the next session's drill list (SCH-07, MUT-04). */
 export type DriftDrill = Readonly<{
   errorId: string;
+  /**
+   * Every live drift into the pair, oldest first, `errorId` last. The drill stays while any of them
+   * does, so dismissing the latest as not a mistake keeps an older one's prompt.
+   */
+  errorIds: readonly string[];
   pair: SimilarPair;
   /** SCH-07: the sibling's page, in the first session after the drift only. */
   siblingPage: number | null;
@@ -296,7 +301,8 @@ export async function loadDriftDrills(db: DatabaseExecutor, today: LocalDate): P
     if (!pair) continue;
     const key = [verseRef(pair.self), verseRef(pair.sibling)].sort().join("|");
     const { sessionsSince } = followUp;
-    drills.set(key, { errorId: followUp.id, pair, siblingPage: sessionsSince === 0 ? pair.sibling.page : null, sessionsSince });
+    const errorIds = [...(drills.get(key)?.errorIds ?? []), followUp.id];
+    drills.set(key, { errorId: followUp.id, errorIds, pair, siblingPage: sessionsSince === 0 ? pair.sibling.page : null, sessionsSince });
   }
   return [...drills.values()];
 }

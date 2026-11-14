@@ -23,7 +23,7 @@ import {
 import { ZaytMood } from "@/components/habit/ZaytMood";
 import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
 import { SabaqSecondLook } from "@/components/hifz/SabaqSecondLook";
-import { SimilarVerseLine } from "@/components/hifz/SimilarVerseLine";
+import { SimilarVerseComparison } from "@/components/hifz/SimilarVerseComparison";
 import { loadPageWordsData } from "@/components/mushaf/MushafPage";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
@@ -126,6 +126,8 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   const [nextLookAt, setNextLookAt] = useState<Date | null>(null);
   /** New memorization waits for review to catch up (PLN-02); a second look is still offered. */
   const [catchUpFirst, setCatchUpFirst] = useState(false);
+  /** Today's new lines are done, so more lines are extra (WirdPlanCard says the same). */
+  const [linesDoneToday, setLinesDoneToday] = useState(false);
   /** What the saved fluent check means for the done step's copy. */
   const [outcome, setOutcome] = useState<{
     passed: boolean;
@@ -218,6 +220,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       }
       setPlan(wird.plan);
       setCatchUpFirst(wird.daily.backlog);
+      setLinesDoneToday(wird.sabaqDoneToday);
       const pageWords = (page: number) => words?.[page - 1] ?? null;
       // SBQ-02: a page completed only by chunks merged from another device joins review now, so the
       // lesson goes on to the next page. A failure here leaves the lines as they are.
@@ -600,7 +603,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
             isDark={isDark}
           />
           <View className="w-full max-w-sm" style={{ gap: 10 }}>
-            <Button label={s.hifzSabaqStart} onPress={() => setLooksDoneStep(false)} />
+            <Button label={linesDoneToday ? s.hifzSabaqMore : s.hifzSabaqStart} onPress={() => setLooksDoneStep(false)} />
             <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
           </View>
         </View>
@@ -693,7 +696,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       <View className="items-center">
         <View style={{ width: "100%", maxWidth: pageWidth }}>
           {/* 8 px in, like the title, page card and buttons below and the hifz review header. */}
-          <MirroredRow dir={dir} className="items-center justify-between px-2 pt-3 pb-2">
+          <MirroredRow dir={dir} className={`items-center justify-between ${centered ? "px-5" : "px-2"} pt-3 pb-2`}>
             {/* Dimmed while Close waits for the grade it was pressed during. */}
             <Pressable
               onPress={close}
@@ -712,7 +715,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
           </MirroredRow>
           {step !== "done" ? (
             // Padding on a wrapper: the track is full width, so a margin on it would only move its start.
-            <View className="px-2">
+            <View className={centered ? "px-5" : "px-2"}>
               <Progress value={((stepIndex + 1) / STEPS.length) * 100} dir={dir} className="h-1" />
             </View>
           ) : null}
@@ -808,16 +811,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         ) : null}
 
         {step === "similar" ? (
-          <View style={{ width: pageWidth - 16, gap: 10 }}>
-            {similar.map((group) => (
-              <Card key={`${group.groupId}-${group.self.surah}:${group.self.ayah}`} elevation="low" className="p-4" style={{ gap: 10 }}>
-                <SimilarVerseLine reference={group.self} isRTL={isRTL} accent={accent} />
-                {group.siblings.map((sibling) => (
-                  <SimilarVerseLine key={`${sibling.surah}:${sibling.ayah}`} reference={sibling} isRTL={isRTL} accent={accent} muted />
-                ))}
-              </Card>
-            ))}
-          </View>
+          <SimilarVerseComparison db={db} groups={similar} language={uiLanguage} isRTL={isRTL} accent={accent} s={s} width={pageWidth - 16} />
         ) : null}
 
         {step !== "intention" && step !== "meaning" && step !== "similar" && step !== "done" ? (

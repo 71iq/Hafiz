@@ -1103,6 +1103,15 @@
               "children": []
             },
             {
+              "id": "hifz.review.interleave",
+              "title": "Similar-verse prompt two pages after a reviewed page",
+              "kind": "transition",
+              "cases": ["PLAN-15"],
+              "uses": ["hifz.review.driftPair", "hifz.review.grade"],
+              "native": false,
+              "children": []
+            },
+            {
               "id": "hifz.review.cloze",
               "title": "Weak spots: Mushaf marker and fill-the-gap card",
               "kind": "widget",

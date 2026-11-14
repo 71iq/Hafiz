@@ -109,7 +109,14 @@ jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   return {
     ...actual,
-    useSettings: () => ({ ...actual.useSettings(), isDark: false, isRTL: false, uiLanguage: mockUiLanguage, fontSize: 20, lineHeight: 40 }),
+    useSettings: () => ({
+      ...actual.useSettings(),
+      isDark: false,
+      isRTL: mockUiLanguage === "ar",
+      uiLanguage: mockUiLanguage,
+      fontSize: 20,
+      lineHeight: 40,
+    }),
   };
 });
 jest.mock("@/lib/haptics", () => ({ hapticMedium: jest.fn(), hapticSuccess: jest.fn() }));
@@ -196,7 +203,13 @@ jest.mock("@/lib/hifz/sabaq", () => ({
   loadSecondLooks: jest.fn(async () => ({ due: [], nextAt: null })),
   saveSecondLook: jest.fn(),
 }));
-jest.mock("@/lib/hifz/similar", () => ({ similarGroupsForAyahs: jest.fn(), withMemorizedSiblings: jest.fn() }));
+jest.mock("@/lib/hifz/similar", () => ({
+  ...jest.requireActual<typeof import("@/lib/hifz/similar")>("@/lib/hifz/similar"),
+  similarGroupsForAyahs: jest.fn(),
+  withMemorizedSiblings: jest.fn(),
+  // No page in these reviews holds a similar verse (MUT-03); tests/unit/hifz-drift-screen.test.tsx covers them.
+  similarGroupsOnPages: jest.fn(async () => []),
+}));
 jest.mock("@/lib/hifz/use-weak-spots", () => ({ refreshWeakSpots: jest.fn() }));
 
 type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (reason: unknown) => void };
@@ -815,6 +828,59 @@ describe("sabaq screen", () => {
     press(s.hifzDrillShow);
     return grading();
   }
+
+  it.each(["en", "ar"] as const)(
+    "compares the similar verses already memorized, each with its meaning, before memorizing (%s)",
+    async (language) => {
+      mockUiLanguage = language;
+      const t = strings[language];
+      const verse = (surah: number, ayah: number, surahName: string, page: number) => ({
+        surah,
+        ayah,
+        surahName,
+        pre: "أُو۟لَٰٓئِكَ",
+        similar: "عَلَىٰ هُدًى",
+        post: "مِّن رَّبِّهِمْ",
+        page,
+      });
+      jest.mocked(withMemorizedSiblings).mockReturnValue([
+        { groupId: "g1", kind: "similar", self: verse(2, 5, "البقرة", 2), siblings: [verse(31, 5, "لقمان", 411)] },
+      ]);
+      // The translations and the Muyassar tafsir for 2:5 and 31:5, copied from the bundled database.
+      const meanings = {
+        en: [
+          "Those are upon [right] guidance from their Lord, and it is those who are the successful",
+          "Those are on [right] guidance from their Lord, and it is those who are the successful",
+        ],
+        ar: [
+          "أصحاب هذه الصفات يسيرون على نور من ربهم وبتوفيق مِن خالقهم وهاديهم، وهم الفائزون الذين أدركوا ما طلبوا، ونَجَوا من شرِّ ما منه هربوا.",
+          "أولئك المتصفون بالصفات السابقة على بيان مِن ربهم ونور، وأولئك هم الفائزون في الدنيا والآخرة.",
+        ],
+      }[language];
+      const reads = mockDatabase.getAllAsync as unknown as jest.Mock<Promise<unknown[]>, [string]>;
+      reads.mockImplementation(async (source) =>
+        source.includes(language === "ar" ? "FROM tafseer WHERE source = 'muyassar'" : "FROM translations")
+          ? [
+              { surah: 2, ayah: 5, text: meanings[0] },
+              { surah: 31, ayah: 5, text: meanings[1] },
+            ]
+          : [],
+      );
+      try {
+        render(<SabaqRoute />, { wrapper: Wrapper });
+        await flush();
+        // Intention, listening and the chunk's meaning come first.
+        for (let step = 0; step < 3; step += 1) press(t.hifzSabaqNext);
+        expect(screen.getByText(t.hifzSimilarTitle)).toBeTruthy();
+        expect(await screen.findByText(meanings[0])).toBeTruthy();
+        expect(screen.getByText(meanings[1])).toBeTruthy();
+        expect(screen.getAllByText(t.hifzSimilarMeaning)).toHaveLength(2);
+        expect(screen.getByText(language === "ar" ? "لقمان ٣١:٥" : "لقمان\u200E 31:5")).toBeTruthy();
+      } finally {
+        reads.mockImplementation(async () => []);
+      }
+    },
+  );
 
   it("does not show the page and lines again under the intention heading", async () => {
     render(<SabaqRoute />, { wrapper: Wrapper });

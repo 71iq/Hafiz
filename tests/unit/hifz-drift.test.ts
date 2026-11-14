@@ -234,6 +234,12 @@ describe("choosing the sibling a drift went into", () => {
     siblings,
   });
 
+  it("shows similar-verse text without the stray Latin full stop some bundled refs carry", async () => {
+    store.sql.prepare("UPDATE mutashabihat_refs SET post_text = ? WHERE surah = 31 AND ayah = 5").run("مِّن رَّبِّهِمْ.");
+    const [group] = await similarGroupsForAyahs(store.db, [{ surah: 2, ayah: 5 }]);
+    expect(group.siblings[0].post).toBe("مِّن رَّبِّهِمْ");
+  });
+
   it("prefers the memorized sibling on the most firmly held page, keeping the dataset's order on ties", () => {
     const groups = [group("a", [ref(31, 5, 411), ref(7, 52, 157)]), group("b", [ref(10, 57, 215)])];
     const memorized = new Set([411, 157, 215]);

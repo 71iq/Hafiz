@@ -158,7 +158,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/hifz/DriftPairPrompt.tsx",
     "card",
     "rntl",
-    "Question and feedback text follow the interface direction; the two verses stay right to left, and each reference follows the interface once revealed.",
+    "Question and feedback text follow the interface direction; the two verses and any neighbouring words stay right to left, and each reference and meaning follows the interface once revealed.",
   ),
   entry(
     "components/hifz/HifzProgressCard.tsx",
@@ -203,10 +203,16 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Second look header mirrors through MirroredRow and its text follows the interface direction; the chunk's Quran lines stay right to left.",
   ),
   entry(
+    "components/hifz/SimilarVerseComparison.tsx",
+    "card",
+    "rntl",
+    "Sabaq's similar-verse cards stack vertically; each verse stays right to left and its meaning follows the interface direction.",
+  ),
+  entry(
     "components/hifz/SimilarVerseLine.tsx",
     "card",
     "source",
-    "The verse stays right to left in both interface directions; its reference follows the interface direction and digits.",
+    "The verse and its neighbouring context stay right to left in both interface directions; its reference and meaning follow the interface direction and digits.",
   ),
   entry(
     "components/hifz/WelcomeBackCard.tsx",

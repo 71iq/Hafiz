@@ -51,7 +51,14 @@ import {
   type InboxItem,
   type RecitationErrorType,
 } from "@/lib/hifz/errors";
-import type { SimilarPair } from "@/lib/hifz/similar";
+import {
+  interleaveIndex,
+  loadInterleaveCandidates,
+  pickInterleavePair,
+  type InterleaveCandidates,
+} from "@/lib/hifz/interleave";
+import { pairKey, similarPair, type SimilarPair } from "@/lib/hifz/similar";
+import { useVerseMeanings } from "@/lib/hifz/use-verse-meanings";
 import { GRADE_CAP, defaultSupportLevel, isGradable, SUPPORT_LEVELS, type SupportLevel } from "@/lib/hifz/grading";
 import { loadRecitationPage, type PageToken, type RecitationPage as PageData } from "@/lib/hifz/page-data";
 import { loadPageCards, loadTodayWird, toPlanPage, type PageCard } from "@/lib/hifz/pages";
@@ -91,26 +98,39 @@ import { hapticMedium } from "@/lib/haptics";
 
 type AyahText = { qcf2: string; page: number; surah: number; ayah: number };
 
+/** The logged drifts into a pair (their error ids, the latest last) and the pair they drifted between. */
+type DriftSource = Readonly<{ errorIds: readonly string[]; pair: SimilarPair }>;
+
 type QueueItem =
   | {
       kind: "page";
       card: PageCard;
       retrievability: number | null;
       again?: boolean;
-      /** SCH-07: a page drilled because it holds the sibling an earlier drift went into, outside today's plan. */
-      drift?: SimilarPair;
+      /**
+       * SCH-07: a page drilled because it holds the sibling an earlier drift went into, outside today's
+       * plan, with every drift of the session that needs it, the one it explains first. It leaves once
+       * all of them are dismissed.
+       */
+      drift?: readonly DriftSource[];
     }
   | { kind: "half"; card: StudyCardRow; page: number; half: Half }
   | { kind: "seam"; card: StudyCardRow; page: number; prompt: AyahText | null; answer: AyahText | null }
   | { kind: "cloze"; card: StudyCardRow; surah: number; ayah: number; word: number; page: number }
   | { kind: "drill"; item: InboxItem; text: { qcf2: string; page: number } | null }
-  /** MUT-04: which of a drifted pair is which, asked about one verse of the pair. */
-  | { kind: "pair"; errorId: string; pair: SimilarPair; target: "self" | "sibling" };
+  /**
+   * "Which one", asked about one verse of a pair: after a drift (MUT-04), with the live drifts into the
+   * pair that queued it, or interleaved after a reviewed page (MUT-03), with null `errorIds`.
+   */
+  | { kind: "pair"; errorIds: readonly string[] | null; pair: SimilarPair; target: "self" | "sibling" };
 
 type Phase = "loading" | "recite" | "check" | "summary" | "empty" | "error";
 
 /** The shared outline Button has no border; on this screen an outline action needs one to read as a button. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
+
+/** Save and load errors, one style across the review's steps and the sabaq screens. */
+const ERROR_TEXT_STYLE = { fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 } as const;
 /** Helper actions sit on a tinted fill so they read as buttons, at the full touch height. */
 const HELPER_BUTTON = "flex-1 h-11 px-2 bg-surface-low dark:bg-surface-dark-low";
 
@@ -121,8 +141,50 @@ const HELPER_BUTTON = "flex-1 h-11 px-2 bg-surface-low dark:bg-surface-dark-low"
 type Totals = { pages: number; clean: number; marked: number; extra: number };
 const NO_TOTALS: Totals = { pages: 0, clean: 0, marked: 0, extra: 0 };
 
-/** What a saved item leaves behind: the totals with its save, and the page again when a learning step is due. */
-type ItemOutcome = Readonly<{ totals: Totals; requeue?: QueueItem | null }>;
+/**
+ * What a saved item leaves behind: the totals with its save, the page again when a learning step is
+ * due, a "Which one" prompt for the reviewed page (MUT-03), and an inbox item dismissed as not a
+ * mistake, whose drift follow-ups leave the session.
+ */
+type ItemOutcome = Readonly<{
+  totals: Totals;
+  requeue?: QueueItem | null;
+  interleave?: Readonly<{ item: QueueItem; page: number }> | null;
+  dismissed?: string | null;
+}>;
+
+/**
+ * The queue after the item at `from` is saved. Only items still ahead change: the requeued page goes to
+ * the end, an interleaved prompt after two other pages or at the end (MUT-03), and the follow-ups of a
+ * dismissed drift leave, apart from a page another drift of the session still needs. A page of today's
+ * plan carries no drift, so it always stays.
+ */
+function nextQueue(queue: readonly QueueItem[], from: number, outcome: ItemOutcome): readonly QueueItem[] {
+  const { requeue, interleave, dismissed } = outcome;
+  if (!requeue && !interleave && !dismissed) return queue;
+  const next = requeue ? [...queue, requeue] : [...queue];
+  if (interleave) {
+    const at = interleaveIndex(next, from, (item) => item.kind === "page" && item.card.page !== interleave.page);
+    next.splice(at, 0, interleave.item);
+  }
+  if (!dismissed) return next;
+  const ahead = next.slice(from + 1).flatMap((item): QueueItem[] => {
+    // A drill stays while any drift that queued it is live.
+    const without = (ids: readonly string[]) => ids.filter((id) => id !== dismissed);
+    if (item.kind === "pair") {
+      if (!item.errorIds) return [item];
+      const errorIds = without(item.errorIds);
+      return errorIds.length === 0 ? [] : [{ ...item, errorIds }];
+    }
+    if (item.kind !== "page" || !item.drift) return [item];
+    const drift = item.drift.flatMap((source) => {
+      const errorIds = without(source.errorIds);
+      return errorIds.length === 0 ? [] : [{ ...source, errorIds }];
+    });
+    return drift.length === 0 ? [] : [{ ...item, drift }];
+  });
+  return [...next.slice(0, from + 1), ...ahead];
+}
 
 /** The first or last ayah that starts on a page, in the page font. */
 async function ayahOnPage(
@@ -169,7 +231,8 @@ function gradeLabel(rating: number, s: UIStrings): string {
  * support level, checked word by word, and graded with the rubric's proposal (4.2), followed by up
  * to 6 drills from the mistake inbox (ERR-04). Progress saves after every page (REV-01). With the
  * half-page unit (UNIT-02) each page is recited and checked as its first half, then its second, and
- * graded once as the page.
+ * graded once as the page. A reviewed page with a memorized similar verse brings an ungraded "Which
+ * one" prompt two pages later (MUT-03).
  */
 function HifzReviewScreen() {
   const db = useDatabase();
@@ -254,6 +317,10 @@ function HifzReviewScreen() {
   const pageScrollRef = useRef<ScrollView>(null);
   /** The queue index whose seam check was already scrolled into view. */
   const seamScrolledFor = useRef<number | null>(null);
+  /** MUT-03: the similar-verse groups on each page of the session, read once when it loads. */
+  const interleaveCandidates = useRef<InterleaveCandidates>(new Map());
+  /** MUT-03: the groups and verse pairs the session asks about, drift prompts included, and the prompts it added. */
+  const asked = useRef({ groups: new Set<string>(), pairs: new Set<string>(), prompts: 0 });
 
   const current = queue[index] ?? null;
   // UNIT-02: with the half-page unit, a page is recited in two halves; remediation items stay as they are.
@@ -337,16 +404,45 @@ function HifzReviewScreen() {
       // and the next three ask which verse of the pair is which. The ayah's own drill stays above.
       for (const drill of monthlyCheck ? [] : await loadDriftDrills(db, today)) {
         const page = drill.siblingPage;
-        if (page !== null && wird && !items.some((item) => item.kind === "page" && item.card.page === page)) {
+        const queued = page === null ? -1 : items.findIndex((item) => item.kind === "page" && item.card.page === page);
+        const shared = queued < 0 ? null : items[queued];
+        if (shared?.kind === "page") {
+          // Another drift's page: it stays while either drift does. A planned page has no drift and stays anyway.
+          if (shared.drift) items[queued] = { ...shared, drift: [...shared.drift, { errorIds: drill.errorIds, pair: drill.pair }] };
+        } else if (page !== null && wird) {
           pageCards ??= await loadPageCards(db, { today, plan: wird.plan });
           const card = pageCards.find((candidate) => candidate.page === page);
           if (card) {
-            items.push({ kind: "page", card, retrievability: toPlanPage(card, today, now).retrievability, drift: drill.pair });
+            items.push({
+              kind: "page",
+              card,
+              retrievability: toPlanPage(card, today, now).retrievability,
+              drift: [{ errorIds: drill.errorIds, pair: drill.pair }],
+            });
           }
         }
         // The prompt alternates between the two verses across its sessions.
-        items.push({ kind: "pair", errorId: drill.errorId, pair: drill.pair, target: drill.sessionsSince % 2 === 0 ? "self" : "sibling" });
+        items.push({ kind: "pair", errorIds: drill.errorIds, pair: drill.pair, target: drill.sessionsSince % 2 === 0 ? "self" : "sibling" });
       }
+      // MUT-03: a regular wird review asks "Which one" after a page with a similar verse whose sibling is
+      // memorized. A drift's prompt already covers its group and pair. The candidates are read once; a
+      // failed read leaves the review without these prompts.
+      const pairs = items.flatMap((item) => (item.kind === "pair" ? [item.pair] : []));
+      asked.current = {
+        groups: new Set(pairs.map((pair) => pair.groupId)),
+        pairs: new Set(pairs.map((pair) => pairKey(pair.self, pair.sibling))),
+        prompts: 0,
+      };
+      interleaveCandidates.current =
+        wird && !drillsOnly && !welcomeBack && !monthlyCheck
+          ? await loadInterleaveCandidates(
+              db,
+              items.flatMap((item) => (item.kind === "page" ? [item.card.page] : [])),
+            ).catch((interleaveError: unknown) => {
+              console.warn("[HifzReview] Similar-verse prompts failed to load:", interleaveError);
+              return new Map();
+            })
+          : new Map();
       sessionRef.current = startReviewSession(
         drillsOnly ? "mistakes" : welcomeBack ? "welcome_back" : monthlyCheck ? "portion_check" : "wird",
       );
@@ -488,21 +584,23 @@ function HifzReviewScreen() {
   /**
    * Move past the item at `from`, or finish after the last one. Resolves once the summary is ready. A
    * page whose learning step is due within the learn-ahead window goes to the end of the queue and
-   * comes back after the other items, as in the flashcard session.
+   * comes back after the other items, as in the flashcard session. The queue changes only here, under
+   * the action lock, so the rendered queue is the current one (see nextQueue).
    */
   const advance = useCallback(
-    async (from: number, final: Totals, requeue: QueueItem | null) => {
+    async (from: number, outcome: ItemOutcome) => {
       setMarkingKey(null);
       actionIndex.current = from + 1;
-      if (requeue) setQueue((items) => [...items, requeue]);
-      if (from + 1 >= queue.length + (requeue ? 1 : 0)) {
-        await finish(final);
+      const next = nextQueue(queue, from, outcome);
+      if (next !== queue) setQueue([...next]);
+      if (from + 1 >= next.length) {
+        await finish(outcome.totals);
         return;
       }
       setIndex(from + 1);
       setPhase("recite");
     },
-    [finish, queue.length],
+    [finish, queue],
   );
 
   /** Record a finished save in the totals now, so the advance and finalization see it. */
@@ -541,7 +639,7 @@ function HifzReviewScreen() {
         setError(s.hifzSaveFailed);
         return;
       }
-      if (!leaveWhenSettled.current) await advance(from, outcome.totals, outcome.requeue ?? null);
+      if (!leaveWhenSettled.current) await advance(from, outcome);
       if (leaveWhenSettled.current) {
         leaveWhenSettled.current = false;
         exit();
@@ -656,6 +754,25 @@ function HifzReviewScreen() {
     gradeRemediation(clean ? Rating.Good : Rating.Again, { ...emptyAttempt(4), seam });
   };
 
+  /**
+   * MUT-03: the "Which one" prompt a reviewed page brings, for the first of its groups the session does
+   * not ask about yet, within the session's cap. It asks for the page's own verse. A pair that cannot be
+   * read leaves the page without one; the grade is already saved.
+   */
+  const interleavePrompt = async (page: number): Promise<ItemOutcome["interleave"]> => {
+    const pick = pickInterleavePair(interleaveCandidates.current.get(page) ?? [], asked.current, asked.current.prompts);
+    if (!pick) return null;
+    const pair = await similarPair(db, pick.self, pick.sibling).catch((pairError: unknown) => {
+      console.warn("[HifzReview] Similar-verse prompt failed to load:", pairError);
+      return null;
+    });
+    if (!pair) return null;
+    asked.current.groups.add(pick.groupId).add(pair.groupId);
+    asked.current.pairs.add(pairKey(pair.self, pair.sibling));
+    asked.current.prompts += 1;
+    return { item: { kind: "pair", errorIds: null, pair, target: "self" }, page };
+  };
+
   const grade = async (rating: Grade, source: "recited" | "salah" = "recited") => {
     if (current?.kind === "half" && source === "recited") {
       await gradeRemediation(rating);
@@ -723,11 +840,12 @@ function HifzReviewScreen() {
         clean: firstInSession && rating >= Rating.Good && markedCount === 0 ? 1 : 0,
         marked: markedCount,
       });
-      return { totals, requeue };
+      const interleave = firstInSession ? await interleavePrompt(card.page) : null;
+      return { totals, requeue, interleave };
     });
   };
 
-  /** MUT-04: a pair prompt saves nothing, but still advances only once. */
+  /** MUT-03, MUT-04: a pair prompt saves nothing and counts toward no total, but still advances only once. */
   const pairDone = () => runItemAction("Pair", async () => ({ totals: totalsRef.current }));
 
   const drillResult = async (result: "clean" | "again" | "not_a_mistake") => {
@@ -739,9 +857,10 @@ function HifzReviewScreen() {
         await dismissInboxItem(db, { id });
         // ERR-06: the dismissal can end a weak spot, so the reader's markers reload.
         refreshWeakSpots(db).catch((refreshError) => console.warn("[HifzReview] Weak spots failed to refresh:", refreshError));
-      } else {
-        await recordDrillResult(db, { id, clean: result === "clean" });
+        // A drift that was not a mistake no longer needs its sibling page or pair prompt (SCH-07, MUT-04).
+        return { totals: totalsRef.current, dismissed: id };
       }
+      await recordDrillResult(db, { id, clean: result === "clean" });
       return { totals: totalsRef.current };
     });
   };
@@ -851,6 +970,12 @@ function HifzReviewScreen() {
         : formatAyahRef(isRTL, token.surah, token.ayah),
     [isRTL],
   );
+  // MUT-05: the pair prompts' meanings, read for the session's pairs rather than on each render.
+  const pairVerses = useMemo(
+    () => queue.flatMap((item) => (item.kind === "pair" ? [item.pair.self, item.pair.sibling] : [])),
+    [queue],
+  );
+  const meanings = useVerseMeanings(db, pairVerses, uiLanguage);
 
   if (phase === "loading") {
     return (
@@ -956,7 +1081,7 @@ function HifzReviewScreen() {
     item.kind === "drill"
       ? `drill:${item.item.id}`
       : item.kind === "pair"
-        ? `pair:${item.errorId}`
+        ? `pair:${item.errorIds?.[0] ?? `group:${item.pair.groupId}`}`
         : item.kind === "page"
           ? `page:${item.card.row.id}`
           : `${item.kind}:${item.card.id}`;
@@ -1043,7 +1168,7 @@ function HifzReviewScreen() {
             </Card>
           ) : null}
           {error ? (
-            <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
+            <Text dir={dir} align="center" className="text-red-700 dark:text-red-400" accessibilityRole="alert" style={ERROR_TEXT_STYLE}>
               {error}
             </Text>
           ) : null}
@@ -1059,7 +1184,7 @@ function HifzReviewScreen() {
       ) : current?.kind === "pair" ? (
         <DriftPairPrompt
           // A fresh prompt per item, so a choice never carries into the next pair.
-          key={`pair:${current.errorId}:${index}`}
+          key={`${itemKey(current)}:${index}`}
           pair={current.pair}
           target={current.target}
           dir={dir}
@@ -1068,6 +1193,7 @@ function HifzReviewScreen() {
           accentText={accentText}
           busy={busy}
           error={error}
+          meanings={meanings}
           onNext={pairDone}
         />
       ) : current?.kind === "drill" ? (
@@ -1092,7 +1218,7 @@ function HifzReviewScreen() {
             </Card>
           ) : null}
           {error ? (
-            <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
+            <Text dir={dir} align="center" className="text-red-700 dark:text-red-400" accessibilityRole="alert" style={ERROR_TEXT_STYLE}>
               {error}
             </Text>
           ) : null}
@@ -1135,7 +1261,7 @@ function HifzReviewScreen() {
             )}
           </Card>
           {error ? (
-            <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
+            <Text dir={dir} align="center" className="text-red-700 dark:text-red-400" accessibilityRole="alert" style={ERROR_TEXT_STYLE}>
               {error}
             </Text>
           ) : null}
@@ -1179,8 +1305,8 @@ function HifzReviewScreen() {
               {current.kind === "page" && current.drift ? (
                 <Text dir={dir} variant="body-sm">
                   {interpolate(s.hifzDriftPage, {
-                    sibling: formatAyahRef(isRTL, current.drift.sibling.surah, current.drift.sibling.ayah),
-                    ref: formatAyahRef(isRTL, current.drift.self.surah, current.drift.self.ayah),
+                    sibling: formatAyahRef(isRTL, current.drift[0].pair.sibling.surah, current.drift[0].pair.sibling.ayah),
+                    ref: formatAyahRef(isRTL, current.drift[0].pair.self.surah, current.drift[0].pair.self.ayah),
                   })}
                 </Text>
               ) : null}
@@ -1362,7 +1488,7 @@ function HifzReviewScreen() {
             {/* Header, title, page card and actions all start 8 px inside the page column. */}
             <View style={{ width: "100%", maxWidth: pageWidth - 16, gap: 10 }}>
               {error ? (
-                <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
+                <Text dir={dir} align="center" className="text-red-700 dark:text-red-400" accessibilityRole="alert" style={ERROR_TEXT_STYLE}>
                   {error}
                 </Text>
               ) : null}
