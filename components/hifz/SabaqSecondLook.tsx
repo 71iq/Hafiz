@@ -15,6 +15,8 @@ import type { SecondLook } from "@/lib/hifz/sabaq";
 import { formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 /** The shared outline Button has no border; here an outline action needs one to read as a button. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
@@ -70,7 +72,8 @@ export function SabaqSecondLook({
   const [shown, setShown] = useState(false);
   // Teal text under 14 px uses the darker token in light mode.
   const accent = isDark ? "#2dd4bf" : "#0f766e";
-  const muted = isDark ? "#d4d4d4" : "#6e5a47";
+  const { effectiveTheme } = useSettings();
+  const muted = mutedIconColor(effectiveTheme);
   const ayahLabel = useCallback((token: PageToken) => formatAyahRef(isRTL, token.surah, token.ayah), [isRTL]);
   const portion = `${interpolate(s.hifzPageN, { n: formatNumber(look.page, language) })} · ${interpolate(
     s.hifzSabaqLines,

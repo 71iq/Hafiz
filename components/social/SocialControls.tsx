@@ -33,6 +33,17 @@ export function SocialNotice({
 }) {
   const { isRTL } = useSettings();
   const { muted } = useSocialAccent();
+  const action =
+    actionLabel && onAction ? (
+      <Button
+        variant="outline"
+        className="h-11 px-4 border border-warm-300 dark:border-neutral-700"
+        label={actionLabel}
+        onPress={onAction}
+      />
+    ) : null;
+  // A long message keeps its full width; its action goes below it, at the reading start.
+  const stacked = action !== null && message.length > 80;
   return (
     <Card elevation="mid" className="px-4 py-3">
       <View className="items-center gap-3" style={socialRowStyle(isRTL)}>
@@ -40,15 +51,9 @@ export function SocialNotice({
         <Text variant="body-sm" className="min-w-0 flex-1" accessibilityLiveRegion="polite">
           {message}
         </Text>
-        {actionLabel && onAction ? (
-          <Button
-            variant="outline"
-            className="h-11 px-4 border border-warm-300 dark:border-neutral-700"
-            label={actionLabel}
-            onPress={onAction}
-          />
-        ) : null}
+        {stacked ? null : action}
       </View>
+      {stacked ? <View className="mt-2" style={{ alignSelf: isRTL ? "flex-end" : "flex-start" }}>{action}</View> : null}
     </Card>
   );
 }
@@ -134,7 +139,7 @@ export function SocialToggleRow({
 export function SocialErrorText({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <Text variant="body-sm" className="text-red-600 dark:text-red-400" accessibilityLiveRegion="polite">
+    <Text variant="body-sm" className="text-red-600 dark:text-red-400" accessibilityRole="alert" accessibilityLiveRegion="polite">
       {message}
     </Text>
   );

@@ -387,7 +387,7 @@ describe("Halaqa tab", () => {
     fireEvent.press(await screen.findByLabelText(strings.ar.halaqaSharingA11y));
     fireEvent(await screen.findByRole("switch", { name: strings.ar.profileIsMinor }), "valueChange", true);
     fireEvent.press(screen.getByRole("button", { name: strings.ar.socialSave }));
-    expect(await screen.findByText(`${strings.ar.socialSaved} ${strings.ar.socialLeftBoardNickname}`)).toBeTruthy();
+    expect(await screen.findByText(strings.ar.socialSavedLeftBoard)).toBeTruthy();
   });
 
   it("shows the shared goal and only what each member shared, with no ranking", async () => {

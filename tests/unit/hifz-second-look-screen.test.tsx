@@ -340,10 +340,24 @@ describe("sabaq second look (SBQ-03)", () => {
     await open();
     expect(screen.getByText(s.hifzSecondLookTitle)).toBeTruthy();
     expect(nextSabaqTarget).not.toHaveBeenCalled();
-    press(s.hifzSecondLookSkipForNow);
+    // Graded, the look is saved and no lesson follows; with a backlog the screen says why.
+    press(s.hifzDrillShow);
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
     expect(screen.queryByText(s.hifzSabaqIntention)).toBeNull();
-    expect(screen.getByText(s.hifzSabaqNoNew)).toBeTruthy();
+    expect(screen.getByText(s.hifzSecondLookSaved)).toBeTruthy();
     if (label === "a review backlog") expect(screen.getByText(s.hifzCatchUpFirst)).toBeTruthy();
+  });
+
+  it("leaves when the look is skipped and no lesson follows", async () => {
+    jest.mocked(nextSabaqTarget).mockResolvedValue(null);
+    await open();
+    press(s.hifzSecondLookSkipForNow);
+    await flush();
+    expect(returnToTabs).toHaveBeenCalledTimes(1);
+    expect(saveSecondLook).not.toHaveBeenCalled();
   });
 
   it("says when a look not yet due will be, on a visit with no new lines", async () => {

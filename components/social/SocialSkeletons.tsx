@@ -46,24 +46,32 @@ export function HalaqaSkeleton({ label }: { label: string }) {
   );
 }
 
-/** The Board join form while the account's stored choices load: the intention, a field, two toggles and Join. */
+/**
+ * The Board join form while the account's stored choices load, shaped like BoardJoin: one card with
+ * the trophy disc and centered headline, the intention text, two toggle rows and Join.
+ */
 export function BoardJoinSkeleton({ label }: { label: string }) {
   const { isRTL } = useSettings();
   return (
     <LoadingBlock label={label}>
-      <Card elevation="low" className="gap-3 p-5">
-        <SkeletonText width="50%" lineHeight={22} />
-        <SkeletonText width="90%" lineHeight={14} />
-        <SkeletonText width="70%" lineHeight={14} />
-      </Card>
-      <Skeleton height={48} borderRadius={16} />
-      {[0, 1].map((index) => (
-        <View key={index} className="items-center justify-between gap-3 py-2" style={socialRowStyle(isRTL)}>
-          <SkeletonText width={index === 0 ? "55%" : "45%"} lineHeight={14} />
-          <Skeleton width={44} height={26} borderRadius={13} />
+      <Card elevation="low" className="gap-4 p-6">
+        <View className="items-center gap-3">
+          <Skeleton width={64} height={64} borderRadius={32} />
+          <SkeletonText width="60%" lineHeight={24} />
         </View>
-      ))}
-      <Skeleton height={48} borderRadius={24} />
+        <View className="gap-2">
+          <SkeletonText width="95%" lineHeight={14} />
+          <SkeletonText width="90%" lineHeight={14} />
+          <SkeletonText width="70%" lineHeight={14} />
+        </View>
+        {[0, 1].map((index) => (
+          <View key={index} className="items-center justify-between gap-3 py-2" style={socialRowStyle(isRTL)}>
+            <SkeletonText width={index === 0 ? "55%" : "45%"} lineHeight={14} />
+            <Skeleton width={44} height={26} borderRadius={13} />
+          </View>
+        ))}
+        <Skeleton height={44} borderRadius={22} />
+      </Card>
     </LoadingBlock>
   );
 }

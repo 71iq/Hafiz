@@ -10,6 +10,8 @@ import { formatLines, formatMinutes, formatNumber, formatPages } from "@/lib/i18
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
+import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 type Props = {
   wird: TodayWird | null;
@@ -45,6 +47,7 @@ export function WirdPlanCard({
   onSetup,
   onDrill,
 }: Props) {
+  const { effectiveTheme } = useSettings();
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   // Teal text under 14 px uses the darker token in light mode.
@@ -80,7 +83,7 @@ export function WirdPlanCard({
   const showSabaq = newMemorizationOpen(wird);
   const secondLookLabel =
     secondLooksDue > 1 ? interpolate(s.hifzSecondLooksReady, { n: formatNumber(secondLooksDue, language) }) : s.hifzSecondLookReady;
-  const muted = isDark ? "#a3a3a3" : "#8a7058";
+  const muted = mutedIconColor(effectiveTheme);
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
 
   return (
@@ -182,7 +185,9 @@ export function WirdPlanCard({
           accessibilityRole="button"
           accessibilityLabel={`${secondLookLabel}, ${s.hifzSecondLookAction}`}
           onPress={onStartSabaq}
-          className="mt-3 min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4 py-2.5"
+          // Capped on wide layouts so "Start" stays near its label.
+          className="mt-3 w-full max-w-md min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4 py-2.5"
+          style={{ alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}
         >
           <MirroredRow dir={dir} className="items-center justify-between gap-3">
             <MirroredRow dir={dir} className="flex-shrink items-center gap-2">
@@ -215,7 +220,8 @@ export function WirdPlanCard({
         <Pressable
           accessibilityRole="button"
           onPress={onDrill}
-          className="mt-3 min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4"
+          className="mt-3 w-full max-w-md min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4"
+          style={{ alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}
         >
           <MirroredRow dir={dir} className="items-center justify-between gap-3">
             <MirroredRow dir={dir} className="flex-shrink items-center gap-2">

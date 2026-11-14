@@ -128,8 +128,9 @@ export const socialStrings = {
     socialSaved: "Saved",
     socialSavedLeftMatched: "Saved. You have left your matched halaqa, which is for adults. Your invite halaqas are unchanged.",
     socialLeftMatched: "You have left your matched halaqa, which is for adults. Your invite halaqas are unchanged.",
-    socialLeftBoardNickname:
-      "You have left the Board, since people under 18 appear there only under a nickname. You can join again with one.",
+    socialSavedLeftBoard: "Saved. Because you are under 18, you have left the Board. You can join again with a nickname.",
+    socialSavedLeftBoth:
+      "Saved. Because you are under 18, you have left your matched halaqa and the Board. Invite halaqas are unchanged. You can join the Board again with a nickname.",
 
     teacherViewTitle: "{{name}}'s progress",
     teacherViewNote: "Hafiz supports a teacher's work and never replaces it.",
@@ -307,7 +308,9 @@ export const socialStrings = {
     socialSaved: "حُفظ",
     socialSavedLeftMatched: "حُفظ. غادرتَ حلقتك المقترحة لأنها للبالغين، وحلقات الدعوة باقية كما هي.",
     socialLeftMatched: "غادرتَ حلقتك المقترحة لأنها للبالغين، وحلقات الدعوة باقية كما هي.",
-    socialLeftBoardNickname: "غادرتَ اللوحة لأن من هم دون الثامنة عشرة لا يظهرون فيها إلا بلقب، ويمكنك الانضمام مجددًا بلقب.",
+    socialSavedLeftBoard: "حُفظ. ولأن عمرك دون الثامنة عشرة غادرتَ اللوحة، ويمكنك الانضمام إليها مجددًا بلقب.",
+    socialSavedLeftBoth:
+      "حُفظ. ولأن عمرك دون الثامنة عشرة غادرتَ حلقتك المقترحة واللوحة، وحلقات الدعوة باقية كما هي، ويمكنك الانضمام إلى اللوحة مجددًا بلقب.",
 
     teacherViewTitle: "تقدّم {{name}}",
     teacherViewNote: "يعين حافظ المعلّم في عمله ولا يغني عنه.",

@@ -642,10 +642,13 @@ export function CommentsSheet({
                   router.push("/auth/login");
                 }}
                 accessibilityRole="button"
-                className="mt-3 min-h-[44px] justify-center self-start rounded-full bg-primary-accent px-4 py-2 dark:bg-primary-bright"
+                // White on teal-700 in light (5.4:1); dark teal text on the bright accent in dark.
+                className="mt-3 min-h-[44px] justify-center self-start rounded-full bg-primary-muted px-4 py-2 dark:bg-primary-bright"
                 style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, alignSelf: isRTL ? "flex-end" : "flex-start" })}
               >
-                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#FFFFFF" }}>{s.authLogin}</Text>
+                <Text className="text-white dark:text-[#042f2e]" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                  {s.authLogin}
+                </Text>
               </Pressable>
             </View>
           )}

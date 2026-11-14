@@ -48,6 +48,7 @@ import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 /** 4.4.1 steps after the optional intention. "similar" appears only when MUT-01 applies. */
 type Step = "intention" | "listen" | "meaning" | "similar" | "looking" | "ayah" | "chunk" | "link" | "check" | "done";
@@ -71,7 +72,7 @@ function formatClockTime(at: Date, language: "en" | "ar"): string {
 function SabaqScreen() {
   const db = useDatabase();
   const s = useStrings();
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { isDark, isRTL, uiLanguage, effectiveTheme } = useSettings();
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const pageWidth = Math.min(width, 640);
@@ -415,7 +416,8 @@ function SabaqScreen() {
         s={s}
         onClose={close}
         onGrade={(rating) => gradeLook(rating)}
-        onSkip={skipLooks}
+        // With no lesson after it, skipping leaves: Close already leaves without saving too.
+        onSkip={target ? skipLooks : leave}
         continuesToNewLines={target !== null}
       />
     );
@@ -424,11 +426,14 @@ function SabaqScreen() {
   // Opened for a 2-minute look, the person sees it saved and chooses whether to start new lines.
   if (looksDoneStep && target && plan) {
     return (
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center px-6">
-        <EmptyState icon={BookOpenCheck} title={s.hifzSecondLookSaved} isDark={isDark} />
-        <View className="w-full max-w-sm" style={{ gap: 10 }}>
-          <Button label={s.hifzSabaqStart} onPress={() => setLooksDoneStep(false)} />
-          <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        {/* The padding is on a plain View: the web SafeAreaView's inline padding replaces a className one. */}
+        <View className="flex-1 items-center justify-center px-6">
+          <EmptyState icon={BookOpenCheck} tone="success" title={s.hifzSecondLookSaved} isDark={isDark} />
+          <View className="w-full max-w-sm" style={{ gap: 10 }}>
+            <Button label={s.hifzSabaqStart} onPress={() => setLooksDoneStep(false)} />
+            <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -438,27 +443,30 @@ function SabaqScreen() {
     // Opened early for a second look, the screen says when it comes due rather than nothing.
     const laterLook = !error && nextLookAt && nextLookAt.getTime() > Date.now() ? nextLookAt : null;
     return (
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center px-6">
-        <EmptyState
-          icon={error ? RotateCcw : BookOpenCheck}
-          title={error ?? (looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
-          subtitle={
-            laterLook
-              ? interpolate(s.hifzSecondLookOpensAt, { time: formatClockTime(laterLook, uiLanguage) })
-              : !error && catchUpFirst
-                ? s.hifzCatchUpFirst
-                : undefined
-          }
-          isDark={isDark}
-        />
-        <View className="w-full max-w-sm" style={{ gap: 10 }}>
-          {error ? <Button label={s.homeLoadRetry} onPress={load} /> : null}
-          <Button
-            variant={error ? "outline" : "default"}
-            className={error ? OUTLINE_BORDER : undefined}
-            label={s.flashcardsSummaryDone}
-            onPress={leave}
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <View className="flex-1 items-center justify-center px-6">
+          <EmptyState
+            icon={error ? RotateCcw : BookOpenCheck}
+            tone={!error && looksSaved > 0 ? "success" : "neutral"}
+            title={error ?? (looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
+            subtitle={
+              laterLook
+                ? interpolate(s.hifzSecondLookOpensAt, { time: formatClockTime(laterLook, uiLanguage) })
+                : !error && catchUpFirst
+                  ? s.hifzCatchUpFirst
+                  : undefined
+            }
+            isDark={isDark}
           />
+          <View className="w-full max-w-sm" style={{ gap: 10 }}>
+            {error ? <Button label={s.homeLoadRetry} onPress={load} /> : null}
+            <Button
+              variant={error ? "outline" : "default"}
+              className={error ? OUTLINE_BORDER : undefined}
+              label={s.flashcardsSummaryDone}
+              onPress={leave}
+            />
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -479,7 +487,7 @@ function SabaqScreen() {
   const hidden = step === "ayah" || step === "chunk" || step === "link" || step === "check";
   // Teal text under 14 px uses the darker token in light mode.
   const accent = isDark ? "#2dd4bf" : "#0f766e";
-  const muted = isDark ? "#d4d4d4" : "#6e5a47";
+  const muted = mutedIconColor(effectiveTheme);
   const portion = `${interpolate(s.hifzPageN, { n: formatNumber(target.page, uiLanguage) })} · ${interpolate(s.hifzSabaqLines, {
     from: formatNumber(target.fromLine, uiLanguage),
     to: formatNumber(target.toLine, uiLanguage),
@@ -519,7 +527,7 @@ function SabaqScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, gap: 14, alignItems: "center", flexGrow: step === "intention" ? 1 : undefined, justifyContent: step === "intention" ? "center" : undefined }}
+        contentContainerStyle={{ padding: 16, gap: 14, alignItems: "center", flexGrow: centered ? 1 : undefined, justifyContent: centered ? "center" : undefined }}
       >
         <View style={{ width: "100%", maxWidth: pageWidth, gap: 6, alignItems: centered ? "center" : undefined }}>
           {step === "intention" && showZayt ? (
@@ -537,7 +545,13 @@ function SabaqScreen() {
           </Text>
           {/* The header already names the page and lines, so the intention has no caption. */}
           {step !== "intention" ? (
-            <Text dir={dir} align={centered ? "center" : undefined} variant="muted" style={{ lineHeight: 20 }}>
+            <Text
+              dir={dir}
+              align={centered ? "center" : undefined}
+              variant="muted"
+              className="text-warm-600 dark:text-neutral-400"
+              style={{ lineHeight: 20 }}
+            >
               {step === "listen"
                 ? interpolate(s.hifzSabaqListenHint, { n: formatNumber(plan.sabaqRepetitions.listen, uiLanguage) })
                 : step === "looking"

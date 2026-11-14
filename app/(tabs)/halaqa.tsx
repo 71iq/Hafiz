@@ -210,9 +210,13 @@ function HalaqaContent({ userId }: { userId: string }) {
       // Saying one is under 18 leaves the matched halaqa, and the Board without a nickname (ETH-07,
       // BRD-07); the notice says so, not only "Saved".
       setNotice(
-        [input.leavesMatched ? s.socialSavedLeftMatched : s.socialSaved, result.leftBoard ? s.socialLeftBoardNickname : null]
-          .filter(Boolean)
-          .join(" "),
+        input.leavesMatched && result.leftBoard
+          ? s.socialSavedLeftBoth
+          : result.leftBoard
+            ? s.socialSavedLeftBoard
+            : input.leavesMatched
+              ? s.socialSavedLeftMatched
+              : s.socialSaved,
       );
       await Promise.all([
         refreshAll(),
@@ -471,7 +475,7 @@ function HalaqaSharingPanel({
       ? { message: s.socialErrorOffline }
       : privacy.isError && !privacy.isFetching
         ? { message: socialFailureMessage(privacy.error, s), onRetry: () => void privacy.refetch() }
-        : { message: s.loading };
+        : { message: s.loading, loading: true };
 
   return (
     <HalaqaSharingSheet

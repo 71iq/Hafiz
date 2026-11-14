@@ -10,20 +10,25 @@ type Props = {
   actionLabel?: string;
   onAction?: () => void;
   isDark: boolean;
+  /** "success" marks something just done: the icon takes the accent on a tinted disc. */
+  tone?: "neutral" | "success";
 };
 
 /**
  * Reusable empty-state component with icon, title, subtitle, and optional action.
- * Follows "The Serene Path" design system: warm neutrals, teal accent, pill buttons.
+ * Follows "The Serene Path" design system: warm neutrals, teal accent, pill buttons. Text colors come
+ * from the theme tokens, so they follow the active theme, and read at 4.5:1 or more.
  */
-export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction, isDark }: Props) {
+export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction, isDark, tone = "neutral" }: Props) {
   const { themeColors } = useSettings();
-  const iconColor = isDark ? "#525252" : "#DFD9D1";
-  const iconBg = withThemeOpacity(themeColors.surfaceHigh, isDark ? 0.4 : 0.6);
-  // Readable at 4.5:1 or more on the surface in both themes; the title stays a step stronger.
-  const titleColor = isDark ? "#e5e5e5" : "#2D2D2D";
-  const subtitleColor = isDark ? "#a3a3a3" : "#6e5a47";
+  const success = tone === "success";
   const accentColor = isDark ? "#2dd4bf" : "#0d9488";
+  const iconColor = success ? accentColor : isDark ? "#525252" : "#DFD9D1";
+  const iconBg = success
+    ? isDark
+      ? "rgba(45, 212, 191, 0.15)"
+      : "rgba(13, 148, 136, 0.10)"
+    : withThemeOpacity(themeColors.surfaceHigh, isDark ? 0.4 : 0.6);
 
   return (
     <View style={{ alignItems: "center", paddingVertical: 48, paddingHorizontal: 32 }}>
@@ -41,10 +46,11 @@ export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction,
         <Icon size={36} color={iconColor} strokeWidth={1.5} />
       </View>
       <Text
+        accessibilityRole="header"
+        className="text-charcoal dark:text-neutral-200"
         style={{
           fontFamily: "Manrope_600SemiBold",
           fontSize: 16,
-          color: titleColor,
           textAlign: "center",
           marginBottom: 6,
         }}
@@ -53,10 +59,10 @@ export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction,
       </Text>
       {subtitle ? (
         <Text
+          className="text-warm-600 dark:text-neutral-400"
           style={{
             fontFamily: "Manrope_400Regular",
             fontSize: 13,
-            color: subtitleColor,
             textAlign: "center",
             lineHeight: 20,
           }}
@@ -67,12 +73,13 @@ export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction,
       {actionLabel && onAction ? (
         <Pressable
           onPress={onAction}
+          accessibilityRole="button"
           style={(state) => ({
             marginTop: 20,
             backgroundColor: accentColor,
             paddingHorizontal: 24,
-            height: 40,
-            borderRadius: 20,
+            minHeight: 44,
+            borderRadius: 22,
             justifyContent: "center",
             alignItems: "center",
             transform: [{ scale: state.pressed ? 0.98 : 1 }],
