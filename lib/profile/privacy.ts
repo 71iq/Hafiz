@@ -103,12 +103,14 @@ export async function saveProfilePrivacy(
 
 /**
  * The pass after minority is recorded. From then on the bucket refuses this account's uploads, so
- * this removes any photo uploaded since the first pass. Best effort: the save has already succeeded,
- * and useMinorPhotoCleanup tries again in each app session.
+ * this removes any photo uploaded since the first pass. Before deleting what it found it reads the
+ * account's privacy again, since another device may have withdrawn minority and uploaded a photo
+ * since this save. Best effort: the save has already succeeded, and useMinorPhotoCleanup tries again
+ * in each app session.
  */
 export async function deleteAvatarFilesAfterMinority(owner: SocialOwner): Promise<void> {
   try {
-    await deleteOwnAvatarFiles(owner);
+    await deleteOwnAvatarFiles(owner, { beforeRemove: async () => (await fetchProfilePrivacy(owner)).isMinor });
   } catch {
     // Retried by useMinorPhotoCleanup.
   }

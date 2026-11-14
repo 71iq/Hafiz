@@ -445,13 +445,27 @@ describe("a minor's photo (ETH-07)", () => {
 
   it("deletes them before joining the board as a minor, and once more after", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockImplementation(async () => {
+    mockRpc.mockImplementation(async (fn: string) => {
+      // The pass after joining reads the account's privacy before it deletes what it found.
+      if (fn === "get_profile_privacy") return privacy(true);
       expect(mockAvatarFiles.size).toBe(0);
       mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
       return gathering;
     });
     await joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner());
     expect(mockAvatarFiles.size).toBe(0);
+  });
+
+  it("keeps a photo uploaded as an adult on another device since the join recorded minority", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRpc.mockImplementation(async (fn: string) => {
+      if (fn === "get_profile_privacy") return privacy(false);
+      // Meanwhile another device withdrew minority and uploaded a photo.
+      mockAvatarFiles.add(`${USER}/adult-elsewhere.jpg`);
+      return gathering;
+    });
+    await joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner());
+    expect([...mockAvatarFiles]).toEqual([`${USER}/adult-elsewhere.jpg`]);
   });
 
   it("does not join the board as a minor when a photo could not be deleted", async () => {

@@ -1554,8 +1554,9 @@ $$;
 -- Current streak: consecutive covered dates (any status) ending today or yesterday. Paused days keep
 -- the run without adding to it (8.2). Days after today are ignored.
 -- STR-07: a missed yesterday can still be made up today before Dhuhr, and the app keeps the streak
--- meanwhile. The cutoff comes from prayer times the server never sees (ETH-11), so on the make-up
--- day the run through the day before yesterday stands all day; the next day it is gone unless made up.
+-- meanwhile, with today's own run added when today is covered (lib/habit/streak.ts computeStreak).
+-- The cutoff comes from prayer times the server never sees (ETH-11), so on the make-up day the run
+-- through the day before yesterday stands all day; the next day it is gone unless made up.
 CREATE OR REPLACE FUNCTION private.habit_streak(member UUID, today DATE)
 RETURNS INTEGER
 LANGUAGE sql
@@ -1567,22 +1568,26 @@ AS $$
     FROM public.habit_days AS h
     WHERE h.user_id = member AND h.status IS NOT NULL AND h.local_date <= to_char(today, 'YYYY-MM-DD')
   ),
-  anchor AS (
-    SELECT CASE
-      WHEN EXISTS (SELECT 1 FROM covered WHERE covered_on = today) THEN today
-      WHEN EXISTS (SELECT 1 FROM covered WHERE covered_on = today - 1) THEN today - 1
-      WHEN EXISTS (SELECT 1 FROM covered WHERE covered_on = today - 2) THEN today - 2
-    END AS anchor_on
-  ),
   islands AS (
     SELECT covered_on, status, covered_on - (row_number() OVER (ORDER BY covered_on))::INTEGER AS run_id
     FROM covered
+  ),
+  -- The last day of each run the streak counts: today's run when today is covered, yesterday's when
+  -- it is not, and the run through the day before yesterday when yesterday is missing.
+  ends AS (
+    SELECT today AS end_on WHERE EXISTS (SELECT 1 FROM covered WHERE covered_on = today)
+    UNION
+    SELECT today - 1
+    WHERE NOT EXISTS (SELECT 1 FROM covered WHERE covered_on = today)
+      AND EXISTS (SELECT 1 FROM covered WHERE covered_on = today - 1)
+    UNION
+    SELECT today - 2
+    WHERE NOT EXISTS (SELECT 1 FROM covered WHERE covered_on = today - 1)
+      AND EXISTS (SELECT 1 FROM covered WHERE covered_on = today - 2)
   )
   SELECT COALESCE(count(*) FILTER (WHERE i.status <> 'paused'), 0)::INTEGER
-  FROM islands AS i, anchor AS a
-  WHERE a.anchor_on IS NOT NULL
-    AND i.covered_on <= a.anchor_on
-    AND i.run_id = (SELECT run_id FROM islands AS x WHERE x.covered_on = a.anchor_on);
+  FROM islands AS i
+  WHERE i.run_id IN (SELECT x.run_id FROM islands AS x JOIN ends AS e ON x.covered_on = e.end_on);
 $$;
 
 -- PTS-02: per wird day, 1 for the minimum, +1 for the full wird, +1 for a completed manzil cycle, at

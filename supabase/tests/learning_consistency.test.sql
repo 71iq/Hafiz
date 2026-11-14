@@ -862,6 +862,26 @@ DO $$
 BEGIN
   PERFORM hz_test.eq('made-up yesterday continues the streak', private.habit_streak('00000000-0000-4000-8019-000000000001', hz_test.utc_today()), 4);
 END $$;
+-- Today covered while yesterday is still missing: the older run and today's count together, as the
+-- app counts them; a paused today keeps the older run without adding to it.
+SELECT hz_test.make_user('00000000-0000-4000-8019-000000000002', 'makeup_streak_today', 'Make-up today', NULL);
+SELECT hz_test.day('00000000-0000-4000-8019-000000000002', hz_test.utc_today() - 2, 'done');
+SELECT hz_test.day('00000000-0000-4000-8019-000000000002', hz_test.utc_today() - 3, 'done');
+SELECT hz_test.day('00000000-0000-4000-8019-000000000002', hz_test.utc_today(), 'done');
+DO $$
+BEGIN
+  PERFORM hz_test.eq('older run and today on the make-up day', private.habit_streak('00000000-0000-4000-8019-000000000002', hz_test.utc_today()), 3);
+END $$;
+-- Its own user: a stored day's status is never lowered, so done cannot become paused.
+SELECT hz_test.make_user('00000000-0000-4000-8019-000000000003', 'makeup_streak_paused', 'Make-up paused', NULL);
+SELECT hz_test.day('00000000-0000-4000-8019-000000000003', hz_test.utc_today() - 2, 'done');
+SELECT hz_test.day('00000000-0000-4000-8019-000000000003', hz_test.utc_today() - 3, 'done');
+SELECT hz_test.day('00000000-0000-4000-8019-000000000003', hz_test.utc_today(), 'paused');
+DO $$
+BEGIN
+  PERFORM hz_test.eq('paused today keeps the older run', private.habit_streak('00000000-0000-4000-8019-000000000003', hz_test.utc_today()), 2);
+  PERFORM hz_test.eq('run gone the day after a missed make-up', private.habit_streak('00000000-0000-4000-8019-000000000003', hz_test.utc_today() + 1), 0);
+END $$;
 
 SET ROLE authenticated;
 DO $$
