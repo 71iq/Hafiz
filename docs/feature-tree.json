@@ -1028,6 +1028,15 @@
               "uses": [],
               "native": false,
               "children": []
+            },
+            {
+              "id": "hifz.setup.repetitions",
+              "title": "Sabaq repetition counts: presets or custom",
+              "kind": "widget",
+              "cases": [],
+              "uses": [],
+              "native": false,
+              "children": []
             }
           ]
         },
@@ -1109,7 +1118,7 @@
           "title": "Sabaq: new lines",
           "kind": "screen",
           "cases": ["PLAN-08"],
-          "uses": ["wird.minimum", "wird.sessioncards"],
+          "uses": ["wird.minimum", "wird.sessioncards", "hifz.setup.repetitions"],
           "native": false,
           "children": [
             {

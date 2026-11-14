@@ -55,11 +55,6 @@ const BASE_STEPS: readonly Step[] = ["intention", "listen", "meaning", "looking"
 /** The shared outline Button has no border; here an outline action needs one to read as a button. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
-/** SBQ-01: the "10 looking, then from memory" practice. */
-const LOOKING_TARGET = 10;
-const CLEAN_IN_A_ROW = 3;
-const LISTEN_REPEATS = 3;
-
 const NO_SECOND_LOOKS: SecondLooks = { due: [], nextAt: null };
 
 /** A wall-clock time with the locale's digits, as the wird card shows its make-up cutoff. */
@@ -526,7 +521,7 @@ function SabaqScreen() {
           {step !== "intention" ? (
             <Text dir={dir} align={centered ? "center" : undefined} variant="muted" style={{ lineHeight: 20 }}>
               {step === "listen"
-                ? s.hifzSabaqListenHint
+                ? interpolate(s.hifzSabaqListenHint, { n: formatNumber(plan.sabaqRepetitions.listen, uiLanguage) })
                 : step === "looking"
                   ? s.hifzSabaqLookingHint
                   : step === "ayah"
@@ -634,7 +629,7 @@ function SabaqScreen() {
                 onPress={() =>
                   rangeState.active
                     ? togglePause()
-                    : playRange({ ayahs: [...target.ayahs], repeatRange: LISTEN_REPEATS }).catch(console.warn)
+                    : playRange({ ayahs: [...target.ayahs], repeatRange: plan.sabaqRepetitions.listen }).catch(console.warn)
                 }
               >
                 {rangeState.active && !rangeState.paused ? <Pause size={16} color={muted} /> : <Play size={16} color={muted} />}
@@ -657,9 +652,9 @@ function SabaqScreen() {
           {step === "looking" ? (
             <>
               <Text dir={dir} align="center" variant="caption">
-                {interpolate(s.hifzSabaqLookingCount, { done: formatNumber(looking, uiLanguage), target: formatNumber(LOOKING_TARGET, uiLanguage) })}
+                {interpolate(s.hifzSabaqLookingCount, { done: formatNumber(looking, uiLanguage), target: formatNumber(plan.sabaqRepetitions.looking, uiLanguage) })}
               </Text>
-              {looking < LOOKING_TARGET ? (
+              {looking < plan.sabaqRepetitions.looking ? (
                 <Button label={s.hifzSabaqReadOnce} onPress={() => setLooking((value) => value + 1)} />
               ) : (
                 <Button label={s.hifzSabaqNext} onPress={goNext} />
@@ -693,7 +688,7 @@ function SabaqScreen() {
                     return;
                   }
                   if (step === "chunk") {
-                    if (cleanRun + 1 >= CLEAN_IN_A_ROW) goNext();
+                    if (cleanRun + 1 >= plan.sabaqRepetitions.cleanInARow) goNext();
                     else setCleanRun((value) => value + 1);
                     return;
                   }
@@ -705,7 +700,10 @@ function SabaqScreen() {
 
           {step === "chunk" ? (
             <Text dir={dir} align="center" variant="caption">
-              {interpolate(s.hifzSabaqCleanCount, { n: formatNumber(cleanRun, uiLanguage) })}
+              {interpolate(s.hifzSabaqCleanCount, {
+                n: formatNumber(cleanRun, uiLanguage),
+                target: formatNumber(plan.sabaqRepetitions.cleanInARow, uiLanguage),
+              })}
             </Text>
           ) : null}
 

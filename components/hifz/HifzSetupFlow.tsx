@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, Pressable, ScrollView, View } from "react-native";
+import { Minus, Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Switch } from "@/components/ui/Switch";
@@ -9,7 +10,21 @@ import type { AppDatabase } from "@/lib/database/types";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { Card } from "@/components/ui/Card";
 import { CALCULATION_METHOD_LABEL_KEYS, PrayerTimesSetup } from "@/components/notifications/PrayerTimesSetup";
-import { applyPreset, DEFAULT_HIFZ_PLAN, PRAYERS, type Anchor, type HifzPlan, type PlanPreset, type Prayer } from "@/lib/hifz/plan";
+import {
+  applyPreset,
+  DEFAULT_HIFZ_PLAN,
+  PRAYERS,
+  SABAQ_REPETITION_BOUNDS,
+  SABAQ_REPETITION_PRESETS,
+  sabaqRepetitionPresetOf,
+  type Anchor,
+  type HifzPlan,
+  type PlanPreset,
+  type Prayer,
+  type SabaqRepetitionCount,
+  type SabaqRepetitionPreset,
+  type SabaqRepetitions,
+} from "@/lib/hifz/plan";
 import { formatMinutes, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
@@ -81,6 +96,130 @@ function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: 
         </Text>
       ) : null}
     </Pressable>
+  );
+}
+
+/** A count with 44 px fewer and more buttons; the pair mirrors in RTL like the reading steppers. */
+function CountStepper({
+  label,
+  value,
+  count,
+  onChange,
+  language,
+  isDark,
+  s,
+}: {
+  label: string;
+  value: number;
+  count: SabaqRepetitionCount;
+  onChange: (value: number) => void;
+  language: "en" | "ar";
+  isDark: boolean;
+  s: UIStrings;
+}) {
+  const dir = language === "ar" ? "rtl" : "ltr";
+  const { min, max } = SABAQ_REPETITION_BOUNDS[count];
+  const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
+  const step = (delta: -1 | 1, disabled: boolean, name: string) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={interpolate(name, { count: label })}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={() => onChange(value + delta)}
+      className="h-11 w-11 items-center justify-center rounded-full"
+      style={({ pressed }) => ({ opacity: disabled ? 0.35 : pressed ? 0.68 : 1 })}
+    >
+      {delta < 0 ? <Minus size={17} color={iconColor} /> : <Plus size={17} color={iconColor} />}
+    </Pressable>
+  );
+  return (
+    <MirroredRow dir={dir} className="min-h-[44px] items-center justify-between gap-3">
+      <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="flex-1 text-charcoal dark:text-neutral-200">
+        {label}
+      </Text>
+      <MirroredRow dir={dir} className="items-center rounded-full bg-surface-high dark:bg-surface-dark-high p-1">
+        {step(-1, value <= min, s.hifzRepsFewer)}
+        <View className="min-w-12 items-center justify-center px-2">
+          <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }} className="text-charcoal dark:text-neutral-100">
+            {formatNumber(value, language)}
+          </Text>
+        </View>
+        {step(1, value >= max, s.hifzRepsMore)}
+      </MirroredRow>
+    </MirroredRow>
+  );
+}
+
+/**
+ * SBQ-01: how many times sabaq has the user listen, read while looking and recite cleanly. Two
+ * presets or custom counts; custom stays chosen once opened, even when its counts match a preset.
+ */
+function SabaqRepetitionsSection({
+  value,
+  onChange,
+  language,
+  isDark,
+  s,
+}: {
+  value: SabaqRepetitions;
+  onChange: (value: SabaqRepetitions) => void;
+  language: "en" | "ar";
+  isDark: boolean;
+  s: UIStrings;
+}) {
+  const dir = language === "ar" ? "rtl" : "ltr";
+  const [customOpen, setCustomOpen] = useState(false);
+  const choice: SabaqRepetitionPreset | "custom" = customOpen ? "custom" : (sabaqRepetitionPresetOf(value) ?? "custom");
+  const choosePreset = (preset: SabaqRepetitionPreset) => {
+    setCustomOpen(false);
+    onChange({ ...SABAQ_REPETITION_PRESETS[preset] });
+  };
+  const counts: readonly { count: SabaqRepetitionCount; label: string }[] = [
+    { count: "listen", label: s.hifzRepsListen },
+    { count: "looking", label: s.hifzRepsLooking },
+    { count: "cleanInARow", label: s.hifzRepsClean },
+  ];
+  return (
+    <View className="mt-4" style={{ gap: 10 }}>
+      <View style={{ gap: 2 }}>
+        <Text dir={dir} variant="title-sm">
+          {s.hifzRepsTitle}
+        </Text>
+        <Text dir={dir} variant="caption">
+          {s.hifzRepsHint}
+        </Text>
+      </View>
+      <OptionCard
+        title={s.hifzRepsLookingThenMemory}
+        hint={s.hifzRepsLookingThenMemoryHint}
+        selected={choice === "looking_then_memory"}
+        onPress={() => choosePreset("looking_then_memory")}
+      />
+      <OptionCard
+        title={s.hifzRepsTwentyTimes}
+        hint={s.hifzRepsTwentyTimesHint}
+        selected={choice === "twenty_times"}
+        onPress={() => choosePreset("twenty_times")}
+      />
+      <OptionCard title={s.hifzRepsCustom} hint={s.hifzRepsCustomHint} selected={choice === "custom"} onPress={() => setCustomOpen(true)} />
+      {choice === "custom" ? (
+        <View className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-2" style={{ gap: 4 }}>
+          {counts.map(({ count, label }) => (
+            <CountStepper
+              key={count}
+              label={label}
+              value={value[count]}
+              count={count}
+              onChange={(next) => onChange({ ...value, [count]: next })}
+              language={language}
+              isDark={isDark}
+              s={s}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -293,6 +432,16 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                 }}
               />
             ))}
+            {/* Only when editing a saved plan: onboarding keeps the default counts (5.1, ONB-01). */}
+            {initialPlan && goal !== "keep" ? (
+              <SabaqRepetitionsSection
+                value={plan.sabaqRepetitions}
+                onChange={(sabaqRepetitions) => setPlan((value) => ({ ...value, sabaqRepetitions }))}
+                language={language}
+                isDark={isDark}
+                s={s}
+              />
+            ) : null}
           </View>
         ) : null}
 

@@ -14,6 +14,51 @@ const anchorSchema = z.discriminatedUnion("kind", [
 ]);
 export type Anchor = z.infer<typeof anchorSchema>;
 
+/** SBQ-01: the range each sabaq repetition count can be set to. */
+export const SABAQ_REPETITION_BOUNDS = {
+  listen: { min: 1, max: 5 },
+  looking: { min: 1, max: 30 },
+  cleanInARow: { min: 1, max: 10 },
+} as const;
+export type SabaqRepetitionCount = keyof typeof SABAQ_REPETITION_BOUNDS;
+
+const repetitionCount = (count: SabaqRepetitionCount) =>
+  z.number().int().min(SABAQ_REPETITION_BOUNDS[count].min).max(SABAQ_REPETITION_BOUNDS[count].max);
+
+const sabaqRepetitionsSchema = z.object({
+  /** Step 2: how many times the reciter plays the new lines. */
+  listen: repetitionCount("listen"),
+  /** Step 4: readings while looking before reciting from memory. */
+  looking: repetitionCount("looking"),
+  /** Step 6: clean recitations of all the new lines in a row. */
+  cleanInARow: repetitionCount("cleanInARow"),
+});
+export type SabaqRepetitions = z.infer<typeof sabaqRepetitionsSchema>;
+
+export type SabaqRepetitionPreset = "looking_then_memory" | "twenty_times";
+
+/**
+ * SBQ-01 presets. The default is the "10 looking, then from memory" practice. The 20-times method is
+ * attributed to Sh. 'Abd al-Muhsin al-Qasim and its exact wording is unverified. Its core is 20
+ * readings while looking; the ayah-by-ayah chaining step covers its per-ayah linking, so listening
+ * and the clean run keep their default counts.
+ */
+export const SABAQ_REPETITION_PRESETS: Readonly<Record<SabaqRepetitionPreset, Readonly<SabaqRepetitions>>> = {
+  looking_then_memory: { listen: 3, looking: 10, cleanInARow: 3 },
+  twenty_times: { listen: 3, looking: 20, cleanInARow: 3 },
+};
+
+/** The preset these counts match, or null when they are custom. */
+export function sabaqRepetitionPresetOf(counts: SabaqRepetitions): SabaqRepetitionPreset | null {
+  const presets = Object.keys(SABAQ_REPETITION_PRESETS) as SabaqRepetitionPreset[];
+  return (
+    presets.find((preset) => {
+      const values = SABAQ_REPETITION_PRESETS[preset];
+      return values.listen === counts.listen && values.looking === counts.looking && values.cleanInARow === counts.cleanInARow;
+    }) ?? null
+  );
+}
+
 const hifzPlanSchema = z.object({
   method: z.enum(["standard", "ottoman", "review_only"]),
   direction: z.enum(["juz_amma_first", "from_fatiha"]),
@@ -33,6 +78,8 @@ const hifzPlanSchema = z.object({
   retention: z.number().min(0.9).max(0.97),
   /** PLN-04: new memorization first instead of last. */
   newFirst: z.boolean(),
+  /** SBQ-01: repetition counts for the sabaq steps. */
+  sabaqRepetitions: sabaqRepetitionsSchema,
 });
 export type HifzPlan = z.infer<typeof hifzPlanSchema>;
 
@@ -50,6 +97,7 @@ export const DEFAULT_HIFZ_PLAN: HifzPlan = {
   meanings: false,
   retention: 0.95,
   newFirst: false,
+  sabaqRepetitions: { ...SABAQ_REPETITION_PRESETS.looking_then_memory },
 };
 
 export type PlanPreset = "part_time_beginner" | "part_time_adult" | "full_time" | "maintenance" | "short_surahs";
@@ -67,11 +115,24 @@ export function applyPreset(plan: HifzPlan, preset: PlanPreset): HifzPlan {
   return { ...plan, ...PLAN_PRESETS[preset] };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function parseHifzPlan(value: string | null | undefined): HifzPlan | null {
   if (!value) return null;
   try {
     const raw = JSON.parse(value);
-    const parsed = hifzPlanSchema.safeParse({ ...DEFAULT_HIFZ_PLAN, ...(raw && typeof raw === "object" ? raw : {}) });
+    const stored: Record<string, unknown> = raw && typeof raw === "object" ? raw : {};
+    // A plan saved before a count existed takes its default; a count out of range rejects the plan like any field.
+    const counts = stored.sabaqRepetitions;
+    const sabaqRepetitions =
+      counts === undefined
+        ? DEFAULT_HIFZ_PLAN.sabaqRepetitions
+        : isRecord(counts)
+          ? { ...DEFAULT_HIFZ_PLAN.sabaqRepetitions, ...counts }
+          : counts;
+    const parsed = hifzPlanSchema.safeParse({ ...DEFAULT_HIFZ_PLAN, ...stored, sabaqRepetitions });
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

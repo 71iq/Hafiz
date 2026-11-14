@@ -4,6 +4,8 @@ import { GradingButtons } from "@/components/flashcards/GradingButtons";
 import { HifzSetupFlow } from "@/components/hifz/HifzSetupFlow";
 import type { AppDatabase } from "@/lib/database/types";
 import { Rating } from "@/lib/fsrs/scheduler";
+import { DEFAULT_HIFZ_PLAN, type HifzPlan } from "@/lib/hifz/plan";
+import { applyHifzSetup } from "@/lib/hifz/setup";
 import { strings } from "@/lib/i18n/strings";
 import { DirectionProvider } from "@/lib/ui/direction";
 
@@ -16,6 +18,8 @@ const mockSettings = {
 };
 // The prayer-times form needs the app database; the flow under test only needs it to render.
 jest.mock("@/components/notifications/PrayerTimesSetup", () => ({ PrayerTimesSetup: () => null }));
+// Saving writes the plan and the memorized portion; these tests check the plan the flow hands over.
+jest.mock("@/lib/hifz/setup", () => ({ applyHifzSetup: jest.fn(async () => ({ declaredPages: 0 })) }));
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   return { ...actual, useSettings: () => mockSettings };
@@ -79,5 +83,102 @@ describe("HifzSetupFlow Not now", () => {
     expect(view.getByText(/^After Fajr, I will do my wird\./)).toBeTruthy();
     fireEvent.press(view.getByText(s.hifzWhenEvening));
     expect(view.getByText(/^In the evening, I will do my wird\./)).toBeTruthy();
+  });
+});
+
+describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
+  const db = { getAllAsync: jest.fn(async () => []) } as unknown as AppDatabase;
+  const savedPlan: HifzPlan = { ...DEFAULT_HIFZ_PLAN, newPerDay: 1 };
+
+  beforeEach(() => jest.mocked(applyHifzSetup).mockClear());
+
+  /** Open the flow on the pace step, where the counts are edited. */
+  async function openPace(initialPlan: HifzPlan | null, language: "en" | "ar" = "en") {
+    const text = strings[language];
+    const view = render(
+      <DirectionProvider dir={language === "ar" ? "rtl" : "ltr"}>
+        <HifzSetupFlow db={db} language={language} isDark={false} s={text} initialPlan={initialPlan} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    for (let step = 0; step < 3; step += 1) fireEvent.press(view.getByText(text.hifzContinue));
+    expect(view.getByText(text.hifzPaceTitle)).toBeTruthy();
+    return view;
+  }
+
+  async function saveAndReadPlan(view: Awaited<ReturnType<typeof openPace>>): Promise<HifzPlan> {
+    fireEvent.press(view.getByText(s.hifzContinue));
+    await act(async () => {
+      fireEvent.press(view.getByText(s.hifzSaveMemorized));
+    });
+    expect(applyHifzSetup).toHaveBeenCalledTimes(1);
+    return jest.mocked(applyHifzSetup).mock.calls[0][1].plan;
+  }
+
+  const radio = (view: Awaited<ReturnType<typeof openPace>>, name: string) => view.getByRole("radio", { name: new RegExp(name) });
+  const checked = (view: Awaited<ReturnType<typeof openPace>>, name: string) => radio(view, name).props.accessibilityState?.checked;
+
+  it("keeps onboarding on the default counts without asking", async () => {
+    const view = await openPace(null);
+    expect(view.queryByText(s.hifzRepsTitle)).toBeNull();
+  });
+
+  it("saves the 20-times preset with the edited plan", async () => {
+    const view = await openPace(savedPlan);
+    expect(checked(view, s.hifzRepsLookingThenMemory)).toBe(true);
+    expect(view.getByText(/Attributed to Sh\. 'Abd al-Muhsin al-Qasim\. Its exact wording is not verified\./)).toBeTruthy();
+    fireEvent.press(radio(view, s.hifzRepsTwentyTimes));
+    expect(checked(view, s.hifzRepsTwentyTimes)).toBe(true);
+    expect(checked(view, s.hifzRepsLookingThenMemory)).toBe(false);
+    const plan = await saveAndReadPlan(view);
+    expect(plan.sabaqRepetitions).toEqual({ listen: 3, looking: 20, cleanInARow: 3 });
+    expect(plan.newPerDay).toBe(1);
+  });
+
+  it("saves custom counts and stops each at the end of its range", async () => {
+    const view = await openPace(savedPlan);
+    expect(view.queryByLabelText("More: Readings while looking")).toBeNull();
+    fireEvent.press(radio(view, s.hifzRepsCustom));
+    expect(checked(view, s.hifzRepsCustom)).toBe(true);
+    for (let tap = 0; tap < 5; tap += 1) fireEvent.press(view.getByLabelText("More: Readings while looking"));
+    expect(view.getByText("15")).toBeTruthy();
+    // Clean in a row stops at 1 and listening at 5.
+    for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("Fewer: Clean in a row from memory"));
+    expect(view.getByLabelText("Fewer: Clean in a row from memory").props.accessibilityState).toMatchObject({ disabled: true });
+    for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("More: Listening"));
+    expect(view.getByLabelText("More: Listening").props.accessibilityState).toMatchObject({ disabled: true });
+    const plan = await saveAndReadPlan(view);
+    expect(plan.sabaqRepetitions).toEqual({ listen: 5, looking: 15, cleanInARow: 1 });
+  });
+
+  it("opens a plan's custom counts as custom, and a preset replaces them", async () => {
+    const view = await openPace({ ...savedPlan, sabaqRepetitions: { listen: 2, looking: 12, cleanInARow: 4 } });
+    expect(checked(view, s.hifzRepsCustom)).toBe(true);
+    expect(view.getByText("12")).toBeTruthy();
+    fireEvent.press(radio(view, s.hifzRepsLookingThenMemory));
+    expect(view.queryByLabelText("More: Readings while looking")).toBeNull();
+    const plan = await saveAndReadPlan(view);
+    expect(plan.sabaqRepetitions).toEqual({ listen: 3, looking: 10, cleanInARow: 3 });
+  });
+
+  it("drops the counts when the goal is only to keep what is memorized", async () => {
+    const view = render(
+      <DirectionProvider dir="ltr">
+        <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={savedPlan} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzGoalKeep));
+    for (let step = 0; step < 3; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    expect(view.getByText(s.hifzPaceTitle)).toBeTruthy();
+    expect(view.queryByText(s.hifzRepsTitle)).toBeNull();
+  });
+
+  it("labels the counts in Arabic with Arabic digits", async () => {
+    const ar = strings.ar;
+    const view = await openPace({ ...savedPlan, sabaqRepetitions: { listen: 2, looking: 12, cleanInARow: 4 } }, "ar");
+    expect(view.getByText(ar.hifzRepsTitle)).toBeTruthy();
+    expect(view.getByText("١٢")).toBeTruthy();
+    expect(view.getByLabelText(`أكثر: ${ar.hifzRepsLooking}`)).toBeTruthy();
   });
 });

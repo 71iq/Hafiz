@@ -20,7 +20,15 @@ import {
   pickMonthlyCheck,
   strengthBands,
 } from "@/lib/hifz/progress";
-import { DEFAULT_HIFZ_PLAN, parseHifzPlan, writeHifzPlan } from "@/lib/hifz/plan";
+import {
+  DEFAULT_HIFZ_PLAN,
+  parseHifzPlan,
+  readHifzPlan,
+  SABAQ_REPETITION_PRESETS,
+  sabaqRepetitionPresetOf,
+  writeHifzPlan,
+  type HifzPlan,
+} from "@/lib/hifz/plan";
 import { pagePolicy, tierFor, type GradeEvent } from "@/lib/hifz/tiers";
 import { pageCardId } from "@/lib/hifz/units";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
@@ -210,6 +218,73 @@ describe("plan setting", () => {
     expect(parseHifzPlan(JSON.stringify({ cycleDays: 0 }))).toBeNull();
     expect(parseHifzPlan("not json")).toBeNull();
     expect(parseHifzPlan(null)).toBeNull();
+  });
+
+  describe("sabaq repetition counts (SBQ-01)", () => {
+    const counts = (value: Partial<HifzPlan["sabaqRepetitions"]>) => ({ ...plan.sabaqRepetitions, ...value });
+
+    it("gives a plan saved before the counts existed the '10 looking, then from memory' defaults", () => {
+      const { sabaqRepetitions: _omitted, ...olderPlan } = DEFAULT_HIFZ_PLAN;
+      expect(parseHifzPlan(JSON.stringify({ ...olderPlan, newPerDay: 1 }))).toMatchObject({
+        newPerDay: 1,
+        sabaqRepetitions: { listen: 3, looking: 10, cleanInARow: 3 },
+      });
+      // A partly saved set keeps the counts it has and takes the default for the rest.
+      expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: { looking: 20 } }))?.sabaqRepetitions).toEqual({
+        listen: 3,
+        looking: 20,
+        cleanInARow: 3,
+      });
+    });
+
+    it("accepts each count at both ends of its range", () => {
+      for (const value of [counts({ listen: 1, looking: 1, cleanInARow: 1 }), counts({ listen: 5, looking: 30, cleanInARow: 10 })]) {
+        expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: value }))?.sabaqRepetitions).toEqual(value);
+      }
+    });
+
+    it.each([
+      ["no listening", { listen: 0 }],
+      ["6 listens", { listen: 6 }],
+      ["no readings", { looking: 0 }],
+      ["31 readings", { looking: 31 }],
+      ["half a reading", { looking: 10.5 }],
+      ["no clean run", { cleanInARow: 0 }],
+      ["11 clean in a row", { cleanInARow: 11 }],
+    ])("rejects a plan with %s, like any field out of range", (_label, value) => {
+      expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: counts(value) }))).toBeNull();
+    });
+
+    it("rejects counts that are not a set of numbers", () => {
+      expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: "twenty" }))).toBeNull();
+      expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: null }))).toBeNull();
+      expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: [20] }))).toBeNull();
+    });
+
+    it("offers the default practice and the 20-times method as presets", () => {
+      expect(SABAQ_REPETITION_PRESETS).toEqual({
+        looking_then_memory: { listen: 3, looking: 10, cleanInARow: 3 },
+        twenty_times: { listen: 3, looking: 20, cleanInARow: 3 },
+      });
+      expect(DEFAULT_HIFZ_PLAN.sabaqRepetitions).toEqual(SABAQ_REPETITION_PRESETS.looking_then_memory);
+      expect(sabaqRepetitionPresetOf(counts({ looking: 20 }))).toBe("twenty_times");
+      expect(sabaqRepetitionPresetOf(counts({}))).toBe("looking_then_memory");
+      expect(sabaqRepetitionPresetOf(counts({ looking: 20, cleanInARow: 5 }))).toBeNull();
+    });
+
+    it("saves the counts in the synced plan and refuses counts out of range", async () => {
+      const store = await openOutboxDatabase();
+      try {
+        await writeHifzPlan(store.db, { ...plan, sabaqRepetitions: counts({ looking: 20 }) });
+        expect((await readHifzPlan(store.db))?.sabaqRepetitions).toEqual(counts({ looking: 20 }));
+        const queued = store.sql.prepare("SELECT data FROM sync_queue WHERE table_name = 'user_settings' AND row_id = 'hifz_plan'").get() as { data: string };
+        expect(JSON.parse(JSON.parse(queued.data).value).sabaqRepetitions).toEqual(counts({ looking: 20 }));
+        await expect(writeHifzPlan(store.db, { ...plan, sabaqRepetitions: counts({ looking: 31 }) })).rejects.toThrow();
+        expect((await readHifzPlan(store.db))?.sabaqRepetitions.looking).toBe(20);
+      } finally {
+        await store.close();
+      }
+    });
   });
 });
 
