@@ -572,13 +572,15 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   const covered = isCoveredToday(snapshot);
   const makeUpOpen = snapshot.headline.kind === "make_up_open";
   await updateBadge(context, permitted, covered);
+  // Expired and covered reminders leave the tray whatever the settings (NOT-06): turning reminders
+  // off or losing permission must not leave yesterday's notification behind.
+  await dismissStale(shown, context, now, covered, makeUpOpen);
   if (!permitted || !context.prefs.enabled) {
     const cancelled = foreign.length + (await cancelEverything(db, scheduled, now));
     if (group.changed) await saveGroupBatches(db, group.batches);
     return { status: permitted ? "disabled" : "no_permission", ...empty, cancelled };
   }
 
-  await dismissStale(shown, context, now, covered, makeUpOpen);
   const plan = planNotifications(context.input);
   await clearSpentRemindLater(db, context, plan);
   const desired = renderDesired(context, plan.slots);

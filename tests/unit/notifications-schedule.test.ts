@@ -943,3 +943,30 @@ describe("a remind-later request during a reschedule (NOT-05b)", () => {
     expect(fake.scheduled.find((item) => item.data.type === "remind_later")?.data.at).toBe(at(TODAY, 6, 30).getTime());
   });
 });
+
+describe("yesterday's notification with reminders off (NOT-06)", () => {
+  it.each(["disabled", "denied"] as const)("leaves the tray when reminders are %s", async (state) => {
+    await seed(lastDays(5, -2));
+    const yesterday = addDays(TODAY, -1);
+    fake.presented = [
+      {
+        osId: "synthetic-yesterday",
+        data: {
+          source: "hafiz-reminder",
+          logId: "synthetic-yesterday-log",
+          type: "wird_reminder",
+          localDate: yesterday,
+          route: "wird",
+          at: at(yesterday, 9).getTime(),
+          contentKey: "synthetic",
+        },
+      },
+    ];
+    if (state === "disabled") await writeReminderPref(store.db, { kind: "enabled", value: false });
+    else fake.permission = { status: "denied", canAskAgain: false };
+
+    await rescheduleReminders(store.db, { now: at(TODAY, 7), language: "en" });
+
+    expect(fake.presented).toEqual([]);
+  });
+});

@@ -13,10 +13,13 @@ type Behavior = { shouldShowBanner: boolean; shouldShowList: boolean };
 type Handler = { handleNotification: (notification: { request: { content: { data: unknown } } }) => Promise<Behavior> };
 
 const mockHandlers: Handler[] = [];
+const mockCategories: unknown[][] = [];
 jest.mock("expo-notifications", () => ({
   setNotificationHandler: (handler: unknown) => mockHandlers.push(handler as Handler),
   setNotificationChannelAsync: async () => undefined,
-  setNotificationCategoryAsync: async () => undefined,
+  setNotificationCategoryAsync: async (...args: unknown[]) => {
+    mockCategories.push(args);
+  },
   AndroidImportance: { DEFAULT: 3 },
   IosAuthorizationStatus: { PROVISIONAL: 3 },
   DEFAULT_ACTION_IDENTIFIER: "expo.modules.notifications.actions.DEFAULT",
@@ -100,5 +103,13 @@ describe("reminders that arrive while the app is open (5.8.2)", () => {
     await configureReminderPlatform(LABELS);
     expect(mockHandlers).toHaveLength(1);
     expect(await arrives(reminder("group_encouragement", ACCOUNT_B))).toBe(false);
+  });
+});
+
+describe("the remind-later action on Android (NOT-05b)", () => {
+  it("opens the app, so its handler runs even after Android ended the app's process", async () => {
+    await reminderPlatform.configure({ ...LABELS, shouldPresent: shouldPresentReminder, onHidden: () => undefined });
+    const [, actions] = mockCategories[mockCategories.length - 1] as [string, { identifier: string; options: object }[]];
+    expect(actions).toEqual([expect.objectContaining({ options: { opensAppToForeground: true } })]);
   });
 });

@@ -86,8 +86,11 @@ export const reminderPlatform: ReminderPlatform = {
         importance: Notifications.AndroidImportance.DEFAULT,
       });
     }
+    // "Remind me in 1 hour" opens the app: its handler (useReminderResponses) needs the database, and
+    // no background task is registered, so an action that stays in the background is lost when
+    // Android has ended the app's process. The launch response carries the action into the handler.
     await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
-      { identifier: REMIND_LATER_ACTION, buttonTitle: remindLaterAction, options: { opensAppToForeground: false } },
+      { identifier: REMIND_LATER_ACTION, buttonTitle: remindLaterAction, options: { opensAppToForeground: true } },
     ]);
   },
 
