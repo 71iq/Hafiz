@@ -118,7 +118,7 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
                     accent={accent}
                     showReference={chosen !== null}
                     status={status}
-                    compareWith={chosen !== null ? other : null}
+                    compareWith={chosen !== null && other ? [other] : null}
                     meaning={meaningOf(option)}
                   />
                 </Card>

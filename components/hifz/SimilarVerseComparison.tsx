@@ -41,7 +41,15 @@ export function SimilarVerseComparison({ db, groups, language, isRTL, accent, s,
           className="p-4"
           style={{ gap: 10 }}
         >
-          <SimilarVerseLine reference={group.self} isRTL={isRTL} accent={accent} meaning={meaningOf(group.self)} />
+          {/* The verse being memorized against each sibling, and each sibling against it: the words that
+              differ, in order, are underlined (MUT-01). */}
+          <SimilarVerseLine
+            reference={group.self}
+            isRTL={isRTL}
+            accent={accent}
+            compareWith={group.siblings}
+            meaning={meaningOf(group.self)}
+          />
           {group.siblings.map((sibling) => (
             <SimilarVerseLine
               key={`${sibling.surah}:${sibling.ayah}`}
@@ -49,6 +57,7 @@ export function SimilarVerseComparison({ db, groups, language, isRTL, accent, s,
               isRTL={isRTL}
               accent={accent}
               muted
+              compareWith={[group.self]}
               meaning={meaningOf(sibling)}
             />
           ))}

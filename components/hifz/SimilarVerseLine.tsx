@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import { View } from "react-native";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
-import { formatAyahRef, normalizeArabicWord } from "@/lib/arabic";
+import { formatAyahRef } from "@/lib/arabic";
 import type { SimilarRef } from "@/lib/hifz/similar";
+import { differingWords } from "@/lib/hifz/word-diff";
 
 type Props = {
   reference: SimilarRef;
@@ -18,10 +19,11 @@ type Props = {
   /** Shown beside the reference once it is shown, such as the prompt's answer mark or "Your choice". */
   status?: ReactNode;
   /**
-   * The other verse of a pair, once a prompt is answered: the words this verse does not share with it
-   * are underlined and only the shared ones keep the accent, so the difference is what stands out.
+   * The verses to tell this one apart from: the other verse of an answered prompt, or the siblings in
+   * a comparison. The words that differ from any of them, compared in order so a moved or repeated word
+   * counts too (differingWords), are underlined, and only the shared ones keep the accent.
    */
-  compareWith?: SimilarRef | null;
+  compareWith?: readonly SimilarRef[] | null;
   /** MUT-05: the verse's meaning in the interface language, with the label naming its source. */
   meaning?: { label: string; text: string } | null;
 };
@@ -55,8 +57,11 @@ export function SimilarVerseLine({
 }: Props) {
   const dir = isRTL ? "rtl" : "ltr";
   const context = reference.context;
-  const otherWords = compareWith ? new Set(verseWords(compareWith).map(normalizeArabicWord)) : null;
-  const sharedWords = new Set(reference.similar.split(/\s+/).filter(Boolean).map(normalizeArabicWord));
+  const words = verseWords(reference);
+  const differs = compareWith && compareWith.length > 0 ? differingWords(words, compareWith.map(verseWords)) : null;
+  // The marked passage's positions in the verse: the words after the part before it.
+  const sharedFrom = reference.pre.split(/\s+/).filter(Boolean).length;
+  const sharedTo = sharedFrom + reference.similar.split(/\s+/).filter(Boolean).length;
   return (
     <View style={{ gap: 4 }}>
       {showReference ? (
@@ -92,17 +97,15 @@ export function SimilarVerseLine({
         style={{ writingDirection: "rtl", textAlign: "right", fontSize: 19, lineHeight: 34, opacity: muted ? 0.85 : 1 }}
         className="text-charcoal dark:text-neutral-100"
       >
-        {otherWords ? (
-          verseWords(reference).map((word, index) => {
-            const key = normalizeArabicWord(word);
-            const differs = !otherWords.has(key);
+        {differs ? (
+          words.map((word, index) => {
             return (
               <Text
                 key={`${index}:${word}`}
                 style={
-                  differs
+                  differs[index]
                     ? { textDecorationLine: "underline" }
-                    : sharedWords.has(key)
+                    : index >= sharedFrom && index < sharedTo
                       ? { color: accent, fontWeight: "700" }
                       : undefined
                 }
