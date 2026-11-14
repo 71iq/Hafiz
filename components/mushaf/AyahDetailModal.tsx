@@ -857,7 +857,7 @@ function TabButton({
       {icon}
       <Text
         numberOfLines={1}
-        className={active ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
+        className={active ? "text-primary-muted dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
         style={{
           fontFamily: "Manrope_600SemiBold",
           fontSize: 12,

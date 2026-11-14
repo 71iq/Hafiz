@@ -1,6 +1,7 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { putCardRow } from "@/lib/fsrs/queries";
 import type { StudyCardRow } from "@/lib/fsrs/types";
+import { ayahSpanIn } from "@/lib/hifz/word-diff";
 
 /**
  * What tells two verses of a pair apart when their wording is the same and a prompt hides their
@@ -19,6 +20,12 @@ export type SimilarRef = Readonly<{
   page: number;
   /** Set by similarPair only when the pair reads the same. */
   context?: PairContext;
+  /**
+   * Where an ayah ends inside the passage, which the bundled text runs across ayat: after the word at
+   * `after` (counting the words of pre, similar and post together) ends ayah `ayah`. Only where the
+   * ayah's own words are found with certainty (ayahSpanIn); otherwise none.
+   */
+  ayahEnds?: readonly { after: number; ayah: number }[];
 }>;
 
 type VerseKey = Readonly<{ surah: number; ayah: number }>;
@@ -97,10 +104,29 @@ function displaySegment(text: string | null): string {
   return (text ?? "").replace(/\./g, "").replace(/\s{2,}/g, " ").trim();
 }
 
+/**
+ * The ayah ends inside a passage that runs into the ayah before or after the ref's own: the end of
+ * the previous ayah before it (not before an ayah 1, where the basmalah or another surah precedes),
+ * and its own end when the next ayah follows. The passage's words are split as SimilarVerseLine
+ * splits them.
+ */
+function ayahEndsIn(segments: readonly string[], row: RefRow): { after: number; ayah: number }[] {
+  const passage = segments.join(" ").split(/\s+/).filter(Boolean);
+  const span = ayahSpanIn(passage, row.text_uthmani.split(/\s+/).filter(Boolean));
+  if (!span) return [];
+  const ends: { after: number; ayah: number }[] = [];
+  if (span.first > 0 && row.ayah > 1) ends.push({ after: span.first - 1, ayah: row.ayah - 1 });
+  if (span.last < passage.length - 1) ends.push({ after: span.last, ayah: row.ayah });
+  return ends;
+}
+
 function toRef(row: RefRow, others: readonly RefRow[]): SimilarRef {
   const base = { surah: row.surah, ayah: row.ayah, surahName: row.surah_name_ar ?? "", page: row.v2_page };
   if (hasSegments(row)) {
-    return { ...base, pre: displaySegment(row.pre_text), similar: displaySegment(row.similar_text), post: displaySegment(row.post_text) };
+    const pre = displaySegment(row.pre_text);
+    const similar = displaySegment(row.similar_text);
+    const post = displaySegment(row.post_text);
+    return { ...base, pre, similar, post, ayahEnds: ayahEndsIn([pre, similar, post], row) };
   }
   const own = words(row.text_uthmani);
   const shared = Math.max(0, ...others.map((other) => sharedEnding(own, words(other.text_uthmani))));

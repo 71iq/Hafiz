@@ -6,7 +6,7 @@ import { SimilarVerseLine } from "@/components/hifz/SimilarVerseLine";
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { strings } from "@/lib/i18n/strings";
 import type { SimilarGroup, SimilarRef } from "@/lib/hifz/similar";
-import { differingWords, wordKey } from "@/lib/hifz/word-diff";
+import { ayahSpanIn, differingWords, wordKey } from "@/lib/hifz/word-diff";
 
 /**
  * MUT-01, MUT-04: the words that tell two similar verses apart, compared in order. The passages of
@@ -135,5 +135,45 @@ describe("what the comparison underlines and how much it shows", () => {
     expect(screen.getByText("ساق5")).toBeTruthy();
     fireEvent.press(screen.getAllByRole("button", { name: strings.en.hifzSimilarShowMeaning })[0]);
     expect(screen.getByText("meaning 21")).toBeTruthy();
+  });
+});
+
+describe("where an ayah ends inside a similar-verse passage", () => {
+  // 86:5 as bundled: the end of 86:4, then 86:5, then the start of 86:6, which repeats its last word.
+  const passage =
+    "إِن كُلُّ نَفْسٍۢ لَّمَّا عَلَيْهَا حَافِظٌۭ فَلْيَنظُرِ ٱلْإِنسَٰانُ مِمَّ خُلِقَ خُلِقَ مِن مَّآءٍۢ دَافِقٍۢ".split(
+      " ",
+    );
+  const ayah = "فَلْيَنظُرِ ٱلْإِنسَٰنُ مِمَّ خُلِقَ".split(" ");
+
+  it("finds the ayah's own words, across spellings, so both of its ends can be marked", () => {
+    expect(ayahSpanIn(passage, ayah)).toEqual({ first: 6, last: 9 });
+  });
+
+  it("finds an ayah cut at the passage's edge, and nothing it cannot place with certainty", () => {
+    expect(ayahSpanIn(passage.slice(0, 9), ayah)).toEqual({ first: 6, last: 8 });
+    // Two words are too few to be sure where the ayah starts.
+    expect(ayahSpanIn(passage.slice(0, 8), ayah)).toBeNull();
+    expect(ayahSpanIn("قال رب".split(" "), "قال رب انك".split(" "))).toBeNull();
+    expect(ayahSpanIn(passage, "وَٱلسَّمَآءِ وَٱلطَّارِقِ".split(" "))).toBeNull();
+  });
+
+  it("numbers the ayah ends between the verses on screen", () => {
+    const ref: SimilarRef = {
+      surah: 86,
+      ayah: 5,
+      surahName: "الطارق",
+      page: 591,
+      pre: passage.slice(0, 6).join(" "),
+      similar: passage.slice(6, 10).join(" "),
+      post: passage.slice(10).join(" "),
+      ayahEnds: [
+        { after: 5, ayah: 4 },
+        { after: 9, ayah: 5 },
+      ],
+    };
+    render(<SimilarVerseLine reference={ref} isRTL accent="#0f766e" />);
+    expect(screen.getByText(" (٤)")).toBeTruthy();
+    expect(screen.getByText(" (٥)")).toBeTruthy();
   });
 });

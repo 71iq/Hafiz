@@ -270,19 +270,26 @@ export function ReadingSettingsSheet({
               compact={compactRows}
             />
             <Divider />
-            <SettingsActionRow
-              title={s.hifzSimilarMarkSetting}
-              subtitle={s.hifzSimilarMarkSettingHint}
-              isRTL={isRTL}
-              trailing={
-                <Switch
-                  value={markSimilarVerses}
-                  onValueChange={setMarkSimilarVerses}
-                  accessibilityLabel={s.hifzSimilarMarkSetting}
-                />
-              }
-              compact={compactRows}
-            />
+            {/* The whole row is the switch, so its target is the row, not the 24 px track. */}
+            <Pressable
+              onPress={() => setMarkSimilarVerses(!markSimilarVerses)}
+              accessibilityRole="switch"
+              accessibilityLabel={s.hifzSimilarMarkSetting}
+              accessibilityHint={s.hifzSimilarMarkSettingHint}
+              accessibilityState={{ checked: markSimilarVerses }}
+            >
+              <SettingsActionRow
+                title={s.hifzSimilarMarkSetting}
+                subtitle={s.hifzSimilarMarkSettingHint}
+                isRTL={isRTL}
+                trailing={
+                  <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                    <Switch value={markSimilarVerses} onValueChange={setMarkSimilarVerses} />
+                  </View>
+                }
+                compact={compactRows}
+              />
+            </Pressable>
           </View>
 
           <SettingsSectionLabel label={s.tafseer} isRTL={isRTL} />
@@ -436,7 +443,7 @@ function SettingsActionRow({
         </Text>
         {subtitle ? (
           <Text
-            className="mt-1 text-warm-500 dark:text-neutral-500"
+            className="mt-1 text-warm-500 dark:text-neutral-400"
             style={{
               fontFamily: "Manrope_400Regular",
               fontSize: 12,

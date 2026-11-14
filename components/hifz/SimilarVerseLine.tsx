@@ -1,8 +1,8 @@
 import { Fragment, type ReactNode } from "react";
-import { View } from "react-native";
+import { Platform, Text as RNText, View } from "react-native";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
-import { formatAyahRef } from "@/lib/arabic";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import { formatNumber } from "@/lib/i18n/count";
 import { interpolate } from "@/lib/i18n/useStrings";
 import type { SimilarRef } from "@/lib/hifz/similar";
@@ -33,6 +33,13 @@ type Props = {
 };
 
 const CONTEXT_STYLE = { writingDirection: "rtl", textAlign: "right", fontSize: 15, lineHeight: 26 } as const;
+// Browsers skip the underline under descenders by default, which hides it under some of exactly the
+// words that differ.
+const UNDERLINE_STYLE = {
+  textDecorationLine: "underline",
+  ...(Platform.OS === "web" ? { textDecorationSkipInk: "none" } : null),
+} as const;
+const AYAH_END_STYLE = { fontSize: 15 } as const;
 
 function verseWords(reference: SimilarRef): string[] {
   return [reference.pre, reference.similar, reference.post].join(" ").split(/\s+/).filter(Boolean);
@@ -96,6 +103,7 @@ export function SimilarVerseLine({
   const sharedFrom = reference.pre.split(/\s+/).filter(Boolean).length;
   const sharedTo = sharedFrom + reference.similar.split(/\s+/).filter(Boolean).length;
   const marks = differs ? underlined(differs, sharedFrom, sharedTo) : null;
+  const ayahEnds = new Map((reference.ayahEnds ?? []).map((end) => [end.after, end.ayah]));
   return (
     <View style={{ gap: 4 }}>
       {showReference ? (
@@ -131,36 +139,32 @@ export function SimilarVerseLine({
         style={{ writingDirection: "rtl", textAlign: "right", fontSize: 19, lineHeight: 34, opacity: muted ? 0.85 : 1 }}
         className="text-charcoal dark:text-neutral-100"
       >
-        {marks ? (
-          words.map((word, index) => {
-            const inPassage = index >= sharedFrom && index < sharedTo;
-            return (
-              // The space stays outside the word, so an underline never runs under it.
-              <Fragment key={`${index}:${word}`}>
-                {index > 0 ? " " : ""}
-                <Text
-                  // Around the passage the text is muted, unless it holds where the verses part.
-                  className={inPassage || marks[index] ? undefined : "text-warm-700 dark:text-neutral-400"}
-                  style={
-                    marks[index]
-                      ? { textDecorationLine: "underline" }
-                      : inPassage
-                        ? { color: accent, fontWeight: "700" }
-                        : undefined
-                  }
-                >
-                  {word}
-                </Text>
-              </Fragment>
-            );
-          })
-        ) : (
-          <>
-            {reference.pre ? `${reference.pre}${reference.similar ? " " : ""}` : ""}
-            {reference.similar ? <Text style={{ color: accent, fontWeight: "700" }}>{reference.similar}</Text> : null}
-            {reference.post ? `${reference.pre || reference.similar ? " " : ""}${reference.post}` : ""}
-          </>
-        )}
+        {words.map((word, index) => {
+          const inPassage = index >= sharedFrom && index < sharedTo;
+          const underline = marks?.[index] === true;
+          const ayahEnd = ayahEnds.get(index);
+          return (
+            // The space stays outside the word, so an underline never runs under it. The spans are
+            // react-native's bare Text, so they keep the verse's size and line height.
+            <Fragment key={`${index}:${word}`}>
+              {index > 0 ? " " : ""}
+              <RNText
+                // When compared, the text around the passage is muted, unless it holds where the verses part.
+                className={marks && !inPassage && !underline ? "text-warm-700 dark:text-neutral-400" : undefined}
+                style={underline ? UNDERLINE_STYLE : inPassage ? { color: accent, fontWeight: "700" } : undefined}
+              >
+                {word}
+              </RNText>
+              {ayahEnd !== undefined ? (
+                // The end of an ayah inside the passage, numbered as in the Mushaf, so the verse
+                // under the reference does not read as running on into the next.
+                <RNText className="text-warm-700 dark:text-neutral-400" style={AYAH_END_STYLE}>
+                  {` (${toArabicNumber(ayahEnd)})`}
+                </RNText>
+              ) : null}
+            </Fragment>
+          );
+        })}
       </Text>
       {context?.after ? (
         <Text style={CONTEXT_STYLE} className="text-warm-700 dark:text-neutral-400">

@@ -60,3 +60,44 @@ function commonSubsequence(a: readonly string[], b: readonly string[]): boolean[
   }
   return inCommon;
 }
+
+/**
+ * Where an ayah's own words sit in a passage that also holds the end of the ayah before it or the
+ * start of the one after (the bundled similar-verse text runs across ayat): the positions of its first
+ * and last word in `passage`, or null when that is not certain. The ayah may be cut at either end of
+ * the passage; the words that do show must all match it (wordKey), with one mismatch allowed in a
+ * long overlap for a spelling the key does not cover, and no other position may match as well.
+ * Words with no letters, such as pause marks, are not counted.
+ */
+export function ayahSpanIn(
+  passage: readonly string[],
+  ayah: readonly string[],
+): { first: number; last: number } | null {
+  const keyed = (list: readonly string[]) =>
+    list.map((word, index) => ({ key: wordKey(word), index })).filter((word) => word.key !== "");
+  const text = keyed(passage);
+  const own = keyed(ayah).map((word) => word.key);
+  if (text.length === 0 || own.length === 0) return null;
+  let best: { first: number; last: number; overlap: number } | null = null;
+  let tied = false;
+  // Each alignment of the ayah against the passage: `offset` is where its first word would fall.
+  for (let offset = 1 - own.length; offset < text.length; offset += 1) {
+    const from = Math.max(0, offset);
+    const to = Math.min(text.length, offset + own.length);
+    const overlap = to - from;
+    if (overlap < Math.min(3, own.length)) continue;
+    let mismatches = 0;
+    for (let at = from; at < to; at += 1) if (text[at].key !== own[at - offset]) mismatches += 1;
+    if (mismatches > (overlap >= 6 ? 1 : 0)) continue;
+    // A cut ayah must reach the passage's edge; otherwise its missing words would be showing.
+    if (offset < 0 && from !== 0) continue;
+    if (offset + own.length > text.length && to !== text.length) continue;
+    if (best === null || overlap > best.overlap) {
+      best = { first: text[from].index, last: text[to - 1].index, overlap };
+      tied = false;
+    } else if (overlap === best.overlap) {
+      tied = true;
+    }
+  }
+  return best && !tied ? { first: best.first, last: best.last } : null;
+}
