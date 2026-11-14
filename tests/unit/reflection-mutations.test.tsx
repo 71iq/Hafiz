@@ -408,7 +408,9 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     fireEvent.press(view.getByText(strings[locale].reflectionSubmit));
     await flush();
     expect(createReflection).toHaveBeenCalledWith(user(1).id, 2, 1, 2, 3, 3, "A private thought", true, expect.any(Function));
-    expect(view.getByText(strings[locale].reflectionPrivacyChanged)).toBeTruthy();
+    expect(view.getByText(strings[locale].reflectionPrivacyChanged).props.accessibilityRole).toBe("alert");
+    // The private note would contradict the message, so it waits while the message shows.
+    expect(view.queryByText(strings[locale].reflectionMinorPrivate)).toBeNull();
     expect(client.getQueryState(privacyKey)?.isInvalidated).toBe(true);
     expect(view.getByDisplayValue("A private thought")).toBeTruthy();
     expect(close).not.toHaveBeenCalled();
@@ -428,7 +430,9 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     fireEvent(input, "submitEditing");
     await flush();
     expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "A private comment", true);
-    expect(view.getByText(strings[locale].commentPrivacyChanged)).toBeTruthy();
+    // Shown above the input, where the person is looking, in place of the private note.
+    expect(view.getByText(strings[locale].commentPrivacyChanged).props.accessibilityRole).toBe("alert");
+    expect(view.queryByText(strings[locale].reflectionMinorPrivate)).toBeNull();
     expect(view.queryByText(strings[locale].commentPostFailed)).toBeNull();
     expect(client.getQueryState(privacyKey)?.isInvalidated).toBe(true);
     expect(view.getByDisplayValue("A private comment")).toBeTruthy();

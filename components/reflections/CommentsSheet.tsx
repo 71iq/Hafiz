@@ -407,7 +407,8 @@ export function CommentsSheet({
               ) : null}
             </View>
 
-            {error ? (
+            {/* Posting failures show above the input, where the person is looking; these are the list's own. */}
+            {error && (failure === "load" || failure === "like") ? (
               <Text
                 className="mb-3 text-red-600 dark:text-red-400"
                 style={{
@@ -530,7 +531,21 @@ export function CommentsSheet({
             )}
           </OverlayBody>
 
-          {user && isMinor ? (
+          {user && error && (failure === "post" || failure === "privacy") ? (
+            <Text
+              accessibilityRole="alert"
+              className="mx-5 mb-2 text-red-600 dark:text-red-400"
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 13,
+                lineHeight: 20,
+                ...textStartStyle(isRTL),
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {error}
+            </Text>
+          ) : user && isMinor ? (
             <Text
               className="mx-5 mb-2"
               style={{

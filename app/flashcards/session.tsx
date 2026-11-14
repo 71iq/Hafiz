@@ -1023,9 +1023,11 @@ function FlashcardSessionScreen() {
               <CardStateBadge state={currentCard.card.state} s={s} />
               <Pressable
                 onPress={() => setCardMenuOpen(true)}
-                className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+                // Dimmed, like the grade buttons, while a change to the card is saving.
+                className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${mutationBusy ? "opacity-50" : ""}`}
                 accessibilityRole="button"
                 accessibilityLabel={s.cardActionsTitle}
+                accessibilityState={{ disabled: mutationBusy }}
                 disabled={mutationBusy}
               >
                 <EllipsisVertical size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
@@ -2116,7 +2118,8 @@ function SessionSummaryView({
           <SummaryCard label={s.flashcardsSummaryRelearning} value={String(summary.relearningCount)} color="#ef4444" compact={compact} />
         </View>
         <SummaryRow label={s.flashcardsSummaryDuration} value={interpolate(s.flashcardsSummaryMinutes, { n: String(durationMin) })} compact={compact} />
-        <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} compact={compact} />
+        {/* No date (none scheduled, or it could not load) leaves the row out rather than a lone dash. */}
+        {nextReview ? <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} compact={compact} /> : null}
       </View>
 
       {summary.total > 0 ? (
@@ -2167,10 +2170,10 @@ function localEndOfTodayIso(base = new Date()): string {
   return end.toISOString();
 }
 
-function formatNextReviewDate(value: string | null, s: UIStrings): string {
-  if (!value) return "—";
+function formatNextReviewDate(value: string | null, s: UIStrings): string | null {
+  if (!value) return null;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return null;
   return date <= new Date(localEndOfTodayIso()) ? s.flashcardsToday : date.toLocaleDateString();
 }
 

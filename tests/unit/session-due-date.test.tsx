@@ -2321,7 +2321,8 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
         expect(view.queryByText(s.flashcardsEasy)).toBeNull();
         expect(within(summaryRow(view, s.flashcardsSummaryReviewed)).getByText("1")).toBeTruthy();
-        expect(within(summaryRow(view, s.flashcardsSummaryNextReview)).getByText("—")).toBeTruthy();
+        // Without a date the row is left out, rather than a lone dash.
+        expect(view.queryByText(s.flashcardsSummaryNextReview)).toBeNull();
         expect(warning).toHaveBeenCalledWith("[FlashcardSession] Next review date failed:", failure);
         expect(putCardRow).toHaveBeenCalledTimes(1);
         expect(putStudyLogRow).toHaveBeenCalledTimes(1);

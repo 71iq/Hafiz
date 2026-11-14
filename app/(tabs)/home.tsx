@@ -102,7 +102,7 @@ export default function HomeScreen() {
   const localNumber = (value: number) => (isRTL ? toArabicNumber(value) : value.toLocaleString());
   const s = useStrings();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const mirroredRowStyle = isRTL ? ({ direction: "ltr" } as const) : undefined;
   const compactDeckCards = width <= VIEWPORT_BREAKPOINTS.phoneLarge;
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
@@ -120,8 +120,10 @@ export default function HomeScreen() {
     (sum, deck) => sum + deck.dueCount + deck.newCount,
     vocabStats.dueCount + vocabStats.newCount,
   );
-  // Due counts of three digits widen the big number by about 38 px.
-  const headerStacked = headerWidth > 0 && headerWidth < (totalDue >= 100 ? 370 : 330);
+  // The counts and Start Review need about 330 px at standard text size; each further digit of the
+  // due count widens the big number by about 38 px, and larger system text widens everything.
+  const headerNeeds = (totalDue >= 1000 ? 410 : totalDue >= 100 ? 370 : 330) * Math.max(1, fontScale);
+  const headerStacked = headerWidth > 0 && headerWidth < headerNeeds;
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
   const { wird, inboxCount, monthlyCheckDue, refresh: refreshWird } = useTodayWird(db);

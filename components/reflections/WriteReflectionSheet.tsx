@@ -276,7 +276,8 @@ export function WriteReflectionSheet({
               )}
             </View>
 
-            {isMinor ? (
+            {/* The private note would contradict a "privacy changed" message, so it waits while that shows. */}
+            {isMinor && error !== s.reflectionPrivacyChanged ? (
               <Text
                 style={{
                   fontFamily: "Manrope_400Regular",
@@ -296,12 +297,15 @@ export function WriteReflectionSheet({
 
             {error && (
               <Text
+                accessibilityRole="alert"
+                className="text-red-600 dark:text-red-400"
                 style={{
-                  fontFamily: "Manrope_400Regular",
-                  fontSize: 12,
-                  color: "#ef4444",
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 13,
+                  lineHeight: 20,
                   marginBottom: 8,
                   ...textStartStyle(isRTL),
+                  writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
                 {error}

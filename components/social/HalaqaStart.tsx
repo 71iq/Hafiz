@@ -140,7 +140,7 @@ export function HalaqaStart({
             >
               <View className="items-center gap-2" style={socialRowStyle(isRTL)}>
                 <KeyRound size={16} color={matchedAllowed ? accent : "#FFFFFF"} />
-                <Text variant="title-sm" className={matchedAllowed ? undefined : "text-white"}>
+                <Text variant="title-sm" className={matchedAllowed ? undefined : "text-white dark:text-white"}>
                   {s.halaqaJoinCode}
                 </Text>
               </View>
