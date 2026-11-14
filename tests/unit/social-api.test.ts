@@ -767,6 +767,23 @@ describe("a teacher's next sabaq (SOC-03)", () => {
     await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
   });
 
+  it("returns nothing from a load a forget overtook, offline or online", async () => {
+    mockRpc.mockResolvedValueOnce({ data: stored, error: null });
+    await loadMySabaqAssignment(USER, false);
+    // Offline: the copy is read before the forget finishes, but the lesson must not use it.
+    const offlineLoad = loadMySabaqAssignment(USER, true);
+    await forgetMySabaqAssignment(USER);
+    await expect(offlineLoad).resolves.toBeNull();
+    // Online: the answer arrives after the forget began.
+    let answer: (value: { data: unknown; error: unknown }) => void = () => undefined;
+    mockRpc.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const onlineLoad = loadMySabaqAssignment(USER, false);
+    const forgetting = forgetMySabaqAssignment(USER);
+    answer({ data: stored, error: null });
+    await forgetting;
+    await expect(onlineLoad).resolves.toBeNull();
+  });
+
   it("never saves an older read's answer over a newer one", async () => {
     let older: (value: { data: unknown; error: unknown }) => void = () => undefined;
     mockRpc.mockReturnValueOnce(new Promise((resolve) => (older = resolve)));

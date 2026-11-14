@@ -26,6 +26,8 @@ export function useAssignedSabaq(
     null,
   );
   const [changes, setChanges] = useState(0);
+  /** Raised at once by a forget, so a read that started before it is dropped even in the same render. */
+  const revision = useRef(0);
   const [open, setOpen] = useState<{ userId: string | null; value: AssignedSabaq | null }>({
     userId: null,
     value: null,
@@ -33,13 +35,17 @@ export function useAssignedSabaq(
   useEffect(
     () =>
       subscribeSabaqAssignmentChanges(() => {
+        revision.current += 1;
         fetched.current = null;
+        setOpen((shown) => ({ ...shown, value: null }));
         setChanges((count) => count + 1);
       }),
     [],
   );
   useEffect(() => {
     let cancelled = false;
+    const startedAt = revision.current;
+    const outdated = () => cancelled || revision.current !== startedAt;
     void (async () => {
       const last = fetched.current;
       const fresh =
@@ -47,11 +53,11 @@ export function useAssignedSabaq(
       let assignment = fresh ? last.value : null;
       if (!fresh) {
         assignment = await loadMySabaqAssignment(userId, offline);
-        if (cancelled) return;
+        if (outdated()) return;
         fetched.current = { userId, offline, at: Date.now(), value: assignment };
       }
       const isOpen = assignment ? await assignedSabaqOpen(db, assignment).catch(() => false) : false;
-      if (!cancelled) setOpen({ userId, value: isOpen ? assignment : null });
+      if (!outdated()) setOpen({ userId, value: isOpen ? assignment : null });
     })();
     return () => {
       cancelled = true;

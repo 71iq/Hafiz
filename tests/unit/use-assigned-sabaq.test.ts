@@ -74,6 +74,21 @@ describe("Home's teacher sabaq (SOC-03)", () => {
     expect(loadMySabaqAssignment).toHaveBeenCalledTimes(2);
   });
 
+  it("hides an assignment at once on a forget, and drops a read that started before it", async () => {
+    const { result } = renderHook(() => useAssignedSabaq(db, USER, 1));
+    await waitFor(() => expect(result.current).toEqual(ASSIGNED));
+    let older: (value: typeof ASSIGNED | null) => void = () => undefined;
+    jest.mocked(loadMySabaqAssignment).mockReturnValueOnce(new Promise((resolve) => (older = resolve)));
+    // A read starts (the freshness window was cleared), then a forget arrives before it answers.
+    act(() => mockListeners.forEach((listener) => listener()));
+    expect(result.current).toBeNull();
+    jest.mocked(loadMySabaqAssignment).mockResolvedValue(null);
+    act(() => mockListeners.forEach((listener) => listener()));
+    await act(async () => older(ASSIGNED));
+    await waitFor(() => expect(loadMySabaqAssignment).toHaveBeenCalledTimes(3));
+    expect(result.current).toBeNull();
+  });
+
   it("shows nothing when the lines cannot be checked, or for another account", async () => {
     jest.mocked(assignedSabaqOpen).mockRejectedValue(new Error("database closed"));
     const { result, rerender } = renderHook(({ user }: { user: string | null }) => useAssignedSabaq(db, user, 1), {

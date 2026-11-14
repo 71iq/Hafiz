@@ -46,6 +46,8 @@ const SABAQ_ASSIGNMENT_CACHE = "sabaq-assignment";
  */
 let readCount = 0;
 const savedRead = new Map<string, number>();
+/** Per account, how many forgets have started; a load that sees it change returns nothing. */
+const forgets = new Map<string, number>();
 const changeListeners = new Set<() => void>();
 
 /** Called after forgetMySabaqAssignment, so a screen that keeps its own copy reads again. */
@@ -62,6 +64,7 @@ export function subscribeSabaqAssignmentChanges(listener: () => void): () => voi
  * The next online read brings back any assignment from another halaqa that still holds.
  */
 export async function forgetMySabaqAssignment(userId: string): Promise<void> {
+  forgets.set(userId, (forgets.get(userId) ?? 0) + 1);
   readCount += 1;
   savedRead.set(userId, readCount);
   await forgetSocialCache(userId, SABAQ_ASSIGNMENT_CACHE);
@@ -96,6 +99,13 @@ const LOAD_TIMEOUT_MS = 5_000;
  */
 export async function loadMySabaqAssignment(userId: string | null, offline: boolean): Promise<AssignedSabaq | null> {
   if (!userId) return null;
+  // A forget that starts while this load awaits ends whatever it found.
+  const forgetsBefore = forgets.get(userId) ?? 0;
+  const result = await loadAssignment(userId, offline);
+  return (forgets.get(userId) ?? 0) === forgetsBefore ? result : null;
+}
+
+async function loadAssignment(userId: string, offline: boolean): Promise<AssignedSabaq | null> {
   const saved = async () => {
     try {
       return (await readOwnSocialCache(userId, SABAQ_ASSIGNMENT_CACHE, mineSchema))?.data ?? null;
