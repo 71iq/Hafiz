@@ -179,19 +179,19 @@ export async function makeUpTarget(
   const today = localDateOf(now);
   const yesterday = addDays(today, -1);
   const dayBefore = addDays(today, -2);
-  // STR-08: a single session never counts for both days. Once yesterday is made up and this session
-  // graded reviews toward it, the rest of the session stays with yesterday, even past the cutoff; the
-  // next session counts for today. The session's part is read from its own reviews, which are
-  // immutable and sync as they are, not from the made-up day's source session, which sync can replace
-  // with another device's session.
+  // STR-08: a single session never counts for both days. Once this session graded reviews toward
+  // yesterday and yesterday can no longer be made up (made up here, or a done, excused or made-up row
+  // that sync brought), the rest of the session stays with yesterday, even past the cutoff; the next
+  // session counts for today. The session's part is read from its own reviews, which are immutable and
+  // sync as they are. While yesterday can still be made up, the window and its cutoff decide below.
   if (sessionId) {
-    const madeUp = await db.getFirstAsync<{ status: string | null }>("SELECT status FROM habit_days WHERE local_date = ?", [yesterday]);
-    if (madeUp?.status === "made_up") {
-      const contributed = await db.getFirstAsync<{ found: number }>(
-        "SELECT 1 AS found FROM study_log WHERE makeup_for = ? AND session_id = ? LIMIT 1",
-        [yesterday, sessionId],
-      );
-      if (contributed) return yesterday;
+    const contributed = await db.getFirstAsync<{ found: number }>(
+      "SELECT 1 AS found FROM study_log WHERE makeup_for = ? AND session_id = ? LIMIT 1",
+      [yesterday, sessionId],
+    );
+    if (contributed) {
+      const row = await db.getFirstAsync<{ status: string | null }>("SELECT status FROM habit_days WHERE local_date = ?", [yesterday]);
+      if (!canStillMakeUp(row?.status ?? null)) return yesterday;
     }
   }
   const dhuhr = given ?? (await readDhuhrResolver(db));

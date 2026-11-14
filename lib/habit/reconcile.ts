@@ -65,12 +65,19 @@ export async function reconcileHabitDaysFromLogs(
       only ? [...only, ...only] : [],
     ),
     db.getAllAsync<HabitDayRow>("SELECT * FROM habit_days WHERE status IS NOT NULL"),
-    // The day each sabaq chunk first passed: its completed step 6 (STR-01), as DAY_TALLY_SQL reads it.
-    db.getAllAsync<{ card_id: string; first: LocalDate }>(
-      "SELECT card_id, MIN(local_date) AS first FROM study_log WHERE card_id LIKE 'chunk:%' AND rating >= 3 AND local_date IS NOT NULL GROUP BY card_id",
+    // Each sabaq chunk's passing reviews: the earliest is its completed step 6 (STR-01), as
+    // DAY_TALLY_SQL reads it. Compared as instants, since sync can change a timestamp's spelling.
+    db.getAllAsync<{ card_id: string; reviewed_at: string }>(
+      "SELECT card_id, reviewed_at FROM study_log WHERE card_id LIKE 'chunk:%' AND rating >= 3",
     ),
   ]);
-  const firstPassOn = new Map(firstPasses.map((row) => [row.card_id, row.first]));
+  const firstPassAt = new Map<string, number>();
+  for (const row of firstPasses) {
+    const at = Date.parse(row.reviewed_at);
+    if (!Number.isFinite(at)) continue;
+    const earliest = firstPassAt.get(row.card_id);
+    if (earliest === undefined || at < earliest) firstPassAt.set(row.card_id, at);
+  }
   const days = new Map(habitRows.map((row) => [row.local_date, row]));
   const own = new Map<LocalDate, LoggedReview[]>();
   const makeUps = new Map<LocalDate, LoggedReview[]>();
@@ -87,7 +94,7 @@ export async function reconcileHabitDaysFromLogs(
         reviews.map((review) => ({
           cardId: review.card_id,
           durationMs: review.duration_ms,
-          sabaqStep: review.rating >= 3 && firstPassOn.get(review.card_id) === review.local_date,
+          sabaqStep: review.rating >= 3 && firstPassAt.get(review.card_id) === Date.parse(review.reviewed_at),
         })),
         { studyCounts: settings.studyCountsTowardMinimum },
       ),

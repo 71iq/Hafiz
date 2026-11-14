@@ -75,10 +75,9 @@ export function recitationUnits(cardId: string): number {
 }
 
 /**
- * `sabaqStep`: the review is a sabaq chunk's first pass, its completed step 6 (SBQ-02): a passing
- * grade of a chunk card with no passing grade on an earlier day. STR-01 counts it as a wird day on
- * its own, however short the chunk. A second look falls on the same day as that pass (SBQ-03), so it
- * adds no step of its own.
+ * `sabaqStep`: the review is a sabaq chunk's completed step 6 (SBQ-02): the chunk card's earliest
+ * passing review. STR-01 counts it as a wird day on its own, however short the chunk. Later reviews
+ * of the chunk (the fluent check, a second look) add no step of their own.
  */
 export type ReviewContribution = Readonly<{ cardId: string; durationMs: number | null; sabaqStep?: boolean }>;
 export type WirdTally = Readonly<{ pageUnits: number; countedMs: number; sabaqStep: boolean }>;
@@ -141,9 +140,10 @@ const TALLY_SELECT = `SELECT
   COALESCE(MAX(CASE
     WHEN card_id LIKE 'chunk:%' AND rating >= 3 AND NOT EXISTS (
       SELECT 1 FROM study_log AS earlier
-      WHERE earlier.card_id = tallied.card_id AND earlier.rating >= 3 AND earlier.local_date < tallied.local_date
+      WHERE earlier.card_id = tallied.card_id AND earlier.rating >= 3
+        AND julianday(earlier.reviewed_at) < julianday(tallied.reviewed_at)
     ) THEN 1 ELSE 0 END), 0) AS sabaq_step
-  FROM (SELECT card_id, rating, duration_ms, local_date, makeup_for, ${LINES_SEG_SQL} AS lines_seg FROM study_log) AS tallied`;
+  FROM (SELECT card_id, rating, reviewed_at, duration_ms, local_date, makeup_for, ${LINES_SEG_SQL} AS lines_seg FROM study_log) AS tallied`;
 
 /**
  * The same tally as tallyReviews, computed by SQLite, so a grade does not load the day's rows. Keep

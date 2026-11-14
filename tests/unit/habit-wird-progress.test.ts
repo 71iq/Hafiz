@@ -484,6 +484,25 @@ describe("a completed sabaq step 6 (STR-01)", () => {
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
   });
 
+  it("counts only a chunk's earliest passing review, not a same-day second look in another session", async () => {
+    const at = (minutes: number) => atLocalTime(TODAY, minutes).toISOString();
+    const insertAt = (cardId: string, reviewedAt: string, makeupFor: string | null) =>
+      store.sql
+        .prepare(
+          `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
+            local_date, grader, duration_ms, makeup_for) VALUES (?, 3, 1, ?, 1, 1, 0, 0, ?, ?, 'self', 60000, ?)`,
+        )
+        .run(cardId, reviewedAt, reviewedAt, TODAY, makeupFor);
+    // The morning pass made yesterday up; the evening look is a later review of the same chunk.
+    insertAt("chunk:madani15:7:1-3", at(9 * 60), addDays(TODAY, -1));
+    insertAt("chunk:madani15:7:1-3", at(19 * 60), null);
+    expect(await tally(TODAY)).toBe(false);
+    await store.db.withTransactionAsync(async (tx) => {
+      await reconcileHabitDaysFromLogs(tx, { now: atLocalTime(TODAY, 20 * 60), dates: new Set([TODAY]) });
+    });
+    expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
+  });
+
   it("does not count a failed check, or a chunk's second look on a later day, as a step 6", async () => {
     insertLog("chunk:madani15:5:1-3", TODAY, 1);
     expect(await tally(TODAY)).toBe(false);
@@ -555,6 +574,27 @@ describe("make-up attribution on each review (STR-08)", () => {
       .prepare("SELECT DISTINCT makeup_for FROM study_log WHERE session_id = ?")
       .all(session.id) as { makeup_for: string | null }[];
     expect(fromSession).toEqual([{ makeup_for: yesterday }]);
+  });
+
+  it("keeps a make-up session with yesterday when sync turns the made-up day into another device's done day", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    const session = startReviewSession("wird", { now: atLocalTime(TODAY, 9 * 60) });
+    for (let i = 0; i < 10; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i), Rating.Good, { session });
+    // Another device recorded yesterday as a genuine done day; the merge keeps the stronger status.
+    store.sql.prepare("UPDATE habit_days SET status = 'done', earned_status = 'done' WHERE local_date = ?").run(yesterday);
+
+    for (let i = 0; i < 10; i += 1) await grade(`3:${i + 1}`, atLocalTime(TODAY, 9 * 60 + 20 + i), Rating.Good, { session });
+    expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
+  });
+
+  it("lets a make-up session that did not finish before the cutoff count for today, never completing the make-up late", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    const session = startReviewSession("wird", { now: atLocalTime(TODAY, 11 * 60) });
+    // Five ayat before the cutoff: half the minimum, so yesterday stays missed.
+    for (let i = 0; i < 5; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 11 * 60 + i), Rating.Good, { session });
+    for (let i = 0; i < 10; i += 1) await grade(`3:${i + 1}`, atLocalTime(TODAY, 13 * 60 + i), Rating.Good, { session });
+    expect((await readHabitDayRow(store.db, yesterday))?.status ?? null).not.toBe("made_up");
+    expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
   });
 
   it("credits reviews pulled from another device to the day they made up, never to today", async () => {
