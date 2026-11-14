@@ -1219,6 +1219,22 @@ BEGIN
   PERFORM hz_test.eq('a minor cannot set an outside photo URL', (SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000b'), NULL::TEXT);
 END $$;
 SET ROLE authenticated;
+-- Fourth review, finding 2: a file the app has not deleted yet sits in a folder named after the
+-- minor's id. Only the minor lists it, which they need to delete it.
+DO $$
+BEGIN
+  PERFORM hz_test.eq('a minor lists their own leftover photo', (
+    SELECT count(*) FROM storage.objects WHERE name LIKE '00000000-0000-4000-8000-00000000000b/%'
+  ), 1::BIGINT);
+  PERFORM hz_test.login('00000000-0000-4000-8000-00000000000c');
+  PERFORM hz_test.eq('a stranger cannot list a minor''s photo', (
+    SELECT count(*) FROM storage.objects WHERE name LIKE '00000000-0000-4000-8000-00000000000b/%'
+  ), 0::BIGINT);
+  PERFORM hz_test.eq('a stranger still lists an adult''s photo', (
+    SELECT count(*) FROM storage.objects WHERE name LIKE '00000000-0000-4000-8000-00000000000a/%'
+  ), 1::BIGINT);
+  PERFORM hz_test.login('00000000-0000-4000-8000-00000000000b');
+END $$;
 DO $$
 BEGIN
   PERFORM hz_test.expect_error($q$INSERT INTO storage.objects (bucket_id, name, owner)
@@ -1241,7 +1257,8 @@ END $$;
 RESET ROLE;
 
 -- Finding 1: once B states they are a minor, their identity row is hidden from everyone but B. The
--- reflection feed embeds authors through the same policy, so other authors still show.
+-- reflection feed embeds authors through the same policy, so other authors still show. Fourth review,
+-- finding 2: B's reflection itself is hidden too, since it carries B's id and words.
 INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content) VALUES
   ('00000000-0000-4000-8000-00000000000a', 1, 1, 1, 1, 1, 'A reflection by an adult author'),
   ('00000000-0000-4000-8000-00000000000b', 1, 2, 2, 1, 1, 'A reflection by a minor author');
@@ -1267,7 +1284,7 @@ BEGIN
     SELECT display_name FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000a'
   ), 'Teacher A');
   PERFORM hz_test.eq('feed keeps adult authors and hides the minor', hz_test.feed_authors(),
-    'A reflection by a minor author=(hidden); A reflection by an adult author=teacher_a');
+    'A reflection by an adult author=teacher_a');
 END $$;
 RESET ROLE;
 
@@ -1281,7 +1298,7 @@ BEGIN
   PERFORM hz_test.eq('outsider gets no summary for a minor', public.get_profile_summary('00000000-0000-4000-8000-00000000000b'),
     NULL::JSONB);
   PERFORM hz_test.eq('outsider feed hides the minor too', hz_test.feed_authors(),
-    'A reflection by a minor author=(hidden); A reflection by an adult author=teacher_a');
+    'A reflection by an adult author=teacher_a');
 END $$;
 RESET ROLE;
 
@@ -1292,6 +1309,8 @@ BEGIN
   PERFORM hz_test.eq('the minor reads their own identity', (
     SELECT username FROM public.profiles WHERE id = auth.uid()
   ), 'member_b');
+  PERFORM hz_test.eq('the minor reads their own reflection in the feed', hz_test.feed_authors(),
+    'A reflection by a minor author=member_b; A reflection by an adult author=teacher_a');
   PERFORM hz_test.eq('the minor sees their own streak', public.get_profile_summary(auth.uid())->>'streak',
     (SELECT value FROM hz_test.state WHERE key = 'b_streak'));
 END $$;
@@ -1411,6 +1430,141 @@ SET ROLE authenticated;
 DO $$
 BEGIN
   PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(false, false, true)', 'nickname_required');
+END $$;
+RESET ROLE;
+
+-- Fourth review, finding 2: a minor's reflections, comments and likes are readable only by that
+-- minor, and the public counts leave them out. 8008-1 is active as an adult and then states
+-- minority; 8008-2 is an adult. Both react to Teacher A's reflection above.
+SELECT hz_test.make_user(('00000000-0000-4000-8008-' || lpad(i::TEXT, 12, '0'))::UUID, 'fourth_user_' || i, 'Fourth ' || i)
+FROM generate_series(1, 2) AS i;
+INSERT INTO hz_test.state SELECT 'adult_reflection', id::TEXT FROM public.reflections WHERE content = 'A reflection by an adult author';
+-- The counts on Teacher A's reflection and on 8008-2's comment there, as the caller reads them.
+CREATE FUNCTION hz_test.adult_counts() RETURNS TEXT LANGUAGE sql STABLE AS $$
+  SELECT r.likes_count || ' likes, ' || r.comments_count || ' comments, comment liked ' || COALESCE((
+    SELECT c.likes_count FROM public.reflection_comments AS c WHERE c.content = 'An adult comment'
+  )::TEXT, '-')
+  FROM public.reflections AS r WHERE r.content = 'A reflection by an adult author'
+$$;
+-- Every reflection, comment and like row the caller can read, as text.
+CREATE FUNCTION hz_test.public_activity() RETURNS TEXT LANGUAGE sql STABLE AS $$
+  SELECT concat_ws(' | ',
+    (SELECT string_agg(to_jsonb(r)::TEXT, ',') FROM public.reflections AS r),
+    (SELECT string_agg(to_jsonb(c)::TEXT, ',') FROM public.reflection_comments AS c),
+    (SELECT string_agg(to_jsonb(l)::TEXT, ',') FROM public.reflection_likes AS l),
+    (SELECT string_agg(to_jsonb(cl)::TEXT, ',') FROM public.reflection_comment_likes AS cl))
+$$;
+GRANT EXECUTE ON FUNCTION hz_test.adult_counts(), hz_test.public_activity() TO anon, authenticated;
+
+SET ROLE authenticated;
+DO $$
+DECLARE
+  adult_reflection UUID := (SELECT value FROM hz_test.state WHERE key = 'adult_reflection')::UUID;
+  adult_comment UUID;
+  minor_reflection UUID;
+BEGIN
+  PERFORM hz_test.login('00000000-0000-4000-8008-000000000002');
+  INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (auth.uid(), adult_reflection);
+  INSERT INTO public.reflection_comments (user_id, reflection_id, content)
+  VALUES (auth.uid(), adult_reflection, 'An adult comment') RETURNING id INTO adult_comment;
+
+  PERFORM hz_test.login('00000000-0000-4000-8008-000000000001');
+  INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
+  VALUES (auth.uid(), 1, 3, 3, 1, 1, 'Written before minority');
+  INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (auth.uid(), adult_reflection);
+  INSERT INTO public.reflection_comments (user_id, reflection_id, content)
+  VALUES (auth.uid(), adult_reflection, 'Said before minority');
+  INSERT INTO public.reflection_comment_likes (user_id, comment_id) VALUES (auth.uid(), adult_comment);
+  PERFORM hz_test.eq('an adult''s activity is counted', hz_test.adult_counts(), '2 likes, 2 comments, comment liked 1');
+
+  -- Stating minority recounts what they touched. A minor still writes, and reads what they wrote.
+  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM hz_test.eq('stating minority leaves their activity out of the counts', hz_test.adult_counts(),
+    '1 likes, 1 comments, comment liked 0');
+  INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
+  VALUES (auth.uid(), 1, 4, 4, 1, 1, 'Written as a minor') RETURNING id INTO minor_reflection;
+  INSERT INTO hz_test.state VALUES ('minor_reflection', minor_reflection::TEXT);
+  INSERT INTO public.reflection_comments (user_id, reflection_id, content)
+  VALUES (auth.uid(), adult_reflection, 'Said as a minor');
+  PERFORM hz_test.eq('a minor''s new comment is not counted', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
+  PERFORM hz_test.eq('the minor reads their own reflections', (
+    SELECT string_agg(content, '; ' ORDER BY content) FROM public.reflections WHERE user_id = auth.uid()
+  ), 'Written as a minor; Written before minority');
+  PERFORM hz_test.eq('the minor reads their own comments', (
+    SELECT string_agg(content, '; ' ORDER BY content) FROM public.reflection_comments WHERE user_id = auth.uid()
+  ), 'Said as a minor; Said before minority');
+  PERFORM hz_test.eq('the minor reads their own likes', (
+    SELECT count(*) FROM public.reflection_likes WHERE user_id = auth.uid()
+  ) + (SELECT count(*) FROM public.reflection_comment_likes WHERE user_id = auth.uid()), 2::BIGINT);
+END $$;
+RESET ROLE;
+
+-- Strangers, signed out or in, read none of it: not the rows, the ids, the words, or the counts.
+-- The probe of the review: B (8000-b) is a minor whose reflection used to stay readable.
+SELECT hz_test.login(NULL);
+SET ROLE anon;
+DO $$
+DECLARE
+  visible TEXT := hz_test.public_activity();
+BEGIN
+  PERFORM hz_test.eq('anon reads no id of a minor', position('00000000-0000-4000-8008-000000000001' IN visible)
+    + position('00000000-0000-4000-8000-00000000000b' IN visible), 0);
+  PERFORM hz_test.eq('anon reads no words of a minor', visible ~ 'minority|as a minor|by a minor', false);
+  PERFORM hz_test.eq('anon still reads adult activity', position('An adult comment' IN visible) > 0, true);
+  PERFORM hz_test.eq('anon reads counts without the minor', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
+  PERFORM hz_test.eq('anon reads as many likes and comments as the counts say', (
+    SELECT count(*) FROM public.reflection_likes WHERE reflection_id = (SELECT value FROM hz_test.state WHERE key = 'adult_reflection')::UUID
+  ) || '/' || (
+    SELECT count(*) FROM public.reflection_comments WHERE reflection_id = (SELECT value FROM hz_test.state WHERE key = 'adult_reflection')::UUID
+  ), '1/1');
+END $$;
+RESET ROLE;
+
+SELECT hz_test.login('00000000-0000-4000-8008-000000000002');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  visible TEXT := hz_test.public_activity();
+  minor_reflection UUID := (SELECT value FROM hz_test.state WHERE key = 'minor_reflection')::UUID;
+BEGIN
+  PERFORM hz_test.eq('a signed-in stranger reads no id of a minor', position('00000000-0000-4000-8008-000000000001' IN visible)
+    + position('00000000-0000-4000-8000-00000000000b' IN visible), 0);
+  PERFORM hz_test.eq('a signed-in stranger reads no words of a minor', visible ~ 'minority|as a minor|by a minor', false);
+  PERFORM hz_test.eq('a signed-in stranger reads counts without the minor', hz_test.adult_counts(),
+    '1 likes, 1 comments, comment liked 0');
+  PERFORM hz_test.expect_error(format($q$INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (%L, %L)$q$,
+    auth.uid(), minor_reflection), 'row-level security');
+  PERFORM hz_test.expect_error(format($q$INSERT INTO public.reflection_comments (user_id, reflection_id, content)
+    VALUES (%L, %L, 'Hello there')$q$, auth.uid(), minor_reflection), 'row-level security');
+END $$;
+RESET ROLE;
+
+-- Withdrawing minority counts the activity again and stating it again leaves it out; removing a
+-- like that was never counted, or the whole account, changes no count.
+SELECT hz_test.login('00000000-0000-4000-8008-000000000001');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM hz_test.eq('withdrawing minority counts the activity again', hz_test.adult_counts(),
+    '2 likes, 3 comments, comment liked 1');
+  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM hz_test.eq('stating it again leaves it out again', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
+  DELETE FROM public.reflection_likes WHERE user_id = auth.uid();
+  PERFORM hz_test.eq('removing a minor''s like changes no count', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
+END $$;
+RESET ROLE;
+DELETE FROM public.profiles WHERE id = '00000000-0000-4000-8008-000000000001';
+DO $$
+BEGIN
+  PERFORM hz_test.eq('deleting a minor''s account changes no count', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
+END $$;
+SELECT hz_test.login('00000000-0000-4000-8008-000000000002');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  DELETE FROM public.reflection_likes WHERE user_id = auth.uid();
+  PERFORM hz_test.eq('an adult''s unlike still counts down', hz_test.adult_counts(), '0 likes, 1 comments, comment liked 0');
 END $$;
 RESET ROLE;
 

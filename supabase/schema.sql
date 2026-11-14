@@ -300,11 +300,8 @@ ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON reflection_comment_likes TO anon, authenticated;
 GRANT INSERT, DELETE ON reflection_comment_likes TO authenticated;
 
--- ─── Reflections: publicly readable (active only), writable by author
-CREATE POLICY "Active reflections are publicly readable"
-  ON reflections FOR SELECT
-  USING (status = 'active');
-
+-- ─── Reflections: readable (active only) unless the author is a minor, writable by author. The read
+-- policies of the reflection tables need profile privacy, so they are created with it below.
 CREATE POLICY "Users can insert own reflections"
   ON reflections FOR INSERT
   WITH CHECK (auth.uid() = user_id);
@@ -320,10 +317,6 @@ CREATE POLICY "Users can delete own reflections"
 
 -- ─── Reflection Likes: visible with their reflection, auth required to write
 -- Child policies look up the parent under its own RLS, so discussion follows reflection visibility.
-CREATE POLICY "Likes follow reflection visibility"
-  ON reflection_likes FOR SELECT
-  USING (EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id));
-
 -- Likes are only added or removed, never updated: owner-rights counters fire on insert and delete.
 CREATE POLICY "Users can insert own likes"
   ON reflection_likes FOR INSERT
@@ -337,10 +330,6 @@ CREATE POLICY "Users can delete own likes"
   USING (auth.uid() = user_id);
 
 -- ─── Reflection Comments: visible with their reflection, auth required to write
-CREATE POLICY "Comments follow reflection visibility"
-  ON reflection_comments FOR SELECT
-  USING (EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id));
-
 CREATE POLICY "Users can insert own comments"
   ON reflection_comments FOR INSERT
   WITH CHECK (
@@ -353,10 +342,6 @@ CREATE POLICY "Users can delete own comments"
   USING (auth.uid() = user_id);
 
 -- ─── Reflection Comment Likes: visible with their comment, auth required to write
-CREATE POLICY "Comment likes follow reflection visibility"
-  ON reflection_comment_likes FOR SELECT
-  USING (EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id));
-
 CREATE POLICY "Users can insert own comment likes"
   ON reflection_comment_likes FOR INSERT
   WITH CHECK (
@@ -547,12 +532,8 @@ SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
-CREATE POLICY "Avatar images are publicly readable"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'avatars');
-
--- Uploads and replacements are allowed with profile privacy below, since a minor may not upload
--- (ETH-07).
+-- Reads, uploads and replacements are allowed with profile privacy below, since a minor's files are
+-- listed only to them and a minor may not upload (ETH-07).
 
 CREATE POLICY "Users can delete own avatar images"
   ON storage.objects FOR DELETE
@@ -563,21 +544,34 @@ CREATE POLICY "Users can delete own avatar images"
   );
 
 -- ─── Trigger: auto-update likes_count on reflections ────────
+-- Counts leave out a minor's likes and comments (ETH-07). The private recount helpers are defined
+-- with profile privacy below. When the parent itself is being deleted, its likes and comments go with
+-- it and there is nothing left to count, so they return before taking any lock.
 CREATE OR REPLACE FUNCTION public.update_reflection_likes_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  target UUID;
+  author UUID;
 BEGIN
   IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_likes' THEN
     RAISE EXCEPTION 'update_reflection_likes_count only maintains public.reflection_likes';
   END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE public.reflections SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = NEW.reflection_id;
-  ELSIF TG_OP = 'DELETE' THEN
-    UPDATE public.reflections SET likes_count = GREATEST(COALESCE(likes_count, 0) - 1, 0) WHERE id = OLD.reflection_id;
+    target := NEW.reflection_id;
+    author := NEW.user_id;
+  ELSE
+    target := OLD.reflection_id;
+    author := OLD.user_id;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = target) THEN
+    RETURN NULL;
+  END IF;
+  PERFORM private.lock_activity_author(author);
+  PERFORM private.recount_reflection(target);
   RETURN NULL;
 END;
 $$;
@@ -594,15 +588,25 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  target UUID;
+  author UUID;
 BEGIN
   IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comments' THEN
     RAISE EXCEPTION 'update_reflection_comments_count only maintains public.reflection_comments';
   END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE public.reflections SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = NEW.reflection_id;
-  ELSIF TG_OP = 'DELETE' THEN
-    UPDATE public.reflections SET comments_count = GREATEST(COALESCE(comments_count, 0) - 1, 0) WHERE id = OLD.reflection_id;
+    target := NEW.reflection_id;
+    author := NEW.user_id;
+  ELSE
+    target := OLD.reflection_id;
+    author := OLD.user_id;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = target) THEN
+    RETURN NULL;
+  END IF;
+  PERFORM private.lock_activity_author(author);
+  PERFORM private.recount_reflection(target);
   RETURN NULL;
 END;
 $$;
@@ -619,15 +623,25 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  target UUID;
+  author UUID;
 BEGIN
   IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comment_likes' THEN
     RAISE EXCEPTION 'update_reflection_comment_likes_count only maintains public.reflection_comment_likes';
   END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE public.reflection_comments SET likes_count = likes_count + 1 WHERE id = NEW.comment_id;
-  ELSIF TG_OP = 'DELETE' THEN
-    UPDATE public.reflection_comments SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = OLD.comment_id;
+    target := NEW.comment_id;
+    author := NEW.user_id;
+  ELSE
+    target := OLD.comment_id;
+    author := OLD.user_id;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.reflection_comments WHERE id = target) THEN
+    RETURN NULL;
+  END IF;
+  PERFORM private.lock_activity_author(author);
+  PERFORM private.recount_comment(target);
   RETURN NULL;
 END;
 $$;
@@ -1296,6 +1310,41 @@ CREATE POLICY "Profiles are readable unless the owner is a minor"
   USING (rls.profile_identity_visible(id));
 DROP FUNCTION IF EXISTS public.profile_identity_visible(UUID);
 
+-- ETH-07: the same rule for public activity. A reflection, comment or like carries its author's id,
+-- so a hidden profiles row alone would still show a minor's id and words here. A minor may still
+-- write them: their rows are readable only by them, so the app keeps working for the minor and
+-- strangers never see the rows, and the public counts leave them out (private.recount_reflection).
+-- A comment or like also follows its parent, so one on a minor's reflection or comment is hidden
+-- with it, and a stranger cannot react to what they cannot read.
+DROP POLICY IF EXISTS "Active reflections are readable unless the author is a minor" ON public.reflections;
+CREATE POLICY "Active reflections are readable unless the author is a minor"
+  ON public.reflections FOR SELECT
+  USING (status = 'active' AND rls.profile_identity_visible(user_id));
+
+DROP POLICY IF EXISTS "Likes follow their reflection unless the liker is a minor" ON public.reflection_likes;
+CREATE POLICY "Likes follow their reflection unless the liker is a minor"
+  ON public.reflection_likes FOR SELECT
+  USING (
+    rls.profile_identity_visible(user_id)
+    AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
+  );
+
+DROP POLICY IF EXISTS "Comments follow their reflection unless the author is a minor" ON public.reflection_comments;
+CREATE POLICY "Comments follow their reflection unless the author is a minor"
+  ON public.reflection_comments FOR SELECT
+  USING (
+    rls.profile_identity_visible(user_id)
+    AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
+  );
+
+DROP POLICY IF EXISTS "Comment likes follow their comment unless the liker is a minor" ON public.reflection_comment_likes;
+CREATE POLICY "Comment likes follow their comment unless the liker is a minor"
+  ON public.reflection_comment_likes FOR SELECT
+  USING (
+    rls.profile_identity_visible(user_id)
+    AND EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id)
+  );
+
 -- ETH-07: a minor's photo never goes public. The avatars bucket is public, so a stated minor may not
 -- upload or replace an avatar there (deleting stays allowed). Stating it clears the profile's photo
 -- in the same transaction. The app deletes the stored files before it records minority, once more
@@ -1336,6 +1385,30 @@ CREATE POLICY "Users can update own avatar images"
     AND NOT rls.caller_is_minor()
   );
 
+-- Each photo sits in a folder named after its owner's id (lib/profile/avatar.ts), and PostgREST and
+-- the storage list endpoint read storage.objects under this policy. A minor's files that the app has
+-- not deleted yet are therefore listed only to the minor, who still needs to list them to delete
+-- them. Names outside an id folder stay listed as before.
+CREATE OR REPLACE FUNCTION rls.avatar_object_visible(object_name TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SET search_path = ''
+AS $$
+  SELECT CASE
+    WHEN split_part(object_name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      THEN rls.profile_identity_visible(split_part(object_name, '/', 1)::UUID)
+    ELSE true
+  END;
+$$;
+REVOKE ALL ON FUNCTION rls.avatar_object_visible(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION rls.avatar_object_visible(TEXT) TO anon, authenticated;
+
+DROP POLICY IF EXISTS "Avatar images are publicly readable" ON storage.objects;
+CREATE POLICY "Avatar images are publicly readable"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars' AND rls.avatar_object_visible(name));
+
 -- Whether a person stated they are a minor, for definer functions that return someone else's details.
 CREATE OR REPLACE FUNCTION private.is_minor(member UUID)
 RETURNS BOOLEAN
@@ -1346,13 +1419,16 @@ AS $$
   SELECT EXISTS (SELECT 1 FROM public.profile_privacy AS pp WHERE pp.user_id = member AND pp.is_minor);
 $$;
 
--- Every write that records minority (set_profile_privacy, join_board) calls this before it writes
--- and holds both locks until it commits:
+-- Every write that can change is_minor (set_profile_privacy, join_board) calls this before it writes,
+-- whichever way it changes, and holds both locks until it commits:
 -- - The profiles row. A photo update in progress holds it, so the minority write waits for that
 --   update to commit and then clears its photo. A photo update that comes later waits on the row,
 --   and profiles_minor_photo then reads the committed minority. FOR NO KEY UPDATE conflicts with that
 --   update but not with the key-share locks that foreign keys take, so an encouragement, membership
---   or sync insert that references this profile does not wait on it.
+--   or sync insert that references this profile does not wait on it. A like or comment by this user
+--   takes the row FOR SHARE (private.lock_activity_author), so it either commits first and is
+--   recounted here (private.recount_minor_activity), or waits and is counted by the committed value.
+--   Account deletion locks the row too, so a board join waits for it rather than deadlocking with it.
 -- - The user's halaqa lock, which join_matched_halaqa takes before it checks minority. A matched join
 --   either commits first, and private.apply_minor_privacy then leaves that halaqa, or reads the
 --   committed minority and is refused.
@@ -1416,6 +1492,96 @@ $$;
 DROP TRIGGER IF EXISTS profiles_minor_photo ON public.profiles;
 CREATE TRIGGER profiles_minor_photo BEFORE INSERT OR UPDATE OF avatar_url ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION private.profiles_minor_photo();
+
+-- ETH-07: like and comment counts are public, so they count only likes and comments that others can
+-- read, never a minor's. Each change recounts instead of adding or subtracting one: recording or
+-- withdrawing minority then recounts what the person touched, and deleting an account, whose
+-- privacy row may already be gone when its likes are removed, cannot subtract a like that was never
+-- counted. The row lock comes first, in its own statement, so the count reads every like and comment
+-- committed before it, and a later change waits for this one. The counter triggers that call these
+-- are defined with the reflection tables above.
+CREATE OR REPLACE FUNCTION private.recount_reflection(target UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.reflections WHERE id = target FOR NO KEY UPDATE;
+  UPDATE public.reflections SET
+    likes_count = (
+      SELECT count(*) FROM public.reflection_likes AS l
+      WHERE l.reflection_id = target AND NOT private.is_minor(l.user_id)
+    ),
+    comments_count = (
+      SELECT count(*) FROM public.reflection_comments AS c
+      WHERE c.reflection_id = target AND NOT private.is_minor(c.user_id)
+    )
+  WHERE id = target;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION private.recount_comment(target UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.reflection_comments WHERE id = target FOR NO KEY UPDATE;
+  UPDATE public.reflection_comments SET likes_count = (
+    SELECT count(*) FROM public.reflection_comment_likes AS cl
+    WHERE cl.comment_id = target AND NOT private.is_minor(cl.user_id)
+  )
+  WHERE id = target;
+END;
+$$;
+
+-- A like or comment trigger takes its author's profiles row FOR SHARE before the parent row it
+-- recounts. Recording or withdrawing minority holds that row FOR NO KEY UPDATE
+-- (private.lock_minor_change), so the two serialize and a count never keeps a minor's like.
+CREATE OR REPLACE FUNCTION private.lock_activity_author(author UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.profiles WHERE id = author FOR SHARE;
+END;
+$$;
+
+-- Recording minority, or withdrawing it, changes which of the person's likes and comments the
+-- public counts include, so every count they touched is recounted, in id order. The callers hold
+-- private.lock_minor_change, so none of the person's own likes or comments is in flight.
+CREATE OR REPLACE FUNCTION private.recount_minor_activity()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  target UUID;
+BEGIN
+  IF NEW.is_minor = COALESCE(CASE WHEN TG_OP = 'UPDATE' THEN OLD.is_minor END, false) THEN
+    RETURN NULL;
+  END IF;
+  FOR target IN
+    SELECT l.reflection_id FROM public.reflection_likes AS l WHERE l.user_id = NEW.user_id
+    UNION
+    SELECT c.reflection_id FROM public.reflection_comments AS c WHERE c.user_id = NEW.user_id
+    ORDER BY 1
+  LOOP
+    PERFORM private.recount_reflection(target);
+  END LOOP;
+  FOR target IN
+    SELECT cl.comment_id FROM public.reflection_comment_likes AS cl WHERE cl.user_id = NEW.user_id ORDER BY 1
+  LOOP
+    PERFORM private.recount_comment(target);
+  END LOOP;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profile_privacy_activity_counts ON public.profile_privacy;
+CREATE TRIGGER profile_privacy_activity_counts AFTER INSERT OR UPDATE OF is_minor ON public.profile_privacy
+  FOR EACH ROW EXECUTE FUNCTION private.recount_minor_activity();
 
 -- ─── Halaqa (5.7.1) ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.halaqa_groups (
@@ -1890,10 +2056,9 @@ BEGIN
   IF p_show_streak IS NULL OR p_show_juz_completions IS NULL OR p_is_minor IS NULL THEN
     RAISE EXCEPTION 'invalid_privacy';
   END IF;
-  -- Recording minority clears the photo and leaves matched halaqas (private.apply_minor_privacy).
-  IF p_is_minor THEN
-    PERFORM private.lock_minor_change(uid);
-  END IF;
+  -- Recording minority clears the photo and leaves matched halaqas (private.apply_minor_privacy), and
+  -- recording or withdrawing it recounts the person's likes and comments.
+  PERFORM private.lock_minor_change(uid);
   SELECT * INTO current_row FROM public.profile_privacy WHERE user_id = uid;
   IF p_is_minor AND COALESCE(current_row.board_joined, false) AND current_row.board_nickname IS NULL THEN
     RAISE EXCEPTION 'nickname_required';
@@ -2450,6 +2615,11 @@ DECLARE
   clean_body TEXT := NULLIF(btrim(COALESCE(p_body, '')), '');
   new_id UUID;
 BEGIN
+  -- The sender's and recipient's profiles rows first, in key-share mode, before any halaqa row:
+  -- deleting either account locks its profile and then cascades to the group (as creator) and the
+  -- memberships, so a send that held those rows and only key-shared the profiles at its insert
+  -- would deadlock with it.
+  PERFORM 1 FROM public.profiles WHERE id IN (uid, p_to_user) ORDER BY id FOR KEY SHARE;
   -- The group row, then the sender's membership row: the order leave_halaqa and the joins use, so a
   -- send and a leave cannot deadlock. Membership is checked under both locks, so a sender who is
   -- leaving cannot send, and concurrent sends by one sender see each other.
@@ -2714,26 +2884,36 @@ $$;
 -- board read places them anyway. Rows another transaction holds (that user reading, joining or
 -- leaving the board, or syncing a wird day) are skipped and left for a later pass.
 -- idx_profile_privacy_board_pending serves the scan in this order, so a pass reads at most 100
--- candidates.
+-- candidates. Each candidate's profiles row is key-shared before their privacy row, as get_board
+-- does, and skipped while an account deletion holds it.
 CREATE OR REPLACE FUNCTION private.board_enroll_pending(board_week DATE)
 RETURNS INTEGER
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 DECLARE
+  pending UUID;
   candidate public.profile_privacy;
   active BOOLEAN;
   placed INTEGER := 0;
 BEGIN
-  FOR candidate IN
-    SELECT * FROM public.profile_privacy AS pp
+  FOR pending IN
+    SELECT pp.user_id FROM public.profile_privacy AS pp
     WHERE pp.board_joined
       AND pp.board_week_start = extract(dow FROM board_week)::INTEGER
       AND pp.board_enrolled_week < board_week
     ORDER BY pp.board_enrolled_week, pp.user_id
     LIMIT 100
-    FOR UPDATE SKIP LOCKED
   LOOP
+    PERFORM 1 FROM public.profiles WHERE id = pending FOR KEY SHARE SKIP LOCKED;
+    CONTINUE WHEN NOT FOUND;
+    SELECT * INTO candidate FROM public.profile_privacy AS pp
+    WHERE pp.user_id = pending
+      AND pp.board_joined
+      AND pp.board_week_start = extract(dow FROM board_week)::INTEGER
+      AND pp.board_enrolled_week < board_week
+    FOR UPDATE SKIP LOCKED;
+    CONTINUE WHEN NOT FOUND;
     active := EXISTS (
       SELECT 1 FROM public.habit_days AS h
       WHERE h.user_id = candidate.user_id
@@ -2757,6 +2937,10 @@ $$;
 -- deferred to commit and first locks the user's privacy row, so a pass considering them at the same
 -- time either finishes first (and is undone here) or skips the locked row and sees this day later.
 -- Runs as owner because the client writes habit_days and has no access to profile_privacy.
+-- It takes no profiles lock first, unlike the board paths: the sync that fires it already holds its
+-- habit_days rows, and an account deletion waits on those rows, so waiting here for that deletion's
+-- profile lock would deadlock. The deletion's cascade reaches habit_days before profile_privacy, so
+-- it waits on the sync's rows before it can hold the privacy row this locks.
 CREATE OR REPLACE FUNCTION private.requeue_board_after_wird_day()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -2840,7 +3024,9 @@ $$;
 -- Called when the Board tab opens. The client sends its bands and offset (8.13), its local date and
 -- its week start (STR-28); the server picks the cohort and computes every score. The caller's
 -- profile_privacy row lock is the one leave_board and join_board take, so the consent read here
--- holds until this placement commits.
+-- holds until this placement commits. The caller's profiles row is key-shared before it: deleting
+-- the account locks that row and then cascades to profile_privacy, so a placement that held the
+-- privacy row and only key-shared the profile at its board_members insert would deadlock with it.
 CREATE OR REPLACE FUNCTION public.get_board(
   p_level_band TEXT,
   p_pace_band TEXT,
@@ -2863,6 +3049,7 @@ BEGIN
   PERFORM private.check_bands(p_level_band, p_pace_band, p_utc_offset_minutes);
   PERFORM private.check_week_start(p_week_start);
   board_week := private.board_week(today, p_week_start);
+  PERFORM 1 FROM public.profiles WHERE id = uid FOR KEY SHARE;
   SELECT * INTO privacy FROM public.profile_privacy WHERE user_id = uid FOR UPDATE;
   IF NOT COALESCE(privacy.board_joined, false) THEN
     RETURN jsonb_build_object('status', 'not_joined', 'week_start', to_char(board_week, 'YYYY-MM-DD'));
@@ -2948,10 +3135,9 @@ BEGIN
   IF minor AND clean_nickname IS NULL THEN
     RAISE EXCEPTION 'nickname_required';
   END IF;
-  -- As in set_profile_privacy, recording minority clears the photo and leaves matched halaqas.
-  IF minor THEN
-    PERFORM private.lock_minor_change(uid);
-  END IF;
+  -- As in set_profile_privacy, since this write sets is_minor either way. The profiles row lock also
+  -- comes before the profile_privacy row that this upsert and the placement in get_board hold.
+  PERFORM private.lock_minor_change(uid);
   INSERT INTO public.profile_privacy (user_id, board_joined, board_nickname, is_minor, board_week_start,
     board_level_band, board_pace_band, board_utc_offset_minutes, board_enrolled_week, updated_at)
   VALUES (uid, true, clean_nickname, minor, p_week_start, p_level_band, p_pace_band, p_utc_offset_minutes,
@@ -2974,6 +3160,8 @@ $$;
 -- One tap: off the board and out of every cohort. The first update takes the caller's
 -- profile_privacy row lock, which a board read holds while it places, so a read in flight either
 -- commits its placement first, which the second update then closes, or reads board_joined = false.
+-- The profiles row is key-shared first, as in get_board, since this holds the privacy row while it
+-- closes board_members rows, both of which an account deletion removes after the profile.
 CREATE OR REPLACE FUNCTION public.leave_board()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -2983,6 +3171,7 @@ AS $$
 DECLARE
   uid UUID := private.require_user();
 BEGIN
+  PERFORM 1 FROM public.profiles WHERE id = uid FOR KEY SHARE;
   UPDATE public.profile_privacy SET board_joined = false, updated_at = now() WHERE user_id = uid;
   UPDATE public.board_members SET left_at = now() WHERE user_id = uid AND left_at IS NULL;
 END;
@@ -2997,6 +3186,10 @@ REVOKE ALL ON FUNCTION
   private.is_minor(UUID),
   private.lock_minor_change(UUID),
   private.apply_minor_privacy(),
+  private.recount_reflection(UUID),
+  private.recount_comment(UUID),
+  private.lock_activity_author(UUID),
+  private.recount_minor_activity(),
   private.require_user(),
   private.checked_local_date(TEXT),
   private.local_today(TEXT),

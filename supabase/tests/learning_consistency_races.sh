@@ -35,6 +35,20 @@ session() {
   } &
 }
 
+# Runs SQL as supabase_admin in its own background session, as an account deletion through GoTrue
+# would. Same output file convention as session.
+admin_session() {
+  local name="$1" sql="$2"
+  {
+    if printf '%s\n' "$sql" | docker exec -i -e PGAPPNAME="race_$name" "$C" psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -qtA \
+      >"$WORK/$name" 2>&1; then
+      echo ok >>"$WORK/$name"
+    else
+      echo failed >>"$WORK/$name"
+    fi
+  } &
+}
+
 # Blocks until `n` race sessions wait on a lock, for at most 10 seconds.
 wait_for_waiters() {
   admin -c "DO \$\$ BEGIN
@@ -92,9 +106,9 @@ uid() { printf '00000000-0000-4000-8009-%012d' "$1"; }
 
 admin >/dev/null <<SQL
 INSERT INTO auth.users (id, email) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race' || i || '@example.invalid'
-FROM generate_series(1, 9) AS i;
+FROM generate_series(1, 19) AS i;
 INSERT INTO public.profiles (id, username) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race_user_' || i
-FROM generate_series(1, 9) AS i;
+FROM generate_series(1, 19) AS i;
 SQL
 
 TODAY="$(admin -c "SELECT to_char((now() AT TIME ZONE 'UTC')::DATE, 'YYYY-MM-DD')")"
@@ -283,5 +297,163 @@ check "minority write finished" "$(tail -1 "$WORK/mf_minor")" ok
 check "the join is refused" "$(grep -c minor_not_allowed "$WORK/mf_join" || true)" 1
 check "no matched membership" \
   "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE user_id = '$(uid 9)' AND kind = 'matched' AND left_at IS NULL")" 0
+
+# Counts the race outputs that report a deadlock.
+deadlocks() { cat "$WORK"/* | grep -c 'deadlock detected' || true; }
+
+# ─── Fourth review, finding 2: a like in flight cannot keep a minor in the public count ─────────
+# User 18 likes user 19's reflection in a transaction that stays open until user 18's minority write
+# is blocked. The like trigger holds user 18's profiles row FOR SHARE, so recording minority waits
+# for the like to commit and then recounts it out. Without that lock the minority write would commit
+# first without seeing the like, and the like would then commit counted.
+rm -f "$WORK"/*
+admin -c "INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
+  VALUES ('$(uid 19)', 2, 1, 1, 1, 1, 'A race reflection by an adult')" >/dev/null
+REFLECTION="$(admin -c "SELECT id FROM public.reflections WHERE user_id = '$(uid 19)'")"
+session like_hold "$(uid 18)" "BEGIN;
+INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES ('$(uid 18)', '$REFLECTION');
+RESET ROLE;
+DO \$\$ BEGIN
+  FOR i IN 1 .. 200 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    EXIT WHEN (SELECT count(*) FROM pg_stat_activity WHERE application_name = 'race_like_minor' AND wait_event_type = 'Lock') >= 1;
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+END \$\$;
+COMMIT;"
+wait_for_hold like_hold
+session like_minor "$(uid 18)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+wait
+check "like finished" "$(tail -1 "$WORK/like_hold")" ok
+check "minority write finished" "$(tail -1 "$WORK/like_minor")" ok
+check "the like is stored" "$(admin -c "SELECT count(*) FROM public.reflection_likes WHERE user_id = '$(uid 18)'")" 1
+check "the minor's like is not counted" "$(admin -c "SELECT likes_count FROM public.reflections WHERE id = '$REFLECTION'")" 0
+
+# ─── Fourth review, finding 8: deleting an account while its own board read places it ──────────
+# User 10 is on the board but not yet placed this week. The controller holds the week's placement
+# lock, so the board read waits on it while holding user 10's profile_privacy row, and the deletion
+# starts then. The read key-shared the profiles row before the privacy row, so the deletion waits on
+# the profile until the read commits. A read that held only the privacy row would wait on the
+# profiles row for its board_members foreign key while the deletion, having deleted the profile,
+# waits on the privacy row it cascades to: a deadlock.
+rm -f "$WORK"/*
+WEEK3="$(admin -c "SELECT private.board_week((now() AT TIME ZONE 'UTC')::DATE, 3)")"
+admin -c "INSERT INTO public.profile_privacy (user_id, board_joined, board_week_start, board_level_band, board_pace_band,
+  board_utc_offset_minutes, board_enrolled_week) VALUES ('$(uid 10)', true, 3, 'hafiz', 'page_plus', 0, DATE '$WEEK3' - 7)" >/dev/null
+controller del_read "SELECT pg_advisory_xact_lock(hashtextextended('hafiz:board:' || DATE '$WEEK3'::TEXT, 0));" 2
+wait_for_controller del_read
+session dr_read "$(uid 10)" "SELECT public.get_board('hafiz', 'page_plus', 0, '$TODAY', 3)->>'status';"
+wait_for_waiters 1
+admin_session dr_delete "DELETE FROM auth.users WHERE id = '$(uid 10)';"
+wait
+check "no deadlock between a board read and account deletion" "$(deadlocks)" 0
+check "board read finished" "$(tail -1 "$WORK/dr_read")" ok
+check "deletion finished" "$(tail -1 "$WORK/dr_delete")" ok
+check "the account is gone with its placement" \
+  "$(admin -c "SELECT count(*) FROM public.profiles WHERE id = '$(uid 10)'")/$(admin -c "SELECT count(*) FROM public.board_members WHERE user_id = '$(uid 10)'")" 0/0
+
+# ─── Fourth review, finding 8: deleting an account while it joins the board ────────────────────
+# User 13 left the board earlier, so joining updates their existing profile_privacy row and then
+# places them. The controller holds one of user 13's user_settings rows, which the deletion reaches
+# after deleting the profile and before profile_privacy, so the deletion waits there holding the
+# profile while the join starts. The join locks the profiles row before the privacy row, so it waits
+# for the deletion and then finds the account gone. A join that updated the privacy row first and
+# reached the profile only at placement would hold the row the deletion cascades to next.
+rm -f "$WORK"/*
+admin -c "INSERT INTO public.profile_privacy (user_id) VALUES ('$(uid 13)');
+  INSERT INTO public.user_settings (user_id, key, value) VALUES ('$(uid 13)', 'race', '1');" >/dev/null
+controller del_join "SELECT 1 FROM public.user_settings WHERE user_id = '$(uid 13)' FOR UPDATE;" 2
+wait_for_controller del_join
+admin_session dj_delete "DELETE FROM auth.users WHERE id = '$(uid 13)';"
+wait_for_waiters 1
+session dj_join "$(uid 13)" "SELECT public.join_board(NULL, false, 'hafiz', 'page_plus', 0, '$TODAY', 3)->>'status';"
+wait
+check "no deadlock between joining the board and account deletion" "$(deadlocks)" 0
+check "deletion finished" "$(tail -1 "$WORK/dj_delete")" ok
+check "the join finished or found the account gone" \
+  "$(if [ "$(tail -1 "$WORK/dj_join")" = ok ] || grep -q 'violates foreign key constraint' "$WORK/dj_join"; then echo yes; else echo no; fi)" yes
+check "the account is gone with its board rows" \
+  "$(admin -c "SELECT count(*) FROM public.profile_privacy WHERE user_id = '$(uid 13)'")/$(admin -c "SELECT count(*) FROM public.board_members WHERE user_id = '$(uid 13)'")" 0/0
+
+# ─── Fourth review, finding 8: deleting an account while another reader's pass places it ───────
+# User 11 is already placed this week, so their board read goes straight to the weekly pass, which
+# places user 12 from their stored bands. The controller holds the week's placement lock, so the pass
+# waits on it while holding user 12's profile_privacy row, and user 12's deletion starts then. The
+# pass key-shared user 12's profiles row before the privacy row, so the deletion waits until the pass
+# commits. A pass that held only the privacy row would deadlock as the board read above would.
+rm -f "$WORK"/*
+admin >/dev/null <<SQL
+WITH cohort AS (
+  INSERT INTO public.board_cohorts (week_start, level_band, pace_band, utc_offset_band)
+  VALUES (DATE '$WEEK3', 'hafiz', 'page_plus', 0) RETURNING id
+)
+INSERT INTO public.board_members (cohort_id, user_id, week_start) SELECT id, '$(uid 11)', DATE '$WEEK3' FROM cohort;
+INSERT INTO public.habit_days (user_id, local_date, earned_status, minimum_met, tz, created_at, updated_at)
+VALUES ('$(uid 12)', '$TODAY', 'done', true, 'UTC', now(), now());
+INSERT INTO public.profile_privacy (user_id, board_joined, board_week_start, board_level_band, board_pace_band,
+  board_utc_offset_minutes, board_enrolled_week) VALUES
+  ('$(uid 11)', true, 3, 'hafiz', 'page_plus', 0, DATE '$WEEK3'),
+  ('$(uid 12)', true, 3, 'hafiz', 'page_plus', 0, DATE '$WEEK3' - 7);
+SQL
+controller del_pass "SELECT pg_advisory_xact_lock(hashtextextended('hafiz:board:' || DATE '$WEEK3'::TEXT, 0));" 2
+wait_for_controller del_pass
+session dp_read "$(uid 11)" "SELECT public.get_board('hafiz', 'page_plus', 0, '$TODAY', 3)->>'status';"
+wait_for_waiters 1
+admin_session dp_delete "DELETE FROM auth.users WHERE id = '$(uid 12)';"
+wait
+check "no deadlock between the weekly pass and account deletion" "$(deadlocks)" 0
+check "board read finished" "$(tail -1 "$WORK/dp_read")" ok
+check "deletion finished" "$(tail -1 "$WORK/dp_delete")" ok
+check "the deleted account left no placement" "$(admin -c "SELECT count(*) FROM public.board_members WHERE user_id = '$(uid 12)'")" 0
+check "the reader is still placed" \
+  "$(admin -c "SELECT count(*) FROM public.board_members WHERE user_id = '$(uid 11)' AND left_at IS NULL")" 1
+
+# ─── Fourth review, finding 8: deleting an account while it sends encouragement ────────────────
+# User 15 sends to user 14, who created the group. The controller holds halaqa_encouragements in
+# SHARE mode, so the send waits at its insert while holding the group row and its own membership row,
+# and user 15's deletion starts then. The send key-shared both profiles first, so the deletion waits
+# on user 15's profile until the send commits. A send that reached the profile only through its
+# insert's foreign key would wait on the deleted profile while the deletion waits on the membership
+# row it cascades to.
+rm -f "$WORK"/*
+DCODE="$(as_user "$(uid 14)" "SELECT public.create_invite_halaqa('Deletion race')->>'invite_code';" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
+DGROUP="$(admin -c "SELECT id FROM public.halaqa_groups WHERE invite_code = '$DCODE'")"
+as_user "$(uid 15)" "SELECT public.join_halaqa_by_code('$DCODE');" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
+controller del_send "LOCK TABLE public.halaqa_encouragements IN SHARE MODE;" 2
+wait_for_controller del_send
+session ds_send "$(uid 15)" "SELECT public.send_halaqa_encouragement('$DGROUP', '$(uid 14)', 'ease', NULL, '$TODAY');"
+wait_for_waiters 1
+admin_session ds_delete "DELETE FROM auth.users WHERE id = '$(uid 15)';"
+wait
+check "no deadlock between a send and the sender's deletion" "$(deadlocks)" 0
+check "send finished" "$(tail -1 "$WORK/ds_send")" ok
+check "deletion finished" "$(tail -1 "$WORK/ds_delete")" ok
+check "the sender's membership and encouragement went with the account" \
+  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE user_id = '$(uid 15)'")/$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE from_user = '$(uid 15)'")" 0/0
+
+# The recipient's side: user 17 sends to user 16, who created the group, while user 16's deletion
+# clears the group's creator. Without the key-share lock on the recipient's profile, the deletion
+# would wait on the group row the send holds while the send's insert waits on the deleted profile.
+rm -f "$WORK"/*
+RCODE="$(as_user "$(uid 16)" "SELECT public.create_invite_halaqa('Recipient race')->>'invite_code';" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
+RGROUP="$(admin -c "SELECT id FROM public.halaqa_groups WHERE invite_code = '$RCODE'")"
+as_user "$(uid 17)" "SELECT public.join_halaqa_by_code('$RCODE');" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
+controller del_recipient "LOCK TABLE public.halaqa_encouragements IN SHARE MODE;" 2
+wait_for_controller del_recipient
+session dr_send "$(uid 17)" "SELECT public.send_halaqa_encouragement('$RGROUP', '$(uid 16)', 'ease', NULL, '$TODAY');"
+wait_for_waiters 1
+admin_session dr_delete "DELETE FROM auth.users WHERE id = '$(uid 16)';"
+wait
+check "no deadlock between a send and the recipient's deletion" "$(deadlocks)" 0
+check "send finished" "$(tail -1 "$WORK/dr_send")" ok
+check "deletion finished" "$(tail -1 "$WORK/dr_delete")" ok
+check "the group stays for the sender without a creator" \
+  "$(admin -c "SELECT (created_by IS NULL)::TEXT || '/' || (deleted_at IS NULL)::TEXT FROM public.halaqa_groups WHERE id = '$RGROUP'")" true/true
+check "the encouragement went with the recipient" \
+  "$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE to_user = '$(uid 16)'")" 0
 
 echo "learning_consistency_races.sh: all races passed"
