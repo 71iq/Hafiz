@@ -1,5 +1,10 @@
+import { reminderPlatform } from "@/lib/notifications/platform";
 import type { ReminderData } from "@/lib/notifications/platform-types";
-import { configureReminderPlatform, setReminderAccountSource } from "@/lib/notifications/schedule";
+import {
+  configureReminderPlatform,
+  setReminderAccountSource,
+  shouldPresentReminder,
+} from "@/lib/notifications/schedule";
 
 // Fourth review, finding 3: expo-notifications asks the app's handler whether a notification that
 // arrives while the app is open shows. Another account's encouragement, or one with no owner, must not.
@@ -20,6 +25,7 @@ jest.mock("expo-notifications", () => ({
 // The native adapter, whatever platform Jest resolves.
 jest.mock("@/lib/notifications/platform", () => jest.requireActual("@/lib/notifications/platform.native"));
 
+const LABELS = { channelName: "Reminders", remindLaterAction: "Remind me in 1 hour" };
 const ACCOUNT_A = "00000000-0000-4000-8000-00000000000a";
 const ACCOUNT_B = "00000000-0000-4000-8000-00000000000b";
 let signedInAccount: string | null = ACCOUNT_A;
@@ -47,7 +53,7 @@ async function arrives(data: unknown): Promise<boolean> {
 
 beforeAll(async () => {
   setReminderAccountSource(() => signedInAccount);
-  await configureReminderPlatform({ channelName: "Reminders", remindLaterAction: "Remind me in 1 hour" });
+  await configureReminderPlatform(LABELS);
 });
 
 beforeEach(() => {
@@ -72,8 +78,26 @@ describe("reminders that arrive while the app is open (5.8.2)", () => {
     expect(await arrives({ source: "hafiz-reminder", type: "group_encouragement" })).toBe(false);
   });
 
+  // Fifth review, finding N5: the OS lets go of an alarm the handler hides, so the next run took it for
+  // delivered. The handler reports what it hides, and the run records it as cancelled instead.
+  it("reports each reminder it hides, and none it shows", async () => {
+    const onHidden = jest.fn();
+    await reminderPlatform.configure({ ...LABELS, shouldPresent: shouldPresentReminder, onHidden });
+    try {
+      const foreign = reminder("group_encouragement", ACCOUNT_B);
+      expect(await arrives(foreign)).toBe(false);
+      expect(await arrives(reminder("group_encouragement", ACCOUNT_A))).toBe(true);
+      expect(await arrives(reminder("wird_reminder"))).toBe(true);
+      // Without a log id there is nothing to record.
+      expect(await arrives({ source: "hafiz-reminder", type: "group_encouragement" })).toBe(false);
+      expect(onHidden.mock.calls).toEqual([[foreign]]);
+    } finally {
+      await configureReminderPlatform(LABELS);
+    }
+  });
+
   it("installs one handler, which follows the latest configuration", async () => {
-    await configureReminderPlatform({ channelName: "Reminders", remindLaterAction: "Remind me in 1 hour" });
+    await configureReminderPlatform(LABELS);
     expect(mockHandlers).toHaveLength(1);
     expect(await arrives(reminder("group_encouragement", ACCOUNT_B))).toBe(false);
   });

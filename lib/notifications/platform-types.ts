@@ -52,10 +52,16 @@ export type ReminderPlatform = Readonly<{
   requestPermission: () => Promise<PermissionState>;
   /**
    * Channel, category and foreground handler. A reminder that arrives while the app is open shows
-   * only when `shouldPresent` allows it; the latest call's check applies. Safe to call repeatedly.
+   * only when `shouldPresent` allows it, and one it hides is passed to `onHidden`: it was never shown,
+   * though the OS no longer holds it. The latest call's callbacks apply. Safe to call repeatedly.
    */
   configure: (
-    options: Readonly<{ channelName: string; remindLaterAction: string; shouldPresent: (data: ReminderData) => boolean }>,
+    options: Readonly<{
+      channelName: string;
+      remindLaterAction: string;
+      shouldPresent: (data: ReminderData) => boolean;
+      onHidden: (data: ReminderData) => void;
+    }>,
   ) => Promise<void>;
   listScheduled: () => Promise<ScheduledReminder[]>;
   listPresented: () => Promise<PresentedReminder[]>;

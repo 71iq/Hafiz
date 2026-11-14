@@ -199,7 +199,10 @@ export async function deleteLogRows(db: DatabaseExecutor, ids: readonly string[]
   await db.runAsync(`DELETE FROM notification_log WHERE id IN (${placeholders(ids.length)})`, [...ids]);
 }
 
-/** Record reminders cancelled just before their time, so they never count as delivered. */
+/**
+ * Record reminders cancelled just before their time, or hidden as they arrived, so they never count
+ * as delivered.
+ */
 export async function markCancelled(db: DatabaseExecutor, ids: readonly string[], at: Date): Promise<void> {
   if (ids.length === 0) return;
   await db.runAsync(

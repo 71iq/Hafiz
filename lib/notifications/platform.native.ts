@@ -23,14 +23,20 @@ const REMIND_LATER_ACTION = "remind_later";
 
 let handlerInstalled = false;
 let shouldPresent: (data: ReminderData) => boolean = () => true;
+let onHidden: (data: ReminderData) => void = () => {};
 
 /**
  * Whether a notification that arrives while the app is open shows. Hafiz posts only its own
  * reminders; one it cannot read shows as before, unless it claims to be a halaqa encouragement,
- * which may belong to another account (5.8.2).
+ * which may belong to another account (5.8.2). A reminder it hides is reported, so the next run does
+ * not count the alarm the OS let go of as delivered.
  */
 function presentable(data: unknown): boolean {
-  if (isReminderData(data)) return shouldPresent(data);
+  if (isReminderData(data)) {
+    if (shouldPresent(data)) return true;
+    onHidden(data);
+    return false;
+  }
   return !(data !== null && typeof data === "object" && (data as Record<string, unknown>).type === "group_encouragement");
 }
 
@@ -61,8 +67,9 @@ export const reminderPlatform: ReminderPlatform = {
     );
   },
 
-  async configure({ channelName, remindLaterAction, shouldPresent: check }) {
+  async configure({ channelName, remindLaterAction, shouldPresent: check, onHidden: report }) {
     shouldPresent = check;
+    onHidden = report;
     // Until this runs, expo-notifications shows nothing that arrives while the app is open.
     if (!handlerInstalled) {
       Notifications.setNotificationHandler({

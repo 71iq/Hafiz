@@ -8,6 +8,7 @@ import { dismissReminderBanner, loadReminderBanner } from "@/lib/notifications/b
 import type {
   PermissionState,
   PresentedReminder,
+  ReminderData,
   ReminderRequest,
   ReminderResponse,
   ScheduledReminder,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/notifications/permission";
 import { openReminderRoute, resolveReminderHref } from "@/lib/notifications/reminder-route";
 import {
+  configureReminderPlatform,
   diffReminders,
   loadReminderContext,
   notifyGroupEncouragement,
@@ -45,6 +47,8 @@ type FakePlatform = {
   nextId: number;
   /** Runs as a cancel request reaches the OS, before it takes effect: an alarm can still go off. */
   beforeCancel: () => void;
+  /** The foreground handler's callbacks from the latest configure call. */
+  foreground: { shouldPresent: (data: ReminderData) => boolean; onHidden: (data: ReminderData) => void } | null;
 };
 
 const fake: FakePlatform = {
@@ -57,6 +61,7 @@ const fake: FakePlatform = {
   badge: null,
   nextId: 1,
   beforeCancel: () => undefined,
+  foreground: null,
 };
 
 jest.mock("@/lib/notifications/platform", () => ({
@@ -69,7 +74,9 @@ jest.mock("@/lib/notifications/platform", () => ({
       fake.permission = fake.requested;
       return fake.requested;
     },
-    configure: async () => {},
+    configure: async (options: NonNullable<FakePlatform["foreground"]>) => {
+      fake.foreground = { shouldPresent: options.shouldPresent, onHidden: options.onHidden };
+    },
     listScheduled: async () => fake.scheduled.map(({ osId, data }) => ({ osId, data })),
     listPresented: async () => fake.presented,
     schedule: async (request: ReminderRequest) => {
@@ -136,6 +143,18 @@ function osFires(until: Date) {
   fake.scheduled = fake.scheduled.filter((item) => item.data.at > until.getTime());
 }
 
+/**
+ * One alarm goes off while the app is open: the OS lets go of it and the foreground handler shows it
+ * or hides it, as lib/notifications/platform.native.ts does.
+ */
+function firesWhileOpen(alarm: ScheduledReminder) {
+  const handler = fake.foreground;
+  if (!handler) throw new Error("The reminder platform was not configured");
+  fake.scheduled = fake.scheduled.filter((item) => item.osId !== alarm.osId);
+  if (handler.shouldPresent(alarm.data)) fake.presented = [...fake.presented, { osId: alarm.osId, data: alarm.data }];
+  else handler.onHidden(alarm.data);
+}
+
 function logRow(id: string) {
   return store.sql.prepare("SELECT delivered_at, cancelled_at FROM notification_log WHERE id = ?").get(id);
 }
@@ -188,6 +207,7 @@ beforeEach(async () => {
     badge: null,
     nextId: 1,
     beforeCancel: () => undefined,
+    foreground: null,
   });
   jest.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -615,6 +635,40 @@ describe("halaqa encouragement batches (5.8.2)", () => {
     expect(shouldPresentReminder(own)).toBe(false);
     // Other reminders carry no account and show as before.
     expect(shouldPresentReminder(wird!)).toBe(true);
+  });
+
+  // Fifth review, finding N5: A's encouragement went off while B was signed in, before the run that
+  // cancels it. The handler hid it and the OS let go of the alarm, so the run took it for delivered,
+  // retired A's batch, and A never got the encouragement.
+  it("gives an encouragement hidden from another account back to its owner, counted once", async () => {
+    await seed([...lastDays(5), TODAY]);
+    await configureReminderPlatform({ channelName: "Reminders", remindLaterAction: "Remind me in 1 hour" });
+    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
+    const alarm = groupScheduled()[0];
+    expect(batches()).toEqual([expect.objectContaining({ account_id: ACCOUNT_A, log_id: alarm.data.logId })]);
+
+    signedInAccount = ACCOUNT_B;
+    firesWhileOpen(alarm);
+    expect(fake.presented).toEqual([]);
+    await rescheduleReminders(store.db, { now: at(TODAY, 10, 31), language: "en" });
+    expect(logRow(alarm.data.logId)).toEqual({ delivered_at: null, cancelled_at: at(TODAY, 10, 31).toISOString() });
+    expect(batches()).toEqual([expect.objectContaining({ account_id: ACCOUNT_A, count: 1, log_id: null })]);
+    expect(groupScheduled()).toEqual([]);
+    expect(fake.presented).toEqual([]);
+
+    // A signs in again: the batch goes out to A, and only that notification counts as delivered.
+    signedInAccount = ACCOUNT_A;
+    await rescheduleReminders(store.db, { now: at(TODAY, 10, 40), language: "en" });
+    const again = groupScheduled();
+    expect(again.map((item) => [item.data.accountId, item.data.at])).toEqual([
+      [ACCOUNT_A, at(TODAY, 10, 41).getTime()],
+    ]);
+    firesWhileOpen(again[0]);
+    expect(fake.presented.map((item) => item.osId)).toEqual([again[0].osId]);
+    await rescheduleReminders(store.db, { now: at(TODAY, 10, 45), language: "en" });
+    expect(logCount("type = 'group_encouragement' AND delivered_at IS NOT NULL")).toBe(1);
+    expect(logRow(again[0].data.logId)).toEqual({ delivered_at: at(TODAY, 10, 45).toISOString(), cancelled_at: null });
+    expect(batches()).toEqual([]);
   });
 
   it("gives an arrival after a delivered notification its own notification", async () => {

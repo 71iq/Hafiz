@@ -136,10 +136,10 @@ function byFirstReceived(a: GroupBatch, b: GroupBatch): number {
 }
 
 /**
- * Retires each batch whose own notification fired, forgets a notification that was cancelled or
- * replaced so the batch is planned again, drops batches older than a week, and picks the signed-in
- * account's oldest batch to plan. Arrivals after a batch's notification went out are in a later batch
- * (notifyGroupEncouragement), so retiring one never drops them.
+ * Retires each batch whose own notification fired, forgets a notification that was cancelled,
+ * replaced or hidden as it arrived so the batch is planned again, drops batches older than a week,
+ * and picks the signed-in account's oldest batch to plan. Arrivals after a batch's notification went
+ * out are in a later batch (notifyGroupEncouragement), so retiring one never drops them.
  */
 function settleGroupBatches(
   stored: readonly GroupBatch[],
@@ -430,7 +430,8 @@ const COVERED_KINDS: readonly string[] = ["done_today", "excused_today", "paused
  * A halaqa encouragement for an account that is not the signed-in one, or with no recorded owner,
  * which may be another account's. It names that account's private group activity, so it never shows
  * while the app is open, and the run that follows a sign-out or another sign-in cancels it and
- * removes it from the tray (5.8.2).
+ * removes it from the tray (5.8.2). One hidden as it arrived is not delivered, so its batch waits for
+ * its owner (recordHidden).
  */
 function isForeignEncouragement(data: ReminderData, account: string | null): boolean {
   return data.type === "group_encouragement" && (account === null || data.accountId !== account);
@@ -441,9 +442,32 @@ export function shouldPresentReminder(data: ReminderData): boolean {
   return !isForeignEncouragement(data, reminderAccount());
 }
 
-/** Channel, category and the foreground handler, which asks shouldPresentReminder. Safe to call repeatedly. */
+/**
+ * Log ids of reminders the foreground handler hid, until a run records them. The OS let go of each
+ * one without showing it, so the run records it as cancelled rather than inferring a delivery. A
+ * halaqa batch whose notification was hidden then goes back to waiting, and its owner gets it after
+ * signing in again (5.8.2).
+ */
+const hiddenReminders = new Set<string>();
+
+/**
+ * Channel, category and the foreground handler, which asks shouldPresentReminder and keeps what it
+ * hid for the next run. Safe to call repeatedly.
+ */
 export function configureReminderPlatform(labels: Readonly<{ channelName: string; remindLaterAction: string }>): Promise<void> {
-  return reminderPlatform.configure({ ...labels, shouldPresent: shouldPresentReminder });
+  return reminderPlatform.configure({
+    ...labels,
+    shouldPresent: shouldPresentReminder,
+    onHidden: (data) => hiddenReminders.add(data.logId),
+  });
+}
+
+/** Records the reminders hidden so far as cancelled, so none counts as delivered. */
+async function recordHidden(db: DatabaseExecutor, now: Date): Promise<void> {
+  const ids = [...hiddenReminders];
+  if (ids.length === 0) return;
+  await markCancelled(db, ids, now);
+  for (const id of ids) hiddenReminders.delete(id);
 }
 
 /** Dismisses foreign encouragement whatever the reminder settings, and returns what is left shown. */
@@ -500,13 +524,15 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   // A reminder was delivered when the OS showed it, or when its time passed and the OS no longer
   // holds it. One past its time that the OS still holds is late and still pending. Either delivery is
   // recorded by the first run that learns of it, and its response window ends 2 hours after that (8.11).
-  // The alarms just cancelled count as held, so they are recorded as cancelled, not delivered.
+  // The alarms just cancelled count as held, so they are recorded as cancelled, not delivered. One the
+  // foreground handler hid is recorded as cancelled first, so its absence is not taken for a delivery.
   const stillScheduled = new Set(listed.map((item) => item.data.logId));
   await markDelivered(
     db,
     presented.map((item) => item.data.logId),
     now,
   );
+  await recordHidden(db, now);
   await markInferredDelivered(db, stillScheduled, now);
   await recordCancelled(db, foreign, now);
   const shown = await dismissForeignEncouragement(presented, account);
