@@ -5,6 +5,7 @@ import { putHabitDay } from "@/lib/habit/queries";
 import type { HabitDayRow } from "@/lib/habit/types";
 import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { dismissReminderBanner, loadReminderBanner } from "@/lib/notifications/banner";
+import { projectHabit } from "@/lib/notifications/habit-projection";
 import type {
   PermissionState,
   PresentedReminder,
@@ -832,5 +833,59 @@ describe("diffReminders", () => {
     expect(result.keep.map((item) => item.osId)).toEqual(["1"]);
     expect(result.cancel.map((item) => item.osId)).toEqual(["2"]);
     expect(result.create.map((item) => item.contentKey)).toEqual(["c"]);
+  });
+});
+
+describe("a day already done under another headline (NOT-04, STR-07)", () => {
+  it("clears today's tray and badge after today's wird is done during an earn-back", async () => {
+    // Ten excused days three days back leave a broken streak to earn back.
+    for (let offset = -3; offset > -13; offset--) {
+      await putHabitDay(store.db, {
+        ...day(addDays(TODAY, offset)),
+        status: "excused",
+        earned_status: null,
+        reason: "illness",
+        minimum_met: 0,
+      });
+    }
+    await writeReminderPref(store.db, { kind: "badge", value: true });
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    const alarm = fake.scheduled.find((item) => item.data.type === "earnback_open" && item.data.localDate === TODAY)!;
+    expect(alarm).toBeTruthy();
+    osFires(at(TODAY, 7));
+    fake.presented = [{ osId: alarm.osId, data: alarm.data }];
+    await seed([TODAY]);
+    const context = await loadReminderContext(store.db, { now: at(TODAY, 7), language: "en" });
+    const snapshot = projectHabit(context.input, TODAY, at(TODAY, 7)).snapshot;
+    expect(snapshot.streak.todayStatus).toBe("done");
+    expect(snapshot.headline.kind).toBe("earn_back");
+
+    await rescheduleReminders(store.db, { now: at(TODAY, 7), language: "en" });
+
+    expect({ presented: fake.presented.length, badge: fake.badge }).toEqual({ presented: 0, badge: 0 });
+  });
+
+  it("clears the badge and today's reminder but keeps yesterday's open make-up reminder", async () => {
+    await seed(lastDays(5, -2));
+    await writeReminderPref(store.db, { kind: "badge", value: true });
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    const makeUp = fake.scheduled.find((item) => item.data.type === "makeup_window" && item.data.localDate === TODAY)!;
+    expect(makeUp).toBeTruthy();
+    const wird: PresentedReminder = {
+      osId: "synthetic-wird",
+      data: { ...makeUp.data, logId: "synthetic-wird-log", type: "wird_reminder", route: "wird" },
+    };
+    fake.scheduled = fake.scheduled.filter((item) => item.osId !== makeUp.osId);
+    fake.presented = [{ osId: makeUp.osId, data: makeUp.data }, wird];
+    await seed([TODAY]);
+    const context = await loadReminderContext(store.db, { now: at(TODAY, 9), language: "en" });
+    const snapshot = projectHabit(context.input, TODAY, at(TODAY, 9)).snapshot;
+    expect(snapshot.streak.todayStatus).toBe("done");
+    expect(snapshot.headline.kind).toBe("make_up_open");
+
+    await rescheduleReminders(store.db, { now: at(TODAY, 9), language: "en" });
+
+    expect(fake.badge).toBe(0);
+    expect(fake.presented.map((item) => item.data.type)).toEqual(["makeup_window"]);
   });
 });

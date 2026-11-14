@@ -31,6 +31,7 @@ import {
 } from "@/lib/notifications/log";
 import {
   backoffLevel,
+  isCoveredToday,
   PLAN_HORIZON_DAYS,
   planNotifications,
   streakFingerprint,
@@ -424,8 +425,6 @@ async function saveGroupBatches(db: DatabaseExecutor, batches: readonly GroupBat
   await writeLocalSetting(db, LOCAL_KEYS.groupPending, batches.length > 0 ? { batches } : null);
 }
 
-const COVERED_KINDS: readonly string[] = ["done_today", "excused_today", "paused"];
-
 /**
  * A halaqa encouragement for an account that is not the signed-in one, or with no recorded owner,
  * which may be another account's. It names that account's private group activity, so it never shows
@@ -481,15 +480,25 @@ async function dismissForeignEncouragement(
 }
 
 /** Remove reminders for past dates (NOT-06) and today's wird reminders once the day is covered (NOT-05). */
+/**
+ * Today's wird reminders leave the tray once today is covered. Yesterday's make-up reminder stays
+ * while the make-up is still open: a day already done does not close it (STR-07).
+ */
 async function dismissStale(
   presented: readonly PresentedReminder[],
   context: ReminderContext,
   now: Date,
   covered: boolean,
+  makeUpOpen: boolean,
 ): Promise<void> {
   const today = context.input.clock.dateOf(now);
   const stale = presented.filter(
-    (item) => item.data.localDate < today || (covered && item.data.localDate === today && WIRD_TYPES.has(item.data.type)),
+    (item) =>
+      item.data.localDate < today ||
+      (covered &&
+        item.data.localDate === today &&
+        WIRD_TYPES.has(item.data.type) &&
+        !(makeUpOpen && item.data.type === "makeup_window")),
   );
   if (stale.length > 0) await reminderPlatform.dismiss(stale.map((item) => item.osId));
 }
@@ -543,7 +552,11 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   const permission = await reminderPlatform.getPermission();
   const permitted = permission.status === "granted";
   const today = context.input.clock.dateOf(now);
-  const covered = COVERED_KINDS.includes(projectHabit(context.input, today, now).snapshot.headline.kind);
+  // The same rule as the planner: an open earn-back or make-up leads the headline even on a day
+  // that is already done, so the headline alone does not say whether today is covered.
+  const snapshot = projectHabit(context.input, today, now).snapshot;
+  const covered = isCoveredToday(snapshot);
+  const makeUpOpen = snapshot.headline.kind === "make_up_open";
   await updateBadge(context, permitted, covered);
   if (!permitted || !context.prefs.enabled) {
     const cancelled = foreign.length + (await cancelEverything(db, scheduled, now));
@@ -551,7 +564,7 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
     return { status: permitted ? "disabled" : "no_permission", ...empty, cancelled };
   }
 
-  await dismissStale(shown, context, now, covered);
+  await dismissStale(shown, context, now, covered, makeUpOpen);
   const plan = planNotifications(context.input);
   await clearSpentRemindLater(db, context, plan);
   const desired = renderDesired(context, plan.slots);

@@ -112,7 +112,7 @@ const COVERED_TODAY = new Set(["done_today", "excused_today", "paused"]);
  * Today already has its wird, an excuse or a pause. The headline alone is not enough: an open
  * earn-back leads the headline even on a day that is already done.
  */
-function isCoveredToday(snapshot: HabitSnapshot): boolean {
+export function isCoveredToday(snapshot: HabitSnapshot): boolean {
   return snapshot.streak.todayStatus !== null || COVERED_TODAY.has(snapshot.headline.kind);
 }
 
