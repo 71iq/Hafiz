@@ -658,7 +658,8 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   // Teal text under 14 px uses the darker token in light mode.
   const accent = isDark ? "#2dd4bf" : "#0f766e";
   const muted = mutedIconColor(effectiveTheme);
-  const portion = `${interpolate(s.hifzPageN, { n: formatNumber(target.page, uiLanguage) })} · ${interpolate(s.hifzSabaqLines, {
+  // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
+  const portion = `${interpolate(s.hifzPageN, { n: formatNumber(target.page, uiLanguage) })}${uiLanguage === "ar" ? "، " : " · "}${interpolate(s.hifzSabaqLines, {
     from: formatNumber(target.fromLine, uiLanguage),
     to: formatNumber(target.toLine, uiLanguage),
   })}`;
@@ -690,7 +691,8 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       {/* Header, progress and footer share the page column instead of spanning a wide window. */}
       <View className="items-center">
         <View style={{ width: "100%", maxWidth: pageWidth }}>
-          <MirroredRow dir={dir} className="items-center justify-between px-5 pt-3 pb-2">
+          {/* 8 px in, like the title, page card and buttons below and the hifz review header. */}
+          <MirroredRow dir={dir} className="items-center justify-between px-2 pt-3 pb-2">
             {/* Dimmed while Close waits for the grade it was pressed during. */}
             <Pressable
               onPress={close}
@@ -709,7 +711,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
           </MirroredRow>
           {step !== "done" ? (
             // Padding on a wrapper: the track is full width, so a margin on it would only move its start.
-            <View className="px-5">
+            <View className="px-2">
               <Progress value={((stepIndex + 1) / STEPS.length) * 100} dir={dir} className="h-1" />
             </View>
           ) : null}
@@ -720,7 +722,8 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         // Title, page card and actions all start 8 px inside the page column, as in the hifz review.
         contentContainerStyle={{
           paddingVertical: 16,
-          paddingHorizontal: 8,
+          // The centred steps, the intention and the end, keep the wider gutter of the other end screens.
+          paddingHorizontal: centered ? 20 : 8,
           gap: 14,
           alignItems: "center",
           flexGrow: centered ? 1 : undefined,
@@ -839,11 +842,17 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 
       </ScrollView>
 
-      <View className="px-2 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
+      <View className={`${centered ? "px-5" : "px-2"} pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center`}>
         <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth - 16, gap: 10 }}>
           {/* Beside the buttons that retry, so a long chunk does not push it below the fold. */}
           {error ? (
-            <Text dir={dir} align="center" className="text-red-600 dark:text-red-400" accessibilityRole="alert">
+            <Text
+              dir={dir}
+              align="center"
+              className="text-red-700 dark:text-red-400"
+              accessibilityRole="alert"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 }}
+            >
               {error}
             </Text>
           ) : null}

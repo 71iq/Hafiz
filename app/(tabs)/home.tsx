@@ -20,6 +20,7 @@ import {
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
@@ -99,7 +100,7 @@ function formatArabicDate(date: Date): string {
 
 export default function HomeScreen() {
   const db = useDatabase();
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { isDark, isRTL, uiLanguage, effectiveTheme } = useSettings();
   // Arabic uses Arabic-Indic digits, matching the reader.
   const localNumber = (value: number) => (isRTL ? toArabicNumber(value) : value.toLocaleString());
   const s = useStrings();
@@ -415,7 +416,7 @@ export default function HomeScreen() {
             style={mirroredRowStyle}
           >
             <Text
-              className="text-warm-400 dark:text-neutral-500 uppercase"
+              className="text-warm-400 dark:text-neutral-400 uppercase"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
             >
               {isRTL ? formatArabicDate(new Date()) : new Date().toLocaleDateString()}
@@ -487,7 +488,7 @@ export default function HomeScreen() {
                   {localNumber(totalDue)}
                 </Text>
                 <Text
-                  className="text-warm-400 dark:text-neutral-500"
+                  className="text-warm-400 dark:text-neutral-400"
                   style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                 >
                   {s.flashcardsDueToday}
@@ -506,7 +507,7 @@ export default function HomeScreen() {
                   {localNumber(pageMode ? wird!.memorizedPages : memorizedCards)}
                 </Text>
                 <Text
-                  className="text-warm-400 dark:text-neutral-500"
+                  className="text-warm-400 dark:text-neutral-400"
                   style={{ fontFamily: "Manrope_500Medium", fontSize: 11, ...textStartStyle(isRTL)}}
                 >
                   {pageMode ? s.hifzHomeMemorizedPages : s.homeMemorized}
@@ -565,7 +566,8 @@ export default function HomeScreen() {
             inboxCount={inboxCount}
             secondLooksDue={secondLooksDue}
             nextLookAt={nextLookAt}
-            ayahDue={totalDue}
+            ayahDue={ayahReviewsDue}
+            ayahNew={smartDecks.reduce((sum, deck) => sum + deck.newCount, 0)}
             language={uiLanguage}
             isDark={isDark}
             s={s}
@@ -617,7 +619,7 @@ export default function HomeScreen() {
                 </View>
                 <View className="flex-1">
                   <Text
-                    className="text-warm-400 dark:text-neutral-500 uppercase"
+                    className="text-warm-400 dark:text-neutral-400 uppercase"
                     // Letter spacing would break the joins between Arabic letters.
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: isRTL ? 0 : 1.5 }}
                   >
@@ -630,7 +632,7 @@ export default function HomeScreen() {
                     {`${surahNames[resume.surah] ? interpolate(s.surahNamed, { name: surahNames[resume.surah] }) : resume.surah}${isRTL ? "، " : " · "}${formatAyahRef(isRTL, resume.surah, resume.ayah)}`}
                   </Text>
                   <Text
-                    className="text-warm-400 dark:text-neutral-500"
+                    className="text-warm-400 dark:text-neutral-400"
                     style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
                   >
                     {interpolate(s.pageN, { n: localNumber(resume.page) })}
@@ -658,7 +660,7 @@ export default function HomeScreen() {
                   {s.homeAuthCardTitle}
                 </Text>
                 <Text
-                  className="text-warm-400 dark:text-neutral-500 mt-0.5 mb-3"
+                  className="text-warm-400 dark:text-neutral-400 mt-0.5 mb-3"
                   style={{ fontFamily: "Manrope_400Regular", fontSize: 12, lineHeight: 18 }}
                 >
                   {s.homeAuthCardSubtitle}
@@ -692,7 +694,7 @@ export default function HomeScreen() {
                 hitSlop={8}
                 className="w-7 h-7 items-center justify-center"
               >
-                <XIcon size={14} color={isDark ? "#737373" : "#8B8178"} />
+                <XIcon size={14} color={mutedIconColor(effectiveTheme)} />
               </Pressable>
             </View>
           </Card>
@@ -708,7 +710,7 @@ export default function HomeScreen() {
               <View className={`items-start justify-between ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
                 <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
                   <Text
-                    className="text-warm-400 dark:text-neutral-500 uppercase"
+                    className="text-warm-400 dark:text-neutral-400 uppercase"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.6 }}
                   >
                     {interpolate(s.reflectionJourneyProgress, {
@@ -924,6 +926,7 @@ function SmartDeckCard({
   compact: boolean;
   s: UIStrings;
 }) {
+  const mutedIcon = mutedIconColor(useSettings().effectiveTheme);
   const Icon = deck.icon;
   const canStart = deck.total > 0;
   const iconNode = (
@@ -946,7 +949,7 @@ function SmartDeckCard({
         {deck.title}
       </Text>
       <Text
-        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+        className="text-warm-400 dark:text-neutral-400 mt-0.5"
         style={{
           fontFamily: "Manrope_400Regular",
           fontSize: 11,
@@ -975,7 +978,7 @@ function SmartDeckCard({
         className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
         hitSlop={8}
       >
-        <List size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+        <List size={14} color={mutedIcon} />
       </Pressable>
       <Pressable
         onPress={(event) => {
@@ -987,7 +990,7 @@ function SmartDeckCard({
         className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
         hitSlop={8}
       >
-        <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+        <Settings2 size={14} color={mutedIcon} />
       </Pressable>
     </View>
   );
@@ -1029,6 +1032,7 @@ function VocabularyDeckCard({
   compact: boolean;
   s: UIStrings;
 }) {
+  const mutedIcon = mutedIconColor(useSettings().effectiveTheme);
   const canStart = stats.total > 0;
   const iconNode = (
     <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
@@ -1050,7 +1054,7 @@ function VocabularyDeckCard({
         {s.vocabDeckTitle}
       </Text>
       <Text
-        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+        className="text-warm-400 dark:text-neutral-400 mt-0.5"
         style={{
           fontFamily: "Manrope_400Regular",
           fontSize: 11,
@@ -1079,7 +1083,7 @@ function VocabularyDeckCard({
         className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
         hitSlop={8}
       >
-        <List size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+        <List size={14} color={mutedIcon} />
       </Pressable>
       <Pressable
         onPress={(event) => {
@@ -1091,7 +1095,7 @@ function VocabularyDeckCard({
         className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
         hitSlop={8}
       >
-        <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+        <Settings2 size={14} color={mutedIcon} />
       </Pressable>
     </View>
   );

@@ -315,7 +315,7 @@ export default function ProgressScreen() {
                     {s.achievementsTitle}
                   </Text>
                   <Text
-                    className="mt-1 text-warm-400 dark:text-neutral-500"
+                    className="mt-1 text-warm-400 dark:text-neutral-400"
                     style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                   >
                     {achievementCount}

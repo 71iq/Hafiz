@@ -479,7 +479,7 @@ export function ActivityHeatmap({
                 {formatCount(item.value)}
               </Text>
               <Text
-                className="text-warm-400 dark:text-neutral-500 mt-1"
+                className="text-warm-400 dark:text-neutral-400 mt-1"
                 style={{
                   fontFamily: "Manrope_500Medium",
                   fontSize: 11,

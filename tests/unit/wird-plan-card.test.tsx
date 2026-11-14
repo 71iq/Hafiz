@@ -26,7 +26,14 @@ function wird(
   } as unknown as TodayWird;
 }
 
-function renderCard(props: { wird: TodayWird; secondLooksDue?: number; nextLookAt?: Date | null; ayahDue?: number; language?: "en" | "ar" }) {
+function renderCard(props: {
+  wird: TodayWird;
+  secondLooksDue?: number;
+  nextLookAt?: Date | null;
+  ayahDue?: number;
+  ayahNew?: number;
+  language?: "en" | "ar";
+}) {
   const handlers = { onStartReview: jest.fn(), onStartSabaq: jest.fn(), onSetup: jest.fn(), onDrill: jest.fn() };
   const view = render(
     <WirdPlanCard
@@ -35,6 +42,7 @@ function renderCard(props: { wird: TodayWird; secondLooksDue?: number; nextLookA
       secondLooksDue={props.secondLooksDue}
       nextLookAt={props.nextLookAt}
       ayahDue={props.ayahDue}
+      ayahNew={props.ayahNew}
       language={props.language ?? "en"}
       isDark={false}
       s={props.language === "ar" ? strings.ar : s}
@@ -100,5 +108,20 @@ describe("Home's second-look cue (SBQ-03)", () => {
     const none = renderCard({ wird: today, ayahDue: 0 }).view;
     expect(none.getByText(s.hifzAyahModeNone)).toBeTruthy();
     expect(none.queryByText(s.hifzWirdStart)).toBeNull();
+  });
+
+  it("in ayah review, shows new cards on their own line, apart from those due, and offers Start for them", () => {
+    const today = { ...wird({ unit: "ayah" }), done: [], total: 0 } as unknown as TodayWird;
+    const view = renderCard({ wird: today, ayahDue: 0, ayahNew: 20 }).view;
+    expect(view.getByText(s.hifzAyahModeNone)).toBeTruthy();
+    expect(view.getByText(interpolate(s.hifzAyahModeNew, { n: "20" }))).toBeTruthy();
+    expect(view.getByText(s.hifzWirdStart)).toBeTruthy();
+  });
+
+  it("offers more lines, not new ones, once today's are done", () => {
+    const done = renderCard({ wird: wird({ newLines: 7, linesToday: 12, todo: 2 }) }).view;
+    expect(done.getByText(s.hifzSabaqMore)).toBeTruthy();
+    expect(done.queryByText(s.hifzSabaqStart)).toBeNull();
+    expect(renderCard({ wird: wird({ newLines: 7, todo: 2 }) }).view.getByText(s.hifzSabaqStart)).toBeTruthy();
   });
 });

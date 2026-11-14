@@ -75,7 +75,8 @@ export function SabaqSecondLook({
   const { effectiveTheme } = useSettings();
   const muted = mutedIconColor(effectiveTheme);
   const ayahLabel = useCallback((token: PageToken) => formatAyahRef(isRTL, token.surah, token.ayah), [isRTL]);
-  const portion = `${interpolate(s.hifzPageN, { n: formatNumber(look.page, language) })} · ${interpolate(
+  // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
+  const portion = `${interpolate(s.hifzPageN, { n: formatNumber(look.page, language) })}${language === "ar" ? "، " : " · "}${interpolate(
     s.hifzSabaqLines,
     {
       from: formatNumber(look.fromLine, language),
@@ -87,7 +88,7 @@ export function SabaqSecondLook({
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <View className="items-center">
         <View style={{ width: "100%", maxWidth: pageWidth }}>
-          <MirroredRow dir={dir} className="items-center justify-between px-5 pt-3 pb-2">
+          <MirroredRow dir={dir} className="items-center justify-between px-2 pt-3 pb-2">
             <Pressable
               onPress={onClose}
               disabled={closePending}
@@ -155,7 +156,8 @@ export function SabaqSecondLook({
           {error ? (
             <Text
               dir={dir}
-              className="text-red-600 dark:text-red-400"
+              align="center"
+              className="text-red-700 dark:text-red-400"
               accessibilityRole="alert"
               style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 }}
             >

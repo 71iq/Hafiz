@@ -72,7 +72,7 @@ export function DefaultDeckProgressChart({
             {s.progressDefaultDecks}
           </Text>
           <Text
-            className="mt-1 text-warm-400 dark:text-neutral-500"
+            className="mt-1 text-warm-400 dark:text-neutral-400"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           >
             {`${s.flashcardsTotalCards}: ${formatNumber(totalCards, uiLanguage)}`}
@@ -200,7 +200,7 @@ function DeckMetric({
         {formatNumber(value, uiLanguage)}
       </Text>
       <Text
-        className="text-warm-500 dark:text-neutral-500"
+        className="text-warm-500 dark:text-neutral-400"
         style={{ fontFamily: "Manrope_500Medium", fontSize: 10, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
       >
         {label}
@@ -226,7 +226,7 @@ function DeckLegendDot({
     <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
       <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       <Text
-        className="text-warm-500 dark:text-neutral-500"
+        className="text-warm-500 dark:text-neutral-400"
         style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
       >
         {label}

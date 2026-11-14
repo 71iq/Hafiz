@@ -33,7 +33,7 @@ export function PublicBadgesGrid({ unlocks }: Props) {
   if (items.length === 0) {
     return (
       <Text
-        className="text-warm-400 dark:text-neutral-500"
+        className="text-warm-400 dark:text-neutral-400"
         style={{ fontFamily: "Manrope_400Regular", fontSize: 13, ...textStartStyle(isRTL)}}
       >
         {s.publicBadgesEmpty}

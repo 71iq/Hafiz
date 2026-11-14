@@ -115,9 +115,10 @@ export function GradingButtons({
                       adjustsFontSizeToFit
                       minimumFontScale={0.75}
                       style={{
-                        color: "rgba(255,255,255,0.82)",
+                        // Solid white at 11 px reads at 4.5:1 or more on every fill.
+                        color: "#fff",
                         fontFamily: "Manrope_600SemiBold",
-                        fontSize: 10,
+                        fontSize: 11,
                         marginTop: 3,
                       }}
                     >

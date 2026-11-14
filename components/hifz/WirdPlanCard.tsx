@@ -22,6 +22,8 @@ type Props = {
   nextLookAt?: Date | null;
   /** Ayah review: the ayah cards due now, since the plan lists no pages then (UNIT-02). */
   ayahDue?: number;
+  /** Ayah review: the new ayah cards on offer, shown apart from those due, as extra (ETH-05). */
+  ayahNew?: number;
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
@@ -42,6 +44,7 @@ export function WirdPlanCard({
   secondLooksDue = 0,
   nextLookAt = null,
   ayahDue = 0,
+  ayahNew = 0,
   language,
   isDark,
   s,
@@ -155,6 +158,11 @@ export function WirdPlanCard({
             : s.hifzNothingDue}
         </Text>
       ) : null}
+      {total === 0 && ayahMode && ayahNew > 0 ? (
+        <Text dir={dir} className="mt-1" variant="caption">
+          {interpolate(s.hifzAyahModeNew, { n: formatNumber(ayahNew, language) })}
+        </Text>
+      ) : null}
 
       {wird.daily.backlog ? (
         <Text dir={dir} className="mt-2" variant="caption" style={{ lineHeight: 18 }}>
@@ -171,7 +179,7 @@ export function WirdPlanCard({
               size="sm"
               // Small text and width, but still a 44 px touch target.
               className="h-11 border border-warm-300 dark:border-neutral-700"
-              label={s.hifzSabaqStart}
+              label={wird.sabaqDoneToday ? s.hifzSabaqMore : s.hifzSabaqStart}
               onPress={onStartSabaq}
             />
           </MirroredRow>
@@ -179,14 +187,14 @@ export function WirdPlanCard({
       ) : (
         // Capped on wide layouts like the rows below, so the buttons line up with them.
         <View className="mt-4 w-full max-w-md" style={{ gap: 8, alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}>
-          {wird.todo.length > 0 || (ayahMode && ayahDue > 0) ? (
+          {wird.todo.length > 0 || (ayahMode && ayahDue + ayahNew > 0) ? (
             <Button label={wird.done.length > 0 ? s.hifzWirdContinue : s.hifzWirdStart} onPress={onStartReview} />
           ) : null}
           {showSabaq ? (
             <Button
               variant={wird.todo.length > 0 ? "outline" : "default"}
               className={wird.todo.length > 0 ? "border border-warm-300 dark:border-neutral-700" : undefined}
-              label={s.hifzSabaqStart}
+              label={wird.sabaqDoneToday ? s.hifzSabaqMore : s.hifzSabaqStart}
               onPress={onStartSabaq}
             />
           ) : null}
