@@ -116,20 +116,34 @@ export function TeacherSabaqAssignment({
   const [toLine, setToLine] = useState(number(current?.toLine ?? 15));
   const [invalid, setInvalid] = useState(false);
   const [noAyat, setNoAyat] = useState(false);
+  /**
+   * Save is checking the range against the preview. The fields and buttons wait meanwhile, and a second
+   * press is ignored, so a slow check can never send an older range after a newer one was saved.
+   */
+  const [checking, setChecking] = useState(false);
+  const checkingNow = useRef(false);
   const dir = isRTL ? "rtl" : "ltr";
   const range = useMemo(() => parseAssignmentInput(page, fromLine, toLine), [page, fromLine, toLine]);
   const { preview, read } = useRangePreview(useDatabase(), range);
 
   const save = async () => {
+    if (checkingNow.current) return;
     setInvalid(range === null);
     setNoAyat(false);
     if (!range) return;
-    // The preview's answer for this range, waited for if it is still being read.
-    if ((await read(range))?.kind === "empty") {
-      setNoAyat(true);
-      return;
+    checkingNow.current = true;
+    setChecking(true);
+    try {
+      // The preview's answer for this range, waited for if it is still being read.
+      if ((await read(range))?.kind === "empty") {
+        setNoAyat(true);
+        return;
+      }
+      onSave(range);
+    } finally {
+      checkingNow.current = false;
+      setChecking(false);
     }
-    onSave(range);
   };
 
   const fields: ReadonlyArray<readonly [string, string, (value: string) => void, number]> = [
@@ -181,7 +195,7 @@ export function TeacherSabaqAssignment({
               maxLength={maxLength}
               accessibilityLabel={label}
               invalid={invalid}
-              editable={!pending}
+              editable={!pending && !checking}
             />
           </Field>
         ))}
@@ -216,14 +230,14 @@ export function TeacherSabaqAssignment({
         </Text>
       ) : null}
       <View className="flex-wrap gap-2" style={socialRowStyle(isRTL)}>
-        <Button label={s.teacherAssignSave} onPress={() => void save()} disabled={pending || disabled} />
+        <Button label={s.teacherAssignSave} onPress={() => void save()} disabled={pending || disabled || checking} />
         {current ? (
           <Button
             variant="outline"
             className="border border-warm-300 dark:border-neutral-700"
             label={s.teacherAssignClear}
             onPress={onClear}
-            disabled={pending || disabled}
+            disabled={pending || disabled || checking}
           />
         ) : null}
       </View>

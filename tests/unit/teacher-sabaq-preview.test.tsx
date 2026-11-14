@@ -196,6 +196,21 @@ describe("the next sabaq preview (SOC-03)", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it("sends one save per check, with the fields held while the range is checked", async () => {
+    const { screen, onSave } = renderForm();
+    fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignPage), "562");
+    fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignFrom), "3");
+    fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignTo), "4");
+    const save = screen.getByRole("button", { name: strings.en.teacherAssignSave });
+    fireEvent.press(save);
+    // While the first press checks the range, another press and an edit change nothing.
+    fireEvent.press(save);
+    expect(screen.getByLabelText(strings.en.teacherAssignPage).props.editable).toBe(false);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledWith({ page: 562, fromLine: 3, toLine: 4 });
+    expect(screen.getByLabelText(strings.en.teacherAssignPage).props.editable).toBe(true);
+  });
+
   it("brackets an ayah end inside the opening, so it never reads as a letter", async () => {
     const preview = await loadSabaqRangePreview(store.db, { page: 562, fromLine: 5, toLine: 6 });
     expect(preview).toMatchObject({ kind: "ayat", opening: "تاسع (٢) عاشر حادي ثاني", startsMidAyah: true });
