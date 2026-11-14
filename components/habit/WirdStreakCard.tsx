@@ -22,6 +22,8 @@ type Props = {
   /** Hide the grace note after the user has seen it. */
   graceNoteDismissed: boolean;
   onDismissGraceNote: () => void;
+  /** Today's plan still has pages or lines left, so a met minimum is "safe", not "done". */
+  wirdLeft?: boolean;
   onOpenBreak: () => void;
 };
 
@@ -42,11 +44,12 @@ export function formatShortDate(localDate: string, language: "en" | "ar"): strin
   });
 }
 
-function headlineMessage(overview: HabitOverview, language: "en" | "ar", s: UIStrings): string {
+function headlineMessage(overview: HabitOverview, language: "en" | "ar", s: UIStrings, wirdLeft: boolean): string {
   const { headline } = overview;
   switch (headline.kind) {
     case "done_today":
-      return s.habitDoneToday;
+      // The minimum keeps the streak; while the day's plan still has work, the wird is not "done".
+      return wirdLeft ? s.habitMinimumMet : s.habitDoneToday;
     case "excused_today":
       return s.habitExcusedToday;
     case "paused":
@@ -95,7 +98,16 @@ function HeadlineIcon({ kind, color }: { kind: HabitOverview["headline"]["kind"]
  * with one calm message for today's state, progress toward the minimum, the streak goal, held grace
  * days and a way to mark an excuse or pause. No sad states, no fear.
  */
-export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismissed, onDismissGraceNote, onOpenBreak }: Props) {
+export function WirdStreakCard({
+  overview,
+  language,
+  isDark,
+  s,
+  graceNoteDismissed,
+  onDismissGraceNote,
+  onOpenBreak,
+  wirdLeft = false,
+}: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   const muted = isDark ? "#a3a3a3" : "#8B8178";
@@ -128,7 +140,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
     <View
       className="mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 pt-3 pb-3"
       accessibilityRole="summary"
-      accessibilityLabel={`${s.habitStreakLabel}: ${formatDays(streak.length, language)}. ${headlineMessage(overview, language, s)}`}
+      accessibilityLabel={`${s.habitStreakLabel}: ${formatDays(streak.length, language)}. ${headlineMessage(overview, language, s, wirdLeft)}`}
     >
       <MirroredRow dir={dir} className="items-start justify-between gap-3">
         <MirroredRow dir={dir} className="min-h-[24px] items-center gap-1.5 flex-shrink-0">
@@ -144,7 +156,7 @@ export function WirdStreakCard({ overview, language, isDark, s, graceNoteDismiss
             className="text-warm-600 dark:text-neutral-400"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 18 }}
           >
-            {headlineMessage(overview, language, s)}
+            {headlineMessage(overview, language, s, wirdLeft)}
           </Text>
           {hasFooterNotes ? null : renderBreakLink("-mt-[7px] -mb-[13px]")}
         </View>

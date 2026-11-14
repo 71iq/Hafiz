@@ -8,7 +8,7 @@ import type { ThemePalette } from "@/lib/settings/context";
 export function mutedIconColor(theme: ThemePalette): string {
   switch (theme) {
     case "beige":
-      return "#8a7058";
+      return "#6e5a47";
     case "white":
       return "#52525b";
     default:

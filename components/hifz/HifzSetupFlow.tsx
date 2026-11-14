@@ -351,6 +351,8 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   }, [back, onCancel, stepIndex]);
 
   const chooseGoal = (next: Goal) => {
+    // Tapping the goal already chosen changes nothing, so it does not reset the saved pace.
+    if (next === goal) return;
     setGoal(next);
     const nextPreset: PlanPreset = next === "keep" ? "maintenance" : "part_time_adult";
     setPreset(nextPreset);
@@ -513,7 +515,8 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                   title={presetLabel(candidate, s)}
                   hint={
                     interpolate(s.hifzPresetSummary, { minutes: formatMinutes(applyPreset(plan, candidate).dailyBudgetMin, language) }) +
-                    (candidate === "short_surahs" ? `. ${s.hifzPresetAyahByAyah}` : "")
+                    // Said only while it is true: chosen, the card describes the plan as it will be saved.
+                    (candidate === "short_surahs" && (preset !== candidate || plan.unit === "ayah") ? `. ${s.hifzPresetAyahByAyah}` : "")
                   }
                   selected={preset === candidate}
                   onPress={() => {

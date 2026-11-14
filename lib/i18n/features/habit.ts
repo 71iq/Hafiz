@@ -80,6 +80,7 @@ export const habitStrings = {
     habitStruggleReward: "\"The one who recites with difficulty has two rewards.\" (Muslim 798)",
     habitExitTitle: "Leave this review?",
     habitExitBody: "Every grade you gave is already saved.",
+    habitExitBodyHalf: "Every grade you gave is already saved. This page is not graded yet.",
     habitExitLeave: "Leave",
     habitExitStay: "Keep reviewing",
     // Progress calendar
@@ -197,6 +198,7 @@ export const habitStrings = {
     habitStruggleReward: "«والذي يقرأ القرآن ويتتعتع فيه وهو عليه شاق له أجران» (رواه مسلم ٧٩٨)",
     habitExitTitle: "الخروج من المراجعة؟",
     habitExitBody: "كل تقييماتك محفوظة.",
+    habitExitBodyHalf: "كل تقييماتك محفوظة. لم تُقيَّم هذه الصفحة بعد.",
     habitExitLeave: "خروج",
     habitExitStay: "متابعة المراجعة",
     habitCalendarTitle: "تقويم الوِرد",

@@ -20,6 +20,8 @@ type Props = {
   secondLooksDue?: number;
   /** When the next of today's second looks opens, while none is due yet. */
   nextLookAt?: Date | null;
+  /** Ayah review: the ayah cards due now, since the plan lists no pages then (UNIT-02). */
+  ayahDue?: number;
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
@@ -39,6 +41,7 @@ export function WirdPlanCard({
   inboxCount,
   secondLooksDue = 0,
   nextLookAt = null,
+  ayahDue = 0,
   language,
   isDark,
   s,
@@ -82,6 +85,8 @@ export function WirdPlanCard({
   const sabqi = wird.todo.filter((page) => page.tier === "sabqi").length;
   const manzil = wird.todo.length - sabqi;
   const showSabaq = newMemorizationOpen(wird);
+  // Ayah review lists no pages; its work is the ayah cards (Start opens the flashcard session).
+  const ayahMode = wird.plan.unit === "ayah";
   const secondLookLabel =
     secondLooksDue > 1 ? interpolate(s.hifzSecondLooksReady, { n: formatNumber(secondLooksDue, language) }) : s.hifzSecondLookReady;
   const muted = mutedIconColor(effectiveTheme);
@@ -140,7 +145,11 @@ export function WirdPlanCard({
         </Text>
       ) : total === 0 ? (
         <Text dir={dir} className="mt-2" variant="caption">
-          {s.hifzNothingDue}
+          {ayahMode
+            ? ayahDue > 0
+              ? interpolate(s.hifzAyahModeDue, { n: formatNumber(ayahDue, language) })
+              : s.hifzAyahModeNone
+            : s.hifzNothingDue}
         </Text>
       ) : null}
 
@@ -167,7 +176,7 @@ export function WirdPlanCard({
       ) : (
         // Capped on wide layouts like the rows below, so the buttons line up with them.
         <View className="mt-4 w-full max-w-md" style={{ gap: 8, alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}>
-          {wird.todo.length > 0 ? (
+          {wird.todo.length > 0 || (ayahMode && ayahDue > 0) ? (
             <Button label={wird.done.length > 0 ? s.hifzWirdContinue : s.hifzWirdStart} onPress={onStartReview} />
           ) : null}
           {showSabaq ? (

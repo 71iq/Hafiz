@@ -57,7 +57,7 @@ export function ToggleGroup<T extends string>({
             <Text
               className={cn(
                 "font-manrope-semibold text-sm text-center",
-                active ? "text-primary-accent dark:text-primary-bright" : "text-warm-400 dark:text-neutral-500",
+                active ? "text-primary-accent dark:text-primary-bright" : "text-warm-600 dark:text-neutral-400",
               )}
               style={{ writingDirection: dir }}
             >

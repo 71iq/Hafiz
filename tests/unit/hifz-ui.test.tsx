@@ -177,8 +177,8 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
     for (let tap = 0; tap < 5; tap += 1) fireEvent.press(view.getByLabelText("More: Reads while looking"));
     expect(view.getByText("15")).toBeTruthy();
     // Clean in a row stops at 1 and listening at 5.
-    for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("Fewer: Clean recitations in a row"));
-    expect(view.getByLabelText("Fewer: Clean recitations in a row").props.accessibilityState).toMatchObject({ disabled: true });
+    for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("Fewer: Clean recitations"));
+    expect(view.getByLabelText("Fewer: Clean recitations").props.accessibilityState).toMatchObject({ disabled: true });
     for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("More: Listens"));
     expect(view.getByLabelText("More: Listens").props.accessibilityState).toMatchObject({ disabled: true });
     const plan = await saveAndReadPlan(view);

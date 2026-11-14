@@ -8,9 +8,10 @@ import { interpolate } from "@/lib/i18n/useStrings";
 const s = strings.en;
 
 /** Only the fields the card reads. */
-function wird(overrides: { backlog?: boolean; newLines?: number; todo?: number } = {}): TodayWird {
+function wird(overrides: { backlog?: boolean; newLines?: number; todo?: number; unit?: "page" | "ayah" } = {}): TodayWird {
   const page = { cardId: "page:madani15:1", tier: "sabqi" } as TodayWird["todo"][number];
   return {
+    plan: { unit: overrides.unit ?? "page" },
     daily: { backlog: overrides.backlog ?? false },
     todo: Array.from({ length: overrides.todo ?? 0 }, () => page),
     done: [page],
@@ -21,7 +22,7 @@ function wird(overrides: { backlog?: boolean; newLines?: number; todo?: number }
   } as unknown as TodayWird;
 }
 
-function renderCard(props: { wird: TodayWird; secondLooksDue?: number; nextLookAt?: Date | null; language?: "en" | "ar" }) {
+function renderCard(props: { wird: TodayWird; secondLooksDue?: number; nextLookAt?: Date | null; ayahDue?: number; language?: "en" | "ar" }) {
   const handlers = { onStartReview: jest.fn(), onStartSabaq: jest.fn(), onSetup: jest.fn(), onDrill: jest.fn() };
   const view = render(
     <WirdPlanCard
@@ -29,6 +30,7 @@ function renderCard(props: { wird: TodayWird; secondLooksDue?: number; nextLookA
       inboxCount={0}
       secondLooksDue={props.secondLooksDue}
       nextLookAt={props.nextLookAt}
+      ayahDue={props.ayahDue}
       language={props.language ?? "en"}
       isDark={false}
       s={props.language === "ar" ? strings.ar : s}
@@ -73,5 +75,16 @@ describe("Home's second-look cue (SBQ-03)", () => {
     const page = { cardId: "page:madani15:1", tier: "manzil" } as TodayWird["todo"][number];
     const today = { ...wird(), todo: [page], done: [page], total: 1 } as unknown as TodayWird;
     expect(renderCard({ wird: today }).view.getByText("1 / 1")).toBeTruthy();
+  });
+
+  it("in ayah review, says how many ayah cards are due and offers Start", () => {
+    const today = { ...wird({ unit: "ayah" }), done: [], total: 0 } as unknown as TodayWird;
+    const { view, handlers } = renderCard({ wird: today, ayahDue: 12 });
+    expect(view.getByText(interpolate(s.hifzAyahModeDue, { n: "12" }))).toBeTruthy();
+    fireEvent.press(view.getByText(s.hifzWirdStart));
+    expect(handlers.onStartReview).toHaveBeenCalledTimes(1);
+    const none = renderCard({ wird: today, ayahDue: 0 }).view;
+    expect(none.getByText(s.hifzAyahModeNone)).toBeTruthy();
+    expect(none.queryByText(s.hifzWirdStart)).toBeNull();
   });
 });

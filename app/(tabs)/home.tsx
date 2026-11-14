@@ -536,6 +536,7 @@ export default function HomeScreen() {
               graceNoteDismissed={habit.recentGraceDay !== null && graceNoteSeen === habit.recentGraceDay}
               onDismissGraceNote={dismissGraceNote}
               onOpenBreak={() => setHabitBreakOpen(true)}
+              wirdLeft={planRemaining > 0}
             />
           ) : habitFailed ? null : (
             // Hold the card's place while it loads, so the content below does not jump down.
@@ -560,6 +561,7 @@ export default function HomeScreen() {
             inboxCount={inboxCount}
             secondLooksDue={secondLooksDue}
             nextLookAt={nextLookAt}
+            ayahDue={totalDue}
             language={uiLanguage}
             isDark={isDark}
             s={s}

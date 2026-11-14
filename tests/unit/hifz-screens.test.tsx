@@ -367,14 +367,15 @@ describe("hifz review screen", () => {
     });
     await flush();
     // The drill that was already queued comes first; the page waits behind it, and the person is told.
-    expect(screen.getByText("2 / 3")).toBeTruthy();
+    // The count is of items, so the page coming back does not add one.
+    expect(screen.getByText("2 / 2")).toBeTruthy();
     expect(screen.getByText(s.hifzPageComesBack)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDrillShow }));
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: s.hifzDrillClean }));
     });
     await flush();
-    expect(screen.getByText("3 / 3")).toBeTruthy();
+    expect(screen.getByText("2 / 2")).toBeTruthy();
     // The page back for its step says so, instead of its tier.
     expect(screen.getByText(s.hifzOnceMore)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
@@ -420,7 +421,9 @@ describe("hifz review screen", () => {
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
 
-    expect(screen.getByText("1 / 1 · First half")).toBeTruthy();
+    // The title names the half; the count stays a count of pages.
+    expect(screen.getByText("1 / 1")).toBeTruthy();
+    expect(screen.getByText(`Page 5 · ${s.hifzHalfA}`)).toBeTruthy();
     expect([...mockRecitation!.lineNumbers!]).toEqual([1, 2]);
     expect(screen.getByText(s.hifzRecitePromptHalf)).toBeTruthy();
     expect(screen.getByText(s.hifzReciteInSalah)).toBeTruthy();
@@ -433,7 +436,7 @@ describe("hifz review screen", () => {
     fireEvent.press(screen.getByRole("button", { name: s.hifzNextHalf }));
     await flush();
 
-    expect(screen.getByText("1 / 1 · Second half")).toBeTruthy();
+    expect(screen.getByText(`Page 5 · ${s.hifzHalfB}`)).toBeTruthy();
     expect([...mockRecitation!.lineNumbers!]).toEqual([3, 4]);
     expect(screen.queryByText(s.hifzReciteInSalah)).toBeNull();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));

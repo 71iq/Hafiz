@@ -263,9 +263,11 @@ const THEME_PALETTES: Record<
       "--color-warm-100": "249 243 235",
       "--color-warm-200": "232 225 218",
       "--color-warm-300": "223 217 209",
-      "--color-warm-400": "185 160 133",
-      "--color-warm-500": "165 138 108",
-      "--color-warm-600": "138 112 88",
+      // Beige secondary text: these steps are text colours only, so they read at 4.6:1 or more on
+      // the beige surfaces (muted and caption text use warm-400).
+      "--color-warm-400": "133 105 79",
+      "--color-warm-500": "122 99 77",
+      "--color-warm-600": "110 90 71",
       "--color-warm-700": "110 90 71",
       "--color-warm-800": "90 74 60",
       "--color-warm-900": "74 62 51",

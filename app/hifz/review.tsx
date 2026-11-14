@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
+import { AccessibilityInfo, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
@@ -525,6 +525,7 @@ function HifzReviewScreen() {
     setError(null);
     setPart("b");
     setPhase("recite");
+    AccessibilityInfo.announceForAccessibility(s.hifzHalfB);
     requestAnimationFrame(() => pageScrollRef.current?.scrollTo({ y: 0, animated: false }));
   };
 
@@ -781,7 +782,11 @@ function HifzReviewScreen() {
 
   // A page in halves proposes the lower of its halves' grades, capped by the lower of their levels.
   const proposal = halves ? proposedHalvesRating(halves) : proposedRating(attempt);
-  const cap = GRADE_CAP[attempt.level];
+  // Reciting the second half, the page's cap is the lower of the two halves' levels.
+  const firstHalfUngraded = inHalves && part === "b" && firstHalf !== null && !isGradable(firstHalf.level);
+  const capLevel: SupportLevel =
+    inHalves && part === "b" && firstHalf ? (Math.min(firstHalf.level, attempt.level) as SupportLevel) : attempt.level;
+  const cap = GRADE_CAP[capLevel];
   const gradeCap = GRADE_CAP[gradedAttempt.level];
   const policyPreviews = useMemo(() => {
     if (!current || !baseSettings) return {};
@@ -902,9 +907,10 @@ function HifzReviewScreen() {
     );
   }
 
-  const itemsLabel = `${formatNumber(index + 1, uiLanguage)} / ${formatNumber(queue.length, uiLanguage)}`;
-  // In halves, the progress also says which half of the page is showing.
-  const progressLabel = inHalves ? `${itemsLabel} · ${part === "a" ? s.hifzHalfA : s.hifzHalfB}` : itemsLabel;
+  // Items, not queue entries: a page back for its learning step keeps its place ("1 / 1", "Once more").
+  const itemKey = (item: QueueItem): string =>
+    item.kind === "drill" ? `drill:${item.item.id}` : item.kind === "page" ? `page:${item.card.row.id}` : `${item.kind}:${item.card.id}`;
+  const progressLabel = `${formatNumber(new Set(queue.slice(0, index + 1).map(itemKey)).size, uiLanguage)} / ${formatNumber(new Set(queue.map(itemKey)).size, uiLanguage)}`;
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   // Teal text under 14 px uses the darker token in light mode to stay readable on tinted chips.
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
@@ -942,7 +948,7 @@ function HifzReviewScreen() {
           <Text
             dir={dir}
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
-            className="text-warm-600 dark:text-neutral-400"
+            className="text-warm-700 dark:text-neutral-400"
           >
             {progressLabel}
           </Text>
@@ -1090,6 +1096,8 @@ function HifzReviewScreen() {
                 >
                   {current.kind === "half"
                     ? `${interpolate(s.hifzPageN, { n: formatNumber(current.page, uiLanguage) })} · ${current.half === "a" ? s.hifzHalfA : s.hifzHalfB}`
+                    : current.kind === "page" && inHalves
+                      ? `${interpolate(s.hifzPageN, { n: formatNumber(current.card.page, uiLanguage) })} · ${part === "a" ? s.hifzHalfA : s.hifzHalfB}`
                     : `${interpolate(s.hifzPageN, { n: formatNumber(current.card.page, uiLanguage) })} · ${interpolate(s.hifzJuzN, { n: formatNumber(juzOfPage(current.card.page), uiLanguage) })}`}
                 </Text>
                 <View className="rounded-full px-3 py-1 bg-primary-accent/10 dark:bg-primary-bright/15">
@@ -1154,7 +1162,9 @@ function HifzReviewScreen() {
                     <Switch value={listener} onValueChange={setListener} />
                   </MirroredRow>
                   <Text dir={dir} variant="caption">
-                    {!isGradable(attempt.level)
+                    {firstHalfUngraded
+                      ? s.hifzHalfNotGraded
+                      : !isGradable(attempt.level)
                       ? s.hifzLevelNotGraded
                       : attempt.level === 3
                         ? s.hifzSwipeHint
@@ -1353,7 +1363,8 @@ function HifzReviewScreen() {
                   ) : isGradable(attempt.level) ? (
                     <Button label={s.hifzDone} onPress={done} disabled={!pageData} />
                   ) : (
-                    <Button label={s.hifzSabaqNext} onPress={skip} disabled={busy} />
+                    // Read at full text, the first half still goes on to the second.
+                    <Button label={inHalves && part === "a" ? s.hifzNextHalf : s.hifzSabaqNext} onPress={skip} disabled={busy} />
                   )}
                   {/* Recited in salah logs the whole page, so in halves it is offered before the first half only. */}
                   {current.kind === "page" && (!inHalves || part === "a") ? (
@@ -1423,7 +1434,8 @@ function HifzReviewScreen() {
         visible={exitOpen}
         title={s.habitExitTitle}
         tone="neutral"
-        message={s.habitExitBody}
+        // In halves, leaving before the second half's grade leaves the page ungraded.
+        message={inHalves && current?.kind === "page" ? s.habitExitBodyHalf : s.habitExitBody}
         cancelLabel={s.habitExitStay}
         confirmLabel={s.habitExitLeave}
         isDark={isDark}
