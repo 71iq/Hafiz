@@ -142,7 +142,10 @@ jest.mock("@/components/habit/SessionHabitCards", () => ({
   strongerWirdEvent: (current: unknown, next: { kind: string }) => (next.kind === "none" ? current : next),
 }));
 jest.mock("@/components/habit/ZaytMood", () => ({ ZaytMood: () => null }));
-jest.mock("@/components/ui/Toast", () => ({ Toast: () => null }));
+jest.mock("@/components/ui/Toast", () => {
+  const { Text } = jest.requireActual<typeof import("react-native")>("react-native");
+  return { Toast: ({ message }: { message: string }) => <Text>{message}</Text> };
+});
 jest.mock("@/lib/fsrs/review-sessions", () => ({ startReviewSession: jest.fn(), endReviewSession: jest.fn() }));
 jest.mock("@/lib/fsrs/queries", () => ({
   ...jest.requireActual<typeof import("@/lib/fsrs/queries")>("@/lib/fsrs/queries"),
@@ -363,14 +366,17 @@ describe("hifz review screen", () => {
       void buttons.onGrade(1);
     });
     await flush();
-    // The drill that was already queued comes first; the page waits behind it.
+    // The drill that was already queued comes first; the page waits behind it, and the person is told.
     expect(screen.getByText("2 / 3")).toBeTruthy();
+    expect(screen.getByText(s.hifzPageComesBack)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDrillShow }));
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: s.hifzDrillClean }));
     });
     await flush();
     expect(screen.getByText("3 / 3")).toBeTruthy();
+    // The page back for its step says so, instead of its tier.
+    expect(screen.getByText(s.hifzOnceMore)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
     await flush();
     await act(async () => {

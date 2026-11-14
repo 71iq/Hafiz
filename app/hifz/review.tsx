@@ -81,7 +81,7 @@ import { hapticMedium } from "@/lib/haptics";
 type AyahText = { qcf2: string; page: number; surah: number; ayah: number };
 
 type QueueItem =
-  | { kind: "page"; card: PageCard; retrievability: number | null }
+  | { kind: "page"; card: PageCard; retrievability: number | null; again?: boolean }
   | { kind: "half"; card: StudyCardRow; page: number; half: Half }
   | { kind: "seam"; card: StudyCardRow; page: number; prompt: AyahText | null; answer: AyahText | null }
   | { kind: "cloze"; card: StudyCardRow; surah: number; ayah: number; word: number; page: number }
@@ -654,7 +654,8 @@ function HifzReviewScreen() {
       const coveredBefore = card.history.grades.some((grade) => grade.date === reviewedOn);
       if (!coveredBefore) setPlanProgress((value) => (value ? { ...value, done: value.done + 1 } : value));
       // A wird milestone is the bigger news; the half page shows up in the queue either way.
-      if (!showWirdNotice(result.wird) && result.remediation.half) {
+      const wirdShown = showWirdNotice(result.wird);
+      if (!wirdShown && result.remediation.half) {
         setNotice(result.remediation.half === "a" ? s.hifzHalfScheduledA : s.hifzHalfScheduledB);
       }
       // The page itself follows FSRS (SCH-08): a relearning step due within the learn-ahead window
@@ -670,8 +671,11 @@ function HifzReviewScreen() {
               history: { ...card.history, grades: [...card.history.grades, { date: reviewedOn, rating: transition.reviewRecord.rating }] },
             },
             retrievability: current.retrievability,
+            // Shown with "Once more", so the page coming back does not read as a grade that failed to save.
+            again: true,
           }
         : null;
+      if (requeue && !wirdShown && !result.remediation.half) setNotice(s.hifzPageComesBack);
       const totals = addTotals({
         pages: firstInSession ? 1 : 0,
         clean: firstInSession && rating >= Rating.Good && markedCount === 0 ? 1 : 0,
@@ -1090,7 +1094,11 @@ function HifzReviewScreen() {
                 </Text>
                 <View className="rounded-full px-3 py-1 bg-primary-accent/10 dark:bg-primary-bright/15">
                   <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accentText }}>
-                    {current.kind === "half" ? s.hifzStrengthenChip : tierLabel(current.card.tier, s)}
+                    {current.kind === "half"
+                      ? s.hifzStrengthenChip
+                      : current.kind === "page" && current.again
+                        ? s.hifzOnceMore
+                        : tierLabel(current.card.tier, s)}
                   </Text>
                 </View>
               </MirroredRow>
