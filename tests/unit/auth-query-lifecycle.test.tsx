@@ -84,6 +84,8 @@ const scopedRoots = [
   "reflectionFeed",
   "reflections",
   "reflectionComments",
+  // A count includes the viewer's own private reflections (ETH-07), so it goes with the account.
+  "reflectionCount",
   "currentUserPublicAchievementUnlocks",
 ] as const;
 const publicKeys = [
@@ -92,7 +94,6 @@ const publicKeys = [
   ["publicAchievementUnlocks", "synthetic-user"],
   ["publicReviewActivity", "synthetic-user"],
   ["publicSurahProgress", "synthetic-user"],
-  ["reflectionCount", 1, 1],
   ["reflectionFeedOptions", "en"],
 ] as const;
 const userA = "00000000-0000-4000-8000-000000000001";
@@ -168,7 +169,7 @@ afterEach(() => {
 });
 
 describe("auth-scoped query cache lifecycle", () => {
-  it("evicts exactly the four scoped roots on an unknown initial binding and keeps public roots", () => {
+  it("evicts exactly the scoped roots on an unknown initial binding and keeps public roots", () => {
     const queryClient = client();
     seed(queryClient);
     const stop = bindAuthQueryCache(queryClient);

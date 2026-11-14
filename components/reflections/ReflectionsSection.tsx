@@ -58,7 +58,7 @@ function ReflectionsSectionContent({
 
   // Fetch count (always, for badge)
   const { data: count = 0 } = useQuery({
-    queryKey: reflectionQueryKeys.count({ surah, ayah }),
+    queryKey: reflectionQueryKeys.count({ surah, ayah, viewerId: user?.id }),
     queryFn: () => fetchReflectionCount(surah, ayah),
     enabled: supabaseConfigured,
     staleTime: 1000 * 60 * 5,

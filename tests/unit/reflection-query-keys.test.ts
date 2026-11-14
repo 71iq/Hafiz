@@ -38,9 +38,11 @@ describe("reflection query keys preserve existing cache contracts", () => {
     [2, 255],
     [114, 6],
     [0, -1],
-  ])("preserves exact ayah/public-count prefixes %s/%s", (surah, ayah) => {
+  ])("preserves exact ayah prefixes and keys each count by its viewer %s/%s", (surah, ayah) => {
     expect(keys.reflections.ayah({ surah, ayah })).toEqual(["reflections", surah, ayah]);
-    expect(keys.count({ surah, ayah })).toEqual(["reflectionCount", surah, ayah]);
+    expect(keys.countAyah({ surah, ayah })).toEqual(["reflectionCount", surah, ayah]);
+    expect(keys.count({ surah, ayah, viewerId: "synthetic-a" })).toEqual(["reflectionCount", surah, ayah, "synthetic-a"]);
+    expect(keys.count({ surah, ayah })).toEqual(["reflectionCount", surah, ayah, "signed-out"]);
   });
   it("retains family prefixes and disabled null comment target", () => {
     expect(keys.feed.all).toEqual(["reflectionFeed"]);

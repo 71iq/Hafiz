@@ -8,6 +8,8 @@ const viewerRoots = [
   reflectionQueryKeys.feed.all[0],
   reflectionQueryKeys.reflections.all[0],
   reflectionQueryKeys.comments.all[0],
+  // A count includes the viewer's own private reflections, so it goes with the account.
+  reflectionQueryKeys.countAyah({ surah: 0, ayah: 0 })[0],
   "currentUserPublicAchievementUnlocks",
 ];
 const cacheOwners = new WeakMap<QueryClient, { owner: AuthOwner; status: "refreshing" | "complete" | "incomplete" }>();

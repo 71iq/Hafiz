@@ -83,7 +83,7 @@ export function WriteReflectionSheet({
       // Invalidate reflection queries for this ayah range
       for (let a = ayahStart; a <= ayahEnd; a++) {
         queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.ayah({ surah, ayah: a }) });
-        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.count({ surah, ayah: a }) });
+        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.countAyah({ surah, ayah: a }) });
       }
       queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
       setContent("");
