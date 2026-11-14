@@ -168,7 +168,8 @@ export function SabaqSecondLook({
           )}
           <Button variant="outline" className={OUTLINE_BORDER} label={continuesToNewLines ? s.hifzSecondLookSkipToNew : s.hifzSecondLookSkipForNow} onPress={onSkip} disabled={busy} />
           <Text dir={dir} align="center" variant="caption" className="text-warm-600 dark:text-neutral-400" style={{ lineHeight: 18 }}>
-            {s.hifzSecondLookSkipHint}
+            {/* Skipping skips every look still to come, so the hint counts them. */}
+            {total - index > 1 ? s.hifzSecondLooksSkipHint : s.hifzSecondLookSkipHint}
           </Text>
         </View>
       </View>

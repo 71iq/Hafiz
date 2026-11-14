@@ -257,12 +257,15 @@ describe("sabaq second look (SBQ-03)", () => {
     jest.mocked(loadSecondLooks).mockResolvedValue({ due: [look(1), look(2)], nextAt: null });
     await open();
     expect(screen.getByText("1 of 2")).toBeTruthy();
+    // Skipping skips both, so the hint counts them.
+    expect(screen.getByText(s.hifzSecondLooksSkipHint)).toBeTruthy();
     press(s.hifzDrillShow);
     await act(async () => {
       void grading().onGrade(4);
     });
     await flush();
     expect(screen.getByText("2 of 2")).toBeTruthy();
+    expect(screen.getByText(s.hifzSecondLookSkipHint)).toBeTruthy();
     expect(screen.getByText("Page 5 · Lines 2 to 2")).toBeTruthy();
     // The next look starts hidden again.
     mockGrading = null;

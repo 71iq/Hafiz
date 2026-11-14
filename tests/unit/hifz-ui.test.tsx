@@ -125,8 +125,12 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
 
   it("saves the 20-times preset with the edited plan", async () => {
     const view = await openPace(savedPlan);
+    // Each set of choices is one labelled group for screen readers. The group is not itself an
+    // accessible element (that would hide its options on iOS), so it is found by its props.
+    const groups = view.UNSAFE_getAllByProps({ accessibilityRole: "radiogroup" }).map((node) => node.props.accessibilityLabel);
+    expect(groups).toEqual(expect.arrayContaining([s.hifzPaceTitle, s.hifzRepsTitle]));
     expect(checked(view, s.hifzRepsLookingThenMemory)).toBe(true);
-    expect(view.getByText(/Attributed to Sh\. 'Abd al-Muhsin al-Qasim\. Its exact wording is not verified\./)).toBeTruthy();
+    expect(view.getByText(/Attributed to Shaykh 'Abd al-Muhsin al-Qasim\. We have not verified its exact wording\./)).toBeTruthy();
     fireEvent.press(radio(view, s.hifzRepsTwentyTimes));
     expect(checked(view, s.hifzRepsTwentyTimes)).toBe(true);
     expect(checked(view, s.hifzRepsLookingThenMemory)).toBe(false);

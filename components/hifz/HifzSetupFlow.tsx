@@ -91,7 +91,8 @@ function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: 
         {title}
       </Text>
       {hint ? (
-        <Text variant="caption" className="mt-0.5">
+        // Readable on the selected teal tint in both themes; the shared caption tone is lighter.
+        <Text variant="caption" className="mt-0.5 text-warm-600 dark:text-neutral-400" style={{ lineHeight: 18 }}>
           {hint}
         </Text>
       ) : null}
@@ -140,7 +141,12 @@ function CountStepper({
       </Text>
       <MirroredRow dir={dir} className="items-center rounded-full bg-surface-high dark:bg-surface-dark-high p-1">
         {step(-1, value <= min, s.hifzRepsFewer)}
-        <View className="min-w-12 items-center justify-center px-2">
+        <View
+          className="min-w-12 items-center justify-center px-2"
+          accessible
+          accessibilityLabel={`${label}: ${formatNumber(value, language)}`}
+          accessibilityLiveRegion="polite"
+        >
           <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }} className="text-charcoal dark:text-neutral-100">
             {formatNumber(value, language)}
           </Text>
@@ -190,19 +196,21 @@ function SabaqRepetitionsSection({
           {s.hifzRepsHint}
         </Text>
       </View>
-      <OptionCard
-        title={s.hifzRepsLookingThenMemory}
-        hint={s.hifzRepsLookingThenMemoryHint}
-        selected={choice === "looking_then_memory"}
-        onPress={() => choosePreset("looking_then_memory")}
-      />
-      <OptionCard
-        title={s.hifzRepsTwentyTimes}
-        hint={s.hifzRepsTwentyTimesHint}
-        selected={choice === "twenty_times"}
-        onPress={() => choosePreset("twenty_times")}
-      />
-      <OptionCard title={s.hifzRepsCustom} hint={s.hifzRepsCustomHint} selected={choice === "custom"} onPress={() => setCustomOpen(true)} />
+      <View accessibilityRole="radiogroup" accessibilityLabel={s.hifzRepsTitle} style={{ gap: 10 }}>
+        <OptionCard
+          title={s.hifzRepsLookingThenMemory}
+          hint={s.hifzRepsLookingThenMemoryHint}
+          selected={choice === "looking_then_memory"}
+          onPress={() => choosePreset("looking_then_memory")}
+        />
+        <OptionCard
+          title={s.hifzRepsTwentyTimes}
+          hint={s.hifzRepsTwentyTimesHint}
+          selected={choice === "twenty_times"}
+          onPress={() => choosePreset("twenty_times")}
+        />
+        <OptionCard title={s.hifzRepsCustom} hint={s.hifzRepsCustomHint} selected={choice === "custom"} onPress={() => setCustomOpen(true)} />
+      </View>
       {choice === "custom" ? (
         <View className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-2" style={{ gap: 4 }}>
           {counts.map(({ count, label }) => (
@@ -420,18 +428,20 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
 
         {step === "pace" ? (
           <View style={{ gap: 10 }}>
-            {PRESETS.filter((candidate) => (goal === "keep" ? candidate === "maintenance" : candidate !== "maintenance")).map((candidate) => (
-              <OptionCard
-                key={candidate}
-                title={presetLabel(candidate, s)}
-                hint={interpolate(s.hifzPresetSummary, { minutes: formatMinutes(applyPreset(plan, candidate).dailyBudgetMin, language) })}
-                selected={preset === candidate}
-                onPress={() => {
-                  setPreset(candidate);
-                  setPlan((value) => applyPreset(value, candidate));
-                }}
-              />
-            ))}
+            <View accessibilityRole="radiogroup" accessibilityLabel={s.hifzPaceTitle} style={{ gap: 10 }}>
+              {PRESETS.filter((candidate) => (goal === "keep" ? candidate === "maintenance" : candidate !== "maintenance")).map((candidate) => (
+                <OptionCard
+                  key={candidate}
+                  title={presetLabel(candidate, s)}
+                  hint={interpolate(s.hifzPresetSummary, { minutes: formatMinutes(applyPreset(plan, candidate).dailyBudgetMin, language) })}
+                  selected={preset === candidate}
+                  onPress={() => {
+                    setPreset(candidate);
+                    setPlan((value) => applyPreset(value, candidate));
+                  }}
+                />
+              ))}
+            </View>
             {/* Only when editing a saved plan: onboarding keeps the default counts (5.1, ONB-01). */}
             {initialPlan && goal !== "keep" ? (
               <SabaqRepetitionsSection
