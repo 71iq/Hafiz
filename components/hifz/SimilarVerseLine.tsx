@@ -4,6 +4,7 @@ import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import { formatNumber } from "@/lib/i18n/count";
+import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import type { SimilarRef } from "@/lib/hifz/similar";
 import { differingWords } from "@/lib/hifz/word-diff";
@@ -40,9 +41,52 @@ const UNDERLINE_STYLE = {
   ...(Platform.OS === "web" ? { textDecorationSkipInk: "none" } : null),
 } as const;
 const AYAH_END_STYLE = { fontSize: 15 } as const;
+// Off screen but read, and left out when the verse is copied.
+const SCREEN_READER_ONLY = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  opacity: 0,
+  userSelect: "none",
+} as const;
 
 function verseWords(reference: SimilarRef): string[] {
   return [reference.pre, reference.similar, reference.post].join(" ").split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Where the passage leaves words of the Quran out (SimilarRef.gaps), a muted "…". A screen reader
+ * reads the mark as a stray symbol or not at all, so it is named: on the web here, in its place; on
+ * native in the verse's label (spokenVerse), since the spans of one text are read as one.
+ */
+function GapMark({ label }: { label: string }) {
+  const web = Platform.OS === "web";
+  return (
+    <>
+      <RNText className="text-warm-700 dark:text-neutral-400" aria-hidden={web}>
+        {" …"}
+      </RNText>
+      {web ? <RNText style={SCREEN_READER_ONLY}>{` ${label} `}</RNText> : null}
+    </>
+  );
+}
+
+/** The verse as a native screen reader says it: its words and ayah ends as shown, each gap named. */
+function spokenVerse(
+  words: readonly string[],
+  ayahEnds: ReadonlyMap<number, number>,
+  gaps: ReadonlySet<number>,
+  label: string,
+  isRTL: boolean,
+): string {
+  const comma = isRTL ? "،" : ",";
+  return words
+    .map((word, index) => {
+      const ayah = ayahEnds.get(index);
+      return `${word}${ayah !== undefined ? ` (${toArabicNumber(ayah)})` : ""}${gaps.has(index) ? `${comma} ${label}${comma}` : ""}`;
+    })
+    .join(" ");
 }
 
 /**
@@ -104,6 +148,8 @@ export function SimilarVerseLine({
   const sharedTo = sharedFrom + reference.similar.split(/\s+/).filter(Boolean).length;
   const marks = differs ? underlined(differs, sharedFrom, sharedTo) : null;
   const ayahEnds = new Map((reference.ayahEnds ?? []).map((end) => [end.after, end.ayah]));
+  const gaps = new Set(reference.gaps ?? []);
+  const gapLabel = strings[isRTL ? "ar" : "en"].hifzSimilarWordsLeftOut;
   return (
     <View style={{ gap: 4 }}>
       {showReference ? (
@@ -138,6 +184,9 @@ export function SimilarVerseLine({
       <Text
         style={{ writingDirection: "rtl", textAlign: "right", fontSize: 19, lineHeight: 34, opacity: muted ? 0.85 : 1 }}
         className="text-charcoal dark:text-neutral-100"
+        accessibilityLabel={
+          gaps.size > 0 && Platform.OS !== "web" ? spokenVerse(words, ayahEnds, gaps, gapLabel, isRTL) : undefined
+        }
       >
         {words.map((word, index) => {
           const inPassage = index >= sharedFrom && index < sharedTo;
@@ -162,6 +211,7 @@ export function SimilarVerseLine({
                   {` (${toArabicNumber(ayahEnd)})`}
                 </RNText>
               ) : null}
+              {gaps.has(index) ? <GapMark label={gapLabel} /> : null}
             </Fragment>
           );
         })}

@@ -1,7 +1,7 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { putCardRow } from "@/lib/fsrs/queries";
 import type { StudyCardRow } from "@/lib/fsrs/types";
-import { ayahSpanIn, wordKey } from "@/lib/hifz/word-diff";
+import { ayahSpanIn, continuesIn, endsAs, foundIn, runsOnIn, wordKey } from "@/lib/hifz/word-diff";
 
 /**
  * What tells two verses of a pair apart when their wording is the same and a prompt hides their
@@ -26,6 +26,12 @@ export type SimilarRef = Readonly<{
    * ayah's own words are found with certainty (ayahSpanIn); otherwise none.
    */
   ayahEnds?: readonly { after: number; ayah: number }[];
+  /**
+   * Where the passage leaves words of the Quran out: after the word at each position (counted as for
+   * `ayahEnds`), the next segment does not follow on in the Quran. Only where that is certain
+   * (continuesIn); otherwise none.
+   */
+  gaps?: readonly number[];
 }>;
 
 type VerseKey = Readonly<{ surah: number; ayah: number }>;
@@ -53,12 +59,16 @@ type RefRow = {
   text_uthmani: string;
   /** The ayah before it in its surah, null for an ayah 1. */
   previous_text: string | null;
+  /** The ayah after it in its surah, null for a surah's last ayah. */
+  next_text: string | null;
 };
 
 const REF_COLUMNS =
-  "r.group_id, g.kind, r.sort_order, r.surah, r.ayah, r.surah_name_ar, r.pre_text, r.similar_text, r.post_text, q.v2_page, q.text_uthmani, prev.text_uthmani AS previous_text";
-/** The ayah before each ref, for the ayah end before it (ayahEndsIn). */
+  "r.group_id, g.kind, r.sort_order, r.surah, r.ayah, r.surah_name_ar, r.pre_text, r.similar_text, r.post_text, q.v2_page, q.text_uthmani, prev.text_uthmani AS previous_text, nxt.text_uthmani AS next_text";
+/** The ayah before each ref, for the ayah end before it (ayahEndsIn) and the joins in its passage (toRef). */
 const PREVIOUS_JOIN = "LEFT JOIN quran_text prev ON prev.surah = r.surah AND prev.ayah = r.ayah - 1";
+/** The ayah after each ref, for the joins in its passage and the data's ayah end marks (toRef). */
+const NEXT_JOIN = "LEFT JOIN quran_text nxt ON nxt.surah = r.surah AND nxt.ayah = r.ayah + 1";
 
 /** Harakat, Quranic annotation marks and tatweel, which do not change which word it is. */
 const MARKS = /[ؐ-ًؚ-ٰٟۖ-ۭـ]/g;
@@ -95,17 +105,80 @@ function hasSegments(row: RefRow): boolean {
   return [row.pre_text, row.similar_text, row.post_text].some((segment) => segment !== null && segment.trim() !== "");
 }
 
+/** "﴿12﴾": an ayah end that some refs in the bundled data mark inside the Quran text, in any digits. */
+const DATA_AYAH_END = /﴿\s*(\p{Nd}+)\s*﴾/gu;
+
+/** A data ayah end mark after the word at `after` of its segment (-1 before its first word). */
+type DataMark = { after: number; ayah: number | null };
+
+/** The number in a mark, from Western, Arabic-Indic or Persian digits, whose code points end in their value in hex. */
+function markNumber(digits: string): number | null {
+  if (!/^(?:[0-9]+|[٠-٩]+|[۰-۹]+)$/.test(digits)) return null;
+  return Number([...digits].map((digit) => digit.charCodeAt(0) % 16).join(""));
+}
+
 /**
- * One ref for display. Tail-only groups (the "similar endings" groups) carry no segments, so the verse
- * falls back to its Unicode Quran text, with the ending it shares with `others` marked: the longest
- * ending shared with any of them. Never the page-font glyphs (AGENTS.md).
+ * A segment as shown, word by word. Some refs in the bundled data carry marks inside the Quran text
+ * that the verse never has: a Latin full stop, a stray "*", or the data's own ayah end such as
+ * "﴿12﴾", which would sit beside the app's number. They are dropped here (the data itself is
+ * protected and left as it is); where an ayah end mark was is kept, so the Quran text can confirm it
+ * (withDataEnds).
  */
+function displaySegment(text: string | null): { words: string[]; marks: DataMark[] } {
+  const words: string[] = [];
+  const marks: DataMark[] = [];
+  for (const token of (text ?? "").replace(DATA_AYAH_END, " ﴿$1﴾ ").replace(/[.*]/g, "").split(/\s+/)) {
+    const mark = /^﴿(\p{Nd}+)﴾$/u.exec(token);
+    if (mark) marks.push({ after: words.length - 1, ayah: markNumber(mark[1]) });
+    else if (token !== "") words.push(token);
+  }
+  return { words, marks };
+}
+
 /**
- * A segment as shown: some refs in the bundled data carry a Latin full stop inside the Quran text, which
- * the verse never has, so it is dropped here (the data itself is protected and left as it is).
+ * How many words at the start of `post` repeat the end of the passage before it where the Quran does
+ * not: the bundled text sometimes starts the words after the passage over from its last words
+ * ("لعلكم ترحمون" twice in 3:132, "عليها" in 11:82). Only when the Quran does not repeat them there
+ * ("خلق خلق" in 86:5-6 stays) and runs on, word for word, from `before` into the rest of `post`, or,
+ * when nothing is left, is certain to go on with other words.
  */
-function displaySegment(text: string | null): string {
-  return (text ?? "").replace(/\./g, "").replace(/\s{2,}/g, " ").trim();
+function repeatedWords(before: readonly string[], post: readonly string[], quran: readonly string[]): number {
+  if (runsOnIn(before, post, quran)) return 0;
+  for (let count = Math.min(before.length, post.length); count > 0; count -= 1) {
+    const ending = before.slice(-count).map(wordKey);
+    if (ending.includes("") || ending.some((key, index) => key !== wordKey(post[index]))) continue;
+    const rest = post.slice(count);
+    const sure = rest.length === 0 ? continuesIn(before, post, quran) === false : runsOnIn(before, rest, quran);
+    return sure ? count : 0;
+  }
+  return 0;
+}
+
+/**
+ * The ayah ends of a passage with the data's own marks added where the Quran text confirms them: a
+ * mark for the ayah before the ref's, its own or the one after, where the words before it end as
+ * that ayah does and words of another ayah follow, as for its own end (ayahEndsIn). A mark at a
+ * place or for an ayah already numbered adds nothing.
+ */
+function withDataEnds(
+  passage: readonly string[],
+  marks: readonly DataMark[],
+  row: RefRow,
+  ends: readonly { after: number; ayah: number }[],
+): { after: number; ayah: number }[] {
+  const texts = new Map([
+    [row.ayah - 1, row.previous_text],
+    [row.ayah, row.text_uthmani],
+    [row.ayah + 1, row.next_text],
+  ]);
+  const all = [...ends];
+  for (const { after, ayah } of marks) {
+    const text = ayah === null ? null : texts.get(ayah);
+    if (ayah === null || !text || after < 0 || all.some((end) => end.after === after || end.ayah === ayah)) continue;
+    const followed = passage.slice(after + 1).some((word) => wordKey(word) !== "");
+    if (followed && endsAs(passage.slice(0, after + 1), text.split(/\s+/))) all.push({ after, ayah });
+  }
+  return all.sort((a, b) => a.after - b.after);
 }
 
 /**
@@ -117,8 +190,7 @@ function displaySegment(text: string | null): string {
  * Words with no letters, such as ۞ or a pause mark, never count as an ayah's text. The passage's
  * words are split as SimilarVerseLine splits them.
  */
-function ayahEndsIn(segments: readonly string[], row: RefRow): { after: number; ayah: number }[] {
-  const passage = segments.join(" ").split(/\s+/).filter(Boolean);
+function ayahEndsIn(passage: readonly string[], row: RefRow): { after: number; ayah: number }[] {
   const span = ayahSpanIn(passage, row.text_uthmani.split(/\s+/).filter(Boolean));
   if (!span) return [];
   const keyed = (from: number, to: number) =>
@@ -144,13 +216,48 @@ function endsWith(ayahText: string, tail: readonly string[]): boolean {
   return mismatches <= (tail.length >= 6 ? 1 : 0);
 }
 
+/**
+ * One ref for display. Tail-only groups (the "similar endings" groups) carry no segments, so the verse
+ * falls back to its Unicode Quran text, with the ending it shares with `others` marked: the longest
+ * ending shared with any of them. Never the page-font glyphs (AGENTS.md). A ref with segments shows
+ * them as displaySegment cleans them, without words its `post` repeats (repeatedWords), with a gap
+ * where a segment does not follow on in the Quran and the ayah ends that are certain.
+ */
 function toRef(row: RefRow, others: readonly RefRow[]): SimilarRef {
   const base = { surah: row.surah, ayah: row.ayah, surahName: row.surah_name_ar ?? "", page: row.v2_page };
   if (hasSegments(row)) {
-    const pre = displaySegment(row.pre_text);
-    const similar = displaySegment(row.similar_text);
-    const post = displaySegment(row.post_text);
-    return { ...base, pre, similar, post, ayahEnds: ayahEndsIn([pre, similar, post], row) };
+    const [pre, similar, post] = [row.pre_text, row.similar_text, row.post_text].map(displaySegment);
+    const quran = [row.previous_text, row.text_uthmani, row.next_text]
+      .filter((text): text is string => typeof text === "string")
+      .join(" ")
+      .split(/\s+/);
+    // The joins are judged only when the passage is found around its own ayah; some refs carry the
+    // text of another ayah, and there nothing about its joins is certain.
+    const placed = foundIn(similar.words, quran);
+    const repeated = placed ? repeatedWords([...pre.words, ...similar.words], post.words, quran) : 0;
+    const segments = [pre.words, similar.words, post.words.slice(repeated)];
+    const passage = segments.flat();
+    const starts = [0, pre.words.length, pre.words.length + similar.words.length];
+    const gaps = [1, 2]
+      .filter((index) => placed && segments[index - 1].length > 0 && segments[index].length > 0)
+      .filter((index) => continuesIn(passage.slice(0, starts[index]), passage.slice(starts[index]), quran) === false)
+      .map((index) => starts[index] - 1);
+    // Each mark counted across the passage; one inside the repeated words dropped from `post` goes with them.
+    const marks = [
+      pre.marks,
+      similar.marks,
+      post.marks.map((mark) => ({ ...mark, after: mark.after - repeated })),
+    ].flatMap((list, index) =>
+      list.filter((mark) => mark.after >= -1).map((mark) => ({ ...mark, after: starts[index] + mark.after })),
+    );
+    return {
+      ...base,
+      pre: segments[0].join(" "),
+      similar: segments[1].join(" "),
+      post: segments[2].join(" "),
+      ayahEnds: withDataEnds(passage, marks, row, ayahEndsIn(passage, row)),
+      gaps,
+    };
   }
   const own = words(row.text_uthmani);
   const shared = Math.max(0, ...others.map((other) => sharedEnding(own, words(other.text_uthmani))));
@@ -193,6 +300,7 @@ async function readRefRows(db: DatabaseExecutor, ayahs: readonly VerseKey[]): Pr
        JOIN mutashabihat_groups g ON g.id = r.group_id
        JOIN quran_text q ON q.surah = r.surah AND q.ayah = r.ayah
        ${PREVIOUS_JOIN}
+       ${NEXT_JOIN}
       WHERE r.group_id IN (SELECT group_id FROM mutashabihat_refs WHERE ${where})
       ORDER BY r.group_id, r.sort_order`,
     ayahs.flatMap((ayah) => [ayah.surah, ayah.ayah]),
@@ -223,6 +331,7 @@ export async function similarGroupsOnPages(db: DatabaseExecutor, pages: readonly
        JOIN mutashabihat_groups g ON g.id = r.group_id
        JOIN quran_text q ON q.surah = r.surah AND q.ayah = r.ayah
        ${PREVIOUS_JOIN}
+       ${NEXT_JOIN}
       WHERE r.group_id IN (
               SELECT m.group_id FROM mutashabihat_refs m
                 JOIN quran_text p ON p.surah = m.surah AND p.ayah = m.ayah

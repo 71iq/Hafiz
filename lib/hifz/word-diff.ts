@@ -35,6 +35,129 @@ export function wordKey(word: string): string {
   return normalizeArabicWord(spelled).replace(/ا+/g, "ا");
 }
 
+/**
+ * A word cut down to its consonants, for telling whether two runs of words are the same stretch of
+ * the Quran when the bundled similar-verse text spells or splits them differently from the Mushaf
+ * text: "يَٰبَنِىٓ" against "يا بني", "ءَامَنُوا۟" against "آمنوا", "بِهِۦ" against "به". Long vowels,
+ * their seats and hamza are dropped, and a doubled letter counts once ("ٱلَّيْلِ", "الليل"). Too loose
+ * to tell single words apart, which wordKey does, so only runs of words are compared this way.
+ */
+function skeleton(word: string): string {
+  return wordKey(word)
+    .replace(/[^ء-ي]/g, "")
+    .replace(/[اءويى]/g, "")
+    .replace(/(.)\1+/g, "$1");
+}
+
+/** The skeletons of the words that have one; "يا", "أو" or ۩ have none and are skipped on both sides. */
+function skeletons(words: readonly string[]): string[] {
+  return words.map(skeleton).filter((key) => key !== "");
+}
+
+/** How many words a join compares on each side. */
+const JOIN_WORDS = 3;
+
+function placesOf(text: readonly string[], run: readonly string[]): number[] {
+  const places: number[] = [];
+  for (let at = 0; at + run.length <= text.length; at += 1) {
+    if (run.every((key, offset) => text[at + offset] === key)) places.push(at);
+  }
+  return places;
+}
+
+/**
+ * Where `run` sits in `text`, from its last words (side "end") or its first ("start"): the position
+ * after its last word or of its first, taking more of its words until one place is left. Null when
+ * it is not there, or not in one place, or when fewer than two words would place it.
+ */
+function placeOf(text: readonly string[], run: readonly string[], side: "start" | "end"): number | null {
+  for (let count = Math.min(JOIN_WORDS, run.length); count >= 2 && count <= run.length; count += 1) {
+    const part = side === "end" ? run.slice(-count) : run.slice(0, count);
+    const places = placesOf(text, part);
+    if (places.length === 0) return null;
+    if (places.length === 1) return side === "end" ? places[0] + count : places[0];
+  }
+  return null;
+}
+
+/** Two short runs read alike when one word at most is added, left out or spelled past the skeleton. */
+function alike(quran: readonly string[], shown: readonly string[]): boolean {
+  return commonSubsequence(quran, shown).filter(Boolean).length >= quran.length - 1;
+}
+
+/** Whether the last words of `before` run straight into the first of `after` somewhere in `text`. */
+function runsInto(text: readonly string[], before: readonly string[], after: readonly string[]): boolean {
+  const run = [...before.slice(-JOIN_WORDS), ...after.slice(0, JOIN_WORDS)];
+  // Joined up as well, for words the two texts split in different places ("ذَرُونَا نَتَّبِعْكُمْ").
+  const joined = (keys: readonly string[]) => keys.join("").replace(/(.)\1+/g, "$1");
+  return placesOf(text, run).length > 0 || joined(text).includes(joined(run));
+}
+
+/** Whether the end of `left` runs straight into the start of `right` in `quran`, word for word. */
+export function runsOnIn(left: readonly string[], right: readonly string[], quran: readonly string[]): boolean {
+  const before = skeletons(left);
+  const after = skeletons(right);
+  return before.length > 0 && after.length > 0 && runsInto(skeletons(quran), before, after);
+}
+
+/**
+ * Whether the words of `right` follow on from those of `left` in the Quran, judged against `quran`,
+ * the ayat around them in order. True when the end of one runs into the start of the other there,
+ * false when a side is found in one place and the Quran goes on (or comes before) with other words,
+ * null when that cannot be told: a side is not there, or sits at the edge of `quran`, or the two
+ * sides disagree. A spelling or word split the skeleton does not cover, or a single word the bundled
+ * text leaves out or adds, never counts as a break.
+ */
+export function continuesIn(
+  left: readonly string[],
+  right: readonly string[],
+  quran: readonly string[],
+): boolean | null {
+  const before = skeletons(left);
+  const after = skeletons(right);
+  const text = skeletons(quran);
+  if (before.length === 0 || after.length === 0 || text.length === 0) return null;
+  if (runsInto(text, before, after)) return true;
+  const tail = before.slice(-JOIN_WORDS);
+  const head = after.slice(0, JOIN_WORDS);
+  const verdicts: boolean[] = [];
+  const end = placeOf(text, before, "end");
+  if (end !== null) {
+    const next = text.slice(end, end + head.length);
+    if (next.length >= 2) verdicts.push(alike(next, head.slice(0, next.length)));
+  }
+  const start = placeOf(text, after, "start");
+  if (start !== null) {
+    const previous = text.slice(Math.max(0, start - tail.length), start);
+    if (previous.length >= 2) verdicts.push(alike(previous, tail.slice(tail.length - previous.length)));
+  }
+  if (verdicts.length === 0) return null;
+  if (verdicts.every(Boolean)) return true;
+  return verdicts.some(Boolean) ? null : false;
+}
+
+/** Whether some of `words` are found in `quran` as they run: their first few or their last few. */
+export function foundIn(words: readonly string[], quran: readonly string[]): boolean {
+  const own = skeletons(words);
+  const text = skeletons(quran);
+  return (
+    own.length > 0 &&
+    (placesOf(text, own.slice(0, JOIN_WORDS)).length > 0 || placesOf(text, own.slice(-JOIN_WORDS)).length > 0)
+  );
+}
+
+/** Whether `words` end as `ayah` does, compared over its last few words. */
+export function endsAs(words: readonly string[], ayah: readonly string[]): boolean {
+  const shown = skeletons(words);
+  const own = skeletons(ayah);
+  const count = Math.min(JOIN_WORDS, own.length);
+  return (
+    count > 0 &&
+    shown.length >= count &&
+    shown.slice(-count).every((key, index) => key === own[own.length - count + index])
+  );
+}
+
 /** For each word of `a`, whether it is in a longest common subsequence of `a` and `b`. */
 function commonSubsequence(a: readonly string[], b: readonly string[]): boolean[] {
   // lengths[i][j]: the longest common subsequence of a[i..] and b[j..].
