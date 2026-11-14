@@ -1,7 +1,7 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { putCardRow } from "@/lib/fsrs/queries";
 import type { StudyCardRow } from "@/lib/fsrs/types";
-import { ayahSpanIn } from "@/lib/hifz/word-diff";
+import { ayahSpanIn, wordKey } from "@/lib/hifz/word-diff";
 
 /**
  * What tells two verses of a pair apart when their wording is the same and a prompt hides their
@@ -51,10 +51,14 @@ type RefRow = {
   post_text: string | null;
   v2_page: number;
   text_uthmani: string;
+  /** The ayah before it in its surah, null for an ayah 1. */
+  previous_text: string | null;
 };
 
 const REF_COLUMNS =
-  "r.group_id, g.kind, r.sort_order, r.surah, r.ayah, r.surah_name_ar, r.pre_text, r.similar_text, r.post_text, q.v2_page, q.text_uthmani";
+  "r.group_id, g.kind, r.sort_order, r.surah, r.ayah, r.surah_name_ar, r.pre_text, r.similar_text, r.post_text, q.v2_page, q.text_uthmani, prev.text_uthmani AS previous_text";
+/** The ayah before each ref, for the ayah end before it (ayahEndsIn). */
+const PREVIOUS_JOIN = "LEFT JOIN quran_text prev ON prev.surah = r.surah AND prev.ayah = r.ayah - 1";
 
 /** Harakat, Quranic annotation marks and tatweel, which do not change which word it is. */
 const MARKS = /[ؐ-ًؚ-ٰٟۖ-ۭـ]/g;
@@ -105,19 +109,39 @@ function displaySegment(text: string | null): string {
 }
 
 /**
- * The ayah ends inside a passage that runs into the ayah before or after the ref's own: the end of
- * the previous ayah before it (not before an ayah 1, where the basmalah or another surah precedes),
- * and its own end when the next ayah follows. The passage's words are split as SimilarVerseLine
- * splits them.
+ * The ayah ends inside a passage that runs into the ayah before or after the ref's own, only where
+ * they are certain, since a wrong number in Quran text misleads:
+ * - its own end, when its last word is in the passage and words of another ayah follow;
+ * - the previous ayah's end, when its own first word is in the passage and the words before it are
+ *   the end of the previous ayah of its surah (the bundled text can carry another surah's ayah there).
+ * Words with no letters, such as ۞ or a pause mark, never count as an ayah's text. The passage's
+ * words are split as SimilarVerseLine splits them.
  */
 function ayahEndsIn(segments: readonly string[], row: RefRow): { after: number; ayah: number }[] {
   const passage = segments.join(" ").split(/\s+/).filter(Boolean);
   const span = ayahSpanIn(passage, row.text_uthmani.split(/\s+/).filter(Boolean));
   if (!span) return [];
+  const keyed = (from: number, to: number) =>
+    passage
+      .slice(from, to)
+      .map((word, offset) => ({ key: wordKey(word), index: from + offset }))
+      .filter((word) => word.key !== "");
   const ends: { after: number; ayah: number }[] = [];
-  if (span.first > 0 && row.ayah > 1) ends.push({ after: span.first - 1, ayah: row.ayah - 1 });
-  if (span.last < passage.length - 1) ends.push({ after: span.last, ayah: row.ayah });
+  const before = keyed(0, span.first);
+  if (span.hasStart && before.length > 0 && row.previous_text && endsWith(row.previous_text, before.map((word) => word.key))) {
+    ends.push({ after: before[before.length - 1].index, ayah: row.ayah - 1 });
+  }
+  if (span.hasEnd && keyed(span.last + 1, passage.length).length > 0) ends.push({ after: span.last, ayah: row.ayah });
   return ends;
+}
+
+/** Whether an ayah's text ends with these words, compared by wordKey, one mismatch allowed in six or more. */
+function endsWith(ayahText: string, tail: readonly string[]): boolean {
+  const own = ayahText.split(/\s+/).map(wordKey).filter((key) => key !== "");
+  if (tail.length > own.length) return false;
+  const end = own.slice(own.length - tail.length);
+  const mismatches = end.filter((key, index) => key !== tail[index]).length;
+  return mismatches <= (tail.length >= 6 ? 1 : 0);
 }
 
 function toRef(row: RefRow, others: readonly RefRow[]): SimilarRef {
@@ -168,6 +192,7 @@ async function readRefRows(db: DatabaseExecutor, ayahs: readonly VerseKey[]): Pr
        FROM mutashabihat_refs r
        JOIN mutashabihat_groups g ON g.id = r.group_id
        JOIN quran_text q ON q.surah = r.surah AND q.ayah = r.ayah
+       ${PREVIOUS_JOIN}
       WHERE r.group_id IN (SELECT group_id FROM mutashabihat_refs WHERE ${where})
       ORDER BY r.group_id, r.sort_order`,
     ayahs.flatMap((ayah) => [ayah.surah, ayah.ayah]),
@@ -197,6 +222,7 @@ export async function similarGroupsOnPages(db: DatabaseExecutor, pages: readonly
        FROM mutashabihat_refs r
        JOIN mutashabihat_groups g ON g.id = r.group_id
        JOIN quran_text q ON q.surah = r.surah AND q.ayah = r.ayah
+       ${PREVIOUS_JOIN}
       WHERE r.group_id IN (
               SELECT m.group_id FROM mutashabihat_refs m
                 JOIN quran_text p ON p.surah = m.surah AND p.ayah = m.ayah

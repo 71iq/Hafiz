@@ -72,13 +72,13 @@ function commonSubsequence(a: readonly string[], b: readonly string[]): boolean[
 export function ayahSpanIn(
   passage: readonly string[],
   ayah: readonly string[],
-): { first: number; last: number } | null {
+): { first: number; last: number; hasStart: boolean; hasEnd: boolean } | null {
   const keyed = (list: readonly string[]) =>
     list.map((word, index) => ({ key: wordKey(word), index })).filter((word) => word.key !== "");
   const text = keyed(passage);
   const own = keyed(ayah).map((word) => word.key);
   if (text.length === 0 || own.length === 0) return null;
-  let best: { first: number; last: number; overlap: number } | null = null;
+  let best: { first: number; last: number; overlap: number; hasStart: boolean; hasEnd: boolean } | null = null;
   let tied = false;
   // Each alignment of the ayah against the passage: `offset` is where its first word would fall.
   for (let offset = 1 - own.length; offset < text.length; offset += 1) {
@@ -93,11 +93,18 @@ export function ayahSpanIn(
     if (offset < 0 && from !== 0) continue;
     if (offset + own.length > text.length && to !== text.length) continue;
     if (best === null || overlap > best.overlap) {
-      best = { first: text[from].index, last: text[to - 1].index, overlap };
+      best = {
+        first: text[from].index,
+        last: text[to - 1].index,
+        overlap,
+        // Whether the ayah's own first and last words are in the passage, rather than cut off.
+        hasStart: offset >= 0,
+        hasEnd: offset + own.length <= text.length,
+      };
       tied = false;
     } else if (overlap === best.overlap) {
       tied = true;
     }
   }
-  return best && !tied ? { first: best.first, last: best.last } : null;
+  return best && !tied ? { first: best.first, last: best.last, hasStart: best.hasStart, hasEnd: best.hasEnd } : null;
 }

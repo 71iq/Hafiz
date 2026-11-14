@@ -1,5 +1,7 @@
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { similarGroupsForAyahs } from "@/lib/hifz/similar";
+import { openOutboxDatabase } from "@/tests/jest/outbox-sqlite";
 import { StyleSheet } from "react-native";
 import { SimilarVerseComparison } from "@/components/hifz/SimilarVerseComparison";
 import { SimilarVerseLine } from "@/components/hifz/SimilarVerseLine";
@@ -147,11 +149,12 @@ describe("where an ayah ends inside a similar-verse passage", () => {
   const ayah = "فَلْيَنظُرِ ٱلْإِنسَٰنُ مِمَّ خُلِقَ".split(" ");
 
   it("finds the ayah's own words, across spellings, so both of its ends can be marked", () => {
-    expect(ayahSpanIn(passage, ayah)).toEqual({ first: 6, last: 9 });
+    expect(ayahSpanIn(passage, ayah)).toEqual({ first: 6, last: 9, hasStart: true, hasEnd: true });
   });
 
   it("finds an ayah cut at the passage's edge, and nothing it cannot place with certainty", () => {
-    expect(ayahSpanIn(passage.slice(0, 9), ayah)).toEqual({ first: 6, last: 8 });
+    // Cut after its third word: its end is not in the passage, so no number may follow it.
+    expect(ayahSpanIn(passage.slice(0, 9), ayah)).toEqual({ first: 6, last: 8, hasStart: true, hasEnd: false });
     // Two words are too few to be sure where the ayah starts.
     expect(ayahSpanIn(passage.slice(0, 8), ayah)).toBeNull();
     expect(ayahSpanIn("قال رب".split(" "), "قال رب انك".split(" "))).toBeNull();
@@ -175,5 +178,43 @@ describe("where an ayah ends inside a similar-verse passage", () => {
     render(<SimilarVerseLine reference={ref} isRTL accent="#0f766e" />);
     expect(screen.getByText(" (٤)")).toBeTruthy();
     expect(screen.getByText(" (٥)")).toBeTruthy();
+  });
+});
+
+describe("ayah numbers inside similar-verse passages, only where certain", () => {
+  const VERSES: [number, number, string][] = [
+    [5, 1, "قال ربي اني دعوت قومي ليلا ونهارا"],
+    [5, 2, "فلم يزدهم دعائي الا فرارا"],
+    [5, 3, "واني كلما دعوتهم لتغفر لهم جعلوا اصابعهم في اذانهم"],
+    [7, 4, "ثم توفى كل نفس ما كسبت وهم لا يظلمون"],
+  ];
+
+  it("numbers no preceding text that is not the previous ayah, and no ayah cut short at a pause", async () => {
+    const store = await openOutboxDatabase();
+    try {
+      for (const [surah, ayah, text] of VERSES) {
+        store.sql
+          .prepare(
+            "INSERT INTO quran_text (surah, ayah, text_uthmani, text_clean, text_qcf2, v2_page) VALUES (?, ?, ?, 'x', 'x', 1)",
+          )
+          .run(surah, ayah, text);
+      }
+      store.sql.exec(
+        "INSERT INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES ('g', 'similar', 'cue', 'test', 0)",
+      );
+      const ref = store.sql.prepare(
+        "INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, pre_text, similar_text, post_text) VALUES ('g', ?, 5, ?, 'نوح', ?, ?, ?)",
+      );
+      // 5:2 as bundled data can carry it: preceded by another surah's ayah, not by 5:1.
+      ref.run(0, 2, "ثم توفى كل نفس ما كسبت وهم لا يظلمون", "فلم يزدهم دعائي", "الا فرارا");
+      // 5:3 after the whole of 5:2, but cut before its own end, at a pause mark.
+      ref.run(1, 3, "فلم يزدهم دعائي الا فرارا", "واني كلما دعوتهم", "لتغفر لهم ۗ");
+      const [group] = await similarGroupsForAyahs(store.db, [{ surah: 5, ayah: 2 }]);
+      expect(group.self.ayahEnds).toEqual([]);
+      // Only the end of 5:2 before it, which is certain.
+      expect(group.siblings[0].ayahEnds).toEqual([{ after: 4, ayah: 2 }]);
+    } finally {
+      await store.close();
+    }
   });
 });
