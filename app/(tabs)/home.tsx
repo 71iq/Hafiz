@@ -126,7 +126,7 @@ export default function HomeScreen() {
   const headerStacked = headerWidth > 0 && headerWidth < headerNeeds;
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
-  const { wird, inboxCount, monthlyCheckDue, secondLooksDue, nextLookAt, refresh: refreshWird } = useTodayWird(db);
+  const { wird, inboxCount, remediationDue, monthlyCheckDue, secondLooksDue, nextLookAt, refresh: refreshWird } = useTodayWird(db);
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   const [dueLoaded, setDueLoaded] = useState(false);
@@ -379,7 +379,10 @@ export default function HomeScreen() {
       ? 1
       : wird === null
         ? 0
-        : wird.todo.length + (wird.newLines > 0 && !wird.daily.backlog && !wird.sabaqDoneToday ? 1 : 0);
+        : wird.todo.length +
+          // A half page or seam due after a missed page is part of today's review (SCH-06, SCH-08).
+          remediationDue +
+          (wird.newLines > 0 && !wird.daily.backlog && !wird.sabaqDoneToday ? 1 : 0);
   const remainingToday = totalDue + planRemaining;
   // MST-01: with page or half-page review, Home counts memorized pages instead of ayah cards.
   const pageMode = !!wird && wird.plan.unit !== "ayah";

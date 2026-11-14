@@ -3,7 +3,7 @@ import { countMistakeInbox } from "@/lib/hifz/errors";
 import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import { declareMemorizedPages, loadPageCards } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
-import { errorHalf, halfLineNumbers, loadDueRemediation } from "@/lib/hifz/remediation";
+import { errorHalf, halfLineNumbers, loadDueRemediation, nextRemediationAt, remediateHalf } from "@/lib/hifz/remediation";
 import { dismissInboxItem, readMistakeInbox, readWeakSpots, type RecitationErrorInput } from "@/lib/hifz/errors";
 import { clozeCardId, createWeakSpotCards, parseClozeCardId } from "@/lib/hifz/weak-spots";
 import { DEFAULT_REVIEW_SAVE_CONTEXT, persistReviewTransition } from "@/lib/fsrs/persist-review";
@@ -363,5 +363,21 @@ describe("weak spots (ERR-06)", () => {
     expect(parseClozeCardId("page:madani15:5")).toBeNull();
     expect(parseHabitSettings(new Map()).showWeakSpots).toBe(true);
     expect(parseHabitSettings(new Map([["habit_hide_weak_spots", "true"]])).showWeakSpots).toBe(false);
+  });
+});
+
+describe("the next remediation due time, for Home's refresh", () => {
+  it("is the earliest half page or seam still on a step, after now", async () => {
+    const store = await openOutboxDatabase();
+    try {
+      const now = new Date("2026-11-14T09:00:00.000Z");
+      await remediateHalf(store.db, { page: 5, half: "a", now });
+      const due = new Date((store.sql.prepare("SELECT due FROM study_cards WHERE id LIKE 'half:%'").get() as { due: string }).due);
+      expect(due.getTime()).toBeGreaterThan(now.getTime());
+      await expect(nextRemediationAt(store.db, new Date(now.getTime() + 60_000))).resolves.toEqual(due);
+      await expect(nextRemediationAt(store.db, due)).resolves.toBeNull();
+    } finally {
+      await store.close();
+    }
   });
 });

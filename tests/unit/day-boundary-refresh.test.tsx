@@ -8,7 +8,7 @@ import { useHabitOverview } from "@/lib/habit/use-habit-overview";
 import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird } from "@/lib/hifz/pages";
 import { monthlyCheckDueFor } from "@/lib/hifz/progress";
-import { countDueRemediation } from "@/lib/hifz/remediation";
+import { countDueRemediation, nextRemediationAt } from "@/lib/hifz/remediation";
 import { countSecondLooks } from "@/lib/hifz/sabaq";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { readDhuhrResolver } from "@/lib/prayer/settings";
@@ -48,7 +48,7 @@ jest.mock("@/lib/habit/queries", () => ({ settleHabitDays: jest.fn(), loadHabitO
 jest.mock("@/lib/prayer/settings", () => ({ readDhuhrResolver: jest.fn() }));
 jest.mock("@/lib/hifz/pages", () => ({ loadTodayWird: jest.fn() }));
 jest.mock("@/lib/hifz/errors", () => ({ countMistakeInbox: jest.fn() }));
-jest.mock("@/lib/hifz/remediation", () => ({ countDueRemediation: jest.fn() }));
+jest.mock("@/lib/hifz/remediation", () => ({ countDueRemediation: jest.fn(), nextRemediationAt: jest.fn() }));
 jest.mock("@/lib/hifz/progress", () => ({ monthlyCheckDueFor: jest.fn() }));
 jest.mock("@/lib/hifz/sabaq", () => ({ countSecondLooks: jest.fn() }));
 
@@ -140,6 +140,7 @@ beforeEach(() => {
     .mockImplementation(async (_db, now = new Date()) => ({ loadedFor: localDateOf(now), cards: [] }) as never);
   jest.mocked(countMistakeInbox).mockResolvedValue(0);
   jest.mocked(countDueRemediation).mockResolvedValue(0);
+  jest.mocked(nextRemediationAt).mockResolvedValue(null);
   jest.mocked(monthlyCheckDueFor).mockResolvedValue(false);
   jest.mocked(countSecondLooks).mockResolvedValue({ due: 0, nextAt: null, offeredAt: null });
 });
@@ -271,6 +272,19 @@ describe("useTodayWird across a day boundary", () => {
     await advanceTo(at(14, 22));
     expect(wirdLoads()).toBe(2);
     expect(result.current.secondLooksDue).toBe(1);
+  });
+
+  it("reloads when a half page or seam on its 10-minute step comes due, and counts it as work left", async () => {
+    jest.mocked(nextRemediationAt).mockResolvedValueOnce(at(14, 21, 10)).mockResolvedValue(null);
+    jest.mocked(countDueRemediation).mockResolvedValueOnce(0).mockResolvedValue(1);
+    const { result } = renderHook(() => useTodayWird(db));
+    await flush();
+    expect(result.current.remediationDue).toBe(0);
+    await advanceTo(at(14, 21, 9));
+    expect(wirdLoads()).toBe(1);
+    await advanceTo(at(14, 21, 10));
+    expect(wirdLoads()).toBe(2);
+    expect(result.current.remediationDue).toBe(1);
   });
 
   it("keeps the wird when the second-look count fails, with no cue", async () => {

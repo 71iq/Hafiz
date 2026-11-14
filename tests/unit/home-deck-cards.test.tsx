@@ -113,7 +113,7 @@ jest.mock("@/lib/habit/use-habit-overview", () => ({
 }));
 jest.mock("@/components/habit/HabitBreakSheet", () => ({ HabitBreakSheet: () => null }));
 jest.mock("@/lib/hifz/use-today-wird", () => ({
-  useTodayWird: () => ({ wird: undefined, inboxCount: 0, monthlyCheckDue: false, refresh: async () => {} }),
+  useTodayWird: () => ({ wird: undefined, inboxCount: 0, remediationDue: 0, monthlyCheckDue: false, secondLooksDue: 0, nextLookAt: null, refresh: async () => {} }),
 }));
 jest.mock("@/components/ui/Toast", () => ({ Toast: () => null }));
 jest.mock("@/components/achievements/AchievementUnlockToast", () => ({ AchievementUnlockToast: () => null }));

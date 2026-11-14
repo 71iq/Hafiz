@@ -138,3 +138,20 @@ export async function loadDueRemediation(db: DatabaseExecutor, now: Date): Promi
 export async function countDueRemediation(db: DatabaseExecutor, now: Date): Promise<number> {
   return (await loadDueRemediation(db, now)).length;
 }
+
+/**
+ * When the next remediation unit comes due after `now` (a half page or seam on its 10-minute step, or
+ * a cloze card), or null when none waits. Home refreshes then, so the unit shows as work left.
+ */
+export async function nextRemediationAt(db: DatabaseExecutor, now: Date): Promise<Date | null> {
+  const row = await db.getFirstAsync<{ due: string }>(
+    `SELECT due FROM study_cards
+     WHERE deck_id = ? AND due > ?
+       AND (((id LIKE 'half:%' OR id LIKE 'seam:%') AND (state IN (1, 3) OR learning_steps > 0)) OR id LIKE 'cloze:%')
+       AND deleted_at IS NULL AND suspended_at IS NULL
+     ORDER BY due LIMIT 1`,
+    [HIFZ_PAGES_DECK_ID, now.toISOString()],
+  );
+  const at = row ? new Date(row.due) : null;
+  return at && Number.isFinite(at.getTime()) ? at : null;
+}

@@ -8,7 +8,7 @@ import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird, type TodayWird } from "@/lib/hifz/pages";
 import { monthlyCheckDueFor } from "@/lib/hifz/progress";
-import { countDueRemediation } from "@/lib/hifz/remediation";
+import { countDueRemediation, nextRemediationAt } from "@/lib/hifz/remediation";
 import { countSecondLooks } from "@/lib/hifz/sabaq";
 import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
@@ -25,6 +25,8 @@ export function useTodayWird(db: AppDatabase) {
   const [inboxCount, setInboxCount] = useState(0);
   const [monthlyCheckDue, setMonthlyCheckDue] = useState(false);
   const [secondLooksDue, setSecondLooksDue] = useState(0);
+  /** Half pages, seams and cloze cards due now: review work the wird includes (SCH-06, SCH-08, ERR-06). */
+  const [remediationDue, setRemediationDue] = useState(0);
   const [nextLookAt, setNextLookAt] = useState<Date | null>(null);
   const [boundary, setBoundary] = useState<number | null>(null);
   const latest = useRef(0);
@@ -34,10 +36,11 @@ export function useTodayWird(db: AppDatabase) {
     const now = new Date();
     let nextBoundary = nextLocalMidnight(now).getTime();
     try {
-      const [next, inbox, remediation, looks] = await Promise.all([
+      const [next, inbox, remediation, nextRemediation, looks] = await Promise.all([
         loadTodayWird(db, now),
         countMistakeInbox(db, localDateOf(now)),
         countDueRemediation(db, now),
+        nextRemediationAt(db, now),
         // The cue is extra: a failed count leaves it off rather than failing the wird.
         countSecondLooks(db, now).catch((error) => {
           console.warn("[Hifz] Second looks failed to load:", error);
@@ -46,11 +49,14 @@ export function useTodayWird(db: AppDatabase) {
       ]);
       const monthly = next ? await monthlyCheckDueFor(db, next.cards, now) : false;
       if (looks.offeredAt) nextBoundary = Math.min(nextBoundary, looks.offeredAt.getTime());
+      // A half page or seam on its 10-minute step becomes work left when it comes due.
+      if (nextRemediation) nextBoundary = Math.min(nextBoundary, nextRemediation.getTime());
       // A page's learning step comes back as a task once it is within the review learn-ahead window.
       if (next?.nextStepAt) nextBoundary = Math.min(nextBoundary, next.nextStepAt.getTime() - REVIEW_LEARN_AHEAD_MS);
       if (load !== latest.current) return;
       setWird(next);
       setInboxCount(inbox + remediation);
+      setRemediationDue(remediation);
       setMonthlyCheckDue(monthly);
       setSecondLooksDue(next ? looks.due : 0);
       setNextLookAt(next ? looks.nextAt : null);
@@ -88,5 +94,5 @@ export function useTodayWird(db: AppDatabase) {
   );
   useDayBoundaryRefresh(boundary, refreshIfFocused);
 
-  return { wird, inboxCount, monthlyCheckDue, secondLooksDue, nextLookAt, refresh };
+  return { wird, inboxCount, remediationDue, monthlyCheckDue, secondLooksDue, nextLookAt, refresh };
 }
