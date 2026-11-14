@@ -1,7 +1,7 @@
 import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { createEmptyCard, type Card } from "./scheduler";
+import { createEmptyCard, State, type Card } from "./scheduler";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
   ALL_NEW_REVIEW_ORDERS,
@@ -1235,33 +1235,42 @@ export async function restoreDeletedStudyCard(db: DatabaseExecutor, id: string, 
 }
 
 /** The row insertNewStudyCard writes, for a caller that grades a card in the transaction that creates it. */
+/**
+ * A memory state a new card starts from instead of an empty card: a review card last reviewed at
+ * `lastReview` with this stability and difficulty, next due on the card's `due`. SBQ-02 starts a page
+ * memorized through sabaq from its chunks' ratings this way.
+ */
+export type StartingSchedule = Readonly<{ stability: number; difficulty: number; lastReview: string; scheduledDays: number }>;
+
 export function newStudyCardRow({
   id,
   deckId,
   due,
   tier = null,
   now,
+  start = null,
 }: {
   id: string;
   deckId: string;
   due: Date;
   tier?: string | null;
   now: string;
+  start?: StartingSchedule | null;
 }): StudyCardRow {
   const empty = createEmptyCard(due);
   return {
     id,
     deck_id: deckId,
     due: empty.due.toISOString(),
-    stability: empty.stability,
-    difficulty: empty.difficulty,
+    stability: start?.stability ?? empty.stability,
+    difficulty: start?.difficulty ?? empty.difficulty,
     elapsed_days: empty.elapsed_days,
-    scheduled_days: empty.scheduled_days,
+    scheduled_days: start?.scheduledDays ?? empty.scheduled_days,
     learning_steps: empty.learning_steps,
-    reps: empty.reps,
+    reps: start ? 1 : empty.reps,
     lapses: empty.lapses,
-    state: empty.state,
-    last_review: null,
+    state: start ? State.Review : empty.state,
+    last_review: start?.lastReview ?? null,
     suspended_at: null,
     buried_until: null,
     marked_at: null,
@@ -1279,31 +1288,37 @@ export function newStudyCardRow({
  */
 export async function insertNewStudyCard(
   db: DatabaseExecutor,
-  { id, deckId, due, tier = null, now }: { id: string; deckId: string; due: Date; tier?: string | null; now: string },
+  {
+    id,
+    deckId,
+    due,
+    tier = null,
+    now,
+    start = null,
+  }: { id: string; deckId: string; due: Date; tier?: string | null; now: string; start?: StartingSchedule | null },
 ): Promise<boolean> {
-  const empty = createEmptyCard(due);
+  const row = newStudyCardRow({ id, deckId, due, tier, now, start });
   // Created again over a deletion, the card is stamped later than that deletion.
   const updatedAt = (await stampsOverDeletedCards(db, [id], new Date(now))).get(id) ?? now;
   const result = await db.runAsync(
     `INSERT INTO study_cards
       (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review,
        created_at, updated_at, deleted_at, tier, tier_changed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
       deck_id = excluded.deck_id, due = excluded.due, stability = excluded.stability, difficulty = excluded.difficulty,
       elapsed_days = excluded.elapsed_days, scheduled_days = excluded.scheduled_days, learning_steps = excluded.learning_steps,
-      reps = excluded.reps, lapses = excluded.lapses, state = excluded.state, last_review = NULL,
+      reps = excluded.reps, lapses = excluded.lapses, state = excluded.state, last_review = excluded.last_review,
       suspended_at = NULL, buried_until = NULL, marked_at = NULL,
       created_at = excluded.created_at, updated_at = excluded.updated_at, deleted_at = NULL,
       tier = excluded.tier, tier_changed_at = excluded.tier_changed_at
      WHERE study_cards.deleted_at IS NOT NULL`,
     [
-      id, deckId, empty.due.toISOString(), empty.stability, empty.difficulty, empty.elapsed_days, empty.scheduled_days,
-      empty.learning_steps, empty.reps, empty.lapses, empty.state, now, updatedAt, tier, tier ? now : null,
+      id, deckId, row.due, row.stability, row.difficulty, row.elapsed_days, row.scheduled_days,
+      row.learning_steps, row.reps, row.lapses, row.state, row.last_review, now, updatedAt, tier, tier ? now : null,
     ]
   );
   if ((result.changes ?? 0) === 0) return false;
-  const row = newStudyCardRow({ id, deckId, due, tier, now });
   await enqueueSync(db, "study_cards", "INSERT", id, cardToSyncData({ ...row, updated_at: updatedAt }));
   return true;
 }

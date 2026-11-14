@@ -1,6 +1,6 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
-import { insertNewStudyCard, newStudyCardRow, readDeckReviewSettings } from "@/lib/fsrs/queries";
+import { insertNewStudyCard, newStudyCardRow, readDeckReviewSettings, type StartingSchedule } from "@/lib/fsrs/queries";
 import { persistReviewTransition, readCurrentCard, type ReviewSaveResult } from "@/lib/fsrs/persist-review";
 import { calculateReviewTransition, REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import type { ReviewSessionRef } from "@/lib/fsrs/review-sessions";
@@ -12,6 +12,7 @@ import type { HifzPlan } from "@/lib/hifz/plan";
 import { pagePolicy } from "@/lib/hifz/tiers";
 import {
   chunkCardId,
+  chunkCardPrefix,
   HIFZ_PAGES_DECK_ID,
   HIFZ_SABAQ_DECK_ID,
   LINES_PER_PAGE,
@@ -177,15 +178,44 @@ function laterToday(due: Date, now: Date): Date | null {
  * passed on an earlier day belongs to that day, and one that only failed today is not memorized yet:
  * the next sabaq offers it again as new lines.
  */
-async function readTodaysChunks(db: DatabaseExecutor, today: LocalDate, now: Date): Promise<{ id: string; due: string }[]> {
-  return db.getAllAsync<{ id: string; due: string }>(
-    `SELECT c.id, c.due FROM study_cards AS c
+async function readTodaysChunks(
+  db: DatabaseExecutor,
+  today: LocalDate,
+  now: Date,
+): Promise<{ id: string; due: string; first_pass_at: string; last_review_at: string }[]> {
+  return db.getAllAsync<{ id: string; due: string; first_pass_at: string; last_review_at: string }>(
+    `SELECT c.id, c.due,
+        (SELECT MIN(l.reviewed_at) FROM study_log AS l WHERE l.card_id = c.id AND l.rating >= 3 AND l.local_date = ?) AS first_pass_at,
+        (SELECT MAX(l.reviewed_at) FROM study_log AS l WHERE l.card_id = c.id AND l.local_date = ?) AS last_review_at
+      FROM study_cards AS c
       WHERE c.deck_id = ? AND c.id LIKE 'chunk:%' AND c.deleted_at IS NULL AND c.suspended_at IS NULL
         AND (c.buried_until IS NULL OR c.buried_until <= ?)
         AND EXISTS (SELECT 1 FROM study_log AS l WHERE l.card_id = c.id AND l.rating >= 3 AND l.local_date = ?)
         AND NOT EXISTS (SELECT 1 FROM study_log AS l WHERE l.card_id = c.id AND l.rating >= 3 AND l.local_date < ?)`,
-    [HIFZ_SABAQ_DECK_ID, now.toISOString(), today, today],
+    [today, today, HIFZ_SABAQ_DECK_ID, now.toISOString(), today, today],
   );
+}
+
+/**
+ * SBQ-03 offers every chunk one second look later the day it passed, whatever FSRS scheduled: an
+ * Easy check graduates the chunk to a later day, yet the look still belongs to today. Until the
+ * first look, a chunk is offered by its due time or this long after its pass, whichever is sooner.
+ * After the look, its own schedule decides, so a look graded Again comes back with its relearning step.
+ */
+const SECOND_LOOK_AFTER_MS = 60 * 60_000;
+
+/** When a chunk that passed at `passedAt` is first offered, given the due time FSRS set. */
+function firstLookAt(due: Date, passedAt: Date): Date {
+  const latest = passedAt.getTime() + SECOND_LOOK_AFTER_MS;
+  return due.getTime() < latest ? due : new Date(latest);
+}
+
+/** When a chunk is offered: its first look's time until it has had one, then its own due time. */
+function lookAt(row: { due: string; first_pass_at: string; last_review_at: string }): Date {
+  const due = new Date(row.due);
+  const passedAt = new Date(row.first_pass_at);
+  const looked = Date.parse(row.last_review_at) > passedAt.getTime();
+  return looked || !Number.isFinite(passedAt.getTime()) ? due : firstLookAt(due, passedAt);
 }
 
 /**
@@ -202,7 +232,7 @@ async function readSecondLookSchedule(db: DatabaseExecutor, now: Date): Promise<
   let nextAt: Date | null = null;
   for (const row of rows) {
     const unit = parsePageUnit(row.id);
-    const at = new Date(row.due);
+    const at = lookAt(row);
     if (unit?.kind !== "chunk" || !Number.isFinite(at.getTime())) continue;
     if (at.getTime() <= now.getTime() + REVIEW_LEARN_AHEAD_MS) due.push({ id: row.id, unit, at: at.getTime() });
     else {
@@ -307,6 +337,24 @@ async function saveChunkGrade(
 }
 
 /**
+ * SBQ-02: a page memorized through sabaq starts from its chunks' ratings rather than as an empty
+ * card. Read inside the grade's transaction, after the final chunk's own review is written, so every
+ * chunk of the page counts. The page is as strong as its weakest chunk: the lowest stability, with
+ * the chunks' mean difficulty, last reviewed now and due tomorrow as a sabqi page. Null when no
+ * graded chunk is left, and the page starts empty as before.
+ */
+async function pageStartFromChunks(tx: DatabaseExecutor, page: number, now: Date): Promise<StartingSchedule | null> {
+  const prefix = chunkCardPrefix(page);
+  const row = await tx.getFirstAsync<{ stability: number | null; difficulty: number | null }>(
+    `SELECT MIN(stability) AS stability, AVG(difficulty) AS difficulty FROM study_cards
+      WHERE deck_id = ? AND id >= ? AND id < ? AND deleted_at IS NULL AND state <> 0 AND stability > 0`,
+    [HIFZ_SABAQ_DECK_ID, prefix, `${prefix.slice(0, -1)};`],
+  );
+  if (!row?.stability || !row.difficulty) return null;
+  return { stability: row.stability, difficulty: row.difficulty, lastReview: now.toISOString(), scheduledDays: 1 };
+}
+
+/**
  * SBQ-02: after the fluent check, the chunk becomes a sabaq card with that grade as its first review,
  * and the page joins review (sabqi, due tomorrow) once its last chunk passes. One transaction.
  * `secondLookAt` is when the chunk's second look comes due, while that is still today (SBQ-03).
@@ -342,11 +390,12 @@ export async function completeSabaqChunk(
             due: atLocalTime(addDays(localDateOf(now), 1), 0),
             tier: "sabqi",
             now: now.toISOString(),
+            start: await pageStartFromChunks(tx, target.page, now),
           });
         }
       : undefined,
   });
-  const secondLookAt = rating >= 3 ? laterToday(new Date(result.transition.updatedCard.due), now) : null;
+  const secondLookAt = rating >= 3 ? laterToday(firstLookAt(new Date(result.transition.updatedCard.due), now), now) : null;
   return { ...result, pageAdded, secondLookAt };
 }
 

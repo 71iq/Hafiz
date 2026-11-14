@@ -1,4 +1,4 @@
-import { addDays, atLocalTime } from "@/lib/habit/dates";
+import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { readHabitDayRow } from "@/lib/habit/queries";
 import { declareMemorizedPages, derivePageTiers, loadPageCard, loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
@@ -8,7 +8,8 @@ import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { chunkCardId, PAGE_COUNT, pageCardId } from "@/lib/hifz/units";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { getDeckTodayStats, loadReviewQueue, readDeckReviewSettings, REVIEW_DECK_IDS } from "@/lib/fsrs/queries";
-import { Rating, type Grade } from "@/lib/fsrs/scheduler";
+import { Rating, State, type Grade } from "@/lib/fsrs/scheduler";
+import type { StudyCardRow } from "@/lib/fsrs/types";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 const TODAY = "2026-11-13";
@@ -212,6 +213,38 @@ describe("sabaq chunks (SBQ-02)", () => {
       expect(await tierOf(day2)).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: day2 } });
     });
 
+    it("starts a page memorized through sabaq from its chunks' ratings, as a review card", async () => {
+      const first = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      await completeSabaqChunk(store.db, { target: first, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60) });
+      const last = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const finishedAt = atLocalTime(TODAY, 9 * 60 + 30);
+      const saved = await completeSabaqChunk(store.db, { target: last, plan, rating: Rating.Easy, session: null, durationMs: 60_000, now: finishedAt });
+      expect(saved.pageAdded).toBe(true);
+
+      const chunks = store.sql
+        .prepare("SELECT stability, difficulty FROM study_cards WHERE id LIKE 'chunk:%' AND deleted_at IS NULL")
+        .all() as { stability: number; difficulty: number }[];
+      expect(chunks).toHaveLength(2);
+      const page = store.sql.prepare("SELECT * FROM study_cards WHERE id = ?").get(pageCardId(1)) as unknown as StudyCardRow;
+      expect(page).toMatchObject({
+        state: State.Review,
+        stability: Math.min(...chunks.map((chunk) => chunk.stability)),
+        last_review: finishedAt.toISOString(),
+        scheduled_days: 1,
+        due: atLocalTime(addDays(TODAY, 1), 0).toISOString(),
+        tier: "sabqi",
+      });
+      expect(page.stability).toBeGreaterThan(0);
+      expect(page.difficulty).toBeCloseTo((chunks[0].difficulty + chunks[1].difficulty) / 2, 6);
+      // The queued upload carries the same starting state.
+      const upload = store.sql
+        .prepare("SELECT data FROM sync_queue WHERE table_name = 'study_cards' AND row_id = ? ORDER BY id DESC LIMIT 1")
+        .get(pageCardId(1)) as { data: string };
+      expect(JSON.parse(upload.data)).toMatchObject({ state: State.Review, stability: page.stability, last_review: page.last_review });
+      // It is still a page from sabaq, not a declared one.
+      expect(await tierOf()).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: TODAY } });
+    });
+
     it("treats a sabaq page removed and declared again as declared", async () => {
       const whole = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords }))!;
       await completeSabaqChunk(store.db, { target: whole, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60) });
@@ -292,6 +325,27 @@ describe("sabaq chunks (SBQ-02)", () => {
       const tomorrow = at(8 * 60, addDays(TODAY, 1));
       expect(Date.parse((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(id) as { due: string }).due)).toBeLessThan(tomorrow.getTime());
       expect(await loadSecondLooks(store.db, { now: tomorrow, pageWords })).toEqual({ due: [], nextAt: null });
+    });
+
+    it("offers an Easy chunk its second look an hour later, though FSRS graduated it to a later day", async () => {
+      const { id, due, saved } = await passPartialChunk(Rating.Easy);
+      expect(localDateOf(due) > TODAY).toBe(true);
+      const lookAt = at(10 * 60);
+      expect(saved.secondLookAt).toEqual(lookAt);
+      expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toEqual({ due: 0, offeredAt: new Date(lookAt.getTime() - REVIEW_LEARN_AHEAD_MS) });
+      expect((await loadSecondLooks(store.db, { now: lookAt, pageWords })).due.map((look) => look.cardId)).toEqual([id]);
+
+      await saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Good, session: null, durationMs: 90_000, now: lookAt });
+      // One look a day: after it, the chunk's own schedule decides, and that is a later day.
+      expect(await loadSecondLooks(store.db, { now: at(21 * 60), pageWords })).toEqual({ due: [], nextAt: null });
+    });
+
+    it("brings a look graded Again back with its relearning step the same day", async () => {
+      const { id, due } = await passPartialChunk();
+      await saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Again, session: null, durationMs: 60_000, now: due });
+      const relearn = new Date((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(id) as { due: string }).due);
+      expect(localDateOf(relearn)).toBe(TODAY);
+      expect((await loadSecondLooks(store.db, { now: relearn, pageWords })).due.map((look) => look.cardId)).toEqual([id]);
     });
 
     it("offers no look for a failed check, and promises none past today", async () => {
