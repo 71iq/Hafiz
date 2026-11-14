@@ -2170,6 +2170,162 @@ describe("Flashcard session due-date editor characterization", () => {
       });
     });
 
+    describe("grades and card actions share one lock", () => {
+      const failure = new Error("synthetic card action failure");
+
+      function closeButton(view: ReturnType<typeof render>): RenderedNode {
+        return view.getByRole("button", { name: s.genericClose });
+      }
+
+      function menuButton(view: ReturnType<typeof render>): RenderedNode {
+        return view.getByRole("button", { name: s.cardActionsTitle });
+      }
+
+      it.each(["suspend", "bury"] as const)(
+        "refuses a grade during a pending %s, then shows the next card instead of a blank screen",
+        async (action) => {
+          const write = createDeferred<StudyCardRow>();
+          const save = action === "suspend" ? setStudyCardSuspended : setStudyCardBuried;
+          jest.mocked(save).mockReturnValueOnce(write.promise);
+          const view = renderSession();
+          await reveal(view);
+          const grade = getTextButton(view, s.flashcardsEasy);
+          fireEvent.press(menuButton(view));
+          await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+          const row = view.getByRole("button", { name: directCardActionLabel(s, action) });
+          // The grade comes before the screen renders the pending action, so only the lock can refuse it.
+          act(() => {
+            fireEvent.press(row);
+            fireEvent.press(grade);
+          });
+          expect(save).toHaveBeenCalledTimes(1);
+          // Once rendered, grading and the card menu wait for the action.
+          expect(getTextButton(view, s.flashcardsEasy).props.accessibilityState).toMatchObject({ disabled: true });
+          expect(menuButton(view).props.accessibilityState).toMatchObject({ disabled: true });
+          await act(async () => write.resolve(firstCard));
+          await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+          expect(putCardRow).not.toHaveBeenCalled();
+          expect(putStudyLogRow).not.toHaveBeenCalled();
+          // The session goes on with the remaining card and finishes on it.
+          await reveal(view, secondCue);
+          fireEvent.press(getTextButton(view, s.flashcardsEasy));
+          await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+          expect(putStudyLogRow).toHaveBeenCalledTimes(1);
+          expect(jest.mocked(putStudyLogRow).mock.calls[0][1].cardId).toBe(secondCard.id);
+        },
+      );
+
+      it("disables the card menu while a grade is unresolved", async () => {
+        const write = createDeferred<void>();
+        jest.mocked(putCardRow).mockReturnValueOnce(write.promise);
+        const view = renderSession();
+        await reveal(view);
+        expect(menuButton(view).props.accessibilityState).toMatchObject({ disabled: false });
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(putCardRow).toHaveBeenCalledTimes(1));
+        expect(menuButton(view).props.accessibilityState).toMatchObject({ disabled: true });
+        await act(async () => write.resolve());
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        expect(menuButton(view).props.accessibilityState).toMatchObject({ disabled: false });
+      });
+
+      it("waits for a pending card action before leaving on Close, and stays to show its failure", async () => {
+        const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const write = createDeferred<StudyCardRow>();
+        jest.mocked(setStudyCardSuspended).mockReturnValueOnce(write.promise);
+        const view = renderSession();
+        await openDirectCardAction(view, s, "front", "suspend");
+        await waitFor(() => expect(setStudyCardSuspended).toHaveBeenCalledTimes(1));
+        expect(preventing()).toBe(true);
+        fireEvent.press(closeButton(view));
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        expect(closeButton(view).props.accessibilityState).toMatchObject({ disabled: true });
+        await act(async () => write.reject(failure));
+        await waitFor(() => expect(view.getByText(s.cardActionFailed)).toBeTruthy());
+        expect(warning).toHaveBeenCalledWith("[FlashcardSession] Card action failed:", failure);
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        expect(endReviewSession).not.toHaveBeenCalled();
+        expect(view.getByText(firstCue)).toBeTruthy();
+        expect(closeButton(view).props.accessibilityState).toMatchObject({ disabled: false });
+        expect(preventing()).toBe(false);
+        // The card is still open, and the cancelled Close does not carry over to the retry.
+        fireEvent.press(menuButton(view));
+        await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+        fireEvent.press(view.getByRole("button", { name: s.cardSuspend }));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        expect(setStudyCardSuspended).toHaveBeenCalledTimes(2);
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+      });
+
+      it("holds a back press during a pending card action, then goes back once it is saved", async () => {
+        const write = createDeferred<StudyCardRow>();
+        jest.mocked(setStudyCardBuried).mockReturnValueOnce(write.promise);
+        const view = renderSession();
+        await openDirectCardAction(view, s, "front", "bury");
+        await waitFor(() => expect(setStudyCardBuried).toHaveBeenCalledTimes(1));
+        let held = false;
+        act(() => {
+          held = back();
+        });
+        expect(held).toBe(true);
+        expect(closeButton(view).props.accessibilityState).toMatchObject({ disabled: true });
+        await act(async () => write.resolve(firstCard));
+        await waitFor(() => expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK));
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
+      });
+    });
+
+    describe("a summary that cannot be fully built after the last grade is saved", () => {
+      const failure = new Error("synthetic next review date failure");
+
+      function summaryRow(view: ReturnType<typeof render>, label: string): RenderedNode {
+        const row = view.UNSAFE_getAllByType(Card).find((card) => within(card).queryByText(label));
+        if (!row) throw new Error(`Missing summary row ${label}`);
+        return row;
+      }
+
+      it("shows the summary without the next review date, and never offers the saved grade again", async () => {
+        const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
+        jest.mocked(getNextEligibleReviewDate).mockRejectedValueOnce(failure);
+        const view = renderSession();
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+        expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
+        expect(view.queryByText(s.flashcardsEasy)).toBeNull();
+        expect(within(summaryRow(view, s.flashcardsSummaryReviewed)).getByText("1")).toBeTruthy();
+        expect(within(summaryRow(view, s.flashcardsSummaryNextReview)).getByText("—")).toBeTruthy();
+        expect(warning).toHaveBeenCalledWith("[FlashcardSession] Next review date failed:", failure);
+        expect(putCardRow).toHaveBeenCalledTimes(1);
+        expect(putStudyLogRow).toHaveBeenCalledTimes(1);
+        expect(recordSessionProgress).toHaveBeenCalledTimes(1);
+        expect(endReviewSession).toHaveBeenCalledTimes(1);
+      });
+
+      it("leaves once confirmed during the summary, even when it cannot be fully built", async () => {
+        jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const nextDate = createDeferred<string | null>();
+        jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
+        jest.mocked(getNextEligibleReviewDate).mockReturnValueOnce(nextDate.promise);
+        const view = renderSession();
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(getNextEligibleReviewDate).toHaveBeenCalledTimes(1));
+        // The grade is saved, so Close asks, and Leave waits for the summary being prepared.
+        fireEvent.press(view.getByRole("button", { name: s.genericClose }));
+        await waitFor(() => expect(view.getByText(s.habitExitLeave)).toBeTruthy());
+        fireEvent.press(getTextButton(view, s.habitExitLeave));
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        await act(async () => nextDate.reject(failure));
+        await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home"));
+        expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+        expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
+        expect(putStudyLogRow).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it("announces the day's minimum wird and ends the first week with a commitment (STR-20)", async () => {
       jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
       jest.mocked(recordWirdProgress).mockResolvedValueOnce({ kind: "minimum_met", length: 2 });

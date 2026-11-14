@@ -134,6 +134,14 @@ type SessionSummary = {
   habit: SessionHabitInput;
 };
 
+/** What follows a saved grade or card action. The change is committed by then, so neither part can report it unsaved. */
+type SavedChange = {
+  /** Bookkeeping for the saved change. It runs even when a held leave goes ahead. */
+  record?: () => void;
+  /** Show what follows: the next card, the updated card or the summary. A held leave skips it. */
+  advance: () => Promise<void> | void;
+};
+
 const NO_HABIT_RESULT: SessionHabitInput = { event: null, overview: null, againCount: 0, total: 0, durationMs: 0 };
 
 function emptySummary(): SessionSummary {
@@ -203,7 +211,8 @@ function FlashcardSessionScreen() {
   const [revealed, setRevealed] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [gradingBusy, setGradingBusy] = useState(false);
+  /** The rendered copy of mutationLockRef: grades, card actions and the card menu are disabled while it is held. */
+  const [mutationBusy, setMutationBusy] = useState(false);
   const sessionStartRef = useRef(Date.now());
   // The review session row is written on the first grade, so an empty session leaves nothing behind.
   const sessionRef = useRef<ReviewSessionRef | null>(null);
@@ -218,17 +227,21 @@ function FlashcardSessionScreen() {
   const reviewedCardIdsRef = useRef(new Set<string>());
   /** The rendered copy of a non-empty reviewedCardIdsRef, so the remove guard below updates with it. */
   const [hasReviewed, setHasReviewed] = useState(false);
-  const gradingInFlightRef = useRef(false);
   /**
-   * Close, a back press or a gesture came while a grade was unresolved. The screen leaves once the
-   * grade is saved, or stays on the card to show a failed save, which would otherwise reach a departed screen.
+   * One lock for every change to the current card, a grade or a card action, taken synchronously on the
+   * press. Two changes that each advance from the same card would otherwise skip a card or step past the list.
+   */
+  const mutationLockRef = useRef(false);
+  /**
+   * Close, a back press or a gesture came while a grade or card action was unresolved. The screen leaves
+   * once it is saved, or stays on the card to show a failed save, which would otherwise reach a departed screen.
    */
   const leaveWhenSettledRef = useRef(false);
   /** Set once the screen leaves on purpose, so the remove guard below lets that navigation through. */
   const exitingRef = useRef(false);
   /** A back press or gesture held for the leave confirmation or a grade; leaving carries it out. */
   const pendingBackRef = useRef<NavigationAction | null>(null);
-  /** The rendered copy of leaveWhenSettledRef, so Close shows that its press is waiting for the grade. */
+  /** The rendered copy of leaveWhenSettledRef, so Close shows that its press is waiting for the change. */
   const [leavePending, setLeavePending] = useState(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
@@ -240,11 +253,10 @@ function FlashcardSessionScreen() {
   const [answerEditOpen, setAnswerEditOpen] = useState(false);
   const [answerEditMode, setAnswerEditMode] = useState<ReviewMode | null>(null);
   const [answerEditText, setAnswerEditText] = useState("");
-  const [cardActionBusy, setCardActionBusy] = useState(false);
 
   const resetSessionProgress = useCallback(() => {
-    gradingInFlightRef.current = false;
-    setGradingBusy(false);
+    mutationLockRef.current = false;
+    setMutationBusy(false);
     setSessionError(null);
     wirdEventRef.current = null;
     againCountRef.current = 0;
@@ -265,7 +277,6 @@ function FlashcardSessionScreen() {
     setAnswerEditOpen(false);
     setAnswerEditMode(null);
     setAnswerEditText("");
-    setCardActionBusy(false);
   }, []);
 
   // Load due cards and pre-fetch all card data
@@ -534,10 +545,17 @@ function FlashcardSessionScreen() {
     animateFlip();
   };
 
+  /**
+   * The summary follows saved grades, so it must not fail: a part that cannot be loaded is left out.
+   * A failure here once reported the last, already saved, grade as unsaved and offered it again.
+   */
   const buildSummary = useCallback(async (): Promise<SessionSummary> => {
     const session = sessionRef.current;
     const [nextReviewDate, overview] = await Promise.all([
-      getNextEligibleReviewDate(db),
+      getNextEligibleReviewDate(db).catch((error) => {
+        console.warn("[FlashcardSession] Next review date failed:", error);
+        return null;
+      }),
       loadHabitOverview(db).catch((error) => {
         console.warn("[FlashcardSession] Habit overview failed:", error);
         return null;
@@ -564,15 +582,16 @@ function FlashcardSessionScreen() {
 
   const advanceAfterRemovingCurrentCard = useCallback(async () => {
     setSessionError(null);
-    setCurrentSideIndex(0);
-    setRevealed(false);
     // Graded cards stay in the list before currentIndex, so removing the last card ends the session
-    // instead of stepping back onto a card that was already reviewed.
-    setCards((prev) => prev.filter((_, index) => index !== currentIndex));
+    // instead of stepping back onto a card that was already reviewed. The card stays in the list
+    // until the summary replaces it, so the index never points past the list meanwhile.
     if (currentIndex >= cards.length - 1) {
       await finishSessionWithSummary();
       return;
     }
+    setCurrentSideIndex(0);
+    setRevealed(false);
+    setCards((prev) => prev.filter((_, index) => index !== currentIndex));
     setPhase("front");
   }, [cards.length, currentIndex, finishSessionWithSummary]);
 
@@ -602,76 +621,113 @@ function FlashcardSessionScreen() {
     setSessionError(s.cardDeletedSkipped);
   }, [advanceAfterRemovingCurrentCard, s.cardDeletedSkipped]);
 
-  const runCardAction = useCallback(async (action: () => Promise<void>) => {
-    if (cardActionBusy || !currentCard) return;
-    setCardActionBusy(true);
+  /**
+   * Run one change to the current card, a grade or a card action, under mutationLockRef. Only a failed
+   * `save` is reported, and it keeps the card open for a retry. Once `save` resolves the change is
+   * committed and the card consumed, so what follows (bookkeeping, the next card or the summary) can
+   * neither present it as unsaved nor offer it again. Close or a back press during the change waits
+   * for it: the screen leaves once it is saved, or stays to show its failure.
+   */
+  const runCardMutation = async (failureLog: string, failureMessage: string, save: () => Promise<SavedChange>) => {
+    if (mutationLockRef.current || !currentCard) return;
+    mutationLockRef.current = true;
+    setMutationBusy(true);
     setSessionError(null);
     try {
-      await action();
-    } catch (e) {
-      console.warn("[FlashcardSession] Card action failed:", e);
-      if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
-      else setSessionError(s.cardActionFailed);
-    } finally {
-      setCardActionBusy(false);
-    }
-  }, [cardActionBusy, currentCard, s.cardActionFailed, skipDeletedCurrentCard]);
-
-  const handleSuspendCard = useCallback(() => {
-    if (!currentCard) return;
-    setCardMenuOpen(false);
-    runCardAction(async () => {
-      hapticMedium();
-      await setStudyCardSuspended(db, currentCard.card.deck_id, currentCard.card.id, true, LIVE_CARD);
-      await advanceAfterRemovingCurrentCard();
-    });
-  }, [advanceAfterRemovingCurrentCard, currentCard, db, runCardAction]);
-
-  const handleBuryCard = useCallback(() => {
-    if (!currentCard) return;
-    setCardMenuOpen(false);
-    runCardAction(async () => {
-      hapticMedium();
-      await setStudyCardBuried(db, currentCard.card.deck_id, currentCard.card.id, true, LIVE_CARD);
-      await advanceAfterRemovingCurrentCard();
-    });
-  }, [advanceAfterRemovingCurrentCard, currentCard, db, runCardAction]);
-
-  const handleToggleMarkCard = useCallback(() => {
-    if (!currentCard) return;
-    setCardMenuOpen(false);
-    runCardAction(async () => {
-      hapticMedium();
-      const updated = await setStudyCardMarked(
-        db,
-        currentCard.card.deck_id,
-        currentCard.card.id,
-        !currentCard.card.marked_at,
-        LIVE_CARD
-      );
-      updateCurrentCardRow(updated);
-    });
-  }, [currentCard, db, runCardAction, updateCurrentCardRow]);
-
-  const handleConfirmCardAction = useCallback(() => {
-    if (!currentCard || !confirmCardAction) return;
-    const action = confirmCardAction;
-    runCardAction(async () => {
-      hapticMedium();
-      if (action === "delete") {
-        await deleteStudyCard(db, currentCard.card.deck_id, currentCard.card.id);
-        setConfirmCardAction(null);
-        await advanceAfterRemovingCurrentCard();
+      let change: SavedChange;
+      try {
+        change = await save();
+      } catch (e) {
+        console.warn(failureLog, e);
+        // The held leave is dropped: the card stays open with its error, and a retry does not leave.
+        leaveWhenSettledRef.current = false;
+        pendingBackRef.current = null;
+        setLeavePending(false);
+        if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
+        else setSessionError(failureMessage);
         return;
       }
-      const updated = await resetStudyCardProgress(db, currentCard.card.deck_id, currentCard.card.id, LIVE_CARD);
-      updateCurrentCardRow(updated);
-      setCurrentSideIndex(0);
-      setRevealed(false);
-      setPhase("front");
-      setConfirmCardAction(null);
+      try {
+        change.record?.();
+      } catch (e) {
+        console.warn("[FlashcardSession] Failed to record a saved change:", e);
+      }
+      // A leave held for this change goes ahead now that it is saved, without showing the next card.
+      if (!leaveWhenSettledRef.current) await change.advance();
+      // Also covers a leave that came while the summary was being prepared.
+      if (leaveWhenSettledRef.current) {
+        leaveWhenSettledRef.current = false;
+        leaveSession();
+      }
+    } finally {
+      mutationLockRef.current = false;
+      setMutationBusy(false);
+    }
+  };
+
+  const runCardAction = (save: () => Promise<SavedChange>) =>
+    runCardMutation("[FlashcardSession] Card action failed:", s.cardActionFailed, save);
+
+  const handleSuspendCard = () => {
+    if (!currentCard) return;
+    const { card } = currentCard;
+    setCardMenuOpen(false);
+    void runCardAction(async () => {
+      hapticMedium();
+      await setStudyCardSuspended(db, card.deck_id, card.id, true, LIVE_CARD);
+      return { advance: advanceAfterRemovingCurrentCard };
     });
-  }, [advanceAfterRemovingCurrentCard, confirmCardAction, currentCard, db, runCardAction, updateCurrentCardRow]);
+  };
+
+  const handleBuryCard = () => {
+    if (!currentCard) return;
+    const { card } = currentCard;
+    setCardMenuOpen(false);
+    void runCardAction(async () => {
+      hapticMedium();
+      await setStudyCardBuried(db, card.deck_id, card.id, true, LIVE_CARD);
+      return { advance: advanceAfterRemovingCurrentCard };
+    });
+  };
+
+  const handleToggleMarkCard = () => {
+    if (!currentCard) return;
+    const { card } = currentCard;
+    setCardMenuOpen(false);
+    void runCardAction(async () => {
+      hapticMedium();
+      const updated = await setStudyCardMarked(db, card.deck_id, card.id, !card.marked_at, LIVE_CARD);
+      return { advance: () => updateCurrentCardRow(updated) };
+    });
+  };
+
+  const handleConfirmCardAction = () => {
+    if (!currentCard || !confirmCardAction) return;
+    const { card } = currentCard;
+    const action = confirmCardAction;
+    void runCardAction(async () => {
+      hapticMedium();
+      if (action === "delete") {
+        await deleteStudyCard(db, card.deck_id, card.id);
+        return {
+          advance: async () => {
+            setConfirmCardAction(null);
+            await advanceAfterRemovingCurrentCard();
+          },
+        };
+      }
+      const updated = await resetStudyCardProgress(db, card.deck_id, card.id, LIVE_CARD);
+      return {
+        advance: () => {
+          updateCurrentCardRow(updated);
+          setCurrentSideIndex(0);
+          setRevealed(false);
+          setPhase("front");
+          setConfirmCardAction(null);
+        },
+      };
+    });
+  };
 
   const openDueDateSheet = useCallback(() => {
     if (!currentCard) return;
@@ -682,22 +738,27 @@ function FlashcardSessionScreen() {
     setDueDateOpen(true);
   }, [currentCard]);
 
-  const handleSaveDueDate = useCallback(() => {
+  const handleSaveDueDate = () => {
     if (!currentCard) return;
+    const { card } = currentCard;
     const parsed = parseDueDateInput(dueDateText);
     if (!parsed.ok) {
       setDueDateError(parsed.reason === "past" ? s.cardDueDatePast : s.cardDueDateInvalid);
       return;
     }
     setDueDateError(null);
-    runCardAction(async () => {
+    void runCardAction(async () => {
       hapticMedium();
-      await setStudyCardDueDate(db, currentCard.card.deck_id, currentCard.card.id, parsed.date, LIVE_CARD);
-      setDueDateOpen(false);
-      setDueDateError(null);
-      await advanceAfterRemovingCurrentCard();
+      await setStudyCardDueDate(db, card.deck_id, card.id, parsed.date, LIVE_CARD);
+      return {
+        advance: async () => {
+          setDueDateOpen(false);
+          setDueDateError(null);
+          await advanceAfterRemovingCurrentCard();
+        },
+      };
     });
-  }, [advanceAfterRemovingCurrentCard, currentCard, db, dueDateText, runCardAction, s.cardDueDateInvalid, s.cardDueDatePast]);
+  };
 
   const openAnswerEditSheet = useCallback(() => {
     if (!currentCard) return;
@@ -710,28 +771,33 @@ function FlashcardSessionScreen() {
     setAnswerEditOpen(true);
   }, [activeModes, currentCard, currentMode, currentSideIndex, s]);
 
-  const handleSaveAnswerEdit = useCallback(() => {
+  const handleSaveAnswerEdit = () => {
     if (!currentCard || !answerEditMode) return;
-    runCardAction(async () => {
-      const value = answerEditText.trim();
-      const key = cardAnswerSettingKey(currentCard.card.id, answerEditMode);
+    const mode = answerEditMode;
+    const value = answerEditText.trim();
+    const key = cardAnswerSettingKey(currentCard.card.id, mode);
+    void runCardAction(async () => {
       if (value.length > 0) {
         await writeUserSetting(db, key, value);
       } else {
         await deleteUserSetting(db, key);
       }
-      setCards((prev) => prev.map((item, index) => {
-        if (index !== currentIndex) return item;
-        const customAnswers = { ...(item.customAnswers ?? {}) };
-        if (value.length > 0) customAnswers[answerEditMode] = value;
-        else delete customAnswers[answerEditMode];
-        return { ...item, customAnswers };
-      }));
-      setAnswerEditOpen(false);
-      setAnswerEditMode(null);
-      setAnswerEditText("");
+      return {
+        advance: () => {
+          setCards((prev) => prev.map((item, index) => {
+            if (index !== currentIndex) return item;
+            const customAnswers = { ...(item.customAnswers ?? {}) };
+            if (value.length > 0) customAnswers[mode] = value;
+            else delete customAnswers[mode];
+            return { ...item, customAnswers };
+          }));
+          setAnswerEditOpen(false);
+          setAnswerEditMode(null);
+          setAnswerEditText("");
+        },
+      };
     });
-  }, [answerEditMode, answerEditText, currentCard, currentIndex, db, runCardAction]);
+  };
 
   const leaveSession = () => {
     exitingRef.current = true;
@@ -747,9 +813,9 @@ function FlashcardSessionScreen() {
     else returnToTabs(navigation.getState(), "/(tabs)/home");
   };
 
-  /** Leave now, or once the grade being saved settles (see leaveWhenSettledRef). */
+  /** Leave now, or once the grade or card action being saved settles (see leaveWhenSettledRef). */
   const leave = () => {
-    if (gradingInFlightRef.current) {
+    if (mutationLockRef.current) {
       leaveWhenSettledRef.current = true;
       setLeavePending(true);
     } else leaveSession();
@@ -758,29 +824,27 @@ function FlashcardSessionScreen() {
   /** A saved grade would be left behind mid-session. Read from the ref, which a saved grade updates at once. */
   const hasReviewedProgress = () => phase !== "summary" && reviewedCardIdsRef.current.size > 0;
 
-  const handleGrade = async (rating: Grade) => {
-    if (!currentCard || gradingInFlightRef.current) return;
-    gradingInFlightRef.current = true;
-    setGradingBusy(true);
-    setSessionError(null);
-    try {
+  const handleGrade = (rating: Grade) => {
+    const item = currentCard;
+    if (!item) return;
+    void runCardMutation("[FlashcardSession] Failed to grade card:", s.flashcardsReviewSaveFailed, async () => {
       hapticMedium();
       const reviewedAt = new Date();
       const saved = await persistReviewTransition({
         db,
-        cardId: currentCard.card.id,
+        cardId: item.card.id,
         // The queued row can be older than the card: sync may have applied another device's review
         // since the queue loaded. Calculate from the card as it is inside the grade's transaction.
         transition: async (tx) =>
           calculateReviewTransition({
-            card: (await readCurrentCard(tx, currentCard.card.id)) ?? currentCard.card,
+            card: (await readCurrentCard(tx, item.card.id)) ?? item.card,
             rating,
             reviewedAt,
-            reviewPolicy: currentCard.settings,
+            reviewPolicy: item.settings,
           }),
         context: {
           session: sessionRef.current,
-          firstGradeInSession: !reviewedCardIdsRef.current.has(currentCard.card.id),
+          firstGradeInSession: !reviewedCardIdsRef.current.has(item.card.id),
           durationMs: reviewedAt.getTime() - cardShownAtRef.current,
           supportLevel: null,
           proposedRating: null,
@@ -788,64 +852,43 @@ function FlashcardSessionScreen() {
           errors: [],
         },
       });
-      if (rating === Rating.Again) againCountRef.current += 1;
-      wirdEventRef.current = strongerWirdEvent(wirdEventRef.current, saved.wird);
-      if (saved.wird.kind === "minimum_met") setWirdNotice(s.habitMinimumMet);
-      else if (saved.wird.kind === "made_up") {
-        setWirdNotice(interpolate(s.habitMadeUp, { n: formatNumber(saved.wird.length, uiLanguage), days: formatDays(saved.wird.length, uiLanguage) }));
-      } else if (saved.wird.kind === "earned_back") {
-        setWirdNotice(interpolate(s.habitEarnedBack, { days: formatDays(saved.wird.length, uiLanguage) }));
-      }
-      // The same-day requeue carries the row that was saved, not one calculated from the queued copy.
+      // The grade is saved. The same-day requeue carries the row that was saved, not one calculated
+      // from the queued copy.
       const { transition } = saved;
-      const requeuedCard = transition.shouldRequeueInSession
-        ? { ...currentCard, card: transition.updatedCard }
-        : null;
-
-      const { reviewRecord } = transition;
-      recordReviewedCard(currentCard.card.id, currentCard.card.state);
-
-      if (currentCard.card.id.startsWith("mutashabihat:") || currentCard.card.id.startsWith("similar-tail:")) {
-        recordAchievementEvent(db, {
-          type: "mutashabih_pair_reviewed",
-          pairId: currentCard.card.id,
-          reviewedAt: reviewRecord.reviewedAt,
-        }).catch(console.warn);
-      }
-
-      // A leave held for this grade goes ahead now that it is saved, without showing the next card.
-      if (!leaveWhenSettledRef.current) {
-        if (requeuedCard) {
-          setCards((prev) => [...prev, requeuedCard]);
-        }
-
-        if (currentIndex < cards.length - 1 || requeuedCard) {
-          setCurrentIndex((i) => i + 1);
-          setCurrentSideIndex(0);
-          setRevealed(false);
-          setPhase("front");
-        } else {
-          await finishSessionWithSummary();
-          hapticSuccess();
-        }
-      }
-      // Also covers a leave that came while the summary was being prepared.
-      if (leaveWhenSettledRef.current) {
-        leaveWhenSettledRef.current = false;
-        leaveSession();
-      }
-    } catch (e) {
-      console.warn("[FlashcardSession] Failed to grade card:", e);
-      // The held leave is dropped: the card stays open with its error, and a retry does not leave.
-      leaveWhenSettledRef.current = false;
-      pendingBackRef.current = null;
-      setLeavePending(false);
-      if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
-      else setSessionError(s.flashcardsReviewSaveFailed);
-    } finally {
-      gradingInFlightRef.current = false;
-      setGradingBusy(false);
-    }
+      const requeuedCard = transition.shouldRequeueInSession ? { ...item, card: transition.updatedCard } : null;
+      return {
+        record: () => {
+          recordReviewedCard(item.card.id, item.card.state);
+          if (rating === Rating.Again) againCountRef.current += 1;
+          wirdEventRef.current = strongerWirdEvent(wirdEventRef.current, saved.wird);
+          if (saved.wird.kind === "minimum_met") setWirdNotice(s.habitMinimumMet);
+          else if (saved.wird.kind === "made_up") {
+            setWirdNotice(interpolate(s.habitMadeUp, { n: formatNumber(saved.wird.length, uiLanguage), days: formatDays(saved.wird.length, uiLanguage) }));
+          } else if (saved.wird.kind === "earned_back") {
+            setWirdNotice(interpolate(s.habitEarnedBack, { days: formatDays(saved.wird.length, uiLanguage) }));
+          }
+          if (item.card.id.startsWith("mutashabihat:") || item.card.id.startsWith("similar-tail:")) {
+            recordAchievementEvent(db, {
+              type: "mutashabih_pair_reviewed",
+              pairId: item.card.id,
+              reviewedAt: transition.reviewRecord.reviewedAt,
+            }).catch(console.warn);
+          }
+        },
+        advance: async () => {
+          if (requeuedCard) setCards((prev) => [...prev, requeuedCard]);
+          if (currentIndex < cards.length - 1 || requeuedCard) {
+            setCurrentIndex((i) => i + 1);
+            setCurrentSideIndex(0);
+            setRevealed(false);
+            setPhase("front");
+          } else {
+            await finishSessionWithSummary();
+            hapticSuccess();
+          }
+        },
+      };
+    });
   };
 
   // SES-02: leaving mid-session asks once. Every grade is already saved, so this only confirms.
@@ -867,39 +910,40 @@ function FlashcardSessionScreen() {
   );
 
   // Back presses, gestures and the iOS swipe behave like Close: with saved grades they ask first, and
-  // during an unresolved grade they wait for it. usePreventRemove, unlike a bare beforeRemove listener,
-  // also tells native-stack to block the native dismissal. `gradingBusy` is the rendered copy of the lock.
-  usePreventRemove(gradingBusy || (phase !== "summary" && hasReviewed), ({ data }) => {
+  // during an unresolved grade or card action they wait for it. usePreventRemove, unlike a bare
+  // beforeRemove listener, also tells native-stack to block the native dismissal. `mutationBusy` is the
+  // rendered copy of the lock.
+  usePreventRemove(mutationBusy || (phase !== "summary" && hasReviewed), ({ data }) => {
     // The screen's own leave goes on, as does a back press this render has not caught up with; React
     // Navigation marks the action as already checked for this screen.
     if (exitingRef.current) navigation.dispatch(data.action);
     else if (hasReviewedProgress()) {
       pendingBackRef.current = data.action;
       setExitConfirmOpen(true);
-    } else if (gradingInFlightRef.current) {
+    } else if (mutationLockRef.current) {
       pendingBackRef.current = data.action;
       leaveWhenSettledRef.current = true;
       setLeavePending(true);
     } else navigation.dispatch(data.action);
   });
 
-  // ─── Render ────────────────────────────────────────────────
+  // No path should leave the index past the cards, but if one does the session finishes to the summary
+  // instead of rendering nothing: a blank screen has no Close. Every card change is saved by then.
+  const cardMissing = phase !== "loading" && phase !== "summary" && !currentCard;
+  useEffect(() => {
+    if (!cardMissing || mutationBusy) return;
+    let cancelled = false;
+    buildSummary().then((next) => {
+      if (cancelled) return;
+      setSummary(next);
+      setPhase("summary");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [buildSummary, cardMissing, mutationBusy]);
 
-  if (phase === "loading") {
-    return (
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        <View className="px-6 pt-6" style={{ gap: 16 }}>
-          <Skeleton isDark={isDark} width="100%" height={8} borderRadius={4} />
-          <View style={{ height: 24 }} />
-          <Skeleton isDark={isDark} width="40%" height={12} borderRadius={6} style={{ alignSelf: "center" }} />
-          <Skeleton isDark={isDark} width="100%" height={200} borderRadius={24} />
-          <View style={{ height: 8 }} />
-          <SkeletonText isDark={isDark} width="80%" lineHeight={14} style={{ alignSelf: "center" }} />
-          <SkeletonText isDark={isDark} width="60%" lineHeight={14} style={{ alignSelf: "center" }} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // ─── Render ────────────────────────────────────────────────
 
   if (phase === "summary") {
     return (
@@ -917,7 +961,21 @@ function FlashcardSessionScreen() {
     );
   }
 
-  if (!currentCard) return null;
+  if (phase === "loading" || !currentCard) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <View className="px-6 pt-6" style={{ gap: 16 }}>
+          <Skeleton isDark={isDark} width="100%" height={8} borderRadius={4} />
+          <View style={{ height: 24 }} />
+          <Skeleton isDark={isDark} width="40%" height={12} borderRadius={6} style={{ alignSelf: "center" }} />
+          <Skeleton isDark={isDark} width="100%" height={200} borderRadius={24} />
+          <View style={{ height: 8 }} />
+          <SkeletonText isDark={isDark} width="80%" lineHeight={14} style={{ alignSelf: "center" }} />
+          <SkeletonText isDark={isDark} width="60%" lineHeight={14} style={{ alignSelf: "center" }} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const sessionTotal = sessionCardTotal || cards.length;
   const currentProgress = Math.min(currentIndex + 1, sessionTotal);
@@ -942,7 +1000,7 @@ function FlashcardSessionScreen() {
               accessibilityRole="button"
               accessibilityLabel={s.genericClose}
               accessibilityState={{ disabled: leavePending }}
-              // Dimmed while Close waits for the grade it was pressed during.
+              // Dimmed while Close waits for the grade or card action it was pressed during.
               className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${leavePending ? "opacity-50" : ""}`}
             >
               <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
@@ -965,7 +1023,7 @@ function FlashcardSessionScreen() {
                 className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={s.cardActionsTitle}
-                disabled={cardActionBusy}
+                disabled={mutationBusy}
               >
                 <EllipsisVertical size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
               </Pressable>
@@ -1117,7 +1175,7 @@ function FlashcardSessionScreen() {
 
           {/* Grading: show directly after last side is revealed, or in grading phase */}
           {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
-            <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} disabled={gradingBusy} />
+            <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} disabled={mutationBusy} />
           )}
         </View>
       </View>
@@ -1127,7 +1185,7 @@ function FlashcardSessionScreen() {
         card={currentCard}
         isDark={isDark}
         isRTL={isRTL}
-        busy={cardActionBusy}
+        busy={mutationBusy}
         s={s}
         onClose={() => setCardMenuOpen(false)}
         onDelete={() => {
@@ -1151,13 +1209,13 @@ function FlashcardSessionScreen() {
         visible={answerEditOpen}
         value={answerEditText}
         error={sessionError}
-        busy={cardActionBusy}
+        busy={mutationBusy}
         isDark={isDark}
         isRTL={isRTL}
         s={s}
         onChange={setAnswerEditText}
         onClose={() => {
-          if (!cardActionBusy) setAnswerEditOpen(false);
+          if (!mutationBusy) setAnswerEditOpen(false);
         }}
         onSave={handleSaveAnswerEdit}
       />
@@ -1165,13 +1223,13 @@ function FlashcardSessionScreen() {
         visible={dueDateOpen}
         value={dueDateText}
         error={dueDateError ?? sessionError}
-        busy={cardActionBusy}
+        busy={mutationBusy}
         isDark={isDark}
         isRTL={isRTL}
         s={s}
         onChange={setDueDateText}
         onClose={() => {
-          if (!cardActionBusy) setDueDateOpen(false);
+          if (!mutationBusy) setDueDateOpen(false);
         }}
         onSave={handleSaveDueDate}
         autoCapitalize="none"
@@ -1184,12 +1242,12 @@ function FlashcardSessionScreen() {
         cancelLabel={s.flashcardsCancel}
         confirmLabel={confirmCardAction === "delete" ? s.flashcardsDelete : s.cardResetProgress}
         destructive={confirmCardAction === "delete"}
-        confirmLoading={cardActionBusy}
+        confirmLoading={mutationBusy}
         error={sessionError}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={() => {
-          if (!cardActionBusy) setConfirmCardAction(null);
+          if (!mutationBusy) setConfirmCardAction(null);
         }}
         onConfirm={handleConfirmCardAction}
       />
