@@ -10,7 +10,9 @@ import { createReflection } from "@/lib/reflections/api";
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import { useDatabase } from "@/lib/database/provider";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
+import { requireSocialOwner } from "@/lib/social/owner";
 import { router } from "expo-router";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useReflectionMutationScope } from "./use-mutation-scope";
@@ -45,6 +47,14 @@ export function WriteReflectionSheet({
   const db = useDatabase();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
+  // ETH-07: a stated minor's reflections and comments are visible only to them. The account's own
+  // privacy comes from the cache the app-wide minor check keeps (useMinorPhotoCleanup).
+  const ownPrivacy = useQuery({
+    queryKey: profilePrivacyKeys.mine(user?.id ?? null),
+    queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
+    enabled: false,
+  });
+  const isMinor = ownPrivacy.data?.isMinor === true;
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const { begin, pending, retire } = useReflectionMutationScope(
@@ -252,6 +262,22 @@ export function WriteReflectionSheet({
                 </Text>
               )}
             </View>
+
+            {isMinor ? (
+              <Text
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 12,
+                  lineHeight: 18,
+                  color: mutedColor,
+                  marginBottom: 8,
+                  ...textStartStyle(isRTL),
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {s.reflectionMinorPrivate}
+              </Text>
+            ) : null}
 
             {error && (
               <Text

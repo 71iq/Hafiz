@@ -11,6 +11,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { ReflectionCard } from "@/components/reflections/ReflectionCard";
 import { CommentsSheet } from "@/components/reflections/CommentsSheet";
 import { WriteReflectionSheet } from "@/components/reflections/WriteReflectionSheet";
+import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import {
   addComment,
   createReflection,
@@ -367,6 +368,21 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     expect(recordAchievementEvent).toHaveBeenCalledTimes(1);
     expect(close).toHaveBeenCalledTimes(1);
     expect(success).toHaveBeenCalledTimes(1);
+  });
+  it("tells an account under 18 that its reflections are visible only to it (ETH-07)", async () => {
+    const sheet = <WriteReflectionSheet open surah={2} ayahStart={1} ayahEnd={1} onClose={jest.fn()} />;
+    const adult = render(sheet, { wrapper });
+    expect(adult.queryByText(strings[locale].reflectionMinorPrivate)).toBeNull();
+    adult.unmount();
+    client.setQueryData(profilePrivacyKeys.mine(user(1).id), {
+      boardJoined: false,
+      boardNickname: null,
+      showStreak: false,
+      showJuzCompletions: false,
+      isMinor: true,
+    });
+    const minor = render(sheet, { wrapper });
+    expect(minor.getByText(strings[locale].reflectionMinorPrivate)).toBeTruthy();
   });
   it("does not dispatch a public post after its index wait loses the source", async () => {
     const pending = deferred(index);
