@@ -7,10 +7,12 @@ import { toArabicNumber } from "@/lib/arabic";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 
+// White labels read at 4.5:1 or more on every fill. Hard and Good keep their light fills in dark themes,
+// since the brighter amber and green fall to about 3.2:1.
 const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
   { rating: Rating.Again, bgLight: "#b91c1c", bgDark: "#dc2626" },
-  { rating: Rating.Hard, bgLight: "#b45309", bgDark: "#d97706" },
-  { rating: Rating.Good, bgLight: "#15803d", bgDark: "#16a34a" },
+  { rating: Rating.Hard, bgLight: "#b45309", bgDark: "#b45309" },
+  { rating: Rating.Good, bgLight: "#15803d", bgDark: "#15803d" },
   { rating: Rating.Easy, bgLight: "#1d4ed8", bgDark: "#2563eb" },
 ];
 

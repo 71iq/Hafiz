@@ -110,8 +110,9 @@ export function SabaqSecondLook({
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, alignItems: "center" }}>
-        <View style={{ width: "100%", maxWidth: pageWidth, gap: 6 }}>
+      {/* Title, page card and actions all start 8 px inside the page column, as in the hifz review. */}
+      <ScrollView contentContainerStyle={{ paddingVertical: 16, paddingHorizontal: 8, gap: 14, alignItems: "center" }}>
+        <View style={{ width: "100%", maxWidth: pageWidth - 16, gap: 6 }}>
           <Text
             dir={dir}
             style={{ fontFamily: "NotoSerif_700Bold", fontSize: 21, lineHeight: 30 }}
@@ -148,8 +149,8 @@ export function SabaqSecondLook({
 
       </ScrollView>
 
-      <View className="px-4 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
-        <View style={{ width: "100%", maxWidth: pageWidth, gap: 10 }}>
+      <View className="px-2 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
+        <View style={{ width: "100%", maxWidth: pageWidth - 16, gap: 10 }}>
           {/* A failed save shows here, by the grade the person just pressed. */}
           {error ? (
             <Text

@@ -216,6 +216,12 @@ jest.mock("@/lib/habit/queries", () => ({
   loadHabitOverview: jest.fn(),
   makeUpTarget: jest.fn(),
 }));
+// The summary's commitment names the reminder anchor; covered by session-commitment-label.
+jest.mock("@/lib/notifications/settings", () => ({
+  ...jest.requireActual("@/lib/notifications/settings"),
+  // A plain function, since the suite resets every mock between cases.
+  readReminderPrefs: async () => ({ anchor: { kind: "prayer", prayer: "fajr", offsetMinutes: 20 } }),
+}));
 // The make-up cutoff reads prayer times inside the grade; covered by habit-wird-progress.
 jest.mock("@/lib/prayer/settings", () => ({
   readDhuhrResolver: jest.fn(async () => () => null),
@@ -2469,7 +2475,8 @@ describe("Flashcard session due-date editor characterization", () => {
       await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
       expect(view.getAllByText(s.habitMinimumMet).length).toBeGreaterThan(0);
       expect(view.getByText("Day 2")).toBeTruthy();
-      expect(getTextButton(view, s.habitCommitTomorrow)).toBeTruthy();
+      // The commitment names the reminder's anchor, after Fajr here.
+      await waitFor(() => expect(getTextButton(view, "I'll be back tomorrow after Fajr")).toBeTruthy());
       expect(view.queryByText(s.flashcardsSummaryDone)).toBeNull();
     });
 

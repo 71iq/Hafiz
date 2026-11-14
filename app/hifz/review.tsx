@@ -18,6 +18,7 @@ import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
 import {
   SessionHabitCards,
   showsCommitment,
+  useCommitmentLabel,
   strongerWirdEvent,
   type SessionHabitInput,
 } from "@/components/habit/SessionHabitCards";
@@ -155,6 +156,7 @@ function HifzReviewScreen() {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, fontSize, lineHeight } = useSettings();
+  const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ mode?: string; level?: string }>();
   const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
@@ -899,7 +901,7 @@ function HifzReviewScreen() {
           ) : null}
           <Button
             className="w-full max-w-sm"
-            label={habitResult && showsCommitment(habitResult) ? s.habitCommitTomorrow : s.flashcardsSummaryDone}
+            label={habitResult && showsCommitment(habitResult) ? commitLabel : s.flashcardsSummaryDone}
             onPress={leave}
           />
         </ScrollView>

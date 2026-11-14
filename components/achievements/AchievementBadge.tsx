@@ -90,7 +90,7 @@ export function AchievementBadge({ item, compact = false }: Props) {
           </Text>
           {!compact && (
             <Text
-              className="mt-1 text-warm-400 dark:text-neutral-500"
+              className="mt-1 text-warm-700 dark:text-neutral-400"
               style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, ...textStartStyle(isRTL)}}
               numberOfLines={2}
             >
@@ -103,7 +103,7 @@ export function AchievementBadge({ item, compact = false }: Props) {
         <>
           <AchievementProgressBar current={currentValue} target={targetValue} />
           <Text
-            className="mt-1.5 text-warm-400 dark:text-neutral-500"
+            className="mt-1.5 text-warm-700 dark:text-neutral-400"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 10, ...textStartStyle(isRTL)}}
           >
             {/* A bidi isolate keeps "2 / 100" in order inside Arabic text. */}

@@ -22,9 +22,9 @@ const textVariants = cva("text-charcoal dark:text-neutral-200", {
       "label-lg": "font-manrope-medium text-sm",
       "label-md": "font-manrope-medium text-xs",
       "label-sm": "font-manrope-medium text-[10px] tracking-wider uppercase",
-      // Muted
-      muted: "font-manrope text-sm text-warm-400 dark:text-neutral-500",
-      caption: "font-manrope text-xs text-warm-400 dark:text-neutral-500",
+      // Muted: neutral-400 in dark themes reads at 4.5:1 or more on cards as well as the page.
+      muted: "font-manrope text-sm text-warm-400 dark:text-neutral-400",
+      caption: "font-manrope text-xs text-warm-400 dark:text-neutral-400",
     },
   },
   defaultVariants: {

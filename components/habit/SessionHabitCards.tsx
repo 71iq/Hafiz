@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { CalendarCheck2, Coffee, HeartHandshake, Sparkles, Target } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
@@ -13,6 +13,10 @@ import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
 import { formatDays, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
+import { readReminderPrefs } from "@/lib/notifications/settings";
+import { prayerLabel } from "@/lib/notifications/templates";
+import type { ReminderAnchor } from "@/lib/notifications/types";
 
 /** ETH-05: suggest rest after this much review in one session. */
 const REST_SUGGESTION_MS = 45 * 60_000;
@@ -45,6 +49,31 @@ export function strongerWirdEvent(
 /** STR-20: during the first week the session ends with a commitment instead of a plain Done. */
 export function showsCommitment(input: SessionHabitInput): boolean {
   return input.event !== null && (input.overview?.streak.length ?? 0) <= 7;
+}
+
+/**
+ * STR-20: the commitment names when the person comes back, the reminder's anchor (the hifz plan's,
+ * or the reminder setting's without a plan): "I'll be back tomorrow after Fajr", or the time for a
+ * clock anchor. Read once when the session screen mounts, so it is ready at the end; until then, or
+ * when it cannot be read, the commitment has no anchor.
+ */
+export function useCommitmentLabel(db: AppDatabase, s: UIStrings, language: "en" | "ar"): string {
+  const [anchor, setAnchor] = useState<ReminderAnchor | null>(null);
+  useEffect(() => {
+    let current = true;
+    readReminderPrefs(db)
+      .then((prefs) => {
+        if (current) setAnchor(prefs.anchor);
+      })
+      .catch((error: unknown) => console.warn("[Habit] Could not read the reminder anchor:", error));
+    return () => {
+      current = false;
+    };
+  }, [db]);
+  if (!anchor) return s.habitCommitTomorrow;
+  return anchor.kind === "prayer"
+    ? interpolate(s.habitCommitTomorrowAfter, { prayer: prayerLabel(anchor.prayer, language) })
+    : interpolate(s.habitCommitTomorrowAt, { time: formatClockMinutesForDisplay(anchor.minutes, language) });
 }
 
 type CardKind = "goal" | "rest" | "struggle" | "reminders";

@@ -7,6 +7,8 @@ import { Switch } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { HabitBreakSheet } from "@/components/habit/HabitBreakSheet";
+import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 import type { AppDatabase } from "@/lib/database/types";
 import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { STREAK_GOAL_OPTIONS } from "@/lib/habit/milestones";
@@ -54,6 +56,7 @@ function Row({ label, hint, dir, children }: { label: string; hint?: string; dir
  */
 export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
+  const mutedIcon = mutedIconColor(useSettings().effectiveTheme);
   const [settings, setSettings] = useState<HabitSettings | null>(null);
   const [breakOpen, setBreakOpen] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -216,7 +219,7 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
             <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
               {s.hifzPlanTitle}
             </Text>
-            <Chevron size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />
+            <Chevron size={16} color={mutedIcon} />
           </MirroredRow>
         </Pressable>
 
@@ -229,7 +232,7 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
             <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
               {s.habitSettingsBreak}
             </Text>
-            <Chevron size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />
+            <Chevron size={16} color={mutedIcon} />
           </MirroredRow>
         </Pressable>
 

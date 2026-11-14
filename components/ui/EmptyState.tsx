@@ -12,6 +12,8 @@ type Props = {
   isDark: boolean;
   /** "success" marks something just done: the icon takes the accent on a tinted disc. */
   tone?: "neutral" | "success";
+  /** "display" sets the title in the serif heading of a session's end, for an end state in a session flow. */
+  titleStyle?: "default" | "display";
 };
 
 /**
@@ -19,7 +21,7 @@ type Props = {
  * Follows "The Serene Path" design system: warm neutrals, teal accent, pill buttons. Text colors come
  * from the theme tokens, so they follow the active theme, and read at 4.5:1 or more.
  */
-export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction, isDark, tone = "neutral" }: Props) {
+export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction, isDark, tone = "neutral", titleStyle = "default" }: Props) {
   const { themeColors } = useSettings();
   const success = tone === "success";
   const accentColor = isDark ? "#2dd4bf" : "#0d9488";
@@ -48,12 +50,11 @@ export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction,
       <Text
         accessibilityRole="header"
         className="text-charcoal dark:text-neutral-200"
-        style={{
-          fontFamily: "Manrope_600SemiBold",
-          fontSize: 16,
-          textAlign: "center",
-          marginBottom: 6,
-        }}
+        style={
+          titleStyle === "display"
+            ? { fontFamily: "NotoSerif_700Bold", fontSize: 21, lineHeight: 30, textAlign: "center", marginBottom: 6 }
+            : { fontFamily: "Manrope_600SemiBold", fontSize: 16, textAlign: "center", marginBottom: 6 }
+        }
       >
         {title}
       </Text>

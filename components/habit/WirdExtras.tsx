@@ -18,6 +18,8 @@ import {
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { putUserSetting } from "@/lib/database/user-settings";
 import type { UIStrings } from "@/lib/i18n/strings";
+import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 type Props = {
   db: AppDatabase;
@@ -57,7 +59,8 @@ export function WirdExtras({ db, inboxCount, hasMemorizedPages, sabaqToday, lang
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
-  const muted = isDark ? "#a3a3a3" : "#8B8178";
+  // Muted icons take the theme's secondary text colour, so they match the text beside them.
+  const muted = mutedIconColor(useSettings().effectiveTheme);
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
   const openers: Partial<Record<ExtraKind, () => void>> = { strengthen: onStrengthen, connect: onConnect };
   const [state, setState] = useState<ExtrasState | null>(null);

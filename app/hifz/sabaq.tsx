@@ -13,7 +13,13 @@ import { Progress } from "@/components/ui/Progress";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
 import { GradingButtons } from "@/components/flashcards/GradingButtons";
-import { SessionHabitCards, showsCommitment, strongerWirdEvent, type SessionHabitInput } from "@/components/habit/SessionHabitCards";
+import {
+  SessionHabitCards,
+  showsCommitment,
+  strongerWirdEvent,
+  useCommitmentLabel,
+  type SessionHabitInput,
+} from "@/components/habit/SessionHabitCards";
 import { ZaytMood } from "@/components/habit/ZaytMood";
 import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
 import { SabaqSecondLook } from "@/components/hifz/SabaqSecondLook";
@@ -70,10 +76,15 @@ function formatClockTime(at: Date, language: "en" | "ar"): string {
  * ayah from memory with chaining, the whole chunk three times cleanly, which turns the chunk into a
  * sabaq card (SBQ-02), linking to what came before, then a graded fluent check of that card.
  */
-function SabaqScreen() {
+/**
+ * `onRestart` opens the screen again from the start, for the second look the done step offers once
+ * it is due (SBQ-03): a fresh load offers due looks before new lines.
+ */
+function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, effectiveTheme } = useSettings();
+  const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const pageWidth = Math.min(width, 640);
@@ -456,7 +467,8 @@ function SabaqScreen() {
       leaveWhenSaved.current = false;
       pendingBack.current = null;
       setLeavePending(false);
-      setError(s.hifzSaveFailed);
+      // No grade was given here: the lines were not saved, and Clean saves them again.
+      setError(s.hifzSabaqCleanRunSaveFailed);
     } finally {
       if (saveLock.current === "saving") {
         saveLock.current = "open";
@@ -576,6 +588,7 @@ function SabaqScreen() {
             icon={BookOpenCheck}
             tone="success"
             title={looksSaved > 1 ? s.hifzSecondLooksSaved : s.hifzSecondLookSaved}
+            titleStyle="display"
             isDark={isDark}
           />
           <View className="w-full max-w-sm" style={{ gap: 10 }}>
@@ -597,6 +610,8 @@ function SabaqScreen() {
             icon={error ? RotateCcw : BookOpenCheck}
             tone={!error && looksSaved > 0 ? "success" : "neutral"}
             title={error ?? (looksSaved > 1 ? s.hifzSecondLooksSaved : looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
+            // The serif title of the sabaq's other ends, as on its done step.
+            titleStyle="display"
             subtitle={
               laterLook
                 ? interpolate(s.hifzSecondLookOpensAt, { time: formatClockTime(laterLook, uiLanguage) })
@@ -695,9 +710,17 @@ function SabaqScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, gap: 14, alignItems: "center", flexGrow: centered ? 1 : undefined, justifyContent: centered ? "center" : undefined }}
+        // Title, page card and actions all start 8 px inside the page column, as in the hifz review.
+        contentContainerStyle={{
+          paddingVertical: 16,
+          paddingHorizontal: 8,
+          gap: 14,
+          alignItems: "center",
+          flexGrow: centered ? 1 : undefined,
+          justifyContent: centered ? "center" : undefined,
+        }}
       >
-        <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth, gap: 6, alignItems: centered ? "center" : undefined }}>
+        <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth - 16, gap: 6, alignItems: centered ? "center" : undefined }}>
           {step === "intention" && showZayt ? (
             <View className="mb-2">
               <ZaytMood mood="gentle_welcome" height={112} />
@@ -807,15 +830,16 @@ function SabaqScreen() {
           </View>
         ) : null}
 
-        {error ? (
-          <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
-            {error}
-          </Text>
-        ) : null}
       </ScrollView>
 
-      <View className="px-4 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
-        <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth, gap: 10 }}>
+      <View className="px-2 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
+        <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth - 16, gap: 10 }}>
+          {/* Beside the buttons that retry, so a long chunk does not push it below the fold. */}
+          {error ? (
+            <Text dir={dir} align="center" className="text-red-600 dark:text-red-400" accessibilityRole="alert">
+              {error}
+            </Text>
+          ) : null}
           {step === "intention" ? <Button label={s.hifzSabaqNext} onPress={goNext} /> : null}
 
           {step === "listen" ? (
@@ -869,7 +893,8 @@ function SabaqScreen() {
                 className={`flex-1 ${OUTLINE_BORDER}`}
                 variant="outline"
                 label={s.hifzSabaqNotYet}
-                disabled={busy}
+                // Once the clean run is met, it is saved or retried, not started over.
+                disabled={busy || (step === "chunk" && cleanRun >= plan.sabaqRepetitions.cleanInARow)}
                 onPress={() => {
                   setShown(false);
                   setCleanRun(0);
@@ -921,7 +946,25 @@ function SabaqScreen() {
           ) : null}
 
           {step === "done" && habitResult ? (
-            <Button label={showsCommitment(habitResult) ? s.habitCommitTomorrow : s.flashcardsSummaryDone} onPress={leave} />
+            outcome?.secondLookNow ? (
+              // SBQ-03: after a check graded Again the look is due already, so it is offered here.
+              <>
+                <Button label={s.hifzSecondLookStart} onPress={onRestart} />
+                <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
+              </>
+            ) : (
+              <Button
+                label={
+                  !showsCommitment(habitResult)
+                    ? s.flashcardsSummaryDone
+                    : outcome?.secondLookAt
+                      ? // The look later today is the next return, not tomorrow (STR-20).
+                        interpolate(s.hifzSabaqBackAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
+                      : commitLabel
+                }
+                onPress={leave}
+              />
+            )
           ) : null}
         </View>
       </View>
@@ -973,5 +1016,11 @@ export default function SabaqScreenRoute() {
   const s = useStrings();
   if (error) return <DatabaseErrorState title={s.databaseError} message={error} />;
   if (!isReady) return <LoadingScreen progress={progress} />;
-  return <SabaqScreen />;
+  return <SabaqVisit />;
+}
+
+/** One visit of the sabaq screen; "Start second look" on the done step begins another. */
+function SabaqVisit() {
+  const [visit, setVisit] = useState(0);
+  return <SabaqScreen key={visit} onRestart={() => setVisit((value) => value + 1)} />;
 }

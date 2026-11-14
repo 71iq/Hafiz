@@ -129,8 +129,11 @@ export function WirdPlanCard({
             </Text>
           ) : null}
           {showSabaq ? (
+            // The lines still left of today's allocation, so a finished lesson does not read as work left.
             <Text dir={dir} variant="caption">
-              {interpolate(s.hifzWirdNew, { lines: formatLines(wird.newLines, language) })}
+              {wird.sabaqDoneToday
+                ? s.hifzWirdNewDone
+                : interpolate(s.hifzWirdNew, { lines: formatLines(Math.max(1, wird.newLines - wird.sabaqLinesToday), language) })}
             </Text>
           ) : null}
         </MirroredRow>

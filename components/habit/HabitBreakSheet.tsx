@@ -7,6 +7,8 @@ import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/co
 import { Text } from "@/components/ui/Text";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { formatShortDate } from "@/components/habit/WirdStreakCard";
+import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 import type { AppDatabase } from "@/lib/database/types";
 import { addDays, localDateOf } from "@/lib/habit/dates";
 import {
@@ -90,6 +92,7 @@ function Chip({
  */
 export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
+  const mutedIcon = mutedIconColor(useSettings().effectiveTheme);
   const [tab, setTab] = useState<Tab>("excuse");
   const [reason, setReason] = useState<ExcuseReason>("illness");
   const [startOffset, setStartOffset] = useState<number>(0);
@@ -233,7 +236,7 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
                       disabled={busy}
                       className="w-11 h-11 items-center justify-center"
                     >
-                      <XIcon size={15} color={isDark ? "#a3a3a3" : "#8B8178"} />
+                      <XIcon size={15} color={mutedIcon} />
                     </Pressable>
                   </MirroredRow>
                 ))}

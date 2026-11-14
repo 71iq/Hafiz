@@ -52,6 +52,7 @@ jest.mock("@/components/flashcards/GradingButtons", () => ({ GradingButtons: () 
 jest.mock("@/components/habit/SessionHabitCards", () => ({
   SessionHabitCards: () => null,
   showsCommitment: () => false,
+  useCommitmentLabel: (_db: unknown, strings: { habitCommitTomorrow: string }) => strings.habitCommitTomorrow,
   strongerWirdEvent: (current: unknown) => current,
 }));
 jest.mock("@/components/habit/ZaytMood", () => ({ ZaytMood: () => null }));

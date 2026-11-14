@@ -202,10 +202,12 @@ export function ActivityHeatmap({
   }
   const renderedWeeks = isRTL ? [...weeks].reverse() : weeks;
 
-  // Month labels: find first visual occurrence of each month.
+  // Month labels at each month's first week in reading order: from the left in English, from the
+  // right in Arabic, where the weeks run right to left and the oldest week is on the right.
   const monthLabels: { label: string; weekIndex: number }[] = [];
   let lastMonth = -1;
-  for (let w = 0; w < renderedWeeks.length; w++) {
+  for (let step = 0; step < renderedWeeks.length; step++) {
+    const w = isRTL ? renderedWeeks.length - 1 - step : step;
     const firstDay = renderedWeeks[w][0];
     const month = firstDay.date.getMonth();
     if (month !== lastMonth) {
@@ -215,20 +217,22 @@ export function ActivityHeatmap({
   }
 
   const spacedMonthLabels = useMemo(() => {
-    const result: { label: string; left: number }[] = [];
+    // `offset` is from the reading start: the left edge in English, the right edge in Arabic.
+    const result: { label: string; offset: number }[] = [];
     const candidates = monthLabels
       .map((m) => {
-        return { label: m.label, left: m.weekIndex * (CELL_SIZE + CELL_GAP) };
+        const fromStart = isRTL ? renderedWeeks.length - 1 - m.weekIndex : m.weekIndex;
+        return { label: m.label, offset: fromStart * (CELL_SIZE + CELL_GAP) };
       })
-      .sort((a, b) => a.left - b.left);
-    let lastLeft = -1000;
+      .sort((a, b) => a.offset - b.offset);
+    let lastOffset = -1000;
     for (const candidate of candidates) {
-      if (candidate.left - lastLeft < 22) continue;
+      if (candidate.offset - lastOffset < 22) continue;
       result.push(candidate);
-      lastLeft = candidate.left;
+      lastOffset = candidate.offset;
     }
     return result;
-  }, [monthLabels, CELL_SIZE]);
+  }, [monthLabels, CELL_SIZE, isRTL, renderedWeeks.length]);
   const heatmapWidth = TOTAL_WEEKS * CELL_SIZE + (TOTAL_WEEKS - 1) * CELL_GAP;
   const contentWidth = heatmapWidth + DAY_LABEL_WIDTH;
   const reviewActiveDays = activeDays ?? data.filter((d) => d.count > 0).length;
@@ -276,7 +280,7 @@ export function ActivityHeatmap({
                 fontSize: 10,
                 color: LABEL_COLOR(isDark),
                 position: "absolute",
-                left: m.left,
+                ...(isRTL ? { right: m.offset } : { left: m.offset }),
                 ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}

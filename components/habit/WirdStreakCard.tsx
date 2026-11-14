@@ -9,6 +9,8 @@ import { weekdayOf } from "@/lib/habit/dates";
 import { formatDays, formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 /** Card notes at 13 px in a darker warm tone, readable on the tinted card. */
 const CAPTION_CLASS = "text-warm-600 dark:text-neutral-400";
@@ -110,7 +112,8 @@ export function WirdStreakCard({
 }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
-  const muted = isDark ? "#a3a3a3" : "#8B8178";
+  // Muted icons take the theme's secondary text colour, so they match the text beside them.
+  const muted = mutedIconColor(useSettings().effectiveTheme);
   const { streak, headline, settings, goal } = overview;
   const showMinimum =
     headline.kind === "at_risk" ||

@@ -8,7 +8,9 @@ import { interpolate } from "@/lib/i18n/useStrings";
 const s = strings.en;
 
 /** Only the fields the card reads. */
-function wird(overrides: { backlog?: boolean; newLines?: number; todo?: number; unit?: "page" | "ayah" } = {}): TodayWird {
+function wird(
+  overrides: { backlog?: boolean; newLines?: number; linesToday?: number; todo?: number; unit?: "page" | "ayah" } = {},
+): TodayWird {
   const page = { cardId: "page:madani15:1", tier: "sabqi" } as TodayWird["todo"][number];
   return {
     plan: { unit: overrides.unit ?? "page" },
@@ -17,6 +19,8 @@ function wird(overrides: { backlog?: boolean; newLines?: number; todo?: number; 
     done: [page],
     total: 1 + (overrides.todo ?? 0),
     newLines: overrides.newLines ?? 0,
+    sabaqLinesToday: overrides.linesToday ?? 0,
+    sabaqDoneToday: (overrides.linesToday ?? 0) >= (overrides.newLines ?? 0) && (overrides.linesToday ?? 0) > 0,
     remainingMinutes: 3,
     memorizedPages: 1,
   } as unknown as TodayWird;
@@ -39,6 +43,16 @@ function renderCard(props: { wird: TodayWird; secondLooksDue?: number; nextLookA
   );
   return { view, handlers };
 }
+
+describe("the wird card's new lines", () => {
+  it("counts the lines still left of today's allocation, then says they are done", () => {
+    expect(renderCard({ wird: wird({ newLines: 7, todo: 2 }) }).view.getByText(interpolate(s.hifzWirdNew, { lines: "7 lines" }))).toBeTruthy();
+    expect(renderCard({ wird: wird({ newLines: 7, linesToday: 4, todo: 2 }) }).view.getByText(interpolate(s.hifzWirdNew, { lines: "3 lines" }))).toBeTruthy();
+    const done = renderCard({ wird: wird({ newLines: 7, linesToday: 12, todo: 2 }) }).view;
+    expect(done.getByText(s.hifzWirdNewDone)).toBeTruthy();
+    expect(done.queryByText(interpolate(s.hifzWirdNew, { lines: "7 lines" }))).toBeNull();
+  });
+});
 
 describe("Home's second-look cue (SBQ-03)", () => {
   it("is absent when no second look is due", () => {

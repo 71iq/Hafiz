@@ -70,6 +70,7 @@ import { useActiveClock } from "@/lib/habit/use-active-clock";
 import {
   SessionHabitCards,
   showsCommitment,
+  useCommitmentLabel,
   strongerWirdEvent,
   type SessionHabitInput,
 } from "@/components/habit/SessionHabitCards";
@@ -198,6 +199,7 @@ function FlashcardSessionScreen() {
   const db = useDatabase();
   const { isDark, isRTL, fontSize, lineHeight, tafseerSource, themeSurface, uiLanguage, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
+  const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
   const navigation = useNavigation();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
@@ -972,6 +974,7 @@ function FlashcardSessionScreen() {
           error={sessionError}
           db={db}
           language={uiLanguage}
+          commitLabel={commitLabel}
         />
       </SafeAreaView>
     );
@@ -2070,6 +2073,7 @@ function SessionSummaryView({
   error,
   db,
   language,
+  commitLabel,
 }: {
   summary: SessionSummary;
   onDone: () => void;
@@ -2078,6 +2082,8 @@ function SessionSummaryView({
   error?: string | null;
   db: AppDatabase;
   language: "en" | "ar";
+  /** STR-20's commitment, read when the session opened (useCommitmentLabel). */
+  commitLabel: string;
 }) {
   const { width, height } = useWindowDimensions();
   const durationMin = Math.max(1, Math.round(summary.durationMs / 60000));
@@ -2144,7 +2150,7 @@ function SessionSummaryView({
 
       <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
         <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 15 : 16, color: "#fff" }}>
-          {showsCommitment(summary.habit) ? s.habitCommitTomorrow : s.flashcardsSummaryDone}
+          {showsCommitment(summary.habit) ? commitLabel : s.flashcardsSummaryDone}
         </Text>
       </Button>
     </ScrollView>

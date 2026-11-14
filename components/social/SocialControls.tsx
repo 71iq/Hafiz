@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Switch } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
 import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 /** Rows mirror in Arabic; `direction: ltr` keeps the explicit order stable on web and native. */
 export function socialRowStyle(isRTL: boolean): ViewStyle {
@@ -12,10 +13,11 @@ export function socialRowStyle(isRTL: boolean): ViewStyle {
 }
 
 export function useSocialAccent() {
-  const { isDark } = useSettings();
+  const { isDark, effectiveTheme } = useSettings();
   return {
     accent: isDark ? "#2dd4bf" : "#0d9488",
-    muted: isDark ? "#a3a3a3" : "#8B8178",
+    // The theme's secondary text colour, so muted icons match the text beside them.
+    muted: mutedIconColor(effectiveTheme),
   };
 }
 

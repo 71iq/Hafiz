@@ -141,6 +141,7 @@ jest.mock("@/components/habit/SessionHabitCards", () => ({
     return null;
   },
   showsCommitment: () => false,
+  useCommitmentLabel: (_db: unknown, strings: { habitCommitTomorrow: string }) => strings.habitCommitTomorrow,
   strongerWirdEvent: (current: unknown, next: { kind: string }) => (next.kind === "none" ? current : next),
 }));
 jest.mock("@/components/habit/ZaytMood", () => ({ ZaytMood: () => null }));
@@ -899,8 +900,11 @@ describe("sabaq screen", () => {
     await flush();
     expect(mockNavigation.dispatch).not.toHaveBeenCalledWith(BACK);
     expect(returnToTabs).not.toHaveBeenCalled();
-    expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
+    // No grade was given at step 6, so the error names the lines and the button that saves them.
+    expect(screen.getByText(s.hifzSabaqCleanRunSaveFailed)).toBeTruthy();
     expect(screen.getByText(s.hifzSabaqStepChunk)).toBeTruthy();
+    // The met clean run is saved again, not started over.
+    expect(screen.getByRole("button", { name: s.hifzSabaqNotYet })).toBeDisabled();
     // Nothing of the lesson is saved, so leaving asks again.
     expect(preventing()).toBe(true);
     // The same button saves again, and the cancelled back press does not carry over.
@@ -908,7 +912,10 @@ describe("sabaq screen", () => {
     await flush();
     expect(saveSabaqCleanRun).toHaveBeenCalledTimes(2);
     expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
-    expect(screen.queryByText(s.hifzSaveFailed)).toBeNull();
+    expect(screen.queryByText(s.hifzSabaqCleanRunSaveFailed)).toBeNull();
+    // The link step's own "Not yet" is open again.
+    press(s.hifzDrillShow);
+    expect(screen.getByRole("button", { name: s.hifzSabaqNotYet })).toBeEnabled();
     expect(mockNavigation.dispatch).not.toHaveBeenCalledWith(BACK);
   });
 

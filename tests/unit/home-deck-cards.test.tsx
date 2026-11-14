@@ -362,7 +362,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
       name: "surah range",
       value: { type: "surah", surahs: [7], ranges: [{ surah: 7, ayahStart: 3, ayahEnd: 5 }] },
       tail: (s: UIStrings) =>
-        s.flashcardsScopeBysurah + ": " + (language === "ar" ? "اسم تجريبي" : "Fixture chapter") + " 3-5",
+        s.flashcardsScopeBysurah + ": " + (language === "ar" ? "اسم تجريبي" : "Fixture chapter") + ` ${num(3)}-${num(5)}`,
     },
     {
       name: "multiple ranges",
@@ -374,22 +374,23 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
           { surah: 8, ayahStart: 1, ayahEnd: 2 },
         ],
       },
-      tail: (s: UIStrings) => s.flashcardsScopeBysurah + ": 2 " + s.flashcardsScopeCustom,
+      tail: (s: UIStrings) => s.flashcardsScopeBysurah + `: ${num(2)} ` + s.flashcardsScopeCustom,
     },
     {
       name: "unknown single surah",
       value: { type: "surah", surahs: [99] },
-      tail: (s: UIStrings) => s.flashcardsScopeBysurah + ": 99",
+      tail: (s: UIStrings) => s.flashcardsScopeBysurah + `: ${num(99)}`,
     },
     {
       name: "multiple surahs",
       value: { type: "surah", surahs: [7, 8] },
-      tail: (s: UIStrings) => s.flashcardsScopeBysurah + ": 2",
+      tail: (s: UIStrings) => s.flashcardsScopeBysurah + `: ${num(2)}`,
     },
     {
       name: "juz",
       value: { type: "juz", juzNumbers: [2, 5] },
-      tail: (s: UIStrings) => s.flashcardsScopeByjuz + ": 2, 5",
+      // Arabic digits and comma in Arabic.
+      tail: (s: UIStrings) => s.flashcardsScopeByjuz + (language === "ar" ? `: ${num(2)}، ${num(5)}` : ": 2, 5"),
     },
   ] satisfies { name: string; value: BuiltInDeckFilter; tail: (s: UIStrings) => string }[])(
     "keeps $name filter text only on smart cards",

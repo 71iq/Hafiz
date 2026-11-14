@@ -356,19 +356,19 @@ export default function HomeScreen() {
       const ranges = filter.ranges ?? [];
       if (ranges.length === 1 && filter.surahs.length === 1) {
         const range = ranges[0];
-        return `${s.flashcardsScopeBysurah}: ${surahNames[range.surah] ?? range.surah} ${range.ayahStart}-${range.ayahEnd}`;
+        return `${s.flashcardsScopeBysurah}: ${surahNames[range.surah] ?? localNumber(range.surah)} ${localNumber(range.ayahStart)}-${localNumber(range.ayahEnd)}`;
       }
       if (ranges.length > 0) {
-        return `${s.flashcardsScopeBysurah}: ${filter.surahs.length} ${s.flashcardsScopeCustom}`;
+        return `${s.flashcardsScopeBysurah}: ${localNumber(filter.surahs.length)} ${s.flashcardsScopeCustom}`;
       }
       if (filter.surahs.length === 1) {
         const n = filter.surahs[0];
-        return `${s.flashcardsScopeBysurah}: ${surahNames[n] ?? n}`;
+        return `${s.flashcardsScopeBysurah}: ${surahNames[n] ?? localNumber(n)}`;
       }
-      return `${s.flashcardsScopeBysurah}: ${filter.surahs.length}`;
+      return `${s.flashcardsScopeBysurah}: ${localNumber(filter.surahs.length)}`;
     }
     if (filter.type === "juz") {
-      return `${s.flashcardsScopeByjuz}: ${filter.juzNumbers.join(", ")}`;
+      return `${s.flashcardsScopeByjuz}: ${filter.juzNumbers.map(localNumber).join(isRTL ? "، " : ", ")}`;
     }
     return s.smartDeckFilterAll;
   };
@@ -536,7 +536,9 @@ export default function HomeScreen() {
               graceNoteDismissed={habit.recentGraceDay !== null && graceNoteSeen === habit.recentGraceDay}
               onDismissGraceNote={dismissGraceNote}
               onOpenBreak={() => setHabitBreakOpen(true)}
-              wirdLeft={planRemaining > 0}
+              // Pages and remediation still due. New lines stay on offer once the pages are done, as
+              // extra (GOAL-04, ETH-05), so they do not hold back "Wird done", as on the wird card.
+              wirdLeft={wird === undefined || (wird?.todo.length ?? 0) + remediationDue > 0}
             />
           ) : habitFailed ? null : (
             // Hold the card's place while it loads, so the content below does not jump down.

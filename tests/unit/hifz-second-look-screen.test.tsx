@@ -76,9 +76,11 @@ jest.mock("@/components/flashcards/GradingButtons", () => ({
     return null;
   },
 }));
+let mockShowsCommitment = false;
 jest.mock("@/components/habit/SessionHabitCards", () => ({
   SessionHabitCards: () => null,
-  showsCommitment: () => false,
+  showsCommitment: () => mockShowsCommitment,
+  useCommitmentLabel: (_db: unknown, strings: { habitCommitTomorrow: string }) => strings.habitCommitTomorrow,
   strongerWirdEvent: (current: unknown, next: { kind: string }) => (next.kind === "none" ? current : next),
 }));
 jest.mock("@/components/habit/ZaytMood", () => ({ ZaytMood: () => null }));
@@ -177,6 +179,7 @@ async function open() {
 
 let warnings: jest.SpyInstance;
 beforeEach(() => {
+  mockShowsCommitment = false;
   jest.clearAllMocks();
   mockGrading = null;
   mockPreventRemove = null;
@@ -445,6 +448,34 @@ describe("sabaq second look (SBQ-03)", () => {
       expect(screen.getByText(interpolate(s.hifzSabaqSecondLookAt, { time }))).toBeTruthy();
       // The lines do not complete their page, so they wait for it rather than joining review tomorrow.
       expect(screen.getByText(s.hifzSabaqDonePartial)).toBeTruthy();
+    });
+
+    it("commits to coming back at the look's time, not tomorrow, while the streak asks for a commitment (STR-20)", async () => {
+      mockShowsCommitment = true;
+      const secondLookAt = new Date(Date.now() + 60 * 60_000);
+      await finishLesson({ secondLookAt });
+      const time = secondLookAt.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
+      expect(screen.getByRole("button", { name: interpolate(s.hifzSabaqBackAt, { time }) })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: s.habitCommitTomorrow })).toBeNull();
+    });
+
+    it("commits to tomorrow when no look comes later today", async () => {
+      mockShowsCommitment = true;
+      await finishLesson({ secondLookAt: null });
+      expect(screen.getByRole("button", { name: s.habitCommitTomorrow })).toBeTruthy();
+    });
+
+    it("offers the look that is due now after a check graded Again, and opens it (SBQ-03)", async () => {
+      await finishLesson({ secondLookAt: null, secondLookNow: true }, 1);
+      expect(screen.getByText(s.hifzSabaqSecondLookNow)).toBeTruthy();
+      expect(screen.getByRole("button", { name: s.flashcardsSummaryDone })).toBeTruthy();
+      // The screen opens again, and a fresh load offers the due look before new lines.
+      jest.mocked(loadSecondLooks).mockResolvedValue({ due: [look(2)], nextAt: null });
+      press(s.hifzSecondLookStart);
+      await flush();
+      expect(screen.getByText(s.hifzSecondLookTitle)).toBeTruthy();
+      expect(screen.getByText("Page 5 · Lines 2 to 2")).toBeTruthy();
+      expect(returnToTabs).not.toHaveBeenCalled();
     });
 
     it("promises no second look when none comes due today", async () => {
