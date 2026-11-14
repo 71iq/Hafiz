@@ -1816,6 +1816,33 @@ BEGIN
   PERFORM hz_test.eq('account deletion keeps every count exact', hz_test.count_drift(), 'none');
 END $$;
 
+-- Sixth review, finding 2: join_board says whether joining as a minor left a matched halaqa, decided
+-- in its own transaction, so the screen can confirm it without reading halaqas first.
+SELECT hz_test.make_user(('00000000-0000-4000-8020-' || lpad(i::TEXT, 12, '0'))::UUID, 'board_minor_' || i, 'Board minor ' || i)
+FROM generate_series(1, 2) AS i;
+SELECT hz_test.login('00000000-0000-4000-8020-000000000001');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM public.join_matched_halaqa('juz_amma', 'light', 180);
+  PERFORM hz_test.eq('joining as a minor reports leaving the matched halaqa',
+    public.join_board('Small Star', true, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'true');
+  PERFORM hz_test.eq('and the matched membership has ended', (
+    SELECT count(*) FROM public.halaqa_members WHERE user_id = auth.uid() AND kind = 'matched' AND left_at IS NULL
+  ), 0::BIGINT);
+END $$;
+RESET ROLE;
+SELECT hz_test.login('00000000-0000-4000-8020-000000000002');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('an adult join reports no matched halaqa left',
+    public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
+  PERFORM hz_test.eq('a minor join without a matched halaqa reports none',
+    public.join_board('Other Star', true, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
+END $$;
+RESET ROLE;
+
 SELECT hz_test.login(NULL);
 SET client_min_messages = warning;
 DROP SCHEMA hz_test CASCADE;

@@ -1,7 +1,15 @@
 import { z } from "zod";
 import { deleteAvatarFilesAfterMinority, deleteOwnAvatarFiles } from "@/lib/profile/privacy";
 import type { SocialOwner } from "@/lib/social/owner";
-import { callSocialRpc, localDateSchema, readSocial, voidResult, type SocialRead } from "@/lib/social/remote";
+import {
+  callSocialRpc,
+  callSocialRpcRaw,
+  localDateSchema,
+  parseSocialPayload,
+  readSocial,
+  voidResult,
+  type SocialRead,
+} from "@/lib/social/remote";
 import type { SocialBands } from "@/lib/social/bands";
 
 /**
@@ -116,17 +124,21 @@ export function isValidBoardNickname(nickname: string | null): boolean {
 export async function joinBoard(
   input: { nickname: string | null; isMinor: boolean; inputs: BoardInputs; today: string },
   owner: SocialOwner,
-): Promise<BoardView> {
+): Promise<{ view: BoardView; leftMatched: boolean }> {
   if (input.isMinor) await deleteOwnAvatarFiles(owner);
-  const view = await callSocialRpc(
+  const raw = await callSocialRpcRaw(
     "join_board",
     { p_nickname: input.nickname, p_is_minor: input.isMinor, ...boardArgs(input.inputs, input.today) },
-    boardViewSchema,
     owner,
   );
+  const view = parseSocialPayload(boardViewSchema, raw);
+  // Whether this join took the account out of a matched halaqa, decided in the join's transaction.
+  const leftMatched = parseSocialPayload(leftMatchedSchema, raw).left_matched === true;
   if (input.isMinor) await deleteAvatarFilesAfterMinority(owner);
-  return view;
+  return { view, leftMatched };
 }
+
+const leftMatchedSchema = z.object({ left_matched: z.boolean().optional() });
 
 /** Stores the latest bands for the weekly pass (8.13). A no-op on the server for users off the board. */
 export async function refreshBoardBandsRemote(inputs: BoardInputs, today: string, owner: SocialOwner): Promise<void> {

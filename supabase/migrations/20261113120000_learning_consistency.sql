@@ -897,21 +897,32 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
+  -- Each branch reads only this account's rows through an index, so the cost follows the account's
+  -- own activity, not the size of the community.
   PERFORM 1 FROM public.reflections AS r
-  WHERE r.user_id = OLD.id
-    OR r.id IN (SELECT l.reflection_id FROM public.reflection_likes AS l WHERE l.user_id = OLD.id)
-    OR r.id IN (SELECT c.reflection_id FROM public.reflection_comments AS c WHERE c.user_id = OLD.id)
+  WHERE r.id IN (
+    SELECT own.id FROM public.reflections AS own WHERE own.user_id = OLD.id
+    UNION SELECT l.reflection_id FROM public.reflection_likes AS l WHERE l.user_id = OLD.id
+    UNION SELECT c.reflection_id FROM public.reflection_comments AS c WHERE c.user_id = OLD.id
+  )
   ORDER BY r.id
   FOR NO KEY UPDATE;
   PERFORM 1 FROM public.reflection_comments AS c
-  WHERE c.user_id = OLD.id
-    OR c.id IN (SELECT cl.comment_id FROM public.reflection_comment_likes AS cl WHERE cl.user_id = OLD.id)
-    OR c.reflection_id IN (SELECT r.id FROM public.reflections AS r WHERE r.user_id = OLD.id)
+  WHERE c.id IN (
+    SELECT own.id FROM public.reflection_comments AS own WHERE own.user_id = OLD.id
+    UNION SELECT cl.comment_id FROM public.reflection_comment_likes AS cl WHERE cl.user_id = OLD.id
+    UNION SELECT under.id FROM public.reflection_comments AS under
+      JOIN public.reflections AS parent ON parent.id = under.reflection_id
+      WHERE parent.user_id = OLD.id
+  )
   ORDER BY c.id
   FOR NO KEY UPDATE;
   RETURN OLD;
 END;
 $$;
+
+-- Account deletion finds the comments an account wrote (private.lock_account_activity).
+CREATE INDEX IF NOT EXISTS idx_reflection_comments_user ON public.reflection_comments(user_id);
 
 DROP TRIGGER IF EXISTS profiles_lock_activity ON public.profiles;
 CREATE TRIGGER profiles_lock_activity BEFORE DELETE ON public.profiles
@@ -2717,6 +2728,8 @@ DECLARE
   today DATE := private.checked_local_date(p_today);
   clean_nickname TEXT := NULLIF(btrim(COALESCE(p_nickname, '')), '');
   minor BOOLEAN := COALESCE(p_is_minor, false);
+  -- Whether recording minority here leaves a matched halaqa, for the screen to say so (ETH-07).
+  leaves_matched BOOLEAN := false;
 BEGIN
   PERFORM private.check_bands(p_level_band, p_pace_band, p_utc_offset_minutes);
   PERFORM private.check_week_start(p_week_start);
@@ -2729,6 +2742,13 @@ BEGIN
   -- As in set_profile_privacy, since this write sets is_minor either way. The profiles row lock also
   -- comes before the profile_privacy row that this upsert and the placement in get_board hold.
   PERFORM private.lock_minor_change(uid);
+  -- Read under the halaqa lock lock_minor_change took, so no matched join can slip in after it.
+  IF minor THEN
+    leaves_matched := EXISTS (
+      SELECT 1 FROM public.halaqa_members AS m
+      WHERE m.user_id = uid AND m.kind = 'matched' AND m.left_at IS NULL
+    );
+  END IF;
   INSERT INTO public.profile_privacy (user_id, board_joined, board_nickname, is_minor, board_week_start,
     board_level_band, board_pace_band, board_utc_offset_minutes, board_enrolled_week, updated_at)
   VALUES (uid, true, clean_nickname, minor, p_week_start, p_level_band, p_pace_band, p_utc_offset_minutes,
@@ -2744,7 +2764,8 @@ BEGIN
     board_enrolled_week = GREATEST(public.profile_privacy.board_enrolled_week, EXCLUDED.board_enrolled_week),
     board_waiting = false,
     updated_at = EXCLUDED.updated_at;
-  RETURN public.get_board(p_level_band, p_pace_band, p_utc_offset_minutes, p_today, p_week_start);
+  RETURN public.get_board(p_level_band, p_pace_band, p_utc_offset_minutes, p_today, p_week_start)
+    || jsonb_build_object('left_matched', leaves_matched);
 END;
 $$;
 

@@ -10,7 +10,6 @@ import { SocialScreen } from "@/components/social/SocialScreen";
 import { StandingsSkeleton } from "@/components/social/SocialSkeletons";
 import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys, boardRead, joinBoard, leaveBoard } from "@/lib/board/api";
-import { myHalaqasRead } from "@/lib/halaqa/api";
 import { useDatabase } from "@/lib/database/provider";
 import { localDateOf } from "@/lib/habit/dates";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -18,7 +17,6 @@ import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { useSettings } from "@/lib/settings/context";
 import { socialFailureMessage } from "@/lib/social/messages";
 import { requireSocialOwner } from "@/lib/social/owner";
-import { readSocial } from "@/lib/social/remote";
 import { readLocalBoardInputs } from "@/lib/social/queries";
 import { formatSocialDate } from "@/lib/social/text";
 import { useIsOffline, useSocialQuery } from "@/lib/social/use-social-query";
@@ -98,18 +96,9 @@ function BoardContent({ userId }: { userId: string }) {
   const join = useMutation({
     mutationFn: async (choice: { nickname: string | null; isMinor: boolean }) => {
       if (!inputs.data) throw new Error("Board inputs are not ready");
-      const owner = requireSocialOwner(userId);
-      // ETH-07: joining as a minor for the first time leaves a matched halaqa, so the screen says so.
-      // Whether there was one is read first; a failed read only means the note is not shown.
-      const leavesMatched =
-        choice.isMinor && privacy.data?.isMinor !== true
-          ? await readSocial(myHalaqasRead(), owner).then(
-              (groups) => groups.some((group) => group.kind === "matched"),
-              () => false,
-            )
-          : false;
-      await joinBoard({ ...choice, inputs: inputs.data, today }, owner);
-      return { leavesMatched };
+      // ETH-07: the server says whether joining as a minor left a matched halaqa, so the screen can.
+      const { leftMatched } = await joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
+      return { leavesMatched: leftMatched };
     },
     onSuccess: async (result, choice) => {
       if (result.leavesMatched) setNotice(s.socialLeftMatched);
