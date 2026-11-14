@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { AppState } from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { onlineManager, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
 import { halaqaKeys } from "@/lib/halaqa/api";
 import { deleteOwnAvatarFiles, fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
@@ -36,10 +36,18 @@ export function cleanUpMinorPhotos(userId: string): Promise<boolean> {
 }
 
 /**
+ * How long the account's own privacy counts as current. Another device can record minority, and its
+ * last photo pass can be cut short, so a return to the foreground or a reconnect reads it again once
+ * this copy is older than this, or when the last read failed. While reads succeed, that is at most
+ * six an hour.
+ */
+export const OWN_PRIVACY_REVALIDATE_MS = 10 * 60_000;
+
+/**
  * Watches the signed-in account's own privacy. While it is a minor, leftover photo files are removed
- * once per app session, again on returning to the foreground after a failure, and halaqa lists
- * reload, since recording minority leaves matched halaqas. The board and halaqa screens invalidate
- * the privacy key after they change it, which refetches it here. Mount once.
+ * once per app session, again on returning to the foreground or reconnecting after a failure, and
+ * halaqa lists reload, since recording minority leaves matched halaqas. The board and halaqa screens
+ * invalidate the privacy key after they change it, which refetches it here. Mount once.
  */
 export function useMinorPhotoCleanup(): void {
   const userId = useAuthStore((state) => state.user?.id ?? null);
@@ -49,7 +57,10 @@ export function useMinorPhotoCleanup(): void {
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(userId ?? "")),
     enabled: userId !== null && isSupabaseConfigured(),
     retry: false,
-    staleTime: Infinity,
+    staleTime: OWN_PRIVACY_REVALIDATE_MS,
+    // lib/query/native-lifecycle.ts reports foreground and network changes on native.
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
   const isMinor = privacy.data?.isMinor === true;
 
@@ -68,6 +79,13 @@ export function useMinorPhotoCleanup(): void {
     const appState = AppState.addEventListener("change", (state) => {
       if (state === "active") run();
     });
-    return () => appState.remove();
+    // A cleanup cut short offline finishes on reconnect. One that succeeded costs nothing.
+    const unsubscribeOnline = onlineManager.subscribe((online) => {
+      if (online) run();
+    });
+    return () => {
+      appState.remove();
+      unsubscribeOnline();
+    };
   }, [queryClient, userId, isMinor]);
 }

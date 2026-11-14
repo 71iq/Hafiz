@@ -66,6 +66,8 @@ async function runCheck(db: AppDatabase, userId: string): Promise<EncouragementC
   const acked = parseAcks(stored?.value);
   const received = await fetchReceivedEncouragements(owner);
   if (!owner.isCurrent()) return { status: "skipped" };
+  // What was listed is handled below; ids past the stop stay unacknowledged for a later check.
+  if (!received.complete) console.warn("[Halaqa] The encouragement list stopped before its last page.");
 
   if (acked === null) {
     // Older encouragements were seen in the app or are past; announcing them now would be noise.

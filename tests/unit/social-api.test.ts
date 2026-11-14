@@ -584,6 +584,7 @@ describe("received encouragements (5.8.2)", () => {
     expect(result).toEqual({
       items: [{ id: GROUP, createdAt: "2026-11-13T08:00:00.123456+00:00" }],
       checkedAt: "2026-11-13T09:00:00+00:00",
+      complete: true,
     });
   });
 
@@ -615,12 +616,62 @@ describe("received encouragements (5.8.2)", () => {
     expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
   });
 
-  it("stops at a page limit instead of reading forever", async () => {
-    mockRpc.mockImplementation(async () => page(1, 1, true, "2026-11-13T09:00:00+00:00"));
-    await expect(fetchReceivedEncouragements(owner())).rejects.toMatchObject({
-      failure: { kind: "failed", message: "received_page_limit" },
+  /** A server that pages `total` items in order, 100 at a time, by the cursor it is sent. */
+  function pagedInbox(total: number) {
+    mockRpc.mockImplementation(async (_fn, args) => {
+      const after = args.p_after_id ? Number(String(args.p_after_id).slice(-12)) : 0;
+      const to = Math.min(after + 100, total);
+      return page(after + 1, to, to < total, "2026-11-13T09:00:00+00:00");
     });
-    expect(mockRpc).toHaveBeenCalledTimes(50);
+  }
+
+  // Fourth review, finding 4: leaving and joining halaqas can fill seven days with more than 50 pages.
+  it("reads every page of a long history while each page moves forward", async () => {
+    pagedInbox(5_940);
+    const result = await fetchReceivedEncouragements(owner());
+    expect(mockRpc).toHaveBeenCalledTimes(60);
+    expect(result.complete).toBe(true);
+    expect(result.items).toHaveLength(5_940);
+    expect(result.items.at(-1)).toEqual({ id: encouragementId(5_940), createdAt: createdAt(5_940) });
+  });
+
+  it("stops at a page that does not move past its cursor, keeping what it listed", async () => {
+    mockRpc.mockImplementation(async () => page(1, 100, true, "2026-11-13T09:00:00+00:00"));
+    const result = await fetchReceivedEncouragements(owner());
+    expect(mockRpc).toHaveBeenCalledTimes(2);
+    expect(result.complete).toBe(false);
+    expect(result.items.map((item) => item.id)).toEqual(Array.from({ length: 100 }, (_, i) => encouragementId(i + 1)));
+  });
+
+  it("stops at a large safety bound, keeping what it listed instead of failing", async () => {
+    let n = 0;
+    mockRpc.mockImplementation(async () => {
+      n += 1;
+      return page(n, n, true, "2026-11-13T09:00:00+00:00");
+    });
+    const result = await fetchReceivedEncouragements(owner());
+    expect(mockRpc.mock.calls.length).toBeGreaterThan(60);
+    expect(mockRpc).toHaveBeenCalledTimes(result.items.length);
+    expect(result.complete).toBe(false);
+    expect(new Set(result.items.map((item) => item.id)).size).toBe(result.items.length);
+  });
+
+  it("compares times to the microsecond, then by id, as the server orders them", async () => {
+    const pageOf = (items: [string, string][], more: boolean) => ({
+      data: { items: items.map(([id, created_at]) => ({ id, created_at })), more, checked_at: "2026-11-13T09:00:00+00:00" },
+      error: null,
+    });
+    mockRpc
+      .mockResolvedValueOnce(pageOf([[encouragementId(9), "2026-11-13T08:00:00.123456+00:00"]], true))
+      // Same millisecond, later microsecond, smaller id: still forward.
+      .mockResolvedValueOnce(pageOf([[encouragementId(1), "2026-11-13T08:00:00.1235+00:00"]], true))
+      // Same time, larger id: forward.
+      .mockResolvedValueOnce(pageOf([[encouragementId(2), "2026-11-13T08:00:00.1235+00:00"]], true))
+      .mockResolvedValueOnce(pageOf([[encouragementId(3), "2026-11-13T08:00:01+00:00"]], false));
+    const result = await fetchReceivedEncouragements(owner());
+    expect(mockRpc).toHaveBeenCalledTimes(4);
+    expect(result.complete).toBe(true);
+    expect(result.items.map((item) => item.id)).toEqual([encouragementId(9), encouragementId(1), encouragementId(2), encouragementId(3)]);
   });
 });
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { parseHifzPlan } from "@/lib/hifz/plan";
 import type { SocialOwner } from "@/lib/social/owner";
-import { callSocialRpc, localDateSchema, readSocial, socialError, voidResult, type SocialRead } from "@/lib/social/remote";
+import { callSocialRpc, localDateSchema, readSocial, voidResult, type SocialRead } from "@/lib/social/remote";
 import type { SocialBands } from "@/lib/social/bands";
 
 /**
@@ -286,37 +286,76 @@ const receivedPageSchema = z.object({
   more: z.boolean(),
   checked_at: z.string().min(1),
 });
+type ReceivedPage = z.output<typeof receivedPageSchema>;
 
 export type ReceivedEncouragements = Readonly<{
   items: { id: string; createdAt: string }[];
   checkedAt: string;
+  /** False when the read stopped before the server's last page; the rest is listed by later checks. */
+  complete: boolean;
 }>;
 
 /**
- * Seven days of every halaqa a reader can be in (10 groups of 50, one send per sender and day) stay
- * under 4,000 items, which is 40 pages.
+ * A guard against a server that never stops, not an expected size. Leaving and joining halaqas can
+ * legitimately fill seven days with thousands of items.
  */
-const RECEIVED_MAX_PAGES = 50;
+const RECEIVED_MAX_PAGES = 300;
+
+type InboxPosition = Readonly<{ ms: number; subMs: number; id: string }>;
+
+/**
+ * A page's place in the server's (created_at, id) order. Postgres keeps microseconds, so the digits
+ * after the millisecond are compared separately, and a uuid sorts as its lowercase text. Null when
+ * the time cannot be read.
+ */
+function inboxPosition(createdAt: string, id: string): InboxPosition | null {
+  const match = /^([^.]*T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(.*)$/.exec(createdAt);
+  if (!match) return null;
+  const fraction = (match[2] ?? "").padEnd(6, "0");
+  const ms = Date.parse(`${match[1]}.${fraction.slice(0, 3)}${match[3]}`);
+  if (!Number.isFinite(ms)) return null;
+  return { ms, subMs: Number(fraction.slice(3, 6)), id: id.toLowerCase() };
+}
+
+/** False only when both places are known and `next` is not after `previous`. */
+function movesForward(next: InboxPosition | null, previous: InboxPosition | null): boolean {
+  if (!next || !previous) return true;
+  if (next.ms !== previous.ms) return next.ms > previous.ms;
+  if (next.subMs !== previous.subMs) return next.subMs > previous.subMs;
+  return next.id > previous.id;
+}
 
 /**
  * Encouragements the reader received in the last 7 days across the halaqas they are still in (5.8.2),
  * each with its id for the device to acknowledge. Reads every page of the window, oldest first, so
- * more arrivals than one page between checks are all listed. `checkedAt` is the server's time at the
- * first page, for pruning acknowledged ids by age.
+ * more arrivals than one page between checks are all listed. Each page must end after the cursor it
+ * was asked for. A page that does not, or a read that reaches RECEIVED_MAX_PAGES, stops the read with
+ * what it listed so far rather than discarding it: the device acknowledges by id, so a later check
+ * lists the rest without announcing anything twice. `checkedAt` is the server's time at the first
+ * page, for pruning acknowledged ids by age.
  */
 export async function fetchReceivedEncouragements(owner: SocialOwner): Promise<ReceivedEncouragements> {
-  const items: ReceivedEncouragements["items"] = [];
+  const items = new Map<string, string>();
+  const listed = (checkedAt: string, complete: boolean): ReceivedEncouragements => ({
+    items: [...items].map(([id, createdAt]) => ({ id, createdAt })),
+    checkedAt,
+    complete,
+  });
   let checkedAt: string | null = null;
   let cursor: Record<string, string> = {};
-  for (let page = 0; page < RECEIVED_MAX_PAGES; page += 1) {
-    const result = await callSocialRpc("get_received_encouragements", cursor, receivedPageSchema, owner);
-    checkedAt ??= result.checked_at;
-    for (const item of result.items) items.push({ id: item.id, createdAt: item.created_at });
+  let previous: InboxPosition | null = null;
+  for (let pages = 1; ; pages += 1) {
+    const result: ReceivedPage = await callSocialRpc("get_received_encouragements", cursor, receivedPageSchema, owner);
+    const firstCheckedAt: string = checkedAt ?? result.checked_at;
+    checkedAt = firstCheckedAt;
+    for (const item of result.items) if (!items.has(item.id)) items.set(item.id, item.created_at);
+    if (!result.more) return listed(firstCheckedAt, true);
     const last = result.items.at(-1);
-    if (!result.more || !last) return { items, checkedAt };
+    const position = last ? inboxPosition(last.created_at, last.id) : null;
+    if (!last || !movesForward(position, previous) || pages >= RECEIVED_MAX_PAGES) return listed(firstCheckedAt, false);
     cursor = { p_after_created_at: last.created_at, p_after_id: last.id };
+    previous = position;
   }
-  throw socialError({ kind: "failed", message: "received_page_limit" });
 }
 
 export function isEncouragementTemplateId(value: string | null): value is EncouragementTemplateId {

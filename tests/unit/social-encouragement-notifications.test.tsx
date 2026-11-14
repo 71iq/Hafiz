@@ -119,6 +119,30 @@ describe("group encouragement notifications (5.8.2)", () => {
     expect(ackedIds()).toEqual([E1]);
   });
 
+  // Fourth review, finding 4: a read that stops early hands on what it listed instead of failing, and
+  // the ids it did not reach are announced by a later check, each once.
+  it("announces what a stopped read listed, and the rest on a later check, never twice", async () => {
+    const E0 = "00000000-0000-4000-8e00-000000000000";
+    const T0 = "2026-11-13T07:00:00+00:00";
+    mockSettings.set(key, acks([E0, T0]));
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    // The server repeats its first page as if more followed.
+    mockRpc.mockResolvedValue({
+      data: { items: [{ id: E1, created_at: T1 }, { id: E2, created_at: T2 }], more: true, checked_at: CHECKED },
+      error: null,
+    });
+    await expect(checkGroupEncouragements(mockDb, USER)).resolves.toEqual({ status: "checked", received: 2 });
+    expect(notifyGroupEncouragement).toHaveBeenLastCalledWith(mockDb, expect.objectContaining({ count: 2 }));
+    expect(ackedIds()).toEqual([E0, E1, E2]);
+
+    mockRpc.mockReset().mockResolvedValue(inbox([E1, T1], [E2, T2], [E3, T2]));
+    await expect(checkGroupEncouragements(mockDb, USER)).resolves.toEqual({ status: "checked", received: 1 });
+    expect(notifyGroupEncouragement).toHaveBeenLastCalledWith(mockDb, expect.objectContaining({ count: 1 }));
+    expect(notifyGroupEncouragement).toHaveBeenCalledTimes(2);
+    expect(ackedIds()).toEqual([E0, E1, E2, E3]);
+    warn.mockRestore();
+  });
+
   it("does nothing for a signed-out reader", async () => {
     Object.assign(mockAuth, signedOut());
     await expect(checkGroupEncouragements(mockDb, null)).resolves.toEqual({ status: "skipped" });

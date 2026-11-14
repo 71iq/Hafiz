@@ -19,8 +19,9 @@ export type ReminderData = Readonly<{
   /** Changes whenever the time or text changes, so an unchanged reminder is left in place. */
   contentKey: string;
   /**
-   * The account a halaqa encouragement belongs to (5.8.2). One shown for another account, or without
-   * an owner, is removed from the tray (lib/notifications/schedule.ts).
+   * The account a halaqa encouragement belongs to (5.8.2). One for another account, or without an
+   * owner, is cancelled, removed from the tray and not shown while the app is open
+   * (lib/notifications/schedule.ts).
    */
   accountId?: string;
 }>;
@@ -49,8 +50,13 @@ export type ReminderPlatform = Readonly<{
   supportsScheduling: boolean;
   getPermission: () => Promise<PermissionState>;
   requestPermission: () => Promise<PermissionState>;
-  /** Channel, category and foreground handler. Safe to call repeatedly. */
-  configure: (labels: Readonly<{ channelName: string; remindLaterAction: string }>) => Promise<void>;
+  /**
+   * Channel, category and foreground handler. A reminder that arrives while the app is open shows
+   * only when `shouldPresent` allows it; the latest call's check applies. Safe to call repeatedly.
+   */
+  configure: (
+    options: Readonly<{ channelName: string; remindLaterAction: string; shouldPresent: (data: ReminderData) => boolean }>,
+  ) => Promise<void>;
   listScheduled: () => Promise<ScheduledReminder[]>;
   listPresented: () => Promise<PresentedReminder[]>;
   schedule: (request: ReminderRequest) => Promise<string>;

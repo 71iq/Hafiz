@@ -427,18 +427,31 @@ async function saveGroupBatches(db: DatabaseExecutor, batches: readonly GroupBat
 const COVERED_KINDS: readonly string[] = ["done_today", "excused_today", "paused"];
 
 /**
- * A halaqa encouragement shown for an account that is not the signed-in one, or with no recorded
- * owner, which may be another account's. It names that account's private group activity, so it
- * leaves the tray on the run that follows a sign-out or another sign-in (5.8.2).
+ * A halaqa encouragement for an account that is not the signed-in one, or with no recorded owner,
+ * which may be another account's. It names that account's private group activity, so it never shows
+ * while the app is open, and the run that follows a sign-out or another sign-in cancels it and
+ * removes it from the tray (5.8.2).
  */
-function isForeignEncouragement(item: PresentedReminder, account: string | null): boolean {
-  return item.data.type === "group_encouragement" && (account === null || item.data.accountId !== account);
+function isForeignEncouragement(data: ReminderData, account: string | null): boolean {
+  return data.type === "group_encouragement" && (account === null || data.accountId !== account);
+}
+
+/** Whether a reminder that arrives while the app is open may show: never another account's encouragement. */
+export function shouldPresentReminder(data: ReminderData): boolean {
+  return !isForeignEncouragement(data, reminderAccount());
+}
+
+/** Channel, category and the foreground handler, which asks shouldPresentReminder. Safe to call repeatedly. */
+export function configureReminderPlatform(labels: Readonly<{ channelName: string; remindLaterAction: string }>): Promise<void> {
+  return reminderPlatform.configure({ ...labels, shouldPresent: shouldPresentReminder });
 }
 
 /** Dismisses foreign encouragement whatever the reminder settings, and returns what is left shown. */
-async function dismissForeignEncouragement(presented: readonly PresentedReminder[]): Promise<PresentedReminder[]> {
-  const account = reminderAccount();
-  const foreign = presented.filter((item) => isForeignEncouragement(item, account));
+async function dismissForeignEncouragement(
+  presented: readonly PresentedReminder[],
+  account: string | null,
+): Promise<PresentedReminder[]> {
+  const foreign = presented.filter((item) => isForeignEncouragement(item.data, account));
   if (foreign.length > 0) await reminderPlatform.dismiss(foreign.map((item) => item.osId));
   return presented.filter((item) => !foreign.includes(item));
 }
@@ -474,19 +487,29 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
     return { status: "unsupported", ...empty };
   }
 
+  // Another account's encouragement is cancelled before the tray is read, whatever the settings.
+  // Cancelling stops the alarm but leaves a notification it already showed, so one that fires before
+  // the cancel is in the tray listing that follows and is dismissed there (5.8.2).
+  const account = reminderAccount();
+  const listed = await reminderPlatform.listScheduled();
+  const foreign = listed.filter((item) => isForeignEncouragement(item.data, account));
+  if (foreign.length > 0) await reminderPlatform.cancel(foreign.map((item) => item.osId));
+  const scheduled = listed.filter((item) => !foreign.includes(item));
+  const presented = await reminderPlatform.listPresented();
+
   // A reminder was delivered when the OS showed it, or when its time passed and the OS no longer
   // holds it. One past its time that the OS still holds is late and still pending. Either delivery is
   // recorded by the first run that learns of it, and its response window ends 2 hours after that (8.11).
-  const scheduled = await reminderPlatform.listScheduled();
-  const presented = await reminderPlatform.listPresented();
-  const stillScheduled = new Set(scheduled.map((item) => item.data.logId));
+  // The alarms just cancelled count as held, so they are recorded as cancelled, not delivered.
+  const stillScheduled = new Set(listed.map((item) => item.data.logId));
   await markDelivered(
     db,
     presented.map((item) => item.data.logId),
     now,
   );
   await markInferredDelivered(db, stillScheduled, now);
-  const shown = await dismissForeignEncouragement(presented);
+  await recordCancelled(db, foreign, now);
+  const shown = await dismissForeignEncouragement(presented, account);
   const context = await loadReminderContext(db, { now, language, stillScheduled });
   await recordOutcomes(db, context, now);
   const { group } = context;
@@ -497,7 +520,7 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   const covered = COVERED_KINDS.includes(projectHabit(context.input, today, now).snapshot.headline.kind);
   await updateBadge(context, permitted, covered);
   if (!permitted || !context.prefs.enabled) {
-    const cancelled = await cancelEverything(db, scheduled, now);
+    const cancelled = foreign.length + (await cancelEverything(db, scheduled, now));
     if (group.changed) await saveGroupBatches(db, group.batches);
     return { status: permitted ? "disabled" : "no_permission", ...empty, cancelled };
   }
@@ -506,8 +529,8 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   const plan = planNotifications(context.input);
   await clearSpentRemindLater(db, context, plan);
   const desired = renderDesired(context, plan.slots);
-  // Only the planned batch's own notification may stay. Any other halaqa notification belongs to
-  // another account or to a batch already retired.
+  // Only the planned batch's own notification may stay. Another account's left at the start, so any
+  // other halaqa notification belongs to a batch already retired.
   const planned = group.planned;
   const isForeignGroup = (item: ScheduledReminder) =>
     item.data.type === "group_encouragement" && (planned === null || item.data.logId !== planned.log_id);
@@ -583,7 +606,7 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   } else if (group.changed) {
     await saveGroupBatches(db, group.batches);
   }
-  return { status: "scheduled", plan, kept: keep.length, created, cancelled: cancel.length, failed };
+  return { status: "scheduled", plan, kept: keep.length, created, cancelled: foreign.length + cancel.length, failed };
 }
 
 let queued: Promise<RescheduleResult> | null = null;

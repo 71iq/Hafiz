@@ -1,9 +1,10 @@
 import React from "react";
 import { AppState, type AppStateStatus } from "react-native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, focusManager, onlineManager } from "@tanstack/react-query";
 import { act, cleanup, render, waitFor } from "@testing-library/react-native";
 import { halaqaKeys } from "@/lib/halaqa/api";
-import { cleanUpMinorPhotos, useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
+import { OWN_PRIVACY_REVALIDATE_MS, cleanUpMinorPhotos, useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
+import { createAppQueryClient } from "@/lib/query/native-lifecycle";
 import { socialFailureOf } from "@/lib/social/remote";
 import { bearerSubject, signedIn, type FakeAuthState } from "./social-test-auth";
 
@@ -80,6 +81,31 @@ function newClient() {
   return client;
 }
 
+/** The app's own client, with its network mode and defaults. */
+function appClient() {
+  const client = createAppQueryClient();
+  queryClients.push(client);
+  return client;
+}
+
+// Query reads the clock for staleness; tests move it forward.
+const realNow = Date.now.bind(Date);
+let clockOffset = 0;
+
+/** What lib/query/native-lifecycle.ts reports when AppState returns to "active", or NetInfo reconnects. */
+async function foreground() {
+  await act(async () => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+}
+async function reconnect() {
+  await act(async () => {
+    onlineManager.setOnline(false);
+    onlineManager.setOnline(true);
+  });
+}
+
 function mount(client = newClient()) {
   return render(
     <QueryClientProvider client={client}>
@@ -93,11 +119,15 @@ beforeEach(() => {
   mockAvatarFiles.clear();
   mockStorageCalls.length = 0;
   mockBeforeList = () => undefined;
+  clockOffset = 0;
+  jest.spyOn(Date, "now").mockImplementation(() => realNow() + clockOffset);
 });
 
 afterEach(() => {
   cleanup();
   for (const client of queryClients.splice(0)) client.clear();
+  focusManager.setFocused(undefined);
+  onlineManager.setOnline(true);
   jest.restoreAllMocks();
 });
 
@@ -180,5 +210,67 @@ describe("minor photo cleanup (ETH-07)", () => {
     expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(true);
     await act(async () => onAppState?.("active"));
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
+  });
+
+  // Fourth review, finding 1: this device read "adult" and kept it, while another device recorded
+  // minority and its last photo pass was cut short. Nothing would read privacy again in this session.
+  it.each([
+    ["a return to the foreground", foreground, 6],
+    ["a reconnect", reconnect, 7],
+  ])("reads its own privacy again on %s once the copy is old, and removes the photos left", async (_label, trigger, n) => {
+    const user = account(n);
+    signIn(signedIn(user));
+    mockAvatarFiles.add(`${user}/left-behind.jpg`);
+    mockRpc.mockResolvedValue(privacy(false));
+    mount(appClient());
+    await waitFor(() => expect(mockRpc).toHaveBeenCalledTimes(1));
+    await act(async () => undefined);
+    expect(mockStorageCalls).toEqual([]);
+
+    mockRpc.mockResolvedValue(privacy(true));
+    // A recent copy is kept, so the cost stays at a few reads an hour.
+    await trigger();
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+
+    clockOffset = OWN_PRIVACY_REVALIDATE_MS + 1;
+    await trigger();
+    await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
+    expect(mockRpc).toHaveBeenCalledTimes(2);
+    expect(mockStorageCalls.every((call) => bearerSubject(call.auth) === user)).toBe(true);
+  });
+
+  it("reads its own privacy again on reconnect after the read at startup failed", async () => {
+    const user = account(8);
+    signIn(signedIn(user));
+    mockAvatarFiles.add(`${user}/left-behind.jpg`);
+    mockRpc.mockRejectedValueOnce(new TypeError("Network request failed")).mockResolvedValue(privacy(true));
+    mount(appClient());
+    await waitFor(() => expect(mockRpc).toHaveBeenCalledTimes(1));
+    await act(async () => undefined);
+    expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(true);
+
+    await reconnect();
+    await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
+    expect(mockRpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("finishes a cleanup cut short offline when the connection returns", async () => {
+    const user = account(9);
+    signIn(signedIn(user));
+    mockAvatarFiles.add(`${user}/left-behind.jpg`);
+    mockRpc.mockResolvedValue(privacy(true));
+    let failures = 1;
+    mockBeforeList = () => {
+      if (failures-- > 0) throw new TypeError("Network request failed");
+    };
+    mount(appClient());
+    await waitFor(() => expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]));
+    await act(async () => undefined);
+    expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(true);
+
+    await reconnect();
+    await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
+    // Privacy was fresh, so only the cleanup ran again.
+    expect(mockRpc).toHaveBeenCalledTimes(1);
   });
 });

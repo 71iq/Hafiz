@@ -3,6 +3,7 @@ import { Linking, Platform } from "react-native";
 import {
   isReminderData,
   type PermissionState,
+  type ReminderData,
   type ReminderPlatform,
   type ReminderResponse,
 } from "@/lib/notifications/platform-types";
@@ -21,6 +22,17 @@ const CATEGORY_ID = "wird-reminder";
 const REMIND_LATER_ACTION = "remind_later";
 
 let handlerInstalled = false;
+let shouldPresent: (data: ReminderData) => boolean = () => true;
+
+/**
+ * Whether a notification that arrives while the app is open shows. Hafiz posts only its own
+ * reminders; one it cannot read shows as before, unless it claims to be a halaqa encouragement,
+ * which may belong to another account (5.8.2).
+ */
+function presentable(data: unknown): boolean {
+  if (isReminderData(data)) return shouldPresent(data);
+  return !(data !== null && typeof data === "object" && (data as Record<string, unknown>).type === "group_encouragement");
+}
 
 function toPermission(response: Notifications.NotificationPermissionsStatus): PermissionState {
   const provisional = response.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
@@ -49,15 +61,15 @@ export const reminderPlatform: ReminderPlatform = {
     );
   },
 
-  async configure({ channelName, remindLaterAction }) {
+  async configure({ channelName, remindLaterAction, shouldPresent: check }) {
+    shouldPresent = check;
+    // Until this runs, expo-notifications shows nothing that arrives while the app is open.
     if (!handlerInstalled) {
       Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        }),
+        handleNotification: async (notification) => {
+          const show = presentable(notification.request.content.data);
+          return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: false, shouldSetBadge: false };
+        },
       });
       handlerInstalled = true;
     }
