@@ -751,7 +751,7 @@ function SwitchSettingsRow({
       isDark={isDark}
       isRTL={isRTL}
     >
-      <Switch value={value} onValueChange={onValueChange} />
+      <Switch accessibilityLabel={title} value={value} onValueChange={onValueChange} />
     </SettingsRow>
   );
 }
@@ -1032,7 +1032,7 @@ function ReviewSwitchRow({
           />
         ) : null}
       </View>
-      <Switch value={value} onValueChange={onValueChange} />
+      <Switch accessibilityLabel={label} value={value} onValueChange={onValueChange} />
     </View>
   );
 }

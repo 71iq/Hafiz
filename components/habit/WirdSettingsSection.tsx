@@ -142,6 +142,7 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
             </Text>
           </View>
           <Switch
+            accessibilityLabel={s.habitSettingsMeanings}
             value={settings.studyCountsTowardMinimum}
             onValueChange={(value) =>
               save(() =>
@@ -158,6 +159,7 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
             {s.habitSettingsZayt}
           </Text>
           <Switch
+            accessibilityLabel={s.habitSettingsZayt}
             value={settings.showZayt}
             onValueChange={(value) =>
               save(() => (value ? deleteUserSetting(db, HABIT_SETTING_KEYS.hideZayt) : writeUserSetting(db, HABIT_SETTING_KEYS.hideZayt, "true")))
@@ -175,6 +177,7 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
             </Text>
           </View>
           <Switch
+            accessibilityLabel={s.habitSettingsWeakSpots}
             value={settings.showWeakSpots}
             onValueChange={(value) =>
               save(() =>

@@ -1362,7 +1362,7 @@ function HifzReviewScreen() {
                         </Text>
                       ) : null}
                     </View>
-                    <Switch value={listener} onValueChange={setListener} />
+                    <Switch accessibilityLabel={s.hifzListenerMode} value={listener} onValueChange={setListener} />
                   </MirroredRow>
                   <Text dir={dir} variant="caption">
                     {firstHalfUngraded

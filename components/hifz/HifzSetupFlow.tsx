@@ -501,7 +501,11 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                   {s.hifzTracksMeaningsHint}
                 </Text>
               </View>
-              <Switch value={plan.meanings} onValueChange={(meanings) => setPlan((value) => ({ ...value, meanings }))} />
+              <Switch
+                accessibilityLabel={s.hifzReviewMeanings}
+                value={plan.meanings}
+                onValueChange={(meanings) => setPlan((value) => ({ ...value, meanings }))}
+              />
             </MirroredRow>
           </View>
         ) : null}

@@ -253,7 +253,7 @@ export function ReadingSettingsSheet({
             <SettingsActionRow
               title={s.quranFontV4Tajweed}
               isRTL={isRTL}
-              trailing={<Switch value={tajweedEnabled} onValueChange={handleTajweedToggle} />}
+              trailing={<Switch accessibilityLabel={s.quranFontV4Tajweed} value={tajweedEnabled} onValueChange={handleTajweedToggle} />}
               compact={compactRows}
             />
           </View>

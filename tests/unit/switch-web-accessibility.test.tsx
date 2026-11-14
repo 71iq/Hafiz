@@ -241,4 +241,16 @@ describe("switch row ownership", () => {
       );
     expect(owners).toEqual(["components/ui/Switch.tsx"]);
   });
+
+  // A standalone Switch beside its label text is read as "switch, off" with no name unless it has one.
+  it("names every standalone switch", () => {
+    const unnamed = ["app", "components"]
+      .flatMap((directory) => sourceFiles(path.join(root, directory)))
+      .flatMap((file) =>
+        [...fs.readFileSync(path.join(root, file), "utf8").matchAll(/<Switch(?![A-Za-z])([\s\S]*?)\/>/g)]
+          .filter((match) => !/accessibilityLabel=/.test(match[1]))
+          .map(() => file),
+      );
+    expect(unnamed).toEqual([]);
+  });
 });

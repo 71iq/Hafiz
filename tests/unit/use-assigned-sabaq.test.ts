@@ -22,7 +22,9 @@ beforeEach(() => {
 
 describe("Home's teacher sabaq (SOC-03)", () => {
   it("shows an assignment while its lines wait, and hides it once they are memorized", async () => {
-    const { result, rerender } = renderHook(({ key }) => useAssignedSabaq(db, USER, key), { initialProps: { key: 1 } });
+    const { result, rerender } = renderHook(({ key }: { key: number }) => useAssignedSabaq(db, USER, key), {
+      initialProps: { key: 1 },
+    });
     await waitFor(() => expect(result.current).toEqual(ASSIGNED));
     jest.mocked(assignedSabaqOpen).mockResolvedValue(false);
     rerender({ key: 2 });
@@ -34,7 +36,9 @@ describe("Home's teacher sabaq (SOC-03)", () => {
 
   it("asks the server again once a copy read offline can be refreshed", async () => {
     mockOffline = true;
-    const { result, rerender } = renderHook(({ key }) => useAssignedSabaq(db, USER, key), { initialProps: { key: 1 } });
+    const { result, rerender } = renderHook(({ key }: { key: number }) => useAssignedSabaq(db, USER, key), {
+      initialProps: { key: 1 },
+    });
     await waitFor(() => expect(result.current).toEqual(ASSIGNED));
     expect(loadMySabaqAssignment).toHaveBeenLastCalledWith(USER, true);
     mockOffline = false;
@@ -46,7 +50,7 @@ describe("Home's teacher sabaq (SOC-03)", () => {
 
   it("shows nothing when the lines cannot be checked, or for another account", async () => {
     jest.mocked(assignedSabaqOpen).mockRejectedValue(new Error("database closed"));
-    const { result, rerender } = renderHook(({ user }) => useAssignedSabaq(db, user, 1), {
+    const { result, rerender } = renderHook(({ user }: { user: string | null }) => useAssignedSabaq(db, user, 1), {
       initialProps: { user: USER as string | null },
     });
     await waitFor(() => expect(assignedSabaqOpen).toHaveBeenCalled());
