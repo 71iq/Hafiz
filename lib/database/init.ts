@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { insertPreparedRows } from "@/lib/database/bulk-insert";
+import { MUTASHABIHAT_ROWS_FILE, refreshMutashabihatRows } from "@/lib/database/mutashabihat-rows";
 import { createSchema, createTextSearchIndex, migrateUserSchema } from "./schema";
 import { reconcileLegacyHabitDaysOnce } from "@/lib/habit/reconcile";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
@@ -814,74 +815,6 @@ async function importAsbabAlNuzul(db: AppDatabase, onProgress: ProgressCallback)
   console.log(`[Import] asbab_al_nuzul done: ${rows.length} rows`);
 }
 
-async function importMutashabihat(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
-  const data = await loadData("mutashabihat/nourquran_hafiz.json");
-  if (!data || typeof data !== "object" || data.schema_version !== "1.0") {
-    throw new Error("Unsupported Nour Quran mutashabihat schema_version");
-  }
-
-  const similarGroups = Array.isArray(data.similar_groups) ? data.similar_groups : [];
-  const tailGroups = Array.isArray(data.tail_groups) ? data.tail_groups : [];
-  onProgress({
-    step: "Mutashabihat",
-    current: 20,
-    total: TOTAL_STEPS,
-    detail: `${similarGroups.length} similar + ${tailGroups.length} tails`,
-  });
-
-  const groupRows: any[][] = [];
-  const refRows: any[][] = [];
-  let sortOrder = 0;
-
-  const appendGroups = (groups: any[], kind: "similar" | "tail") => {
-    for (const group of groups) {
-      const refs = Array.isArray(group.refs) ? group.refs : [];
-      const validRefs = refs.filter((ref: any) => Number.isInteger(ref.surah) && Number.isInteger(ref.ayah));
-      if (validRefs.length < 2) continue;
-
-      const id = typeof group.id === "string" ? group.id : null;
-      const cue = kind === "similar" ? group.phrase : group.tail;
-      if (!id || typeof cue !== "string" || cue.trim().length === 0) continue;
-
-      groupRows.push([id, kind, cue.trim(), String(group.source ?? data.source?.name ?? "nourquran"), sortOrder++]);
-      validRefs.forEach((ref: any, index: number) => {
-        refRows.push([
-          id,
-          index,
-          ref.surah,
-          ref.ayah,
-          typeof ref.surah_name_ar === "string" ? ref.surah_name_ar : null,
-          typeof ref.tail_5 === "string" ? ref.tail_5 : null,
-          kind === "similar" && typeof ref.pre_text === "string" ? ref.pre_text : null,
-          kind === "similar" && typeof ref.similar_text === "string" ? ref.similar_text : null,
-          kind === "similar" && typeof ref.post_text === "string" ? ref.post_text : null,
-        ]);
-      });
-    }
-  };
-
-  appendGroups(similarGroups, "similar");
-  appendGroups(tailGroups, "tail");
-
-  await db.withTransactionAsync(async (tx) => {
-    await tx.runAsync("DELETE FROM mutashabihat_refs");
-    await tx.runAsync("DELETE FROM mutashabihat_groups");
-  });
-
-  await batchInsert(
-    db,
-    "INSERT OR REPLACE INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES (?, ?, ?, ?, ?)",
-    groupRows,
-  );
-  await batchInsert(
-    db,
-    "INSERT OR REPLACE INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, tail_5, pre_text, similar_text, post_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    refRows,
-  );
-
-  console.log(`[Import] mutashabihat done: ${groupRows.length} groups + ${refRows.length} refs`);
-}
-
 async function importReflectionJourneyLevels(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   // Ayah counts come from the surahs table: parsing the 8 MB quran-data.json for them on every
   // native launch delayed startup.
@@ -1029,22 +962,16 @@ async function runNewTabImports(db: AppDatabase, onProgress: ProgressCallback): 
   if ((await safeCount("asbab_al_nuzul")) === 0) {
     await safeImport("asbab_al_nuzul", () => importAsbabAlNuzul(db, onProgress));
   }
-  const missingMutashabihatSegments = await db
-    .getFirstAsync<{ c: number }>(
-      `SELECT COUNT(*) as c
-       FROM mutashabihat_refs r
-       JOIN mutashabihat_groups g ON g.id = r.group_id
-      WHERE g.kind = 'similar'
-        AND TRIM(COALESCE(r.similar_text, '')) = ''`,
-    )
-    .catch(() => ({ c: 0 }));
-  if (
-    (await safeCount("mutashabihat_groups")) === 0 ||
-    (await safeCount("mutashabihat_refs")) === 0 ||
-    (missingMutashabihatSegments?.c ?? 0) > 0
-  ) {
-    await safeImport("mutashabihat", () => importMutashabihat(db, onProgress));
-  }
+  // The similar-verse rows come only from the generated rows file, never the raw NourQuran JSON,
+  // whose passages are not aligned with the Quran text (lib/database/mutashabihat-rows.ts).
+  await safeImport("mutashabihat", async () => {
+    const refresh = await refreshMutashabihatRows(db, () => loadData(MUTASHABIHAT_ROWS_FILE));
+    if (refresh.replaced) {
+      console.log(
+        `[Import] similar-verse rows refreshed; ${refresh.retiredCards.length} cards without their verse deleted`,
+      );
+    }
+  });
   if (Platform.OS !== "web") {
     await safeImport("reflection_journey_levels", () => importReflectionJourneyLevels(db, onProgress));
   }
@@ -1331,7 +1258,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
     void loadData("tajweed-rules-en.json");
     void loadData("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json");
     void loadData("asbab-al-nuzul.json");
-    void loadData("mutashabihat/nourquran_hafiz.json");
+    void loadData(MUTASHABIHAT_ROWS_FILE);
     for (let i = 1; i <= 114; i++) void loadTafseerFile(i);
   }
 

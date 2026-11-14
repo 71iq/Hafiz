@@ -4,11 +4,14 @@ import { once } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { rebuildRef } from "./mutashabihat-align.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const DATA_DIR = path.join(ROOT, "assets", "data");
 const DB_PATH = path.join(DATA_DIR, "quran.db");
 const SCHEMA_PATH = path.join(ROOT, "lib", "database", "schema.ts");
+const MUTASHABIHAT_ROWS_FILE = path.join("mutashabihat", "nourquran_hafiz_rows.json");
 
 const ARABIC_DIACRITICS_RE = /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
 const NON_ARABIC_RE = /[^\u0600-\u06FF]/g;
@@ -334,9 +337,30 @@ function buildQiraatRows(data) {
   return Array.from(rowsByKey.values());
 }
 
-function buildMutashabihatRows(data) {
+/**
+ * The NourQuran similar-verse groups, as the rows of mutashabihat_groups and mutashabihat_refs. Each
+ * similar-kind ref's pre, similar and post segments are rebuilt from the Uthmani text around its ayah
+ * (scripts/mutashabihat-align.mjs). Study card ids are built from a group's id and a ref's sort
+ * order (lib/fsrs/smart-decks.ts), so a ref that changes ayah must not keep its sort order:
+ * - a ref whose text is another ayah's is relabelled to that ayah and takes the next free sort order
+ *   after the group's source refs, in source order;
+ * - it is left out instead when that ayah is already in its group;
+ * - the other refs keep their source sort orders, gaps included.
+ * The build refuses a ref the rule cannot align, or one left without similar words. Tail-only groups
+ * carry no segments.
+ */
+function buildMutashabihatRows(data, quran) {
   const groupRows = [];
   const refRows = [];
+  const tally = { rebuilt: 0, relabelled: 0, dropped: 0 };
+  const surahNames = new Map();
+  for (const group of [...(data.similar_groups ?? []), ...(data.tail_groups ?? [])]) {
+    for (const ref of group.refs ?? []) {
+      if (Number.isInteger(ref.surah) && typeof ref.surah_name_ar === "string" && !surahNames.has(ref.surah)) {
+        surahNames.set(ref.surah, ref.surah_name_ar);
+      }
+    }
+  }
   let sortOrder = 0;
 
   const appendGroups = (groups, kind) => {
@@ -350,25 +374,115 @@ function buildMutashabihatRows(data) {
       if (!id || typeof cue !== "string" || cue.trim().length === 0) continue;
 
       groupRows.push([id, kind, cue.trim(), String(group.source ?? data.source?.name ?? "nourquran"), sortOrder++]);
-      validRefs.forEach((ref, index) => {
+      const placed = validRefs.map((ref, index) => {
+        const row = {
+          index,
+          surah: ref.surah,
+          ayah: ref.ayah,
+          surahName: typeof ref.surah_name_ar === "string" ? ref.surah_name_ar : null,
+          tail5: typeof ref.tail_5 === "string" ? ref.tail_5 : null,
+          segments: { pre: null, similar: null, post: null },
+          relabelled: false,
+        };
+        const hasSegments = [ref.pre_text, ref.similar_text, ref.post_text].some((text) => typeof text === "string");
+        if (kind !== "similar" || !hasSegments) return row;
+        const rebuilt = rebuildRef(ref, quran);
+        if (rebuilt.status === "kept") {
+          throw new Error(
+            `Similar-verse ref ${id}:${index} (${ref.surah}:${ref.ayah}) is not aligned: ${rebuilt.notes.join("; ")}`,
+          );
+        }
+        if (rebuilt.segments.similar.trim() === "") {
+          throw new Error(`Similar-verse ref ${id}:${index} (${ref.surah}:${ref.ayah}) has no similar words`);
+        }
+        row.segments = rebuilt.segments;
+        if (rebuilt.status === "relabelled") {
+          row.relabelled = true;
+          row.surah = rebuilt.relabel.surah;
+          row.ayah = rebuilt.relabel.ayah;
+          if (row.surah !== ref.surah) row.surahName = surahNames.get(row.surah) ?? null;
+        }
+        return row;
+      });
+      const ayat = new Set(placed.filter((row) => !row.relabelled).map((row) => `${row.surah}:${row.ayah}`));
+      let nextSortOrder = validRefs.length;
+      const kept = [];
+      for (const row of placed) {
+        if (row.relabelled) {
+          if (ayat.has(`${row.surah}:${row.ayah}`)) {
+            tally.dropped += 1;
+            continue;
+          }
+          ayat.add(`${row.surah}:${row.ayah}`);
+          tally.relabelled += 1;
+          row.sortOrder = nextSortOrder++;
+        } else {
+          if (kind === "similar" && row.segments.similar !== null) tally.rebuilt += 1;
+          row.sortOrder = row.index;
+        }
+        kept.push(row);
+      }
+      for (const row of kept.sort((a, b) => a.sortOrder - b.sortOrder)) {
         refRows.push([
           id,
-          index,
-          ref.surah,
-          ref.ayah,
-          typeof ref.surah_name_ar === "string" ? ref.surah_name_ar : null,
-          typeof ref.tail_5 === "string" ? ref.tail_5 : null,
-          kind === "similar" && typeof ref.pre_text === "string" ? ref.pre_text : null,
-          kind === "similar" && typeof ref.similar_text === "string" ? ref.similar_text : null,
-          kind === "similar" && typeof ref.post_text === "string" ? ref.post_text : null,
+          row.sortOrder,
+          row.surah,
+          row.ayah,
+          row.surahName,
+          row.tail5,
+          row.segments.pre,
+          row.segments.similar,
+          row.segments.post,
         ]);
-      });
+      }
     }
   };
 
   appendGroups(Array.isArray(data.similar_groups) ? data.similar_groups : [], "similar");
   appendGroups(Array.isArray(data.tail_groups) ? data.tail_groups : [], "tail");
-  return { groupRows, refRows };
+  return { groupRows, refRows, tally };
+}
+
+/**
+ * The similar-verse rows as the app reads them when its database lacks them or holds an older
+ * version (lib/database/mutashabihat-rows.ts): exactly the rows written to quran.db, one per line,
+ * with a version that changes whenever they do.
+ */
+function writeMutashabihatRowsFile(mutashabihat) {
+  const rows = { groups: mutashabihat.groupRows, refs: mutashabihat.refRows };
+  const version = createHash("sha256").update(JSON.stringify(rows)).digest("hex").slice(0, 16);
+  const lines = (list) => list.map((row) => `    ${JSON.stringify(row)}`).join(",\n");
+  const text = [
+    "{",
+    `  "schema_version": "1.0",`,
+    `  "version": ${JSON.stringify(version)},`,
+    `  "about": "Generated by scripts/build-quran-db.mjs from nourquran_hafiz.json and quran_text.text_uthmani. Do not edit.",`,
+    `  "groups": [\n${lines(rows.groups)}\n  ],`,
+    `  "refs": [\n${lines(rows.refs)}\n  ]`,
+    "}",
+    "",
+  ].join("\n");
+  fs.writeFileSync(path.join(DATA_DIR, MUTASHABIHAT_ROWS_FILE), text);
+  return version;
+}
+
+/** The Uthmani words of every ayah, for rebuilding the similar-verse segments. */
+function quranWords(quranTextRows) {
+  const words = new Map();
+  const counts = new Map();
+  const ordered = [];
+  for (const row of quranTextRows) {
+    const list = String(row.text_uthmani).split(/\s+/).filter(Boolean);
+    words.set(`${row.surah}:${row.ayah}`, list);
+    counts.set(row.surah, Math.max(counts.get(row.surah) ?? 0, row.ayah));
+    ordered.push([row.surah, row.ayah, list]);
+  }
+  return {
+    ayahWords: (surah, ayah) => words.get(`${surah}:${ayah}`),
+    ayahCount: (surah) => counts.get(surah),
+    basmala: words.get("1:1"),
+    allAyat: () => ordered,
+  };
 }
 
 function buildReflectionJourneyRows(data) {
@@ -513,7 +627,13 @@ async function main() {
   await db.insertRows("qiraat_encyclopedia", ["surah", "ayah", "text", "ayah_group"],
     buildQiraatRows(readJson("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json")), 100);
 
-  const mutashabihat = buildMutashabihatRows(readJson("mutashabihat/nourquran_hafiz.json"));
+  const quran = quranWords(quranData.tables.quran_text);
+  const mutashabihat = buildMutashabihatRows(readJson("mutashabihat/nourquran_hafiz.json"), quran);
+  const { rebuilt, relabelled, dropped } = mutashabihat.tally;
+  console.log(
+    `Similar-verse refs: ${rebuilt} rebuilt from the Uthmani text, ${relabelled} relabelled to the ayah whose text they hold, ${dropped} left out as already in their group`,
+  );
+  console.log(`Wrote ${MUTASHABIHAT_ROWS_FILE}, version ${writeMutashabihatRowsFile(mutashabihat)}`);
   await db.insertRows("mutashabihat_groups", ["id", "kind", "cue", "source", "sort_order"], mutashabihat.groupRows);
   await db.insertRows("mutashabihat_refs", ["group_id", "sort_order", "surah", "ayah", "surah_name_ar", "tail_5", "pre_text", "similar_text", "post_text"], mutashabihat.refRows, 100);
 

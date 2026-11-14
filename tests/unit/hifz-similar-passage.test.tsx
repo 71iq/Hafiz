@@ -174,6 +174,59 @@ describe("a similar-verse passage as shown", () => {
     const shuara = await shown(26, 69);
     expect(shuara.similar).toBe("وَٱتْلُ عَلَيْهِمْ نَبَأَ إِبْرَٰاهِيمَ");
   });
+
+  it("numbers the ends of the ayat around it in a passage rebuilt from the Uthmani text, which has no marks", async () => {
+    // 38:12 as the build now writes it: 38:11, 38:12 and 38:13 whole, then the start of 38:14.
+    store.sql.exec(
+      "INSERT INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES ('rebuilt', 'similar', 'cue', 'test', 1)",
+    );
+    const ref = store.sql.prepare(
+      "INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, pre_text, similar_text, post_text) VALUES ('rebuilt', ?, ?, ?, 'سورة', ?, ?, ?)",
+    );
+    ref.run(
+      0,
+      38,
+      12,
+      AYAT["38:11"],
+      "كَذَّبَتْ قَبْلَهُمْ قَوْمُ نُوحٍ",
+      `وَعَادٌ وَفِرْعَوْنُ ذُو ٱلْأَوْتَادِ ${AYAT["38:13"]} إِن كُلٌّ`,
+    );
+    ref.run(1, 114, 1, null, null, null);
+    const groups = await similarGroupsForAyahs(store.db, [{ surah: 38, ayah: 12 }]);
+    const sad = groups.find((group) => group.groupId === "rebuilt")!.self;
+    const passage = words(`${sad.pre} ${sad.similar} ${sad.post}`);
+    expect(sad.gaps).toEqual([]);
+    expect(sad.ayahEnds).toEqual([
+      { after: passage.indexOf("ٱلْأَحْزَابِ"), ayah: 11 },
+      { after: passage.indexOf("ٱلْأَوْتَادِ"), ayah: 12 },
+      { after: passage.indexOf("ٱلْأَحْزَابُ"), ayah: 13 },
+    ]);
+  });
+
+  it("marks the long skip a rebuilt passage keeps at a join, and numbers the ayah end before it", async () => {
+    // 2:178 as the build now writes it: the end of 2:177, the first four words of 2:178, then 2:179.
+    // The 33 words between are more than the build fills, so the join keeps its gap.
+    store.sql.exec(
+      "INSERT INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES ('rebuilt', 'similar', 'cue', 'test', 1)",
+    );
+    const ref = store.sql.prepare(
+      "INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, pre_text, similar_text, post_text) VALUES ('rebuilt', ?, ?, ?, 'سورة', ?, ?, ?)",
+    );
+    ref.run(
+      0,
+      2,
+      178,
+      words(AYAT["2:177"]).slice(-3).join(" "),
+      words(AYAT["2:178"]).slice(0, 4).join(" "),
+      AYAT["2:179"],
+    );
+    ref.run(1, 114, 1, null, null, null);
+    const groups = await similarGroupsForAyahs(store.db, [{ surah: 2, ayah: 178 }]);
+    const qisas = groups.find((group) => group.groupId === "rebuilt")!.self;
+    expect(qisas.gaps).toEqual([6]);
+    // The end of 2:177 before it is numbered: 2:178 is placed in the words up to the gap.
+    expect(qisas.ayahEnds).toEqual([{ after: 2, ayah: 177 }]);
+  });
 });
 
 describe("the left-out words on screen", () => {

@@ -1150,7 +1150,9 @@ function buildSegmentedMutashabihatPrompt(
   const targetWords = normalizeArabicWords(targetRef.textClean);
   if (targetWords.length === 0) return null;
 
-  const promptWordCount = findSegmentPromptWordCount(targetWords, targetRef.preText ?? "", similarWords);
+  const promptWordCount =
+    findSegmentPromptWordCount(targetWords, normalizeArabicWords(targetRef.preText ?? ""), similarWords) ||
+    uthmaniSegmentEnd(targetRef);
   if (promptWordCount <= 0) return null;
 
   const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
@@ -1174,12 +1176,21 @@ function buildSegmentedMutashabihatPrompt(
   };
 }
 
+/**
+ * Where the similar words end in the ayah, matched word for word against its Uthmani text. The bundled
+ * segments are built from the Uthmani text, whose spelling the plain text does not always share
+ * ("أَزْوَٰجًا", "أَزْوَاجًا"), so this is tried when the plain text does not hold them.
+ */
+function uthmaniSegmentEnd(ref: SmartDeckRef): number {
+  const keys = (text: string) => splitQuranWords(text).map((word) => normalizeArabicWords(word).join(""));
+  return findSegmentPromptWordCount(keys(ref.textUthmani), keys(ref.preText ?? ""), keys(ref.similarText ?? ""));
+}
+
 function findSegmentPromptWordCount(
   targetWords: string[],
-  preText: string,
+  preWords: string[],
   similarWords: string[]
 ): number {
-  const preWords = normalizeArabicWords(preText);
   if (preWords.length > 0) {
     const combinedWords = [...preWords, ...similarWords];
     const combinedStart = findSubsequenceStart(targetWords, combinedWords);

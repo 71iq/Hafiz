@@ -35,8 +35,8 @@ export const nativeRequires: Record<string, () => any> =
         "al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json": () =>
           readBundledJson(require("../../assets/native-data/al-qira-at-al-mawsoo-ah-al-qur-aniyyah.hafizdata")),
         "asbab-al-nuzul.json": () => readBundledJson(require("../../assets/native-data/asbab-al-nuzul.hafizdata")),
-        "mutashabihat/nourquran_hafiz.json": () =>
-          readBundledJson(require("../../assets/native-data/mutashabihat/nourquran_hafiz.hafizdata")),
+        "mutashabihat/nourquran_hafiz_rows.json": () =>
+          readBundledJson(require("../../assets/native-data/mutashabihat/nourquran_hafiz_rows.hafizdata")),
       }
     : {};
 

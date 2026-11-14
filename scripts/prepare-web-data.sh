@@ -21,7 +21,8 @@ cp assets/data/tajweed-rules-ar.json public/data/
 cp assets/data/tajweed-rules-en.json public/data/
 cp assets/data/al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json public/data/
 cp assets/data/asbab-al-nuzul.json public/data/
-cp assets/data/mutashabihat/nourquran_hafiz.json public/data/mutashabihat/
+# The generated similar-verse rows; the raw NourQuran JSON is a build input only.
+cp assets/data/mutashabihat/nourquran_hafiz_rows.json public/data/mutashabihat/
 cp assets/data/layout/page-words.json public/data/layout/
 cp assets/data/layout/page-lines.json public/data/layout/
 cp assets/data/translations/*.json public/data/translations/

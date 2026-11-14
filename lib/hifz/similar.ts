@@ -186,11 +186,15 @@ function withDataEnds(
  * they are certain, since a wrong number in Quran text misleads:
  * - its own end, when its last word is in the passage and words of another ayah follow;
  * - the previous ayah's end, when its own first word is in the passage and the words before it are
- *   the end of the previous ayah of its surah (the bundled text can carry another surah's ayah there).
+ *   the end of the previous ayah of its surah (the bundled text can carry another surah's ayah there);
+ * - the next ayah's end, when its own end is in the passage and the words after it are the whole next
+ *   ayah of its surah, followed by more words. Passages rebuilt from the Uthmani text carry no ayah
+ *   marks of their own (withDataEnds), so this is where that end comes from.
  * Words with no letters, such as ۞ or a pause mark, never count as an ayah's text. The passage's
- * words are split as SimilarVerseLine splits them.
+ * words are split as SimilarVerseLine splits them. `followed` says that more words of the shown
+ * passage follow these, past a gap.
  */
-function ayahEndsIn(passage: readonly string[], row: RefRow): { after: number; ayah: number }[] {
+function ayahEndsIn(passage: readonly string[], row: RefRow, followed = false): { after: number; ayah: number }[] {
   const span = ayahSpanIn(passage, row.text_uthmani.split(/\s+/).filter(Boolean));
   if (!span) return [];
   const keyed = (from: number, to: number) =>
@@ -203,8 +207,26 @@ function ayahEndsIn(passage: readonly string[], row: RefRow): { after: number; a
   if (span.hasStart && before.length > 0 && row.previous_text && endsWith(row.previous_text, before.map((word) => word.key))) {
     ends.push({ after: before[before.length - 1].index, ayah: row.ayah - 1 });
   }
-  if (span.hasEnd && keyed(span.last + 1, passage.length).length > 0) ends.push({ after: span.last, ayah: row.ayah });
+  const after = keyed(span.last + 1, passage.length);
+  if (span.hasEnd && (after.length > 0 || followed)) ends.push({ after: span.last, ayah: row.ayah });
+  const afterKeys = after.map((word) => word.key);
+  const next = span.hasEnd && row.next_text ? wholeAyahAt(row.next_text, afterKeys) : null;
+  if (next !== null) ends.push({ after: after[next - 1].index, ayah: row.ayah + 1 });
   return ends;
+}
+
+/**
+ * How many of `words` (wordKey keys) an ayah's whole text takes at their start, when more words follow
+ * it; null when they do not start with it. One mismatch is allowed in six or more, as in endsWith.
+ */
+function wholeAyahAt(ayahText: string, words: readonly string[]): number | null {
+  const own = ayahText
+    .split(/\s+/)
+    .map(wordKey)
+    .filter((key) => key !== "");
+  if (own.length === 0 || words.length <= own.length) return null;
+  const mismatches = own.filter((key, index) => key !== words[index]).length;
+  return mismatches <= (own.length >= 6 ? 1 : 0) ? own.length : null;
 }
 
 /** Whether an ayah's text ends with these words, compared by wordKey, one mismatch allowed in six or more. */
@@ -250,12 +272,21 @@ function toRef(row: RefRow, others: readonly RefRow[]): SimilarRef {
     ].flatMap((list, index) =>
       list.filter((mark) => mark.after >= -1).map((mark) => ({ ...mark, after: starts[index] + mark.after })),
     );
+    // The ayah's own words are placed in the run around the similar words: past a gap the words come
+    // from elsewhere in the Quran, and would hide where its cut-off end meets the gap (ayahSpanIn).
+    const runStart = gaps.includes(starts[1] - 1) ? starts[1] : 0;
+    const runEnd = gaps.includes(starts[2] - 1) ? starts[2] : passage.length;
+    const followed = passage.slice(runEnd).some((word) => wordKey(word) !== "");
+    const ends = ayahEndsIn(passage.slice(runStart, runEnd), row, followed).map((end) => ({
+      ...end,
+      after: end.after + runStart,
+    }));
     return {
       ...base,
       pre: segments[0].join(" "),
       similar: segments[1].join(" "),
       post: segments[2].join(" "),
-      ayahEnds: withDataEnds(passage, marks, row, ayahEndsIn(passage, row)),
+      ayahEnds: withDataEnds(passage, marks, row, ends),
       gaps,
     };
   }
@@ -407,8 +438,8 @@ function differingParts(a: string | null, b: string | null, side: "end" | "start
 /**
  * A pair whose two verses read the same could only be told apart by the references a prompt hides,
  * so each verse gets the end of the ayah before it, or, when those match too, the start of the ayah
- * after it. In the bundled data 30 of 4,445 verse pairs read the same; only 23:7 and 70:31 also match
- * on both sides, and they show their surah names.
+ * after it. A few pairs in the bundled groups read the same. Where the neighbouring ayat match on both
+ * sides as well, as for 23:7 and 70:31, the verses show their surah names.
  */
 async function withContext(db: DatabaseExecutor, pair: SimilarPair): Promise<SimilarPair> {
   const neighbours = [pair.self, pair.sibling].flatMap((ref) => [
