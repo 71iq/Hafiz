@@ -515,7 +515,8 @@ export const strings = {
     // Flashcards
     tabFlashcards: "Flashcards",
     flashcardsTitle: "Flashcards",
-    flashcardsDueToday: "Due today",
+    // Home's headline counts due and new cards, so it does not say "due" (the deck rows split them).
+    flashcardsDueToday: "Cards today",
     flashcardsNewCards: "New",
     flashcardsTotalCards: "Total cards",
     flashcardsStartReview: "Review cards",
@@ -1443,7 +1444,7 @@ export const strings = {
     // Flashcards
     tabFlashcards: "البطاقات",
     flashcardsTitle: "البطاقات",
-    flashcardsDueToday: "مستحقة اليوم",
+    flashcardsDueToday: "بطاقات اليوم",
     flashcardsNewCards: "جديدة",
     flashcardsTotalCards: "إجمالي البطاقات",
     flashcardsStartReview: "راجع البطاقات",

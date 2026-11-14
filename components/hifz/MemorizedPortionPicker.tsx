@@ -120,7 +120,8 @@ export function MemorizedPortionPicker({ surahs, selectedSurahs, selectedJuz, on
       <Text dir={dir} variant="caption" style={{ color: accentText }}>
         {selectedJuz.size + selectedSurahs.size === 0
           ? s.hifzMemorizedNone
-          : `${interpolate(s.hifzSelectedJuz, { n: formatNumber(selectedJuz.size, language) })} · ${interpolate(s.hifzSelectedSurahs, { n: formatNumber(selectedSurahs.size, language) })}`}
+          : // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
+            `${interpolate(s.hifzSelectedJuz, { n: formatNumber(selectedJuz.size, language) })}${language === "ar" ? "، " : " · "}${interpolate(s.hifzSelectedSurahs, { n: formatNumber(selectedSurahs.size, language) })}`}
       </Text>
     </View>
   );
