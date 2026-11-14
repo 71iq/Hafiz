@@ -122,7 +122,7 @@ export default function HomeScreen() {
   );
   // The counts and Start Review need about 330 px at standard text size; each further digit of the
   // due count widens the big number by about 38 px, and larger system text widens everything.
-  const headerNeeds = (totalDue >= 1000 ? 410 : totalDue >= 100 ? 370 : 330) * Math.max(1, fontScale);
+  const headerNeeds = (totalDue >= 1000 ? 420 : totalDue >= 100 ? 370 : 330) * Math.max(1, fontScale);
   const headerStacked = headerWidth > 0 && headerWidth < headerNeeds;
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
@@ -465,13 +465,16 @@ export default function HomeScreen() {
             className={headerStacked ? "gap-3" : `flex-row items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
             style={headerStacked ? undefined : mirroredRowStyle}
           >
+            {/* Stacked, the counts may still need more than one line at very large text sizes. */}
             <View
-              className={`grow shrink-0 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+              className={`${headerStacked ? "flex-wrap" : "grow shrink-0"} flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
               style={mirroredRowStyle}
             >
               <View className={isRTL ? "items-end" : "items-start"}>
                 <Text
                   className="text-charcoal dark:text-neutral-100"
+                  // Already display size; larger system text grows it only a little more.
+                  maxFontSizeMultiplier={1.3}
                   style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}
                 >
                   {localNumber(totalDue)}
@@ -506,7 +509,7 @@ export default function HomeScreen() {
             {totalDue > 0 && (
               <Pressable
                 onPress={() => handleStartReview()}
-                className={`rounded-full bg-primary-accent px-4 py-3 flex-row items-center gap-2 ${headerStacked ? "justify-center" : ""} ${isRTL ? "flex-row-reverse" : ""}`}
+                className={`min-h-[44px] rounded-full bg-primary-accent px-4 py-3 flex-row items-center gap-2 ${headerStacked ? "justify-center" : ""} ${isRTL ? "flex-row-reverse" : ""}`}
                 accessibilityRole="button"
                 style={({ pressed }) => ({ ...(mirroredRowStyle ?? {}), transform: [{ scale: pressed ? 0.97 : 1 }] })}
               >

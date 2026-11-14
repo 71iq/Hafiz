@@ -83,9 +83,11 @@ export function CommentsSheet({
   const [commentLikeOverrides, setCommentLikeOverrides] = useState<
     Record<string, { source: ReflectionComment; lease: ReflectionMutationLease; liked: boolean; likesCount: number }>
   >({});
-  const [failure, setFailure] = useState<"load" | "post" | "privacy" | "like" | null>(null);
+  // Each failure shows where the person acted: the first load at the top, loading more beside its
+  // button, and posting or liking above the input.
+  const [failure, setFailure] = useState<"load" | "more" | "post" | "privacy" | "like" | null>(null);
   const error =
-    failure === "load"
+    failure === "load" || failure === "more"
       ? s.commentLoadFailed
       : failure === "post"
         ? s.commentPostFailed
@@ -149,12 +151,15 @@ export function CommentsSheet({
     setCommentLikeOverrides({});
   }, [reflectionId, user?.id]);
 
+  // fetchNextPage reports a failed page through the query's error, not by throwing, so the kind
+  // comes from the query: a failed next page shows beside "Load more", anything else at the top.
   useEffect(() => {
     if (commentsQuery.error) {
-      console.warn("[Comments] Failed to load:", commentsQuery.error);
-      setFailure("load");
+      const more = commentsQuery.isFetchNextPageError;
+      console.warn(more ? "[Comments] Failed to load more:" : "[Comments] Failed to load:", commentsQuery.error);
+      setFailure(more ? "more" : "load");
     }
-  }, [commentsQuery.error, s.commentLoadFailed]);
+  }, [commentsQuery.error, commentsQuery.isFetchNextPageError]);
 
   const handleSubmit = useCallback(async () => {
     if (!user || !reflectionId || !text.trim()) return;
@@ -201,11 +206,9 @@ export function CommentsSheet({
     setFailure(null);
     try {
       await commentsQuery.fetchNextPage({ cancelRefetch: false });
-    } catch (error) {
-      if (lease.isCurrent()) {
-        console.warn("[Comments] Failed to load more:", error);
-        setFailure("load");
-      }
+    } catch {
+      // Not reached by default: a failed page sets the query's error, handled above.
+      if (lease.isCurrent()) setFailure("more");
     } finally {
       lease.release();
     }
@@ -407,13 +410,15 @@ export function CommentsSheet({
               ) : null}
             </View>
 
-            {/* Posting failures show above the input, where the person is looking; these are the list's own. */}
-            {error && (failure === "load" || failure === "like") ? (
+            {/* Only the first load fails here; other failures show where the person acted. */}
+            {error && failure === "load" ? (
               <Text
+                accessibilityRole="alert"
                 className="mb-3 text-red-600 dark:text-red-400"
                 style={{
                   fontFamily: "Manrope_500Medium",
-                  fontSize: 12,
+                  fontSize: 13,
+                  lineHeight: 20,
                   ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
@@ -527,11 +532,25 @@ export function CommentsSheet({
                     )}
                   </Pressable>
                 )}
+                {error && failure === "more" ? (
+                  <Text
+                    accessibilityRole="alert"
+                    className="pb-3 text-center text-red-600 dark:text-red-400"
+                    style={{
+                      fontFamily: "Manrope_500Medium",
+                      fontSize: 13,
+                      lineHeight: 20,
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {error}
+                  </Text>
+                ) : null}
               </>
             )}
           </OverlayBody>
 
-          {user && error && (failure === "post" || failure === "privacy") ? (
+          {user && error && (failure === "post" || failure === "privacy" || failure === "like") ? (
             <Text
               accessibilityRole="alert"
               className="mx-5 mb-2 text-red-600 dark:text-red-400"
@@ -592,9 +611,12 @@ export function CommentsSheet({
               <Pressable
                 onPress={handleSubmit}
                 disabled={submitting || !text.trim()}
+                accessibilityRole="button"
+                accessibilityLabel={s.reflectionSend}
+                // A 44 px target around the 18 px icon.
+                className="-my-2 h-11 w-11 items-center justify-center"
                 style={({ pressed }) => ({
                   opacity: pressed || submitting || !text.trim() ? 0.4 : 1,
-                  padding: 6,
                 })}
               >
                 <Send size={18} color={isDark ? "#5eead4" : "#003638"} />

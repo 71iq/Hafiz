@@ -213,6 +213,8 @@ function FlashcardSessionScreen() {
   const [sessionError, setSessionError] = useState<string | null>(null);
   /** The rendered copy of mutationLockRef: grades, card actions and the card menu are disabled while it is held. */
   const [mutationBusy, setMutationBusy] = useState(false);
+  /** A card action (not a grade) is saving: only then does the card menu dim, so it does not blink on every grade. */
+  const [cardActionBusy, setCardActionBusy] = useState(false);
   const sessionStartRef = useRef(Date.now());
   // The review session row is written on the first grade, so an empty session leaves nothing behind.
   const sessionRef = useRef<ReviewSessionRef | null>(null);
@@ -668,8 +670,16 @@ function FlashcardSessionScreen() {
     }
   };
 
-  const runCardAction = (save: () => Promise<SavedChange>) =>
-    runCardMutation("[FlashcardSession] Card action failed:", s.cardActionFailed, save);
+  const runCardAction = async (save: () => Promise<SavedChange>) => {
+    // A refused second press must not clear the dim of the action still saving.
+    if (mutationLockRef.current) return;
+    setCardActionBusy(true);
+    try {
+      await runCardMutation("[FlashcardSession] Card action failed:", s.cardActionFailed, save);
+    } finally {
+      setCardActionBusy(false);
+    }
+  };
 
   const handleSuspendCard = () => {
     if (!currentCard) return;
@@ -1023,8 +1033,9 @@ function FlashcardSessionScreen() {
               <CardStateBadge state={currentCard.card.state} s={s} />
               <Pressable
                 onPress={() => setCardMenuOpen(true)}
-                // Dimmed, like the grade buttons, while a change to the card is saving.
-                className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${mutationBusy ? "opacity-50" : ""}`}
+                // Disabled while any change to the card saves; dimmed only for a card action, so it does
+                // not blink on every grade.
+                className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${cardActionBusy ? "opacity-50" : ""}`}
                 accessibilityRole="button"
                 accessibilityLabel={s.cardActionsTitle}
                 accessibilityState={{ disabled: mutationBusy }}

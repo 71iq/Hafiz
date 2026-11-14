@@ -344,6 +344,11 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     await flush();
     expect(view.getByText("17")).toBeTruthy();
     expect(view.getByText(strings[locale].reflectionLikeFailed)).toBeTruthy();
+    // The like error shows above the input, below the comments, where the person is looking.
+    const tree = JSON.stringify(view.toJSON());
+    const likeError = tree.indexOf(strings[locale].reflectionLikeFailed);
+    expect(likeError).toBeGreaterThan(tree.indexOf("Synthetic second"));
+    expect(likeError).toBeLessThan(tree.indexOf(strings[locale].reflectionAddComment));
   });
   it("admits one public post before the Mushaf index finishes loading", async () => {
     const pending = deferred(index);
@@ -815,6 +820,10 @@ it("comment pagination admits one pending page and retains rows through error an
   pending.reject(new Error("synthetic page rejected"));
   await waitFor(() => expect(view.getByText(strings.en.commentLoadFailed)).toBeTruthy());
   expect(view.getByText("Synthetic comment")).toBeTruthy();
+  // A failed page shows beside "Load more", not above the list the person scrolled past.
+  const tree = JSON.stringify(view.toJSON());
+  expect(tree.indexOf(strings.en.commentLoadFailed)).toBeGreaterThan(tree.indexOf(strings.en.reflectionLoadMore));
+  expect(tree.indexOf(strings.en.commentLoadFailed)).toBeGreaterThan(tree.indexOf("Synthetic comment"));
   jest.mocked(fetchComments).mockResolvedValue({ data: [comment("next")], hasMore: false });
   fireEvent.press(view.getByText(strings.en.reflectionLoadMore));
   await waitFor(() => expect(view.getByText("Synthetic next")).toBeTruthy());
