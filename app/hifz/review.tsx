@@ -1085,7 +1085,10 @@ function HifzReviewScreen() {
         : item.kind === "page"
           ? `page:${item.card.row.id}`
           : `${item.kind}:${item.card.id}`;
-  const progressLabel = `${formatNumber(new Set(queue.slice(0, index + 1).map(itemKey)).size, uiLanguage)} / ${formatNumber(new Set(queue.map(itemKey)).size, uiLanguage)}`;
+  // "Which one" prompts are not counted: an interleaved one joins mid-session (MUT-03), and the count
+  // would jump from "1 / 4" to "2 / 5" under the person.
+  const counted = (items: readonly QueueItem[]) => new Set(items.filter((item) => item.kind !== "pair").map(itemKey)).size;
+  const progressLabel = `${formatNumber(Math.max(1, counted(queue.slice(0, index + 1))), uiLanguage)} / ${formatNumber(Math.max(1, counted(queue)), uiLanguage)}`;
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   // Teal text under 14 px uses the darker token in light mode to stay readable on tinted chips.
   const accentText = isDark ? "#2dd4bf" : "#0f766e";

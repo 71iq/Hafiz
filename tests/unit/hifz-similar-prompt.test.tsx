@@ -4,6 +4,7 @@ import { DriftPairPrompt } from "@/components/hifz/DriftPairPrompt";
 import { SimilarVerseComparison } from "@/components/hifz/SimilarVerseComparison";
 import { similarGroupsForAyahs, similarPair, type SimilarPair } from "@/lib/hifz/similar";
 import { strings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 /**
@@ -201,11 +202,13 @@ describe("meaning anchor (MUT-05)", () => {
       const s = strings[language];
       renderPrompt(await pairOf("8:75", "9:115"), language, meaningMap(language));
       expect(screen.queryByText(MEANINGS["8:75"][language])).toBeNull();
-      expect(screen.queryByText(s.hifzSimilarMeaning)).toBeNull();
+      expect(screen.queryByText(/^Translation of ayah|^تفسير الآية/)).toBeNull();
       fireEvent.press(screen.getAllByRole("radio")[1]);
       expect(screen.getByText(MEANINGS["8:75"][language])).toBeTruthy();
       expect(screen.getByText(MEANINGS["9:115"][language])).toBeTruthy();
-      expect(screen.getAllByText(s.hifzSimilarMeaning)).toHaveLength(2);
+      // Each label names the ayah it explains.
+      expect(screen.getByText(interpolate(s.hifzSimilarMeaning, { ref: language === "ar" ? "٨:٧٥" : "8:75" }))).toBeTruthy();
+      expect(screen.getByText(interpolate(s.hifzSimilarMeaning, { ref: language === "ar" ? "٩:١١٥" : "9:115" }))).toBeTruthy();
     },
   );
 
@@ -227,9 +230,12 @@ describe("meaning anchor (MUT-05)", () => {
         />
       );
       const { rerender } = render(view(groups));
+      // The verse being memorized shows its meaning; the sibling's waits behind its button.
       expect(await screen.findByText(MEANINGS["8:75"][language])).toBeTruthy();
+      expect(screen.queryByText(MEANINGS["9:115"][language])).toBeNull();
+      fireEvent.press(screen.getByRole("button", { name: s.hifzSimilarShowMeaning }));
       expect(screen.getByText(MEANINGS["9:115"][language])).toBeTruthy();
-      expect(screen.getAllByText(s.hifzSimilarMeaning)).toHaveLength(2);
+      expect(screen.queryByRole("button", { name: s.hifzSimilarShowMeaning })).toBeNull();
       // The other language's text is not shown.
       expect(screen.queryByText(MEANINGS["8:75"][language === "ar" ? "en" : "ar"])).toBeNull();
       // A new render with the same verses reads nothing again.

@@ -1,8 +1,10 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { View } from "react-native";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import { formatAyahRef } from "@/lib/arabic";
+import { formatNumber } from "@/lib/i18n/count";
+import { interpolate } from "@/lib/i18n/useStrings";
 import type { SimilarRef } from "@/lib/hifz/similar";
 import { differingWords } from "@/lib/hifz/word-diff";
 
@@ -26,6 +28,8 @@ type Props = {
   compareWith?: readonly SimilarRef[] | null;
   /** MUT-05: the verse's meaning in the interface language, with the label naming its source. */
   meaning?: { label: string; text: string } | null;
+  /** MUT-01's context cue: "Page {{n}}", added after the reference when given. */
+  pageTemplate?: string;
 };
 
 const CONTEXT_STYLE = { writingDirection: "rtl", textAlign: "right", fontSize: 15, lineHeight: 26 } as const;
@@ -34,9 +38,37 @@ function verseWords(reference: SimilarRef): string[] {
   return [reference.pre, reference.similar, reference.post].join(" ").split(/\s+/).filter(Boolean);
 }
 
-/** "Surah 78:2", with the Arabic surah name isolated in English so the digits after it keep their order. */
-function referenceLabel(reference: SimilarRef, isRTL: boolean): string {
-  return `${reference.surahName}${isRTL ? "" : "‎"} ${formatAyahRef(isRTL, reference.surah, reference.ayah)}`;
+/**
+ * "النبأ 78:2 · Page 582": the Arabic surah name isolated in English so the digits after it keep their
+ * order, and the page when a template is given (MUT-01). An Arabic comma joins it in Arabic, since a
+ * middle dot beside Arabic-Indic digits reads as a zero.
+ */
+function referenceLabel(reference: SimilarRef, isRTL: boolean, pageTemplate?: string): string {
+  const label = `${reference.surahName}${isRTL ? "" : "\u200E"} ${formatAyahRef(isRTL, reference.surah, reference.ayah)}`;
+  if (!pageTemplate) return label;
+  return `${label}${isRTL ? "، " : " · "}${interpolate(pageTemplate, { n: formatNumber(reference.page, isRTL ? "ar" : "en") })}`;
+}
+
+/**
+ * Which words to underline: those that differ inside the shared passage, plus the nearest differing
+ * word on each side of it, where the verses part. The rest of the surrounding text differs anyway, so
+ * marking it would bury the difference that matters.
+ */
+function underlined(differs: readonly boolean[], from: number, to: number): boolean[] {
+  const marks = differs.map((differs, index) => differs && index >= from && index < to);
+  for (let index = from - 1; index >= 0; index -= 1) {
+    if (differs[index]) {
+      marks[index] = true;
+      break;
+    }
+  }
+  for (let index = to; index < differs.length; index += 1) {
+    if (differs[index]) {
+      marks[index] = true;
+      break;
+    }
+  }
+  return marks;
 }
 
 /**
@@ -54,6 +86,7 @@ export function SimilarVerseLine({
   status = null,
   compareWith = null,
   meaning = null,
+  pageTemplate,
 }: Props) {
   const dir = isRTL ? "rtl" : "ltr";
   const context = reference.context;
@@ -62,12 +95,13 @@ export function SimilarVerseLine({
   // The marked passage's positions in the verse: the words after the part before it.
   const sharedFrom = reference.pre.split(/\s+/).filter(Boolean).length;
   const sharedTo = sharedFrom + reference.similar.split(/\s+/).filter(Boolean).length;
+  const marks = differs ? underlined(differs, sharedFrom, sharedTo) : null;
   return (
     <View style={{ gap: 4 }}>
       {showReference ? (
         <MirroredRow dir={dir} className="items-center gap-1.5">
           <Text dir={dir} variant="caption">
-            {referenceLabel(reference, isRTL)}
+            {referenceLabel(reference, isRTL, pageTemplate)}
           </Text>
           {status}
         </MirroredRow>
@@ -85,7 +119,7 @@ export function SimilarVerseLine({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
-          {referenceLabel(reference, isRTL)}
+          {referenceLabel(reference, isRTL, pageTemplate)}
         </Text>
       )}
       {context?.before ? (
@@ -97,21 +131,27 @@ export function SimilarVerseLine({
         style={{ writingDirection: "rtl", textAlign: "right", fontSize: 19, lineHeight: 34, opacity: muted ? 0.85 : 1 }}
         className="text-charcoal dark:text-neutral-100"
       >
-        {differs ? (
+        {marks ? (
           words.map((word, index) => {
+            const inPassage = index >= sharedFrom && index < sharedTo;
             return (
-              <Text
-                key={`${index}:${word}`}
-                style={
-                  differs[index]
-                    ? { textDecorationLine: "underline" }
-                    : index >= sharedFrom && index < sharedTo
-                      ? { color: accent, fontWeight: "700" }
-                      : undefined
-                }
-              >
-                {index > 0 ? ` ${word}` : word}
-              </Text>
+              // The space stays outside the word, so an underline never runs under it.
+              <Fragment key={`${index}:${word}`}>
+                {index > 0 ? " " : ""}
+                <Text
+                  // Around the passage the text is muted, unless it holds where the verses part.
+                  className={inPassage || marks[index] ? undefined : "text-warm-700 dark:text-neutral-400"}
+                  style={
+                    marks[index]
+                      ? { textDecorationLine: "underline" }
+                      : inPassage
+                        ? { color: accent, fontWeight: "700" }
+                        : undefined
+                  }
+                >
+                  {word}
+                </Text>
+              </Fragment>
             );
           })
         ) : (
@@ -129,7 +169,7 @@ export function SimilarVerseLine({
       ) : null}
       {meaning && meaning.text ? (
         // Set apart from the verse, in the interface font and direction, so it never reads as Quran text.
-        <View className="mt-1 pt-2 border-t border-warm-200 dark:border-neutral-800" style={{ gap: 2 }}>
+        <View className="mt-1" style={{ gap: 2 }}>
           <Text dir={dir} variant="label-md" className="text-warm-700 dark:text-neutral-400">
             {meaning.label}
           </Text>

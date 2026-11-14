@@ -692,11 +692,12 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      {/* Header, progress and footer share the page column instead of spanning a wide window. */}
-      <View className="items-center">
-        <View style={{ width: "100%", maxWidth: pageWidth }}>
-          {/* 8 px in, like the title, page card and buttons below and the hifz review header. */}
-          <MirroredRow dir={dir} className={`items-center justify-between ${centered ? "px-5" : "px-2"} pt-3 pb-2`}>
+      {/* Header, progress and footer share the page column instead of spanning a wide window. The
+          gutter is the content's: 8 px in, or 20 px on the centred steps, and the column is the same
+          width, so close, progress, text and buttons line up on phones and on wide windows. */}
+      <View className={`items-center ${centered ? "px-5" : "px-2"}`}>
+        <View style={{ width: "100%", maxWidth: pageWidth - 16 }}>
+          <MirroredRow dir={dir} className="items-center justify-between pt-3 pb-2">
             {/* Dimmed while Close waits for the grade it was pressed during. */}
             <Pressable
               onPress={close}
@@ -714,8 +715,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
             <View style={{ width: 44 }} />
           </MirroredRow>
           {step !== "done" ? (
-            // Padding on a wrapper: the track is full width, so a margin on it would only move its start.
-            <View className={centered ? "px-5" : "px-2"}>
+            <View>
               <Progress value={((stepIndex + 1) / STEPS.length) * 100} dir={dir} className="h-1" />
             </View>
           ) : null}

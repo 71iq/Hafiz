@@ -247,7 +247,7 @@ export function WirdPlanCard({
         >
           <MirroredRow dir={dir} className="items-center justify-between gap-3">
             <MirroredRow dir={dir} className="flex-shrink items-center gap-2">
-              <PenLine size={15} color={accent} />
+              <PenLine size={15} color={accent} style={{ flexShrink: 0 }} />
               <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="flex-shrink text-charcoal dark:text-neutral-200">
                 {interpolate(s.hifzInboxCount, { n: formatNumber(inboxCount, language) })}
               </Text>

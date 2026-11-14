@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { AccessibilityInfo, Pressable, ScrollView, View } from "react-native";
 import { Check } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -9,6 +9,7 @@ import { formatAyahRef } from "@/lib/arabic";
 import { meaningKey } from "@/lib/hifz/meanings";
 import type { SimilarPair, SimilarRef } from "@/lib/hifz/similar";
 import type { UIStrings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
 
 type Props = {
   pair: SimilarPair;
@@ -47,10 +48,12 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
   // Mushaf order, so the right answer's position follows the verses, not the prompt.
   const options = [pair.self, pair.sibling].sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
   // The Arabic surah name is isolated in English, so the digits after it keep their order.
-  const answerRef = `${answer.surahName}${isRTL ? "" : "‎"} ${formatAyahRef(isRTL, answer.surah, answer.ayah)}`;
+  const answerRef = `${answer.surahName}${isRTL ? "" : "\u200E"} ${formatAyahRef(isRTL, answer.surah, answer.ayah)}`;
   const meaningOf = (ref: SimilarRef) => {
     const text = chosen === null ? undefined : meanings.get(meaningKey(ref));
-    return text ? { label: s.hifzSimilarMeaning, text } : null;
+    return text
+      ? { label: interpolate(s.hifzSimilarMeaning, { ref: formatAyahRef(isRTL, ref.surah, ref.ayah) }), text }
+      : null;
   };
   const right = chosen !== null && sameVerse(chosen, answer);
   return (
@@ -109,13 +112,21 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
                 accessibilityRole="radio"
                 accessibilityState={{ checked: picked, disabled: chosen !== null }}
                 disabled={chosen !== null}
-                onPress={() => setChosen(option)}
+                onPress={() => {
+                  setChosen(option);
+                  // VoiceOver has no polite live region, so the feedback is announced in both systems.
+                  AccessibilityInfo.announceForAccessibility(
+                    sameVerse(option, answer) ? s.hifzPairRight : s.hifzPairOther,
+                  );
+                }}
               >
                 <Card elevation="low" className={`p-4 rounded-3xl ${border}`}>
                   <SimilarVerseLine
                     reference={option}
                     isRTL={isRTL}
-                    accent={accent}
+                    // The verse text takes the text-safe accent (4.5:1 on cards); the check keeps the bright one.
+                    accent={accentText}
+                    pageTemplate={s.hifzPageN}
                     showReference={chosen !== null}
                     status={status}
                     compareWith={chosen !== null && other ? [other] : null}

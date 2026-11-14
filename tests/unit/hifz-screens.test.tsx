@@ -872,10 +872,13 @@ describe("sabaq screen", () => {
         // Intention, listening and the chunk's meaning come first.
         for (let step = 0; step < 3; step += 1) press(t.hifzSabaqNext);
         expect(screen.getByText(t.hifzSimilarTitle)).toBeTruthy();
+        // The chunk's verse shows its meaning; the memorized sibling's waits behind its button.
         expect(await screen.findByText(meanings[0])).toBeTruthy();
+        expect(screen.queryByText(meanings[1])).toBeNull();
+        press(t.hifzSimilarShowMeaning);
         expect(screen.getByText(meanings[1])).toBeTruthy();
-        expect(screen.getAllByText(t.hifzSimilarMeaning)).toHaveLength(2);
-        expect(screen.getByText(language === "ar" ? "لقمان ٣١:٥" : "لقمان\u200E 31:5")).toBeTruthy();
+        // Each verse's reference with its page, the context cue (MUT-01).
+        expect(screen.getByText(language === "ar" ? "لقمان ٣١:٥، صفحة ٤١١" : "لقمان\u200E 31:5 · Page 411")).toBeTruthy();
       } finally {
         reads.mockImplementation(async () => []);
       }

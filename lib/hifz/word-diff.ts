@@ -8,15 +8,31 @@ import { normalizeArabicWord } from "@/lib/arabic";
  * With no others, nothing differs.
  */
 export function differingWords(own: readonly string[], others: readonly (readonly string[])[]): boolean[] {
-  const ownKeys = own.map(normalizeArabicWord);
+  const ownKeys = own.map(wordKey);
   const differs = own.map(() => false);
   for (const other of others) {
-    const kept = commonSubsequence(ownKeys, other.map(normalizeArabicWord));
+    const kept = commonSubsequence(ownKeys, other.map(wordKey));
     kept.forEach((inCommon, index) => {
       if (!inCommon) differs[index] = true;
     });
   }
   return differs;
+}
+
+/**
+ * A word as compared: Uthmani and plain spellings of one word match. The dagger alif of the Uthmani
+ * text stands for the full alif of the plain one ("خَٰلِدِينَ", "خَالِدِينَ"), and runs of alif collapse,
+ * since normalizeArabicWord drops the dagger alif but keeps a full one. Over alif maqsura it is only
+ * the vowel, which plain spelling leaves out ("يَسْعَىٰ", "يَسْعَى"), so it is dropped there. A waw
+ * that carries it with no vowel of its own is the Uthmani way of writing that alif ("ٱلصَّلَوٰةَ",
+ * "الصَّلَاةَ"); a waw with its own vowel, as in "ٱلسَّمَٰوَٰتِ", stays a waw.
+ */
+export function wordKey(word: string): string {
+  const spelled = word
+    .replace(/\u0649\u0670/g, "\u0649")
+    .replace(/\u0648\u0670/g, "ا")
+    .replace(/\u0670/g, "ا");
+  return normalizeArabicWord(spelled).replace(/ا+/g, "ا");
 }
 
 /** For each word of `a`, whether it is in a longest common subsequence of `a` and `b`. */

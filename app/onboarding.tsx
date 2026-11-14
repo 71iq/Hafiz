@@ -34,7 +34,9 @@ function OnboardingInner() {
   const dir = isRTL ? "rtl" : "ltr";
   const rowDirection = isRTL ? "row-reverse" : "row";
   const accentColor = isDark ? "#2dd4bf" : "#0d9488";
-  const accentPressed = isDark ? "#14b8a6" : "#0f766e";
+  // White text needs the deeper teal in every theme: on the bright dark-theme accent it reads at 1.9:1.
+  const buttonFill = "#0d9488";
+  const buttonPressed = "#0f766e";
   const goldColor = "#FDDC91";
   const textPrimary = isDark ? "#F5F5F5" : "#2D2D2D";
   const textMuted = isDark ? "#A3A3A3" : "#8a7058";
@@ -268,7 +270,7 @@ function OnboardingInner() {
               style={({ pressed }) => ({
                 minHeight: 54,
                 borderRadius: 27,
-                backgroundColor: pressed ? accentPressed : accentColor,
+                backgroundColor: pressed ? buttonPressed : buttonFill,
                 flexDirection: rowDirection,
                 alignItems: "center",
                 justifyContent: "center",
