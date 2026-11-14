@@ -77,6 +77,9 @@ function SabaqScreen() {
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const pageWidth = Math.min(width, 640);
+  // The done step's text, cards and button share the habit cards' width (max-w-sm, as on the other
+  // end screens), so a wide window does not show three widths at once.
+  const doneWidth = Math.min(pageWidth, 384);
   const dir = isRTL ? "rtl" : "ltr";
   const { playRange, rangeState, stop, togglePause } = useAyahAudio();
 
@@ -634,7 +637,7 @@ function SabaqScreen() {
       <ScrollView
         contentContainerStyle={{ padding: 16, gap: 14, alignItems: "center", flexGrow: centered ? 1 : undefined, justifyContent: centered ? "center" : undefined }}
       >
-        <View style={{ width: "100%", maxWidth: pageWidth, gap: 6, alignItems: centered ? "center" : undefined }}>
+        <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth, gap: 6, alignItems: centered ? "center" : undefined }}>
           {step === "intention" && showZayt ? (
             <View className="mb-2">
               <ZaytMood mood="gentle_welcome" height={112} />
@@ -739,7 +742,7 @@ function SabaqScreen() {
         ) : null}
 
         {step === "done" && habitResult ? (
-          <View style={{ width: "100%", maxWidth: pageWidth, alignItems: "center", gap: 12 }}>
+          <View style={{ width: "100%", maxWidth: doneWidth, alignItems: "center", gap: 12 }}>
             <SessionHabitCards input={habitResult} db={db} language={uiLanguage} isDark={isDark} s={s} />
           </View>
         ) : null}
@@ -752,7 +755,7 @@ function SabaqScreen() {
       </ScrollView>
 
       <View className="px-4 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
-        <View style={{ width: "100%", maxWidth: pageWidth, gap: 10 }}>
+        <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth, gap: 10 }}>
           {step === "intention" ? <Button label={s.hifzSabaqNext} onPress={goNext} /> : null}
 
           {step === "listen" ? (
