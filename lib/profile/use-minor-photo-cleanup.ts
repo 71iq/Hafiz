@@ -32,8 +32,10 @@ export function cleanUpMinorPhotos(userId: string, readAt = 0): Promise<boolean>
   const current = running.get(userId);
   if (current) {
     if (current.readAt >= readAt) return current.run;
-    // A newer read came while an older cleanup runs: run again once it is done.
-    return current.run.then(() => cleanUpMinorPhotos(userId, readAt));
+    // A newer read came while an older cleanup runs: run again once it settles, whether it finished
+    // or failed, so a transient failure of the older pass does not drop the newer read's cleanup.
+    const again = () => cleanUpMinorPhotos(userId, readAt);
+    return current.run.then(again, again);
   }
   const minority = minorities.get(userId) ?? 0;
   const run: Promise<boolean> = (async () => {

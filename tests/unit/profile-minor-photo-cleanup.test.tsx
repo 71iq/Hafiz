@@ -18,7 +18,7 @@ let mockAuth: FakeAuthState;
 let mockClientSession: FakeAuthState["session"];
 const mockAvatarFiles = new Set<string>();
 const mockStorageCalls: { op: "list" | "remove"; auth: string | undefined }[] = [];
-let mockBeforeList: () => void = () => undefined;
+let mockBeforeList: () => void | Promise<void> = () => undefined;
 
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
@@ -37,7 +37,7 @@ jest.mock("@/lib/supabase", () => ({
           },
           list: async (folder: string) => {
             mockStorageCalls.push({ op: "list", auth: headers.Authorization });
-            mockBeforeList();
+            await mockBeforeList();
             const names = [...mockAvatarFiles].filter((path) => path.startsWith(`${folder}/`)).map((path) => path.slice(folder.length + 1));
             return { data: names.map((name) => ({ id: `id-${name}`, name })), error: null };
           },
@@ -182,6 +182,28 @@ describe("minor photo cleanup (ETH-07)", () => {
       await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user) });
     });
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-by-another-device.jpg`)).toBe(false));
+  });
+
+  it("runs a newer read's cleanup even when the older cleanup it waited for fails", async () => {
+    const user = account(8);
+    signIn(signedIn(user));
+    mockAvatarFiles.add(`${user}/left-behind.jpg`);
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    let failFirst = true;
+    let releaseFirst!: () => void;
+    const firstHeld = new Promise<void>((resolve) => (releaseFirst = resolve));
+    mockBeforeList = async () => {
+      if (!failFirst) return;
+      failFirst = false;
+      await firstHeld;
+      throw new TypeError("Network request failed");
+    };
+    const older = cleanUpMinorPhotos(user, 100).catch((error: unknown) => error);
+    const newer = cleanUpMinorPhotos(user, 200);
+    releaseFirst();
+    expect(await older).toBeInstanceOf(TypeError);
+    await expect(newer).resolves.toBe(true);
+    expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false);
   });
 
   it("cleans up again in a later minority after it was withdrawn", async () => {
