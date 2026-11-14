@@ -76,7 +76,8 @@ export function WirdPlanCard({
     );
   }
 
-  const total = wird.todo.length + wird.done.length;
+  // A page on a due learning step is in both lists; total counts each page once.
+  const total = wird.total;
   const complete = wird.todo.length === 0 && total > 0;
   const sabqi = wird.todo.filter((page) => page.tier === "sabqi").length;
   const manzil = wird.todo.length - sabqi;

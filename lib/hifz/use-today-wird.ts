@@ -10,6 +10,7 @@ import { loadTodayWird, type TodayWird } from "@/lib/hifz/pages";
 import { monthlyCheckDueFor } from "@/lib/hifz/progress";
 import { countDueRemediation } from "@/lib/hifz/remediation";
 import { countSecondLooks } from "@/lib/hifz/sabaq";
+import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
 /**
@@ -45,6 +46,8 @@ export function useTodayWird(db: AppDatabase) {
       ]);
       const monthly = next ? await monthlyCheckDueFor(db, next.cards, now) : false;
       if (looks.offeredAt) nextBoundary = Math.min(nextBoundary, looks.offeredAt.getTime());
+      // A page's learning step comes back as a task once it is within the review learn-ahead window.
+      if (next?.nextStepAt) nextBoundary = Math.min(nextBoundary, next.nextStepAt.getTime() - REVIEW_LEARN_AHEAD_MS);
       if (load !== latest.current) return;
       setWird(next);
       setInboxCount(inbox + remediation);

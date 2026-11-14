@@ -80,11 +80,14 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlan {
   const pages = input.pages.filter((page) => !page.reviewedToday);
   // A page sent back to sabaq after failing sabqi twice is relearned every day, ahead of sabqi.
   const relearn = pages.filter((page) => page.tier === "sabaq").sort((a, b) => a.page - b.page);
+  // A page completed through sabaq has no page review yet, and its card is first due the next day
+  // (SBQ-02), so it waits for that date like any due card. Later it comes every sabqi_every days.
+  const sabqiDue = (page: PlanPage) =>
+    page.lastReviewDate ? diffDays(page.lastReviewDate, today) >= plan.sabqiEvery : page.dueDate <= today;
   const sabqi = [
     ...relearn,
     ...pages
-      .filter((page) => page.tier === "sabqi")
-      .filter((page) => !page.lastReviewDate || diffDays(page.lastReviewDate, today) >= plan.sabqiEvery)
+      .filter((page) => page.tier === "sabqi" && sabqiDue(page))
       .sort((a, b) => a.page - b.page),
   ];
   const manzil = pages.filter((page) => isManzil(page.tier));

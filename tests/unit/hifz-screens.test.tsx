@@ -205,7 +205,12 @@ const pageData: RecitationPage = {
 };
 const row = { id: "page:madani15:5", deck_id: "hifz-pages", tier: "manzil" } as StudyCardRow;
 const pageCard: PageCard = { row, page: 5, tier: "manzil", history: { declared: true, firstFluentDate: null, grades: [] } };
-const saved = { wird: { kind: "none" }, tier: "manzil", remediation: { half: null, seam: null } } as unknown as Awaited<ReturnType<typeof savePageGrade>>;
+const saved = {
+  wird: { kind: "none" },
+  tier: "manzil",
+  remediation: { half: null, seam: null },
+  transition: { updatedCard: row, shouldRequeueInSession: false, reviewRecord: { rating: 3 } },
+} as unknown as Awaited<ReturnType<typeof savePageGrade>>;
 const inboxItem: InboxItem = {
   id: "err-1",
   cardId: "page:madani15:5",
@@ -324,11 +329,55 @@ describe("hifz review screen", () => {
       minutesPerReviewPage: 3,
       done: [],
       todo: [{ cardId: row.id, page: 5, tier: "manzil", lastReviewDate: null, reviewedToday: false, dueDate: "2026-11-13", retrievability: 0.95 }],
+      total: 1,
     } as never);
     jest.mocked(loadPageCards).mockResolvedValue([pageCard]);
     jest.mocked(readMistakeInbox).mockResolvedValue([]);
     jest.mocked(loadDueRemediation).mockResolvedValue([]);
     jest.mocked(loadRecitationPage).mockResolvedValue(pageData);
+  });
+
+  it("brings a page graded Again back after the other items while its step is due, and counts it once", async () => {
+    const relearning = { ...row, state: 3, due: "2026-11-14T10:10:00.000Z" } as StudyCardRow;
+    jest
+      .mocked(savePageGrade)
+      .mockResolvedValueOnce({
+        ...saved,
+        tier: "manzil.needs_work",
+        transition: { updatedCard: relearning, shouldRequeueInSession: true, reviewRecord: { rating: 1 } },
+      } as never)
+      .mockResolvedValueOnce(saved);
+    jest.mocked(readMistakeInbox).mockResolvedValue([inboxItem]);
+    mockDatabase.getFirstAsync.mockResolvedValue({ text_qcf2: "a b", v2_page: 5 });
+    const buttons = await openCheck();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+    await act(async () => {
+      void buttons.onGrade(1);
+    });
+    await flush();
+    // The drill that was already queued comes first; the page waits behind it.
+    expect(screen.getByText("2 / 3")).toBeTruthy();
+    fireEvent.press(screen.getByRole("button", { name: s.hifzDrillShow }));
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: s.hifzDrillClean }));
+    });
+    await flush();
+    expect(screen.getByText("3 / 3")).toBeTruthy();
+    fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
+    await flush();
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    expect(savePageGrade).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(savePageGrade).mock.calls[0][1]).toMatchObject({ card: row, firstGradeInSession: true });
+    // The second recitation is graded from the row the first grade saved, as a later grade in the session.
+    expect(jest.mocked(savePageGrade).mock.calls[1][1]).toMatchObject({ card: relearning, firstGradeInSession: false });
+    expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
+    // One page of the plan, recited twice: the plan and the pace count it once.
+    expect(screen.getByText("Wird 1 of 1 pages")).toBeTruthy();
+    expect(jest.mocked(recordReviewPace).mock.calls[0][1]).toMatchObject({ pages: 1 });
+    mockDatabase.getFirstAsync.mockResolvedValue(null);
   });
 
   async function openCheck() {

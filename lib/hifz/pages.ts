@@ -1,6 +1,8 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { putUserSetting } from "@/lib/database/user-settings";
 import { insertNewStudyCard } from "@/lib/fsrs/queries";
+import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
+import { State } from "@/lib/fsrs/scheduler";
 import { fsrs } from "ts-fsrs";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { addDays, atLocalTime, localDateOf, weekdayOf, type LocalDate } from "@/lib/habit/dates";
@@ -248,6 +250,18 @@ async function readMinutesPerPage(db: DatabaseExecutor): Promise<{ newPage: numb
   };
 }
 
+/**
+ * A page card on a learning or relearning step that is due now, within the learn-ahead window the
+ * session requeue and the flashcard queues use (REVIEW_LEARN_AHEAD_MS). A page graded Again today is
+ * on such a step (10 minutes for sabqi and manzil), so it comes back the same day.
+ */
+function learningStepDue(row: StudyCardRow, now: Date): boolean {
+  return (
+    (row.state === State.Learning || row.state === State.Relearning) &&
+    Date.parse(row.due) <= now.getTime() + REVIEW_LEARN_AHEAD_MS
+  );
+}
+
 const TODAY_PLAN_KEY = "device_hifz_today_plan";
 
 type TodaySnapshot = { date: LocalDate; ids: string[]; newLines: number };
@@ -280,10 +294,17 @@ export function passedLineCount(chunkIds: readonly string[]): number {
 export type TodayWird = Readonly<{
   plan: HifzPlan;
   daily: DailyPlan;
-  /** Pages still to review today, in order. */
+  /**
+   * Pages still to review today, in order: the day's planned pages not reviewed yet, then pages
+   * reviewed today whose learning or relearning step is due (see learningStepDue). Those stay in done.
+   */
   todo: readonly PlanPage[];
-  /** Pages reviewed today. */
+  /** Pages reviewed today. A page stays here while a learning step brings it back into todo. */
   done: readonly PlanPage[];
+  /** Pages in today's wird, each counted once: done, plus planned pages not reviewed yet. */
+  total: number;
+  /** When the next learning step of a page reviewed today comes due later today, or null. */
+  nextStepAt: Date | null;
   newLines: number;
   remainingMinutes: number;
   minutesPerReviewPage: number;
@@ -344,16 +365,41 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
   }
   const linesToday = passedLineCount(sabaqToday.map((row) => row.card_id));
   const byId = new Map(pages.map((page) => [page.cardId, page]));
-  const todo = snapshot.ids.flatMap((id) => {
+  const planned = snapshot.ids.flatMap((id) => {
     const page = byId.get(id);
     return page && !page.reviewedToday ? [page] : [];
   });
+  // Coverage and pending steps are separate: a page reviewed today stays done for the day's share,
+  // and a learning step that comes due brings it back after the planned pages, soonest due first.
+  const steps = cards
+    .filter((card) => learningStepDue(card.row, now))
+    .sort((a, b) => Date.parse(a.row.due) - Date.parse(b.row.due) || a.page - b.page)
+    .flatMap((card) => {
+      const page = byId.get(card.row.id);
+      return page?.reviewedToday ? [page] : [];
+    });
+  const todo = [...planned, ...steps];
   const done = pages.filter((page) => page.reviewedToday);
+  // A step not due yet brings its page back later today; Home refreshes then (useTodayWird).
+  const reviewedToday = new Set(done.map((page) => page.cardId));
+  const nextStepAt =
+    cards
+      .filter(
+        (card) =>
+          reviewedToday.has(card.row.id) &&
+          (card.row.state === State.Learning || card.row.state === State.Relearning) &&
+          !learningStepDue(card.row, now) &&
+          localDateOf(new Date(card.row.due)) === today,
+      )
+      .map((card) => new Date(card.row.due))
+      .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
   return {
     plan,
     daily,
     todo,
     done,
+    total: done.length + planned.length,
+    nextStepAt,
     newLines: snapshot.newLines,
     remainingMinutes: todo.length * minutes.reviewPage,
     minutesPerReviewPage: minutes.reviewPage,

@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { persistReviewTransition } from "@/lib/fsrs/persist-review";
-import { Rating } from "@/lib/fsrs/scheduler";
+import { Rating, State, type Grade } from "@/lib/fsrs/scheduler";
 import {
   DEFAULT_ENABLED_MODES,
   DEFAULT_NEW_CARD_SORT_ORDER,
@@ -12,7 +12,8 @@ import {
 } from "@/lib/fsrs/types";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { buildDailyPlan, type PlanPage } from "@/lib/hifz/daily-plan";
-import { declareMemorizedPages, isMemorized, loadTodayWird, type PageCard } from "@/lib/hifz/pages";
+import type { PageToken } from "@/lib/hifz/page-data";
+import { declareMemorizedPages, isMemorized, loadPageCards, loadTodayWird, type PageCard } from "@/lib/hifz/pages";
 import {
   completedJuz,
   monthlyCheckCandidates,
@@ -29,6 +30,7 @@ import {
   writeHifzPlan,
   type HifzPlan,
 } from "@/lib/hifz/plan";
+import { emptyAttempt, savePageGrade } from "@/lib/hifz/review";
 import { pagePolicy, tierFor, type GradeEvent } from "@/lib/hifz/tiers";
 import { pageCardId } from "@/lib/hifz/units";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
@@ -50,6 +52,8 @@ const DEFAULT_DECK_REVIEW_SETTINGS: DeckReviewSettings = {
   testModes: DEFAULT_ENABLED_MODES,
   wordTestModes: DEFAULT_WORD_TEST_MODES,
 };
+
+const FIRST_TOKEN: PageToken = { glyph: "g", surah: 1, ayah: 1, wordPos: 1, isMarker: false, firstLetter: "ب" };
 
 function grade(daysAgo: number, rating: GradeEvent["rating"]): GradeEvent {
   return { date: addDays(TODAY, -daysAgo), rating };
@@ -156,6 +160,14 @@ describe("daily plan (4.3.1)", () => {
     const sabqi = page(200, { tier: "sabqi", lastReviewDate: addDays(TODAY, -1) });
     const result = buildDailyPlan(input([page(1), sabqi, relearn]));
     expect(result.review.slice(0, 2)).toEqual([relearn, sabqi]);
+  });
+
+  it("waits for a new sabqi page's first due date before its first review", () => {
+    // Completed through sabaq today: no page review yet, due tomorrow at local midnight.
+    const fresh = page(200, { tier: "sabqi", lastReviewDate: null, dueDate: addDays(TODAY, 1), retrievability: null });
+    expect(buildDailyPlan(input([fresh])).sabqi).toEqual([]);
+    const dueToday = { ...fresh, dueDate: TODAY };
+    expect(buildDailyPlan(input([dueToday])).sabqi).toEqual([dueToday]);
   });
 
   it("adds manzil pages FSRS wants sooner and pages that need work, needs-work first", () => {
@@ -321,11 +333,90 @@ describe("memorized pages and today's wird (ONB-04, PLAN-01)", () => {
     expect(first.todo.length).toBe(2);
     const target = first.todo[0];
     const card = store.sql.prepare("SELECT * FROM study_cards WHERE id = ?").get(target.cardId) as never;
-    const transition = calculateReviewTransition({ card, rating: Rating.Good, reviewedAt: atLocalTime(TODAY, 610) });
+    // The page's own policy: a declared page has no learning steps, so Good schedules it days out.
+    const reviewPolicy = pagePolicy("manzil.unverified", { ...plan, cycleDays: 10 }, DEFAULT_DECK_REVIEW_SETTINGS);
+    const transition = calculateReviewTransition({ card, rating: Rating.Good, reviewedAt: atLocalTime(TODAY, 610), reviewPolicy });
     await persistReviewTransition({ db: store.db, cardId: target.cardId, transition });
     const second = (await loadTodayWird(store.db, atLocalTime(TODAY, 620)))!;
     expect(second.todo.map((p) => p.cardId)).toEqual([first.todo[1].cardId]);
     expect(second.done.map((p) => p.cardId)).toEqual([target.cardId]);
+  });
+
+  it("brings a page graded Again today back once its relearning step is due, and keeps it covered", async () => {
+    const wirdPlan: HifzPlan = { ...plan, cycleDays: 10, newPerDay: 0, method: "review_only" };
+    const start = addDays(TODAY, -12);
+    await writeHifzPlan(store.db, wirdPlan);
+    await declareMemorizedPages(store.db, { pages: [1, 2], cycleDays: 10, now: atLocalTime(start, 600) });
+    const gradePage = async (page: number, rating: Grade, at: Date) => {
+      const cards = await loadPageCards(store.db, { today: localDateOf(at), plan: wirdPlan });
+      const card = cards.find((candidate) => candidate.page === page)!;
+      return savePageGrade(store.db, {
+        card: card.row,
+        history: card.history,
+        plan: wirdPlan,
+        attempt: emptyAttempt(4),
+        rating,
+        firstToken: FIRST_TOKEN,
+        session: null,
+        durationMs: 60_000,
+        now: at,
+      });
+    };
+    // Page 1 was checked 12 days ago, so like page 2 it is past its 10-day floor today.
+    await gradePage(1, Rating.Good, atLocalTime(start, 610));
+    const morning = (await loadTodayWird(store.db, atLocalTime(TODAY, 600)))!;
+    expect(morning.todo.map((p) => p.page).sort()).toEqual([1, 2]);
+
+    const again = await gradePage(1, Rating.Again, atLocalTime(TODAY, 610));
+    expect(again.transition.updatedCard.state).toBe(State.Relearning);
+    // 10:30: the 10-minute step is due. The page is pending again after the planned page, and still done.
+    const due = (await loadTodayWird(store.db, atLocalTime(TODAY, 630)))!;
+    expect(due.todo.map((p) => p.cardId)).toEqual([pageCardId(2), pageCardId(1)]);
+    expect(due.done.map((p) => p.cardId)).toEqual([pageCardId(1)]);
+    expect(due.total).toBe(2);
+    expect(due.remainingMinutes).toBe(2 * due.minutesPerReviewPage);
+    // The day's floor share still counts the page once, as reviewed today.
+    expect(due.daily.done.map((p) => p.cardId)).toEqual([pageCardId(1)]);
+
+    // Good moves it to the next-day step: it leaves pending and keeps its one place in done.
+    const good = await gradePage(1, Rating.Good, atLocalTime(TODAY, 631));
+    expect(localDateOf(new Date(good.transition.updatedCard.due)) > TODAY).toBe(true);
+    const after = (await loadTodayWird(store.db, atLocalTime(TODAY, 640)))!;
+    expect(after.todo.map((p) => p.cardId)).toEqual([pageCardId(2)]);
+    expect(after.done.map((p) => p.cardId)).toEqual([pageCardId(1)]);
+    expect(after.total).toBe(2);
+  });
+
+  it("says when a page's later learning step comes back today, for Home to refresh then", async () => {
+    const wirdPlan: HifzPlan = { ...plan, cycleDays: 10, newPerDay: 0, method: "review_only" };
+    await writeHifzPlan(store.db, wirdPlan);
+    const start = addDays(TODAY, -12);
+    await declareMemorizedPages(store.db, { pages: [1], cycleDays: 10, now: atLocalTime(start, 600) });
+    const gradePage = async (rating: Grade, at: Date) => {
+      const [card] = await loadPageCards(store.db, { today: localDateOf(at), plan: wirdPlan });
+      return savePageGrade(store.db, {
+        card: card.row,
+        history: card.history,
+        plan: wirdPlan,
+        attempt: emptyAttempt(4),
+        rating,
+        firstToken: FIRST_TOKEN,
+        session: null,
+        durationMs: 60_000,
+        now: at,
+      });
+    };
+    await gradePage(Rating.Good, atLocalTime(start, 610));
+    const again = await gradePage(Rating.Again, atLocalTime(TODAY, 600));
+    expect(again.transition.updatedCard.state).toBe(State.Relearning);
+    // A step longer than the learn-ahead window, as the sabaq tier's 1-hour step.
+    store.sql.prepare("UPDATE study_cards SET due = ? WHERE id = ?").run(atLocalTime(TODAY, 780).toISOString(), pageCardId(1));
+    const waiting = (await loadTodayWird(store.db, atLocalTime(TODAY, 610)))!;
+    expect(waiting.todo).toEqual([]);
+    expect(waiting.nextStepAt).toEqual(atLocalTime(TODAY, 780));
+    const back = (await loadTodayWird(store.db, atLocalTime(TODAY, 770)))!;
+    expect(back.todo.map((p) => p.cardId)).toEqual([pageCardId(1)]);
+    expect(back.nextStepAt).toBeNull();
   });
 });
 

@@ -91,9 +91,15 @@ const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 /** Helper actions sit on a tinted fill so they read as buttons, at the full touch height. */
 const HELPER_BUTTON = "flex-1 h-11 px-2 bg-surface-low dark:bg-surface-dark-low";
 
-/** `extra` counts half pages and seams reviewed on their own. */
+/**
+ * `pages` and `clean` take each page once per session, like the session record; `marked` counts the
+ * marks of every recitation. `extra` counts half pages and seams reviewed on their own.
+ */
 type Totals = { pages: number; clean: number; marked: number; extra: number };
 const NO_TOTALS: Totals = { pages: 0, clean: 0, marked: 0, extra: 0 };
+
+/** What a saved item leaves behind: the totals with its save, and the page again when a learning step is due. */
+type ItemOutcome = Readonly<{ totals: Totals; requeue?: QueueItem | null }>;
 
 /** The first or last ayah that starts on a page, in the page font. */
 async function ayahOnPage(
@@ -210,6 +216,8 @@ function HifzReviewScreen() {
   const itemClock = useActiveClock();
   const wirdEvent = useRef<SessionHabitInput["event"]>(null);
   const againCount = useRef(0);
+  /** Pages graded in this session, so a page a learning step brings back is a later grade, not a new page. */
+  const gradedPages = useRef<Set<string>>(new Set());
   const minutesPerPage = useRef(3);
   const pageScrollRef = useRef<ScrollView>(null);
   /** The queue index whose seam check was already scrolled into view. */
@@ -234,7 +242,7 @@ function HifzReviewScreen() {
       if (wird && !drillsOnly) {
         setPlan(wird.plan);
         minutesPerPage.current = wird.minutesPerReviewPage;
-        setPlanProgress({ done: wird.done.length, total: wird.done.length + wird.todo.length });
+        setPlanProgress({ done: wird.done.length, total: wird.total });
         const cards = await loadPageCards(db, { today, plan: wird.plan });
         const byId = new Map(cards.map((card) => [card.row.id, card]));
         setHeldPages(new Set(cards.filter((card) => card.tier !== "sabaq").map((card) => card.page)));
@@ -289,6 +297,7 @@ function HifzReviewScreen() {
       );
       sessionClock.reset();
       actionIndex.current = 0;
+      gradedPages.current = new Set();
       totalsRef.current = NO_TOTALS;
       setTotals(NO_TOTALS);
       setQueue(items);
@@ -414,12 +423,17 @@ function HifzReviewScreen() {
     [db, monthlyCheck, sessionClock],
   );
 
-  /** Move past the item at `from`, or finish after the last one. Resolves once the summary is ready. */
+  /**
+   * Move past the item at `from`, or finish after the last one. Resolves once the summary is ready. A
+   * page whose learning step is due within the learn-ahead window goes to the end of the queue and
+   * comes back after the other items, as in the flashcard session.
+   */
   const advance = useCallback(
-    async (from: number, final: Totals) => {
+    async (from: number, final: Totals, requeue: QueueItem | null) => {
       setMarkingKey(null);
       actionIndex.current = from + 1;
-      if (from + 1 >= queue.length) {
+      if (requeue) setQueue((items) => [...items, requeue]);
+      if (from + 1 >= queue.length + (requeue ? 1 : 0)) {
         await finish(final);
         return;
       }
@@ -447,16 +461,16 @@ function HifzReviewScreen() {
    * Run one action on the current item under the action lock: the save, then the advance and, after
    * the last item, the finalization. A failed save releases the lock and keeps the item open.
    */
-  const runItemAction = async (label: string, save: () => Promise<Totals>) => {
+  const runItemAction = async (label: string, save: () => Promise<ItemOutcome>) => {
     const from = index;
     if (actionLock.current || actionIndex.current !== from) return;
     actionLock.current = true;
     setBusy(true);
     setError(null);
     try {
-      let final: Totals;
+      let outcome: ItemOutcome;
       try {
-        final = await save();
+        outcome = await save();
       } catch (saveError) {
         console.warn(`[HifzReview] ${label} failed:`, saveError);
         leaveWhenSettled.current = false;
@@ -465,7 +479,7 @@ function HifzReviewScreen() {
         setError(s.hifzSaveFailed);
         return;
       }
-      if (!leaveWhenSettled.current) await advance(from, final);
+      if (!leaveWhenSettled.current) await advance(from, outcome.totals, outcome.requeue ?? null);
       if (leaveWhenSettled.current) {
         leaveWhenSettled.current = false;
         exit();
@@ -477,7 +491,7 @@ function HifzReviewScreen() {
   };
 
   /** Next at an ungraded support level: nothing is saved, but it still advances only once. */
-  const skip = () => runItemAction("Skip", async () => totalsRef.current);
+  const skip = () => runItemAction("Skip", async () => ({ totals: totalsRef.current }));
 
   const setLevel = (level: SupportLevel) => {
     setAttempt((value) => ({ ...value, level }));
@@ -546,7 +560,7 @@ function HifzReviewScreen() {
       });
       if (rating === Rating.Again) againCount.current += 1;
       showWirdNotice(result.wird);
-      return addTotals({ extra: 1 });
+      return { totals: addTotals({ extra: 1 }) };
     });
   };
 
@@ -568,7 +582,9 @@ function HifzReviewScreen() {
     const firstToken = tokens.find((token) => !token.isMarker) ?? tokens[0];
     if (!firstToken && grader !== "salah") return;
     const usedAttempt = grader === "salah" ? emptyAttempt(4) : attempt;
+    const firstInSession = !gradedPages.current.has(card.row.id);
     await runItemAction("Grade", async () => {
+      const reviewedOn = localDateOf(new Date());
       const result = await savePageGrade(db, {
         card: card.row,
         history: card.history,
@@ -577,18 +593,42 @@ function HifzReviewScreen() {
         rating,
         firstToken: firstToken ?? { glyph: "", surah: 1, ayah: 1, wordPos: null, isMarker: true, firstLetter: null },
         session: sessionRef.current,
+        firstGradeInSession: firstInSession,
         durationMs: itemClock.elapsedMs(),
         grader,
         page: pageData,
       });
+      gradedPages.current.add(card.row.id);
       if (rating === Rating.Again) againCount.current += 1;
       const markedCount = grader === "salah" ? 0 : usedAttempt.marks.size + usedAttempt.peeked.length + usedAttempt.shown.length;
-      setPlanProgress((value) => (value ? { ...value, done: value.done + 1 } : value));
+      // A page counts once toward today's plan, however often a learning step brings it back.
+      const coveredBefore = card.history.grades.some((grade) => grade.date === reviewedOn);
+      if (!coveredBefore) setPlanProgress((value) => (value ? { ...value, done: value.done + 1 } : value));
       // A wird milestone is the bigger news; the half page shows up in the queue either way.
       if (!showWirdNotice(result.wird) && result.remediation.half) {
         setNotice(result.remediation.half === "a" ? s.hifzHalfScheduledA : s.hifzHalfScheduledB);
       }
-      return addTotals({ pages: 1, clean: rating >= Rating.Good && markedCount === 0 ? 1 : 0, marked: markedCount });
+      // The page itself follows FSRS (SCH-08): a relearning step due within the learn-ahead window
+      // brings it back in this session, graded from the row this grade saved.
+      const { transition } = result;
+      const requeue: QueueItem | null = transition.shouldRequeueInSession
+        ? {
+            kind: "page",
+            card: {
+              row: transition.updatedCard,
+              page: card.page,
+              tier: result.tier,
+              history: { ...card.history, grades: [...card.history.grades, { date: reviewedOn, rating: transition.reviewRecord.rating }] },
+            },
+            retrievability: current.retrievability,
+          }
+        : null;
+      const totals = addTotals({
+        pages: firstInSession ? 1 : 0,
+        clean: firstInSession && rating >= Rating.Good && markedCount === 0 ? 1 : 0,
+        marked: markedCount,
+      });
+      return { totals, requeue };
     });
   };
 
@@ -604,7 +644,7 @@ function HifzReviewScreen() {
       } else {
         await recordDrillResult(db, { id, clean: result === "clean" });
       }
-      return totalsRef.current;
+      return { totals: totalsRef.current };
     });
   };
 

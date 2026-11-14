@@ -14,6 +14,7 @@ function wird(overrides: { backlog?: boolean; newLines?: number; todo?: number }
     daily: { backlog: overrides.backlog ?? false },
     todo: Array.from({ length: overrides.todo ?? 0 }, () => page),
     done: [page],
+    total: 1 + (overrides.todo ?? 0),
     newLines: overrides.newLines ?? 0,
     remainingMinutes: 3,
     memorizedPages: 1,
@@ -66,5 +67,11 @@ describe("Home's second-look cue (SBQ-03)", () => {
     const due = renderCard({ wird: wird(), secondLooksDue: 1, nextLookAt }).view;
     expect(due.queryByText("Second look at 10:00 AM")).toBeNull();
     expect(due.getByText(s.hifzSecondLookReady)).toBeTruthy();
+  });
+
+  it("counts a page back on a learning step once in the day's total", () => {
+    const page = { cardId: "page:madani15:1", tier: "manzil" } as TodayWird["todo"][number];
+    const today = { ...wird(), todo: [page], done: [page], total: 1 } as unknown as TodayWird;
+    expect(renderCard({ wird: today }).view.getByText("1 / 1")).toBeTruthy();
   });
 });

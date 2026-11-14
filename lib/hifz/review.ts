@@ -177,6 +177,11 @@ export type PageGradeInput = Readonly<{
   rating: Grade;
   firstToken: PageToken;
   session: ReviewSessionRef | null;
+  /**
+   * False when the session already graded this page, as when a relearning step brought it back. The
+   * review is logged and counts like any other; the session's page counts take each page once.
+   */
+  firstGradeInSession?: boolean;
   durationMs: number;
   grader?: "self" | "salah" | "teacher";
   now?: Date;
@@ -248,7 +253,7 @@ export async function savePageGrade(
     },
     context: {
       session: input.session,
-      firstGradeInSession: true,
+      firstGradeInSession: input.firstGradeInSession ?? true,
       durationMs: input.durationMs,
       supportLevel: input.grader === "salah" ? null : level,
       proposedRating: proposed === 0 ? null : proposed,

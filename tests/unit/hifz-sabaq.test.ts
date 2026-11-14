@@ -106,6 +106,21 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
   });
 
+  it("does not plan a page completed today for review before its first due date, tomorrow", async () => {
+    await writeHifzPlan(store.db, plan);
+    const whole = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
+    expect(whole.completesPage).toBe(true);
+    const saved = await completeSabaqChunk(store.db, { target: whole, plan, rating: Rating.Good, session: null, durationMs: 600_000, now: atLocalTime(TODAY, 600) });
+    expect(saved.pageAdded).toBe(true);
+    // This device saved no plan for today before the page was added, so today's list is built now.
+    const today = (await loadTodayWird(store.db, atLocalTime(TODAY, 630)))!;
+    expect(today.cards.map((card) => [card.row.id, card.tier])).toEqual([[pageCardId(1), "sabqi"]]);
+    expect(today.daily.sabqi).toEqual([]);
+    expect(today.todo).toEqual([]);
+    const tomorrow = (await loadTodayWird(store.db, atLocalTime(addDays(TODAY, 1), 9 * 60)))!;
+    expect(tomorrow.todo.map((page) => page.cardId)).toEqual([pageCardId(1)]);
+  });
+
   it("does not add the page when the fluent check of its last chunk fails", async () => {
     const target = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
     expect(target.completesPage).toBe(true);
