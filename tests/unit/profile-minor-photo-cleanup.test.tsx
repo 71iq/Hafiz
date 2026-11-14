@@ -148,18 +148,40 @@ describe("minor photo cleanup (ETH-07)", () => {
     expect(client.getQueryState(halaqaKeys.mine(user))?.isInvalidated).toBe(true);
   });
 
-  it("runs once per app session and account, with one list request when nothing is left", async () => {
+  it("lists once per privacy read when nothing is left, not on every mount", async () => {
     const user = account(2);
     signIn(signedIn(user));
     mockRpc.mockResolvedValue(privacy(true));
-    const first = mount();
+    const client = newClient();
+    const first = mount(client);
     await waitFor(() => expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]));
     first.unmount();
-    // A fresh query cache, as after a reload of the screen tree: privacy is read again.
-    mount();
-    await waitFor(() => expect(mockRpc).toHaveBeenCalledTimes(2));
+    // The same read, still fresh in the cache: nothing to do.
+    mount(client);
     await act(async () => undefined);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
     expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]);
+    // A fresh read that still says minor checks once more.
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user) });
+    });
+    await waitFor(() => expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "list"]));
+  });
+
+  it("removes a file left by another device's minority it never saw end (only minor reads here)", async () => {
+    const user = account(7);
+    signIn(signedIn(user));
+    mockRpc.mockResolvedValue(privacy(true));
+    const client = newClient();
+    mount(client);
+    await waitFor(() => expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]));
+    // Elsewhere: withdrawn, a photo uploaded, minority recorded again, and its last pass interrupted.
+    // This device was asleep and only ever reads "minor".
+    mockAvatarFiles.add(`${user}/left-by-another-device.jpg`);
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user) });
+    });
+    await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-by-another-device.jpg`)).toBe(false));
   });
 
   it("cleans up again in a later minority after it was withdrawn", async () => {
