@@ -26,13 +26,17 @@ export function parseWirdMinimum(value: string | null | undefined): WirdMinimum 
 }
 
 /**
- * Recitation is measured in twentieths of a page so the sums stay exact. An ayah card is about a
- * tenth of a page: the 604 Madani pages hold 6,236 ayat.
+ * Recitation is measured in sixtieths of a page so every weight is whole and the sums stay exact:
+ * halves, seam quarters, ayah tenths and sabaq chunk lines (fifteenths) all divide 60, so chunks
+ * that cover a page add up to exactly one page. An ayah card is about a tenth of a page: the 604
+ * Madani pages hold 6,236 ayat.
  */
-export const PAGE_UNITS = 20;
+export const PAGE_UNITS = 60;
 
 /** Lines on a Madani page (lib/hifz/units LINES_PER_PAGE): a sabaq chunk counts by its share of one. */
 const LINES_PER_PAGE = 15;
+/** One line's weight, 4 sixtieths. */
+const LINE_UNITS = PAGE_UNITS / LINES_PER_PAGE;
 
 /** A single review's time counts toward the minutes path up to this cap, so an idle screen cannot. */
 const MAX_COUNTED_REVIEW_MS = 10 * 60_000;
@@ -51,14 +55,14 @@ function cardRole(cardId: string): CardRole {
 
 /**
  * A sabaq chunk's weight, by its lines: its id ends in "from-to" (lib/hifz/units chunkCardId). Four
- * lines are 5 twentieths, so a short second look (SBQ-03) is not a page of recitation (STR-01).
+ * lines are 16 sixtieths, so a short second look (SBQ-03) is not a page of recitation (STR-01).
  * Null for an id that does not end in its lines; it counts as a page, as before.
  */
 function chunkUnits(cardId: string): number | null {
   const match = /^(\d+)-(\d+)$/.exec(cardId.slice(cardId.lastIndexOf(":") + 1));
   if (!match) return null;
   const lines = Number(match[2]) - Number(match[1]) + 1;
-  return Math.max(1, Math.min(PAGE_UNITS, Math.round((lines * PAGE_UNITS) / LINES_PER_PAGE)));
+  return Math.max(1, Math.min(PAGE_UNITS, lines * LINE_UNITS));
 }
 
 export function recitationUnits(cardId: string): number {
@@ -109,7 +113,7 @@ const STUDY_SQL = "(card_id LIKE 'word:%' OR card_id LIKE 'qiraat:%' OR card_id 
 const LINES_SEG_SQL = "replace(card_id, rtrim(card_id, replace(card_id, ':', '')), '')";
 const CHUNK_LINES_OK_SQL =
   "(lines_seg GLOB '[0-9]*-[0-9]*' AND NOT lines_seg GLOB '*[^-0-9]*' AND length(lines_seg) - length(replace(lines_seg, '-', '')) = 1)";
-const CHUNK_UNITS_SQL = `MAX(1, MIN(${PAGE_UNITS}, CAST(ROUND((CAST(substr(lines_seg, instr(lines_seg, '-') + 1) AS INTEGER) - CAST(substr(lines_seg, 1, instr(lines_seg, '-') - 1) AS INTEGER) + 1) * ${PAGE_UNITS}.0 / ${LINES_PER_PAGE}) AS INTEGER)))`;
+const CHUNK_UNITS_SQL = `MAX(1, MIN(${PAGE_UNITS}, (CAST(substr(lines_seg, instr(lines_seg, '-') + 1) AS INTEGER) - CAST(substr(lines_seg, 1, instr(lines_seg, '-') - 1) AS INTEGER) + 1) * ${LINE_UNITS}))`;
 
 const TALLY_SELECT = `SELECT
   COALESCE(SUM(CASE
