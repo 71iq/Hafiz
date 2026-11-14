@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "expo-router";
-import { HifzSetupFlow } from "@/components/hifz/HifzSetupFlow";
+import { HifzSetupFlow, setupSavedNotice } from "@/components/hifz/HifzSetupFlow";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
@@ -34,19 +35,22 @@ function HifzSetupScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <HifzSetupFlow
-        db={db}
-        language={uiLanguage}
-        isDark={isDark}
-        s={s}
-        initialPlan={plan}
-        onCancel={close}
-        onDone={() => {
-          emitHabitChanged();
-          showNotice(s.hifzPlanSaved);
-          close();
-        }}
-      />
+      {/* The same 640 px column as onboarding, so wide screens do not stretch the controls. */}
+      <View className="w-full max-w-[640px] flex-1 self-center">
+        <HifzSetupFlow
+          db={db}
+          language={uiLanguage}
+          isDark={isDark}
+          s={s}
+          initialPlan={plan}
+          onCancel={close}
+          onDone={(saved) => {
+            emitHabitChanged();
+            showNotice(setupSavedNotice(saved, s, uiLanguage));
+            close();
+          }}
+        />
+      </View>
     </SafeAreaView>
   );
 }

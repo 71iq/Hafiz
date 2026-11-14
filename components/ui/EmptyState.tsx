@@ -59,7 +59,7 @@ export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction,
       </Text>
       {subtitle ? (
         <Text
-          className="text-warm-600 dark:text-neutral-400"
+          className="text-warm-700 dark:text-neutral-400"
           style={{
             fontFamily: "Manrope_400Regular",
             fontSize: 13,

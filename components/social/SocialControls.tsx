@@ -43,7 +43,8 @@ export function SocialNotice({
       />
     ) : null;
   // A long message keeps its full width; its action goes below it, at the reading start.
-  const stacked = action !== null && message.length > 80;
+  // Arabic notices run shorter in characters for the same lines, so the bar is low.
+  const stacked = action !== null && message.length > 60;
   return (
     <Card elevation="mid" className="px-4 py-3">
       <View className="items-center gap-3" style={socialRowStyle(isRTL)}>
@@ -139,7 +140,7 @@ export function SocialToggleRow({
 export function SocialErrorText({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <Text variant="body-sm" className="text-red-600 dark:text-red-400" accessibilityRole="alert" accessibilityLiveRegion="polite">
+    <Text variant="body-sm" className="text-red-600 dark:text-red-400" accessibilityRole="alert">
       {message}
     </Text>
   );

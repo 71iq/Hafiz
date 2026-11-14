@@ -1,10 +1,10 @@
 import React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { GradingButtons } from "@/components/flashcards/GradingButtons";
-import { HifzSetupFlow } from "@/components/hifz/HifzSetupFlow";
+import { HifzSetupFlow, setupSavedNotice } from "@/components/hifz/HifzSetupFlow";
 import type { AppDatabase } from "@/lib/database/types";
 import { Rating } from "@/lib/fsrs/scheduler";
-import { DEFAULT_HIFZ_PLAN, type HifzPlan } from "@/lib/hifz/plan";
+import { applyPreset, DEFAULT_HIFZ_PLAN, type HifzPlan } from "@/lib/hifz/plan";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { strings } from "@/lib/i18n/strings";
 import { DirectionProvider } from "@/lib/ui/direction";
@@ -118,6 +118,20 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
   const radio = (view: Awaited<ReturnType<typeof openPace>>, name: string) => view.getByRole("radio", { name: new RegExp(name) });
   const checked = (view: Awaited<ReturnType<typeof openPace>>, name: string) => radio(view, name).props.accessibilityState?.checked;
 
+  it("opens on the saved plan's goal and pace, and a review-only plan without repetition counts", async () => {
+    const view = await openPace(applyPreset(savedPlan, "maintenance"));
+    expect(checked(view, s.hifzPresetMaintenance)).toBe(true);
+    expect(view.queryByText(s.hifzRepsTitle)).toBeNull();
+  });
+
+  it("restores the unit chosen earlier when a pace other than short surahs is picked", async () => {
+    const view = await openPace({ ...savedPlan, unit: "page" });
+    fireEvent.press(radio(view, s.hifzPresetShort));
+    expect(view.getByText(new RegExp(s.hifzPresetAyahByAyah.replace(".", "\\.")))).toBeTruthy();
+    fireEvent.press(radio(view, s.hifzPresetFullTime));
+    expect((await saveAndReadPlan(view)).unit).toBe("page");
+  });
+
   it("keeps onboarding on the default counts without asking", async () => {
     const view = await openPace(null);
     expect(view.queryByText(s.hifzRepsTitle)).toBeNull();
@@ -141,16 +155,16 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
 
   it("saves custom counts and stops each at the end of its range", async () => {
     const view = await openPace(savedPlan);
-    expect(view.queryByLabelText("More: Readings while looking")).toBeNull();
+    expect(view.queryByLabelText("More: Reads while looking")).toBeNull();
     fireEvent.press(radio(view, s.hifzRepsCustom));
     expect(checked(view, s.hifzRepsCustom)).toBe(true);
-    for (let tap = 0; tap < 5; tap += 1) fireEvent.press(view.getByLabelText("More: Readings while looking"));
+    for (let tap = 0; tap < 5; tap += 1) fireEvent.press(view.getByLabelText("More: Reads while looking"));
     expect(view.getByText("15")).toBeTruthy();
     // Clean in a row stops at 1 and listening at 5.
-    for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("Fewer: Clean in a row from memory"));
-    expect(view.getByLabelText("Fewer: Clean in a row from memory").props.accessibilityState).toMatchObject({ disabled: true });
-    for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("More: Listening"));
-    expect(view.getByLabelText("More: Listening").props.accessibilityState).toMatchObject({ disabled: true });
+    for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("Fewer: Clean recitations in a row"));
+    expect(view.getByLabelText("Fewer: Clean recitations in a row").props.accessibilityState).toMatchObject({ disabled: true });
+    for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("More: Listens"));
+    expect(view.getByLabelText("More: Listens").props.accessibilityState).toMatchObject({ disabled: true });
     const plan = await saveAndReadPlan(view);
     expect(plan.sabaqRepetitions).toEqual({ listen: 5, looking: 15, cleanInARow: 1 });
   });
@@ -160,7 +174,7 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
     expect(checked(view, s.hifzRepsCustom)).toBe(true);
     expect(view.getByText("12")).toBeTruthy();
     fireEvent.press(radio(view, s.hifzRepsLookingThenMemory));
-    expect(view.queryByLabelText("More: Readings while looking")).toBeNull();
+    expect(view.queryByLabelText("More: Reads while looking")).toBeNull();
     const plan = await saveAndReadPlan(view);
     expect(plan.sabaqRepetitions).toEqual({ listen: 3, looking: 10, cleanInARow: 3 });
   });
@@ -184,5 +198,23 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
     expect(view.getByText(ar.hifzRepsTitle)).toBeTruthy();
     expect(view.getByText("١٢")).toBeTruthy();
     expect(view.getByLabelText(`أكثر: ${ar.hifzRepsLooking}`)).toBeTruthy();
+  });
+});
+
+describe("the notice after saving a plan (7.6)", () => {
+  const base = { plan: DEFAULT_HIFZ_PLAN, declaredPages: 0, migratedPages: 0, firstPlan: false, unitSwitched: false, repetitionsChanged: false };
+  it("says only what the save changes", () => {
+    expect(setupSavedNotice({ ...base, firstPlan: true }, strings.en, "en")).toBe(strings.en.hifzPlanSavedFirst);
+    expect(setupSavedNotice(base, strings.en, "en")).toBe(strings.en.hifzPlanSavedReview);
+    expect(setupSavedNotice({ ...base, repetitionsChanged: true }, strings.en, "en")).toBe(strings.en.hifzPlanSaved);
+    expect(
+      setupSavedNotice({ ...base, repetitionsChanged: true, plan: { ...DEFAULT_HIFZ_PLAN, method: "review_only" } }, strings.en, "en"),
+    ).toBe(strings.en.hifzPlanSavedReview);
+    expect(setupSavedNotice({ ...base, unitSwitched: true, migratedPages: 3 }, strings.en, "en")).toBe(
+      "Plan saved. 3 pages you reviewed ayah by ayah now review as whole pages. Their schedule is kept.",
+    );
+    expect(setupSavedNotice({ ...base, unitSwitched: true, plan: { ...DEFAULT_HIFZ_PLAN, unit: "ayah" } }, strings.en, "en")).toBe(
+      strings.en.hifzPlanSavedToAyat,
+    );
   });
 });

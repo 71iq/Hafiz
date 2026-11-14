@@ -429,7 +429,12 @@ function SabaqScreen() {
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
         {/* The padding is on a plain View: the web SafeAreaView's inline padding replaces a className one. */}
         <View className="flex-1 items-center justify-center px-6">
-          <EmptyState icon={BookOpenCheck} tone="success" title={s.hifzSecondLookSaved} isDark={isDark} />
+          <EmptyState
+            icon={BookOpenCheck}
+            tone="success"
+            title={looksSaved > 1 ? s.hifzSecondLooksSaved : s.hifzSecondLookSaved}
+            isDark={isDark}
+          />
           <View className="w-full max-w-sm" style={{ gap: 10 }}>
             <Button label={s.hifzSabaqStart} onPress={() => setLooksDoneStep(false)} />
             <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
@@ -448,7 +453,7 @@ function SabaqScreen() {
           <EmptyState
             icon={error ? RotateCcw : BookOpenCheck}
             tone={!error && looksSaved > 0 ? "success" : "neutral"}
-            title={error ?? (looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
+            title={error ?? (looksSaved > 1 ? s.hifzSecondLooksSaved : looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
             subtitle={
               laterLook
                 ? interpolate(s.hifzSecondLookOpensAt, { time: formatClockTime(laterLook, uiLanguage) })
@@ -512,7 +517,7 @@ function SabaqScreen() {
             >
               <X size={18} color={muted} />
             </Pressable>
-            <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="text-warm-600 dark:text-neutral-400">
+            <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="text-warm-700 dark:text-neutral-400">
               {portion}
             </Text>
             <View style={{ width: 44 }} />
@@ -549,7 +554,7 @@ function SabaqScreen() {
               dir={dir}
               align={centered ? "center" : undefined}
               variant="muted"
-              className="text-warm-600 dark:text-neutral-400"
+              className="text-warm-700 dark:text-neutral-400"
               style={{ lineHeight: 20 }}
             >
               {step === "listen"

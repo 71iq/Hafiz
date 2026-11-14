@@ -101,7 +101,7 @@ export function SabaqSecondLook({
             <Text
               dir={dir}
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
-              className="text-warm-600 dark:text-neutral-400"
+              className="text-warm-700 dark:text-neutral-400"
             >
               {portion}
             </Text>
@@ -120,7 +120,7 @@ export function SabaqSecondLook({
             {s.hifzSecondLookTitle}
           </Text>
           {/* Readable at 4.5:1 in both themes; the shared muted tone is lighter. */}
-          <Text dir={dir} variant="muted" className="text-warm-600 dark:text-neutral-400" style={{ lineHeight: 20 }}>
+          <Text dir={dir} variant="muted" className="text-warm-700 dark:text-neutral-400" style={{ lineHeight: 20 }}>
             {s.hifzSecondLookHint}
           </Text>
           {total > 1 ? (
@@ -167,7 +167,7 @@ export function SabaqSecondLook({
             <Button label={s.hifzDrillShow} onPress={() => setShown(true)} />
           )}
           <Button variant="outline" className={OUTLINE_BORDER} label={continuesToNewLines ? s.hifzSecondLookSkipToNew : s.hifzSecondLookSkipForNow} onPress={onSkip} disabled={busy} />
-          <Text dir={dir} align="center" variant="caption" className="text-warm-600 dark:text-neutral-400" style={{ lineHeight: 18 }}>
+          <Text dir={dir} align="center" variant="caption" className="text-warm-700 dark:text-neutral-400" style={{ lineHeight: 18 }}>
             {/* Skipping skips every look still to come, so the hint counts them. */}
             {total - index > 1 ? s.hifzSecondLooksSkipHint : s.hifzSecondLookSkipHint}
           </Text>

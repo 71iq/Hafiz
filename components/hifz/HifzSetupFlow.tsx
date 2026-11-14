@@ -13,6 +13,7 @@ import { CALCULATION_METHOD_LABEL_KEYS, PrayerTimesSetup } from "@/components/no
 import {
   applyPreset,
   DEFAULT_HIFZ_PLAN,
+  presetOf,
   PRAYERS,
   SABAQ_REPETITION_BOUNDS,
   SABAQ_REPETITION_PRESETS,
@@ -25,10 +26,12 @@ import {
   type SabaqRepetitionPreset,
   type SabaqRepetitions,
 } from "@/lib/hifz/plan";
-import { formatMinutes, formatNumber } from "@/lib/i18n/count";
+import { formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { readPrayerLocation } from "@/lib/prayer/settings";
+import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 import type { PrayerLocation } from "@/lib/prayer/times";
 
 type Goal = "memorize" | "keep" | "both";
@@ -77,7 +80,7 @@ function anchorPhrase(anchor: Anchor, language: "en" | "ar", s: UIStrings): stri
   return interpolate(s.hifzWhenAtTime, { time });
 }
 
-type StepEntry = Readonly<{ plan: HifzPlan; preset: PlanPreset; surahs: Set<number>; juz: Set<number> }>;
+type StepEntry = Readonly<{ plan: HifzPlan; preset: PlanPreset | null; surahs: Set<number>; juz: Set<number> }>;
 
 function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: string; selected: boolean; onPress: () => void }) {
   return (
@@ -85,14 +88,14 @@ function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: 
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
-      className={`min-h-[56px] justify-center rounded-3xl px-4 py-3 ${selected ? "bg-primary-accent/12 dark:bg-primary-bright/15 border border-primary-accent dark:border-primary-bright" : "bg-surface-low dark:bg-surface-dark-low border border-transparent"}`}
+      className={`min-h-[56px] justify-center rounded-3xl px-4 py-3 ${selected ? "bg-primary-accent/10 dark:bg-primary-bright/15 border border-primary-accent dark:border-primary-bright" : "bg-surface-low dark:bg-surface-dark-low border border-transparent"}`}
     >
-      <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-100"}>
+      <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-100"}>
         {title}
       </Text>
       {hint ? (
         // Readable on the selected teal tint in both themes; the shared caption tone is lighter.
-        <Text variant="caption" className="mt-0.5 text-warm-600 dark:text-neutral-400" style={{ lineHeight: 18 }}>
+        <Text variant="caption" className="mt-0.5 text-warm-700 dark:text-neutral-400" style={{ lineHeight: 18 }}>
           {hint}
         </Text>
       ) : null}
@@ -120,7 +123,8 @@ function CountStepper({
 }) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const { min, max } = SABAQ_REPETITION_BOUNDS[count];
-  const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
+  const { effectiveTheme } = useSettings();
+  const iconColor = mutedIconColor(effectiveTheme);
   const step = (delta: -1 | 1, disabled: boolean, name: string) => (
     <Pressable
       accessibilityRole="button"
@@ -150,6 +154,8 @@ function CountStepper({
           <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }} className="text-charcoal dark:text-neutral-100">
             {formatNumber(value, language)}
           </Text>
+          {/* A web live region reads its text, not its label, so the label travels with the value there. */}
+          <Text style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 }}>{`${label}: ${formatNumber(value, language)}`}</Text>
         </View>
         {step(1, value >= max, s.hifzRepsMore)}
       </MirroredRow>
@@ -192,7 +198,7 @@ function SabaqRepetitionsSection({
         <Text dir={dir} variant="title-sm">
           {s.hifzRepsTitle}
         </Text>
-        <Text dir={dir} variant="caption">
+        <Text dir={dir} variant="caption" className="text-warm-700 dark:text-neutral-400" style={{ lineHeight: 18 }}>
           {s.hifzRepsHint}
         </Text>
       </View>
@@ -212,7 +218,7 @@ function SabaqRepetitionsSection({
         <OptionCard title={s.hifzRepsCustom} hint={s.hifzRepsCustomHint} selected={choice === "custom"} onPress={() => setCustomOpen(true)} />
       </View>
       {choice === "custom" ? (
-        <View className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-2" style={{ gap: 4 }}>
+        <View className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-2" style={{ gap: 8 }}>
           {counts.map(({ count, label }) => (
             <CountStepper
               key={count}
@@ -231,6 +237,29 @@ function SabaqRepetitionsSection({
   );
 }
 
+/** What a saved setup changed, for the screen that shows the saved notice. */
+export type SetupSaved = Readonly<{
+  plan: HifzPlan;
+  declaredPages: number;
+  /** Pages made from reviewed ayah cards by a switch to page review (7.6). */
+  migratedPages: number;
+  /** No plan was saved before: the wird starts today. */
+  firstPlan: boolean;
+  /** The recitation unit changed between page and ayah review. */
+  unitSwitched: boolean;
+  repetitionsChanged: boolean;
+}>;
+
+/** What the saved notice says after editing a plan: only what this save changes, and when (7.6). */
+export function setupSavedNotice(saved: SetupSaved, s: UIStrings, language: "en" | "ar"): string {
+  if (saved.firstPlan) return s.hifzPlanSavedFirst;
+  if (saved.unitSwitched && saved.plan.unit === "ayah") return s.hifzPlanSavedToAyat;
+  if (saved.unitSwitched && saved.migratedPages > 0) {
+    return interpolate(s.hifzPlanSavedToPages, { pages: formatPages(saved.migratedPages, language) });
+  }
+  return saved.repetitionsChanged && saved.plan.method !== "review_only" ? s.hifzPlanSaved : s.hifzPlanSavedReview;
+}
+
 type Props = {
   db: AppDatabase;
   language: "en" | "ar";
@@ -238,7 +267,7 @@ type Props = {
   s: UIStrings;
   /** The plan to start from, when editing; null starts from the defaults. */
   initialPlan: HifzPlan | null;
-  onDone: (result: { plan: HifzPlan; declaredPages: number }) => void;
+  onDone: (result: SetupSaved) => void;
   onCancel?: () => void;
 };
 
@@ -249,9 +278,14 @@ type Props = {
 export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, onCancel }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const [stepIndex, setStepIndex] = useState(0);
-  const [goal, setGoal] = useState<Goal>("both");
+  // Editing starts from the saved plan as it is: its goal, and its preset only while it still matches.
+  const [goal, setGoal] = useState<Goal>(initialPlan?.method === "review_only" ? "keep" : "both");
   const [plan, setPlan] = useState<HifzPlan>(initialPlan ?? applyPreset(DEFAULT_HIFZ_PLAN, "part_time_adult"));
-  const [preset, setPreset] = useState<PlanPreset>("part_time_adult");
+  const [preset, setPreset] = useState<PlanPreset | null>(initialPlan ? presetOf(initialPlan) : "part_time_adult");
+  // The unit chosen on the tracks step. "Short surahs" reviews ayah by ayah; another pace brings this back.
+  const [chosenUnit, setChosenUnit] = useState<HifzPlan["unit"]>(
+    initialPlan && presetOf(initialPlan) !== "short_surahs" ? initialPlan.unit : DEFAULT_HIFZ_PLAN.unit,
+  );
   const [surahs, setSurahs] = useState<SurahChoice[]>([]);
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
@@ -322,7 +356,15 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         memorizedSurahs: [...selectedSurahs],
         memorizedJuz: [...selectedJuz],
       });
-      onDone({ plan: finalPlan, declaredPages: result.declaredPages });
+      onDone({
+        plan: finalPlan,
+        declaredPages: result.declaredPages,
+        migratedPages: result.migratedPages,
+        firstPlan: initialPlan === null,
+        unitSwitched: initialPlan !== null && (initialPlan.unit === "ayah") !== (finalPlan.unit === "ayah"),
+        repetitionsChanged:
+          initialPlan !== null && JSON.stringify(initialPlan.sabaqRepetitions) !== JSON.stringify(finalPlan.sabaqRepetitions),
+      });
     } catch (saveError) {
       console.warn("[HifzSetup] Save failed:", saveError);
       setError(s.hifzSaveFailedGeneric);
@@ -382,7 +424,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         </Text>
 
         {step === "goal" ? (
-          <View style={{ gap: 10 }}>
+          <View accessibilityRole="radiogroup" accessibilityLabel={title} style={{ gap: 10 }}>
             <OptionCard title={s.hifzGoalMemorize} selected={goal === "memorize"} onPress={() => chooseGoal("memorize")} />
             <OptionCard title={s.hifzGoalKeep} selected={goal === "keep"} onPress={() => chooseGoal("keep")} />
             <OptionCard title={s.hifzGoalBoth} selected={goal === "both"} onPress={() => chooseGoal("both")} />
@@ -409,9 +451,32 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
 
         {step === "tracks" ? (
           <View style={{ gap: 10 }}>
-            <OptionCard title={s.hifzUnitPage} hint={s.hifzUnitPageHint} selected={plan.unit === "page"} onPress={() => setPlan((value) => ({ ...value, unit: "page" }))} />
-            <OptionCard title={s.hifzUnitHalf} hint={s.hifzUnitHalfHint} selected={plan.unit === "half"} onPress={() => setPlan((value) => ({ ...value, unit: "half" }))} />
-            <OptionCard title={s.hifzUnitAyah} hint={s.hifzUnitAyahHint} selected={plan.unit === "ayah"} onPress={() => setPlan((value) => ({ ...value, unit: "ayah" }))} />
+            <View accessibilityRole="radiogroup" accessibilityLabel={title} style={{ gap: 10 }}>
+              {(
+                [
+                  ["page", s.hifzUnitPage, s.hifzUnitPageHint],
+                  ["half", s.hifzUnitHalf, s.hifzUnitHalfHint],
+                  ["ayah", s.hifzUnitAyah, s.hifzUnitAyahHint],
+                ] as const
+              ).map(([unit, label, hint]) => (
+                <OptionCard
+                  key={unit}
+                  title={label}
+                  hint={hint}
+                  selected={plan.unit === unit}
+                  onPress={() => {
+                    setChosenUnit(unit);
+                    setPlan((value) => ({ ...value, unit }));
+                  }}
+                />
+              ))}
+            </View>
+            {/* Editing a plan: a switch of unit keeps what was learned (7.6). */}
+            {initialPlan ? (
+              <Text dir={dir} variant="caption" className="text-warm-700 dark:text-neutral-400" style={{ lineHeight: 18 }}>
+                {s.hifzUnitSwitchKeepsSchedule}
+              </Text>
+            ) : null}
             <MirroredRow dir={dir} className="mt-2 items-center justify-between gap-3 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
               <View className="flex-1">
                 <Text dir={dir} style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className="text-charcoal dark:text-neutral-100">
@@ -433,17 +498,24 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                 <OptionCard
                   key={candidate}
                   title={presetLabel(candidate, s)}
-                  hint={interpolate(s.hifzPresetSummary, { minutes: formatMinutes(applyPreset(plan, candidate).dailyBudgetMin, language) })}
+                  hint={
+                    interpolate(s.hifzPresetSummary, { minutes: formatMinutes(applyPreset(plan, candidate).dailyBudgetMin, language) }) +
+                    (candidate === "short_surahs" ? ` ${s.hifzPresetAyahByAyah}` : "")
+                  }
                   selected={preset === candidate}
                   onPress={() => {
                     setPreset(candidate);
-                    setPlan((value) => applyPreset(value, candidate));
+                    // "Short surahs" reviews ayah by ayah; any other pace keeps the unit chosen on step 3.
+                    setPlan((value) => {
+                      const next = applyPreset(value, candidate);
+                      return candidate === "short_surahs" ? next : { ...next, unit: chosenUnit };
+                    });
                   }}
                 />
               ))}
             </View>
             {/* Only when editing a saved plan: onboarding keeps the default counts (5.1, ONB-01). */}
-            {initialPlan && goal !== "keep" ? (
+            {initialPlan && goal !== "keep" && plan.method !== "review_only" ? (
               <SabaqRepetitionsSection
                 value={plan.sabaqRepetitions}
                 onChange={(sabaqRepetitions) => setPlan((value) => ({ ...value, sabaqRepetitions }))}
@@ -460,7 +532,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
             <Text dir={dir} variant="muted">
               {interpolate(s.hifzWhenHint, { when: anchorPhrase(plan.anchor, language, s) })}
             </Text>
-            <MirroredRow dir={dir} className="flex-wrap gap-2">
+            <MirroredRow dir={dir} className="flex-wrap gap-2" accessibilityRole="radiogroup" accessibilityLabel={title}>
               {PRAYERS.map((prayer) => {
                 const selected = plan.anchor.kind === "prayer" && plan.anchor.prayer === prayer;
                 return (

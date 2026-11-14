@@ -104,7 +104,7 @@ export function WirdPlanCard({
       </MirroredRow>
 
       {complete ? (
-        <Text dir={dir} className="mt-1.5 text-warm-600 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
+        <Text dir={dir} className="mt-1.5 text-warm-700 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
           {s.hifzWirdCompleteLine}
         </Text>
       ) : null}
@@ -165,7 +165,8 @@ export function WirdPlanCard({
           </MirroredRow>
         ) : null
       ) : (
-        <View className="mt-4" style={{ gap: 8 }}>
+        // Capped on wide layouts like the rows below, so the buttons line up with them.
+        <View className="mt-4 w-full max-w-md" style={{ gap: 8, alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}>
           {wird.todo.length > 0 ? (
             <Button label={wird.done.length > 0 ? s.hifzWirdContinue : s.hifzWirdStart} onPress={onStartReview} />
           ) : null}
@@ -209,7 +210,7 @@ export function WirdPlanCard({
       {secondLooksDue === 0 && nextLookAt ? (
         <MirroredRow dir={dir} className="mt-3 items-center gap-2">
           <Eye size={14} color={muted} />
-          <Text dir={dir} className="text-warm-600 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
+          <Text dir={dir} className="text-warm-700 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
             {interpolate(s.hifzSecondLookLater, {
               time: formatClockMinutesForDisplay(nextLookAt.getHours() * 60 + nextLookAt.getMinutes(), language),
             })}

@@ -115,6 +115,16 @@ export function applyPreset(plan: HifzPlan, preset: PlanPreset): HifzPlan {
   return { ...plan, ...PLAN_PRESETS[preset] };
 }
 
+/** The preset a saved plan was made from, when every field the preset sets still matches; else null. */
+export function presetOf(plan: HifzPlan): PlanPreset | null {
+  const presets = Object.keys(PLAN_PRESETS) as PlanPreset[];
+  return (
+    presets.find((preset) =>
+      Object.entries(PLAN_PRESETS[preset]).every(([key, value]) => plan[key as keyof HifzPlan] === value),
+    ) ?? null
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
