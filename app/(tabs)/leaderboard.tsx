@@ -145,17 +145,32 @@ function BoardContent({ userId }: { userId: string }) {
           onAction={offline ? undefined : () => void refresh()}
         />
       ) : view.status === "not_joined" ? (
-        <BoardJoin
-          key={privacy.dataUpdatedAt}
-          initialNickname={privacy.data?.boardNickname ?? null}
-          initialIsMinor={privacy.data?.isMinor ?? false}
-          pending={join.isPending || !inputs.data}
-          error={joinError}
-          onJoin={(choice) => {
-            setJoinError(null);
-            join.mutate(choice);
-          }}
-        />
+        // ETH-07: the form starts from the account's stored age choice. Joining before it loads would
+        // send "not under 18" and clear a minor's setting, making their profile public, so the form
+        // waits for a successful read.
+        privacy.data ? (
+          <BoardJoin
+            key={privacy.dataUpdatedAt}
+            initialNickname={privacy.data.boardNickname}
+            initialIsMinor={privacy.data.isMinor}
+            pending={join.isPending || !inputs.data}
+            error={joinError}
+            onJoin={(choice) => {
+              setJoinError(null);
+              join.mutate(choice);
+            }}
+          />
+        ) : offline ? (
+          <SocialNotice icon={CloudOff} message={s.socialOfflineEmpty} />
+        ) : privacy.error ? (
+          <SocialNotice
+            message={socialFailureMessage(privacy.error, s)}
+            actionLabel={s.socialTryAgain}
+            onAction={() => void privacy.refetch()}
+          />
+        ) : (
+          <StandingsSkeleton label={s.loading} />
+        )
       ) : (
         <BoardStandings
           view={view}

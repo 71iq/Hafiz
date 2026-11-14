@@ -169,6 +169,53 @@ describe("Board tab", () => {
     expect(await screen.findByText(strings.en.boardGatheringTitle)).toBeTruthy();
   });
 
+  it("waits for the stored age choice before offering Join, then keeps a minor's choice (ETH-07)", async () => {
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    let releasePrivacy: (() => void) | undefined;
+    mockRpc.mockImplementation(async (fn, args) => {
+      if (fn !== "get_profile_privacy") return base(fn, args);
+      await new Promise<void>((resolve) => (releasePrivacy = resolve));
+      return { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null };
+    });
+    const screen = renderScreen();
+    await waitFor(() => expect(releasePrivacy).toBeDefined());
+    // Joining now would send "not under 18" and clear the stored choice.
+    expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
+    expect(screen.queryByText(strings.en.boardIntentionTitle)).toBeNull();
+
+    releasePrivacy!();
+    expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
+    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+    fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
+    await waitFor(() =>
+      expect(mockRpc).toHaveBeenCalledWith(
+        "join_board",
+        expect.objectContaining({ p_nickname: "Little Star", p_is_minor: true }),
+      ),
+    );
+  });
+
+  it("offers a retry instead of Join when the stored age choice cannot be read (ETH-07)", async () => {
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    let privacyFails = true;
+    mockRpc.mockImplementation(async (fn, args) => {
+      if (fn !== "get_profile_privacy") return base(fn, args);
+      if (privacyFails) return { data: null, error: { message: "synthetic privacy failure" } };
+      return { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null };
+    });
+    const screen = renderScreen();
+    const retry = await screen.findByRole("button", { name: strings.en.socialTryAgain });
+    expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
+    expect(mockRpc.mock.calls.map(([fn]) => fn)).not.toContain("join_board");
+
+    privacyFails = false;
+    fireEvent.press(retry);
+    expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
+    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+  });
+
   it("requires a nickname from a reader under 18 (BRD-07)", async () => {
     signIn(USER);
     const screen = renderScreen();
