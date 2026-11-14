@@ -2226,6 +2226,9 @@ $$;
 
 -- Current streak: consecutive covered dates (any status) ending today or yesterday. Paused days keep
 -- the run without adding to it (8.2). Days after today are ignored.
+-- STR-07: a missed yesterday can still be made up today before Dhuhr, and the app keeps the streak
+-- meanwhile. The cutoff comes from prayer times the server never sees (ETH-11), so on the make-up
+-- day the run through the day before yesterday stands all day; the next day it is gone unless made up.
 CREATE OR REPLACE FUNCTION private.habit_streak(member UUID, today DATE)
 RETURNS INTEGER
 LANGUAGE sql
@@ -2241,6 +2244,7 @@ AS $$
     SELECT CASE
       WHEN EXISTS (SELECT 1 FROM covered WHERE covered_on = today) THEN today
       WHEN EXISTS (SELECT 1 FROM covered WHERE covered_on = today - 1) THEN today - 1
+      WHEN EXISTS (SELECT 1 FROM covered WHERE covered_on = today - 2) THEN today - 2
     END AS anchor_on
   ),
   islands AS (

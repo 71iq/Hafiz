@@ -29,19 +29,32 @@ const minorities = new Map<string, number>();
  */
 export function cleanUpMinorPhotos(userId: string, readAt = 0): Promise<boolean> {
   if ((cleaned.get(userId) ?? -1) >= readAt) return Promise.resolve(true);
+  const minority = minorities.get(userId) ?? 0;
   const current = running.get(userId);
   if (current) {
     if (current.readAt >= readAt) return current.run;
     // A newer read came while an older cleanup runs: run again once it settles, whether it finished
-    // or failed, so a transient failure of the older pass does not drop the newer read's cleanup.
-    const again = () => cleanUpMinorPhotos(userId, readAt);
+    // or failed, so a transient failure of the older pass does not drop the newer read's cleanup. Not
+    // once the account is known not to be a minor since: its photos are an adult's again.
+    const again = () => ((minorities.get(userId) ?? 0) === minority ? cleanUpMinorPhotos(userId, readAt) : Promise.resolve(true));
     return current.run.then(again, again);
   }
-  const minority = minorities.get(userId) ?? 0;
   const run: Promise<boolean> = (async () => {
     const owner = captureSocialOwner(userId);
     if (!owner) return false;
-    await deleteOwnAvatarFiles(owner);
+    await deleteOwnAvatarFiles(owner, {
+      // Files found: before deleting any, the account must still be a minor, here and on the server.
+      // Another device may have withdrawn minority and uploaded a photo since this device's read.
+      beforeRemove: async () => {
+        if ((minorities.get(userId) ?? 0) !== minority) return false;
+        const fresh = await fetchProfilePrivacy(owner);
+        if (!fresh.isMinor) {
+          forgetMinorPhotoCleanup(userId);
+          return false;
+        }
+        return (minorities.get(userId) ?? 0) === minority;
+      },
+    });
     if ((minorities.get(userId) ?? 0) === minority) cleaned.set(userId, Math.max(readAt, cleaned.get(userId) ?? -1));
     return true;
   })().finally(() => {

@@ -125,9 +125,13 @@ const AVATAR_MAX_REQUESTS = 100;
  * included, as the owner's own session. The bucket serves files to anyone with the link, so clearing
  * the profile's avatar_url alone would leave a minor's photo published. It lists everything first and
  * then removes it, so an account with nothing stored costs one list request. Fails when a file could
- * not be deleted or the account changed, so the caller can retry.
+ * not be deleted or the account changed, so the caller can retry. `beforeRemove`, when given, runs
+ * once there is something to delete; resolving false leaves every file and returns 0.
  */
-export async function deleteOwnAvatarFiles(owner: SocialOwner): Promise<number> {
+export async function deleteOwnAvatarFiles(
+  owner: SocialOwner,
+  { beforeRemove }: { beforeRemove?: () => Promise<boolean> } = {},
+): Promise<number> {
   let requests = 0;
   const bucket = async () => {
     requests += 1;
@@ -150,6 +154,7 @@ export async function deleteOwnAvatarFiles(owner: SocialOwner): Promise<number> 
     }
   }
 
+  if (paths.length > 0 && beforeRemove && !(await beforeRemove())) return 0;
   for (let start = 0; start < paths.length; start += AVATAR_PAGE) {
     const batch = paths.slice(start, start + AVATAR_PAGE);
     const removed = await (await bucket()).remove(batch);

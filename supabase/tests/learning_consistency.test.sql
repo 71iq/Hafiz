@@ -844,6 +844,24 @@ DO $$
 BEGIN
   PERFORM hz_test.eq('streak includes today', private.habit_streak('00000000-0000-4000-8003-000000000004', hz_test.utc_today()), 4);
 END $$;
+-- STR-07: yesterday missed, so today is the make-up day; the run through the day before stands all
+-- day (the server never knows the Dhuhr cutoff), and is gone the day after unless made up. Its own
+-- user, so the Board users' matching below is unchanged.
+SELECT hz_test.make_user('00000000-0000-4000-8019-000000000001', 'makeup_streak_user', 'Make-up', NULL);
+SELECT hz_test.day('00000000-0000-4000-8019-000000000001', hz_test.utc_today() - 2, 'done');
+SELECT hz_test.day('00000000-0000-4000-8019-000000000001', hz_test.utc_today() - 3, 'done');
+SELECT hz_test.day('00000000-0000-4000-8019-000000000001', hz_test.utc_today() - 4, 'made_up');
+DO $$
+BEGIN
+  PERFORM hz_test.eq('streak kept on the make-up day', private.habit_streak('00000000-0000-4000-8019-000000000001', hz_test.utc_today()), 3);
+  PERFORM hz_test.eq('streak gone the day after a missed make-up', private.habit_streak('00000000-0000-4000-8019-000000000001', hz_test.utc_today() + 1), 0);
+END $$;
+-- Made up before the cutoff, yesterday counts and the run goes on through it.
+SELECT hz_test.day('00000000-0000-4000-8019-000000000001', hz_test.utc_today() - 1, 'made_up');
+DO $$
+BEGIN
+  PERFORM hz_test.eq('made-up yesterday continues the streak', private.habit_streak('00000000-0000-4000-8019-000000000001', hz_test.utc_today()), 4);
+END $$;
 
 SET ROLE authenticated;
 DO $$

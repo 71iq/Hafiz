@@ -71,10 +71,38 @@ export async function reconcileHabitDaysFromLogs(
   { now, dates }: { now: Date; dates?: ReadonlySet<LocalDate> },
 ): Promise<number> {
   const today = localDateOf(now);
-  // After an incremental pull only the pulled reviews' days can change, so only those are read.
-  const only = dates ? [...dates] : null;
+  // Each sabaq chunk's reviews: a pass with no review before it, or right after a failed one, is
+  // a completed step 6 (STR-01), as DAY_TALLY_SQL reads it. Compared as instants, since sync can
+  // change a timestamp's spelling.
+  const chunkReviews = await db.getAllAsync<{
+    card_id: string;
+    rating: number;
+    reviewed_at: string;
+    local_date: LocalDate | null;
+    makeup_for: LocalDate | null;
+  }>("SELECT card_id, rating, reviewed_at, local_date, makeup_for FROM study_log WHERE card_id LIKE 'chunk:%'");
+  // After an incremental pull only the pulled reviews' days can change, so only those are read, with
+  // every day of a chunk reviewed on them: a pulled review can change which later review of that
+  // chunk completes step 6, on another day (a failed check arriving between two passes).
+  let only: LocalDate[] | null = null;
+  if (dates) {
+    const affected = new Set(dates);
+    const creditDay = (review: { reviewed_at: string; local_date: LocalDate | null }) =>
+      review.local_date ?? localDateOf(new Date(review.reviewed_at));
+    const touched = new Set(
+      chunkReviews
+        .filter((review) => dates.has(creditDay(review)) || (review.makeup_for !== null && dates.has(review.makeup_for)))
+        .map((review) => review.card_id),
+    );
+    for (const review of chunkReviews) {
+      if (!touched.has(review.card_id)) continue;
+      affected.add(creditDay(review));
+      if (review.makeup_for) affected.add(review.makeup_for);
+    }
+    only = [...affected];
+  }
   const marks = only ? only.map(() => "?").join(", ") : "";
-  const [settings, logs, habitRows, chunkReviews] = await Promise.all([
+  const [settings, logs, habitRows] = await Promise.all([
     readHabitSettings(db),
     db.getAllAsync<LoggedReview>(
       only
@@ -84,12 +112,6 @@ export async function reconcileHabitDaysFromLogs(
       only ? [...only, ...only] : [],
     ),
     db.getAllAsync<HabitDayRow>("SELECT * FROM habit_days WHERE status IS NOT NULL"),
-    // Each sabaq chunk's reviews: a pass with no review before it, or right after a failed one, is
-    // a completed step 6 (STR-01), as DAY_TALLY_SQL reads it. Compared as instants, since sync can
-    // change a timestamp's spelling.
-    db.getAllAsync<{ card_id: string; rating: number; reviewed_at: string }>(
-      "SELECT card_id, rating, reviewed_at FROM study_log WHERE card_id LIKE 'chunk:%'",
-    ),
   ]);
   const stepsAt = sabaqStepInstants(chunkReviews);
   const days = new Map(habitRows.map((row) => [row.local_date, row]));

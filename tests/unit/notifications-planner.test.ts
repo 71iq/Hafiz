@@ -332,6 +332,25 @@ describe("planNotifications", () => {
     expect(new Set(planNotifications(input({ backoff: 0, ignoredCount: 0, horizonDays: 2 })).slots.map((slot) => slot.localDate)).size).toBe(2);
   });
 
+  it("counts only reminders the daily cap keeps toward back-off (NOT-07, NOT-09)", () => {
+    // Today is a day every-other-day back-off keeps and tomorrow one it skips, so a miscount shows.
+    const today = addDays(TODAY, 1);
+    const tomorrow = addDays(today, 1);
+    // Five ignored; a group message already took one of today's two places.
+    const delivered = [{ type: "group_encouragement" as const, templateId: "group_encouragement.1", localDate: today, at: RIYADH.at(today, 2 * 60) }];
+    const result = planNotifications(
+      input({ now: RIYADH.at(today, 3 * 60), habit: { days: days(streak(5, 0)), pause: null }, backoff: backoffLevel(5), ignoredCount: 5, delivered }),
+    );
+    const counted = (slot: { type: string }) => slot.type === "wird_reminder" || slot.type === "streak_at_risk";
+    // Today keeps one counted reminder; the other is capped, never sent, and so never ignored.
+    expect(result.slots.filter((slot) => slot.localDate === today && counted(slot))).toHaveLength(1);
+    expect(result.skipped.some((slot) => slot.localDate === today && slot.reason === "cap")).toBe(true);
+    // So tomorrow's first reminder is the seventh sent, and tomorrow is not backed off before it.
+    const first = result.slots.filter((slot) => slot.localDate === tomorrow).sort((a, b) => a.at.getTime() - b.at.getTime())[0];
+    expect(first).toBeDefined();
+    expect(result.skipped.filter((slot) => slot.localDate === tomorrow && slot.reason === "backoff" && slot.at < first.at)).toEqual([]);
+  });
+
   it("sends the earn-back reminder once, when the window opens", () => {
     // Excused days count toward the streak but earn no grace, so the break is not covered.
     const habit = { days: days(streak(10, -3, "excused")), pause: null };

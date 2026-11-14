@@ -4,7 +4,12 @@ import { QueryClient, QueryClientProvider, focusManager, onlineManager } from "@
 import { act, cleanup, render, waitFor } from "@testing-library/react-native";
 import { halaqaKeys } from "@/lib/halaqa/api";
 import { profilePrivacyKeys } from "@/lib/profile/privacy";
-import { OWN_PRIVACY_REVALIDATE_MS, cleanUpMinorPhotos, useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
+import {
+  OWN_PRIVACY_REVALIDATE_MS,
+  cleanUpMinorPhotos,
+  forgetMinorPhotoCleanup,
+  useMinorPhotoCleanup,
+} from "@/lib/profile/use-minor-photo-cleanup";
 import { createAppQueryClient } from "@/lib/query/native-lifecycle";
 import { socialFailureOf } from "@/lib/social/remote";
 import { bearerSubject, signedIn, type FakeAuthState } from "./social-test-auth";
@@ -198,12 +203,52 @@ describe("minor photo cleanup (ETH-07)", () => {
       await firstHeld;
       throw new TypeError("Network request failed");
     };
+    // Still a minor on the server when the files are removed.
+    mockRpc.mockResolvedValue(privacy(true));
     const older = cleanUpMinorPhotos(user, 100).catch((error: unknown) => error);
     const newer = cleanUpMinorPhotos(user, 200);
     releaseFirst();
     expect(await older).toBeInstanceOf(TypeError);
     await expect(newer).resolves.toBe(true);
     expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false);
+  });
+
+  it("drops a queued cleanup once an adult read comes, so a photo uploaded after it stays", async () => {
+    const user = account(11);
+    signIn(signedIn(user));
+    mockRpc.mockResolvedValue(privacy(false));
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    let releaseFirst!: () => void;
+    const firstHeld = new Promise<void>((resolve) => (releaseFirst = resolve));
+    let failFirst = true;
+    mockBeforeList = async () => {
+      if (!failFirst) return;
+      failFirst = false;
+      await firstHeld;
+      throw new TypeError("Network request failed");
+    };
+    const older = cleanUpMinorPhotos(user, 100).catch((error: unknown) => error);
+    const queued = cleanUpMinorPhotos(user, 200);
+    // An adult read arrives, then the person uploads a photo, then the held request fails.
+    forgetMinorPhotoCleanup(user);
+    mockAvatarFiles.add(`${user}/adult.jpg`);
+    releaseFirst();
+    expect(await older).toBeInstanceOf(TypeError);
+    await expect(queued).resolves.toBe(true);
+    expect(mockAvatarFiles.has(`${user}/adult.jpg`)).toBe(true);
+    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]);
+  });
+
+  it("keeps a photo uploaded as an adult on another device, though this device's last read said minor", async () => {
+    const user = account(12);
+    signIn(signedIn(user));
+    // Elsewhere minority was withdrawn and a photo uploaded; the server now says adult.
+    mockAvatarFiles.add(`${user}/adult-elsewhere.jpg`);
+    mockRpc.mockResolvedValue(privacy(false));
+    await expect(cleanUpMinorPhotos(user, 300)).resolves.toBe(true);
+    expect(mockAvatarFiles.has(`${user}/adult-elsewhere.jpg`)).toBe(true);
+    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]);
+    expect(mockRpc).toHaveBeenCalledWith("get_profile_privacy", {});
   });
 
   it("cleans up again in a later minority after it was withdrawn", async () => {
@@ -250,6 +295,7 @@ describe("minor photo cleanup (ETH-07)", () => {
   it("stops when the account changes, and tries again for that account later", async () => {
     const user = account(4);
     signIn(signedIn(user));
+    mockRpc.mockResolvedValue(privacy(true));
     mockAvatarFiles.add(`${user}/left-behind.jpg`);
     mockBeforeList = () => signIn(signedIn(account(98)));
     const stopped = await cleanUpMinorPhotos(user).catch((error: unknown) => error);
@@ -309,7 +355,8 @@ describe("minor photo cleanup (ETH-07)", () => {
     clockOffset = OWN_PRIVACY_REVALIDATE_MS + 1;
     await trigger();
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
-    expect(mockRpc).toHaveBeenCalledTimes(2);
+    // Two reads of the account's privacy, and one more on the server before removing what was found.
+    expect(mockRpc).toHaveBeenCalledTimes(3);
     expect(mockStorageCalls.every((call) => bearerSubject(call.auth) === user)).toBe(true);
   });
 
@@ -325,7 +372,8 @@ describe("minor photo cleanup (ETH-07)", () => {
 
     await reconnect();
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
-    expect(mockRpc).toHaveBeenCalledTimes(2);
+    // Two reads of the account's privacy, and one more before removing what was found.
+    expect(mockRpc).toHaveBeenCalledTimes(3);
   });
 
   it("finishes a cleanup cut short offline when the connection returns", async () => {
@@ -345,6 +393,7 @@ describe("minor photo cleanup (ETH-07)", () => {
     await reconnect();
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
     // Privacy was fresh, so only the cleanup ran again.
-    expect(mockRpc).toHaveBeenCalledTimes(1);
+    // The startup read, and one more before removing what was found.
+    expect(mockRpc).toHaveBeenCalledTimes(2);
   });
 });

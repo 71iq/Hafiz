@@ -372,42 +372,66 @@ export function planNotifications(input: PlannerInput): PlanResult {
   const sent = (candidate: Candidate) =>
     candidate.type !== "remind_later" &&
     input.delivered.some((item) => item.type === candidate.type && item.localDate === candidate.localDate);
-  const timed: Candidate[] = [];
-  let projectedIgnored = input.ignoredCount ?? null;
-  for (const candidate of [...candidates].sort((a, b) => a.at.getTime() - b.at.getTime())) {
-    const level = projectedIgnored === null ? input.backoff : backoffLevel(projectedIgnored);
-    const reason = timingProblem(candidate, now, level, input.weekStart, clock) ?? (sent(candidate) ? "sent" : null);
-    if (reason) skipped.push({ type: candidate.type, localDate: candidate.localDate, at: candidate.at, reason });
-    else {
-      timed.push(candidate);
-      // Unanswered until a session, which replans: the next reminders see it as ignored (NOT-09).
-      if (projectedIgnored !== null && COUNTED_FOR_BACKOFF.has(candidate.type)) projectedIgnored += 1;
-    }
-  }
-
   // NOT-07 caps per date, counting everything that already fired that day, follow-ups and group
   // messages included. A follow-up ranks first, so it takes the place of the lowest-ranked later
   // reminder of its day only when the cap would otherwise be exceeded.
-  const accepted: Candidate[] = [];
-  const byDate = new Map<LocalDate, Candidate[]>();
-  for (const candidate of timed) byDate.set(candidate.localDate, [...(byDate.get(candidate.localDate) ?? []), candidate]);
-  for (const [date, list] of byDate) {
+  const capDate = (date: LocalDate, list: readonly Candidate[]) => {
+    const kept: Candidate[] = [];
+    const dropped: Candidate[] = [];
     let used =
       input.delivered.filter((item) => item.localDate === date && item.at.getTime() <= now.getTime()).length +
       (input.late ?? []).filter((item) => item.localDate === date).length;
     const ordered = [...list].sort((a, b) => a.priority - b.priority || a.at.getTime() - b.at.getTime());
     for (const candidate of ordered.filter((item) => !item.late)) {
       if (used < DAILY_CAP) {
-        accepted.push(candidate);
+        kept.push(candidate);
         used += 1;
-      } else skipped.push({ type: candidate.type, localDate: date, at: candidate.at, reason: "cap" });
+      } else dropped.push(candidate);
     }
     for (const candidate of ordered.filter((item) => item.late)) {
       if (used < LATE_DAY_CAP) {
-        accepted.push(candidate);
+        kept.push(candidate);
         used += 1;
-      } else skipped.push({ type: candidate.type, localDate: date, at: candidate.at, reason: "cap" });
+      } else dropped.push(candidate);
     }
+    return { kept, dropped };
+  };
+
+  // Day by day in date order: the timing filters, then the cap. A reminder sent and left unanswered
+  // until a session, which replans, counts as ignored for the reminders after it (NOT-09), but only
+  // one the cap keeps is sent. So within a day the timing runs again counting only the reminders the
+  // first pass kept, and the next day starts from the kept ones.
+  const accepted: Candidate[] = [];
+  let projectedIgnored = input.ignoredCount ?? null;
+  const byDate = new Map<LocalDate, Candidate[]>();
+  for (const candidate of [...candidates].sort((a, b) => a.at.getTime() - b.at.getTime())) {
+    byDate.set(candidate.localDate, [...(byDate.get(candidate.localDate) ?? []), candidate]);
+  }
+  for (const date of [...byDate.keys()].sort()) {
+    const list = byDate.get(date)!;
+    const dayStart = projectedIgnored;
+    const timeDate = (counts: (candidate: Candidate) => boolean) => {
+      const timed: Candidate[] = [];
+      const late: SkippedSlot[] = [];
+      let projected = dayStart;
+      for (const candidate of list) {
+        const level = projected === null ? input.backoff : backoffLevel(projected);
+        const reason = timingProblem(candidate, now, level, input.weekStart, clock) ?? (sent(candidate) ? "sent" : null);
+        if (reason) late.push({ type: candidate.type, localDate: candidate.localDate, at: candidate.at, reason });
+        else {
+          timed.push(candidate);
+          if (projected !== null && COUNTED_FOR_BACKOFF.has(candidate.type) && counts(candidate)) projected += 1;
+        }
+      }
+      return { timed, skippedHere: late, ...capDate(date, timed) };
+    };
+    const first = timeDate(() => true);
+    const firstKept = new Set(first.kept);
+    const final = first.dropped.length === 0 ? first : timeDate((candidate) => firstKept.has(candidate));
+    skipped.push(...final.skippedHere);
+    for (const candidate of final.dropped) skipped.push({ type: candidate.type, localDate: date, at: candidate.at, reason: "cap" });
+    accepted.push(...final.kept);
+    if (dayStart !== null) projectedIgnored = dayStart + final.kept.filter((candidate) => COUNTED_FOR_BACKOFF.has(candidate.type)).length;
   }
 
   // Templates, in time order so earlier slots count toward later no-repeat and citation checks.

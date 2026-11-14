@@ -512,6 +512,24 @@ describe("a completed sabaq step 6 (STR-01)", () => {
     expect(await tally(addDays(TODAY, -1))).toBe(true);
   });
 
+  it("reconciles a later day whose step 6 a pulled review changes, though only the pulled review's day is given", async () => {
+    const [first, between, later] = [addDays(TODAY, -3), addDays(TODAY, -2), addDays(TODAY, -1)];
+    // Two passes of one chunk: the later one is no step, so its day has no wird.
+    insertLog("chunk:madani15:9:1-3", first, 3);
+    insertLog("chunk:madani15:9:1-3", later, 3);
+    await store.db.withTransactionAsync(async (tx) => {
+      await reconcileHabitDaysFromLogs(tx, { now: atLocalTime(TODAY, 14 * 60) });
+    });
+    expect(await readHabitDayRow(store.db, later)).toBeNull();
+    // Sync brings a failed check between them, so the later pass learns the chunk again.
+    insertLog("chunk:madani15:9:1-3", between, 1);
+    expect(await tally(later)).toBe(true);
+    await store.db.withTransactionAsync(async (tx) => {
+      await reconcileHabitDaysFromLogs(tx, { now: atLocalTime(TODAY, 14 * 60), dates: new Set([between]) });
+    });
+    expect(await readHabitDayRow(store.db, later)).toMatchObject({ status: "done" });
+  });
+
   it("counts a chunk learned again after a failed check as a step 6 on that day, in SQL and in reconciliation", async () => {
     const yesterday = addDays(TODAY, -1);
     const insertAt = (rating: number, at: Date) =>
