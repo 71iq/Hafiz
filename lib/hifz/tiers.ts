@@ -13,6 +13,11 @@ export type PageHistory = Readonly<{
   firstFluentDate: LocalDate | null;
   /** Declared memorized at onboarding or in My memorization, not memorized in the app. */
   declared: boolean;
+  /**
+   * UNIT-02: the page card started from the schedules of its reviewed ayah cards when the user
+   * switched to page review, and has no grades of its own yet. Those ayah reviews verify it.
+   */
+  fromAyahReviews?: boolean;
   /** Graded reviews of the page card, oldest first. */
   grades: readonly GradeEvent[];
 }>;
@@ -30,7 +35,8 @@ function needsWork(grades: readonly GradeEvent[]): boolean {
 /**
  * TIER-01: a page's tier is a pure function of its review history and the plan (8.6), replayed in
  * date order so a decision made on one day is not undone by a later ordinary grade.
- * - Declared pages are manzil, unverified until their first graded review (ONB-04).
+ * - Declared pages are manzil, unverified until their first graded review (ONB-04). A page made from
+ *   reviewed ayah cards (UNIT-02) is manzil from the start, since those reviews verified it.
  * - A page memorized in the app is sabqi from its fluent check. It graduates to manzil once it is
  *   sabqi_days old and its last 3 grades in this sabqi period are Good or better. Two Again grades
  *   in a row while sabqi send it back to sabaq; the next Good grade passes it again and starts a new
@@ -40,8 +46,8 @@ function needsWork(grades: readonly GradeEvent[]): boolean {
  */
 export function tierFor(history: PageHistory, today: LocalDate, plan: Pick<HifzPlan, "sabqiDays">): Tier {
   const { grades } = history;
-  if (history.declared) {
-    if (grades.length === 0) return "manzil.unverified";
+  if (history.declared || history.fromAyahReviews) {
+    if (grades.length === 0) return history.fromAyahReviews ? "manzil" : "manzil.unverified";
     return needsWork(grades) ? "manzil.needs_work" : "manzil";
   }
   if (!history.firstFluentDate) return "sabaq";

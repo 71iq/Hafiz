@@ -148,7 +148,10 @@ function pagesOf(cardIds: readonly string[]): number[] {
 function pageHistory(row: StudyCardRow, page: number, sabaq: SabaqPasses, grades: Map<string, GradeEvent[]>): PageHistory {
   const created = Date.parse(row.created_at);
   const firstFluentDate = Number.isFinite(created) ? (sabaq.get(page)?.get(created) ?? null) : null;
-  return { declared: firstFluentDate === null, firstFluentDate, grades: grades.get(row.id) ?? [] };
+  const own = grades.get(row.id) ?? [];
+  // UNIT-02: a card with a last review but no grades of its own started from its reviewed ayah cards.
+  const fromAyahReviews = firstFluentDate === null && own.length === 0 && row.last_review !== null;
+  return { declared: firstFluentDate === null && !fromAyahReviews, firstFluentDate, fromAyahReviews, grades: own };
 }
 
 /**
@@ -221,16 +224,22 @@ function retrievability(row: StudyCardRow, now: Date): number | null {
 export function isMemorized(card: PageCard): boolean {
   if (card.tier === "sabaq" || card.tier === "manzil.unverified") return false;
   const last = card.history.grades[card.history.grades.length - 1];
-  return last !== undefined && last.rating >= 3;
+  // A page made from reviewed ayah cards counts until its own first grade decides, as those ayat did.
+  if (last === undefined) return card.history.fromAyahReviews === true;
+  return last.rating >= 3;
 }
 
 export function toPlanPage(card: PageCard, today: LocalDate, now: Date): PlanPage {
   const before = card.history.grades.filter((grade) => grade.date < today);
+  // UNIT-02: a page made from its reviewed ayah cards was last reviewed with them, so its manzil floor
+  // counts from that date instead of treating it as never reviewed.
+  const ayahReviewed =
+    before.length === 0 && card.history.fromAyahReviews && card.row.last_review ? localDateOf(new Date(card.row.last_review)) : null;
   return {
     cardId: card.row.id,
     page: card.page,
     tier: card.tier,
-    lastReviewDate: before.length > 0 ? before[before.length - 1].date : null,
+    lastReviewDate: before.length > 0 ? before[before.length - 1].date : ayahReviewed && ayahReviewed <= today ? ayahReviewed : null,
     reviewedToday: card.history.grades.some((grade) => grade.date === today),
     dueDate: localDateOf(new Date(card.row.due)),
     retrievability: retrievability(card.row, now),

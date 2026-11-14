@@ -1,9 +1,9 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
-import { materializeAllSmartDeckCards, SMART_DECK_IDS, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
+import { materializeAllSmartDeckCards, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
 import { declareMemorizedPages } from "@/lib/hifz/pages";
-import { writeHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
+import { putHifzPlan, readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { pagesOfJuz } from "@/lib/hifz/units";
+import { switchToAyahReview, switchToPageReview } from "@/lib/hifz/unit-switch";
 
 /** Pages whose every ayah belongs to one of the surahs (a page shared with an unchosen surah is left out). */
 async function pagesCoveredBySurahs(db: DatabaseExecutor, surahs: readonly number[]): Promise<number[]> {
@@ -40,15 +40,26 @@ export type HifzSetup = Readonly<{
 }>;
 
 /**
- * Save a plan and the memorized portion (5.1 steps 2 to 5, UNIT-02). Page and half-page review
- * declares the memorized pages, unverified with first checks spread over the first cycle (ONB-04),
- * and stops the ayah deck adding new cards so the same portion is not reviewed twice. Ayah review
- * keeps the existing ayah decks. The similar-verse, qira'at and asbab decks follow the memorized
- * surahs either way.
+ * Save a plan and the memorized portion (5.1 steps 2 to 5, UNIT-02). The plan and the switch of
+ * recitation unit (7.6, lib/hifz/unit-switch) commit together. Page and half-page review first makes
+ * page cards from fully reviewed ayah cards and stops the ayah deck adding new cards, then declares
+ * the other memorized pages, unverified with first checks spread over the first cycle (ONB-04). Ayah
+ * review restores the ayah cards page review set aside and keeps the existing ayah decks. The
+ * similar-verse, qira'at and asbab decks follow the memorized surahs either way.
  */
-export async function applyHifzSetup(db: AppDatabase, setup: HifzSetup): Promise<{ declaredPages: number }> {
+export async function applyHifzSetup(
+  db: AppDatabase,
+  setup: HifzSetup,
+): Promise<{ declaredPages: number; migratedPages: number }> {
   const { plan } = setup;
-  await writeHifzPlan(db, plan);
+  const now = setup.now ?? new Date();
+  let migratedPages = 0;
+  await db.withTransactionAsync(async (tx) => {
+    const previousUnit = (await readHifzPlan(tx))?.unit ?? null;
+    await putHifzPlan(tx, plan);
+    if (plan.unit === "ayah") await switchToAyahReview(tx, { previousUnit, now });
+    else migratedPages = await switchToPageReview(tx, { previousUnit, now });
+  });
   const pages = new Set<number>(await pagesCoveredBySurahs(db, setup.memorizedSurahs));
   for (const juz of setup.memorizedJuz) for (const page of pagesOfJuz(juz)) pages.add(page);
   const surahs = new Set<number>([...setup.memorizedSurahs, ...(await surahsOnPages(db, [...pages]))]);
@@ -56,16 +67,9 @@ export async function applyHifzSetup(db: AppDatabase, setup: HifzSetup): Promise
 
   if (plan.unit === "ayah") {
     await materializeAllSmartDeckCards(db);
-    return { declaredPages: 0 };
+    return { declaredPages: 0, migratedPages: 0 };
   }
-  const retention = await readDeckReviewSettings(db, SMART_DECK_IDS.retention);
-  if (retention.newCardsLimit !== 0) {
-    await writeDeckReviewSettings(db, SMART_DECK_IDS.retention, { ...retention, newCardsLimit: 0 });
-  }
-  const declaredPages = await declareMemorizedPages(db, {
-    pages: [...pages],
-    cycleDays: plan.cycleDays,
-    now: setup.now,
-  });
-  return { declaredPages };
+  // Pages that now have a card, including those just made from ayah cards, are left alone.
+  const declaredPages = await declareMemorizedPages(db, { pages: [...pages], cycleDays: plan.cycleDays, now });
+  return { declaredPages, migratedPages };
 }

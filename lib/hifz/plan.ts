@@ -147,8 +147,13 @@ export async function readHifzPlan(db: DatabaseExecutor): Promise<HifzPlan | nul
 
 /** PLAN-01: a plan change applies from the next session and never deletes review history. */
 export async function writeHifzPlan(database: AppDatabase, plan: HifzPlan): Promise<void> {
+  await database.withTransactionAsync((db) => putHifzPlan(db, plan));
+}
+
+/** writeHifzPlan with the caller's executor, so the plan and its upload commit with the caller's other writes. */
+export async function putHifzPlan(db: DatabaseExecutor, plan: HifzPlan): Promise<void> {
   const parsed = hifzPlanSchema.parse(plan);
-  await database.withTransactionAsync((db) => putUserSetting(db, HIFZ_PLAN_KEY, JSON.stringify(parsed)));
+  await putUserSetting(db, HIFZ_PLAN_KEY, JSON.stringify(parsed));
 }
 
 /** New memorization is scheduled on this weekday (0 is Sunday). */

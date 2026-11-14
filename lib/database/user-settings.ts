@@ -24,6 +24,8 @@ const SYNCABLE_SETTING_KEYS = new Set([
   "hifz_t_new",
   "hifz_t_rev",
   "hifz_manzil_cycle_start",
+  // UNIT-02: the ayah deck's new-card limit before a switch to page review, restored on switching back.
+  "hifz_ayah_new_cards_limit",
 ]);
 
 export type UserSettingRow = {

@@ -270,6 +270,15 @@ export async function writeDeckReviewSettings(
   await writeUserSetting(db, deckReviewSettingsKey(deckId), JSON.stringify(normalized));
 }
 
+/** writeDeckReviewSettings with the caller's executor, so the setting and its upload commit with the caller's other writes. */
+export async function putDeckReviewSettings(
+  db: DatabaseExecutor,
+  deckId: string,
+  settings: Partial<DeckReviewSettings>
+): Promise<void> {
+  await putUserSetting(db, deckReviewSettingsKey(deckId), JSON.stringify(normalizeDeckReviewSettings(settings)));
+}
+
 function meaningCardId(surah: number, ayah: number, wordPos: number): string {
   return `word:${surah}:${ayah}:${wordPos}`;
 }
