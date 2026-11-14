@@ -500,7 +500,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                   title={presetLabel(candidate, s)}
                   hint={
                     interpolate(s.hifzPresetSummary, { minutes: formatMinutes(applyPreset(plan, candidate).dailyBudgetMin, language) }) +
-                    (candidate === "short_surahs" ? ` ${s.hifzPresetAyahByAyah}` : "")
+                    (candidate === "short_surahs" ? `. ${s.hifzPresetAyahByAyah}` : "")
                   }
                   selected={preset === candidate}
                   onPress={() => {
