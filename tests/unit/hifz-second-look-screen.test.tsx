@@ -21,6 +21,7 @@ import {
 } from "@/lib/hifz/sabaq";
 import { similarGroupsForAyahs, withMemorizedSiblings } from "@/lib/hifz/similar";
 import { strings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 
 /** The sabaq screen's second look (SBQ-03): offered before new lines, saved like a chunk grade, and easy to skip. */
@@ -221,14 +222,30 @@ describe("sabaq second look (SBQ-03)", () => {
       durationMs: expect.any(Number),
     });
     expect(emitHabitChanged).toHaveBeenCalled();
-    expect(screen.getByText(s.hifzSabaqIntention)).toBeTruthy();
+    // A short end state first: the person came for a 2-minute look and chooses whether to go on.
     expect(screen.getByText(s.hifzSecondLookSaved)).toBeTruthy();
+    expect(screen.queryByText(s.hifzSabaqIntention)).toBeNull();
+    press(s.hifzSabaqStart);
+    expect(screen.getByText(s.hifzSabaqIntention)).toBeTruthy();
+  });
+
+  it("leaves from the end state without starting a lesson", async () => {
+    await open();
+    press(s.hifzDrillShow);
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    press(s.flashcardsSummaryDone);
+    await flush();
+    expect(returnToTabs).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(s.hifzSabaqIntention)).toBeNull();
   });
 
   it("goes on to new lines when skipped, without saving anything", async () => {
     await open();
     expect(screen.getByText(s.hifzSecondLookSkipHint)).toBeTruthy();
-    press(s.hifzNotNow);
+    press(s.hifzSecondLookSkipToNew);
     expect(screen.getByText(s.hifzSabaqIntention)).toBeTruthy();
     expect(screen.queryByText(s.hifzSecondLookSaved)).toBeNull();
     expect(saveSecondLook).not.toHaveBeenCalled();
@@ -287,7 +304,7 @@ describe("sabaq second look (SBQ-03)", () => {
     });
     await flush();
     expect(saveSecondLook).toHaveBeenCalledTimes(2);
-    expect(screen.getByText(s.hifzSabaqIntention)).toBeTruthy();
+    expect(screen.getByText(s.hifzSecondLookSaved)).toBeTruthy();
   });
 
   it("moves past a look whose chunk was deleted since the screen loaded", async () => {
@@ -323,7 +340,7 @@ describe("sabaq second look (SBQ-03)", () => {
     await open();
     expect(screen.getByText(s.hifzSecondLookTitle)).toBeTruthy();
     expect(nextSabaqTarget).not.toHaveBeenCalled();
-    press(s.hifzNotNow);
+    press(s.hifzSecondLookSkipForNow);
     expect(screen.queryByText(s.hifzSabaqIntention)).toBeNull();
     expect(screen.getByText(s.hifzSabaqNoNew)).toBeTruthy();
     if (label === "a review backlog") expect(screen.getByText(s.hifzCatchUpFirst)).toBeTruthy();
@@ -336,7 +353,7 @@ describe("sabaq second look (SBQ-03)", () => {
     await open();
     expect(screen.getByText(s.hifzSabaqNoNew)).toBeTruthy();
     const time = nextAt.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
-    expect(screen.getByText(`Come back after ${time} for a 2-minute second look. It helps them settle.`)).toBeTruthy();
+    expect(screen.getByText(interpolate(s.hifzSecondLookOpensAt, { time }))).toBeTruthy();
   });
 
   it("still starts the lesson when second looks cannot be read", async () => {
@@ -373,9 +390,7 @@ describe("sabaq second look (SBQ-03)", () => {
       const secondLookAt = new Date(Date.now() + 60 * 60_000);
       await finishLesson({ secondLookAt });
       const time = secondLookAt.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
-      expect(
-        screen.getByText(`Come back after ${time} for a 2-minute second look. It helps them settle.`),
-      ).toBeTruthy();
+      expect(screen.getByText(interpolate(s.hifzSabaqSecondLookAt, { time }))).toBeTruthy();
       // The lines do not complete their page, so they wait for it rather than joining review tomorrow.
       expect(screen.getByText(s.hifzSabaqDonePartial)).toBeTruthy();
     });

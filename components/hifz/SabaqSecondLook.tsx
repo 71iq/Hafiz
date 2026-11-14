@@ -38,6 +38,8 @@ type Props = {
   onGrade: (rating: Grade) => void;
   /** Go on to new lines. Nothing is saved, so the look stays due for the rest of the day. */
   onSkip: () => void;
+  /** A new lesson follows when the look is skipped, so the skip says where it goes. */
+  continuesToNewLines: boolean;
 };
 
 /**
@@ -60,6 +62,7 @@ export function SabaqSecondLook({
   onClose,
   onGrade,
   onSkip,
+  continuesToNewLines,
 }: Props) {
   const { width } = useWindowDimensions();
   const pageWidth = Math.min(width, 640);
@@ -160,7 +163,7 @@ export function SabaqSecondLook({
           ) : (
             <Button label={s.hifzDrillShow} onPress={() => setShown(true)} />
           )}
-          <Button variant="outline" className={OUTLINE_BORDER} label={s.hifzNotNow} onPress={onSkip} disabled={busy} />
+          <Button variant="outline" className={OUTLINE_BORDER} label={continuesToNewLines ? s.hifzSecondLookSkipToNew : s.hifzSecondLookSkipForNow} onPress={onSkip} disabled={busy} />
           <Text dir={dir} align="center" variant="caption" className="text-warm-600 dark:text-neutral-400" style={{ lineHeight: 18 }}>
             {s.hifzSecondLookSkipHint}
           </Text>

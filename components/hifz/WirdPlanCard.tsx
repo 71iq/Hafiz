@@ -9,12 +9,15 @@ import { newMemorizationOpen, type TodayWird } from "@/lib/hifz/pages";
 import { formatLines, formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 
 type Props = {
   wird: TodayWird | null;
   inboxCount: number;
   /** SBQ-03: chunks memorized earlier today whose second look is due now. */
   secondLooksDue?: number;
+  /** When the next of today's second looks opens, while none is due yet. */
+  nextLookAt?: Date | null;
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
@@ -33,6 +36,7 @@ export function WirdPlanCard({
   wird,
   inboxCount,
   secondLooksDue = 0,
+  nextLookAt = null,
   language,
   isDark,
   s,
@@ -74,6 +78,9 @@ export function WirdPlanCard({
   const sabqi = wird.todo.filter((page) => page.tier === "sabqi").length;
   const manzil = wird.todo.length - sabqi;
   const showSabaq = newMemorizationOpen(wird);
+  const secondLookLabel =
+    secondLooksDue > 1 ? interpolate(s.hifzSecondLooksReady, { n: formatNumber(secondLooksDue, language) }) : s.hifzSecondLookReady;
+  const muted = isDark ? "#a3a3a3" : "#8a7058";
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
 
   return (
@@ -173,15 +180,15 @@ export function WirdPlanCard({
       {secondLooksDue > 0 ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${s.hifzSecondLookReady}, ${s.hifzSecondLookAction}`}
+          accessibilityLabel={`${secondLookLabel}, ${s.hifzSecondLookAction}`}
           onPress={onStartSabaq}
-          className="mt-3 min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4"
+          className="mt-3 min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4 py-2.5"
         >
           <MirroredRow dir={dir} className="items-center justify-between gap-3">
             <MirroredRow dir={dir} className="flex-shrink items-center gap-2">
               <Eye size={15} color={accent} />
               <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="flex-shrink text-charcoal dark:text-neutral-200">
-                {s.hifzSecondLookReady}
+                {secondLookLabel}
               </Text>
             </MirroredRow>
             <MirroredRow dir={dir} className="items-center gap-1">
@@ -190,6 +197,18 @@ export function WirdPlanCard({
             </MirroredRow>
           </MirroredRow>
         </Pressable>
+      ) : null}
+
+      {/* Between the lesson and the look, Home says when it opens. */}
+      {secondLooksDue === 0 && nextLookAt ? (
+        <MirroredRow dir={dir} className="mt-3 items-center gap-2">
+          <Eye size={14} color={muted} />
+          <Text dir={dir} className="text-warm-600 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
+            {interpolate(s.hifzSecondLookLater, {
+              time: formatClockMinutesForDisplay(nextLookAt.getHours() * 60 + nextLookAt.getMinutes(), language),
+            })}
+          </Text>
+        </MirroredRow>
       ) : null}
 
       {inboxCount > 0 ? (

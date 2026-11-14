@@ -44,6 +44,7 @@ import {
 } from "@/lib/hifz/sabaq";
 import { formatAyahRef } from "@/lib/arabic";
 import { formatNumber } from "@/lib/i18n/count";
+import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { useSettings } from "@/lib/settings/context";
@@ -57,9 +58,9 @@ const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
 const NO_SECOND_LOOKS: SecondLooks = { due: [], nextAt: null };
 
-/** A wall-clock time with the locale's digits, as the wird card shows its make-up cutoff. */
+/** A wall-clock time as the interface writes times, the same as Home's second-look line. */
 function formatClockTime(at: Date, language: "en" | "ar"): string {
-  return at.toLocaleTimeString(language === "ar" ? "ar-u-nu-arab" : "en", { hour: "numeric", minute: "2-digit" });
+  return formatClockMinutesForDisplay(at.getHours() * 60 + at.getMinutes(), language);
 }
 
 /**
@@ -99,6 +100,8 @@ function SabaqScreen() {
   const [looks, setLooks] = useState<readonly SecondLook[]>([]);
   const [lookIndex, setLookIndex] = useState(0);
   const [looksSaved, setLooksSaved] = useState(0);
+  /** The last look was graded and a lesson can follow: a short end state, not straight into new lines. */
+  const [looksDoneStep, setLooksDoneStep] = useState(false);
   /** When the next of today's second looks comes due, as loaded, for the screen with no new lines. */
   const [nextLookAt, setNextLookAt] = useState<Date | null>(null);
   /** New memorization waits for review to catch up (PLN-02); a second look is still offered. */
@@ -306,6 +309,7 @@ function SabaqScreen() {
         return;
       }
       setLooksSaved((value) => value + 1);
+      if (lookIndex + 1 >= looks.length && target) setLooksDoneStep(true);
       nextLook();
     } catch (saveError) {
       leaveWhenSaved.current = false;
@@ -412,7 +416,21 @@ function SabaqScreen() {
         onClose={close}
         onGrade={(rating) => gradeLook(rating)}
         onSkip={skipLooks}
+        continuesToNewLines={target !== null}
       />
+    );
+  }
+
+  // Opened for a 2-minute look, the person sees it saved and chooses whether to start new lines.
+  if (looksDoneStep && target && plan) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center px-6">
+        <EmptyState icon={BookOpenCheck} title={s.hifzSecondLookSaved} isDark={isDark} />
+        <View className="w-full max-w-sm" style={{ gap: 10 }}>
+          <Button label={s.hifzSabaqStart} onPress={() => setLooksDoneStep(false)} />
+          <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -426,7 +444,7 @@ function SabaqScreen() {
           title={error ?? (looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
           subtitle={
             laterLook
-              ? interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(laterLook, uiLanguage) })
+              ? interpolate(s.hifzSecondLookOpensAt, { time: formatClockTime(laterLook, uiLanguage) })
               : !error && catchUpFirst
                 ? s.hifzCatchUpFirst
                 : undefined
@@ -544,14 +562,15 @@ function SabaqScreen() {
             </Text>
           ) : null}
           {/* SBQ-03: only a second look that will be offered today is promised, with its time. */}
+          {/* The one thing to act on later, so it reads at body size. */}
           {step === "done" && outcome?.secondLookAt ? (
-            <Text dir={dir} align="center" variant="caption" style={{ lineHeight: 18 }}>
+            <Text
+              dir={dir}
+              align="center"
+              className="mt-2 text-charcoal dark:text-neutral-200"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, lineHeight: 21 }}
+            >
               {interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })}
-            </Text>
-          ) : null}
-          {step === "intention" && looksSaved > 0 ? (
-            <Text dir={dir} align="center" variant="caption">
-              {s.hifzSecondLookSaved}
             </Text>
           ) : null}
           {step === "ayah" && currentAyah ? (

@@ -126,7 +126,7 @@ export default function HomeScreen() {
   const headerStacked = headerWidth > 0 && headerWidth < headerNeeds;
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
-  const { wird, inboxCount, monthlyCheckDue, secondLooksDue, refresh: refreshWird } = useTodayWird(db);
+  const { wird, inboxCount, monthlyCheckDue, secondLooksDue, nextLookAt, refresh: refreshWird } = useTodayWird(db);
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   const [dueLoaded, setDueLoaded] = useState(false);
@@ -555,6 +555,7 @@ export default function HomeScreen() {
             wird={wird}
             inboxCount={inboxCount}
             secondLooksDue={secondLooksDue}
+            nextLookAt={nextLookAt}
             language={uiLanguage}
             isDark={isDark}
             s={s}

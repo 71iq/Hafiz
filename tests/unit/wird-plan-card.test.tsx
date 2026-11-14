@@ -3,6 +3,7 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { WirdPlanCard } from "@/components/hifz/WirdPlanCard";
 import type { TodayWird } from "@/lib/hifz/pages";
 import { strings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
 
 const s = strings.en;
 
@@ -19,13 +20,14 @@ function wird(overrides: { backlog?: boolean; newLines?: number; todo?: number }
   } as unknown as TodayWird;
 }
 
-function renderCard(props: { wird: TodayWird; secondLooksDue?: number; language?: "en" | "ar" }) {
+function renderCard(props: { wird: TodayWird; secondLooksDue?: number; nextLookAt?: Date | null; language?: "en" | "ar" }) {
   const handlers = { onStartReview: jest.fn(), onStartSabaq: jest.fn(), onSetup: jest.fn(), onDrill: jest.fn() };
   const view = render(
     <WirdPlanCard
       wird={props.wird}
       inboxCount={0}
       secondLooksDue={props.secondLooksDue}
+      nextLookAt={props.nextLookAt}
       language={props.language ?? "en"}
       isDark={false}
       s={props.language === "ar" ? strings.ar : s}
@@ -51,9 +53,18 @@ describe("Home's second-look cue (SBQ-03)", () => {
     expect(handlers.onStartSabaq).toHaveBeenCalledTimes(1);
   });
 
-  it("reads in Arabic", () => {
+  it("counts several due looks, in Arabic too", () => {
+    expect(renderCard({ wird: wird(), secondLooksDue: 2 }).view.getByText("2 second looks ready")).toBeTruthy();
     const { view } = renderCard({ wird: wird(), secondLooksDue: 2, language: "ar" });
-    expect(view.getByText(strings.ar.hifzSecondLookReady)).toBeTruthy();
+    expect(view.getByText(interpolate(strings.ar.hifzSecondLooksReady, { n: "٢" }))).toBeTruthy();
     expect(view.getByText(strings.ar.hifzSecondLookAction)).toBeTruthy();
+  });
+
+  it("says when the next look opens while none is due yet, and not once one is", () => {
+    const nextLookAt = new Date(2026, 10, 14, 10, 0);
+    expect(renderCard({ wird: wird(), nextLookAt }).view.getByText("Second look at 10:00 AM")).toBeTruthy();
+    const due = renderCard({ wird: wird(), secondLooksDue: 1, nextLookAt }).view;
+    expect(due.queryByText("Second look at 10:00 AM")).toBeNull();
+    expect(due.getByText(s.hifzSecondLookReady)).toBeTruthy();
   });
 });
