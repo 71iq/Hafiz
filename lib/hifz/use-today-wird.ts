@@ -24,6 +24,7 @@ export function useTodayWird(db: AppDatabase) {
   const [inboxCount, setInboxCount] = useState(0);
   const [monthlyCheckDue, setMonthlyCheckDue] = useState(false);
   const [secondLooksDue, setSecondLooksDue] = useState(0);
+  const [nextLookAt, setNextLookAt] = useState<Date | null>(null);
   const [boundary, setBoundary] = useState<number | null>(null);
   const latest = useRef(0);
 
@@ -39,7 +40,7 @@ export function useTodayWird(db: AppDatabase) {
         // The cue is extra: a failed count leaves it off rather than failing the wird.
         countSecondLooks(db, now).catch((error) => {
           console.warn("[Hifz] Second looks failed to load:", error);
-          return { due: 0, offeredAt: null };
+          return { due: 0, nextAt: null, offeredAt: null };
         }),
       ]);
       const monthly = next ? await monthlyCheckDueFor(db, next.cards, now) : false;
@@ -49,6 +50,7 @@ export function useTodayWird(db: AppDatabase) {
       setInboxCount(inbox + remediation);
       setMonthlyCheckDue(monthly);
       setSecondLooksDue(next ? looks.due : 0);
+      setNextLookAt(next ? looks.nextAt : null);
     } catch (error) {
       console.warn("[Hifz] Today's wird failed to load:", error);
       if (load === latest.current) setWird((current) => current ?? null);
@@ -83,5 +85,5 @@ export function useTodayWird(db: AppDatabase) {
   );
   useDayBoundaryRefresh(boundary, refreshIfFocused);
 
-  return { wird, inboxCount, monthlyCheckDue, secondLooksDue, refresh };
+  return { wird, inboxCount, monthlyCheckDue, secondLooksDue, nextLookAt, refresh };
 }

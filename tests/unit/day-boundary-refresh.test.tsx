@@ -141,7 +141,7 @@ beforeEach(() => {
   jest.mocked(countMistakeInbox).mockResolvedValue(0);
   jest.mocked(countDueRemediation).mockResolvedValue(0);
   jest.mocked(monthlyCheckDueFor).mockResolvedValue(false);
-  jest.mocked(countSecondLooks).mockResolvedValue({ due: 0, offeredAt: null });
+  jest.mocked(countSecondLooks).mockResolvedValue({ due: 0, nextAt: null, offeredAt: null });
 });
 
 afterEach(() => {
@@ -261,8 +261,8 @@ describe("useTodayWird across a day boundary", () => {
   it("reloads when the next second look is offered, so Home's cue appears without a focus change (SBQ-03)", async () => {
     jest
       .mocked(countSecondLooks)
-      .mockResolvedValueOnce({ due: 0, offeredAt: at(14, 22) })
-      .mockResolvedValue({ due: 1, offeredAt: null });
+      .mockResolvedValueOnce({ due: 0, nextAt: at(14, 22, 20), offeredAt: at(14, 22) })
+      .mockResolvedValue({ due: 1, nextAt: null, offeredAt: null });
     const { result } = renderHook(() => useTodayWird(db));
     await flush();
     expect(result.current.secondLooksDue).toBe(0);

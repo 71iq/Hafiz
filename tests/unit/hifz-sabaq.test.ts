@@ -284,9 +284,9 @@ describe("sabaq chunks (SBQ-02)", () => {
     it("counts due looks for Home's cue and says when the next is offered", async () => {
       const { due } = await passPartialChunk();
       const offeredAt = new Date(due.getTime() - REVIEW_LEARN_AHEAD_MS);
-      expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toEqual({ due: 0, offeredAt });
+      expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toEqual({ due: 0, nextAt: due, offeredAt });
       // The moment it is offered, sabaq shows it and Home counts it.
-      expect(await countSecondLooks(store.db, offeredAt)).toEqual({ due: 1, offeredAt: null });
+      expect(await countSecondLooks(store.db, offeredAt)).toEqual({ due: 1, nextAt: null, offeredAt: null });
       expect((await loadSecondLooks(store.db, { now: offeredAt, pageWords })).due).toHaveLength(1);
     });
 
@@ -332,7 +332,7 @@ describe("sabaq chunks (SBQ-02)", () => {
       expect(localDateOf(due) > TODAY).toBe(true);
       const lookAt = at(10 * 60);
       expect(saved.secondLookAt).toEqual(lookAt);
-      expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toEqual({ due: 0, offeredAt: new Date(lookAt.getTime() - REVIEW_LEARN_AHEAD_MS) });
+      expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toEqual({ due: 0, nextAt: lookAt, offeredAt: new Date(lookAt.getTime() - REVIEW_LEARN_AHEAD_MS) });
       expect((await loadSecondLooks(store.db, { now: lookAt, pageWords })).due.map((look) => look.cardId)).toEqual([id]);
 
       await saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Good, session: null, durationMs: 90_000, now: lookAt });

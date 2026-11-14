@@ -298,11 +298,6 @@ export type TodayWird = Readonly<{
 }>;
 
 /**
- * Today's wird (4.3). The page list is fixed the first time it is built each day, on this device,
- * so it does not reshuffle as pages are reviewed; a plan change applies from the next day (PLAN-01).
- * Returns null when no plan is set up.
- */
-/**
  * PLN-02: new memorization is open today only on a day with new lines and without a review backlog.
  * Home offers "Memorize new lines" and the sabaq screen offers a new chunk by this one rule; a
  * second look from earlier today is offered either way.
@@ -311,6 +306,11 @@ export function newMemorizationOpen(wird: Pick<TodayWird, "newLines" | "daily">)
   return wird.newLines > 0 && !wird.daily.backlog;
 }
 
+/**
+ * Today's wird (4.3). The page list is fixed the first time it is built each day, on this device,
+ * so it does not reshuffle as pages are reviewed; a plan change applies from the next day (PLAN-01).
+ * Returns null when no plan is set up.
+ */
 export async function loadTodayWird(database: AppDatabase, now = new Date()): Promise<TodayWird | null> {
   const plan = await readHifzPlan(database);
   if (!plan) return null;

@@ -245,16 +245,16 @@ async function readSecondLookSchedule(db: DatabaseExecutor, now: Date): Promise<
 }
 
 /**
- * How many second looks are due now and when the next one is offered later today, for Home's cue.
- * `offeredAt` is a review queue's learn-ahead window before that chunk's due time, the moment
- * loadSecondLooks starts offering it.
+ * How many second looks are due now and when the next one comes later today, for Home's cue.
+ * `nextAt` is its time as the done step promised it; `offeredAt` is a review queue's learn-ahead
+ * window before that, the moment loadSecondLooks starts offering it.
  */
 export async function countSecondLooks(
   db: DatabaseExecutor,
   now = new Date(),
-): Promise<{ due: number; offeredAt: Date | null }> {
+): Promise<{ due: number; nextAt: Date | null; offeredAt: Date | null }> {
   const { due, nextAt } = await readSecondLookSchedule(db, now);
-  return { due: due.length, offeredAt: nextAt ? new Date(nextAt.getTime() - REVIEW_LEARN_AHEAD_MS) : null };
+  return { due: due.length, nextAt, offeredAt: nextAt ? new Date(nextAt.getTime() - REVIEW_LEARN_AHEAD_MS) : null };
 }
 
 export async function loadSecondLooks(
