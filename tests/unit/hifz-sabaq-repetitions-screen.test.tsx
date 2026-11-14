@@ -67,6 +67,7 @@ jest.mock("@/lib/hifz/pages", () => ({
   readMemorizedPageNumbers: jest.fn(),
 }));
 jest.mock("@/lib/hifz/sabaq", () => ({
+  addCoveredSabaqPages: async () => 0,
   completeSabaqChunk: jest.fn(),
   nextSabaqTarget: jest.fn(),
   saveSabaqCleanRun: jest.fn(),

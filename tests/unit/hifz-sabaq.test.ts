@@ -4,6 +4,7 @@ import { declareMemorizedPages, derivePageTiers, loadPageCard, loadPageCards, lo
 import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { countDueRemediation } from "@/lib/hifz/remediation";
 import {
+  addCoveredSabaqPages,
   completeSabaqChunk,
   countSecondLooks,
   loadSecondLooks,
@@ -191,6 +192,8 @@ describe("sabaq chunks (SBQ-02)", () => {
     // This device saved no plan for today before the page was added, so today's list is built now.
     const today = (await loadTodayWird(store.db, atLocalTime(TODAY, 630)))!;
     expect(today.cards.map((card) => [card.row.id, card.tier])).toEqual([[pageCardId(1), "sabqi"]]);
+    // MST-01: the passing graded recitation that completed it counts until the page's own first grade.
+    expect(today.memorizedPages).toBe(1);
     expect(today.daily.sabqi).toEqual([]);
     expect(today.todo).toEqual([]);
     const tomorrow = (await loadTodayWird(store.db, atLocalTime(addDays(TODAY, 1), 9 * 60)))!;
@@ -341,6 +344,35 @@ describe("sabaq chunks (SBQ-02)", () => {
     const passed = await saveSecondLook(store.db, { cardId: firstId, pageData: await lookPage(firstId), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
     expect(passed.pageAdded).toBe(true);
     expect(store.sql.prepare("SELECT tier FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual({ tier: "sabqi" });
+  });
+
+  it("adds a page that chunks merged from another device completed, dated to its last learning (SBQ-02)", async () => {
+    const pageWords = () => null;
+    const first = (await nextSabaqTarget(store.db, { plan, wantLines: 3, pageWords }))!;
+    const { check } = await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60));
+    const last = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords }))!;
+    const firstId = chunkCardId(1, first.fromLine, first.toLine);
+    // Another device failed the first chunk's look; this device pulls it, then learns the last lines.
+    await saveSecondLook(store.db, { cardId: firstId, pageData: await lookPage(firstId), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: check.secondLookAt! });
+    expect((await saveSabaqCleanRun(store.db, { target: last, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 10 * 60 + 5) })).pageAdded).toBe(false);
+    // The other device learned the first chunk again; sync brings that pass.
+    const repass = atLocalTime(TODAY, 10 * 60 + 30).toISOString();
+    store.sql
+      .prepare(
+        `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, local_date, grader, duration_ms)
+         VALUES (?, 3, 1, ?, 1, 5, 0, 0, ?, ?, 'self', 60000)`,
+      )
+      .run(firstId, repass, repass, TODAY);
+    // Every line is memorized, yet no device added the page, so no lesson is offered.
+    expect(count("SELECT COUNT(*) AS count FROM study_cards WHERE id = ?", pageCardId(1))).toBe(0);
+    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toBeNull();
+
+    expect(await addCoveredSabaqPages(store.db, { plan, pageWords })).toBe(1);
+    expect(store.sql.prepare("SELECT tier, created_at FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual({ tier: "sabqi", created_at: repass });
+    // It keeps its sabaq provenance, so it counts as memorized, and a second pass adds nothing.
+    await writeHifzPlan(store.db, plan);
+    expect((await loadTodayWird(store.db, atLocalTime(TODAY, 11 * 60)))!.memorizedPages).toBe(1);
+    expect(await addCoveredSabaqPages(store.db, { plan, pageWords })).toBe(0);
   });
 
   it("in ayah review, leaves the ayah decks' scope as it was when the grade that completes the page fails", async () => {

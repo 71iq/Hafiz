@@ -12,6 +12,7 @@ import type { PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import { loadTodayWird, readMemorizedPageNumbers } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
 import {
+  addCoveredSabaqPages,
   completeSabaqChunk,
   loadSecondLooks,
   nextSabaqTarget,
@@ -96,6 +97,7 @@ jest.mock("@/lib/hifz/pages", () => ({
   readMemorizedPageNumbers: jest.fn(),
 }));
 jest.mock("@/lib/hifz/sabaq", () => ({
+  addCoveredSabaqPages: jest.fn(),
   completeSabaqChunk: jest.fn(),
   nextSabaqTarget: jest.fn(),
   saveSabaqCleanRun: jest.fn(),
@@ -195,6 +197,7 @@ beforeEach(() => {
     sabaqLinesToday: 3,
     daily: { backlog: false },
   } as never);
+  jest.mocked(addCoveredSabaqPages).mockResolvedValue(0);
   jest.mocked(nextSabaqTarget).mockResolvedValue(target);
   jest.mocked(loadSecondLooks).mockResolvedValue({ due: [look(1)], nextAt: null });
   jest.mocked(saveSecondLook).mockResolvedValue(lookSaved);
@@ -262,6 +265,27 @@ describe("sabaq second look (SBQ-03)", () => {
     await flush();
     press(s.hifzSabaqStart);
     expect(screen.getByText("Page 5 · Lines 2 to 2")).toBeTruthy();
+  });
+
+  it("adds a page its merged chunks completed before choosing the lesson's lines (SBQ-02)", async () => {
+    const order: string[] = [];
+    jest.mocked(addCoveredSabaqPages).mockImplementationOnce(async () => {
+      order.push("pages");
+      return 1;
+    });
+    jest.mocked(nextSabaqTarget).mockImplementationOnce(async () => {
+      order.push("target");
+      return target;
+    });
+    await open();
+    expect(order).toEqual(["pages", "target"]);
+  });
+
+  it("still loads the lesson when such a page cannot be added", async () => {
+    jest.mocked(addCoveredSabaqPages).mockRejectedValueOnce(new Error("Synthetic read failure"));
+    await open();
+    expect(screen.getByText(s.hifzSecondLookTitle)).toBeTruthy();
+    expect(nextSabaqTarget).toHaveBeenCalledTimes(1);
   });
 
   it("leaves from the end state without starting a lesson", async () => {

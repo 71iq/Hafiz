@@ -71,8 +71,10 @@ function byOldestReview(a: PlanPage, b: PlanPage): number {
 /**
  * The structured wird for today (4.3.1): sabqi first, then ceil(O / C) manzil pages with the oldest
  * last review plus every page past its floor date, then extras FSRS wants sooner, lowest recall
- * first. The budget trims extras first, then the newest floor pages that are not more than 3 days
- * overdue. New memorization fits in what is left and pauses while manzil is far behind.
+ * first. Within the floor, pages never reviewed come first, in the order chosen, then the rest by
+ * lowest recall (SCH-05). The budget trims extras first, then the last floor pages, the strongest,
+ * that are not more than 3 days overdue. New memorization fits in what is left and pauses while
+ * manzil is far behind.
  */
 export function buildDailyPlan(input: DailyPlanInput): DailyPlan {
   const { plan, today } = input;
@@ -103,6 +105,14 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlan {
     floor.push(page);
     floorIds.add(page.cardId);
   }
+  // SCH-05: priority, not permission. The floor decides which pages; the order is lowest recall
+  // first, after the never-reviewed, whose first check keeps its place (a stable sort).
+  floor.sort((a, b) => {
+    const aNew = a.lastReviewDate === null;
+    const bNew = b.lastReviewDate === null;
+    if (aNew || bNew) return aNew === bNew ? 0 : aNew ? -1 : 1;
+    return (a.retrievability ?? 0) - (b.retrievability ?? 0) || a.page - b.page;
+  });
   const extra = manzil
     .filter((page) => !floorIds.has(page.cardId))
     .filter(

@@ -225,14 +225,19 @@ export function ActivityHeatmap({
         return { label: m.label, offset: fromStart * (CELL_SIZE + CELL_GAP) };
       })
       .sort((a, b) => a.offset - b.offset);
-    let lastOffset = -1000;
+    // A label needs its own width before the next: Arabic month names run about 35 px at this size.
+    const minGap = isArabic ? 44 : 22;
     for (const candidate of candidates) {
-      if (candidate.offset - lastOffset < 22) continue;
+      const last = result[result.length - 1];
+      if (last && candidate.offset - last.offset < minGap) {
+        // The first label marks a month only partly shown at the edge; the next month's is worth more.
+        if (result.length === 1) result[0] = candidate;
+        continue;
+      }
       result.push(candidate);
-      lastOffset = candidate.offset;
     }
     return result;
-  }, [monthLabels, CELL_SIZE, isRTL, renderedWeeks.length]);
+  }, [monthLabels, CELL_SIZE, isRTL, isArabic, renderedWeeks.length]);
   const heatmapWidth = TOTAL_WEEKS * CELL_SIZE + (TOTAL_WEEKS - 1) * CELL_GAP;
   const contentWidth = heatmapWidth + DAY_LABEL_WIDTH;
   const reviewActiveDays = activeDays ?? data.filter((d) => d.count > 0).length;

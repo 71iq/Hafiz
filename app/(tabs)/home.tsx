@@ -46,6 +46,7 @@ import { WirdPlanCard } from "@/components/hifz/WirdPlanCard";
 import { WelcomeBackCard } from "@/components/hifz/WelcomeBackCard";
 import { WirdExtras } from "@/components/habit/WirdExtras";
 import { MonthlyCheckCard } from "@/components/hifz/MonthlyCheckCard";
+import { reviewLeftToday } from "@/lib/hifz/pages";
 import { markMonthlyCheck } from "@/lib/hifz/progress";
 import { diffDays } from "@/lib/habit/dates";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
@@ -116,6 +117,8 @@ export default function HomeScreen() {
   });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
   const user = useAuthStore((state) => state.user);
+  // Ayah reviews due now in the ayah decks, without new cards: ayah review's daily work (UNIT-02).
+  const ayahReviewsDue = smartDecks.reduce((sum, deck) => sum + deck.dueCount, 0);
   // The headline is what the deck rows offer, which is also what Review all loads.
   const totalDue = smartDecks.reduce(
     (sum, deck) => sum + deck.dueCount + deck.newCount,
@@ -536,9 +539,8 @@ export default function HomeScreen() {
               graceNoteDismissed={habit.recentGraceDay !== null && graceNoteSeen === habit.recentGraceDay}
               onDismissGraceNote={dismissGraceNote}
               onOpenBreak={() => setHabitBreakOpen(true)}
-              // Pages and remediation still due. New lines stay on offer once the pages are done, as
-              // extra (GOAL-04, ETH-05), so they do not hold back "Wird done", as on the wird card.
-              wirdLeft={wird === undefined || (wird?.todo.length ?? 0) + remediationDue > 0}
+              // Unknown while the wird loads; without a plan there is no wird review to wait for.
+              wirdLeft={wird === undefined || (wird !== null && reviewLeftToday(wird, { remediationDue, ayahReviewsDue }))}
             />
           ) : habitFailed ? null : (
             // Hold the card's place while it loads, so the content below does not jump down.

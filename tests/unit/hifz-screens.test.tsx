@@ -188,6 +188,7 @@ jest.mock("@/lib/hifz/review", () => ({
   recordReviewPace: jest.fn(),
 }));
 jest.mock("@/lib/hifz/sabaq", () => ({
+  addCoveredSabaqPages: async () => 0,
   completeSabaqChunk: jest.fn(),
   nextSabaqTarget: jest.fn(),
   saveSabaqCleanRun: jest.fn(),

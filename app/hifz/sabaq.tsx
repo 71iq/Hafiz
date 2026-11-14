@@ -40,6 +40,7 @@ import { loadTodayWird, newMemorizationOpen, readMemorizedPageNumbers } from "@/
 import { similarGroupsForAyahs, withMemorizedSiblings, type SimilarGroup, type SimilarRef } from "@/lib/hifz/similar";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import {
+  addCoveredSabaqPages,
   completeSabaqChunk,
   loadSecondLooks,
   nextSabaqTarget,
@@ -217,6 +218,12 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       setPlan(wird.plan);
       setCatchUpFirst(wird.daily.backlog);
       const pageWords = (page: number) => words?.[page - 1] ?? null;
+      // SBQ-02: a page completed only by chunks merged from another device joins review now, so the
+      // lesson goes on to the next page. A failure here leaves the lines as they are.
+      await addCoveredSabaqPages(db, { plan: wird.plan, pageWords }).catch((healError: unknown) => {
+        console.warn("[Sabaq] Could not add a page its merged chunks completed:", healError);
+        return 0;
+      });
       // Opened for a second look on a day new memorization is paused, the screen offers no new lines.
       targetQuery.current = newMemorizationOpen(wird)
         ? {

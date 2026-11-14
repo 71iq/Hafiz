@@ -224,8 +224,9 @@ function retrievability(row: StudyCardRow, now: Date): number | null {
 export function isMemorized(card: PageCard): boolean {
   if (card.tier === "sabaq" || card.tier === "manzil.unverified") return false;
   const last = card.history.grades[card.history.grades.length - 1];
-  // A page made from reviewed ayah cards counts until its own first grade decides, as those ayat did.
-  if (last === undefined) return card.history.fromAyahReviews === true;
+  // Until the page's own first grade decides, the graded recitation that made the page counts: the
+  // passing chunk grade that completed it in sabaq, or the reviewed ayah cards it was made from.
+  if (last === undefined) return card.history.fromAyahReviews === true || card.history.firstFluentDate !== null;
   return last.rating >= 3;
 }
 
@@ -340,6 +341,18 @@ export type TodayWird = Readonly<{
  */
 export function newMemorizationOpen(wird: Pick<TodayWird, "newLines" | "daily">): boolean {
   return wird.newLines > 0 && !wird.daily.backlog;
+}
+
+/**
+ * GOAL-04: review still due today, which holds back "Wird done" on Home's streak line: the pages left
+ * and the half pages or seams due, or in ayah review (UNIT-02), whose list has no pages, the ayah
+ * cards due. New lines and new cards stay on offer as extra (ETH-05), as on the wird card.
+ */
+export function reviewLeftToday(
+  wird: Pick<TodayWird, "todo"> & { plan: Pick<HifzPlan, "unit"> },
+  { remediationDue, ayahReviewsDue }: { remediationDue: number; ayahReviewsDue: number },
+): boolean {
+  return wird.todo.length + remediationDue + (wird.plan.unit === "ayah" ? ayahReviewsDue : 0) > 0;
 }
 
 /**

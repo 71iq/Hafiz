@@ -13,7 +13,7 @@ import {
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { buildDailyPlan, type PlanPage } from "@/lib/hifz/daily-plan";
 import type { PageToken } from "@/lib/hifz/page-data";
-import { declareMemorizedPages, isMemorized, loadPageCards, loadTodayWird, type PageCard } from "@/lib/hifz/pages";
+import { declareMemorizedPages, isMemorized, loadPageCards, loadTodayWird, reviewLeftToday, type PageCard } from "@/lib/hifz/pages";
 import {
   completedJuz,
   monthlyCheckCandidates,
@@ -146,13 +146,34 @@ const input = (pages: PlanPage[], overrides: Partial<Parameters<typeof buildDail
 describe("daily plan (4.3.1)", () => {
   it("takes ceil(O / C) of the oldest manzil pages plus every overdue page, sabqi first", () => {
     const manzil = Array.from({ length: 40 }, (_, i) => page(i + 1, { lastReviewDate: addDays(TODAY, -(i % 25) - 1) }));
-    const overdue = page(100, { lastReviewDate: addDays(TODAY, -33) });
+    // Past its floor date, so its recall is the lowest of the slice.
+    const overdue = page(100, { lastReviewDate: addDays(TODAY, -33), retrievability: 0.6 });
     const sabqi = page(200, { tier: "sabqi", lastReviewDate: addDays(TODAY, -1) });
     const result = buildDailyPlan(input([...manzil, overdue, sabqi]));
     expect(result.review[0]).toBe(sabqi);
     expect(result.floor[0]).toBe(overdue);
     expect(result.floor).toHaveLength(2);
     expect(result.overdueCount).toBe(1);
+  });
+
+  it("holds back Home's wird done for review still due, the due ayah cards in ayah review, not for new work (GOAL-04)", () => {
+    const pageDay = { todo: [], plan: { unit: "page" as const } };
+    const ayahDay = { todo: [], plan: { unit: "ayah" as const } };
+    expect(reviewLeftToday(pageDay, { remediationDue: 0, ayahReviewsDue: 20 })).toBe(false);
+    expect(reviewLeftToday(pageDay, { remediationDue: 1, ayahReviewsDue: 0 })).toBe(true);
+    expect(reviewLeftToday({ ...pageDay, todo: [page(1)] }, { remediationDue: 0, ayahReviewsDue: 0 })).toBe(true);
+    expect(reviewLeftToday(ayahDay, { remediationDue: 0, ayahReviewsDue: 20 })).toBe(true);
+    expect(reviewLeftToday(ayahDay, { remediationDue: 0, ayahReviewsDue: 0 })).toBe(false);
+  });
+
+  it("orders the day's manzil slice by lowest recall, after pages never reviewed (SCH-05)", () => {
+    const strong = page(1, { lastReviewDate: addDays(TODAY, -25), retrievability: 0.99 });
+    const weak = page(2, { lastReviewDate: addDays(TODAY, -25), retrievability: 0.1 });
+    const unchecked = page(3, { tier: "manzil.unverified", lastReviewDate: null, retrievability: null });
+    const others = Array.from({ length: 60 }, (_, i) => page(10 + i, { lastReviewDate: addDays(TODAY, -(i % 20) - 1) }));
+    const result = buildDailyPlan(input([strong, weak, unchecked, ...others]));
+    // The floor still takes the oldest reviews; within it the weaker page comes first.
+    expect(result.floor.slice(0, 3).map((item) => item.page)).toEqual([3, 2, 1]);
   });
 
   it("puts a page sent back to sabaq first in the review every day", () => {

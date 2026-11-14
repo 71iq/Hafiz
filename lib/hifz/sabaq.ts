@@ -456,6 +456,64 @@ function pageLineNumbers(pageData: RecitationPage): number[] {
   return ayahLines(pageData).map((line) => line.lineNumber);
 }
 
+/**
+ * SBQ-02 after sync or a restore: the pages, in the plan's order, whose ayah lines are all memorized
+ * but that have no page card. A grade adds its page from the chunks this device has, so two devices
+ * whose chunks complete the page only once merged each add nothing, and sabaq would stay on a page
+ * with nothing left to offer. Each page is dated to the grade that completed it, the latest of its
+ * chunks' completed steps 6 (sabaqStepFlags), so it keeps its sabaq provenance (readSabaqPasses) and
+ * its first review date. One transaction each, which checks the coverage again. Returns the number
+ * of pages added.
+ */
+export async function addCoveredSabaqPages(
+  db: AppDatabase,
+  { plan, pageWords }: { plan: HifzPlan; pageWords: (page: number) => PageWordsLines | null },
+): Promise<number> {
+  const order = newPageOrder(plan);
+  let added = 0;
+  // Each pass adds the first unmemorized page or stops, so this runs at most once per page.
+  for (let pass = 0; pass < PAGE_COUNT; pass += 1) {
+    const pageRows = await db.getAllAsync<{ id: string }>(
+      "SELECT id FROM study_cards WHERE deck_id = ? AND id LIKE 'page:%' AND deleted_at IS NULL",
+      [HIFZ_PAGES_DECK_ID],
+    );
+    const memorized = new Set(pageRows.flatMap((row) => {
+      const unit = parsePageUnit(row.id);
+      return unit?.kind === "page" ? [unit.page] : [];
+    }));
+    const page = order.find((candidate) => !memorized.has(candidate));
+    if (page === undefined) return added;
+    const done = await readDoneChunks(db, chunkCardPrefix(page));
+    if (done.length === 0) return added;
+    const pageLines = pageLineNumbers(await loadRecitationPage(db, page, pageWords(page)));
+    if (pageLines.length === 0 || !pageLines.every((lineNumber) => coveredBy(done, lineNumber))) return added;
+    const ids = done.map((chunk) => chunkCardId(chunk.page, chunk.fromLine, chunk.toLine));
+    const logs = await db.getAllAsync<{ card_id: string; rating: number; reviewed_at: string }>(
+      `SELECT card_id, rating, reviewed_at FROM study_log WHERE card_id IN (${ids.map(() => "?").join(", ")})`,
+      ids,
+    );
+    let completedAt = Number.NEGATIVE_INFINITY;
+    for (const id of ids) {
+      const reviews = logs
+        .filter((log) => log.card_id === id)
+        .map((log) => ({ at: Date.parse(log.reviewed_at), rating: log.rating }))
+        .filter((review) => Number.isFinite(review.at))
+        .sort((a, b) => a.at - b.at);
+      const steps = sabaqStepFlags(reviews);
+      const learnedAt = reviews.filter((_, index) => steps[index]).at(-1)?.at;
+      if (learnedAt !== undefined) completedAt = Math.max(completedAt, learnedAt);
+    }
+    if (!Number.isFinite(completedAt)) return added;
+    let pageAdded = false;
+    await db.withTransactionAsync(async (tx) => {
+      pageAdded = await addPageIfComplete(tx, { page, pageLines, plan, now: new Date(completedAt) });
+    });
+    if (!pageAdded) return added;
+    added += 1;
+  }
+  return added;
+}
+
 type ChunkSaveInput = { target: SabaqTarget; plan: HifzPlan; session: ReviewSessionRef | null; durationMs: number; now?: Date };
 
 function targetCardId(target: SabaqTarget): string {
