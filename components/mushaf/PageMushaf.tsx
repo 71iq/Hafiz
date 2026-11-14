@@ -46,7 +46,7 @@ import {
   buildLayoutOffsets,
 } from "@/lib/mushaf/page-layout";
 import { findJuzRangeForAyah } from "@/lib/mushaf/position";
-import { AyahDetailModal } from "./AyahDetailModal";
+import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
 import { JuzNameText } from "./JuzNameText";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -388,6 +388,7 @@ export function PageMushaf({
   const initialPage = clampPage(requestedPage);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [detailAyah, setDetailAyah] = useState<{ surah: number; ayah: number } | null>(null);
+  const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("tafsir");
   const currentPageRef = useRef(initialPage);
   const dragStartPageRef = useRef(1);
   const pageIndicatorMountedRef = useRef(false);
@@ -1053,6 +1054,14 @@ export function PageMushaf({
 
   const openAyahDetail = useCallback((surah: number, ayah: number) => {
     pauseAutoScrollForUser();
+    setDetailTab("tafsir");
+    setDetailAyah({ surah, ayah });
+  }, [pauseAutoScrollForUser]);
+
+  // MUT-02: a similar-verse mark opens the same detail sheet on its Similar verses tab.
+  const openSimilarVerses = useCallback((surah: number, ayah: number) => {
+    pauseAutoScrollForUser();
+    setDetailTab("similar");
     setDetailAyah({ surah, ayah });
   }, [pauseAutoScrollForUser]);
 
@@ -1231,6 +1240,7 @@ export function PageMushaf({
             usePageWords={item.usePageWords}
             pageWordLineNumbers={item.pageWordLineNumbers}
             onOpenAyahDetail={openAyahDetail}
+            onOpenSimilarVerses={openSimilarVerses}
             highlightedAyahKey={highlightedAyahKey}
             highlightedWord={highlightedWord}
             paddingTop={pagePaddingTop}
@@ -1263,6 +1273,7 @@ export function PageMushaf({
       pageWidth,
       pageData.length,
       openAyahDetail,
+      openSimilarVerses,
       pageMetaMap,
       pagePaddingTop,
       pagePaddingBottom,
@@ -1355,6 +1366,7 @@ export function PageMushaf({
                     usePageWords={item.usePageWords}
                     pageWordLineNumbers={item.pageWordLineNumbers}
                     onOpenAyahDetail={openAyahDetail}
+                    onOpenSimilarVerses={openSimilarVerses}
                     highlightedAyahKey={highlightedAyahKey}
                     highlightedWord={highlightedWord}
                     paddingTop={HORIZONTAL_PAGE_TOP_PADDING}
@@ -1399,7 +1411,7 @@ export function PageMushaf({
         />
       )}
 
-      <AyahDetailModal target={detailAyah} onClose={() => setDetailAyah(null)} />
+      <AyahDetailModal target={detailAyah} onClose={() => setDetailAyah(null)} initialTab={detailTab} />
 
       {showPageIndicator && (
         <View className="absolute bottom-3 left-0 right-0 items-center pointer-events-none">

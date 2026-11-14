@@ -161,6 +161,9 @@ type SettingsContextType = {
   setQuranMarkerStyle: (style: QuranMarkerStyle) => void;
   showAyahMarkers: boolean;
   setShowAyahMarkers: (show: boolean) => void;
+  /** MUT-02: mark ayat whose similar verse is memorized. On by default. */
+  markSimilarVerses: boolean;
+  setMarkSimilarVerses: (mark: boolean) => void;
   pageScroll: PageScroll;
   setPageScroll: (scroll: PageScroll) => void;
   showTranslation: boolean;
@@ -209,6 +212,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setQuranMarkerStyle: () => {},
   showAyahMarkers: true,
   setShowAyahMarkers: () => {},
+  markSimilarVerses: true,
+  setMarkSimilarVerses: () => {},
   pageScroll: "vertical",
   setPageScroll: () => {},
   showTranslation: false,
@@ -458,6 +463,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [quranFontStyle, setQuranFontStyleState] = useState<QuranFontStyle>("qcf2");
   const [quranMarkerStyle, setQuranMarkerStyleState] = useState<QuranMarkerStyle>("auto");
   const [showAyahMarkers, setShowAyahMarkersState] = useState(true);
+  const [markSimilarVerses, setMarkSimilarVersesState] = useState(true);
   const effectiveFontIndex = fontSizeIndex;
   const [pageScroll, setPageScrollState] = useState<PageScroll>("vertical");
   const [showTranslation, setShowTranslationState] = useState(false);
@@ -487,6 +493,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           "quran_font_style",
           "quran_marker_style",
           "show_ayah_markers",
+          "mark_similar_verses",
           "page_scroll",
           "show_translation",
           "show_tafseer",
@@ -535,6 +542,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedShowAyahMarkers = saved.show_ayah_markers;
         if (savedShowAyahMarkers === "true") setShowAyahMarkersState(true);
         if (savedShowAyahMarkers === "false") setShowAyahMarkersState(false);
+
+        const savedMarkSimilarVerses = saved.mark_similar_verses;
+        if (savedMarkSimilarVerses === "true") setMarkSimilarVersesState(true);
+        if (savedMarkSimilarVerses === "false") setMarkSimilarVersesState(false);
 
         const savedPageScroll = saved.page_scroll;
         if (savedPageScroll === "vertical" || savedPageScroll === "horizontal") {
@@ -694,6 +705,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db],
   );
 
+  const setMarkSimilarVerses = useCallback(
+    (mark: boolean) => {
+      setMarkSimilarVersesState(mark);
+      writeSetting(db, "mark_similar_verses", String(mark)).catch(console.warn);
+    },
+    [db],
+  );
+
   const setPageScroll = useCallback(
     (scroll: PageScroll) => {
       setPageScrollState(scroll);
@@ -836,6 +855,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setQuranMarkerStyle,
         showAyahMarkers,
         setShowAyahMarkers,
+        markSimilarVerses,
+        setMarkSimilarVerses,
         pageScroll,
         setPageScroll,
         showTranslation,

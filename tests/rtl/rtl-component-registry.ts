@@ -319,6 +319,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Selection actions mirror; selected Quran content remains natural.",
   ),
   entry(
+    "components/mushaf/SimilarVerseMarker.tsx",
+    "mushaf-reading",
+    "rntl",
+    "Page marks centre on the ayah number without physical offsets, inside the unflipped Quran line; the verse-view button follows its header row's mirroring and labels use the interface digits.",
+  ),
+  entry(
     "components/mushaf/SurahHeader.tsx",
     "mushaf-reading",
     "source",

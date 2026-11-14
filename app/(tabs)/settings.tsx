@@ -4,6 +4,7 @@ import { View, Text, Pressable, ActivityIndicator, Linking, StyleSheet, useWindo
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
+import { Switch } from "@/components/ui/Switch";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { Toast } from "@/components/ui/Toast";
@@ -123,6 +124,8 @@ export default function SettingsScreen() {
     setQuranFontStyle,
     quranMarkerStyle,
     setQuranMarkerStyle,
+    markSimilarVerses,
+    setMarkSimilarVerses,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
@@ -598,6 +601,41 @@ export default function SettingsScreen() {
                   ]}
                 />
               </SettingsControlRow>
+
+              <View
+                className="items-center justify-between gap-3"
+                style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="mb-1 text-charcoal dark:text-neutral-200"
+                    style={{
+                      fontFamily: "Manrope_600SemiBold",
+                      fontSize: 14,
+                      ...textStartStyle(isRTL),
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {s.hifzSimilarMarkSetting}
+                  </Text>
+                  <Text
+                    className="text-warm-400 dark:text-neutral-500"
+                    style={{
+                      fontFamily: "Manrope_500Medium",
+                      fontSize: 12,
+                      ...textStartStyle(isRTL),
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {s.hifzSimilarMarkSettingHint}
+                  </Text>
+                </View>
+                <Switch
+                  value={markSimilarVerses}
+                  onValueChange={setMarkSimilarVerses}
+                  accessibilityLabel={s.hifzSimilarMarkSetting}
+                />
+              </View>
             </View>
           </Card>
 

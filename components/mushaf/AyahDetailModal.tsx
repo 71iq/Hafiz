@@ -4,11 +4,23 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View, useWind
 import { formatAyahRef } from "@/lib/arabic";
 import * as Clipboard from "expo-clipboard";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
-import { BookOpenText, Bookmark, ChevronLeft, ChevronRight, Copy, MessageCircle, NotebookPen, Pause, Play } from "lucide-react-native";
+import {
+  BookOpenText,
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  EqualApproximately,
+  MessageCircle,
+  NotebookPen,
+  Pause,
+  Play,
+} from "lucide-react-native";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
 import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
 import { PrivateNotesSection } from "@/components/notes/PrivateNotesSection";
+import { SimilarVerseComparison } from "@/components/hifz/SimilarVerseComparison";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { MirroredRow } from "@/components/ui/MirroredRow";
@@ -22,6 +34,7 @@ import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
+import { useSimilarAyah } from "@/lib/hifz/use-similar-markers";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -59,7 +72,7 @@ type TafsirRow = {
   text: string;
 };
 
-export type AyahDetailTabKey = "translation" | "tafsir" | "hadith" | "qiraat" | "notes" | "reflections";
+export type AyahDetailTabKey = "similar" | "translation" | "tafsir" | "hadith" | "qiraat" | "notes" | "reflections";
 
 type Props = {
   target: TargetAyah | null;
@@ -86,6 +99,8 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     effectiveTheme,
     tafseerSource,
     setTafseerSource,
+    markSimilarVerses,
+    isLoaded: settingsLoaded,
   } = useSettings();
   const { isBookmarked, showToast, refreshBookmarks } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
@@ -102,6 +117,7 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   const [shareBusy, setShareBusy] = useState(false);
   const [currentTarget, setCurrentTarget] = useState<TargetAyah | null>(target);
   const [adjacentAyahs, setAdjacentAyahs] = useState<AdjacentAyahs>({ previous: null, next: null });
+  const [similarWidth, setSimilarWidth] = useState<number | null>(null);
 
   const activeTarget = target ? currentTarget ?? target : null;
   const open = activeTarget !== null;
@@ -132,6 +148,11 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     ? (uiLanguage === "ar" ? ayahRow.surah_name_arabic : ayahRow.surah_name_english)
     : `${activeTarget?.surah ?? ""}:${activeTarget?.ayah ?? ""}`;
   const subtitle = activeTarget ? formatAyahRef(isRTL, activeTarget.surah, activeTarget.ayah) : undefined;
+  // MUT-02, MUT-05: an ayah with a memorized similar verse gets a Similar verses tab, read from the
+  // reader's per-page store. The tab stays while the reads are pending, so a mark that opened it on
+  // this tab does not fall back to Tafsir before they finish.
+  const similar = useSimilarAyah(db, activeTarget, ayahRow?.v2_page ?? null, settingsLoaded && markSimilarVerses && open);
+  const showSimilar = similar.groups.length > 0 || (activeTab === "similar" && !similar.settled);
   const tafsirSourceConfigs = useMemo(() => {
     const rowsBySource = new Set((tafsirRows ?? []).map((row) => row.source));
     return AVAILABLE_TAFSIR_SOURCES.filter((source) => rowsBySource.has(source.id));
@@ -190,6 +211,13 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
       setActiveTab("tafsir");
     }
   }, [activeTab, showTranslation]);
+
+  // Moving to an ayah without a memorized similar verse, or turning the marks off, leaves the tab.
+  useEffect(() => {
+    if (activeTab === "similar" && similar.settled && similar.groups.length === 0) {
+      setActiveTab("tafsir");
+    }
+  }, [activeTab, similar.groups.length, similar.settled]);
 
   useEffect(() => {
     if (!activeTarget) return;
@@ -346,6 +374,13 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   if (!activeTarget) return null;
 
   const tabs: Array<{ key: AyahDetailTabKey; label: string; icon: ReactNode }> = [
+    ...(showSimilar
+      ? [{
+          key: "similar" as AyahDetailTabKey,
+          label: s.hifzSimilarTitle,
+          icon: <EqualApproximately size={15} color={activeTab === "similar" ? "#0d9488" : iconColor} />,
+        }]
+      : []),
     ...(showTranslation
       ? [{
           key: "translation" as AyahDetailTabKey,
@@ -521,6 +556,40 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
         </ScrollView>
 
         <View className="mt-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
+          {activeTab === "similar" && (
+            <View
+              onLayout={(event) => {
+                const next = Math.round(event.nativeEvent.layout.width);
+                if (next > 0) setSimilarWidth((current) => (current === next ? current : next));
+              }}
+            >
+              {similar.groups.length > 0 ? (
+                <SimilarVerseComparison
+                  db={db}
+                  groups={similar.groups}
+                  language={uiLanguage}
+                  isRTL={isRTL}
+                  accent={isDark ? "#2dd4bf" : "#0f766e"}
+                  s={s}
+                  // Until the box is measured, the sheet's width less its padding.
+                  width={similarWidth ?? Math.max(0, Math.min(width, 1080) - 72)}
+                />
+              ) : (
+                <Text
+                  className="text-warm-700 dark:text-neutral-300"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 15,
+                    lineHeight: 26,
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                    ...textStartStyle(isRTL),
+                  }}
+                >
+                  {s.loading}
+                </Text>
+              )}
+            </View>
+          )}
           {activeTab === "translation" && (
             <Text
               className="text-charcoal dark:text-neutral-200"

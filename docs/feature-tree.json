@@ -250,6 +250,15 @@
               "children": []
             },
             {
+              "id": "shared.ayahdetail.similar",
+              "title": "Similar verses tab: memorized similar verses with meanings",
+              "kind": "widget",
+              "cases": ["AYAH-11"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
               "id": "shared.ayahdetail.qiraat",
               "title": "Qiraat tab",
               "kind": "widget",
@@ -640,6 +649,15 @@
           "kind": "widget",
           "cases": ["SET-03", "SET-04", "SET-05", "SET-06"],
           "uses": ["shared.overlay", "shared.tafsirpicker"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "reader.similar",
+          "title": "Similar-verse marks on page and verse views",
+          "kind": "widget",
+          "cases": ["PLAN-16"],
+          "uses": ["shared.ayahdetail.similar", "reader.settings", "reader.ayahactions"],
           "native": false,
           "children": []
         },

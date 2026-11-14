@@ -57,6 +57,8 @@ export function ReadingSettingsSheet({
     setQuranFontStyle,
     quranMarkerStyle,
     setQuranMarkerStyle,
+    markSimilarVerses,
+    setMarkSimilarVerses,
     tafseerSource,
     setTafseerSource,
     isDark,
@@ -265,6 +267,20 @@ export function ReadingSettingsSheet({
               onPress={() => setMarkerStylePickerVisible(true)}
               disabled={quranRenderFontStyle === "qcf2"}
               trailing={<Chevron size={17} color={controlColor} />}
+              compact={compactRows}
+            />
+            <Divider />
+            <SettingsActionRow
+              title={s.hifzSimilarMarkSetting}
+              subtitle={s.hifzSimilarMarkSettingHint}
+              isRTL={isRTL}
+              trailing={
+                <Switch
+                  value={markSimilarVerses}
+                  onValueChange={setMarkSimilarVerses}
+                  accessibilityLabel={s.hifzSimilarMarkSetting}
+                />
+              }
               compact={compactRows}
             />
           </View>

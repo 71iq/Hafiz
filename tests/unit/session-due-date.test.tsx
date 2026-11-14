@@ -107,6 +107,8 @@ const mockSettings: ReturnType<typeof useSettings> = {
   setQuranMarkerStyle: jest.fn(),
   showAyahMarkers: true,
   setShowAyahMarkers: jest.fn(),
+  markSimilarVerses: true,
+  setMarkSimilarVerses: jest.fn(),
   pageScroll: "vertical",
   setPageScroll: jest.fn(),
   showTranslation: false,

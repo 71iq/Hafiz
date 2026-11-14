@@ -16,6 +16,8 @@ import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
 import { AyahWordText } from "./WordSpan";
 import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
+import { useSimilarMarks } from "@/lib/hifz/use-similar-markers";
+import { SimilarVerseButton } from "./SimilarVerseMarker";
 import {
   BookOpenText,
   Bookmark,
@@ -24,7 +26,7 @@ import {
   Play,
   Share2,
 } from "lucide-react-native";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import {
   addBookmark as dbAddBookmark,
   fetchSurahName,
@@ -85,10 +87,22 @@ function AyahBlockInner({
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
-  const { recitationId, isRTL, isDark, quranRenderFontStyle: quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
+  const {
+    recitationId,
+    isRTL,
+    isDark,
+    quranRenderFontStyle: quranFontStyle,
+    quranMarkerStyle,
+    showAyahMarkers,
+    effectiveTheme,
+    markSimilarVerses,
+    isLoaded: settingsLoaded,
+  } = useSettings();
   const s = useStrings();
   const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
   const isWeakSpot = useWeakSpotMarker();
+  // MUT-02: the page's marks are read once for every block on that page, once the setting is known.
+  const similarMarked = useSimilarMarks(db, v2Page, settingsLoaded && markSimilarVerses).has(`${surah}:${ayah}`);
   const { getAyahState, toggleAyah } = useAyahAudio();
 
   const fontVisible = useQuranPageFontReady(quranFontStyle, v2Page);
@@ -281,6 +295,13 @@ function AyahBlockInner({
         </View>
 
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
+          {similarMarked ? (
+            <SimilarVerseButton
+              label={interpolate(s.hifzSimilarMarker, { ref: formatAyahRef(isRTL, surah, ayah) })}
+              isDark={isDark}
+              onPress={() => openDetail("similar")}
+            />
+          ) : null}
           <ActionIcon
             icon={
               bookmarkBusy ? (

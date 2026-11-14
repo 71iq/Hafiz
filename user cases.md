@@ -83,11 +83,12 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - AYAH-03. From the same panel, choose reflection or private note. Open its editor above the action panel for the selected ayah. Closing the editor closes both panels.
 - AYAH-04. Open ayah detail through a page-marker click on web, a marker double-tap on native, or a verse-view content pill. A pill selects its corresponding detail tab.
 - AYAH-05. In detail, move to the previous/next ayah while keeping the selected tab. Disable movement at Quran boundaries.
-- AYAH-06. Switch detail tabs between tafsir, translation, qiraat, private notes, reflections, and enabled Hadith content. Arabic UI omits Translation and moves an active Translation tab to Tafsir.
+- AYAH-06. Switch detail tabs between tafsir, translation, qiraat, private notes, reflections, enabled Hadith content, and Similar verses when it applies. Arabic UI omits Translation and moves an active Translation tab to Tafsir.
 - AYAH-07. Read the selected translation in its text direction, or its loading placeholder. Read tafsir, switch among available sources, or open Manage sources and use the shared source-selection flow.
 - AYAH-08. Read qiraat for the ayah and any covered-ayah group. Loading and missing-content states replace the text when needed.
 - AYAH-09. With Hadith content enabled, read references, load another page, retry an initial failure, or view empty/unavailable content. Cached references can remain visible after refresh failure.
 - AYAH-10. From a verse card or detail, copy the ayah/reference/link, toggle its bookmark, or use enabled audio playback. Copy/bookmark failures show feedback. Controls with share icons copy to the clipboard.
+- AYAH-11. Open the Similar verses tab of an ayah that is similar to one already memorized. Each memorized similar verse shows with this one, with the shared wording marked and the verses' meanings: the translation, or in Arabic the Muyassar tafsir. Moving to an ayah without one returns to Tafsir. The tab is hidden while Mark similar verses is off.
 
 ## Words and browser text selection
 
@@ -181,6 +182,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - PLAN-13. Miss the same word in 3 or more sessions. It becomes a weak spot: the Mushaf marks it with a small dot (a dotted underline in verse view on some devices) unless turned off, and a fill-the-gap card shows its ayah with that word hidden until Check, then asks whether it was recited cleanly. Mistakes from other devices count, including after signing in on a new device. Dismissing a mistake on any device removes the card once the word is wrong in fewer than 3 sessions.
 - PLAN-14. Drift into a similar verse while reciting a page. Mark the word as a drift: the next session adds the page of the verse it drifted into, and a "Which one?" prompt shows both verses with their shared wording marked until one is chosen. Verses that read the same also show the end of the ayah before them, or the start of the ayah after. Once one is chosen, each verse shows its translation, or the Muyassar tafsir in Arabic. The prompt returns in the next 3 sessions. Marking the drift as not a mistake removes its page and prompt from the session, unless another drift still needs the page.
 - PLAN-15. Review a page that holds a similar verse whose sibling is memorized. Two pages later, or at the end when fewer are left, the wird review asks "Which one?" for that pair. Each group is asked about once a session, at most 3 times in all, and not when a drift prompt already asks about it. The prompt is not graded and does not count toward the wird.
+- PLAN-16. Read an ayah in the Mushaf that is similar to one already memorized. Page view puts a small dot on its ayah number, and verse view shows a similar-verses button beside its bookmark. Tapping the mark opens the ayah's Similar verses tab. A long press on a marked ayah number still selects the ayah. Mark similar verses in reader settings or General turns the marks off. A page whose similar verses cannot be read shows no marks.
 
 ## Reflection journey
 

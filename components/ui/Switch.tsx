@@ -7,10 +7,12 @@ type Props = {
   value: boolean;
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
+  /** The setting's name, for screen readers, when the switch sits beside its label. */
+  accessibilityLabel?: string;
 };
 
 /** shadcn-style animated toggle switch, consistent on web + native */
-export function Switch({ value, onValueChange, disabled }: Props) {
+export function Switch({ value, onValueChange, disabled, accessibilityLabel }: Props) {
   const { themeColors } = useSettings();
   const thumbLeft = useRef(new Animated.Value(value ? 22 : 2)).current;
 
@@ -41,6 +43,7 @@ export function Switch({ value, onValueChange, disabled }: Props) {
         overflow: "hidden",
       }}
       accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: value, disabled }}
     >
       <Animated.View

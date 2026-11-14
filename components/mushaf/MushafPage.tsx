@@ -1,8 +1,11 @@
 import { memo, useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
+import { useSimilarMarks } from "@/lib/hifz/use-similar-markers";
+import { useDatabaseStatus } from "@/lib/database/provider";
 import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
+import { SimilarVersePageMarker } from "./SimilarVerseMarker";
 import {
   isQuranPageFontLoaded,
   loadQuranPageFont,
@@ -87,6 +90,8 @@ type Props = {
   usePageWords?: boolean;
   pageWordLineNumbers?: number[];
   onOpenAyahDetail?: (surah: number, ayah: number) => void;
+  /** MUT-02: opens the similar verses of a marked ayah. Without it the page marks nothing. */
+  onOpenSimilarVerses?: (surah: number, ayah: number) => void;
   highlightedAyahKey?: string | null;
   highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
   paddingTop?: number;
@@ -192,6 +197,7 @@ function MushafPageInner({
   usePageWords: pageUsesPageWords,
   pageWordLineNumbers: precomputedPageWordLineNumbers,
   onOpenAyahDetail,
+  onOpenSimilarVerses,
   highlightedAyahKey,
   highlightedWord,
   paddingTop = 8,
@@ -218,7 +224,26 @@ function MushafPageInner({
     const beforeEnd = surah < end.surah || (surah === end.surah && ayah <= end.ayah);
     return afterStart && beforeEnd;
   };
-  const { quranRenderFontStyle: quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
+  const {
+    quranRenderFontStyle: quranFontStyle,
+    quranMarkerStyle,
+    showAyahMarkers,
+    effectiveTheme,
+    markSimilarVerses,
+    isLoaded: settingsLoaded,
+  } = useSettings();
+  // MUT-02: the page's similar-verse marks sit on its ayah end markers, so hidden markers mark nothing.
+  // Nothing is read until the saved setting is known, so a reader who turned the marks off reads none.
+  const { db } = useDatabaseStatus();
+  const similarMarks = useSimilarMarks(
+    db,
+    pageNumber,
+    settingsLoaded === true &&
+      markSimilarVerses === true &&
+      showAyahMarkers &&
+      onOpenSimilarVerses !== undefined &&
+      ayahs.length > 0,
+  );
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
 
@@ -324,6 +349,13 @@ function MushafPageInner({
   const handleMarkerLongPress = useCallback((surah: number, ayah: number) => {
     const key = `${surah}:${ayah}`;
     skipNextMarkerPressRef.current = key;
+    lastMarkerTapRef.current = null;
+    selectAyah(surah, ayah);
+  }, [selectAyah]);
+
+  // The similar-verse mark covers its ayah end marker and takes its presses, so the marker's own
+  // long-press guard is not set: no marker press follows to skip.
+  const handleSimilarLongPress = useCallback((surah: number, ayah: number) => {
     lastMarkerTapRef.current = null;
     selectAyah(surah, ayah);
   }, [selectAyah]);
@@ -511,6 +543,7 @@ function MushafPageInner({
               const isTargetAyah =
                 !highlightedWord &&
                 highlightedAyahKey === `${identity.surah}:${identity.ayah}`;
+              const similarMarked = similarMarks.has(`${identity.surah}:${identity.ayah}`);
               return (
                 <Pressable
                   key={`w-${lineNumber}-${i}`}
@@ -534,6 +567,8 @@ function MushafPageInner({
                     // @ts-ignore
                     cursor: "pointer",
                     ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
+                    // The mark's target reaches past the marker; above the next word, its taps reach it.
+                    ...(similarMarked ? { zIndex: 1 } : null),
                   })}
                 >
                   <Text
@@ -555,6 +590,16 @@ function MushafPageInner({
                   >
                     {w}
                   </Text>
+                  {similarMarked ? (
+                    <SimilarVersePageMarker
+                      surah={identity.surah}
+                      ayah={identity.ayah}
+                      fontSize={fontSize}
+                      lineHeight={lineHeight}
+                      onPress={() => onOpenSimilarVerses?.(identity.surah, identity.ayah)}
+                      onLongPress={() => handleSimilarLongPress(identity.surah, identity.ayah)}
+                    />
+                  ) : null}
                 </Pressable>
               );
             }
