@@ -151,6 +151,7 @@ jest.mock("@/lib/habit/settings", () => ({
 }));
 jest.mock("@/lib/habit/use-habit-overview", () => ({ emitHabitChanged: jest.fn() }));
 jest.mock("@/lib/hifz/pages", () => ({
+  newMemorizationOpen: jest.requireActual<typeof import("@/lib/hifz/pages")>("@/lib/hifz/pages").newMemorizationOpen,
   loadTodayWird: jest.fn(),
   loadPageCards: jest.fn(),
   toPlanPage: jest.fn(),
@@ -643,7 +644,12 @@ describe("sabaq screen", () => {
   } satisfies SabaqTarget;
 
   beforeEach(() => {
-    jest.mocked(loadTodayWird).mockResolvedValue({ plan: DEFAULT_HIFZ_PLAN, newLines: 3, sabaqLinesToday: 0 } as never);
+    jest.mocked(loadTodayWird).mockResolvedValue({
+      plan: DEFAULT_HIFZ_PLAN,
+      newLines: 3,
+      sabaqLinesToday: 0,
+      daily: { backlog: false },
+    } as never);
     jest.mocked(nextSabaqTarget).mockResolvedValue(target);
     jest.mocked(similarGroupsForAyahs).mockResolvedValue([]);
     jest.mocked(withMemorizedSiblings).mockReturnValue([]);

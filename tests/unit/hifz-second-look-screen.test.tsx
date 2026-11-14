@@ -86,7 +86,11 @@ jest.mock("@/lib/fsrs/review-sessions", () => ({ startReviewSession: jest.fn(), 
 jest.mock("@/lib/habit/queries", () => ({ loadHabitOverview: jest.fn() }));
 jest.mock("@/lib/habit/settings", () => ({ readHabitSettings: jest.fn() }));
 jest.mock("@/lib/habit/use-habit-overview", () => ({ emitHabitChanged: jest.fn() }));
-jest.mock("@/lib/hifz/pages", () => ({ loadTodayWird: jest.fn(), readMemorizedPageNumbers: jest.fn() }));
+jest.mock("@/lib/hifz/pages", () => ({
+  newMemorizationOpen: jest.requireActual<typeof import("@/lib/hifz/pages")>("@/lib/hifz/pages").newMemorizationOpen,
+  loadTodayWird: jest.fn(),
+  readMemorizedPageNumbers: jest.fn(),
+}));
 jest.mock("@/lib/hifz/sabaq", () => ({
   completeSabaqChunk: jest.fn(),
   nextSabaqTarget: jest.fn(),
@@ -179,7 +183,12 @@ beforeEach(() => {
   jest.mocked(endReviewSession).mockResolvedValue(null as never);
   jest.mocked(loadHabitOverview).mockResolvedValue(null as never);
   jest.mocked(readHabitSettings).mockResolvedValue({ showZayt: false } as never);
-  jest.mocked(loadTodayWird).mockResolvedValue({ plan: DEFAULT_HIFZ_PLAN, newLines: 3, sabaqLinesToday: 3 } as never);
+  jest.mocked(loadTodayWird).mockResolvedValue({
+    plan: DEFAULT_HIFZ_PLAN,
+    newLines: 3,
+    sabaqLinesToday: 3,
+    daily: { backlog: false },
+  } as never);
   jest.mocked(nextSabaqTarget).mockResolvedValue(target);
   jest.mocked(loadSecondLooks).mockResolvedValue({ due: [look(1)], nextAt: null });
   jest.mocked(saveSecondLook).mockResolvedValue(lookSaved);
@@ -304,6 +313,20 @@ describe("sabaq second look (SBQ-03)", () => {
     await flush();
     expect(screen.getByText(s.hifzSecondLookSaved)).toBeTruthy();
     expect(screen.queryByText(s.hifzSabaqNoNew)).toBeNull();
+  });
+
+  it.each([
+    ["a review backlog", { newLines: 3, daily: { backlog: true } }],
+    ["a day without new lines", { newLines: 0, daily: { backlog: false } }],
+  ])("offers the look but no new lesson with %s (PLN-02)", async (label, wird) => {
+    jest.mocked(loadTodayWird).mockResolvedValue({ plan: DEFAULT_HIFZ_PLAN, sabaqLinesToday: 0, ...wird } as never);
+    await open();
+    expect(screen.getByText(s.hifzSecondLookTitle)).toBeTruthy();
+    expect(nextSabaqTarget).not.toHaveBeenCalled();
+    press(s.hifzNotNow);
+    expect(screen.queryByText(s.hifzSabaqIntention)).toBeNull();
+    expect(screen.getByText(s.hifzSabaqNoNew)).toBeTruthy();
+    if (label === "a review backlog") expect(screen.getByText(s.hifzCatchUpFirst)).toBeTruthy();
   });
 
   it("says when a look not yet due will be, on a visit with no new lines", async () => {

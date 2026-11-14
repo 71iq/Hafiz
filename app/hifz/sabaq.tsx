@@ -30,7 +30,7 @@ import { useActiveClock } from "@/lib/habit/use-active-clock";
 import { readHabitSettings } from "@/lib/habit/settings";
 import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
 import type { PageToken } from "@/lib/hifz/page-data";
-import { loadTodayWird, readMemorizedPageNumbers } from "@/lib/hifz/pages";
+import { loadTodayWird, newMemorizationOpen, readMemorizedPageNumbers } from "@/lib/hifz/pages";
 import { similarGroupsForAyahs, withMemorizedSiblings, type SimilarGroup, type SimilarRef } from "@/lib/hifz/similar";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import {
@@ -106,6 +106,8 @@ function SabaqScreen() {
   const [looksSaved, setLooksSaved] = useState(0);
   /** When the next of today's second looks comes due, as loaded, for the screen with no new lines. */
   const [nextLookAt, setNextLookAt] = useState<Date | null>(null);
+  /** New memorization waits for review to catch up (PLN-02); a second look is still offered. */
+  const [catchUpFirst, setCatchUpFirst] = useState(false);
   /** What the saved fluent check means for the done step's copy. */
   const [outcome, setOutcome] = useState<{ passed: boolean; partial: boolean; secondLookAt: Date | null } | null>(null);
   const STEPS: readonly Step[] = useMemo(
@@ -157,14 +159,18 @@ function SabaqScreen() {
         return;
       }
       setPlan(wird.plan);
+      setCatchUpFirst(wird.daily.backlog);
       const pageWords = (page: number) => words?.[page - 1] ?? null;
       const [next, secondLooks] = await Promise.all([
-        nextSabaqTarget(db, {
-          plan: wird.plan,
-          // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
-          wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
-          pageWords,
-        }),
+        // Opened for a second look on a day new memorization is paused, the screen offers no new lines.
+        newMemorizationOpen(wird)
+          ? nextSabaqTarget(db, {
+              plan: wird.plan,
+              // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
+              wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
+              pageWords,
+            })
+          : Promise.resolve(null),
         // A second look that cannot be read is left for the next visit; new lines still load.
         loadSecondLooks(db, { pageWords }).catch((lookError) => {
           console.warn("[Sabaq] Failed to load second looks:", lookError);
@@ -423,7 +429,13 @@ function SabaqScreen() {
         <EmptyState
           icon={error ? RotateCcw : BookOpenCheck}
           title={error ?? (looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
-          subtitle={laterLook ? interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(laterLook, uiLanguage) }) : undefined}
+          subtitle={
+            laterLook
+              ? interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(laterLook, uiLanguage) })
+              : !error && catchUpFirst
+                ? s.hifzCatchUpFirst
+                : undefined
+          }
           isDark={isDark}
         />
         <View className="w-full max-w-sm" style={{ gap: 10 }}>

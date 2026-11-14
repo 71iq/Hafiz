@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Progress } from "@/components/ui/Progress";
 import { Text } from "@/components/ui/Text";
-import type { TodayWird } from "@/lib/hifz/pages";
+import { newMemorizationOpen, type TodayWird } from "@/lib/hifz/pages";
 import { formatLines, formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
@@ -73,7 +73,7 @@ export function WirdPlanCard({
   const complete = wird.todo.length === 0 && total > 0;
   const sabqi = wird.todo.filter((page) => page.tier === "sabqi").length;
   const manzil = wird.todo.length - sabqi;
-  const showSabaq = wird.newLines > 0 && !wird.daily.backlog;
+  const showSabaq = newMemorizationOpen(wird);
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
 
   return (
