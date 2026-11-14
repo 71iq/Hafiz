@@ -28,6 +28,7 @@ import {
   leaveHalaqa,
   myHalaqasRead,
   sendEncouragement,
+  setHalaqaMemberRole,
   setHalaqaSharing,
   type EncouragementTemplateId,
   type HalaqaMember,
@@ -97,6 +98,8 @@ function HalaqaContent({ userId }: { userId: string }) {
   const [encourageTarget, setEncourageTarget] = useState<HalaqaMember | null>(null);
   const [encourageError, setEncourageError] = useState<string | null>(null);
   const [teacherTarget, setTeacherTarget] = useState<HalaqaMember | null>(null);
+  const [roleTarget, setRoleTarget] = useState<HalaqaMember | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
   const [sharingOpen, setSharingOpen] = useState(false);
   const [sharingError, setSharingError] = useState<string | null>(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -249,6 +252,27 @@ function HalaqaContent({ userId }: { userId: string }) {
     onError: (error) => setLeaveError(socialFailureMessage(error, s)),
   });
 
+  // SOC-03: the creator of an invite halaqa makes a member a teacher or takes the role back. The dialog
+  // stays open until the group view shows the new role, and keeps the old one with the error on failure.
+  const roleMutationKey = [...halaqaKeys.all(userId), "set-role"];
+  const changeRole = useMutation({
+    mutationKey: roleMutationKey,
+    mutationFn: (member: HalaqaMember) =>
+      setHalaqaMemberRole(
+        active?.id ?? "",
+        member.userId,
+        member.role === "teacher" ? "member" : "teacher",
+        requireSocialOwner(userId),
+      ),
+    onSuccess: async () => {
+      await refreshAll();
+      setRoleTarget(null);
+    },
+    onError: (error) => setRoleError(socialFailureMessage(error, s)),
+  });
+  const removesTeacher = roleTarget?.role === "teacher";
+  const roleName = { name: roleTarget?.name ?? "" };
+
   const shareCode = async (code: string) => {
     const message = interpolate(s.halaqaShareMessage, { code });
     try {
@@ -333,11 +357,16 @@ function HalaqaContent({ userId }: { userId: string }) {
         <>
           <HalaqaGroup
             detail={snapshot.data}
+            rolePending={changeRole.isPending}
             onEncourage={(member) => {
               setEncourageError(null);
               setEncourageTarget(member);
             }}
             onTeacherView={setTeacherTarget}
+            onChangeRole={(member) => {
+              setRoleError(null);
+              setRoleTarget(member);
+            }}
             onShareCode={(code) => void shareCode(code)}
             onOpenSharing={() => {
               setSharingError(null);
@@ -425,6 +454,27 @@ function HalaqaContent({ userId }: { userId: string }) {
         isRTL={isRTL}
         onCancel={() => setLeaveOpen(false)}
         onConfirm={() => leave.mutate()}
+      />
+
+      <ConfirmDialog
+        visible={roleTarget !== null}
+        title={interpolate(removesTeacher ? s.halaqaRemoveTeacherTitle : s.halaqaMakeTeacherTitle, roleName)}
+        message={removesTeacher ? s.halaqaRemoveTeacherBody : s.halaqaMakeTeacherBody}
+        cancelLabel={s.socialCancel}
+        confirmLabel={removesTeacher ? s.halaqaRemoveTeacherConfirm : s.halaqaMakeTeacherConfirm}
+        tone="neutral"
+        confirmLoading={changeRole.isPending}
+        error={roleError}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => setRoleTarget(null)}
+        onConfirm={() => {
+          // The mutation cache knows at once that a save started; isPending reaches the button a tick
+          // later, so a fast second tap could send the change twice.
+          if (!roleTarget || queryClient.isMutating({ mutationKey: roleMutationKey }) > 0) return;
+          setRoleError(null);
+          changeRole.mutate(roleTarget);
+        }}
       />
     </SocialScreen>
   );

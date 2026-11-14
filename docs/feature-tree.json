@@ -1308,10 +1308,10 @@
         },
         {
           "id": "halaqa.teacher",
-          "title": "Teacher view",
+          "title": "Teacher role and teacher view",
           "kind": "widget",
           "cases": ["HALAQA-07"],
-          "uses": ["shared.overlay"],
+          "uses": ["shared.overlay", "shared.confirm"],
           "native": false,
           "children": []
         },

@@ -1,5 +1,15 @@
 import { Pressable, View } from "react-native";
-import { BookCheck, CalendarCheck2, ClipboardList, Eye, HandHeart, LogOut, Share2 } from "lucide-react-native";
+import {
+  BookCheck,
+  CalendarCheck2,
+  ClipboardList,
+  Eye,
+  GraduationCap,
+  HandHeart,
+  LogOut,
+  Share2,
+  UserMinus,
+} from "lucide-react-native";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -17,19 +27,25 @@ type Language = "en" | "ar";
 
 /**
  * One halaqa: the shared weekly goal (SOC-07), members with their shared consistency (SOC-02),
- * one-tap encouragement (SOC-06), invite sharing and leaving. No member ranking anywhere.
+ * one-tap encouragement (SOC-06), teacher roles (SOC-03), invite sharing and leaving. No member
+ * ranking anywhere.
  */
 export function HalaqaGroup({
   detail,
+  rolePending,
   onEncourage,
   onTeacherView,
+  onChangeRole,
   onShareCode,
   onOpenSharing,
   onLeave,
 }: {
   detail: HalaqaDetail;
+  /** A role change is saving; the role controls wait for it. */
+  rolePending: boolean;
   onEncourage: (member: HalaqaMember) => void;
   onTeacherView: (member: HalaqaMember) => void;
+  onChangeRole: (member: HalaqaMember) => void;
   onShareCode: (code: string) => void;
   onOpenSharing: () => void;
   onLeave: () => void;
@@ -40,6 +56,9 @@ export function HalaqaGroup({
   const { accent, muted } = useSocialAccent();
   const { group, goal } = detail;
   const title = group.kind === "matched" ? s.halaqaMatchedName : (group.name ?? s.halaqaMatchedName);
+  // SOC-03: only an invite halaqa's creator assigns teachers, as the server checks. Their own role is
+  // chosen when they create it.
+  const managesRoles = group.kind === "invite" && group.isCreator;
 
   return (
     <View className="gap-4">
@@ -107,8 +126,11 @@ export function HalaqaGroup({
             member={member}
             language={language}
             s={s}
+            canChangeRole={managesRoles && !member.isMe}
+            rolePending={rolePending}
             onEncourage={() => onEncourage(member)}
             onTeacherView={() => onTeacherView(member)}
+            onChangeRole={() => onChangeRole(member)}
           />
         ))}
       </View>
@@ -186,18 +208,25 @@ function MemberRow({
   member,
   language,
   s,
+  canChangeRole,
+  rolePending,
   onEncourage,
   onTeacherView,
+  onChangeRole,
 }: {
   member: HalaqaMember;
   language: Language;
   s: UIStrings;
+  canChangeRole: boolean;
+  rolePending: boolean;
   onEncourage: () => void;
   onTeacherView: () => void;
+  onChangeRole: () => void;
 }) {
   const { isDark, isRTL } = useSettings();
   const { accent, muted } = useSocialAccent();
   const shared = member.week !== null || member.streak !== null || member.juzCompletions !== null;
+  const isTeacher = member.role === "teacher";
   return (
     <Card elevation="low" className="gap-3 px-4 py-3.5">
       <View className="items-center gap-3" style={socialRowStyle(isRTL)}>
@@ -251,19 +280,46 @@ function MemberRow({
         <Text variant="caption">{s.halaqaNotShared}</Text>
       )}
 
-      {member.canOpenTeacherView ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={interpolate(s.halaqaTeacherViewA11y, { name: member.name })}
-          onPress={onTeacherView}
-          className="min-h-11 items-center gap-2 self-start"
-          style={socialRowStyle(isRTL)}
-        >
-          <ClipboardList size={16} color={accent} />
-          <Text variant="label-lg" className="text-primary-accent dark:text-primary-bright">
-            {s.halaqaTeacherView}
-          </Text>
-        </Pressable>
+      {member.canOpenTeacherView || canChangeRole ? (
+        <View className="flex-wrap items-center gap-x-5" style={socialRowStyle(isRTL)}>
+          {member.canOpenTeacherView ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={interpolate(s.halaqaTeacherViewA11y, { name: member.name })}
+              onPress={onTeacherView}
+              className="min-h-11 items-center gap-2"
+              style={socialRowStyle(isRTL)}
+            >
+              <ClipboardList size={16} color={accent} />
+              <Text variant="label-lg" className="text-primary-accent dark:text-primary-bright">
+                {s.halaqaTeacherView}
+              </Text>
+            </Pressable>
+          ) : null}
+          {canChangeRole ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={interpolate(isTeacher ? s.halaqaRemoveTeacherA11y : s.halaqaMakeTeacherA11y, {
+                name: member.name,
+              })}
+              accessibilityState={{ disabled: rolePending }}
+              disabled={rolePending}
+              onPress={onChangeRole}
+              className="min-h-11 items-center gap-2"
+              style={[socialRowStyle(isRTL), { opacity: rolePending ? 0.6 : 1 }]}
+            >
+              {isTeacher ? <UserMinus size={16} color={muted} /> : <GraduationCap size={16} color={accent} />}
+              <Text
+                variant="label-lg"
+                className={
+                  isTeacher ? "text-warm-500 dark:text-neutral-400" : "text-primary-accent dark:text-primary-bright"
+                }
+              >
+                {isTeacher ? s.halaqaRemoveTeacher : s.halaqaMakeTeacher}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </Card>
   );

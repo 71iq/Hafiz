@@ -9,6 +9,7 @@ import {
   joinHalaqaByCode,
   normalizeInviteCode,
   sendEncouragement,
+  setHalaqaMemberRole,
   setHalaqaSharing,
 } from "@/lib/halaqa/api";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
@@ -621,6 +622,26 @@ describe("teacher view plan (SOC-03)", () => {
   it("shows no plan for a missing or unreadable one", async () => {
     mockRpc.mockResolvedValue({ data: { name: null, plan: { hifz_plan: "not json", tiers: {} }, grades: null }, error: null });
     await expect(fetchTeacherView(GROUP, OTHER, "2026-11-13", owner())).resolves.toMatchObject({ plan: { hifzPlan: null } });
+  });
+});
+
+describe("teacher role (SOC-03)", () => {
+  it("asks the server to set a member's role, as the account that started it", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await expect(setHalaqaMemberRole(GROUP, OTHER, "teacher", owner())).resolves.toBeUndefined();
+    await setHalaqaMemberRole(GROUP, OTHER, "member", owner());
+    expect(mockRpc.mock.calls).toEqual([
+      ["set_halaqa_member_role", { p_group_id: GROUP, p_member_id: OTHER, p_role: "teacher" }],
+      ["set_halaqa_member_role", { p_group_id: GROUP, p_member_id: OTHER, p_role: "member" }],
+    ]);
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+  });
+
+  it("keeps the server's refusal of anyone but the invite halaqa's creator as its cause", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: "42501", message: "not_allowed" } });
+    const error = await setHalaqaMemberRole(GROUP, OTHER, "teacher", owner()).catch((caught: unknown) => caught);
+    expect(socialFailureOf(error)).toEqual({ kind: "rejected", code: "not_allowed" });
+    expect(socialFailureMessage(error, strings.ar)).toBe(strings.ar.socialErrorGeneric);
   });
 });
 

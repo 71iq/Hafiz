@@ -1,10 +1,11 @@
 import React from "react";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import HalaqaScreen from "@/app/(tabs)/halaqa";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { strings } from "@/lib/i18n/strings";
 import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import { interpolate } from "@/lib/i18n/useStrings";
@@ -440,6 +441,181 @@ describe("Halaqa tab", () => {
     expect(await offline.findByText("Family halaqa")).toBeTruthy();
     expect(offline.getByText(/^Offline\. Showing what you last saw on /)).toBeTruthy();
     expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  describe("teacher role (SOC-03)", () => {
+    // The reader created this invite halaqa as its teacher.
+    const created = { ...summary, role: "teacher", is_creator: true };
+    function groupWith(group: Record<string, unknown> & { role: string }, yusufRole: "member" | "teacher") {
+      return {
+        ...detail,
+        group,
+        members: [
+          { ...detail.members[0], role: group.role },
+          { ...detail.members[1], role: yusufRole },
+        ],
+      };
+    }
+    // The halaqa as the server holds it: a role write changes what the next group read returns.
+    type Reply = { data: unknown; error: unknown };
+    function serve(start: "member" | "teacher", write: (args: Record<string, unknown>) => Reply | Promise<Reply>) {
+      let yusufRole = start;
+      mockRpc.mockImplementation(async (fn, args) => {
+        switch (fn) {
+          case "get_my_halaqas":
+            return { data: [created], error: null };
+          case "get_halaqa_detail":
+            return { data: groupWith(created, yusufRole), error: null };
+          case "set_halaqa_member_role": {
+            const result = await write(args);
+            if (!result.error) yusufRole = args.p_role as "member" | "teacher";
+            return result;
+          }
+          default:
+            throw new Error(`Unexpected RPC ${fn}`);
+        }
+      });
+    }
+    const roleWrites = () => mockRpc.mock.calls.filter(([fn]) => fn === "set_halaqa_member_role");
+    const makeLabel = (name: string, locale: "en" | "ar" = "en") =>
+      interpolate(strings[locale].halaqaMakeTeacherA11y, { name });
+    const removeLabel = (name: string, locale: "en" | "ar" = "en") =>
+      interpolate(strings[locale].halaqaRemoveTeacherA11y, { name });
+    // The row's own control stays on screen under the dialog, so dialog buttons are found inside it.
+    const inDialog = (screen: ReturnType<typeof renderScreen>) =>
+      within(screen.UNSAFE_getAllByType(ConfirmDialog).find((dialog) => dialog.props.visible)!);
+
+    it("lets the creator make another member a teacher after confirming, once", async () => {
+      signIn(USER);
+      let release: (() => void) | undefined;
+      serve("member", () => new Promise<Reply>((resolve) => (release = () => resolve({ data: null, error: null }))));
+      const screen = renderScreen();
+
+      const make = await screen.findByRole("button", { name: makeLabel("Yusuf") });
+      expect(make.props.accessibilityState).toMatchObject({ disabled: false });
+      // Nothing is sent before the creator confirms what a teacher sees.
+      fireEvent.press(make);
+      expect(screen.getByText(interpolate(strings.en.halaqaMakeTeacherTitle, { name: "Yusuf" }))).toBeTruthy();
+      expect(screen.getByText(strings.en.halaqaMakeTeacherBody)).toBeTruthy();
+      expect(roleWrites()).toHaveLength(0);
+
+      const confirm = inDialog(screen).getByRole("button", { name: strings.en.halaqaMakeTeacherConfirm });
+      fireEvent.press(confirm);
+      fireEvent.press(confirm);
+      // While it saves, the row's control waits too.
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: makeLabel("Yusuf") }).props.accessibilityState).toMatchObject({
+          disabled: true,
+        }),
+      );
+      await act(async () => release!());
+      expect(await screen.findByRole("button", { name: removeLabel("Yusuf") })).toBeTruthy();
+      expect(roleWrites()).toEqual([
+        ["set_halaqa_member_role", { p_group_id: GROUP, p_member_id: OTHER, p_role: "teacher" }],
+      ]);
+      expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+      await waitFor(() => expect(screen.queryByText(strings.en.halaqaMakeTeacherBody)).toBeNull());
+    });
+
+    it("lets the creator remove a member's teacher role after confirming", async () => {
+      signIn(USER);
+      serve("teacher", () => ({ data: null, error: null }));
+      const screen = renderScreen();
+
+      fireEvent.press(await screen.findByRole("button", { name: removeLabel("Yusuf") }));
+      expect(screen.getByText(interpolate(strings.en.halaqaRemoveTeacherTitle, { name: "Yusuf" }))).toBeTruthy();
+      expect(screen.getByText(strings.en.halaqaRemoveTeacherBody)).toBeTruthy();
+      fireEvent.press(inDialog(screen).getByRole("button", { name: strings.en.halaqaRemoveTeacherConfirm }));
+
+      expect(await screen.findByRole("button", { name: makeLabel("Yusuf") })).toBeTruthy();
+      expect(roleWrites()).toEqual([
+        ["set_halaqa_member_role", { p_group_id: GROUP, p_member_id: OTHER, p_role: "member" }],
+      ]);
+    });
+
+    it("offers no role control to other members, in a matched halaqa, or on the creator's own row", async () => {
+      signIn(USER);
+      const noRoleControl = (screen: ReturnType<typeof renderScreen>) => {
+        for (const name of ["Amina", "Yusuf"]) {
+          expect(screen.queryByRole("button", { name: makeLabel(name) })).toBeNull();
+          expect(screen.queryByRole("button", { name: removeLabel(name) })).toBeNull();
+        }
+        expect(screen.queryByText(strings.en.halaqaMakeTeacher)).toBeNull();
+        expect(screen.queryByText(strings.en.halaqaRemoveTeacher)).toBeNull();
+      };
+
+      // A member who did not create the halaqa, beside a teacher.
+      respond({ get_my_halaqas: [summary], get_halaqa_detail: groupWith(summary, "teacher") });
+      const member = renderScreen();
+      expect(await member.findByText("Family halaqa")).toBeTruthy();
+      noRoleControl(member);
+      member.unmount();
+
+      // A matched halaqa has no teachers, whatever the summary says.
+      const matched = { ...created, kind: "matched", name: null, invite_code: null };
+      respond({ get_my_halaqas: [matched], get_halaqa_detail: groupWith(matched, "member") });
+      const inMatched = renderScreen();
+      expect(await inMatched.findByText(strings.en.halaqaMatchedName)).toBeTruthy();
+      noRoleControl(inMatched);
+      inMatched.unmount();
+
+      // The creator's own role was chosen at creation; only the other member's row has the control.
+      respond({ get_my_halaqas: [created], get_halaqa_detail: groupWith(created, "member") });
+      const creator = renderScreen();
+      expect(await creator.findByRole("button", { name: makeLabel("Yusuf") })).toBeTruthy();
+      expect(creator.queryByRole("button", { name: makeLabel("Amina") })).toBeNull();
+      expect(creator.queryByRole("button", { name: removeLabel("Amina") })).toBeNull();
+      expect(creator.getAllByText(strings.en.halaqaMakeTeacher)).toHaveLength(1);
+      expect(mockRpc.mock.calls.filter(([fn]) => fn === "set_halaqa_member_role")).toHaveLength(0);
+    });
+
+    it("shows a refused write in the dialog and keeps the member's role", async () => {
+      signIn(USER);
+      serve("member", () => ({ data: null, error: { message: "not_allowed", code: "42501" } }));
+      const screen = renderScreen();
+
+      fireEvent.press(await screen.findByRole("button", { name: makeLabel("Yusuf") }));
+      const reads = mockRpc.mock.calls.filter(([fn]) => fn === "get_halaqa_detail").length;
+      fireEvent.press(inDialog(screen).getByRole("button", { name: strings.en.halaqaMakeTeacherConfirm }));
+
+      expect(await screen.findByText(strings.en.socialErrorGeneric)).toBeTruthy();
+      expect(roleWrites()).toHaveLength(1);
+      // The dialog stays open for another try or cancel, and the row still offers the same change.
+      expect(screen.getByText(strings.en.halaqaMakeTeacherBody)).toBeTruthy();
+      expect(screen.getByRole("button", { name: makeLabel("Yusuf") }).props.accessibilityState).toMatchObject({
+        disabled: false,
+      });
+      expect(screen.queryByRole("button", { name: removeLabel("Yusuf") })).toBeNull();
+      // Only the creator's own row carries the teacher badge.
+      expect(screen.getAllByText(strings.en.halaqaTeacherBadge)).toHaveLength(1);
+      expect(mockRpc.mock.calls.filter(([fn]) => fn === "get_halaqa_detail")).toHaveLength(reads);
+
+      fireEvent.press(inDialog(screen).getByRole("button", { name: strings.en.socialCancel }));
+      await waitFor(() => expect(screen.queryByText(strings.en.socialErrorGeneric)).toBeNull());
+    });
+
+    it("lays the control out from the reading side in English and Arabic", async () => {
+      signIn(USER);
+      serve("member", () => ({ data: null, error: null }));
+      const english = renderScreen();
+      const make = await english.findByRole("button", { name: makeLabel("Yusuf") });
+      expect(flattenStyle(make.props.style)).toMatchObject({ direction: "ltr", flexDirection: "row" });
+      expect(english.getByText(strings.en.halaqaMakeTeacher)).toBeTruthy();
+      english.unmount();
+
+      mockSettings.isRTL = true;
+      mockSettings.uiLanguage = "ar";
+      const arabic = renderScreen();
+      const ar = await arabic.findByRole("button", { name: makeLabel("Yusuf", "ar") });
+      expect(flattenStyle(ar.props.style)).toMatchObject({ direction: "ltr", flexDirection: "row-reverse" });
+      expect(arabic.getByText(strings.ar.halaqaMakeTeacher)).toBeTruthy();
+      fireEvent.press(ar);
+      expect(arabic.getByText(interpolate(strings.ar.halaqaMakeTeacherTitle, { name: "Yusuf" }))).toBeTruthy();
+      expect(arabic.getByText(strings.ar.halaqaMakeTeacherBody)).toBeTruthy();
+      fireEvent.press(inDialog(arabic).getByRole("button", { name: strings.ar.halaqaMakeTeacherConfirm }));
+      expect(await arabic.findByRole("button", { name: removeLabel("Yusuf", "ar") })).toBeTruthy();
+      expect(arabic.getByText(strings.ar.halaqaRemoveTeacher)).toBeTruthy();
+    });
   });
 
   it("keeps wird features unblocked: offline with nothing saved is a calm note", async () => {

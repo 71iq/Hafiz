@@ -92,6 +92,18 @@ export const socialStrings = {
     halaqaAddAnother: "Join or create another halaqa",
     halaqaTeacherView: "Teacher view",
     halaqaTeacherViewA11y: "Open teacher view for {{name}}",
+    halaqaMakeTeacher: "Make teacher",
+    halaqaMakeTeacherA11y: "Make {{name}} a teacher",
+    halaqaMakeTeacherTitle: "Make {{name}} a teacher?",
+    halaqaMakeTeacherBody:
+      "A teacher sees each member's plan and stages, recent grades and mistake count, only where that member allows it. You can remove the role at any time.",
+    halaqaMakeTeacherConfirm: "Make teacher",
+    halaqaRemoveTeacher: "Remove teacher role",
+    halaqaRemoveTeacherA11y: "Remove teacher role from {{name}}",
+    halaqaRemoveTeacherTitle: "Remove the teacher role from {{name}}?",
+    halaqaRemoveTeacherBody:
+      "They stay in the halaqa but no longer see members' plans, stages, grades or mistake counts.",
+    halaqaRemoveTeacherConfirm: "Remove role",
     halaqaSwitchA11y: "Show {{name}}",
 
     halaqaEncourageTitle: "Encourage {{name}}",
@@ -273,6 +285,17 @@ export const socialStrings = {
     halaqaAddAnother: "انضم إلى حلقة أخرى أو أنشئها",
     halaqaTeacherView: "عرض المعلّم",
     halaqaTeacherViewA11y: "افتح عرض المعلّم لـ {{name}}",
+    halaqaMakeTeacher: "امنح دور المعلّم",
+    halaqaMakeTeacherA11y: "امنح {{name}} دور المعلّم",
+    halaqaMakeTeacherTitle: "منح {{name}} دور المعلّم؟",
+    halaqaMakeTeacherBody:
+      "يرى المعلّم خطة كل عضو ومراحله وتقييماته الأخيرة وعدد أخطائه، بإذن ذلك العضو فقط. ويمكنك إزالة الدور متى شئت.",
+    halaqaMakeTeacherConfirm: "منح الدور",
+    halaqaRemoveTeacher: "أزل دور المعلّم",
+    halaqaRemoveTeacherA11y: "أزل دور المعلّم عن {{name}}",
+    halaqaRemoveTeacherTitle: "إزالة دور المعلّم عن {{name}}؟",
+    halaqaRemoveTeacherBody: "يبقى في الحلقة، لكنه لن يرى خطط الأعضاء ولا مراحلهم ولا تقييماتهم ولا عدد أخطائهم.",
+    halaqaRemoveTeacherConfirm: "إزالة الدور",
     halaqaSwitchA11y: "اعرض {{name}}",
 
     halaqaEncourageTitle: "شجّع {{name}}",

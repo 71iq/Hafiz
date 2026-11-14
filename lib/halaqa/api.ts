@@ -246,6 +246,26 @@ export function setHalaqaSharing(groupId: string, sharing: HalaqaSharing, owner:
   );
 }
 
+export type HalaqaRole = z.output<typeof role>;
+
+/**
+ * SOC-03: the creator of an invite halaqa makes another member a teacher or takes the role back. The
+ * server refuses anyone else, and matched halaqas, with not_allowed.
+ */
+export async function setHalaqaMemberRole(
+  groupId: string,
+  memberId: string,
+  nextRole: HalaqaRole,
+  owner: SocialOwner,
+): Promise<void> {
+  await callSocialRpc(
+    "set_halaqa_member_role",
+    { p_group_id: groupId, p_member_id: memberId, p_role: nextRole },
+    voidResult,
+    owner,
+  );
+}
+
 export async function sendEncouragement(
   input: {
     groupId: string;
