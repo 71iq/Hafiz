@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { AppState } from "react-native";
-import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
+import { addDays, atLocalTime, deviceZoneKey, localDateOf } from "@/lib/habit/dates";
+
+/** How often an open screen checks whether the device changed time zone. */
+const ZONE_CHECK_MS = 60_000;
 
 /** The next local midnight after `now`, when a new local day starts. */
 export function nextLocalMidnight(now: Date): Date {
@@ -17,6 +20,9 @@ export function nextLocalMidnight(now: Date): Date {
  * The timer runs only while the app is in the foreground, so a resume after the boundary reloads once,
  * from the foreground event, rather than once for the event and again for the overdue timer. On the
  * web, AppState follows page visibility.
+ *
+ * A time zone change moves the local day and its boundary, so while in the foreground the zone is
+ * checked once a minute, and a change reloads, which sets the boundary in the new zone.
  */
 export function useDayBoundaryRefresh(boundary: number | null, reload: () => void): void {
   useEffect(() => {
@@ -40,15 +46,38 @@ export function useDayBoundaryRefresh(boundary: number | null, reload: () => voi
       );
     };
 
+    let zone = deviceZoneKey();
+    let zoneTimer: ReturnType<typeof setInterval> | undefined;
+    const watchZone = () => {
+      if (zoneTimer !== undefined) return;
+      zoneTimer = setInterval(() => {
+        const next = deviceZoneKey();
+        if (next === zone) return;
+        zone = next;
+        reload();
+      }, ZONE_CHECK_MS);
+    };
+    const unwatchZone = () => {
+      if (zoneTimer !== undefined) clearInterval(zoneTimer);
+      zoneTimer = undefined;
+    };
+
     let away = AppState.currentState === "background";
-    if (!away) arm();
+    if (!away) {
+      arm();
+      watchZone();
+    }
     // react-native-web returns nothing when the page has no visibility API; the timer still runs.
     const subscription: { remove: () => void } | undefined = AppState.addEventListener("change", (state) => {
       if (state === "background") {
         away = true;
         disarm();
+        unwatchZone();
       } else if (state === "active" && away) {
         away = false;
+        // The resume reload below already covers a zone changed while away.
+        zone = deviceZoneKey();
+        watchZone();
         // A boundary that passed while away is covered by this reload, which sets the next one.
         if (boundary !== null && boundary > Date.now()) arm();
         reload();
@@ -56,6 +85,7 @@ export function useDayBoundaryRefresh(boundary: number | null, reload: () => voi
     });
     return () => {
       disarm();
+      unwatchZone();
       subscription?.remove();
     };
   }, [boundary, reload]);

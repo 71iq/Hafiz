@@ -4,7 +4,7 @@ import { AppState } from "react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
-import { deviceTimeZone } from "@/lib/habit/dates";
+import { deviceZoneKey } from "@/lib/habit/dates";
 import { notificationsStrings } from "@/lib/i18n/features/notifications";
 import { useSettings } from "@/lib/settings/context";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
@@ -22,10 +22,6 @@ import type { ReminderRoute } from "@/lib/notifications/types";
 
 const REVIEW_SETTLE_MS = 1500;
 const ZONE_CHECK_MS = 60_000;
-
-function zoneKey(): string {
-  return `${deviceTimeZone()}|${new Date().getTimezoneOffset()}`;
-}
 
 function warn(error: unknown) {
   console.warn("[Reminders]", error);
@@ -63,14 +59,14 @@ export function useReminderScheduling(): void {
       .catch(warn)
       .finally(run);
 
-    let zone = zoneKey();
+    let zone = deviceZoneKey();
     const appState = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
-      zone = zoneKey();
+      zone = deviceZoneKey();
       run();
     });
     const zoneTimer = setInterval(() => {
-      const next = zoneKey();
+      const next = deviceZoneKey();
       if (next === zone) return;
       zone = next;
       run();

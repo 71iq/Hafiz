@@ -35,6 +35,7 @@ import {
   type WordTestMode,
 } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
+import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import { putUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import {
   dayDiffLocal,
@@ -1186,6 +1187,36 @@ export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Prom
   if ((result.changes ?? 0) === 0) throw new StudyCardDeletedError();
 
   await enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card));
+}
+
+/** An ISO instant later than `now` and every given stamp, so a write made now supersedes all of them. */
+function laterThanAll(now: Date, stamps: readonly (string | null | undefined)[]): string {
+  let at = now.toISOString();
+  for (const stamp of stamps) {
+    if (!stamp || compareSyncTimestamps(stamp, at) < 0) continue;
+    const next = Date.parse(stamp) + 1;
+    if (Number.isFinite(next)) at = new Date(next).toISOString();
+  }
+  return at;
+}
+
+/**
+ * Undoes a card's deletion: it comes back with its schedule and history as they were, so its training
+ * is kept. Its updated_at is later than both now and the version it replaces, so a deletion stamped by
+ * a clock running ahead of this one does not win over the restore when it uploads. Queues the upload.
+ * Returns false when there is no deleted card with this id.
+ */
+export async function restoreDeletedStudyCard(db: DatabaseExecutor, id: string, now: Date): Promise<boolean> {
+  const row = await db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NOT NULL", [id]);
+  if (!row) return false;
+  const at = laterThanAll(now, [row.updated_at, row.deleted_at]);
+  const result = await db.runAsync("UPDATE study_cards SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL", [
+    at,
+    id,
+  ]);
+  if ((result.changes ?? 0) === 0) return false;
+  await enqueueSync(db, "study_cards", "UPDATE", id, cardToSyncData(rowWithDefaultStatus({ ...row, deleted_at: null, updated_at: at })));
+  return true;
 }
 
 /** The row insertNewStudyCard writes, for a caller that grades a card in the transaction that creates it. */

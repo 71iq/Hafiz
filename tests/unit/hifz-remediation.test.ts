@@ -290,6 +290,23 @@ describe("weak spots (ERR-06)", () => {
     expect(JSON.parse(upload?.data ?? "{}")).toMatchObject({ id: clozeCardId(2, 255, 4), deck_id: "hifz-pages", deleted_at: expect.any(String) });
   });
 
+  it("restores a deleted cloze card with its training when the word becomes weak again", async () => {
+    for (let day = 0; day < 3; day += 1) await gradeWithErrors(day, [wrongWord(4)]);
+    const id = clozeCardId(2, 255, 4);
+    store.sql.prepare("UPDATE study_cards SET reps = 4, stability = 9 WHERE id = ?").run(id);
+    const [item] = await readMistakeInbox(store.db, addDays(TODAY, 2));
+    await dismissInboxItem(store.db, { id: item.id, now: atLocalTime(addDays(TODAY, 2), 700) });
+    expect(liveCards()).toEqual([]);
+
+    await gradeWithErrors(3, [wrongWord(4)]);
+    expect(liveCards()).toEqual([{ id }]);
+    expect(store.sql.prepare("SELECT reps, stability FROM study_cards WHERE id = ?").get(id)).toEqual({ reps: 4, stability: 9 });
+    const upload = store.sql
+      .prepare("SELECT data FROM sync_queue WHERE table_name = 'study_cards' AND row_id = ? ORDER BY id DESC LIMIT 1")
+      .get(id) as { data: string };
+    expect(JSON.parse(upload.data)).toMatchObject({ id, reps: 4, deleted_at: null });
+  });
+
   it("keeps the cloze card when the word is still wrong in 3 sessions after a dismissal", async () => {
     for (let day = 0; day < 4; day += 1) await gradeWithErrors(day, [wrongWord(4)]);
     const [item] = await readMistakeInbox(store.db, addDays(TODAY, 3));

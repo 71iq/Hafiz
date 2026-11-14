@@ -77,6 +77,14 @@ export function deviceTimeZone(at = new Date()): string {
   return `UTC${sign}${hours}:${minutes}`;
 }
 
+/**
+ * The device's zone and current offset, which change together when the user travels or the device
+ * changes zone. Screens and reminders compare it to notice a change while the app stays open.
+ */
+export function deviceZoneKey(at = new Date()): string {
+  return `${deviceTimeZone(at)}|${at.getTimezoneOffset()}`;
+}
+
 /** Every date from `from` to `to`, inclusive. Empty when `to` is before `from`. */
 export function datesBetween(from: LocalDate, to: LocalDate): LocalDate[] {
   const days = diffDays(from, to);

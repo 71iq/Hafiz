@@ -1642,11 +1642,21 @@ it("brings back a cloze card another device deleted while the word is still weak
   const deletedAt = new Date(Date.now() + 60_000).toISOString();
   mockTableRows.set("recitation_errors:incremental", []);
   mockTableRows.set("study_cards:incremental", [
-    // Deleted after this device made its card, so the deletion applies here first.
+    // Deleted after this device made its card, by a clock running a minute ahead, so the deletion
+    // applies here first. It carries the training that device saw.
     { ...clozeCard({ updated_at: deletedAt, deleted_at: deletedAt }), synced_at: "2099-01-01T00:00:00.000Z" },
   ]);
   await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+  // Restored as it was, training kept, and stamped after the deletion so its upload wins.
+  const restored = sql.prepare("SELECT reps, state, stability, updated_at FROM study_cards WHERE id = 'cloze:2:255:4'").get() as {
+    reps: number;
+    state: number;
+    stability: number;
+    updated_at: string;
+  };
+  expect(restored).toMatchObject({ reps: 7, state: State.Review, stability: 5 });
+  expect(Date.parse(restored.updated_at)).toBeGreaterThan(Date.parse(deletedAt));
 });
 
 it("removes a restored cloze card whose weak spot a restored dismissal ended", async () => {

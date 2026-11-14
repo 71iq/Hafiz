@@ -1,5 +1,5 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
-import { deleteStudyCardRow, insertNewStudyCard } from "@/lib/fsrs/queries";
+import { deleteStudyCardRow, insertNewStudyCard, restoreDeletedStudyCard } from "@/lib/fsrs/queries";
 import { HIFZ_PAGES_DECK_ID } from "@/lib/hifz/units";
 
 /** ERR-06: a location wrong in this many separate sessions is a weak spot. */
@@ -86,8 +86,9 @@ async function weakLocationIds(
 
 /**
  * Give each word location among `errors` that is now a weak spot (wrong in 3 or more sessions) its
- * cloze card, due now. Locations that already have a card are skipped before any counting. Returns
- * how many cards were created. Pass a transaction: each new card queues its upload.
+ * cloze card: a new card due now, or a deleted one restored with its schedule and history. Locations
+ * that already have a live card are skipped before any counting. Returns how many cards were created
+ * or restored. Pass a transaction: each card queues its upload.
  *
  * Runs inside the grade transaction with the grade's errors. Call it after a sync pull too, with the
  * pulled recitation_errors rows, so a weak spot whose sessions came from more than one device gets
@@ -103,7 +104,10 @@ export async function createWeakSpotCards(db: DatabaseExecutor, errors: readonly
   let created = 0;
   for (const location of missing) {
     if (!weak.has(location.id)) continue;
-    if (await insertNewStudyCard(db, { id: location.id, deckId: HIFZ_PAGES_DECK_ID, due: now, now: now.toISOString() })) created += 1;
+    // A card deleted here or on another device comes back as it was, training kept: a deletion made
+    // from a device missing some of this word's errors must not cost the reviews already done.
+    if (await restoreDeletedStudyCard(db, location.id, now)) created += 1;
+    else if (await insertNewStudyCard(db, { id: location.id, deckId: HIFZ_PAGES_DECK_ID, due: now, now: now.toISOString() })) created += 1;
   }
   return created;
 }

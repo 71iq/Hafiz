@@ -37,6 +37,12 @@ jest.mock("@react-navigation/native", () => {
     },
   };
 });
+/** The device's zone; a test changes it the way travel or a settings change does. */
+let mockZone = "Asia/Amman|-180";
+jest.mock("@/lib/habit/dates", () => ({
+  ...jest.requireActual<typeof import("@/lib/habit/dates")>("@/lib/habit/dates"),
+  deviceZoneKey: () => mockZone,
+}));
 jest.mock("@/lib/habit/queries", () => ({ settleHabitDays: jest.fn(), loadHabitOverview: jest.fn() }));
 jest.mock("@/lib/prayer/settings", () => ({ readDhuhrResolver: jest.fn() }));
 jest.mock("@/lib/hifz/pages", () => ({ loadTodayWird: jest.fn() }));
@@ -103,6 +109,7 @@ const overviewLoads = () => jest.mocked(loadHabitOverview).mock.calls.length;
 const wirdLoads = () => jest.mocked(loadTodayWird).mock.calls.length;
 
 beforeEach(() => {
+  mockZone = "Asia/Amman|-180";
   jest.useFakeTimers();
   jest.setSystemTime(EVENING);
   jest.clearAllMocks();
@@ -199,6 +206,18 @@ describe("useHabitOverview across a day boundary", () => {
     await flush();
     expect(overviewLoads()).toBe(2);
     expect(loadedFor(result.current.overview)).toBe("2026-11-15");
+  });
+
+  it("reloads within a minute when the device changes time zone while the screen stays open", async () => {
+    renderHook(() => useHabitOverview(db));
+    await flush();
+    const before = overviewLoads();
+    // A minute with the same zone reloads nothing.
+    await advanceTo(new Date(EVENING.getTime() + 60_000));
+    expect(overviewLoads()).toBe(before);
+    mockZone = "Asia/Tokyo|-540";
+    await advanceTo(new Date(EVENING.getTime() + 120_000));
+    expect(overviewLoads()).toBe(before + 1);
   });
 
   it("clears its timer and AppState listener on unmount", async () => {
