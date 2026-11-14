@@ -353,6 +353,10 @@ async function insertMeaningCardRows(
       lapses = excluded.lapses,
       state = excluded.state,
       last_review = excluded.last_review,
+      -- A card added again starts fresh, as its queued upload says: no status kept from before.
+      suspended_at = NULL,
+      buried_until = NULL,
+      marked_at = NULL,
       created_at = excluded.created_at,
       updated_at = excluded.updated_at,
       deleted_at = NULL
@@ -662,6 +666,9 @@ async function ensureStudyCardRow(
 
   const now = new Date();
   const nowIso = now.toISOString();
+  // Created again over a deletion, the card is stamped later than that deletion, so the action that
+  // follows is not older than a tombstone stamped by a clock running ahead and does not lose to it.
+  const updatedAt = (await stampsOverDeletedCards(db, [cardId], now)).get(cardId) ?? nowIso;
   const emptyCard = createEmptyCard(now);
   const row: StudyCardRow = {
     id: cardId,
@@ -680,7 +687,7 @@ async function ensureStudyCardRow(
     buried_until: null,
     marked_at: null,
     created_at: nowIso,
-    updated_at: nowIso,
+    updated_at: updatedAt,
     deleted_at: null,
   };
 
