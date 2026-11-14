@@ -116,6 +116,15 @@ function isCoveredToday(snapshot: HabitSnapshot): boolean {
   return snapshot.streak.todayStatus !== null || COVERED_TODAY.has(snapshot.headline.kind);
 }
 
+/**
+ * Today is excused or paused: the user set the day aside, so nothing presses them to recite. A day
+ * already done is not set aside; yesterday's open make-up can still be reminded then (STR-07).
+ */
+function isSetAsideToday(snapshot: HabitSnapshot, pause: HabitPause | null, date: LocalDate): boolean {
+  const status = snapshot.streak.todayStatus;
+  return status === "excused" || status === "paused" || (pause !== null && pause.start <= date && date <= pause.end);
+}
+
 function mod(value: number, by: number): number {
   return ((value % by) + by) % by;
 }
@@ -212,8 +221,13 @@ export function planNotifications(input: PlannerInput): PlanResult {
     const makeUp = project(date, makeUpAt).snapshot;
 
     // Home shows yesterday's open make-up even on an excused or paused day, but a reminder to recite
-    // today would press on a day the user set aside, so it is not sent then.
-    if (makeUp.headline.kind === "make_up_open" && !isCoveredToday(makeUp) && prefs.types.makeup_window) {
+    // today would press on a day the user set aside, so it is not sent then. A day already done is
+    // not set aside: another device may have recorded it while yesterday is still makeable here.
+    if (
+      makeUp.headline.kind === "make_up_open" &&
+      !isSetAsideToday(makeUp, input.habit.pause, date) &&
+      prefs.types.makeup_window
+    ) {
       add({
         type: "makeup_window",
         at: makeUpAt,
@@ -478,10 +492,13 @@ function remindLaterCandidate(
     return null;
   };
   if (date < today || input.clock.dateOf(at) !== date) return skip("expired");
-  if (at.getTime() <= input.now.getTime()) return skip("past");
+  // Coverage and the streak state come before "past": a follow-up past its time that the OS still
+  // holds is kept only while it is still due (reconcileReminders), so a day completed, excused or
+  // paused since then cancels it.
   const state = project(date, at).snapshot;
   if (isCoveredToday(state)) return skip("state_changed");
   if (streakFingerprint(project(today, input.now).snapshot) !== pending.fingerprint) return skip("state_changed");
+  if (at.getTime() <= input.now.getTime()) return skip("past");
   const length = state.streak.length;
   return {
     type: "remind_later",

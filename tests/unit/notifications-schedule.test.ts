@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { putUserSetting } from "@/lib/database/user-settings";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { putHabitDay } from "@/lib/habit/queries";
 import type { HabitDayRow } from "@/lib/habit/types";
@@ -77,6 +78,7 @@ jest.mock("@/lib/notifications/platform", () => ({
     },
     dismiss: async (ids: readonly string[]) => {
       fake.dismissed.push(...ids);
+      fake.presented = fake.presented.filter((item) => !ids.includes(item.osId));
     },
     setBadge: async (count: number) => {
       fake.badge = count;
@@ -158,11 +160,12 @@ async function insertSession(id: string, started: Date) {
   );
 }
 
-async function addLogRow(id: string, type: string, scheduled: Date) {
+/** A log row for a reminder the OS no longer holds; `delivered` is when this device saw it shown. */
+async function addLogRow(id: string, type: string, scheduled: Date, delivered: Date | null = null) {
   await store.db.runAsync(
     `INSERT INTO notification_log (id, type, template_id, local_date, scheduled_for, os_id, delivered_at, opened_at, converted, cancelled_at)
-     VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, 0, NULL)`,
-    [id, type, `${type}.1`, localDateOf(scheduled), scheduled.toISOString()],
+     VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, 0, NULL)`,
+    [id, type, `${type}.1`, localDateOf(scheduled), scheduled.toISOString(), delivered?.toISOString() ?? null],
   );
 }
 
@@ -283,6 +286,37 @@ describe("rescheduleReminders", () => {
     expect(Number(pending?.count)).toBe(0);
   });
 
+  it.each(["done", "excused", "paused"] as const)(
+    "cancels an overdue follow-up the OS still holds once today is %s (NOT-05b)",
+    async (cover) => {
+      await seed(lastDays(5));
+      await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+      const original = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
+      osFires(at(TODAY, 5, 21));
+      expect(await requestRemindLater(store.db, { data: original.data, action: "remind_later" }, { now: at(TODAY, 5, 30) })).toBe(true);
+      const followUp = () => fake.scheduled.find((item) => item.data.type === "remind_later");
+      expect(followUp()?.data.at).toBe(at(TODAY, 6, 30).getTime());
+
+      // 06:45: the 06:30 alarm is late and the OS still holds it when the day becomes covered.
+      if (cover === "done") await seed([TODAY]);
+      else if (cover === "excused") await putHabitDay(store.db, { ...day(TODAY), status: "excused", earned_status: null, reason: "illness", minimum_met: 0 });
+      else await putUserSetting(store.db, "habit_pause", JSON.stringify({ start: TODAY, end: addDays(TODAY, 3) }));
+      await rescheduleReminders(store.db, { now: at(TODAY, 6, 45), language: "en" });
+      expect(followUp()).toBeUndefined();
+    },
+  );
+
+  it("keeps an overdue follow-up the OS still holds while today is still open", async () => {
+    await seed(lastDays(5));
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    const original = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
+    osFires(at(TODAY, 5, 21));
+    await requestRemindLater(store.db, { data: original.data, action: "remind_later" }, { now: at(TODAY, 5, 30) });
+    const followUp = fake.scheduled.find((item) => item.data.type === "remind_later")!;
+    await rescheduleReminders(store.db, { now: at(TODAY, 6, 45), language: "en" });
+    expect(fake.scheduled.find((item) => item.data.type === "remind_later")?.osId).toBe(followUp.osId);
+  });
+
   it("refuses a follow-up that would cross midnight or land in quiet hours", async () => {
     await seed(lastDays(5));
     await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
@@ -316,6 +350,26 @@ describe("rescheduleReminders", () => {
     osFires(at(TODAY, 9));
     await rescheduleReminders(store.db, { now: at(TODAY, 9), language: "en" });
     expect(logCount("converted = 1 AND type = 'wird_reminder'")).toBe(1);
+  });
+
+  it.each([
+    ["seen in the tray", true],
+    ["swiped away before the app ran", false],
+  ])("counts a delayed delivery %s from when it showed, not from its time (NOT-09)", async (_label, presented) => {
+    await seed(lastDays(5));
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    const wird = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
+    // The OS holds the 05:20 alarm until 10:00, then shows it; the app runs at 10:01.
+    await rescheduleReminders(store.db, { now: at(TODAY, 9), language: "en" });
+    fake.scheduled = fake.scheduled.filter((item) => item.osId !== wird.osId);
+    fake.presented = presented ? [{ osId: wird.osId, data: wird.data }] : [];
+    await rescheduleReminders(store.db, { now: at(TODAY, 10, 1), language: "en" });
+    expect(storedSetting(LOCAL_KEYS.backoff)).toMatchObject({ consecutive_ignored: 0, cursor: null });
+
+    // A session at 10:10 answers it.
+    await insertSession("s-after-delivery", at(TODAY, 10, 10));
+    await rescheduleReminders(store.db, { now: at(TODAY, 10, 15), language: "en" });
+    expect(logCount(`id = '${wird.data.logId}' AND converted = 1`)).toBe(1);
   });
 
   it("keeps a late alarm the OS still holds as pending, and counts it only once the OS lets go", async () => {
@@ -418,7 +472,8 @@ describe("rescheduleReminders", () => {
     await writeReminderPref(store.db, { kind: "enabled", value: false });
     const backoff = () => storedSetting(LOCAL_KEYS.backoff) as { consecutive_ignored: number; level: number };
     for (let offset = 0; offset < 7; offset += 1) {
-      await addLogRow(`old-${offset}`, "wird_reminder", at(addDays("2026-08-01", offset), 5, 20));
+      const shown = at(addDays("2026-08-01", offset), 5, 20);
+      await addLogRow(`old-${offset}`, "wird_reminder", shown, shown);
     }
     await rescheduleReminders(store.db, { now: at("2026-08-10", 3), language: "en" });
     expect(backoff()).toMatchObject({ consecutive_ignored: 7, level: 1 });
@@ -427,7 +482,8 @@ describe("rescheduleReminders", () => {
     await rescheduleReminders(store.db, { now: at("2026-11-10", 3), language: "en" });
     expect(logCount("id LIKE 'old-%'")).toBe(0);
     for (let offset = 0; offset < 7; offset += 1) {
-      await addLogRow(`new-${offset}`, "wird_reminder", at(addDays("2026-11-11", offset), 5, 20));
+      const shown = at(addDays("2026-11-11", offset), 5, 20);
+      await addLogRow(`new-${offset}`, "wird_reminder", shown, shown);
     }
     await rescheduleReminders(store.db, { now: at("2026-11-19", 3), language: "en" });
     expect(backoff()).toMatchObject({ consecutive_ignored: 14, level: 2 });
@@ -475,6 +531,41 @@ describe("halaqa encouragement batches (5.8.2)", () => {
     signedInAccount = ACCOUNT_A;
     await rescheduleReminders(store.db, { now: at(TODAY, 10, 9), language: "en" });
     expect(scheduledBatchOwner()).toEqual([ACCOUNT_A]);
+  });
+
+  it.each([
+    ["the account signs out", null],
+    ["another account signs in", ACCOUNT_B],
+  ])("removes a shown encouragement from the tray once %s", async (_label, next) => {
+    await seed([...lastDays(5), TODAY]);
+    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
+    const own = groupScheduled()[0];
+    expect(own.data.accountId).toBe(ACCOUNT_A);
+    // The OS shows it at 10:30, next to one from an older build that names no account.
+    osFires(at(TODAY, 10, 30));
+    const { accountId: _owner, ...unowned } = own.data;
+    fake.presented = [
+      { osId: own.osId, data: own.data },
+      { osId: "unowned", data: { ...unowned, logId: "unowned-log" } },
+    ];
+    await rescheduleReminders(store.db, { now: at(TODAY, 10, 35), language: "en" });
+    expect(fake.dismissed).toEqual(["unowned"]);
+
+    signedInAccount = next;
+    await rescheduleReminders(store.db, { now: at(TODAY, 10, 40), language: "en" });
+    expect(fake.dismissed).toEqual(["unowned", own.osId]);
+  });
+
+  it("removes another account's shown encouragement even with reminders turned off", async () => {
+    await seed([...lastDays(5), TODAY]);
+    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
+    const own = groupScheduled()[0];
+    osFires(at(TODAY, 10, 30));
+    fake.presented = [{ osId: own.osId, data: own.data }];
+    await writeReminderPref(store.db, { kind: "enabled", value: false });
+    signedInAccount = ACCOUNT_B;
+    await rescheduleReminders(store.db, { now: at(TODAY, 10, 40), language: "en" });
+    expect(fake.dismissed).toEqual([own.osId]);
   });
 
   it("gives an arrival after a delivered notification its own notification", async () => {

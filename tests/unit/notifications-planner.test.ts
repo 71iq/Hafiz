@@ -340,6 +340,17 @@ describe("planNotifications", () => {
     expect(result.slots.filter((slot) => slot.localDate === TODAY && slot.type === "makeup_window")).toEqual([]);
   });
 
+  it("reminds about yesterday's open make-up on a day another device already recorded as done (STR-07)", () => {
+    // Another device with an earlier cutoff settled yesterday as grace and recorded today's wird; this
+    // device's window for yesterday is still open.
+    const habit = { days: days({ ...streak(6, -2), [addDays(TODAY, -1)]: "grace", [TODAY]: "done" }), pause: null };
+    const types = { ...DEFAULT_REMINDER_PREFS.types, makeup_window: true };
+    const result = planNotifications(input({ habit, prefs: prefsWith({ types }), now: RIYADH.at(TODAY, 0) }));
+    expect(result.slots.filter((slot) => slot.localDate === TODAY && WIRD_TYPES.has(slot.type)).map((slot) => slot.type)).toEqual([
+      "makeup_window",
+    ]);
+  });
+
   it("sends no earn-back reminder on a day whose wird is already done", () => {
     // The earn-back headline leads on Home even when today is done; the planner must still see today as covered.
     const habit = { days: days({ ...streak(10, -3, "excused"), [TODAY]: "done" }), pause: null };
@@ -576,10 +587,15 @@ describe("planNotifications properties", () => {
         const plannerInput = build(scenario);
         const habit = { days: [...plannerInput.habit.days, { localDate: TODAY, status: todayStatus, fullMet: false }], pause: null };
         const result = planNotifications({ ...plannerInput, habit });
+        // A day already done is not set aside: yesterday's open make-up may still be reminded when
+        // another device recorded today while yesterday is makeable here (STR-07). An excused day
+        // gets nothing about the wird.
         for (const slot of result.slots) {
           expect(slot.at.getTime()).toBeGreaterThan(plannerInput.now.getTime());
           expect(plannerInput.clock.dateOf(slot.at)).toBe(slot.localDate);
-          if (slot.localDate === TODAY) expect(WIRD_TYPES.has(slot.type)).toBe(false);
+          if (slot.localDate !== TODAY || !WIRD_TYPES.has(slot.type)) continue;
+          const headline = projectHabit({ ...plannerInput, habit }, TODAY, slot.at).snapshot.headline.kind;
+          expect({ type: slot.type, todayStatus, headline }).toEqual({ type: "makeup_window", todayStatus: "done", headline: "make_up_open" });
         }
       }),
       { numRuns: 150 },

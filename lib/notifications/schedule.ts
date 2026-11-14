@@ -19,6 +19,7 @@ import {
   markCancelled,
   markConverted,
   markDelivered,
+  markInferredDelivered,
   markOpened,
   pruneLog,
   readBackoffRows,
@@ -87,9 +88,9 @@ export type ReminderContext = Readonly<{
 let reminderAccount: () => string | null = () => null;
 
 /**
- * The signed-in account. Only its halaqa batches reach the OS (5.8.2), so one account's
+ * The signed-in account. Only its halaqa batches reach the OS or stay shown (5.8.2), so one account's
  * encouragement is never announced to another. lib/notifications/use-reminder-scheduling.ts sets it;
- * until then no batch is scheduled.
+ * until then no batch is scheduled and none stays shown.
  */
 export function setReminderAccountSource(source: () => string | null): void {
   reminderAccount = source;
@@ -298,8 +299,9 @@ export function diffReminders(
  * The run's reconcile step. A reminder due within NEAR_FIRE_MS, or past its time while the OS still
  * holds it (a late alarm), may be showing right now, so it is never replaced. It stays while the plan
  * still has its type on its date, and that planned slot is dropped. A late one also stays when the
- * plan skipped that slot only because its time has passed. Otherwise it is cancelled. Everything later
- * is matched by content.
+ * plan skipped that slot only because its time has passed. The planner reports "past" only for a
+ * slot that is otherwise still due, so a late alarm for a day since covered is cancelled, as is any
+ * other. Everything later is matched by content.
  */
 export function reconcileReminders(
   scheduled: readonly ScheduledReminder[],
@@ -424,6 +426,23 @@ async function saveGroupBatches(db: DatabaseExecutor, batches: readonly GroupBat
 
 const COVERED_KINDS: readonly string[] = ["done_today", "excused_today", "paused"];
 
+/**
+ * A halaqa encouragement shown for an account that is not the signed-in one, or with no recorded
+ * owner, which may be another account's. It names that account's private group activity, so it
+ * leaves the tray on the run that follows a sign-out or another sign-in (5.8.2).
+ */
+function isForeignEncouragement(item: PresentedReminder, account: string | null): boolean {
+  return item.data.type === "group_encouragement" && (account === null || item.data.accountId !== account);
+}
+
+/** Dismisses foreign encouragement whatever the reminder settings, and returns what is left shown. */
+async function dismissForeignEncouragement(presented: readonly PresentedReminder[]): Promise<PresentedReminder[]> {
+  const account = reminderAccount();
+  const foreign = presented.filter((item) => isForeignEncouragement(item, account));
+  if (foreign.length > 0) await reminderPlatform.dismiss(foreign.map((item) => item.osId));
+  return presented.filter((item) => !foreign.includes(item));
+}
+
 /** Remove reminders for past dates (NOT-06) and today's wird reminders once the day is covered (NOT-05). */
 async function dismissStale(
   presented: readonly PresentedReminder[],
@@ -456,19 +475,19 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   }
 
   // A reminder was delivered when the OS showed it, or when its time passed and the OS no longer
-  // holds it. One past its time that the OS still holds is late and still pending.
+  // holds it. One past its time that the OS still holds is late and still pending. Either delivery is
+  // recorded by the first run that learns of it, and its response window ends 2 hours after that (8.11).
   const scheduled = await reminderPlatform.listScheduled();
   const presented = await reminderPlatform.listPresented();
+  const stillScheduled = new Set(scheduled.map((item) => item.data.logId));
   await markDelivered(
     db,
     presented.map((item) => item.data.logId),
     now,
   );
-  const context = await loadReminderContext(db, {
-    now,
-    language,
-    stillScheduled: new Set(scheduled.map((item) => item.data.logId)),
-  });
+  await markInferredDelivered(db, stillScheduled, now);
+  const shown = await dismissForeignEncouragement(presented);
+  const context = await loadReminderContext(db, { now, language, stillScheduled });
   await recordOutcomes(db, context, now);
   const { group } = context;
 
@@ -483,7 +502,7 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
     return { status: permitted ? "disabled" : "no_permission", ...empty, cancelled };
   }
 
-  await dismissStale(presented, context, now, covered);
+  await dismissStale(shown, context, now, covered);
   const plan = planNotifications(context.input);
   await clearSpentRemindLater(db, context, plan);
   const desired = renderDesired(context, plan.slots);
@@ -528,6 +547,7 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
       route: item.slot.route,
       at: item.slot.at.getTime(),
       contentKey: item.contentKey,
+      ...(item.slot.type === "group_encouragement" && planned !== null ? { accountId: planned.account_id } : {}),
     };
     try {
       const osId = await reminderPlatform.schedule({

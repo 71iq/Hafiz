@@ -33,9 +33,9 @@ function warn(error: unknown) {
 
 /**
  * NOT-04: replan the next 7 days on app start, on return to the foreground, when the time zone
- * changes, after sync, after review activity (sessions and grades), when the language changes and
- * when another account signs in, whose halaqa encouragement is the only one scheduled (5.8.2).
- * Mount once, under the database and settings providers.
+ * changes, after sync, after review activity (sessions and grades), when the language changes, and
+ * when the account signs out or another signs in: only the signed-in account's halaqa encouragement
+ * stays scheduled or shown (5.8.2). Mount once, under the database and settings providers.
  */
 export function useReminderScheduling(): void {
   const { db, isReady } = useDatabaseStatus();

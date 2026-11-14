@@ -18,6 +18,11 @@ export type ReminderData = Readonly<{
   at: number;
   /** Changes whenever the time or text changes, so an unchanged reminder is left in place. */
   contentKey: string;
+  /**
+   * The account a halaqa encouragement belongs to (5.8.2). One shown for another account, or without
+   * an owner, is removed from the tray (lib/notifications/schedule.ts).
+   */
+  accountId?: string;
 }>;
 
 export type ScheduledReminder = Readonly<{ osId: string; data: ReminderData }>;
@@ -73,6 +78,7 @@ export function isReminderData(value: unknown): value is ReminderData {
     ROUTES.includes(String(data.route)) &&
     typeof data.at === "number" &&
     Number.isFinite(data.at) &&
-    typeof data.contentKey === "string"
+    typeof data.contentKey === "string" &&
+    (data.accountId === undefined || typeof data.accountId === "string")
   );
 }
