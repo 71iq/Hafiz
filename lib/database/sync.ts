@@ -78,8 +78,14 @@ const REMOTE_RESTORE_TABLES = [
 type RemoteAccountRows = { [K in SyncTable]: SyncRows[K][] };
 type AccountRestoreResult = {
   pulled: number;
+  /** Data came down from the account and replaced what this device held. */
   accountRestored: boolean;
   localDataReplaced: boolean;
+  /**
+   * This sync finished the account's restore on this device, with or without remote data. From then
+   * on the local data belongs to this account, so features that waited for it (board reporting) start.
+   */
+  restoreCompleted?: boolean;
 };
 
 export type SyncResult = AccountRestoreResult & {
@@ -361,6 +367,7 @@ export async function fullSync(db: AppDatabase): Promise<SyncResult> {
     pulled: totalPulled,
     accountRestored: restored.accountRestored,
     localDataReplaced: restored.localDataReplaced,
+    ...(restored.restoreCompleted ? { restoreCompleted: true } : {}),
   };
 }
 
@@ -446,7 +453,7 @@ async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Pr
   if (remoteRowCount === 0) {
     await markAccountRestoreComplete(db, userId, false, snapshotStartedAt, owner);
     owner.requireCurrent();
-    return { pulled: 0, accountRestored: false, localDataReplaced: false };
+    return { pulled: 0, accountRestored: false, localDataReplaced: false, restoreCompleted: true };
   }
 
   const hadLocalData = await hasLocalSyncableData(db);
@@ -488,6 +495,7 @@ async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Pr
     pulled: remoteRowCount,
     accountRestored: true,
     localDataReplaced: hadLocalData,
+    restoreCompleted: true,
   };
 }
 

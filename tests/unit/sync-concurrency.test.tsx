@@ -323,6 +323,12 @@ it("retires an old database run and starts one run against its replacement", asy
   expect(mockStats).toHaveBeenCalledTimes(1);
 });
 
+it("announces a restore that found no remote data, which moved nothing and replaced nothing", async () => {
+  mockFullSync.mockResolvedValueOnce({ status: "synced", pushed: 0, pulled: 0, accountRestored: false, localDataReplaced: false, restoreCompleted: true });
+  renderHook(() => useSync());
+  await waitFor(() => expect(emitSyncCompleted).toHaveBeenCalledWith(expect.objectContaining({ restoreCompleted: true, pulled: 0 })));
+});
+
 it("announces a finished account restore even when it moved no rows", async () => {
   mockFullSync.mockResolvedValueOnce({ status: "synced", pushed: 0, pulled: 0, accountRestored: true, localDataReplaced: false });
   renderHook(() => useSync());

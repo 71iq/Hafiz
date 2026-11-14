@@ -1490,6 +1490,12 @@ it("keeps a pulled page card's cached tier", async () => {
   });
 });
 
+it("reports a finished restore when the account has no remote data yet", async () => {
+  await expect(fullSync(db)).resolves.toMatchObject({ pulled: 0, accountRestored: false, restoreCompleted: true });
+  // The next sync has nothing left to restore.
+  await expect(fullSync(db)).resolves.not.toHaveProperty("restoreCompleted");
+});
+
 it("drops device state built from the replaced account when restoring another", async () => {
   putSetting("device_hifz_today_plan", JSON.stringify({ date: "2026-11-13", ids: ["page:madani15:5"], newLines: 0 }));
   putSetting("device_wird_extras", "{}");

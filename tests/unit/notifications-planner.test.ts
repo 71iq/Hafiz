@@ -351,6 +351,22 @@ describe("planNotifications", () => {
     ]);
   });
 
+  it("lets a late make-up alarm go once the cutoff has passed, so the OS does not ring it after", () => {
+    const habit = { days: days({ ...streak(6, -2), [addDays(TODAY, -1)]: "grace", [TODAY]: "done" }), pause: null };
+    const types = { ...DEFAULT_REMINDER_PREFS.types, makeup_window: true };
+    const makeUpSlots = (minutes: number) => {
+      const result = planNotifications(input({ habit, prefs: prefsWith({ types }), now: RIYADH.at(TODAY, minutes) }));
+      return {
+        planned: result.slots.filter((slot) => slot.localDate === TODAY && slot.type === "makeup_window").length,
+        keptAsPast: result.skipped.filter((slot) => slot.localDate === TODAY && slot.type === "makeup_window" && slot.reason === "past").length,
+      };
+    };
+    // At 11:30 the 11:00 reminder has passed but yesterday can still be made up: a late alarm stays.
+    expect(makeUpSlots(11 * 60 + 30)).toEqual({ planned: 0, keptAsPast: 1 });
+    // At 13:00 the 12:30 cutoff has passed: nothing keeps it.
+    expect(makeUpSlots(13 * 60)).toEqual({ planned: 0, keptAsPast: 0 });
+  });
+
   it("sends no earn-back reminder on a day whose wird is already done", () => {
     // The earn-back headline leads on Home even when today is done; the planner must still see today as covered.
     const habit = { days: days({ ...streak(10, -3, "excused"), [TODAY]: "done" }), pause: null };

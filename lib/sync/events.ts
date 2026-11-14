@@ -3,6 +3,8 @@ type SyncCompletedSummary = {
   pulled: number;
   accountRestored?: boolean;
   localDataReplaced?: boolean;
+  /** This sync finished the account's restore on this device, with or without remote data. */
+  restoreCompleted?: boolean;
 };
 
 type Listener = (summary: SyncCompletedSummary) => void;

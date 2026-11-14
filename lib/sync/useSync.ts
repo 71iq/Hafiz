@@ -144,7 +144,7 @@ export function useSync() {
       if (result.localDataReplaced) setAccountRestoreNotice(true);
       // A finished account restore is announced even when it moved no rows: the local data now
       // belongs to this account, and screens and the board refresh wait for it.
-      if (result.pushed > 0 || result.pulled > 0 || result.accountRestored) emitSyncCompleted(result);
+      if (result.pushed > 0 || result.pulled > 0 || result.accountRestored || result.restoreCompleted) emitSyncCompleted(result);
       if (!isCurrent()) return;
       const qfResult = isQfSyncEnabled() ? await fullQfUserSync(db) : null;
       if (!isCurrent()) return;

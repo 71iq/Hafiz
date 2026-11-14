@@ -252,10 +252,11 @@ export function useBoardBandRefresh(): void {
     const appState = AppState.addEventListener("change", (state) => {
       if (state === "active") run();
     });
-    // Pulled rows, a finished restore included, change the inputs now; a push only uploads changes
-    // whose activity already started the settle timer.
+    // A finished restore makes this account's data local, so the first report goes now. Other syncs
+    // settle like activity: their pulled rows are often this device's own changes coming back, and
+    // comparing bands after each would rescan the history for nothing.
     const unsubscribeSync = subscribeSyncCompleted((summary) => {
-      if (summary.pulled > 0 || summary.accountRestored) run();
+      if (summary.restoreCompleted || summary.accountRestored) run();
       else settleThenRun();
     });
     const unsubscribeHabit = subscribeHabitChanged(settleThenRun);

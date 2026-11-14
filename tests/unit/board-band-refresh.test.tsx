@@ -103,10 +103,34 @@ describe("useBoardBandRefresh (8.13)", () => {
     await waitFor(() => expect(sentLevels()).toEqual(["juz_amma"]));
     expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
 
-    // Another device's changes arrive with a later sync.
+    // A later sync settles like activity: its pulled rows are often this device's own changes coming
+    // back, so the bands are compared once, after the settle time.
+    jest.useFakeTimers();
     jest.mocked(readLocalBoardInputs).mockResolvedValue(hafiz);
-    await act(async () => emitSyncCompleted({ pushed: 0, pulled: 2 }));
+    const derivations = jest.mocked(readLocalBoardInputs).mock.calls.length;
+    for (let echo = 0; echo < 3; echo += 1) {
+      await act(async () => {
+        emitSyncCompleted({ pushed: 1, pulled: 2 });
+        jest.advanceTimersByTime(10_000);
+      });
+    }
+    expect(jest.mocked(readLocalBoardInputs).mock.calls.length).toBe(derivations);
+    await act(async () => {
+      jest.advanceTimersByTime(BOARD_ACTIVITY_SETTLE_MS);
+    });
     await waitFor(() => expect(sentLevels()).toEqual(["juz_amma", "hafiz"]));
+    expect(jest.mocked(readLocalBoardInputs).mock.calls.length).toBe(derivations + 1);
+  });
+
+  it("reports at once when a restore that found no remote data finishes", async () => {
+    jest.mocked(hasCompletedAccountRestore).mockResolvedValue(false);
+    renderProbe();
+    await waitFor(() => expect(hasCompletedAccountRestore).toHaveBeenCalledWith(mockDb, USER));
+    await act(async () => {});
+    expect(mockRpc).not.toHaveBeenCalled();
+    jest.mocked(hasCompletedAccountRestore).mockResolvedValue(true);
+    await act(async () => emitSyncCompleted({ pushed: 0, pulled: 0, accountRestored: false, restoreCompleted: true }));
+    await waitFor(() => expect(sentLevels()).toEqual(["juz_amma"]));
   });
 
   it("compares the bands once a burst of review activity settles", async () => {

@@ -216,15 +216,20 @@ export function planNotifications(input: PlannerInput): PlanResult {
       });
 
     // 8.9: the make-up reminder comes at the anchor, or 90 minutes before the cutoff when that is earlier.
-    const leadAt = minutesBefore(makeUpCutoff(input, addDays(date, -1)), MAKE_UP_LEAD_MINUTES);
+    const cutoffAt = makeUpCutoff(input, addDays(date, -1));
+    const leadAt = minutesBefore(cutoffAt, MAKE_UP_LEAD_MINUTES);
     const makeUpAt = leadAt.getTime() < times.anchorAt.getTime() ? leadAt : times.anchorAt;
     const makeUp = project(date, makeUpAt).snapshot;
 
     // Home shows yesterday's open make-up even on an excused or paused day, but a reminder to recite
     // today would press on a day the user set aside, so it is not sent then. A day already done is
     // not set aside: another device may have recorded it while yesterday is still makeable here.
+    // Once the cutoff has passed nothing can be made up, so a make-up alarm the OS delivers late is
+    // not kept as a slot whose time merely passed (reconcileReminders); the projection at the slot's
+    // own time still shows the window open.
     if (
       makeUp.headline.kind === "make_up_open" &&
+      input.now.getTime() < cutoffAt.getTime() &&
       !isSetAsideToday(makeUp, input.habit.pause, date) &&
       prefs.types.makeup_window
     ) {
