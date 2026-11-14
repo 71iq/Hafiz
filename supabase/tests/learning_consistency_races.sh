@@ -111,9 +111,9 @@ uid() { printf '00000000-0000-4000-8009-%012d' "$1"; }
 
 admin >/dev/null <<SQL
 INSERT INTO auth.users (id, email) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race' || i || '@example.invalid'
-FROM generate_series(1, 24) AS i;
+FROM generate_series(1, 25) AS i;
 INSERT INTO public.profiles (id, username) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race_user_' || i
-FROM generate_series(1, 24) AS i;
+FROM generate_series(1, 25) AS i;
 SQL
 
 TODAY="$(admin -c "SELECT to_char((now() AT TIME ZONE 'UTC')::DATE, 'YYYY-MM-DD')")"
@@ -259,7 +259,7 @@ DO \$\$ BEGIN
 END \$\$;
 COMMIT;"
 wait_for_hold photo_hold
-session photo_minor "$(uid 7)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+session photo_minor "$(uid 7)" "SELECT public.set_profile_privacy(false, false, true, false)->>'is_minor';"
 wait
 check "photo update finished" "$(tail -1 "$WORK/photo_hold")" ok
 check "minority write finished" "$(tail -1 "$WORK/photo_minor")" ok
@@ -277,7 +277,7 @@ controller minor_join "SELECT pg_advisory_xact_lock(hashtextextended('hafiz:hala
 wait_for_controller minor_join
 session mj_join "$(uid 8)" "SELECT public.join_matched_halaqa('juz_amma', 'light', 180)->>'id';"
 wait_for_waiters 1
-session mj_minor "$(uid 8)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+session mj_minor "$(uid 8)" "SELECT public.set_profile_privacy(false, false, true, false)->>'is_minor';"
 wait
 check "minority write finished" "$(tail -1 "$WORK/mj_minor")" ok
 check "the join committed first or was refused as a minor" \
@@ -294,7 +294,7 @@ rm -f "$WORK"/*
 admin -c "INSERT INTO public.profile_privacy (user_id) VALUES ('$(uid 9)')" >/dev/null
 controller minor_first "SELECT 1 FROM public.profile_privacy WHERE user_id = '$(uid 9)' FOR UPDATE;" 2
 wait_for_controller minor_first
-session mf_minor "$(uid 9)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+session mf_minor "$(uid 9)" "SELECT public.set_profile_privacy(false, false, true, false)->>'is_minor';"
 wait_for_waiters 1
 session mf_join "$(uid 9)" "SELECT public.join_matched_halaqa('juz_amma', 'light', 180)->>'id';"
 wait
@@ -327,7 +327,7 @@ DO \$\$ BEGIN
 END \$\$;
 COMMIT;"
 wait_for_hold like_hold
-session like_minor "$(uid 18)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+session like_minor "$(uid 18)" "SELECT public.set_profile_privacy(false, false, true, false)->>'is_minor';"
 wait
 check "like finished" "$(tail -1 "$WORK/like_hold")" ok
 check "minority write finished" "$(tail -1 "$WORK/like_minor")" ok
@@ -371,7 +371,7 @@ controller del_join "SELECT 1 FROM public.user_settings WHERE user_id = '$(uid 1
 wait_for_controller del_join
 admin_session dj_delete "DELETE FROM auth.users WHERE id = '$(uid 13)';"
 wait_for_waiters 1
-session dj_join "$(uid 13)" "SELECT public.join_board(NULL, false, 'hafiz', 'page_plus', 0, '$TODAY', 3)->>'status';"
+session dj_join "$(uid 13)" "SELECT public.join_board(NULL, false, false, 'hafiz', 'page_plus', 0, '$TODAY', 3)->>'status';"
 wait
 check "no deadlock between joining the board and account deletion" "$(deadlocks)" 0
 check "deletion finished" "$(tail -1 "$WORK/dj_delete")" ok
@@ -470,7 +470,7 @@ check "the encouragement went with the recipient" \
 rm -f "$WORK"/*
 admin -c "INSERT INTO public.profile_privacy (user_id, is_minor) VALUES ('$(uid 20)', true)" >/dev/null
 session withdraw_hold "$(uid 20)" "BEGIN;
-SELECT public.set_profile_privacy(false, false, false)->>'is_minor';
+SELECT public.set_profile_privacy(false, false, false, true)->>'is_minor';
 RESET ROLE;
 DO \$\$ BEGIN
   FOR i IN 1 .. 200 LOOP
@@ -513,7 +513,7 @@ as_user "$(uid 21)" "SELECT public.set_reflection_comment_like('$(uid 21)', '$DC
   docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
 controller minor_delete "SELECT 1 FROM public.reflections WHERE id = '$DREFLECTION' FOR NO KEY UPDATE;" 2
 wait_for_controller minor_delete
-session md_minor "$(uid 21)" "SELECT public.set_profile_privacy(false, false, true)->>'is_minor';"
+session md_minor "$(uid 21)" "SELECT public.set_profile_privacy(false, false, true, false)->>'is_minor';"
 wait_for_waiters 1
 session md_delete "$(uid 21)" "SELECT public.delete_reflection_comment('$(uid 21)', '$DCOMMENT');"
 wait
@@ -568,7 +568,7 @@ DO \$\$ BEGIN
 END \$\$;
 COMMIT;"
 wait_for_hold private_hold
-session private_withdraw "$(uid 24)" "SELECT public.set_profile_privacy(false, false, false)->>'is_minor';"
+session private_withdraw "$(uid 24)" "SELECT public.set_profile_privacy(false, false, false, true)->>'is_minor';"
 wait
 check "private writes finished" "$(tail -1 "$WORK/private_hold")" ok
 check "withdrawal finished" "$(tail -1 "$WORK/private_withdraw")" ok
@@ -579,5 +579,31 @@ check "anon reads neither" \
 check "both are stored private" \
   "$(admin -c "SELECT (SELECT bool_and(is_private) FROM public.reflection_likes WHERE user_id = '$(uid 24)')::TEXT || '/' || (SELECT bool_and(is_private) FROM public.reflection_comments WHERE user_id = '$(uid 24)')::TEXT")" true/true
 check "the counts match a recount" "$(recount "$DREFLECTION")" "0/0 0/0"
+
+# ─── Eighth review, finding 1: a stale Board join cannot clear minority recorded in flight ─────
+# User 25 is an adult. Another device records minority in a transaction that stays open until this
+# device's join, whose form loaded "not under 18", is blocked. The join compares the loaded value
+# under private.lock_minor_change, so it waits for the minority write, reads the committed minority
+# and is refused. A join that compared before taking the lock would pass on the old value and clear
+# minority when it commits, making the profile public.
+rm -f "$WORK"/*
+session minor_hold "$(uid 25)" "BEGIN;
+SELECT public.set_profile_privacy(false, false, true, false)->>'is_minor';
+RESET ROLE;
+DO \$\$ BEGIN
+  FOR i IN 1 .. 200 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    EXIT WHEN (SELECT count(*) FROM pg_stat_activity WHERE application_name = 'race_stale_join' AND wait_event_type = 'Lock') >= 1;
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+END \$\$;
+COMMIT;"
+wait_for_hold minor_hold
+session stale_join "$(uid 25)" "SELECT public.join_board(NULL, false, false, 'juz_amma', 'light', 180, '$TODAY', 1)->>'status';"
+wait
+check "minority write finished" "$(tail -1 "$WORK/minor_hold")" ok
+check "the stale join is refused" "$(grep -c privacy_changed "$WORK/stale_join" || true)" 1
+check "minority stays recorded and the Board is not joined" \
+  "$(admin -c "SELECT is_minor::TEXT || '/' || board_joined::TEXT FROM public.profile_privacy WHERE user_id = '$(uid 25)'")" true/false
 
 echo "learning_consistency_races.sh: all races passed"

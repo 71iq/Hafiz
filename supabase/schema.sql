@@ -2389,10 +2389,14 @@ BEGIN
 END;
 $$;
 
+-- p_expected_minor is the minority the form loaded. A form loaded before another device recorded
+-- minority would otherwise clear it and make the profile public (ETH-07), so a stored value that
+-- differs refuses the write with privacy_changed and the app reloads.
 CREATE OR REPLACE FUNCTION public.set_profile_privacy(
   p_show_streak BOOLEAN,
   p_show_juz_completions BOOLEAN,
-  p_is_minor BOOLEAN
+  p_is_minor BOOLEAN,
+  p_expected_minor BOOLEAN
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -2402,25 +2406,39 @@ AS $$
 DECLARE
   uid UUID := private.require_user();
   current_row public.profile_privacy;
+  -- Whether recording minority took a Board member without a nickname off the Board, for the screen
+  -- to say so.
+  leaves_board BOOLEAN;
 BEGIN
-  IF p_show_streak IS NULL OR p_show_juz_completions IS NULL OR p_is_minor IS NULL THEN
+  IF p_show_streak IS NULL OR p_show_juz_completions IS NULL OR p_is_minor IS NULL OR p_expected_minor IS NULL THEN
     RAISE EXCEPTION 'invalid_privacy';
   END IF;
   -- Recording minority clears the photo and leaves matched halaqas (private.apply_minor_privacy), and
-  -- recording or withdrawing it recounts the person's likes and comments.
+  -- recording or withdrawing it recounts the person's likes and comments. Every minority write holds
+  -- this lock, so the stored value compared below holds until this write commits.
   PERFORM private.lock_minor_change(uid);
-  SELECT * INTO current_row FROM public.profile_privacy WHERE user_id = uid;
-  IF p_is_minor AND COALESCE(current_row.board_joined, false) AND current_row.board_nickname IS NULL THEN
-    RAISE EXCEPTION 'nickname_required';
+  -- The row lock comes last, as in join_board. It waits for a board placement in progress, so the
+  -- Board choice read here is the committed one.
+  SELECT * INTO current_row FROM public.profile_privacy WHERE user_id = uid FOR UPDATE;
+  IF COALESCE(current_row.is_minor, false) IS DISTINCT FROM p_expected_minor THEN
+    RAISE EXCEPTION 'privacy_changed';
   END IF;
+  -- Under 18s appear on the Board only under a nickname (BRD-07). Recording minority must not fail on
+  -- that rule, so a member without one leaves the Board in this transaction, as leave_board does, and
+  -- can join again with a nickname.
+  leaves_board := p_is_minor AND COALESCE(current_row.board_joined, false) AND current_row.board_nickname IS NULL;
   INSERT INTO public.profile_privacy (user_id, show_streak, show_juz_completions, is_minor, updated_at)
   VALUES (uid, p_show_streak, p_show_juz_completions, p_is_minor, now())
   ON CONFLICT (user_id) DO UPDATE SET
     show_streak = EXCLUDED.show_streak,
     show_juz_completions = EXCLUDED.show_juz_completions,
     is_minor = EXCLUDED.is_minor,
+    board_joined = public.profile_privacy.board_joined AND NOT leaves_board,
     updated_at = EXCLUDED.updated_at;
-  RETURN public.get_profile_privacy();
+  IF leaves_board THEN
+    UPDATE public.board_members SET left_at = now() WHERE user_id = uid AND left_at IS NULL;
+  END IF;
+  RETURN public.get_profile_privacy() || jsonb_build_object('left_board', leaves_board);
 END;
 $$;
 
@@ -2559,7 +2577,8 @@ AS $$
     'invite_code', g.invite_code,
     'member_count', private.halaqa_active_count(g.id),
     'role', m.role,
-    'is_creator', g.created_by = member,
+    -- created_by is null once the creator deletes their account; the client needs a boolean.
+    'is_creator', COALESCE(g.created_by = member, false),
     'share_consistency', m.share_consistency,
     'share_juz', m.share_juz,
     'share_plan_with_teachers', m.share_plan_with_teachers,
@@ -3457,9 +3476,11 @@ END;
 $$;
 
 -- BRD-04: opt-in from the Board tab, optionally under a nickname. A minor must use one (BRD-07).
+-- p_expected_minor is the minority the form loaded, compared as in set_profile_privacy.
 CREATE OR REPLACE FUNCTION public.join_board(
   p_nickname TEXT,
   p_is_minor BOOLEAN,
+  p_expected_minor BOOLEAN,
   p_level_band TEXT,
   p_pace_band TEXT,
   p_utc_offset_minutes INTEGER,
@@ -3475,12 +3496,15 @@ DECLARE
   uid UUID := private.require_user();
   today DATE := private.checked_local_date(p_today);
   clean_nickname TEXT := NULLIF(btrim(COALESCE(p_nickname, '')), '');
-  minor BOOLEAN := COALESCE(p_is_minor, false);
+  minor BOOLEAN := p_is_minor;
   -- Whether recording minority here leaves a matched halaqa, for the screen to say so (ETH-07).
   leaves_matched BOOLEAN := false;
 BEGIN
   PERFORM private.check_bands(p_level_band, p_pace_band, p_utc_offset_minutes);
   PERFORM private.check_week_start(p_week_start);
+  IF p_is_minor IS NULL OR p_expected_minor IS NULL THEN
+    RAISE EXCEPTION 'invalid_privacy';
+  END IF;
   IF clean_nickname IS NOT NULL AND (char_length(clean_nickname) NOT BETWEEN 3 AND 20 OR clean_nickname ~ '[[:cntrl:]]') THEN
     RAISE EXCEPTION 'invalid_nickname';
   END IF;
@@ -3490,6 +3514,10 @@ BEGIN
   -- As in set_profile_privacy, since this write sets is_minor either way. The profiles row lock also
   -- comes before the profile_privacy row that this upsert and the placement in get_board hold.
   PERFORM private.lock_minor_change(uid);
+  -- Every minority write holds that lock, so the stored value read here holds until this commits.
+  IF private.is_minor(uid) IS DISTINCT FROM p_expected_minor THEN
+    RAISE EXCEPTION 'privacy_changed';
+  END IF;
   -- Read under the halaqa lock lock_minor_change took, so no matched join can slip in after it.
   IF minor THEN
     leaves_matched := EXISTS (
@@ -3597,7 +3625,7 @@ REVOKE ALL ON FUNCTION
   public.delete_reflection_comment(UUID, UUID),
   public.delete_reflection(UUID, UUID),
   public.get_profile_privacy(),
-  public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN),
+  public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN),
   public.get_profile_summary(UUID),
   public.get_my_halaqas(),
   public.create_invite_halaqa(TEXT, BOOLEAN),
@@ -3613,7 +3641,7 @@ REVOKE ALL ON FUNCTION
   public.get_halaqa_teacher_view(UUID, UUID, TEXT),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
-  public.join_board(TEXT, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),
+  public.join_board(TEXT, BOOLEAN, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.leave_board()
 FROM PUBLIC, anon, authenticated;
 
@@ -3625,7 +3653,7 @@ GRANT EXECUTE ON FUNCTION
   public.delete_reflection_comment(UUID, UUID),
   public.delete_reflection(UUID, UUID),
   public.get_profile_privacy(),
-  public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN),
+  public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN),
   public.get_profile_summary(UUID),
   public.get_my_halaqas(),
   public.create_invite_halaqa(TEXT, BOOLEAN),
@@ -3641,7 +3669,7 @@ GRANT EXECUTE ON FUNCTION
   public.get_halaqa_teacher_view(UUID, UUID, TEXT),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
-  public.join_board(TEXT, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),
+  public.join_board(TEXT, BOOLEAN, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.leave_board()
 TO authenticated;
 

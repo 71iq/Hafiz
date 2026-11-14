@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CloudOff, Users } from "lucide-react-native";
 import { EncouragementSheet } from "@/components/social/EncouragementSheet";
 import { HalaqaGroup } from "@/components/social/HalaqaGroup";
-import { HalaqaSharingSheet, type ProfileVisibility } from "@/components/social/HalaqaSharingSheet";
+import { HalaqaSharingSheet, type ProfileVisibilityChange } from "@/components/social/HalaqaSharingSheet";
 import { HalaqaStart } from "@/components/social/HalaqaStart";
 import { SocialGate, SocialNotice, socialRowStyle } from "@/components/social/SocialControls";
 import { SocialScreen } from "@/components/social/SocialScreen";
@@ -15,6 +15,7 @@ import { TeacherViewSheet } from "@/components/social/TeacherViewSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Text } from "@/components/ui/Text";
 import { useAuthStore } from "@/lib/auth/store";
+import { boardKeys } from "@/lib/board/api";
 import { useDatabase } from "@/lib/database/provider";
 import { localDateOf } from "@/lib/habit/dates";
 import {
@@ -33,7 +34,12 @@ import {
   type HalaqaSharing,
 } from "@/lib/halaqa/api";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
-import { fetchProfilePrivacy, profilePrivacyKeys, saveProfilePrivacy } from "@/lib/profile/privacy";
+import {
+  fetchProfilePrivacy,
+  ProfilePrivacyChangedError,
+  profilePrivacyKeys,
+  saveProfilePrivacy,
+} from "@/lib/profile/privacy";
 import { useSettings } from "@/lib/settings/context";
 import { socialFailureMessage } from "@/lib/social/messages";
 import { requireSocialOwner } from "@/lib/social/owner";
@@ -113,12 +119,12 @@ function HalaqaContent({ userId }: { userId: string }) {
     read: active ? halaqaDetailRead(active.id, today) : null,
   });
 
+  // Read from the cache only: the app-wide minor check keeps it (useMinorPhotoCleanup), and the
+  // sharing sheet reads it again each time it opens (HalaqaSharingPanel).
   const privacy = useQuery({
     queryKey: profilePrivacyKeys.mine(userId),
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(userId)),
-    enabled: sharingOpen && !offline,
-    retry: false,
-    networkMode: "always",
+    enabled: false,
   });
 
   const teacherView = useQuery({
@@ -180,30 +186,52 @@ function HalaqaContent({ userId }: { userId: string }) {
     onError: (error) => setEncourageError(socialFailureMessage(error, s)),
   });
 
-  // ETH-07: the server takes a minor out of matched halaqas, so the matched join is not offered. The
-  // privacy is read from the cache the app-wide minor check keeps (useMinorPhotoCleanup).
+  // ETH-07: the server takes a minor out of matched halaqas, so the matched join is not offered.
   const isMinor = privacy.data?.isMinor === true;
+  const reloadPrivacy = () => queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) });
 
   const saveSharing = useMutation({
-    mutationFn: async (input: { sharing: HalaqaSharing; visibility: ProfileVisibility | null; leavesMatched: boolean }) => {
-      if (!active) return;
+    mutationFn: async (input: {
+      sharing: HalaqaSharing;
+      visibility: ProfileVisibilityChange | null;
+      leavesMatched: boolean;
+    }): Promise<{ leftBoard: boolean }> => {
+      if (!active) return { leftBoard: false };
       // One owner for both writes: the second is refused before it is sent if the account changed.
       const owner = requireSocialOwner(userId);
       await setHalaqaSharing(active.id, input.sharing, owner);
-      if (input.visibility) await saveProfilePrivacy(input.visibility, owner);
+      if (!input.visibility) return { leftBoard: false };
+      // The server says whether recording minority took a Board member without a nickname off the Board.
+      const saved = await saveProfilePrivacy(input.visibility, owner);
+      return { leftBoard: saved.leftBoard };
     },
-    onSuccess: async (_result, input) => {
+    onSuccess: async (result, input) => {
       setSharingOpen(false);
-      // Saying one is under 18 leaves the matched halaqa (ETH-07); the notice says so, not only "Saved".
-      setNotice(input.leavesMatched ? s.socialSavedLeftMatched : s.socialSaved);
+      // Saying one is under 18 leaves the matched halaqa, and the Board without a nickname (ETH-07,
+      // BRD-07); the notice says so, not only "Saved".
+      setNotice(
+        [input.leavesMatched ? s.socialSavedLeftMatched : s.socialSaved, result.leftBoard ? s.socialLeftBoardNickname : null]
+          .filter(Boolean)
+          .join(" "),
+      );
       await Promise.all([
         refreshAll(),
-        queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) }),
+        reloadPrivacy(),
+        // The Board tab reads whether the account is still on it.
+        result.leftBoard ? queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) }) : null,
         // ETH-07: stating minority clears the photo on the server, so the signed-in profile reloads.
         input.visibility?.isMinor ? useAuthStore.getState().fetchProfile() : null,
       ]);
     },
-    onError: (error) => setSharingError(socialFailureMessage(error, s)),
+    onError: (error) => {
+      if (error instanceof ProfilePrivacyChangedError) {
+        // Another device changed the age setting. The sheet reloads it and the person decides again.
+        setSharingError(s.socialErrorPrivacyChanged);
+        void reloadPrivacy();
+        return;
+      }
+      setSharingError(socialFailureMessage(error, s));
+    },
   });
 
   const leave = useMutation({
@@ -361,16 +389,18 @@ function HalaqaContent({ userId }: { userId: string }) {
       />
 
       {active && sharingOpen ? (
-        <HalaqaSharingSheet
-          key={`${active.id}:${privacy.dataUpdatedAt}`}
-          open
+        <HalaqaSharingPanel
+          // A reconnect mounts it afresh, so it reads the stored choices again.
+          key={`${active.id}:${offline ? "offline" : "online"}`}
+          userId={userId}
+          offline={offline}
           sharing={active.sharing}
-          privacy={privacy.data ?? null}
           pending={saveSharing.isPending}
           error={sharingError}
           onSave={(sharing, visibility) => {
             setSharingError(null);
-            const leavesMatched = visibility?.isMinor === true && !isMinor && groups.some((group) => group.kind === "matched");
+            const leavesMatched =
+              visibility?.isMinor === true && !visibility.expectedMinor && groups.some((group) => group.kind === "matched");
             saveSharing.mutate({ sharing, visibility, leavesMatched });
           }}
           onClose={() => setSharingOpen(false)}
@@ -392,5 +422,69 @@ function HalaqaContent({ userId }: { userId: string }) {
         onConfirm={() => leave.mutate()}
       />
     </SocialScreen>
+  );
+}
+
+/**
+ * ETH-07: the sharing sheet saves the account's age choice with the value it loaded, which the server
+ * compares. A cached copy can predate another device changing it, so the profile choices appear only
+ * after a read that completed while this panel is open, and give way to a note while a read runs or
+ * after one fails. The halaqa choices stay available either way.
+ */
+function HalaqaSharingPanel({
+  userId,
+  offline,
+  sharing,
+  pending,
+  error,
+  onSave,
+  onClose,
+}: {
+  userId: string;
+  offline: boolean;
+  sharing: HalaqaSharing;
+  pending: boolean;
+  error: string | null;
+  onSave: (sharing: HalaqaSharing, visibility: ProfileVisibilityChange | null) => void;
+  onClose: () => void;
+}) {
+  const s = useStrings();
+  const privacy = useQuery({
+    queryKey: profilePrivacyKeys.mine(userId),
+    queryFn: () => fetchProfilePrivacy(requireSocialOwner(userId)),
+    enabled: !offline,
+    retry: false,
+    networkMode: "always",
+    // Read again each time the sheet opens, even with a fresh cached copy.
+    refetchOnMount: "always",
+  });
+  // ETH-07: the profile choices start only from a read that succeeded since the sheet opened. They
+  // stay through later refetches; saving sends the minority they loaded, and the server refuses it if
+  // that changed since (privacy_changed).
+  const [verified, setVerified] = useState(false);
+  const readSinceOpen = privacy.isFetchedAfterMount && privacy.isSuccess && !privacy.isFetching;
+  if (readSinceOpen && !verified) setVerified(true);
+  const fresh = (verified || readSinceOpen) && privacy.data ? privacy.data : null;
+  const notice = fresh
+    ? null
+    : offline
+      ? { message: s.socialErrorOffline }
+      : privacy.isError && !privacy.isFetching
+        ? { message: socialFailureMessage(privacy.error, s), onRetry: () => void privacy.refetch() }
+        : { message: s.loading };
+
+  return (
+    <HalaqaSharingSheet
+      // Restarts from new stored values; a refetch that returns the same ones keeps what was changed.
+      key={fresh ? `fresh:${fresh.isMinor}:${fresh.showStreak}:${fresh.showJuzCompletions}` : "none"}
+      open
+      sharing={sharing}
+      privacy={fresh}
+      privacyNotice={notice}
+      pending={pending}
+      error={error}
+      onSave={onSave}
+      onClose={onClose}
+    />
   );
 }

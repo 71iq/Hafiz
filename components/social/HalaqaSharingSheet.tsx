@@ -10,15 +10,21 @@ import { useSettings } from "@/lib/settings/context";
 import { SocialErrorText, SocialToggleRow, socialRowStyle } from "./SocialControls";
 
 export type ProfileVisibility = Pick<ProfilePrivacy, "showStreak" | "showJuzCompletions" | "isMinor">;
+/** The profile choices to save, with the minority the sheet loaded, which the server compares. */
+export type ProfileVisibilityChange = ProfileVisibility & { expectedMinor: boolean };
 
 /**
  * Sharing choices (SOC-01, SOC-03, ETH-07): what this halaqa's members and teachers see, and what the
- * public profile shows. Mount it with a key per open so the drafts start from the saved values.
+ * public profile shows. Mount it with a key per open so the drafts start from the saved values, and
+ * again whenever `privacy` changes. Pass `privacy` only from a read that completed while the sheet is
+ * open: saving a stale copy is refused by the server. Without it the profile choices are not shown or
+ * saved, and `privacyNotice` says why.
  */
 export function HalaqaSharingSheet({
   open,
   sharing,
   privacy,
+  privacyNotice,
   pending,
   error,
   onSave,
@@ -27,14 +33,17 @@ export function HalaqaSharingSheet({
   open: boolean;
   sharing: HalaqaSharing;
   privacy: ProfileVisibility | null;
+  privacyNotice?: { message: string; onRetry?: () => void } | null;
   pending: boolean;
   error: string | null;
-  onSave: (sharing: HalaqaSharing, privacy: ProfileVisibility | null) => void;
+  onSave: (sharing: HalaqaSharing, privacy: ProfileVisibilityChange | null) => void;
   onClose: () => void;
 }) {
   const s = useStrings();
   const { isRTL } = useSettings();
   const [draft, setDraft] = useState(sharing);
+  // What the sheet loaded, kept for the save even if the parent passes another copy without a remount.
+  const [loaded] = useState(privacy);
   const [visibility, setVisibility] = useState(privacy);
   const set = (key: keyof HalaqaSharing) => (value: boolean) => setDraft((current) => ({ ...current, [key]: value }));
   const setVisible = (key: keyof ProfileVisibility) => (value: boolean) =>
@@ -99,6 +108,18 @@ export function HalaqaSharingSheet({
               disabled={pending}
             />
           </View>
+        ) : privacyNotice ? (
+          <View className="gap-2 border-t border-warm-200 pt-4 dark:border-neutral-800">
+            <Text variant="title-md" accessibilityRole="header">
+              {s.profileVisibilityTitle}
+            </Text>
+            <Text variant="caption" accessibilityLiveRegion="polite">
+              {privacyNotice.message}
+            </Text>
+            {privacyNotice.onRetry ? (
+              <Button variant="ghost" label={s.socialTryAgain} onPress={privacyNotice.onRetry} disabled={pending} />
+            ) : null}
+          </View>
         ) : null}
         <SocialErrorText message={error} />
       </OverlayBody>
@@ -108,7 +129,7 @@ export function HalaqaSharingSheet({
           <Button
             className="flex-1"
             label={s.socialSave}
-            onPress={() => onSave(draft, visibility)}
+            onPress={() => onSave(draft, visibility && loaded ? { ...visibility, expectedMinor: loaded.isMinor } : null)}
             disabled={pending}
             accessibilityState={{ disabled: pending, busy: pending }}
           />

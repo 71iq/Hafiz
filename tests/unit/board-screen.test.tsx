@@ -94,10 +94,23 @@ const ready = {
   ],
 };
 
+// The account's privacy as an earlier read on this device left it in the cache: an adult.
+const cachedAdult = {
+  boardJoined: false,
+  boardNickname: null,
+  showStreak: false,
+  showJuzCompletions: false,
+  isMinor: false,
+};
+
 const queryClients: QueryClient[] = [];
-function renderScreen() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+/** `staleTime` as the app sets it, so a cached copy counts as fresh; `seed` fills the cache first. */
+function renderScreen(options: { staleTime?: number; seed?: (client: QueryClient) => void } = {}) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: options.staleTime ?? 0 } },
+  });
   queryClients.push(client);
+  options.seed?.(client);
   return render(
     <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
       <QueryClientProvider client={client}>
@@ -165,7 +178,10 @@ describe("Board tab", () => {
 
     fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
     await waitFor(() =>
-      expect(mockRpc).toHaveBeenCalledWith("join_board", expect.objectContaining({ p_nickname: null, p_is_minor: false })),
+      expect(mockRpc).toHaveBeenCalledWith(
+        "join_board",
+        expect.objectContaining({ p_nickname: null, p_is_minor: false, p_expected_minor: false }),
+      ),
     );
     expect(await screen.findByText(strings.en.boardGatheringTitle)).toBeTruthy();
   });
@@ -192,7 +208,7 @@ describe("Board tab", () => {
     await waitFor(() =>
       expect(mockRpc).toHaveBeenCalledWith(
         "join_board",
-        expect.objectContaining({ p_nickname: "Little Star", p_is_minor: true }),
+        expect.objectContaining({ p_nickname: "Little Star", p_is_minor: true, p_expected_minor: true }),
       ),
     );
   });
@@ -224,19 +240,125 @@ describe("Board tab", () => {
     expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
   });
 
-  it("keeps a typed nickname when the stored choices are read again unchanged", async () => {
+  it("reads the stored age choice again when the Board opens, even with a fresh cached copy (ETH-07)", async () => {
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    let releasePrivacy: (() => void) | undefined;
+    mockRpc.mockImplementation(async (fn, args) => {
+      if (fn !== "get_profile_privacy") return base(fn, args);
+      await new Promise<void>((resolve) => (releasePrivacy = resolve));
+      // Another device recorded minority after this device cached its copy.
+      return { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null };
+    });
+    const screen = renderScreen({
+      staleTime: Infinity,
+      seed: (client) => client.setQueryData(profilePrivacyKeys.mine(USER), cachedAdult),
+    });
+    await waitFor(() => expect(releasePrivacy).toBeDefined());
+    // Joining from the cached copy would send "not under 18".
+    expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
+    expect(screen.getByLabelText(strings.en.loading)).toBeTruthy();
+
+    releasePrivacy!();
+    expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
+    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+  });
+
+  it("keeps Join hidden when the read of the stored age choice fails, even with a cached copy (ETH-07)", async () => {
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation(async (fn, args) =>
+      fn === "get_profile_privacy" ? { data: null, error: { message: "synthetic privacy failure" } } : base(fn, args),
+    );
+    const screen = renderScreen({ seed: (client) => client.setQueryData(profilePrivacyKeys.mine(USER), cachedAdult) });
+    expect(await screen.findByRole("button", { name: strings.en.socialTryAgain })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
+    expect(mockRpc.mock.calls.map(([fn]) => fn)).not.toContain("join_board");
+  });
+
+  it("keeps the form and a typed nickname while the stored choices are read again unchanged", async () => {
     signIn(USER);
     const screen = renderScreen();
     await screen.findByText(strings.en.boardIntentionTitle);
     fireEvent.press(screen.getByRole("switch", { name: strings.en.boardMinorToggle }));
     fireEvent.changeText(screen.getByLabelText(strings.en.boardNicknameLabel), "Little Star");
+    const base = mockRpc.getMockImplementation()!;
+    let releasePrivacy: (() => void) | undefined;
+    mockRpc.mockImplementation(async (fn, args) => {
+      if (fn !== "get_profile_privacy") return base(fn, args);
+      await new Promise<void>((resolve) => (releasePrivacy = resolve));
+      return base(fn, args);
+    });
+    const client = queryClients[queryClients.length - 1];
+    act(() => {
+      void client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
+    });
+    await waitFor(() => expect(releasePrivacy).toBeDefined());
+    // The form stays while the read runs: a stale join is refused by the server (privacy_changed).
+    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
+    await act(async () => {
+      releasePrivacy!();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
+    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+  });
+
+  it("starts the form again from stored choices that changed on another device", async () => {
+    signIn(USER);
+    const screen = renderScreen();
+    await screen.findByText(strings.en.boardIntentionTitle);
+    const base = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation(async (fn, args) =>
+      fn === "get_profile_privacy"
+        ? { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null }
+        : base(fn, args),
+    );
     const client = queryClients[queryClients.length - 1];
     await act(async () => {
       await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
     });
-    expect(mockRpc.mock.calls.filter(([fn]) => fn === "get_profile_privacy").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
     expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+  });
+
+  it("says the age setting changed on another device and reloads it when the join is refused (ETH-07)", async () => {
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    let stored: Record<string, unknown> = privacy;
+    mockRpc.mockImplementation(async (fn, args) => {
+      if (fn === "get_profile_privacy") return { data: stored, error: null };
+      if (fn === "join_board") {
+        // Another device recorded minority after this form loaded.
+        stored = { ...privacy, is_minor: true, board_nickname: "Little Star" };
+        return { data: null, error: { message: "privacy_changed", code: "P0001" } };
+      }
+      return base(fn, args);
+    });
+    const screen = renderScreen();
+    await screen.findByText(strings.en.boardIntentionTitle);
+    fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
+
+    expect(await screen.findByText(strings.en.socialErrorPrivacyChanged)).toBeTruthy();
+    expect(mockRpc).toHaveBeenCalledWith("join_board", expect.objectContaining({ p_is_minor: false, p_expected_minor: false }));
+    expect(mockRpc.mock.calls.filter(([fn]) => fn === "get_profile_privacy")).toHaveLength(2);
+    // The form now starts from the reloaded choice.
+    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
+  });
+
+  it("shows the changed-setting message in Arabic", async () => {
+    mockSettings.isRTL = true;
+    mockSettings.uiLanguage = "ar";
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation(async (fn, args) =>
+      fn === "join_board" ? { data: null, error: { message: "privacy_changed", code: "P0001" } } : base(fn, args),
+    );
+    const screen = renderScreen();
+    await screen.findByText(strings.ar.boardIntentionTitle);
+    fireEvent.press(screen.getByRole("button", { name: strings.ar.boardJoin }));
+    expect(await screen.findByText(strings.ar.socialErrorPrivacyChanged)).toBeTruthy();
   });
 
   it("requires a nickname from a reader under 18 (BRD-07)", async () => {
@@ -252,7 +374,7 @@ describe("Board tab", () => {
     await waitFor(() =>
       expect(mockRpc).toHaveBeenCalledWith(
         "join_board",
-        expect.objectContaining({ p_nickname: "Little Star", p_is_minor: true }),
+        expect.objectContaining({ p_nickname: "Little Star", p_is_minor: true, p_expected_minor: false }),
       ),
     );
   });

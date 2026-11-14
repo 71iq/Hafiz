@@ -34,6 +34,7 @@ export const socialStrings = {
     socialErrorNicknameRequired: "Under 18s appear on the Board under a nickname. Add one to continue.",
     socialErrorAlreadyEncouraged: "You've already sent encouragement in this halaqa. You can send one a day.",
     socialErrorAccountChanged: "You switched accounts, so this stopped. Try again.",
+    socialErrorPrivacyChanged: "Your age setting was changed on another device. Check it and try again.",
     socialErrorNotMember: "You're no longer in this halaqa.",
     socialErrorDate: "Your device date looks off. Check it and try again.",
     socialProfileJuzCompleted: "Juz completed",
@@ -127,6 +128,8 @@ export const socialStrings = {
     socialSaved: "Saved",
     socialSavedLeftMatched: "Saved. You have left your matched halaqa, which is for adults. Your invite halaqas are unchanged.",
     socialLeftMatched: "You have left your matched halaqa, which is for adults. Your invite halaqas are unchanged.",
+    socialLeftBoardNickname:
+      "You have left the Board, since people under 18 appear there only under a nickname. You can join again with one.",
 
     teacherViewTitle: "{{name}}'s progress",
     teacherViewNote: "Hafiz supports a teacher's work and never replaces it.",
@@ -213,6 +216,7 @@ export const socialStrings = {
     socialErrorNicknameRequired: "يظهر من هم دون الثامنة عشرة في اللوحة بلقب. أضف لقبًا للمتابعة.",
     socialErrorAlreadyEncouraged: "أرسلت تشجيعًا في هذه الحلقة. يمكنك إرسال تشجيع واحد كل يوم.",
     socialErrorAccountChanged: "توقّف هذا لأنك بدّلت الحساب. حاول مجددًا.",
+    socialErrorPrivacyChanged: "تغيّر إعداد العمر من جهاز آخر. راجعه وحاول مجددًا.",
     socialErrorNotMember: "لم تعد عضوًا في هذه الحلقة.",
     socialErrorDate: "يبدو تاريخ جهازك غير صحيح. تحقق منه وحاول مجددًا.",
     socialProfileJuzCompleted: "الأجزاء المكتملة",
@@ -303,6 +307,7 @@ export const socialStrings = {
     socialSaved: "حُفظ",
     socialSavedLeftMatched: "حُفظ. غادرتَ حلقتك المقترحة لأنها للبالغين، وحلقات الدعوة باقية كما هي.",
     socialLeftMatched: "غادرتَ حلقتك المقترحة لأنها للبالغين، وحلقات الدعوة باقية كما هي.",
+    socialLeftBoardNickname: "غادرتَ اللوحة لأن من هم دون الثامنة عشرة لا يظهرون فيها إلا بلقب، ويمكنك الانضمام مجددًا بلقب.",
 
     teacherViewTitle: "تقدّم {{name}}",
     teacherViewNote: "يعين حافظ المعلّم في عمله ولا يغني عنه.",

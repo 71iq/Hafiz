@@ -851,22 +851,22 @@ BEGIN
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000001');
   board := public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.eq('board is opt-in', board->>'status', 'not_joined');
-  PERFORM hz_test.expect_error(format($q$SELECT public.join_board(NULL, true, 'juz_amma', 'light', 180, %L, 1)$q$, hz_test.today_text()), 'nickname_required');
-  PERFORM hz_test.expect_error(format($q$SELECT public.join_board('ab', false, 'juz_amma', 'light', 180, %L, 1)$q$, hz_test.today_text()), 'invalid_nickname');
-  PERFORM hz_test.expect_error($q$SELECT public.join_board(NULL, false, 'juz_amma', 'light', 180, '1999-01-01', 1)$q$, 'invalid_local_date');
-  board := public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM hz_test.expect_error(format($q$SELECT public.join_board(NULL, true, false, 'juz_amma', 'light', 180, %L, 1)$q$, hz_test.today_text()), 'nickname_required');
+  PERFORM hz_test.expect_error(format($q$SELECT public.join_board('ab', false, false, 'juz_amma', 'light', 180, %L, 1)$q$, hz_test.today_text()), 'invalid_nickname');
+  PERFORM hz_test.expect_error($q$SELECT public.join_board(NULL, false, false, 'juz_amma', 'light', 180, '1999-01-01', 1)$q$, 'invalid_local_date');
+  board := public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.eq('alone: gathering', board->>'status', 'gathering');
   PERFORM hz_test.eq('gathering shows no standings', board ? 'standings', false);
   PERFORM hz_test.eq('board week starts Monday', board->>'week_start', hz_test.d(hz_test.week_start()));
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000002');
-  PERFORM public.join_board('Quiet Reader', false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM public.join_board('Quiet Reader', false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000003');
-  PERFORM public.join_board('Little Star', true, 'juz_amma', 'light', 120, hz_test.today_text(), 1);
+  PERFORM public.join_board('Little Star', true, false, 'juz_amma', 'light', 120, hz_test.today_text(), 1);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000004');
-  board := public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  board := public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.eq('four members: still gathering', board->>'member_count', '4');
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000005');
-  board := public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  board := public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.eq('five members: standings', board->>'status', 'ready');
   PERFORM hz_test.eq('five rows', jsonb_array_length(board->'standings'), 5);
   PERFORM hz_test.eq('no user ids in standings', position('00000000-0000-4000' IN board::TEXT), 0);
@@ -893,24 +893,24 @@ BEGIN
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000005');
   PERFORM hz_test.eq('leaver removed from standings', public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 1)->>'status', 'gathering');
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000002');
-  PERFORM hz_test.eq('rejoin returns to the cohort', public.join_board('Quiet Reader', false, 'hafiz', 'maintenance', -600, hz_test.today_text(), 1)->>'member_count', '5');
+  PERFORM hz_test.eq('rejoin returns to the cohort', public.join_board('Quiet Reader', false, false, 'hafiz', 'maintenance', -600, hz_test.today_text(), 1)->>'member_count', '5');
   -- Fill the cohort to 30; the next exact match starts a new cohort.
   FOR i IN 6 .. 30 LOOP
     PERFORM hz_test.login(('00000000-0000-4000-8003-' || lpad(i::TEXT, 12, '0'))::UUID);
-    PERFORM public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+    PERFORM public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   END LOOP;
   PERFORM hz_test.eq('cohort holds 30', (public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 30);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000031');
-  PERFORM hz_test.eq('31st starts a cohort', (public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 1);
+  PERFORM hz_test.eq('31st starts a cohort', (public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 1);
   -- Widening (BRD-08): adjacent level and a 3 h zone join the small cohort; two bands away starts another.
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000032');
-  PERFORM hz_test.eq('adjacent level joins small cohort', (public.join_board(NULL, false, 'juz_4_15', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 2);
+  PERFORM hz_test.eq('adjacent level joins small cohort', (public.join_board(NULL, false, false, 'juz_4_15', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 2);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000033');
-  PERFORM hz_test.eq('3 h zone joins small cohort', (public.join_board(NULL, false, 'juz_amma', 'light', 360, hz_test.today_text(), 1)->>'member_count')::INTEGER, 3);
+  PERFORM hz_test.eq('3 h zone joins small cohort', (public.join_board(NULL, false, false, 'juz_amma', 'light', 360, hz_test.today_text(), 1)->>'member_count')::INTEGER, 3);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000034');
-  PERFORM hz_test.eq('two level bands away starts a cohort', (public.join_board(NULL, false, 'juz_16_29', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 1);
+  PERFORM hz_test.eq('two level bands away starts a cohort', (public.join_board(NULL, false, false, 'juz_16_29', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 1);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000035');
-  PERFORM hz_test.eq('far zone starts a cohort', (public.join_board(NULL, false, 'juz_amma', 'light', -300, hz_test.today_text(), 1)->>'member_count')::INTEGER, 1);
+  PERFORM hz_test.eq('far zone starts a cohort', (public.join_board(NULL, false, false, 'juz_amma', 'light', -300, hz_test.today_text(), 1)->>'member_count')::INTEGER, 1);
 END $$;
 RESET ROLE;
 
@@ -935,10 +935,10 @@ BEGIN
   PERFORM public.leave_board();
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000036');
   PERFORM hz_test.eq('replacement fills the free place',
-    (public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 30);
+    (public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 30);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000007');
   PERFORM hz_test.eq('returning member is placed elsewhere',
-    (public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 4);
+    (public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 4);
 END $$;
 RESET ROLE;
 DO $$
@@ -1000,21 +1000,21 @@ DECLARE
 BEGIN
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000041');
   PERFORM hz_test.expect_error(format($q$SELECT public.get_board('juz_amma', 'light', 180, %L, 7)$q$, hz_test.today_text()), 'invalid_week_start');
-  PERFORM hz_test.expect_error(format($q$SELECT public.join_board(NULL, false, 'juz_amma', 'light', 180, %L, NULL)$q$, hz_test.today_text()), 'invalid_week_start');
-  board := public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 6);
+  PERFORM hz_test.expect_error(format($q$SELECT public.join_board(NULL, false, false, 'juz_amma', 'light', 180, %L, NULL)$q$, hz_test.today_text()), 'invalid_week_start');
+  board := public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 6);
   PERFORM hz_test.eq('Saturday week start', board->>'week_start', hz_test.d(hz_test.saturday_week()));
   PERFORM hz_test.eq('week start is a Saturday', extract(dow FROM (board->>'week_start')::DATE)::INTEGER, 6);
   PERFORM hz_test.eq('not mixed with Monday cohorts of the same bands', (board->>'member_count')::INTEGER, 1);
   FOR i IN 42 .. 45 LOOP
     PERFORM hz_test.login(('00000000-0000-4000-8003-' || lpad(i::TEXT, 12, '0'))::UUID);
-    board := public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 6);
+    board := public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 6);
   END LOOP;
   PERFORM hz_test.eq('Saturday cohort ready', board->>'status', 'ready');
   SELECT s INTO me FROM jsonb_array_elements(board->'standings') AS s WHERE s->>'name' = 'Board 41';
   PERFORM hz_test.eq('points from Saturday to Friday only', (me->>'points')::INTEGER, 2);
   -- Changing the week start mid-week moves the user; they never hold two active cohorts at once.
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000040');
-  PERFORM public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   board := public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 6);
   PERFORM hz_test.eq('moved to the Saturday cohort', board->>'member_count', '6');
 END $$;
@@ -1177,7 +1177,7 @@ DECLARE
 BEGIN
   PERFORM hz_test.eq('owner sees own streak', public.get_profile_summary(auth.uid())->>'streak',
     (SELECT value FROM hz_test.state WHERE key = 'b_streak'));
-  privacy := public.set_profile_privacy(true, true, false);
+  privacy := public.set_profile_privacy(true, true, false, false);
   PERFORM hz_test.eq('privacy saved', privacy->>'show_streak', 'true');
 END $$;
 RESET ROLE;
@@ -1193,7 +1193,7 @@ RESET ROLE;
 
 SELECT hz_test.login('00000000-0000-4000-8000-00000000000b');
 SET ROLE authenticated;
-SELECT public.set_profile_privacy(true, true, true);
+SELECT public.set_profile_privacy(true, true, true, false);
 RESET ROLE;
 
 -- Finding 1 (second review): stating minority clears the profile photo in the same transaction, and
@@ -1360,7 +1360,7 @@ BEGIN
   PERFORM hz_test.login('00000000-0000-4000-8006-000000000001');
   PERFORM public.send_halaqa_encouragement((matched->>'id')::UUID, '00000000-0000-4000-8006-000000000002', 'together',
     NULL, hz_test.today_text());
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM hz_test.eq('only the invite halaqa stays', (
     SELECT string_agg(h->>'id', ',') FROM jsonb_array_elements(public.get_my_halaqas()) AS h
   ), invite->>'id');
@@ -1389,7 +1389,7 @@ BEGIN
   PERFORM hz_test.login('00000000-0000-4000-8006-000000000004');
   matched := public.join_matched_halaqa('starting', 'maintenance', -720);
   INSERT INTO hz_test.state VALUES ('third_alone', matched->>'id');
-  PERFORM public.join_board('Quiet Kid', true, 'starting', 'maintenance', -720, hz_test.today_text(), 0);
+  PERFORM public.join_board('Quiet Kid', true, false, 'starting', 'maintenance', -720, hz_test.today_text(), 0);
   PERFORM hz_test.eq('a board minor keeps no matched halaqa', public.get_my_halaqas(), '[]'::JSONB);
 END $$;
 RESET ROLE;
@@ -1424,12 +1424,42 @@ END $$;
 RESET ROLE;
 UPDATE public.profiles SET avatar_url = NULL WHERE id = '00000000-0000-4000-8006-000000000001';
 
--- A minor already on the board without a nickname cannot be recorded (BRD-07).
+-- Eighth review, finding 3: under 18s appear on the Board only under a nickname (BRD-07), and the
+-- sharing settings have no nickname field. Recording minority for a Board member without one never
+-- fails on that rule: it takes them off the Board in the same transaction and says so, and they can
+-- join again with a nickname. 8003-1 is on the Board without a nickname.
 SELECT hz_test.login('00000000-0000-4000-8003-000000000001');
 SET ROLE authenticated;
 DO $$
+DECLARE
+  privacy JSONB;
 BEGIN
-  PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(false, false, true)', 'nickname_required');
+  privacy := public.set_profile_privacy(false, false, true, false);
+  PERFORM hz_test.eq('eighth: minority is recorded for a Board member without a nickname', privacy->>'is_minor', 'true');
+  PERFORM hz_test.eq('eighth: they left the Board', privacy->>'board_joined', 'false');
+  PERFORM hz_test.eq('eighth: and the save says so', privacy->'left_board', 'true'::JSONB);
+  PERFORM hz_test.eq('eighth: the Board shows them as not joined',
+    public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 1)->>'status', 'not_joined');
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('eighth: leaving closed their placement', (
+    SELECT count(*) FROM public.board_members
+    WHERE user_id = '00000000-0000-4000-8003-000000000001' AND left_at IS NULL
+  ), 0::BIGINT);
+END $$;
+SET ROLE authenticated;
+DO $$
+DECLARE
+  privacy JSONB;
+BEGIN
+  PERFORM public.join_board('Quiet Return', true, true, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM hz_test.eq('eighth: they join again under a nickname', public.get_profile_privacy()->>'board_joined', 'true');
+  -- With a nickname, saving as a minor keeps them on the Board.
+  privacy := public.set_profile_privacy(false, false, true, true);
+  PERFORM hz_test.eq('eighth: a minor with a nickname stays on the Board', privacy->>'board_joined', 'true');
+  PERFORM hz_test.eq('eighth: and the save reports no leave', privacy->'left_board', 'false'::JSONB);
 END $$;
 RESET ROLE;
 
@@ -1475,7 +1505,7 @@ BEGIN
   PERFORM hz_test.eq('an adult''s activity is counted', hz_test.adult_counts(), '2 likes, 2 comments, comment liked 1');
 
   -- Stating minority recounts what they touched. A minor still writes, and reads what they wrote.
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM hz_test.eq('stating minority leaves their activity out of the counts', hz_test.adult_counts(),
     '1 likes, 1 comments, comment liked 0');
   minor_reflection := (public.create_reflection(auth.uid(), 1, 4, 4, 1, 1, 'Written as a minor', true)).id;
@@ -1541,10 +1571,10 @@ SELECT hz_test.login('00000000-0000-4000-8008-000000000001');
 SET ROLE authenticated;
 DO $$
 BEGIN
-  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM public.set_profile_privacy(false, false, false, true);
   PERFORM hz_test.eq('withdrawing minority counts again only what was written as an adult', hz_test.adult_counts(),
     '2 likes, 2 comments, comment liked 1');
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM hz_test.eq('stating it again leaves it out again', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
   PERFORM public.set_reflection_like(auth.uid(), (SELECT value FROM hz_test.state WHERE key = 'adult_reflection')::UUID, false);
   PERFORM hz_test.eq('removing a minor''s like changes no count', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
@@ -1615,12 +1645,12 @@ DO $$
 DECLARE
   target UUID := (SELECT value FROM hz_test.state WHERE key = 'fifth_reflection')::UUID;
 BEGIN
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM public.create_reflection(auth.uid(), 2, 2, 2, 1, 1, 'Kept private as promised', true);
   PERFORM public.add_reflection_comment(auth.uid(), target, 'A comment kept private as promised', true);
 
   -- Another device withdraws minority while this screen still promises privacy.
-  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM public.set_profile_privacy(false, false, false, true);
   PERFORM hz_test.expect_error(format($q$SELECT public.create_reflection(%L, 2, 3, 3, 1, 1,
     'Promised private after the withdrawal', true)$q$, auth.uid()), 'privacy_changed');
   PERFORM hz_test.expect_error(format($q$SELECT public.add_reflection_comment(%L, %L,
@@ -1633,7 +1663,7 @@ BEGIN
 
   -- The reverse: the screen shows an adult, another device recorded minority. The text only becomes
   -- more private, so it is accepted.
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM public.create_reflection(auth.uid(), 2, 5, 5, 1, 1, 'Shown as public, kept private for a minor', false);
   PERFORM public.add_reflection_comment(auth.uid(), target, 'Shown as public, kept private for a minor', false);
 
@@ -1757,17 +1787,17 @@ END $$;
 SELECT hz_test.login('00000000-0000-4000-8010-000000000005');
 DO $$
 BEGIN
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM hz_test.eq('minority leaves 8010-5 out', (
     SELECT likes_count || '/' || comments_count FROM public.reflections WHERE content = 'A busy reflection'
   ), '1/201');
   PERFORM public.set_reflection_comment_like(auth.uid(), (SELECT id FROM public.reflection_comments WHERE content = 'Busy comment 3'), true);
   PERFORM public.set_reflection_comment_like(auth.uid(), (SELECT id FROM public.reflection_comments WHERE content = 'Busy comment 1'), false);
-  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM public.set_profile_privacy(false, false, false, true);
   PERFORM hz_test.eq('withdrawing counts 8010-5 again', (
     SELECT likes_count || '/' || comments_count FROM public.reflections WHERE content = 'A busy reflection'
   ), '2/202');
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
 END $$;
 
 -- 8010-3 deletes their second reflection, with its comments and likes.
@@ -1828,7 +1858,7 @@ DO $$
 BEGIN
   PERFORM public.join_matched_halaqa('juz_amma', 'light', 180);
   PERFORM hz_test.eq('joining as a minor reports leaving the matched halaqa',
-    public.join_board('Small Star', true, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'true');
+    public.join_board('Small Star', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'true');
 END $$;
 RESET ROLE;
 -- Clients cannot read memberships directly; the owner checks that it really ended.
@@ -1844,9 +1874,9 @@ SET ROLE authenticated;
 DO $$
 BEGIN
   PERFORM hz_test.eq('an adult join reports no matched halaqa left',
-    public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
+    public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
   PERFORM hz_test.eq('a minor join without a matched halaqa reports none',
-    public.join_board('Other Star', true, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
+    public.join_board('Other Star', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
 END $$;
 RESET ROLE;
 
@@ -1902,14 +1932,14 @@ BEGIN
   PERFORM hz_test.eq('seventh: an adult''s activity is counted', hz_test.seventh_counts(), '1 likes, 2 comments, comment liked 1');
 
   PERFORM hz_test.login('00000000-0000-4000-8030-000000000002');
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM public.create_reflection(auth.uid(), 3, 3, 3, 1, 1, 'Seventh private reflection by two', true);
   PERFORM public.add_reflection_comment(auth.uid(), adult_reflection, 'Seventh private comment by two', true);
   PERFORM public.set_reflection_like(auth.uid(), adult_reflection, true);
   PERFORM public.set_reflection_comment_like(auth.uid(), adult_comment, true);
 
   PERFORM hz_test.login('00000000-0000-4000-8030-000000000003');
-  PERFORM public.join_board('Seventh Kid', true, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM public.join_board('Seventh Kid', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM public.create_reflection(auth.uid(), 3, 4, 4, 1, 1, 'Seventh private reflection by three', true);
   PERFORM public.add_reflection_comment(auth.uid(), adult_reflection, 'Seventh private comment by three', true);
   PERFORM public.set_reflection_like(auth.uid(), adult_reflection, true);
@@ -1918,7 +1948,7 @@ BEGIN
 
   -- Existing behavior: an adult who becomes a minor has their earlier rows hidden while they are one.
   PERFORM hz_test.login('00000000-0000-4000-8030-000000000004');
-  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM hz_test.eq('seventh: becoming a minor leaves earlier activity out', hz_test.seventh_counts(),
     '0 likes, 1 comments, comment liked 0');
 END $$;
@@ -1941,15 +1971,15 @@ SET ROLE authenticated;
 DO $$
 BEGIN
   PERFORM hz_test.login('00000000-0000-4000-8030-000000000002');
-  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM public.set_profile_privacy(false, false, false, true);
   PERFORM hz_test.eq('seventh: withdrawing through set_profile_privacy keeps private rows out of the counts',
     hz_test.seventh_counts(), '0 likes, 1 comments, comment liked 0');
   PERFORM hz_test.login('00000000-0000-4000-8030-000000000003');
-  PERFORM public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM public.join_board(NULL, false, true, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.eq('seventh: withdrawing through join_board keeps private rows out of the counts',
     hz_test.seventh_counts(), '0 likes, 1 comments, comment liked 0');
   PERFORM hz_test.login('00000000-0000-4000-8030-000000000004');
-  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM public.set_profile_privacy(false, false, false, true);
   PERFORM hz_test.eq('seventh: withdrawing counts again what was written as an adult', hz_test.seventh_counts(),
     '1 likes, 2 comments, comment liked 1');
 END $$;
@@ -2100,6 +2130,104 @@ DO $$
 BEGIN
   PERFORM hz_test.eq('seventh: private rows keep every count exact', hz_test.count_drift(), 'none');
 END $$;
+
+-- Eighth review, finding 1: a form saves the minority it loaded, and the write is refused with
+-- privacy_changed when the stored value differs, so a form left open on another device can neither
+-- clear minority nor record it from a stale copy. Both RPCs that set is_minor compare. 8040-1 is
+-- recorded as a minor by another device while this one still shows an adult, and then the reverse.
+SELECT hz_test.make_user('00000000-0000-4000-8040-000000000001', 'stale_user_1', 'Stale 1');
+SELECT hz_test.login('00000000-0000-4000-8040-000000000001');
+SET ROLE authenticated;
+SELECT public.set_profile_privacy(false, false, true, false);
+RESET ROLE;
+INSERT INTO hz_test.state
+  SELECT 'stale_row', to_jsonb(pp)::TEXT FROM public.profile_privacy AS pp WHERE user_id = '00000000-0000-4000-8040-000000000001';
+SET ROLE authenticated;
+DO $$
+BEGIN
+  -- This device loaded "not under 18" before the other device recorded minority.
+  PERFORM hz_test.expect_error(format($q$SELECT public.join_board(NULL, false, false, 'juz_amma', 'light', 180, %L, 1)$q$,
+    hz_test.today_text()), 'privacy_changed');
+  PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(true, true, false, false)', 'privacy_changed');
+  -- A stale form is refused even when what it sends would keep minority.
+  PERFORM hz_test.expect_error(format($q$SELECT public.join_board('Stale Star', true, false, 'juz_amma', 'light', 180, %L, 1)$q$,
+    hz_test.today_text()), 'privacy_changed');
+  PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(false, false, true, false)', 'privacy_changed');
+  -- The loaded value is required.
+  PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(false, false, true, NULL)', 'invalid_privacy');
+  PERFORM hz_test.expect_error(format($q$SELECT public.join_board('Stale Star', true, NULL, 'juz_amma', 'light', 180, %L, 1)$q$,
+    hz_test.today_text()), 'invalid_privacy');
+  PERFORM hz_test.eq('eighth: minority stays recorded after stale writes', public.get_profile_privacy()->>'is_minor', 'true');
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('eighth: refused writes change nothing', (
+    SELECT to_jsonb(pp)::TEXT FROM public.profile_privacy AS pp WHERE user_id = '00000000-0000-4000-8040-000000000001'
+  ), (SELECT value FROM hz_test.state WHERE key = 'stale_row'));
+  PERFORM hz_test.eq('eighth: a refused join places nobody', (
+    SELECT count(*) FROM public.board_members WHERE user_id = '00000000-0000-4000-8040-000000000001'
+  ), 0::BIGINT);
+END $$;
+SET ROLE authenticated;
+DO $$
+DECLARE
+  snapshot TEXT;
+BEGIN
+  -- The other device withdraws minority with the value it loaded, so it writes.
+  PERFORM hz_test.eq('eighth: a matching value writes through set_profile_privacy',
+    public.set_profile_privacy(true, false, false, true)->>'is_minor', 'false');
+  -- This device still shows a minor.
+  snapshot := public.get_profile_privacy()::TEXT;
+  PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(false, false, true, true)', 'privacy_changed');
+  PERFORM hz_test.expect_error(format($q$SELECT public.join_board('Stale Star', true, true, 'juz_amma', 'light', 180, %L, 1)$q$,
+    hz_test.today_text()), 'privacy_changed');
+  PERFORM hz_test.eq('eighth: a stale minor form changes nothing', public.get_profile_privacy()::TEXT, snapshot);
+  -- Reloaded, the join goes through.
+  PERFORM public.join_board('Stale Star', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM hz_test.eq('eighth: a matching value writes through join_board', public.get_profile_privacy()->>'is_minor', 'true');
+  PERFORM hz_test.eq('eighth: and joins the Board', public.get_profile_privacy()->>'board_joined', 'true');
+END $$;
+RESET ROLE;
+
+-- Eighth review, finding 2: deleting a halaqa creator's account clears created_by, and the surviving
+-- members' list still says false, not null, for is_creator, so the app can read it. 8050-1 creates an
+-- invite halaqa that 8050-2 joins, then deletes their account.
+SELECT hz_test.make_user(('00000000-0000-4000-8050-' || lpad(i::TEXT, 12, '0'))::UUID, 'creator_user_' || i, 'Creator ' || i)
+FROM generate_series(1, 2) AS i;
+SET ROLE authenticated;
+DO $$
+DECLARE
+  invite JSONB;
+BEGIN
+  PERFORM hz_test.login('00000000-0000-4000-8050-000000000001');
+  invite := public.create_invite_halaqa('Creator leaves');
+  PERFORM hz_test.eq('eighth: the creator is marked', invite->'is_creator', 'true'::JSONB);
+  INSERT INTO hz_test.state VALUES ('creator_group', invite->>'id');
+  PERFORM hz_test.login('00000000-0000-4000-8050-000000000002');
+  PERFORM public.join_halaqa_by_code(invite->>'invite_code');
+END $$;
+RESET ROLE;
+DELETE FROM auth.users WHERE id = '00000000-0000-4000-8050-000000000001';
+DO $$
+BEGIN
+  PERFORM hz_test.eq('eighth: the halaqa stays without a creator', (
+    SELECT (created_by IS NULL)::TEXT || '/' || (deleted_at IS NULL)::TEXT FROM public.halaqa_groups
+    WHERE id = (SELECT value FROM hz_test.state WHERE key = 'creator_group')::UUID
+  ), 'true/true');
+END $$;
+SELECT hz_test.login('00000000-0000-4000-8050-000000000002');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  halaqas JSONB := public.get_my_halaqas();
+BEGIN
+  PERFORM hz_test.eq('eighth: the member still lists the halaqa', jsonb_array_length(halaqas), 1);
+  PERFORM hz_test.eq('eighth: is_creator is false, not null', halaqas->0->'is_creator', 'false'::JSONB);
+  PERFORM hz_test.eq('eighth: the detail reads too', public.get_halaqa_detail(
+    (SELECT value FROM hz_test.state WHERE key = 'creator_group')::UUID, hz_test.today_text())->'group'->'is_creator', 'false'::JSONB);
+END $$;
+RESET ROLE;
 
 SELECT hz_test.login(NULL);
 SET client_min_messages = warning;

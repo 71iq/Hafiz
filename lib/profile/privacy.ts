@@ -1,27 +1,27 @@
 import { z } from "zod";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { requireSignedOutViewer, requireSocialOwner, type SocialOwner } from "@/lib/social/owner";
-import { callSocialRpc, classifyRemoteError, socialError } from "@/lib/social/remote";
+import { callSocialRpc, classifyRemoteError, socialError, socialFailureOf } from "@/lib/social/remote";
 
 /**
  * Profile visibility (SOC-01, ETH-07). Everything beyond identity is private unless the person turns it
  * on. The choices live in an owner-only table, and what others may see is decided by the server.
  */
-const profilePrivacySchema = z
-  .object({
-    board_joined: z.boolean(),
-    board_nickname: z.string().nullable(),
-    show_streak: z.boolean(),
-    show_juz_completions: z.boolean(),
-    is_minor: z.boolean(),
-  })
-  .transform((row) => ({
-    boardJoined: row.board_joined,
-    boardNickname: row.board_nickname,
-    showStreak: row.show_streak,
-    showJuzCompletions: row.show_juz_completions,
-    isMinor: row.is_minor,
-  }));
+const privacyRow = z.object({
+  board_joined: z.boolean(),
+  board_nickname: z.string().nullable(),
+  show_streak: z.boolean(),
+  show_juz_completions: z.boolean(),
+  is_minor: z.boolean(),
+});
+const toPrivacy = (row: z.output<typeof privacyRow>) => ({
+  boardJoined: row.board_joined,
+  boardNickname: row.board_nickname,
+  showStreak: row.show_streak,
+  showJuzCompletions: row.show_juz_completions,
+  isMinor: row.is_minor,
+});
+const profilePrivacySchema = privacyRow.transform(toPrivacy);
 export type ProfilePrivacy = z.output<typeof profilePrivacySchema>;
 
 /** Null fields are hidden from this viewer. */
@@ -45,22 +45,58 @@ export function fetchProfilePrivacy(owner: SocialOwner): Promise<ProfilePrivacy>
 }
 
 /**
- * Saves the visibility choices. Recording minority (ETH-07) deletes the stored photo files first and
- * is not sent when that fails, so the save can be retried before anything is recorded. The server
- * then clears the profile photo, refuses new uploads and leaves matched halaqas, and one more pass
- * removes a photo another device uploaded in between.
+ * ETH-07: the server refused a write that sets is_minor because the stored value is no longer the one
+ * the form loaded. Another device changed the age setting, and saving the old copy could clear a
+ * minor's setting and make their profile public. Nothing was written. The screen reloads the
+ * privacy and asks the person to check it and try again.
+ */
+export class ProfilePrivacyChangedError extends Error {
+  constructor() {
+    super("privacy_changed");
+    this.name = "ProfilePrivacyChangedError";
+  }
+}
+
+/** Maps the server's refusal of a stale minority value to its own error and passes others through. */
+export function profilePrivacyWriteError(error: unknown): unknown {
+  const failure = socialFailureOf(error);
+  return failure.kind === "failed" && failure.message === "privacy_changed" ? new ProfilePrivacyChangedError() : error;
+}
+
+const savedPrivacySchema = privacyRow
+  .extend({ left_board: z.boolean() })
+  .transform((row) => ({ ...toPrivacy(row), leftBoard: row.left_board }));
+/** The saved choices, and whether recording minority took the account off the Board (BRD-07). */
+export type SavedProfilePrivacy = z.output<typeof savedPrivacySchema>;
+
+/**
+ * Saves the visibility choices. `expectedMinor` is the minority the form loaded; the server refuses
+ * the save with ProfilePrivacyChangedError when the stored value differs. Recording minority (ETH-07)
+ * deletes the stored photo files first and is not sent when that fails, so the save can be retried
+ * before anything is recorded. The server then clears the profile photo, refuses new uploads, leaves
+ * matched halaqas, takes a Board member without a nickname off the Board, and one more pass removes a
+ * photo another device uploaded in between.
  */
 export async function saveProfilePrivacy(
-  input: { showStreak: boolean; showJuzCompletions: boolean; isMinor: boolean },
+  input: { showStreak: boolean; showJuzCompletions: boolean; isMinor: boolean; expectedMinor: boolean },
   owner: SocialOwner,
-): Promise<ProfilePrivacy> {
-  if (input.isMinor) await deleteOwnAvatarFiles(owner);
+): Promise<SavedProfilePrivacy> {
+  // Only a change to minority deletes first. A form that already showed a minor has nothing new to
+  // record, and a stale one would otherwise delete an adult's photos before the server refuses it.
+  if (input.isMinor && !input.expectedMinor) await deleteOwnAvatarFiles(owner);
   const saved = await callSocialRpc(
     "set_profile_privacy",
-    { p_show_streak: input.showStreak, p_show_juz_completions: input.showJuzCompletions, p_is_minor: input.isMinor },
-    profilePrivacySchema,
+    {
+      p_show_streak: input.showStreak,
+      p_show_juz_completions: input.showJuzCompletions,
+      p_is_minor: input.isMinor,
+      p_expected_minor: input.expectedMinor,
+    },
+    savedPrivacySchema,
     owner,
-  );
+  ).catch((error: unknown) => {
+    throw profilePrivacyWriteError(error);
+  });
   if (saved.isMinor) await deleteAvatarFilesAfterMinority(owner);
   return saved;
 }

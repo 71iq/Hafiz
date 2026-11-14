@@ -130,6 +130,22 @@ const detail = {
   received: [],
 };
 
+// The account's own privacy as the server returns it, and as an earlier read left it in the cache.
+const adultPrivacy = {
+  board_joined: false,
+  board_nickname: null as string | null,
+  show_streak: false,
+  show_juz_completions: false,
+  is_minor: false,
+};
+const cachedAdult = {
+  boardJoined: false,
+  boardNickname: null,
+  showStreak: false,
+  showJuzCompletions: false,
+  isMinor: false,
+};
+
 const queryClients: QueryClient[] = [];
 function renderScreen(seed?: (client: QueryClient) => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
@@ -239,16 +255,107 @@ describe("Halaqa tab", () => {
     respond({
       get_my_halaqas: [matched],
       get_halaqa_detail: { ...detail, group: matched },
-      get_profile_privacy: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: false },
+      get_profile_privacy: adultPrivacy,
       set_halaqa_sharing: matched,
-      set_profile_privacy: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: true },
+      set_profile_privacy: { ...adultPrivacy, is_minor: true, left_board: false },
     });
     const screen = renderScreen();
     fireEvent.press(await screen.findByLabelText(strings.en.halaqaSharingA11y));
     fireEvent(await screen.findByRole("switch", { name: strings.en.profileIsMinor }), "valueChange", true);
     fireEvent.press(screen.getByRole("button", { name: strings.en.socialSave }));
     expect(await screen.findByText(strings.en.socialSavedLeftMatched)).toBeTruthy();
-    expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", expect.objectContaining({ p_is_minor: true }));
+    expect(mockRpc).toHaveBeenCalledWith(
+      "set_profile_privacy",
+      expect.objectContaining({ p_is_minor: true, p_expected_minor: false }),
+    );
+  });
+
+  it("offers the profile choices only from a read made since the sheet opened (ETH-07)", async () => {
+    signIn(USER);
+    let privacyFails = true;
+    mockRpc.mockImplementation(async (fn) => {
+      switch (fn) {
+        case "get_my_halaqas":
+          return { data: [summary], error: null };
+        case "get_halaqa_detail":
+          return { data: detail, error: null };
+        case "get_profile_privacy":
+          return privacyFails
+            ? { data: null, error: { message: "synthetic privacy failure" } }
+            : { data: { ...adultPrivacy, is_minor: true }, error: null };
+        default:
+          throw new Error(`Unexpected RPC ${fn}`);
+      }
+    });
+    // An earlier read on this device left an adult copy in the cache.
+    const screen = renderScreen((client) => client.setQueryData(profilePrivacyKeys.mine(USER), cachedAdult));
+    fireEvent.press(await screen.findByLabelText(strings.en.halaqaSharingA11y));
+    expect(await screen.findByText(strings.en.socialErrorGeneric)).toBeTruthy();
+    // Saving the cached copy could clear minority recorded on another device.
+    expect(screen.queryByRole("switch", { name: strings.en.profileIsMinor })).toBeNull();
+
+    privacyFails = false;
+    fireEvent.press(screen.getByRole("button", { name: strings.en.socialTryAgain }));
+    const minor = await screen.findByRole("switch", { name: strings.en.profileIsMinor });
+    expect(minor.props.accessibilityState).toMatchObject({ checked: true });
+  });
+
+  it("says the age setting changed on another device and reloads it when the save is refused (ETH-07)", async () => {
+    signIn(USER);
+    let stored = adultPrivacy;
+    mockRpc.mockImplementation(async (fn) => {
+      switch (fn) {
+        case "get_my_halaqas":
+          return { data: [summary], error: null };
+        case "get_halaqa_detail":
+          return { data: detail, error: null };
+        case "set_halaqa_sharing":
+          return { data: summary, error: null };
+        case "get_profile_privacy":
+          return { data: stored, error: null };
+        case "set_profile_privacy":
+          // Another device recorded minority after the sheet loaded.
+          stored = { ...adultPrivacy, is_minor: true };
+          return { data: null, error: { message: "privacy_changed", code: "P0001" } };
+        default:
+          throw new Error(`Unexpected RPC ${fn}`);
+      }
+    });
+    const screen = renderScreen();
+    fireEvent.press(await screen.findByLabelText(strings.en.halaqaSharingA11y));
+    fireEvent(await screen.findByRole("switch", { name: strings.en.profileShowStreak }), "valueChange", true);
+    fireEvent.press(screen.getByRole("button", { name: strings.en.socialSave }));
+
+    expect(await screen.findByText(strings.en.socialErrorPrivacyChanged)).toBeTruthy();
+    expect(mockRpc).toHaveBeenCalledWith(
+      "set_profile_privacy",
+      expect.objectContaining({ p_is_minor: false, p_expected_minor: false }),
+    );
+    // The sheet stays open with the reloaded choice.
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: strings.en.profileIsMinor }).props.accessibilityState).toMatchObject({
+        checked: true,
+      }),
+    );
+    expect(mockRpc.mock.calls.filter(([fn]) => fn === "get_profile_privacy")).toHaveLength(2);
+  });
+
+  it("says the Board was left when saving under 18 without a Board nickname (BRD-07)", async () => {
+    mockSettings.isRTL = true;
+    mockSettings.uiLanguage = "ar";
+    signIn(USER);
+    respond({
+      get_my_halaqas: [summary],
+      get_halaqa_detail: detail,
+      get_profile_privacy: { ...adultPrivacy, board_joined: true },
+      set_halaqa_sharing: summary,
+      set_profile_privacy: { ...adultPrivacy, is_minor: true, left_board: true },
+    });
+    const screen = renderScreen();
+    fireEvent.press(await screen.findByLabelText(strings.ar.halaqaSharingA11y));
+    fireEvent(await screen.findByRole("switch", { name: strings.ar.profileIsMinor }), "valueChange", true);
+    fireEvent.press(screen.getByRole("button", { name: strings.ar.socialSave }));
+    expect(await screen.findByText(`${strings.ar.socialSaved} ${strings.ar.socialLeftBoardNickname}`)).toBeTruthy();
   });
 
   it("shows the shared goal and only what each member shared, with no ranking", async () => {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { deleteAvatarFilesAfterMinority, deleteOwnAvatarFiles } from "@/lib/profile/privacy";
+import { deleteAvatarFilesAfterMinority, deleteOwnAvatarFiles, profilePrivacyWriteError } from "@/lib/profile/privacy";
 import type { SocialOwner } from "@/lib/social/owner";
 import {
   callSocialRpc,
@@ -118,19 +118,29 @@ export function isValidBoardNickname(nickname: string | null): boolean {
 }
 
 /**
- * Joining as a minor records it on the account (ETH-07), as saveProfilePrivacy does: the stored photo
- * files are deleted before the join is sent, which is not sent when that fails, and once more after.
+ * Joining sets the account's minority (ETH-07), as saveProfilePrivacy does. `expectedMinor` is the
+ * value the form loaded, and the server refuses the join with ProfilePrivacyChangedError when the
+ * stored value differs, so a form loaded before another device recorded minority cannot clear it.
+ * Recording minority deletes the stored photo files before the join is sent, which is not sent when
+ * that fails, and once more after.
  */
 export async function joinBoard(
-  input: { nickname: string | null; isMinor: boolean; inputs: BoardInputs; today: string },
+  input: { nickname: string | null; isMinor: boolean; expectedMinor: boolean; inputs: BoardInputs; today: string },
   owner: SocialOwner,
 ): Promise<{ view: BoardView; leftMatched: boolean }> {
-  if (input.isMinor) await deleteOwnAvatarFiles(owner);
+  if (input.isMinor && !input.expectedMinor) await deleteOwnAvatarFiles(owner);
   const raw = await callSocialRpcRaw(
     "join_board",
-    { p_nickname: input.nickname, p_is_minor: input.isMinor, ...boardArgs(input.inputs, input.today) },
+    {
+      p_nickname: input.nickname,
+      p_is_minor: input.isMinor,
+      p_expected_minor: input.expectedMinor,
+      ...boardArgs(input.inputs, input.today),
+    },
     owner,
-  );
+  ).catch((error: unknown) => {
+    throw profilePrivacyWriteError(error);
+  });
   const view = parseSocialPayload(boardViewSchema, raw);
   // Whether this join took the account out of a matched halaqa, decided in the join's transaction.
   const leftMatched = parseSocialPayload(leftMatchedSchema, raw).left_matched === true;

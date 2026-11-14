@@ -13,7 +13,12 @@ import {
 } from "@/lib/halaqa/api";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
 import { strings } from "@/lib/i18n/strings";
-import { deleteOwnAvatarFiles, fetchProfileSummary, saveProfilePrivacy } from "@/lib/profile/privacy";
+import {
+  deleteOwnAvatarFiles,
+  fetchProfileSummary,
+  ProfilePrivacyChangedError,
+  saveProfilePrivacy,
+} from "@/lib/profile/privacy";
 import { loadWithSocialCache } from "@/lib/social/cache";
 import { encouragementText } from "@/lib/social/encouragements";
 import { socialFailureMessage } from "@/lib/social/messages";
@@ -267,11 +272,24 @@ describe("board adapter", () => {
 
   it("sends the minor flag and nickname with the bands; the server computes every score", async () => {
     mockRpc.mockResolvedValue({ data: { status: "gathering", week_start: "2026-11-09", member_count: 1, min_members: 5 }, error: null });
-    await joinBoard({ nickname: "Little Star", isMinor: true, inputs, today: "2026-11-13" }, owner());
+    await joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner());
     const [fn, args] = mockRpc.mock.calls[0];
     expect(fn).toBe("join_board");
-    expect(args).toMatchObject({ p_nickname: "Little Star", p_is_minor: true, p_level_band: "juz_amma", p_week_start: 6 });
+    expect(args).toMatchObject({
+      p_nickname: "Little Star",
+      p_is_minor: true,
+      p_expected_minor: false,
+      p_level_band: "juz_amma",
+      p_week_start: 6,
+    });
     expect(Object.keys(args).some((key) => /score|point|cohort/.test(key))).toBe(false);
+  });
+
+  it("reports a join refused for a changed age setting as its own error (ETH-07)", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "privacy_changed", code: "P0001" } });
+    await expect(
+      joinBoard({ nickname: null, isMinor: false, expectedMinor: false, inputs, today: "2026-11-13" }, owner()),
+    ).rejects.toBeInstanceOf(ProfilePrivacyChangedError);
   });
 });
 
@@ -310,7 +328,7 @@ describe("profile summary (SOC-01)", () => {
 
 describe("a minor's photo (ETH-07)", () => {
   const privacy = (isMinor: boolean) => ({
-    data: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: isMinor },
+    data: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: isMinor, left_board: false },
     error: null,
   });
 
@@ -321,7 +339,7 @@ describe("a minor's photo (ETH-07)", () => {
       expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
       return privacy(true);
     });
-    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner());
+    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
     expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
     // The pass before the save, and the one after it, which finds nothing left with one request.
     expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "remove", "list"]);
@@ -333,7 +351,7 @@ describe("a minor's photo (ETH-07)", () => {
     mockRemoveRefused = true;
     mockRpc.mockResolvedValue(privacy(true));
     await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner()),
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
     ).rejects.toMatchObject({ failure: { kind: "failed" } });
     expect(mockRpc).not.toHaveBeenCalled();
   });
@@ -377,7 +395,7 @@ describe("a minor's photo (ETH-07)", () => {
       mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
       return privacy(true);
     });
-    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner());
+    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
     expect([...mockAvatarFiles]).toEqual([]);
   });
 
@@ -388,15 +406,38 @@ describe("a minor's photo (ETH-07)", () => {
       return privacy(true);
     });
     await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true }, owner()),
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
     ).resolves.toMatchObject({ isMinor: true });
   });
 
   it("leaves an adult's photos alone", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
     mockRpc.mockResolvedValue(privacy(false));
-    await saveProfilePrivacy({ showStreak: true, showJuzCompletions: false, isMinor: false }, owner());
+    await saveProfilePrivacy({ showStreak: true, showJuzCompletions: false, isMinor: false, expectedMinor: false }, owner());
     expect(mockStorageCalls).toEqual([]);
+  });
+
+  it("sends the minority the form loaded and reports a refusal for a changed setting as its own error", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRpc.mockResolvedValue({ data: null, error: { message: "privacy_changed", code: "P0001" } });
+    // The form still shows a minor, but another device withdrew it: the adult's photo is not deleted.
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: true }, owner()),
+    ).rejects.toBeInstanceOf(ProfilePrivacyChangedError);
+    expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", {
+      p_show_streak: false,
+      p_show_juz_completions: false,
+      p_is_minor: true,
+      p_expected_minor: true,
+    });
+    expect([...mockAvatarFiles]).toEqual([`${USER}/1.jpg`]);
+  });
+
+  it("says when recording minority took the account off the Board (BRD-07)", async () => {
+    mockRpc.mockResolvedValue({ data: { ...privacy(true).data, board_joined: false, left_board: true }, error: null });
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
+    ).resolves.toMatchObject({ isMinor: true, boardJoined: false, leftBoard: true });
   });
 
   const gathering = { data: { status: "gathering", week_start: "2026-11-09", member_count: 1, min_members: 5 }, error: null };
@@ -409,7 +450,7 @@ describe("a minor's photo (ETH-07)", () => {
       mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
       return gathering;
     });
-    await joinBoard({ nickname: "Little Star", isMinor: true, inputs, today: "2026-11-13" }, owner());
+    await joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner());
     expect(mockAvatarFiles.size).toBe(0);
   });
 
@@ -418,7 +459,7 @@ describe("a minor's photo (ETH-07)", () => {
     mockRemoveRefused = true;
     mockRpc.mockResolvedValue(gathering);
     await expect(
-      joinBoard({ nickname: "Little Star", isMinor: true, inputs, today: "2026-11-13" }, owner()),
+      joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner()),
     ).rejects.toMatchObject({ failure: { kind: "failed" } });
     expect(mockRpc).not.toHaveBeenCalled();
   });
@@ -543,7 +584,7 @@ describe("account binding (requests belong to the account that started them)", (
     await expect(setHalaqaSharing(GROUP, sharing, captured)).rejects.toMatchObject({
       failure: { kind: "account_changed" },
     });
-    const second = await saveProfilePrivacy({ showStreak: true, showJuzCompletions: true, isMinor: false }, captured).catch(
+    const second = await saveProfilePrivacy({ showStreak: true, showJuzCompletions: true, isMinor: false, expectedMinor: false }, captured).catch(
       (caught: unknown) => caught,
     );
     expect(socialFailureOf(second)).toEqual({ kind: "account_changed" });
