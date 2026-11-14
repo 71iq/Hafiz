@@ -1,7 +1,7 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
-import { meetsMinimum, tallyReviews } from "@/lib/habit/minimum";
+import { meetsMinimum, sabaqStepFlags, tallyReviews } from "@/lib/habit/minimum";
 import { putHabitDay } from "@/lib/habit/queries";
 import { readHabitSettings } from "@/lib/habit/settings";
 import type { HabitDayRow } from "@/lib/habit/types";
@@ -36,11 +36,7 @@ function rowFor(date: LocalDate, status: "done" | "made_up", at: string, credite
   };
 }
 
-/**
- * The instants of each chunk card's completed steps 6 (STR-01), the rule DAY_TALLY_SQL applies: a
- * pass with no earlier review, or whose latest earlier review failed. Reviews at the same earlier
- * instant count as passed if any of them passed, as the SQL orders them.
- */
+/** The instants of each chunk card's completed steps 6 (STR-01), by sabaqStepFlags. */
 function sabaqStepInstants(rows: readonly { card_id: string; rating: number; reviewed_at: string }[]): Map<string, Set<number>> {
   const byCard = new Map<string, { at: number; rating: number }[]>();
   for (const row of rows) {
@@ -53,24 +49,8 @@ function sabaqStepInstants(rows: readonly { card_id: string; rating: number; rev
   const steps = new Map<string, Set<number>>();
   for (const [cardId, reviews] of byCard) {
     reviews.sort((a, b) => a.at - b.at);
-    // The best rating at the latest instant before the current one, or null before the first review.
-    let priorBest: number | null = null;
-    let groupAt = Number.NaN;
-    let groupBest = 0;
-    for (const review of reviews) {
-      if (review.at !== groupAt) {
-        if (!Number.isNaN(groupAt)) priorBest = groupBest;
-        groupAt = review.at;
-        groupBest = review.rating;
-      } else {
-        groupBest = Math.max(groupBest, review.rating);
-      }
-      if (review.rating >= 3 && (priorBest === null || priorBest < 3)) {
-        const instants = steps.get(cardId) ?? new Set<number>();
-        instants.add(review.at);
-        steps.set(cardId, instants);
-      }
-    }
+    const flags = sabaqStepFlags(reviews);
+    steps.set(cardId, new Set(reviews.filter((_, index) => flags[index]).map((review) => review.at)));
   }
   return steps;
 }

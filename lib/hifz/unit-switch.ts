@@ -1,4 +1,4 @@
-import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { putUserSetting, removeUserSetting } from "@/lib/database/user-settings";
 import {
   insertNewStudyCard,
@@ -9,7 +9,7 @@ import {
   type StartingSchedule,
 } from "@/lib/fsrs/queries";
 import { State } from "@/lib/fsrs/scheduler";
-import { readSmartDeckFilter, SMART_DECK_IDS, writeAllDecksFilter, type BuiltInDeckFilter } from "@/lib/fsrs/smart-decks";
+import { putAllDecksFilter, readSmartDeckFilter, SMART_DECK_IDS, type BuiltInDeckFilter } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_DECK_NEW_CARD_LIMIT, type StudyCardRow, type SurahAyahRange } from "@/lib/fsrs/types";
 import { localDateOf } from "@/lib/habit/dates";
 import { ensureManzilCycleStart } from "@/lib/hifz/pages";
@@ -293,9 +293,10 @@ export function filterCoveringSpans(filter: BuiltInDeckFilter, spans: readonly A
 
 /**
  * SBQ-02 in ayah review: the ayah decks take in a page memorized through sabaq, as setup scopes them
- * to the memorized surahs (applyHifzSetup), so its new ayah cards are reviewed. Its own transaction.
+ * to the memorized surahs (applyHifzSetup), so its new ayah cards are reviewed. Runs inside the
+ * caller's transaction, so a failed grade leaves the filters as they were.
  */
-export async function coverPageInAyahReview(db: AppDatabase, page: number): Promise<void> {
+export async function coverPageInAyahReview(db: DatabaseExecutor, page: number): Promise<void> {
   const spans = await db.getAllAsync<AyahSpan>(
     `SELECT p.surah AS surah, MIN(p.ayah) AS first, MAX(p.ayah) AS last,
             (SELECT MAX(q.ayah) FROM quran_text AS q WHERE q.surah = p.surah) AS count
@@ -303,5 +304,5 @@ export async function coverPageInAyahReview(db: AppDatabase, page: number): Prom
     [page],
   );
   const widened = filterCoveringSpans(await readSmartDeckFilter(db, SMART_DECK_IDS.retention), spans);
-  if (widened) await writeAllDecksFilter(db, widened);
+  if (widened) await putAllDecksFilter(db, widened);
 }

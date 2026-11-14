@@ -232,6 +232,35 @@ describe("sabaq second look (SBQ-03)", () => {
     expect(screen.getByText(s.hifzSabaqIntention)).toBeTruthy();
   });
 
+  it("chooses the lesson's lines again after a graded look, so a failed look's lines come first (SBQ-02)", async () => {
+    // Loaded with the look still passed, the lesson was line 2. The failed look offers line 1 again.
+    jest.mocked(nextSabaqTarget).mockResolvedValueOnce(target).mockResolvedValueOnce({ ...target, fromLine: 1, toLine: 1, lineNumbers: new Set([1]) });
+    await open();
+    expect(jest.mocked(saveSecondLook).mock.calls).toHaveLength(0);
+    press(s.hifzDrillShow);
+    await act(async () => {
+      void grading().onGrade(1);
+    });
+    await flush();
+    expect(jest.mocked(saveSecondLook).mock.calls[0][1]).toMatchObject({ cardId: "chunk:madani15:5:1-1", pageData });
+    expect(nextSabaqTarget).toHaveBeenCalledTimes(2);
+    press(s.hifzSabaqStart);
+    expect(screen.getByText(s.hifzSabaqIntention)).toBeTruthy();
+    expect(screen.getByText("Page 5 · Lines 1 to 1")).toBeTruthy();
+  });
+
+  it("keeps the loaded lesson when its lines cannot be chosen again after a look", async () => {
+    jest.mocked(nextSabaqTarget).mockResolvedValueOnce(target).mockRejectedValueOnce(new Error("Synthetic read failure"));
+    await open();
+    press(s.hifzDrillShow);
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    press(s.hifzSabaqStart);
+    expect(screen.getByText("Page 5 · Lines 2 to 2")).toBeTruthy();
+  });
+
   it("leaves from the end state without starting a lesson", async () => {
     await open();
     press(s.hifzDrillShow);
@@ -440,10 +469,25 @@ describe("sabaq second look (SBQ-03)", () => {
 
     it("after a failed check of lines that completed their page, says they come up in tomorrow's review", async () => {
       jest.mocked(nextSabaqTarget).mockResolvedValue({ ...target, completesPage: true });
+      jest.mocked(saveSabaqCleanRun).mockResolvedValue({ wird: { kind: "none" }, pageAdded: true } as Awaited<ReturnType<typeof saveSabaqCleanRun>>);
       await finishLesson({ secondLookAt: null }, 1);
       // Step 6 added the page, so the lines are not offered again as new lines.
       expect(screen.getByText(s.hifzSabaqNotFluentReview)).toBeTruthy();
       expect(screen.queryByText(s.hifzSabaqNotFluent)).toBeNull();
+    });
+
+    it("follows the page step 6 added, not the lines chosen at load, when an earlier chunk's look failed since", async () => {
+      // Chosen as the page's last lines, but step 6 found earlier lines no longer memorized and added no page.
+      jest.mocked(nextSabaqTarget).mockResolvedValue({ ...target, completesPage: true });
+      await finishLesson({ secondLookAt: null }, 1);
+      expect(screen.getByText(s.hifzSabaqNotFluent)).toBeTruthy();
+      expect(screen.queryByText(s.hifzSabaqNotFluentReview)).toBeNull();
+    });
+
+    it("says the lines join review with their page when a passed lesson's page is still incomplete", async () => {
+      jest.mocked(nextSabaqTarget).mockResolvedValue({ ...target, completesPage: true });
+      await finishLesson({ secondLookAt: null }, 3);
+      expect(screen.getByText(s.hifzSabaqDonePartial)).toBeTruthy();
     });
   });
 });

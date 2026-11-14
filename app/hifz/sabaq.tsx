@@ -114,7 +114,14 @@ function SabaqScreen() {
   /** New memorization waits for review to catch up (PLN-02); a second look is still offered. */
   const [catchUpFirst, setCatchUpFirst] = useState(false);
   /** What the saved fluent check means for the done step's copy. */
-  const [outcome, setOutcome] = useState<{ passed: boolean; partial: boolean; secondLookAt: Date | null; secondLookNow: boolean } | null>(null);
+  const [outcome, setOutcome] = useState<{
+    passed: boolean;
+    partial: boolean;
+    /** This lesson added the page to review, at step 6 or the check. */
+    pageAdded: boolean;
+    secondLookAt: Date | null;
+    secondLookNow: boolean;
+  } | null>(null);
   const STEPS: readonly Step[] = useMemo(
     () => (similar.length > 0 ? ["intention", "listen", "meaning", "similar", "looking", "ayah", "chunk", "link", "check"] : BASE_STEPS),
     [similar.length],
@@ -132,6 +139,13 @@ function SabaqScreen() {
   /** What step 6's save meant for the wird and how long the lesson had taken, for the summary. */
   const cleanRunEvent = useRef<SessionHabitInput["event"]>(null);
   const cleanRunMs = useRef(0);
+  /** Step 6's save added the chunk's page to review (SBQ-02). */
+  const cleanRunPageAdded = useRef(false);
+  /**
+   * How load chose the lesson's lines, so a graded second look can choose them again. Null when the
+   * screen offers no new lines.
+   */
+  const targetQuery = useRef<Parameters<typeof nextSabaqTarget>[1] | null>(null);
   /**
    * The rendered copy of `saveLock === "saving"`, for the remove guard below. Unlike `busy` it ends as
    * soon as the grade is saved, so leaving while the summary loads is not held.
@@ -160,6 +174,18 @@ function SabaqScreen() {
    * one, and the check would grade lines the person never memorized. The meanings follow the language
    * in their own effect below.
    */
+  /** Show the lesson's lines, with the similar verses the user already knows (MUT-01). */
+  const showTarget = useCallback(
+    async (next: SabaqTarget | null) => {
+      setTarget(next);
+      if (!next) return;
+      // MUT-01: before memorizing, show siblings the user already knows, with the difference marked.
+      const [groups, memorizedPages] = await Promise.all([similarGroupsForAyahs(db, next.ayahs), readMemorizedPageNumbers(db)]);
+      setSimilar(withMemorizedSiblings(groups, memorizedPages));
+    },
+    [db],
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -180,16 +206,17 @@ function SabaqScreen() {
       setPlan(wird.plan);
       setCatchUpFirst(wird.daily.backlog);
       const pageWords = (page: number) => words?.[page - 1] ?? null;
+      // Opened for a second look on a day new memorization is paused, the screen offers no new lines.
+      targetQuery.current = newMemorizationOpen(wird)
+        ? {
+            plan: wird.plan,
+            // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
+            wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
+            pageWords,
+          }
+        : null;
       const [next, secondLooks] = await Promise.all([
-        // Opened for a second look on a day new memorization is paused, the screen offers no new lines.
-        newMemorizationOpen(wird)
-          ? nextSabaqTarget(db, {
-              plan: wird.plan,
-              // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
-              wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
-              pageWords,
-            })
-          : Promise.resolve(null),
+        targetQuery.current ? nextSabaqTarget(db, targetQuery.current) : Promise.resolve(null),
         // A second look that cannot be read is left for the next visit; new lines still load.
         loadSecondLooks(db, { pageWords }).catch((lookError) => {
           console.warn("[Sabaq] Failed to load second looks:", lookError);
@@ -199,12 +226,7 @@ function SabaqScreen() {
       setLooks(secondLooks.due);
       setLookIndex(0);
       setNextLookAt(secondLooks.nextAt);
-      setTarget(next);
-      if (next) {
-        // MUT-01: before memorizing, show siblings the user already knows, with the difference marked.
-        const [groups, memorizedPages] = await Promise.all([similarGroupsForAyahs(db, next.ayahs), readMemorizedPageNumbers(db)]);
-        setSimilar(withMemorizedSiblings(groups, memorizedPages));
-      }
+      await showTarget(next);
       sessionRef.current = startReviewSession("sabaq");
       lessonClock.reset();
     } catch (loadError) {
@@ -213,7 +235,7 @@ function SabaqScreen() {
     } finally {
       setLoading(false);
     }
-  }, [db, lessonClock]);
+  }, [db, lessonClock, showTarget]);
 
   useEffect(() => {
     load();
@@ -325,6 +347,33 @@ function SabaqScreen() {
   };
 
   /**
+   * SBQ-02: a graded look can change which lines count as memorized: a failed one offers its lines
+   * again, a passed one after a failed check covers them again. So the lesson's lines are chosen
+   * again before it starts. The same lines keep the loaded lesson; a failed read keeps it too, since
+   * the save checks the page in its own transaction.
+   */
+  const chooseTargetAgain = async (): Promise<SabaqTarget | null> => {
+    const query = targetQuery.current;
+    if (!query) return target;
+    try {
+      const next = await nextSabaqTarget(db, query);
+      const same =
+        next !== null &&
+        target !== null &&
+        next.page === target.page &&
+        next.fromLine === target.fromLine &&
+        next.toLine === target.toLine &&
+        next.completesPage === target.completesPage;
+      if (same) return target;
+      await showTarget(next);
+      return next;
+    } catch (targetError) {
+      console.warn("[Sabaq] Could not choose the lesson's lines again:", targetError);
+      return target;
+    }
+  };
+
+  /**
    * SBQ-03: save the current second look as a review of its chunk card. It shares the check's save
    * lock and leave handling: a second tap is ignored, leaving waits for the save, and a failed save
    * stays on the look to retry. The lock opens again afterwards, since the lesson's check is still ahead.
@@ -337,7 +386,14 @@ function SabaqScreen() {
     setBusy(true);
     setError(null);
     try {
-      await saveSecondLook(db, { cardId: look.cardId, plan, rating, session: sessionRef.current, durationMs: lessonClock.elapsedMs() });
+      await saveSecondLook(db, {
+        cardId: look.cardId,
+        pageData: look.pageData,
+        plan,
+        rating,
+        session: sessionRef.current,
+        durationMs: lessonClock.elapsedMs(),
+      });
       saveLock.current = "open";
       setSaving(false);
       emitHabitChanged();
@@ -346,7 +402,8 @@ function SabaqScreen() {
         return;
       }
       setLooksSaved((value) => value + 1);
-      if (lookIndex + 1 >= looks.length && target) setLooksDoneStep(true);
+      const lesson = await chooseTargetAgain();
+      if (lookIndex + 1 >= looks.length && lesson) setLooksDoneStep(true);
       nextLook();
     } catch (saveError) {
       leaveWhenSaved.current = false;
@@ -386,6 +443,7 @@ function SabaqScreen() {
       setChunkSaved(true);
       cleanRunEvent.current = strongerWirdEvent(null, result.wird);
       cleanRunMs.current = durationMs;
+      cleanRunPageAdded.current = result.pageAdded;
       emitHabitChanged();
       if (leaveWhenSaved.current) {
         exit();
@@ -426,9 +484,11 @@ function SabaqScreen() {
       setSaving(false);
       setLessonSaved(true);
       // SBQ-02: a lower grade than Good offers the lines again, unless step 6 completed their page.
+      const pageAdded = cleanRunPageAdded.current || result.pageAdded;
       setOutcome({
         passed: rating >= 3,
-        partial: rating >= 3 && !target.completesPage,
+        partial: rating >= 3 && !pageAdded,
+        pageAdded,
         secondLookAt: result.secondLookAt ?? null,
         secondLookNow: result.secondLookNow === true,
       });
@@ -596,7 +656,7 @@ function SabaqScreen() {
     outcome?.passed === false
       ? lookLine
         ? null
-        : target.completesPage
+        : outcome.pageAdded
           ? s.hifzSabaqNotFluentReview
           : s.hifzSabaqNotFluent
       : outcome?.partial

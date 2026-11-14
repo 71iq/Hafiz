@@ -82,6 +82,28 @@ export function recitationUnits(cardId: string): number {
  * short the chunk. A pass after a pass (the fluent check, a second look) adds no step of its own.
  */
 export type ReviewContribution = Readonly<{ cardId: string; durationMs: number | null; sabaqStep?: boolean }>;
+
+/**
+ * Which of one chunk card's reviews, sorted by instant, are completed steps 6 (see ReviewContribution),
+ * as DAY_TALLY_SQL reads them: a pass with no earlier review, or whose latest earlier review failed.
+ * Reviews at the same earlier instant count as passed if any of them passed.
+ */
+export function sabaqStepFlags(reviews: readonly { at: number; rating: number }[]): boolean[] {
+  // The best rating at the latest instant before the current one, or null before the first review.
+  let priorBest: number | null = null;
+  let groupAt = Number.NaN;
+  let groupBest = 0;
+  return reviews.map((review) => {
+    if (review.at !== groupAt) {
+      if (!Number.isNaN(groupAt)) priorBest = groupBest;
+      groupAt = review.at;
+      groupBest = review.rating;
+    } else {
+      groupBest = Math.max(groupBest, review.rating);
+    }
+    return review.rating >= 3 && (priorBest === null || priorBest < 3);
+  });
+}
 export type WirdTally = Readonly<{ pageUnits: number; countedMs: number; sabaqStep: boolean }>;
 
 export function tallyReviews(

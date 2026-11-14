@@ -15,7 +15,9 @@ import {
 } from "@/lib/hifz/sabaq";
 import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { startReviewSession } from "@/lib/fsrs/review-sessions";
-import { chunkCardId, PAGE_COUNT, pageCardId } from "@/lib/hifz/units";
+import { chunkCardId, PAGE_COUNT, pageCardId, parsePageUnit } from "@/lib/hifz/units";
+import { loadRecitationPage } from "@/lib/hifz/page-data";
+import * as unitSwitch from "@/lib/hifz/unit-switch";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { getDeckTodayStats, loadReviewQueue, readDeckReviewSettings, REVIEW_DECK_IDS } from "@/lib/fsrs/queries";
 import { Rating, State, type Grade } from "@/lib/fsrs/scheduler";
@@ -136,6 +138,12 @@ describe("sabaq chunks (SBQ-02)", () => {
     const check = await completeSabaqChunk(store.db, { target, plan: lessonPlan, rating, session, durationMs: 60_000, now: checkAt });
     return { cleanRun, check, session };
   }
+  /** A second look's page, laid out as loadSecondLooks lays it out without page words. */
+  const lookPage = (cardId: string) => {
+    const unit = parsePageUnit(cardId);
+    if (unit?.kind !== "chunk") throw new Error(`Not a chunk: ${cardId}`);
+    return loadRecitationPage(store.db, unit.page, null);
+  };
   const count = (sql: string, ...params: string[]) => (store.sql.prepare(sql).get(...params) as { count: number }).count;
 
   it("chooses the next lines of the first unmemorized page, then adds the page at its last chunk's clean run", async () => {
@@ -301,13 +309,51 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(second).toMatchObject({ fromLine: 5, toLine: 7, completesPage: false });
     await learn(second, Rating.Good, atLocalTime(TODAY, 9 * 60 + 30));
 
-    await saveSecondLook(store.db, { cardId: chunkCardId(1, 2, 4), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: check.secondLookAt! });
+    await saveSecondLook(store.db, { cardId: chunkCardId(1, 2, 4), pageData: await lookPage(chunkCardId(1, 2, 4)), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: check.secondLookAt! });
     // The failed lines come back in their place, up to the lines still memorized; the page is not complete with them.
     expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 2, toLine: 4, completesPage: false });
     // Passing the look again makes them memorized, and the last line completes the page.
     const relearn = new Date((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(chunkCardId(1, 2, 4)) as { due: string }).due);
-    await saveSecondLook(store.db, { cardId: chunkCardId(1, 2, 4), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
+    await saveSecondLook(store.db, { cardId: chunkCardId(1, 2, 4), pageData: await lookPage(chunkCardId(1, 2, 4)), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
     expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 8, toLine: 8, completesPage: true });
+  });
+
+  it("adds no page at step 6 of lines chosen before an earlier chunk's look failed, then adds it when the look passes", async () => {
+    const pageWords = () => null;
+    const first = (await nextSabaqTarget(store.db, { plan, wantLines: 3, pageWords }))!;
+    const { check } = await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60));
+    // The screen chooses the page's last lines when it opens, with the first chunk's look due.
+    const last = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords }))!;
+    expect(last).toMatchObject({ fromLine: 5, toLine: 8, completesPage: true });
+    const firstId = chunkCardId(1, first.fromLine, first.toLine);
+    await saveSecondLook(store.db, { cardId: firstId, pageData: await lookPage(firstId), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: check.secondLookAt! });
+
+    // Step 6 of those lines finds the first chunk no longer memorized, so the page waits.
+    const stale = await saveSabaqCleanRun(store.db, { target: last, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 10 * 60 + 5) });
+    expect(stale.pageAdded).toBe(false);
+    expect(count("SELECT COUNT(*) AS count FROM study_cards WHERE id = ?", pageCardId(1))).toBe(0);
+    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 2, toLine: 4, completesPage: true });
+
+    // Passing the first chunk at its relearning look memorizes every line, so that grade adds the page.
+    // Without it every line would count as memorized with no page card, and sabaq would stay on this
+    // page with nothing to offer.
+    const relearn = new Date((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(firstId) as { due: string }).due);
+    const passed = await saveSecondLook(store.db, { cardId: firstId, pageData: await lookPage(firstId), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
+    expect(passed.pageAdded).toBe(true);
+    expect(store.sql.prepare("SELECT tier FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual({ tier: "sabqi" });
+  });
+
+  it("in ayah review, leaves the ayah decks' scope as it was when the grade that completes the page fails", async () => {
+    const ayahPlan = { ...plan, unit: "ayah" as const };
+    await writeHifzPlan(store.db, ayahPlan);
+    await writeAllDecksFilter(store.db, { type: "surah", surahs: [2] });
+    const whole = (await nextSabaqTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null }))!;
+    jest.spyOn(unitSwitch, "addSabaqPageToAyahReview").mockRejectedValueOnce(new Error("Synthetic ayah card failure"));
+    await expect(saveSabaqCleanRun(store.db, { target: whole, plan: ayahPlan, session: null, durationMs: 60_000 })).rejects.toThrow(
+      "Synthetic ayah card failure",
+    );
+    expect(await readSmartDeckFilter(store.db, SMART_DECK_IDS.retention)).toEqual({ type: "surah", surahs: [2] });
+    expect(count("SELECT COUNT(*) AS count FROM study_cards")).toBe(0);
   });
 
   it("counts a chunk once in its lesson's session, though step 6 and the check both grade it", async () => {
@@ -473,6 +519,34 @@ describe("sabaq chunks (SBQ-02)", () => {
     const logCount = (id: string) => count("SELECT COUNT(*) AS count FROM study_log WHERE card_id = ?", id);
     const cardDue = (id: string) => new Date((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(id) as { due: string }).due);
 
+    it("offers a look an hour after a later lesson that learned the chunk again after a failed check", async () => {
+      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const id = chunkCardId(1, target.fromLine, target.toLine);
+      // Step 6 at 08:55 and a failed check at 09:00; the look that follows is skipped.
+      await learn(target, Rating.Again, at(9 * 60));
+      // A second lesson of the same lines, in its own session: step 6 at 10:10, the check at 10:15.
+      const { check } = await learn(target, Rating.Good, at(10 * 60 + 15));
+      expect(check.secondLookAt).toEqual(at(11 * 60 + 15));
+      expect(await countSecondLooks(store.db, at(10 * 60 + 20))).toMatchObject({ due: 0, nextAt: at(11 * 60 + 15) });
+      expect((await loadSecondLooks(store.db, { now: at(11 * 60 + 15), pageWords })).due.map((look) => look.cardId)).toEqual([id]);
+    });
+
+    it("resolves a committed check whose look cannot be read afterwards, so the grade is not offered again", async () => {
+      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const id = chunkCardId(1, target.fromLine, target.toLine);
+      const session = startReviewSession("sabaq", { now: at(8 * 60 + 50) });
+      await saveSabaqCleanRun(store.db, { target, plan, session, durationMs: 60_000, now: at(8 * 60 + 55) });
+      const read = store.db.getAllAsync.bind(store.db);
+      jest.spyOn(store.db, "getAllAsync").mockImplementation(((sql: string, params?: unknown) => {
+        if (sql.includes("c.buried_until <= ?")) return Promise.reject(new Error("Synthetic read failure"));
+        return read(sql, params as never);
+      }) as typeof store.db.getAllAsync);
+      jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      const check = await completeSabaqChunk(store.db, { target, plan, rating: Rating.Good, session, durationMs: 60_000, now: at(9 * 60) });
+      expect(check).toMatchObject({ secondLookAt: null, secondLookNow: false });
+      expect(logCount(id)).toBe(2);
+    });
+
     it("offers a chunk an hour after its lesson, though the passed check graduated it, and says when before that", async () => {
       const { id, lookAt, saved } = await passPartialChunk();
       // Step 6 and the check are the lesson; the check graduated the chunk past today, yet its look is today.
@@ -499,7 +573,7 @@ describe("sabaq chunks (SBQ-02)", () => {
     it("saves a graded look as a logged review of the chunk card that counts for the day", async () => {
       const { id, lookAt } = await passPartialChunk();
       const before = store.sql.prepare("SELECT reps, state, due FROM study_cards WHERE id = ?").get(id) as { reps: number; state: number; due: string };
-      const result = await saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Good, session: null, durationMs: 90_000, now: lookAt });
+      const result = await saveSecondLook(store.db, { cardId: id, pageData: await lookPage(id), plan, rating: Rating.Good, session: null, durationMs: 90_000, now: lookAt });
 
       expect(logCount(id)).toBe(3);
       expect(store.sql.prepare("SELECT rating, local_date, duration_ms, support_level FROM study_log WHERE card_id = ? ORDER BY reviewed_at DESC LIMIT 1").get(id)).toEqual({
@@ -539,7 +613,7 @@ describe("sabaq chunks (SBQ-02)", () => {
       expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toEqual({ due: 0, nextAt: lookAt, offeredAt: new Date(lookAt.getTime() - REVIEW_LEARN_AHEAD_MS) });
       expect((await loadSecondLooks(store.db, { now: lookAt, pageWords })).due.map((look) => look.cardId)).toEqual([id]);
 
-      await saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Good, session: null, durationMs: 90_000, now: lookAt });
+      await saveSecondLook(store.db, { cardId: id, pageData: await lookPage(id), plan, rating: Rating.Good, session: null, durationMs: 90_000, now: lookAt });
       expect(await loadSecondLooks(store.db, { now: at(21 * 60), pageWords })).toEqual({ due: [], nextAt: null });
     });
 
@@ -552,7 +626,7 @@ describe("sabaq chunks (SBQ-02)", () => {
 
     it("brings a look graded Again back with its relearning step the same day", async () => {
       const { id, lookAt } = await passPartialChunk();
-      await saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Again, session: null, durationMs: 60_000, now: lookAt });
+      await saveSecondLook(store.db, { cardId: id, pageData: await lookPage(id), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: lookAt });
       const relearn = cardDue(id);
       expect(localDateOf(relearn)).toBe(TODAY);
       expect((await loadSecondLooks(store.db, { now: relearn, pageWords })).due.map((look) => look.cardId)).toEqual([id]);
@@ -571,7 +645,7 @@ describe("sabaq chunks (SBQ-02)", () => {
       expect(await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords })).toMatchObject({ fromLine: target.fromLine, toLine: target.toLine });
 
       // Passed at its look, the lines count as memorized again and the next lesson goes on.
-      await saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
+      await saveSecondLook(store.db, { cardId: id, pageData: await lookPage(id), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
       const next = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       expect(next).toMatchObject({ fromLine: 6, toLine: 8 });
       // A Hard check is not fluent either; its later step is promised with the time Home shows.
@@ -602,7 +676,7 @@ describe("sabaq chunks (SBQ-02)", () => {
     it("does not grade a chunk deleted since the screen loaded", async () => {
       const { id, lookAt } = await passPartialChunk();
       store.sql.prepare("UPDATE study_cards SET deleted_at = ? WHERE id = ?").run(lookAt.toISOString(), id);
-      await expect(saveSecondLook(store.db, { cardId: id, plan, rating: Rating.Good, session: null, durationMs: 60_000, now: lookAt })).rejects.toBeInstanceOf(
+      await expect(saveSecondLook(store.db, { cardId: id, pageData: await lookPage(id), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: lookAt })).rejects.toBeInstanceOf(
         StudyCardDeletedError,
       );
       expect(logCount(id)).toBe(2);

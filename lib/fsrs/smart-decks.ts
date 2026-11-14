@@ -234,15 +234,20 @@ export async function writeAllDecksFilter(
   db: AppDatabase,
   filter: BuiltInDeckFilter
 ): Promise<void> {
-  const normalized = normalizeSmartDeckFilter(filter);
-  const value = JSON.stringify(normalized);
   // Every deck filter and its queued upload commit together, so no deck keeps a stale filter.
-  await db.withTransactionAsync(async (tx) => {
-    await putUserSetting(tx, ALL_DECKS_FILTER_KEY, value);
-    for (const deckId of SMART_DECK_ID_LIST) {
-      await putUserSetting(tx, smartDeckFilterKey(deckId), value);
-    }
-  });
+  await db.withTransactionAsync((tx) => putAllDecksFilter(tx, filter));
+}
+
+/** writeAllDecksFilter inside the caller's transaction, so the filters commit with its other writes. */
+export async function putAllDecksFilter(
+  tx: DatabaseExecutor,
+  filter: BuiltInDeckFilter
+): Promise<void> {
+  const value = JSON.stringify(normalizeSmartDeckFilter(filter));
+  await putUserSetting(tx, ALL_DECKS_FILTER_KEY, value);
+  for (const deckId of SMART_DECK_ID_LIST) {
+    await putUserSetting(tx, smartDeckFilterKey(deckId), value);
+  }
 }
 
 /**
