@@ -22,26 +22,40 @@ import { HIFZ_PAGES_DECK_ID, isValidPage, pageCardId } from "@/lib/hifz/units";
  * Moving back to ayah review restores them and sets every page card aside, so ayah review has no
  * page tasks.
  *
- * A card suspended by a switch has suspended_at set to the Unix epoch. The mark lives in the card
- * row, so it syncs with the card and another device can switch back too. A card the user suspends or
- * resumes later gets a real time or null, so a switch never undoes the user's own choice.
+ * A card suspended by a switch has suspended_at set to the Unix epoch. A card a switch brings back
+ * has buried_until set to the epoch, which every queue reads as not buried. The marks live in the
+ * card row, so they sync with the card (buried_until comes with suspended_at from the later write),
+ * and the device whose plan wins can undo a losing switch made elsewhere (lib/hifz/unit-applied). A
+ * card the user suspends or resumes later gets a real time or null: setting a card aside clears
+ * buried_until, so a resume by hand carries no mark, and a switch never undoes the user's own choice.
  */
 export const UNIT_SWITCH_SUSPENDED_AT = new Date(0).toISOString();
+export const UNIT_SWITCH_RESUMED_BURIED_UNTIL = UNIT_SWITCH_SUSPENDED_AT;
 
 /** Suspended by a unit switch. Compared as an instant, since the server can return another format. */
 export function isUnitSwitchSuspension(suspendedAt: string | null | undefined): boolean {
   return !!suspendedAt && Date.parse(suspendedAt) === 0;
 }
 
+/** Active because a switch brought it back. Compared as an instant, like isUnitSwitchSuspension. */
+export function isUnitSwitchResume(card: Pick<StudyCardRow, "suspended_at" | "buried_until">): boolean {
+  return !card.suspended_at && !!card.buried_until && Date.parse(card.buried_until) === 0;
+}
+
 /**
  * The cards of page review: pages, and the half pages and seams their grades relearn (SCH-06,
  * SCH-08). Weak-spot cloze cards are word cards and stay in either unit.
  */
-const PAGE_REVIEW_CARDS_SQL = "(id LIKE 'page:%' OR id LIKE 'half:%' OR id LIKE 'seam:%')";
+export const PAGE_REVIEW_CARDS_SQL = "(id LIKE 'page:%' OR id LIKE 'half:%' OR id LIKE 'seam:%')";
 
 /** Set a live card aside with the switch mark, keeping its schedule and history for a switch back. */
-async function setAsideForUnitSwitch(db: DatabaseExecutor, card: StudyCardRow, at: string): Promise<void> {
+export async function setAsideForUnitSwitch(db: DatabaseExecutor, card: StudyCardRow, at: string): Promise<void> {
   await putCardRow(db, { ...card, suspended_at: UNIT_SWITCH_SUSPENDED_AT, buried_until: null, updated_at: at });
+}
+
+/** A card brought back from the switch mark, carrying the resume mark. */
+export function resumedFromUnitSwitch(card: StudyCardRow, at: string): StudyCardRow {
+  return { ...card, suspended_at: null, buried_until: UNIT_SWITCH_RESUMED_BURIED_UNTIL, updated_at: at };
 }
 
 /** The ayah deck's new-card limit from before page review set it to 0, restored when ayah review returns. */
@@ -138,7 +152,7 @@ export async function switchToPageReview(
   );
   const pageCards = new Map<string, StudyCardRow>();
   for (const row of rows) {
-    const current = isUnitSwitchSuspension(row.suspended_at) ? { ...row, suspended_at: null, updated_at: at } : row;
+    const current = isUnitSwitchSuspension(row.suspended_at) ? resumedFromUnitSwitch(row, at) : row;
     if (current !== row) await putCardRow(db, current);
     if (row.id.startsWith("page:")) pageCards.set(row.id, current);
   }
@@ -170,6 +184,13 @@ export async function switchToPageReview(
       await setAsideForUnitSwitch(db, card, at);
     }
   }
+  // Ayah cards still active, on pages not all reviewed, stay in page review and drop the resume mark,
+  // so a reconcile does not take them for a losing switch's and set them aside.
+  const kept = await db.getAllAsync<StudyCardRow>(
+    "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND suspended_at IS NULL AND buried_until IS NOT NULL",
+    [SMART_DECK_IDS.retention],
+  );
+  for (const card of kept.filter(isUnitSwitchResume)) await putCardRow(db, { ...card, buried_until: null, updated_at: at });
   // MST-04: like declared pages, pages made from ayah cards start the first manzil cycle.
   if (migrated > 0) await ensureManzilCycleStart(db, localDateOf(now));
 
@@ -201,7 +222,7 @@ export async function switchToAyahReview(
     [SMART_DECK_IDS.retention],
   );
   const restored = suspended.filter((card) => isUnitSwitchSuspension(card.suspended_at));
-  for (const card of restored) await putCardRow(db, { ...card, suspended_at: null, updated_at: at });
+  for (const card of restored) await putCardRow(db, resumedFromUnitSwitch(card, at));
 
   const pageReviewCards = await db.getAllAsync<StudyCardRow>(
     `SELECT * FROM study_cards WHERE deck_id = ? AND ${PAGE_REVIEW_CARDS_SQL} AND deleted_at IS NULL AND suspended_at IS NULL`,

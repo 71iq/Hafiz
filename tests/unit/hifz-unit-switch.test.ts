@@ -1,16 +1,26 @@
-import { readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
-import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
+import type { SQLInputValue } from "node:sqlite";
+import {
+  readDeckReviewSettings,
+  resetStudyCardProgress,
+  setStudyCardSuspended,
+  writeDeckReviewSettings,
+} from "@/lib/fsrs/queries";
+import { getDueCardsForReview, SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_DECK_NEW_CARD_LIMIT, type StudyCardRow } from "@/lib/fsrs/types";
 import { atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { declareMemorizedPages, isMemorized, loadPageCards, loadTodayWird, toPlanPage } from "@/lib/hifz/pages";
-import { reconcileUnitAfterSync } from "@/lib/hifz/unit-applied";
+import { markUnitAppliedFromPlan, reconcileUnitAfterSync, unitReconcileNeeded } from "@/lib/hifz/unit-applied";
 import { isSyncableUserSetting } from "@/lib/database/user-settings";
 import { DEFAULT_HIFZ_PLAN, readHifzPlan, writeHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { loadDueRemediation } from "@/lib/hifz/remediation";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { tierFor } from "@/lib/hifz/tiers";
-import { pageCardId } from "@/lib/hifz/units";
-import { AYAH_NEW_CARDS_LIMIT_KEY, UNIT_SWITCH_SUSPENDED_AT } from "@/lib/hifz/unit-switch";
+import { HIFZ_PAGES_DECK_ID, pageCardId } from "@/lib/hifz/units";
+import {
+  AYAH_NEW_CARDS_LIMIT_KEY,
+  UNIT_SWITCH_RESUMED_BURIED_UNTIL,
+  UNIT_SWITCH_SUSPENDED_AT,
+} from "@/lib/hifz/unit-switch";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 const TODAY = "2026-11-13";
@@ -24,6 +34,7 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
   let store: OutboxDatabase;
   const now = atLocalTime(TODAY, 9 * 60);
   const days = (count: number) => new Date(now.getTime() + count * DAY).toISOString();
+  const minutes = (count: number) => new Date(now.getTime() + count * 60_000);
 
   beforeEach(async () => {
     store = await openOutboxDatabase();
@@ -346,6 +357,197 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
     expect(store.sql.prepare("SELECT 1 FROM study_cards WHERE id = ?").get(pageCardId(1))).toBeUndefined();
     for (const id of ["1:1", "1:2", "1:3"]) expect(suspendedAt(id)).toBeNull();
     expect(await newCardsLimit()).toBe(7);
+  });
+
+  /** Every card row and the number of queued uploads. */
+  const cardsAndQueue = () => ({
+    cards: store.sql.prepare("SELECT * FROM study_cards ORDER BY id").all(),
+    queued: (store.sql.prepare("SELECT COUNT(*) AS n FROM sync_queue").get() as { n: number }).n,
+  });
+
+  async function expectReconcileChangesNothing(at: Date) {
+    expect(await unitReconcileNeeded(store.db)).toBe(false);
+    const before = cardsAndQueue();
+    await store.db.withTransactionAsync((tx) => reconcileUnitAfterSync(tx, at));
+    expect(cardsAndQueue()).toEqual(before);
+  }
+
+  it("changes nothing on a reconcile after a switch, a switch back, and a switch back to a page no longer all reviewed", async () => {
+    await setup(pagePlan);
+    await setup(ayahPlan, minutes(1));
+    // The ayah cards come back with the resume mark; the page cards step aside without it.
+    for (const id of ["1:1", "1:2", "1:3"]) {
+      expect(cardRow(id)).toMatchObject({ suspended_at: null, buried_until: UNIT_SWITCH_RESUMED_BURIED_UNTIL });
+    }
+    expect(cardRow(pageCardId(1))).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT, buried_until: null });
+    await expectReconcileChangesNothing(minutes(2));
+
+    await setup(pagePlan, minutes(3));
+    expect(cardRow(pageCardId(1))).toMatchObject({ suspended_at: null, buried_until: UNIT_SWITCH_RESUMED_BURIED_UNTIL });
+    for (const id of ["1:1", "1:2", "1:3"]) {
+      expect(cardRow(id)).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT, buried_until: null });
+    }
+    await expectReconcileChangesNothing(minutes(4));
+
+    // In ayah review 1:3 starts over, so page 1 no longer has every ayah reviewed and page review keeps
+    // its ayah cards active. They drop the resume mark, so no reconcile sets them aside.
+    await setup(ayahPlan, minutes(5));
+    await resetStudyCardProgress(store.db, RETENTION, "1:3");
+    await setup(pagePlan, minutes(6));
+    for (const id of ["1:1", "1:2", "1:3"]) expect(cardRow(id)).toMatchObject({ suspended_at: null, buried_until: null });
+    await expectReconcileChangesNothing(minutes(7));
+  });
+
+  it("sets aside, after an account restore, the ayah cards a losing switch to ayah review brought back", async () => {
+    await setup(pagePlan);
+    // The restored rows hold another device's switch to ayah review, which the page plan beat. The
+    // server can return the marks in another format.
+    store.sql.prepare("UPDATE study_cards SET suspended_at = NULL, buried_until = ? WHERE id = '1:1'").run(UNIT_SWITCH_RESUMED_BURIED_UNTIL);
+    store.sql.prepare("UPDATE study_cards SET suspended_at = NULL, buried_until = '1970-01-01T00:00:00+00:00' WHERE id = '1:2'").run();
+    store.sql.prepare("UPDATE study_cards SET suspended_at = '1970-01-01T00:00:00+00:00' WHERE id = ?").run(pageCardId(1));
+    expect(await unitReconcileNeeded(store.db)).toBe(true);
+
+    await store.db.withTransactionAsync((tx) => markUnitAppliedFromPlan(tx, minutes(1)));
+    for (const id of ["1:1", "1:2"]) {
+      expect(cardRow(id)).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT, buried_until: null });
+      expect(lastQueued("study_cards", id)).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT, buried_until: null });
+    }
+    expect(cardRow(pageCardId(1))).toMatchObject({ suspended_at: null, buried_until: UNIT_SWITCH_RESUMED_BURIED_UNTIL });
+    // Page 2's ayah cards, which page review keeps active, carry no mark and stay.
+    for (const id of ["2:1", "2:2", "2:3"]) expect(suspendedAt(id)).toBeNull();
+    expect(await unitReconcileNeeded(store.db)).toBe(false);
+  });
+
+  describe("after another device's switch that a later plan edit beat", () => {
+    const devices: OutboxDatabase[] = [];
+    const FAR = "2100-01-01T00:00:00.000Z";
+
+    afterEach(async () => {
+      for (const device of devices.splice(0)) await device.close();
+    });
+
+    const rowsOf = (device: OutboxDatabase, table: string) =>
+      device.sql.prepare(`SELECT * FROM ${table}`).all() as Record<string, SQLInputValue>[];
+
+    function putRow(device: OutboxDatabase, table: string, row: Record<string, SQLInputValue>) {
+      const columns = Object.keys(row);
+      device.sql
+        .prepare(`INSERT OR REPLACE INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`)
+        .run(...Object.values(row));
+    }
+
+    /** Device B, holding device A's (this store's) cards, plan and applied unit, as after a sync both ways. */
+    async function secondDevice(): Promise<OutboxDatabase> {
+      const device = await openOutboxDatabase();
+      devices.push(device);
+      for (const table of ["quran_text", "study_cards", "user_settings"]) {
+        for (const row of rowsOf(store, table)) putRow(device, table, row);
+      }
+      return device;
+    }
+
+    /**
+     * `to` pulls the cards `from` wrote later. A card's status columns, buried_until with suspended_at,
+     * come with updated_at from the later write (upsertStudyCard in lib/database/sync.ts). No card is
+     * reviewed here, so the schedules agree and the later row comes whole.
+     */
+    function pullCards(to: OutboxDatabase, from: OutboxDatabase) {
+      for (const row of rowsOf(from, "study_cards")) {
+        const local = to.sql.prepare("SELECT updated_at FROM study_cards WHERE id = ?").get(row.id) as
+          | { updated_at: string }
+          | undefined;
+        if (!local || Date.parse(local.updated_at) < Date.parse(String(row.updated_at))) putRow(to, "study_cards", row);
+      }
+    }
+
+    /** The end of a pull, as lib/database/sync runs it: the reconcile only when it has something to do. */
+    async function reconcileAsSync(device: OutboxDatabase, at: Date) {
+      if (await unitReconcileNeeded(device.db)) {
+        await device.db.withTransactionAsync((tx) => reconcileUnitAfterSync(tx, at));
+      }
+    }
+
+    const row = (device: OutboxDatabase, id: string) =>
+      device.sql.prepare("SELECT * FROM study_cards WHERE id = ?").get(id) as unknown as StudyCardRow;
+    /** The ayah flashcard queue, which counts a card as buried while buried_until is later than now. */
+    const ayahQueue = async (device: OutboxDatabase) =>
+      (await getDueCardsForReview(device.db, RETENTION, { dueUntil: FAR, limit: 100 })).map((card) => card.id).sort();
+    const activePageCards = (device: OutboxDatabase) =>
+      device.sql
+        .prepare("SELECT id FROM study_cards WHERE deck_id = ? AND suspended_at IS NULL AND deleted_at IS NULL ORDER BY id")
+        .all(HIFZ_PAGES_DECK_ID)
+        .map((card) => card.id);
+
+    it("leaves only page review active on both devices when a page plan edit beats a switch to ayah review", async () => {
+      await setup(pagePlan);
+      const deviceA = store;
+      const deviceB = await secondDevice();
+      // B switches to ayah review: its ayah cards come back with the resume mark and its page cards step aside.
+      await applyHifzSetup(deviceB.db, { plan: ayahPlan, memorizedSurahs: [1, 2], memorizedJuz: [], now: minutes(1) });
+      expect(row(deviceB, "1:1")).toMatchObject({ suspended_at: null, buried_until: UNIT_SWITCH_RESUMED_BURIED_UNTIL });
+      // On A the person resumes 1:2 by hand, which leaves no mark, then edits the page plan, which wins.
+      await setStudyCardSuspended(deviceA.db, RETENTION, "1:2", false);
+      expect(row(deviceA, "1:2")).toMatchObject({ suspended_at: null, buried_until: null });
+      const edited = { ...pagePlan, dailyBudgetMin: 45 };
+      await setup(edited, minutes(3));
+
+      pullCards(deviceA, deviceB);
+      expect(await unitReconcileNeeded(deviceA.db)).toBe(true);
+      await reconcileAsSync(deviceA, minutes(4));
+      // Page tasks are in the wird, and of page 1 the ayah queue holds only the ayah resumed by hand.
+      expect(await ayahQueue(deviceA)).toEqual(["1:2", "2:1", "2:2", "2:3"]);
+      expect((await loadTodayWird(deviceA.db, minutes(4)))!.total).toBeGreaterThan(0);
+      expect(activePageCards(deviceA)).toEqual([pageCardId(1), pageCardId(2)]);
+      for (const id of ["1:1", "1:3"]) {
+        expect(row(deviceA, id)).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT, buried_until: null });
+        expect(lastQueued("study_cards", id)).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT, buried_until: null });
+      }
+      expect(row(deviceA, "1:4").suspended_at).toBe(USER_SUSPENDED_AT);
+      expect(await unitReconcileNeeded(deviceA.db)).toBe(false);
+
+      // B pulls A's plan and cards. Its switch to page review sets aside every live ayah card of a page
+      // made from ayah cards, so it cannot keep 1:2: it does not know a resume by hand from a card
+      // active in ayah review.
+      await writeHifzPlan(deviceB.db, edited);
+      pullCards(deviceB, deviceA);
+      await reconcileAsSync(deviceB, minutes(5));
+      const queueB = await ayahQueue(deviceB);
+      for (const id of ["1:1", "1:3"]) expect(queueB).not.toContain(id);
+      expect((await loadTodayWird(deviceB.db, minutes(5)))!.total).toBeGreaterThan(0);
+      expect(activePageCards(deviceB)).toEqual([pageCardId(1), pageCardId(2)]);
+      expect(await unitReconcileNeeded(deviceB.db)).toBe(false);
+    });
+
+    it("leaves only ayah review active on both devices when an ayah plan edit beats a switch to page review", async () => {
+      await setup(pagePlan);
+      await setup(ayahPlan, minutes(1));
+      const deviceA = store;
+      const deviceB = await secondDevice();
+      // B switches to page review: its page cards come back with the resume mark and page 1's ayah cards step aside.
+      await applyHifzSetup(deviceB.db, { plan: pagePlan, memorizedSurahs: [1, 2], memorizedJuz: [], now: minutes(2) });
+      expect(row(deviceB, pageCardId(1))).toMatchObject({ suspended_at: null, buried_until: UNIT_SWITCH_RESUMED_BURIED_UNTIL });
+      // On A the person resumes page 2 by hand, then edits the ayah plan, which wins.
+      await setStudyCardSuspended(deviceA.db, HIFZ_PAGES_DECK_ID, pageCardId(2), false);
+      const edited = { ...ayahPlan, dailyBudgetMin: 45 };
+      await setup(edited, minutes(3));
+
+      pullCards(deviceA, deviceB);
+      expect(await unitReconcileNeeded(deviceA.db)).toBe(true);
+      await reconcileAsSync(deviceA, minutes(4));
+      expect(activePageCards(deviceA)).toEqual([pageCardId(2)]);
+      expect(row(deviceA, pageCardId(1))).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT, buried_until: null });
+      expect(lastQueued("study_cards", pageCardId(1))).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT });
+      expect(await ayahQueue(deviceA)).toEqual(expect.arrayContaining(["1:1", "1:2", "1:3"]));
+      expect(await unitReconcileNeeded(deviceA.db)).toBe(false);
+
+      // B pulls A's plan and cards; its switch to ayah review sets every live page card aside.
+      await writeHifzPlan(deviceB.db, edited);
+      pullCards(deviceB, deviceA);
+      await reconcileAsSync(deviceB, minutes(5));
+      expect(activePageCards(deviceB)).toEqual([]);
+      expect(await ayahQueue(deviceB)).toEqual(expect.arrayContaining(["1:1", "1:2", "1:3"]));
+      expect(await unitReconcileNeeded(deviceB.db)).toBe(false);
+    });
   });
 });
 

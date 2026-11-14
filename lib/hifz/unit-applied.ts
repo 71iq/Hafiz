@@ -5,7 +5,16 @@ import { laterThanAll } from "@/lib/fsrs/card-stamps";
 import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { HIFZ_PAGES_DECK_ID } from "@/lib/hifz/units";
-import { isUnitSwitchSuspension, reviewsPages, switchToAyahReview, switchToPageReview } from "@/lib/hifz/unit-switch";
+import {
+  isUnitSwitchResume,
+  isUnitSwitchSuspension,
+  PAGE_REVIEW_CARDS_SQL,
+  resumedFromUnitSwitch,
+  reviewsPages,
+  setAsideForUnitSwitch,
+  switchToAyahReview,
+  switchToPageReview,
+} from "@/lib/hifz/unit-switch";
 
 type Unit = HifzPlan["unit"];
 
@@ -52,30 +61,52 @@ export async function applyUnitSwitch(
 }
 
 /**
+ * The live cards of one unit that match `condition`: ayah cards in the retention deck, or page,
+ * half-page and seam cards in the pages deck. Weak-spot cloze cards belong to neither.
+ */
+async function unitCards(db: DatabaseExecutor, ayah: boolean, condition: string): Promise<StudyCardRow[]> {
+  return ayah
+    ? db.getAllAsync<StudyCardRow>(
+        `SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND ${condition}`,
+        [SMART_DECK_IDS.retention],
+      )
+    : db.getAllAsync<StudyCardRow>(
+        `SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND ${condition} AND ${PAGE_REVIEW_CARDS_SQL}`,
+        [HIFZ_PAGES_DECK_ID],
+      );
+}
+
+/**
  * The cards of the plan's own unit that carry the switch mark (lib/hifz/unit-switch): ayah cards in
  * ayah review, page, half-page and seam cards in page review. Only a switch writes the mark, so these
  * came from another device's switch to the other unit whose plan did not win, or a restore of cards
  * left that way. A card the person suspended has a real time and is left alone.
  */
 async function markedActiveCards(db: DatabaseExecutor, unit: Unit): Promise<StudyCardRow[]> {
-  const rows =
-    unit === "ayah"
-      ? await db.getAllAsync<StudyCardRow>(
-          "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND suspended_at IS NOT NULL",
-          [SMART_DECK_IDS.retention],
-        )
-      : await db.getAllAsync<StudyCardRow>(
-          `SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND suspended_at IS NOT NULL
-             AND (id LIKE 'page:%' OR id LIKE 'half:%' OR id LIKE 'seam:%')`,
-          [HIFZ_PAGES_DECK_ID],
-        );
+  const rows = await unitCards(db, !reviewsPages(unit), "suspended_at IS NOT NULL");
   return rows.filter((row) => isUnitSwitchSuspension(row.suspended_at));
 }
 
-/** Brings back the plan's own cards that another device's switch set aside (see markedActiveCards). */
-async function restoreMarkedActiveCards(db: DatabaseExecutor, unit: Unit, now: Date): Promise<void> {
+/**
+ * The other unit's cards that carry the resume mark: active because a switch to that unit brought
+ * them back, which can only be another device's switch whose plan did not win, or a restore of cards
+ * left that way. A card the person resumed by hand carries no mark and is left alone.
+ */
+async function resumedOtherCards(db: DatabaseExecutor, unit: Unit): Promise<StudyCardRow[]> {
+  const rows = await unitCards(db, reviewsPages(unit), "suspended_at IS NULL AND buried_until IS NOT NULL");
+  return rows.filter(isUnitSwitchResume);
+}
+
+/**
+ * Undoes another device's losing switch: brings back the plan's own cards it set aside, and sets
+ * aside again the other unit's cards it brought back (see markedActiveCards and resumedOtherCards).
+ */
+async function undoLosingSwitch(db: DatabaseExecutor, unit: Unit, now: Date): Promise<void> {
   for (const row of await markedActiveCards(db, unit)) {
-    await putCardRow(db, { ...row, suspended_at: null, updated_at: laterThanAll(now, [row.updated_at]) });
+    await putCardRow(db, resumedFromUnitSwitch(row, laterThanAll(now, [row.updated_at])));
+  }
+  for (const row of await resumedOtherCards(db, unit)) {
+    await setAsideForUnitSwitch(db, row, laterThanAll(now, [row.updated_at]));
   }
 }
 
@@ -85,15 +116,17 @@ export async function unitReconcileNeeded(db: DatabaseExecutor): Promise<boolean
   if (!plan) return false;
   const applied = await readAppliedUnit(db);
   if (applied === null || reviewsPages(applied) !== reviewsPages(plan.unit)) return true;
-  return (await markedActiveCards(db, plan.unit)).length > 0;
+  if ((await markedActiveCards(db, plan.unit)).length > 0) return true;
+  return (await resumedOtherCards(db, plan.unit)).length > 0;
 }
 
 /**
  * After sync, the cards here follow the winning plan's unit (7.6). When the cards were last set for
- * the other kind of review, the switch runs. Whatever was applied here, the plan's own cards never
- * keep the switch mark: another device may have switched to the other unit and lost to a later plan
- * edit, and its pulled suspensions would otherwise disable the winning unit's cards. The device that
- * fixes them uploads the result. Does nothing without a plan.
+ * the other kind of review, the switch runs. Whatever was applied here, no card keeps the marks of a
+ * switch to the other unit: another device may have switched and lost to a later plan edit, and its
+ * pulled rows would otherwise disable the winning unit's cards and leave the other unit's active, so
+ * both kinds of review would show. The device that fixes them uploads the result. Does nothing
+ * without a plan.
  */
 export async function reconcileUnitAfterSync(db: DatabaseExecutor, now: Date): Promise<void> {
   const plan = await readHifzPlan(db);
@@ -105,10 +138,13 @@ export async function reconcileUnitAfterSync(db: DatabaseExecutor, now: Date): P
   } else if (reviewsPages(applied) !== reviewsPages(plan.unit)) {
     await applyUnitSwitch(db, { unit: plan.unit, previousPlanUnit: applied, now });
   }
-  await restoreMarkedActiveCards(db, plan.unit, now);
+  await undoLosingSwitch(db, plan.unit, now);
 }
 
-/** After an account restore the cards come from the server as the plan left them, the plan's own cards active. */
+/**
+ * After an account restore the cards come from the server as the plan left them, the plan's own cards
+ * active and the other unit's set aside.
+ */
 export async function markUnitAppliedFromPlan(db: DatabaseExecutor, now: Date): Promise<void> {
   const plan = await readHifzPlan(db);
   if (!plan) {
@@ -116,5 +152,5 @@ export async function markUnitAppliedFromPlan(db: DatabaseExecutor, now: Date): 
     return;
   }
   await writeAppliedUnit(db, plan.unit, now);
-  await restoreMarkedActiveCards(db, plan.unit, now);
+  await undoLosingSwitch(db, plan.unit, now);
 }
