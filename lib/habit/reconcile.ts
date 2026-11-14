@@ -37,6 +37,45 @@ function rowFor(date: LocalDate, status: "done" | "made_up", at: string, credite
 }
 
 /**
+ * The instants of each chunk card's completed steps 6 (STR-01), the rule DAY_TALLY_SQL applies: a
+ * pass with no earlier review, or whose latest earlier review failed. Reviews at the same earlier
+ * instant count as passed if any of them passed, as the SQL orders them.
+ */
+function sabaqStepInstants(rows: readonly { card_id: string; rating: number; reviewed_at: string }[]): Map<string, Set<number>> {
+  const byCard = new Map<string, { at: number; rating: number }[]>();
+  for (const row of rows) {
+    const at = Date.parse(row.reviewed_at);
+    if (!Number.isFinite(at)) continue;
+    const reviews = byCard.get(row.card_id) ?? [];
+    reviews.push({ at, rating: row.rating });
+    byCard.set(row.card_id, reviews);
+  }
+  const steps = new Map<string, Set<number>>();
+  for (const [cardId, reviews] of byCard) {
+    reviews.sort((a, b) => a.at - b.at);
+    // The best rating at the latest instant before the current one, or null before the first review.
+    let priorBest: number | null = null;
+    let groupAt = Number.NaN;
+    let groupBest = 0;
+    for (const review of reviews) {
+      if (review.at !== groupAt) {
+        if (!Number.isNaN(groupAt)) priorBest = groupBest;
+        groupAt = review.at;
+        groupBest = review.rating;
+      } else {
+        groupBest = Math.max(groupBest, review.rating);
+      }
+      if (review.rating >= 3 && (priorBest === null || priorBest < 3)) {
+        const instants = steps.get(cardId) ?? new Set<number>();
+        instants.add(review.at);
+        steps.set(cardId, instants);
+      }
+    }
+  }
+  return steps;
+}
+
+/**
  * Record wird days that the review log proves but no habit row records: reviews saved by app versions
  * before wird days existed, reviews from several devices that meet a minimum only together, and
  * restored accounts whose old devices never uploaded wird days.
@@ -55,7 +94,7 @@ export async function reconcileHabitDaysFromLogs(
   // After an incremental pull only the pulled reviews' days can change, so only those are read.
   const only = dates ? [...dates] : null;
   const marks = only ? only.map(() => "?").join(", ") : "";
-  const [settings, logs, habitRows, firstPasses] = await Promise.all([
+  const [settings, logs, habitRows, chunkReviews] = await Promise.all([
     readHabitSettings(db),
     db.getAllAsync<LoggedReview>(
       only
@@ -65,19 +104,14 @@ export async function reconcileHabitDaysFromLogs(
       only ? [...only, ...only] : [],
     ),
     db.getAllAsync<HabitDayRow>("SELECT * FROM habit_days WHERE status IS NOT NULL"),
-    // Each sabaq chunk's passing reviews: the earliest is its completed step 6 (STR-01), as
-    // DAY_TALLY_SQL reads it. Compared as instants, since sync can change a timestamp's spelling.
-    db.getAllAsync<{ card_id: string; reviewed_at: string }>(
-      "SELECT card_id, reviewed_at FROM study_log WHERE card_id LIKE 'chunk:%' AND rating >= 3",
+    // Each sabaq chunk's reviews: a pass with no review before it, or right after a failed one, is
+    // a completed step 6 (STR-01), as DAY_TALLY_SQL reads it. Compared as instants, since sync can
+    // change a timestamp's spelling.
+    db.getAllAsync<{ card_id: string; rating: number; reviewed_at: string }>(
+      "SELECT card_id, rating, reviewed_at FROM study_log WHERE card_id LIKE 'chunk:%'",
     ),
   ]);
-  const firstPassAt = new Map<string, number>();
-  for (const row of firstPasses) {
-    const at = Date.parse(row.reviewed_at);
-    if (!Number.isFinite(at)) continue;
-    const earliest = firstPassAt.get(row.card_id);
-    if (earliest === undefined || at < earliest) firstPassAt.set(row.card_id, at);
-  }
+  const stepsAt = sabaqStepInstants(chunkReviews);
   const days = new Map(habitRows.map((row) => [row.local_date, row]));
   const own = new Map<LocalDate, LoggedReview[]>();
   const makeUps = new Map<LocalDate, LoggedReview[]>();
@@ -94,7 +128,7 @@ export async function reconcileHabitDaysFromLogs(
         reviews.map((review) => ({
           cardId: review.card_id,
           durationMs: review.duration_ms,
-          sabaqStep: review.rating >= 3 && firstPassAt.get(review.card_id) === Date.parse(review.reviewed_at),
+          sabaqStep: review.rating >= 3 && (stepsAt.get(review.card_id)?.has(Date.parse(review.reviewed_at)) ?? false),
         })),
         { studyCounts: settings.studyCountsTowardMinimum },
       ),

@@ -8,7 +8,7 @@ import { readHabitSettings } from "@/lib/habit/settings";
 import type { PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import { loadTodayWird, readMemorizedPageNumbers } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN, type HifzPlan } from "@/lib/hifz/plan";
-import { loadSecondLooks, nextSabaqTarget, type SabaqTarget } from "@/lib/hifz/sabaq";
+import { loadSecondLooks, nextSabaqTarget, saveSabaqCleanRun, type SabaqTarget } from "@/lib/hifz/sabaq";
 import { similarGroupsForAyahs, withMemorizedSiblings } from "@/lib/hifz/similar";
 import { strings } from "@/lib/i18n/strings";
 
@@ -68,6 +68,7 @@ jest.mock("@/lib/hifz/pages", () => ({
 jest.mock("@/lib/hifz/sabaq", () => ({
   completeSabaqChunk: jest.fn(),
   nextSabaqTarget: jest.fn(),
+  saveSabaqCleanRun: jest.fn(),
   loadSecondLooks: jest.fn(),
   saveSecondLook: jest.fn(),
 }));
@@ -131,6 +132,7 @@ beforeEach(() => {
   jest.mocked(readHabitSettings).mockResolvedValue({ showZayt: false } as never);
   jest.mocked(nextSabaqTarget).mockResolvedValue(target);
   jest.mocked(loadSecondLooks).mockResolvedValue({ due: [], nextAt: null });
+  jest.mocked(saveSabaqCleanRun).mockResolvedValue({ wird: { kind: "none" }, pageAdded: false } as Awaited<ReturnType<typeof saveSabaqCleanRun>>);
   jest.mocked(similarGroupsForAyahs).mockResolvedValue([]);
   jest.mocked(withMemorizedSiblings).mockReturnValue([]);
   jest.mocked(readMemorizedPageNumbers).mockResolvedValue(new Set());
@@ -168,8 +170,12 @@ describe("sabaq repetition counts (SBQ-01)", () => {
       press(s.hifzSabaqClean);
     }
     expect(screen.getByText("Clean in a row: 4 of 5")).toBeTruthy();
+    expect(saveSabaqCleanRun).not.toHaveBeenCalled();
     press(s.hifzDrillShow);
     press(s.hifzSabaqClean);
+    // The fifth saves the chunk (SBQ-02), then the lesson moves on.
+    await flush();
+    expect(saveSabaqCleanRun).toHaveBeenCalledTimes(1);
     expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
   });
 
@@ -183,6 +189,8 @@ describe("sabaq repetition counts (SBQ-01)", () => {
     press(s.hifzSabaqClean);
     press(s.hifzDrillShow);
     press(s.hifzSabaqClean);
+    await flush();
+    expect(saveSabaqCleanRun).toHaveBeenCalledTimes(1);
     expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
   });
 });

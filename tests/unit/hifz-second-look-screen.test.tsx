@@ -15,6 +15,7 @@ import {
   completeSabaqChunk,
   loadSecondLooks,
   nextSabaqTarget,
+  saveSabaqCleanRun,
   saveSecondLook,
   type SabaqTarget,
   type SecondLook,
@@ -95,6 +96,7 @@ jest.mock("@/lib/hifz/pages", () => ({
 jest.mock("@/lib/hifz/sabaq", () => ({
   completeSabaqChunk: jest.fn(),
   nextSabaqTarget: jest.fn(),
+  saveSabaqCleanRun: jest.fn(),
   loadSecondLooks: jest.fn(),
   saveSecondLook: jest.fn(),
 }));
@@ -193,6 +195,7 @@ beforeEach(() => {
   jest.mocked(nextSabaqTarget).mockResolvedValue(target);
   jest.mocked(loadSecondLooks).mockResolvedValue({ due: [look(1)], nextAt: null });
   jest.mocked(saveSecondLook).mockResolvedValue(lookSaved);
+  jest.mocked(saveSabaqCleanRun).mockResolvedValue({ wird: { kind: "none" }, pageAdded: false } as Awaited<ReturnType<typeof saveSabaqCleanRun>>);
   jest.mocked(similarGroupsForAyahs).mockResolvedValue([]);
   jest.mocked(withMemorizedSiblings).mockReturnValue([]);
   jest.mocked(readMemorizedPageNumbers).mockResolvedValue(new Set());
@@ -381,8 +384,8 @@ describe("sabaq second look (SBQ-03)", () => {
   });
 
   describe("after the fluent check", () => {
-    /** Walk the lesson to its graded fluent check and save it with `result`. */
-    async function finishLesson(result: Partial<ChunkSave>) {
+    /** Walk the lesson, step 6's save included, to its fluent check, grade it `rating` and save it with `result`. */
+    async function finishLesson(result: Partial<ChunkSave>, rating: 1 | 2 | 3 | 4 = 3) {
       jest.mocked(loadSecondLooks).mockResolvedValue({ due: [], nextAt: null });
       jest
         .mocked(completeSabaqChunk)
@@ -391,16 +394,19 @@ describe("sabaq second look (SBQ-03)", () => {
       for (let step = 0; step < 3; step += 1) press(s.hifzSabaqNext);
       for (let reading = 0; reading < 10; reading += 1) press(s.hifzSabaqReadOnce);
       press(s.hifzSabaqNext);
-      for (let clean = 0; clean < 5; clean += 1) {
+      for (let clean = 0; clean < 4; clean += 1) {
         press(s.hifzDrillShow);
         press(s.hifzSabaqClean);
       }
+      await flush();
+      press(s.hifzDrillShow);
+      press(s.hifzSabaqClean);
       press(s.hifzDrillShow);
       await act(async () => {
-        void grading().onGrade(3);
+        void grading().onGrade(rating);
       });
       await flush();
-      expect(screen.getByText(s.hifzSabaqDoneTitle)).toBeTruthy();
+      expect(screen.getByText(rating >= 3 ? s.hifzSabaqDoneTitle : s.hifzSabaqNotFluentTitle)).toBeTruthy();
     }
 
     it("promises the second look with the time it comes due", async () => {
@@ -415,6 +421,29 @@ describe("sabaq second look (SBQ-03)", () => {
     it("promises no second look when none comes due today", async () => {
       await finishLesson({ secondLookAt: null });
       expect(screen.queryByText(/second look/)).toBeNull();
+    });
+
+    it("after a failed check, says when the lines come back for their second look instead of next time", async () => {
+      const secondLookAt = new Date(Date.now() + 60 * 60_000);
+      await finishLesson({ secondLookAt }, 2);
+      const time = secondLookAt.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
+      expect(screen.getByText(interpolate(s.hifzSabaqSecondLookAt, { time }))).toBeTruthy();
+      expect(screen.queryByText(s.hifzSabaqNotFluent)).toBeNull();
+      expect(screen.queryByText(s.hifzSabaqDonePartial)).toBeNull();
+    });
+
+    it("after a failed check with no look later today, says the lines come up again next time", async () => {
+      await finishLesson({ secondLookAt: null }, 1);
+      expect(screen.getByText(s.hifzSabaqNotFluent)).toBeTruthy();
+      expect(screen.queryByText(/second look/)).toBeNull();
+    });
+
+    it("after a failed check of lines that completed their page, says they come up in tomorrow's review", async () => {
+      jest.mocked(nextSabaqTarget).mockResolvedValue({ ...target, completesPage: true });
+      await finishLesson({ secondLookAt: null }, 1);
+      // Step 6 added the page, so the lines are not offered again as new lines.
+      expect(screen.getByText(s.hifzSabaqNotFluentReview)).toBeTruthy();
+      expect(screen.queryByText(s.hifzSabaqNotFluent)).toBeNull();
     });
   });
 });

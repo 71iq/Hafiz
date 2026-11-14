@@ -75,9 +75,11 @@ export function recitationUnits(cardId: string): number {
 }
 
 /**
- * `sabaqStep`: the review is a sabaq chunk's completed step 6 (SBQ-02): the chunk card's earliest
- * passing review. STR-01 counts it as a wird day on its own, however short the chunk. Later reviews
- * of the chunk (the fluent check, a second look) add no step of their own.
+ * `sabaqStep`: the review is a sabaq chunk's completed step 6 (SBQ-02): a passing review of the chunk
+ * card with no review before it, or right after a failed one. That is the pass that memorized the
+ * chunk, the first time or again after a failed fluent check or look, the same rule by which
+ * nextSabaqTarget counts a chunk as memorized. STR-01 counts it as a wird day on its own, however
+ * short the chunk. A pass after a pass (the fluent check, a second look) adds no step of its own.
  */
 export type ReviewContribution = Readonly<{ cardId: string; durationMs: number | null; sabaqStep?: boolean }>;
 export type WirdTally = Readonly<{ pageUnits: number; countedMs: number; sabaqStep: boolean }>;
@@ -138,11 +140,11 @@ const TALLY_SELECT = `SELECT
     WHEN ${STUDY_SQL} AND ? = 0 THEN 0
     ELSE MIN(MAX(COALESCE(duration_ms, 0), 0), ${MAX_COUNTED_REVIEW_MS}) END), 0) AS counted_ms,
   COALESCE(MAX(CASE
-    WHEN card_id LIKE 'chunk:%' AND rating >= 3 AND NOT EXISTS (
-      SELECT 1 FROM study_log AS earlier
-      WHERE earlier.card_id = tallied.card_id AND earlier.rating >= 3
-        AND julianday(earlier.reviewed_at) < julianday(tallied.reviewed_at)
-    ) THEN 1 ELSE 0 END), 0) AS sabaq_step
+    WHEN card_id LIKE 'chunk:%' AND rating >= 3 AND COALESCE((
+      SELECT prior.rating FROM study_log AS prior
+      WHERE prior.card_id = tallied.card_id AND julianday(prior.reviewed_at) < julianday(tallied.reviewed_at)
+      ORDER BY julianday(prior.reviewed_at) DESC, prior.rating DESC LIMIT 1
+    ), 0) < 3 THEN 1 ELSE 0 END), 0) AS sabaq_step
   FROM (SELECT card_id, rating, reviewed_at, duration_ms, local_date, makeup_for, ${LINES_SEG_SQL} AS lines_seg FROM study_log) AS tallied`;
 
 /**

@@ -12,13 +12,14 @@ import { readDeckReviewSettings } from "@/lib/fsrs/queries";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { loadHabitOverview } from "@/lib/habit/queries";
 import { readHabitSettings } from "@/lib/habit/settings";
+import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
 import { dismissInboxItem, readMistakeInbox, recordDrillResult, type InboxItem } from "@/lib/hifz/errors";
 import { loadRecitationPage, type PageToken, type RecitationPage } from "@/lib/hifz/page-data";
 import { loadPageCards, loadTodayWird, readMemorizedPageNumbers, type PageCard } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
 import { loadDueRemediation } from "@/lib/hifz/remediation";
 import { recordReviewPace, savePageGrade } from "@/lib/hifz/review";
-import { completeSabaqChunk, nextSabaqTarget, type SabaqTarget } from "@/lib/hifz/sabaq";
+import { completeSabaqChunk, nextSabaqTarget, saveSabaqCleanRun, type SabaqTarget } from "@/lib/hifz/sabaq";
 import { similarGroupsForAyahs, withMemorizedSiblings } from "@/lib/hifz/similar";
 import { refreshWeakSpots } from "@/lib/hifz/use-weak-spots";
 import { strings } from "@/lib/i18n/strings";
@@ -103,11 +104,12 @@ jest.mock("@/lib/database/provider", () => ({
   useDatabase: () => mockDatabase,
   useDatabaseStatus: () => ({ isReady: true, progress: null, error: null }),
 }));
+let mockUiLanguage: "en" | "ar" = "en";
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   return {
     ...actual,
-    useSettings: () => ({ ...actual.useSettings(), isDark: false, isRTL: false, uiLanguage: "en", fontSize: 20, lineHeight: 40 }),
+    useSettings: () => ({ ...actual.useSettings(), isDark: false, isRTL: false, uiLanguage: mockUiLanguage, fontSize: 20, lineHeight: 40 }),
   };
 });
 jest.mock("@/lib/haptics", () => ({ hapticMedium: jest.fn(), hapticSuccess: jest.fn() }));
@@ -187,6 +189,7 @@ jest.mock("@/lib/hifz/review", () => ({
 jest.mock("@/lib/hifz/sabaq", () => ({
   completeSabaqChunk: jest.fn(),
   nextSabaqTarget: jest.fn(),
+  saveSabaqCleanRun: jest.fn(),
   // No second look is due in these lessons; tests/unit/hifz-second-look-screen.test.tsx covers them.
   loadSecondLooks: jest.fn(async () => ({ due: [], nextAt: null })),
   saveSecondLook: jest.fn(),
@@ -311,6 +314,7 @@ function controlDeviceLifecycle() {
 let warnings: jest.SpyInstance;
 beforeEach(() => {
   mockPreventRemove = null;
+  mockUiLanguage = "en";
   exits = [];
   jest.clearAllMocks();
   jest.mocked(returnToTabs).mockImplementation(() => {
@@ -762,6 +766,12 @@ describe("sabaq screen", () => {
     completesPage: false,
   } satisfies SabaqTarget;
 
+  const press = (name: string) => fireEvent.press(screen.getByRole("button", { name }));
+  type ChunkSave = Awaited<ReturnType<typeof completeSabaqChunk>>;
+  type CleanRunSave = Awaited<ReturnType<typeof saveSabaqCleanRun>>;
+  const chunkSaved = { wird: { kind: "none" }, pageAdded: false } as unknown as ChunkSave;
+  const cleanRunSaved = { wird: { kind: "none" }, pageAdded: false } as unknown as CleanRunSave;
+
   beforeEach(() => {
     jest.mocked(loadTodayWird).mockResolvedValue({
       plan: DEFAULT_HIFZ_PLAN,
@@ -770,28 +780,36 @@ describe("sabaq screen", () => {
       daily: { backlog: false },
     } as never);
     jest.mocked(nextSabaqTarget).mockResolvedValue(target);
+    jest.mocked(saveSabaqCleanRun).mockResolvedValue(cleanRunSaved);
     jest.mocked(similarGroupsForAyahs).mockResolvedValue([]);
     jest.mocked(withMemorizedSiblings).mockReturnValue([]);
     jest.mocked(readMemorizedPageNumbers).mockResolvedValue(new Set());
   });
 
-  const press = (name: string) => fireEvent.press(screen.getByRole("button", { name }));
-  type ChunkSave = Awaited<ReturnType<typeof completeSabaqChunk>>;
-  const chunkSaved = { wird: { kind: "none" }, pageAdded: false } as unknown as ChunkSave;
-
-  /** Walk the session to its graded fluent check and return its grade buttons. */
-  async function openSabaqCheck() {
+  /** Walk the lesson to step 6 with its last clean recitation to go and the lines shown. */
+  async function openSabaqCleanRun() {
     render(<SabaqRoute />, { wrapper: Wrapper });
     await flush();
     // Intention, listening and meaning, then ten readings while looking.
     for (let step = 0; step < 3; step += 1) press(s.hifzSabaqNext);
     for (let reading = 0; reading < 10; reading += 1) press(s.hifzSabaqReadOnce);
     press(s.hifzSabaqNext);
-    // One ayah, the whole chunk three times, then the link, each from memory.
-    for (let clean = 0; clean < 5; clean += 1) {
+    // One ayah, then the whole chunk twice, each from memory.
+    for (let clean = 0; clean < 3; clean += 1) {
       press(s.hifzDrillShow);
       press(s.hifzSabaqClean);
     }
+    press(s.hifzDrillShow);
+    expect(screen.getByText("Clean in a row: 2 of 3")).toBeTruthy();
+  }
+
+  /** Walk the session through step 6's save and the link to its graded fluent check, and return its grade buttons. */
+  async function openSabaqCheck() {
+    await openSabaqCleanRun();
+    press(s.hifzSabaqClean);
+    await flush();
+    press(s.hifzDrillShow);
+    press(s.hifzSabaqClean);
     press(s.hifzDrillShow);
     return grading();
   }
@@ -801,6 +819,111 @@ describe("sabaq screen", () => {
     await flush();
     expect(screen.getByText(s.hifzSabaqIntention)).toBeTruthy();
     expect(screen.getAllByText(`Page 5 · Lines 1 to 1`)).toHaveLength(1);
+  });
+
+  it("saves the chunk once step 6's clean run is met, then moves on to the link (SBQ-02)", async () => {
+    await openSabaqCleanRun();
+    expect(saveSabaqCleanRun).not.toHaveBeenCalled();
+    press(s.hifzSabaqClean);
+    await flush();
+    expect(saveSabaqCleanRun).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(saveSabaqCleanRun).mock.calls[0][1]).toEqual({
+      target,
+      plan: DEFAULT_HIFZ_PLAN,
+      session: { id: "session-1" },
+      durationMs: expect.any(Number),
+    });
+    expect(emitHabitChanged).toHaveBeenCalled();
+    expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
+    expect(completeSabaqChunk).not.toHaveBeenCalled();
+  });
+
+  it("keeps the lesson's chunk and session when the language changes after step 6 saved it", async () => {
+    // Loading again would choose the next lines, since step 6 memorized these.
+    jest.mocked(nextSabaqTarget).mockResolvedValueOnce(target).mockResolvedValue({ ...target, fromLine: 2, toLine: 2, lineNumbers: new Set([2]) });
+    await openSabaqCleanRun();
+    press(s.hifzSabaqClean);
+    await flush();
+    mockUiLanguage = "ar";
+    screen.rerender(<SabaqRoute />);
+    await flush();
+    mockUiLanguage = "en";
+    screen.rerender(<SabaqRoute />);
+    await flush();
+    expect(nextSabaqTarget).toHaveBeenCalledTimes(1);
+    expect(startReviewSession).toHaveBeenCalledTimes(1);
+    // Only the meanings followed the language.
+    expect(mockDatabase.getFirstAsync).toHaveBeenCalledWith(expect.stringContaining("FROM tafseer"), [2, 1]);
+    expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
+    press(s.hifzDrillShow);
+    press(s.hifzSabaqClean);
+    press(s.hifzDrillShow);
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+    expect(jest.mocked(completeSabaqChunk).mock.calls[0][1]).toMatchObject({ target, session: { id: "session-1" } });
+  });
+
+  it("holds a back press during step 6's unresolved save, then goes back once it is saved, keeping the chunk", async () => {
+    const save = deferred<CleanRunSave>();
+    jest.mocked(saveSabaqCleanRun).mockReturnValue(save.promise);
+    await openSabaqCleanRun();
+    press(s.hifzSabaqClean);
+    let held = false;
+    act(() => {
+      held = back();
+    });
+    expect(held).toBe(true);
+    // During the save the press waits for it rather than asking.
+    expect(screen.queryByText(s.hifzSabaqExitTitle)).toBeNull();
+    await act(async () => save.resolve(cleanRunSaved));
+    await flush();
+    expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK);
+    expect(endReviewSession).toHaveBeenCalled();
+    expect(emitHabitChanged).toHaveBeenCalled();
+    expect(completeSabaqChunk).not.toHaveBeenCalled();
+  });
+
+  it("holds a back press during step 6's unresolved save, and stays on step 6 to show a failure and save again", async () => {
+    const save = deferred<CleanRunSave>();
+    jest.mocked(saveSabaqCleanRun).mockReturnValueOnce(save.promise).mockResolvedValueOnce(cleanRunSaved);
+    await openSabaqCleanRun();
+    press(s.hifzSabaqClean);
+    let held = false;
+    act(() => {
+      held = back();
+    });
+    expect(held).toBe(true);
+    await act(async () => save.reject(new Error("disk full")));
+    await flush();
+    expect(mockNavigation.dispatch).not.toHaveBeenCalledWith(BACK);
+    expect(returnToTabs).not.toHaveBeenCalled();
+    expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
+    expect(screen.getByText(s.hifzSabaqStepChunk)).toBeTruthy();
+    // Nothing of the lesson is saved, so leaving asks again.
+    expect(preventing()).toBe(true);
+    // The same button saves again, and the cancelled back press does not carry over.
+    press(s.hifzSabaqClean);
+    await flush();
+    expect(saveSabaqCleanRun).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
+    expect(screen.queryByText(s.hifzSaveFailed)).toBeNull();
+    expect(mockNavigation.dispatch).not.toHaveBeenCalledWith(BACK);
+  });
+
+  it("leaves the link without asking once step 6 saved the chunk", async () => {
+    await openSabaqCleanRun();
+    press(s.hifzSabaqClean);
+    await flush();
+    expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
+    expect(preventing()).toBe(false);
+    press(s.genericClose);
+    await flush();
+    expect(screen.queryByText(s.hifzSabaqExitTitle)).toBeNull();
+    expect(exits).toEqual(["left"]);
+    expect(endReviewSession).toHaveBeenCalled();
+    expect(completeSabaqChunk).not.toHaveBeenCalled();
   });
 
   it("waits for the check's unresolved grade before leaving on Close, then leaves once it is saved", async () => {
@@ -820,7 +943,7 @@ describe("sabaq screen", () => {
   });
 
   it("asks before Close or a back press leaves an unsaved lesson, and goes once confirmed", async () => {
-    await openSabaqCheck();
+    await openSabaqCleanRun();
     // Close asks, and staying keeps the lesson.
     press(s.genericClose);
     expect(screen.getByText(s.hifzSabaqExitTitle)).toBeTruthy();
@@ -837,15 +960,29 @@ describe("sabaq screen", () => {
     await flush();
     expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK);
     expect(endReviewSession).toHaveBeenCalled();
+    expect(saveSabaqCleanRun).not.toHaveBeenCalled();
   });
 
-  it("prevents removal, the native swipe included, through the unsaved lesson and its save, and not once saved", async () => {
+  it("prevents removal, the native swipe included, through the unsaved lesson and step 6's save, and not once the chunk is saved", async () => {
+    const save = deferred<CleanRunSave>();
+    jest.mocked(saveSabaqCleanRun).mockReturnValue(save.promise);
+    await openSabaqCleanRun();
+    expect(preventing()).toBe(true);
+    press(s.hifzSabaqClean);
+    expect(preventing()).toBe(true);
+    await act(async () => save.resolve(cleanRunSaved));
+    await flush();
+    expect(preventing()).toBe(false);
+    expect(back()).toBe(false);
+  });
+
+  it("prevents removal during the check's save, and not once it is saved while the summary loads", async () => {
     const save = deferred<ChunkSave>();
     jest.mocked(completeSabaqChunk).mockReturnValue(save.promise);
     const overview = deferred<null>();
     jest.mocked(loadHabitOverview).mockReturnValue(overview.promise as never);
     const buttons = await openSabaqCheck();
-    expect(preventing()).toBe(true);
+    expect(preventing()).toBe(false);
     await act(async () => {
       void buttons.onGrade(3);
     });
@@ -920,6 +1057,19 @@ describe("sabaq screen", () => {
     expect(screen.getByText(s.hifzSabaqNotFluent)).toBeTruthy();
     expect(screen.queryByText(s.hifzSabaqDoneTitle)).toBeNull();
     expect(screen.queryByText(s.hifzSabaqDone)).toBeNull();
+    expect(saveSabaqCleanRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the second look is ready now after a check graded Again, instead of waiting for new lines (SBQ-03)", async () => {
+    jest.mocked(completeSabaqChunk).mockResolvedValueOnce({ ...chunkSaved, secondLookAt: null, secondLookNow: true });
+    const buttons = await openSabaqCheck();
+    await act(async () => {
+      void buttons.onGrade(1);
+    });
+    await flush();
+    expect(screen.getByText(s.hifzSabaqNotFluentTitle)).toBeTruthy();
+    expect(screen.getByText(s.hifzSabaqSecondLookNow)).toBeTruthy();
+    expect(screen.queryByText(s.hifzSabaqNotFluent)).toBeNull();
   });
 
   it("saves the chunk once when the fluent check is graded twice, and not again after it is saved", async () => {
@@ -943,9 +1093,20 @@ describe("sabaq screen", () => {
   describe("time away from the screen", () => {
     controlDeviceLifecycle();
 
-    it.each(AWAY_CASES)("counts only time on screen toward the chunk and the summary when %s", async (_label, how) => {
+    it.each(AWAY_CASES)("counts only time on screen toward step 6, the check and the summary when %s", async (_label, how) => {
+      jest.mocked(saveSabaqCleanRun).mockResolvedValue({ wird: { kind: "minimum_met" }, pageAdded: false } as unknown as CleanRunSave);
       jest.mocked(completeSabaqChunk).mockResolvedValue(chunkSaved);
-      await openSabaqCheck();
+      await openSabaqCleanRun();
+      deviceTime += 2 * MINUTE;
+      stayAway(how, 5 * MINUTE);
+      deviceTime += 2 * MINUTE;
+      press(s.hifzSabaqClean);
+      await flush();
+      // Step 6 saves the lesson's four minutes on screen so far; the check's time starts after it.
+      expect(jest.mocked(saveSabaqCleanRun).mock.calls[0][1].durationMs).toBe(4 * MINUTE);
+      press(s.hifzDrillShow);
+      press(s.hifzSabaqClean);
+      press(s.hifzDrillShow);
       deviceTime += MINUTE;
       stayAway(how, 6 * MINUTE);
       deviceTime += 2 * MINUTE;
@@ -953,9 +1114,10 @@ describe("sabaq screen", () => {
         void grading().onGrade(3);
       });
       await flush();
-      // Three minutes on screen, not the nine since the lesson loaded.
       expect(jest.mocked(completeSabaqChunk).mock.calls[0][1].durationMs).toBe(3 * MINUTE);
-      expect(mockHabitInput?.durationMs).toBe(3 * MINUTE);
+      // The summary covers the whole lesson and keeps the minimum step 6 met, though the check met nothing new.
+      expect(mockHabitInput?.durationMs).toBe(7 * MINUTE);
+      expect(mockHabitInput?.event).toEqual({ kind: "minimum_met" });
     });
   });
 });

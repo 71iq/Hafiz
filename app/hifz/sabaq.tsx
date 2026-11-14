@@ -37,6 +37,7 @@ import {
   completeSabaqChunk,
   loadSecondLooks,
   nextSabaqTarget,
+  saveSabaqCleanRun,
   saveSecondLook,
   type SabaqTarget,
   type SecondLook,
@@ -66,8 +67,8 @@ function formatClockTime(at: Date, language: "en" | "ar"): string {
 
 /**
  * Sabaq, new memorization (4.4.1): intention, listening, meaning, reading while looking, ayah by
- * ayah from memory with chaining, the whole chunk three times cleanly, linking to what came before,
- * then a graded fluent check that turns the chunk into a sabaq card (SBQ-02).
+ * ayah from memory with chaining, the whole chunk three times cleanly, which turns the chunk into a
+ * sabaq card (SBQ-02), linking to what came before, then a graded fluent check of that card.
  */
 function SabaqScreen() {
   const db = useDatabase();
@@ -92,6 +93,8 @@ function SabaqScreen() {
   const [exitOpen, setExitOpen] = useState(false);
   /** The rendered copy of `saveLock === "saved"`: the lesson is saved, so leaving asks nothing. */
   const [lessonSaved, setLessonSaved] = useState(false);
+  /** Step 6's clean run saved the chunk (SBQ-02), so leaving before the check asks nothing either. */
+  const [chunkSaved, setChunkSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
   const [showZayt, setShowZayt] = useState(false);
@@ -108,7 +111,7 @@ function SabaqScreen() {
   /** New memorization waits for review to catch up (PLN-02); a second look is still offered. */
   const [catchUpFirst, setCatchUpFirst] = useState(false);
   /** What the saved fluent check means for the done step's copy. */
-  const [outcome, setOutcome] = useState<{ passed: boolean; partial: boolean; secondLookAt: Date | null } | null>(null);
+  const [outcome, setOutcome] = useState<{ passed: boolean; partial: boolean; secondLookAt: Date | null; secondLookNow: boolean } | null>(null);
   const STEPS: readonly Step[] = useMemo(
     () => (similar.length > 0 ? ["intention", "listen", "meaning", "similar", "looking", "ayah", "chunk", "link", "check"] : BASE_STEPS),
     [similar.length],
@@ -119,9 +122,13 @@ function SabaqScreen() {
   /**
    * The fluent check's grade: "open" until it is graded, "saving" while the save is unresolved, then
    * "saved" for good, since the check is over. Taken before React renders `busy`, so a second tap
-   * cannot grade the chunk again; a failed save opens it again so the user can retry.
+   * cannot grade the chunk again; a failed save opens it again so the user can retry. Step 6's save
+   * and a second look's take it too, and open it again once saved, since the check is still ahead.
    */
   const saveLock = useRef<"open" | "saving" | "saved">("open");
+  /** What step 6's save meant for the wird and how long the lesson had taken, for the summary. */
+  const cleanRunEvent = useRef<SessionHabitInput["event"]>(null);
+  const cleanRunMs = useRef(0);
   /**
    * The rendered copy of `saveLock === "saving"`, for the remove guard below. Unlike `busy` it ends as
    * soon as the grade is saved, so leaving while the summary loads is not held.
@@ -140,6 +147,16 @@ function SabaqScreen() {
   const [leavePending, setLeavePending] = useState(false);
   const step: Step = habitResult ? "done" : STEPS[stepIndex];
 
+  /** The current strings, for load's error text, so a language change does not reload the lesson. */
+  const strings = useRef(s);
+  strings.current = s;
+
+  /**
+   * Load the lesson once: its target, second looks and review session. It does not depend on the
+   * language, since loading again mid-lesson would choose the next chunk once step 6 has saved this
+   * one, and the check would grade lines the person never memorized. The meanings follow the language
+   * in their own effect below.
+   */
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -181,16 +198,6 @@ function SabaqScreen() {
       setNextLookAt(secondLooks.nextAt);
       setTarget(next);
       if (next) {
-        const rows = await Promise.all(
-          next.ayahs.map(async (ayah) => {
-            const row =
-              uiLanguage === "ar"
-                ? await db.getFirstAsync<{ text: string }>("SELECT text FROM tafseer WHERE surah = ? AND ayah = ? AND source = 'muyassar'", [ayah.surah, ayah.ayah])
-                : await db.getFirstAsync<{ text: string }>("SELECT text_en AS text FROM translations WHERE surah = ? AND ayah = ?", [ayah.surah, ayah.ayah]);
-            return { key: `${ayah.surah}:${ayah.ayah}`, text: row?.text ?? "" };
-          }),
-        );
-        setMeanings(rows);
         // MUT-01: before memorizing, show siblings the user already knows, with the difference marked.
         const [groups, memorizedPages] = await Promise.all([similarGroupsForAyahs(db, next.ayahs), readMemorizedPageNumbers(db)]);
         setSimilar(withMemorizedSiblings(groups, memorizedPages));
@@ -199,16 +206,42 @@ function SabaqScreen() {
       lessonClock.reset();
     } catch (loadError) {
       console.warn("[Sabaq] Failed to load:", loadError);
-      setError(s.hifzLoadFailed);
+      setError(strings.current.hifzLoadFailed);
     } finally {
       setLoading(false);
     }
-  }, [db, lessonClock, s.hifzLoadFailed, uiLanguage]);
+  }, [db, lessonClock]);
 
   useEffect(() => {
     load();
     return () => stop();
   }, [load, stop]);
+
+  // The meaning step's text, in the interface language: the Muyassar tafsir in Arabic, the
+  // translation in English. A language change reloads only this.
+  useEffect(() => {
+    if (!target) return;
+    let current = true;
+    Promise.all(
+      target.ayahs.map(async (ayah) => {
+        const row =
+          uiLanguage === "ar"
+            ? await db.getFirstAsync<{ text: string }>("SELECT text FROM tafseer WHERE surah = ? AND ayah = ? AND source = 'muyassar'", [ayah.surah, ayah.ayah])
+            : await db.getFirstAsync<{ text: string }>("SELECT text_en AS text FROM translations WHERE surah = ? AND ayah = ?", [ayah.surah, ayah.ayah]);
+        return { key: `${ayah.surah}:${ayah.ayah}`, text: row?.text ?? "" };
+      }),
+    )
+      .then((rows) => {
+        if (current) setMeanings(rows);
+      })
+      .catch((meaningError: unknown) => {
+        console.warn("[Sabaq] Failed to load meanings:", meaningError);
+        if (current) setError(strings.current.hifzLoadFailed);
+      });
+    return () => {
+      current = false;
+    };
+  }, [db, target, uiLanguage]);
 
   const goNext = () => {
     setShown(false);
@@ -238,10 +271,10 @@ function SabaqScreen() {
   );
 
   /**
-   * The lesson is under way and nothing of it is saved yet: its lines are saved only by the final
-   * check, so leaving asks first, as the hifz review does with graded pages.
+   * The lesson is under way and nothing of it is saved yet: its lines are saved once step 6's clean
+   * run is met, so leaving before that asks first, as the hifz review does with graded pages.
    */
-  const lessonUnsaved = stepIndex > 0 && !habitResult && !saving && !lessonSaved;
+  const lessonUnsaved = stepIndex > 0 && !habitResult && !saving && !lessonSaved && !chunkSaved;
 
   // Close, hardware back, a back gesture and the iOS swipe behave alike: during an unresolved grade
   // they wait for it, and in an unsaved lesson they ask first. usePreventRemove, unlike a bare
@@ -331,6 +364,47 @@ function SabaqScreen() {
     }
   };
 
+  /**
+   * SBQ-02: step 6's clean run is met, so the chunk is saved now, Good, with the lesson's time so far,
+   * and the check's time starts after it. It shares the check's save lock and leave handling: a second
+   * tap is ignored, leaving waits for the save, and a failed save stays on step 6 to retry.
+   */
+  const saveCleanRun = async () => {
+    if (!target || !plan || saveLock.current !== "open") return;
+    saveLock.current = "saving";
+    setSaving(true);
+    setBusy(true);
+    setError(null);
+    try {
+      const durationMs = lessonClock.elapsedMs();
+      const result = await saveSabaqCleanRun(db, { target, plan, session: sessionRef.current, durationMs });
+      saveLock.current = "open";
+      setSaving(false);
+      setChunkSaved(true);
+      cleanRunEvent.current = strongerWirdEvent(null, result.wird);
+      cleanRunMs.current = durationMs;
+      emitHabitChanged();
+      if (leaveWhenSaved.current) {
+        exit();
+        return;
+      }
+      lessonClock.reset();
+      goNext();
+    } catch (saveError) {
+      console.warn("[Sabaq] Clean run save failed:", saveError);
+      leaveWhenSaved.current = false;
+      pendingBack.current = null;
+      setLeavePending(false);
+      setError(s.hifzSaveFailed);
+    } finally {
+      if (saveLock.current === "saving") {
+        saveLock.current = "open";
+        setSaving(false);
+      }
+      setBusy(false);
+    }
+  };
+
   const finish = async (rating: Grade) => {
     if (!target || !plan || saveLock.current !== "open") return;
     saveLock.current = "saving";
@@ -348,8 +422,13 @@ function SabaqScreen() {
       saveLock.current = "saved";
       setSaving(false);
       setLessonSaved(true);
-      // SBQ-02: only Good or Easy memorizes the lines; a lower grade offers them again next time.
-      setOutcome({ passed: rating >= 3, partial: rating >= 3 && !target.completesPage, secondLookAt: result.secondLookAt ?? null });
+      // SBQ-02: a lower grade than Good offers the lines again, unless step 6 completed their page.
+      setOutcome({
+        passed: rating >= 3,
+        partial: rating >= 3 && !target.completesPage,
+        secondLookAt: result.secondLookAt ?? null,
+        secondLookNow: result.secondLookNow === true,
+      });
       if (leaveWhenSaved.current) {
         emitHabitChanged();
         exit();
@@ -361,12 +440,13 @@ function SabaqScreen() {
         session ? endReviewSession(db, { session }).catch(console.warn) : null,
       ]);
       emitHabitChanged();
+      // The summary covers the whole lesson: step 6's save and the check after it.
       setHabitResult({
-        event: strongerWirdEvent(null, result.wird),
+        event: strongerWirdEvent(cleanRunEvent.current, result.wird),
         overview,
         againCount: rating === 1 ? 1 : 0,
         total: 1,
-        durationMs: lessonClock.elapsedMs(),
+        durationMs: cleanRunMs.current + lessonClock.elapsedMs(),
       });
     } catch (saveError) {
       console.warn("[Sabaq] Save failed:", saveError);
@@ -499,6 +579,26 @@ function SabaqScreen() {
   })}`;
   // The intention and the end are moments, not instructions, so they sit centred.
   const centered = step === "intention" || step === "done";
+  // SBQ-03: the second look the done step promises, with its time later today, or ready now, as after
+  // a check graded Again, whose relearning step is a few minutes away.
+  const lookLine =
+    step === "done" && outcome?.secondLookAt
+      ? interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
+      : step === "done" && outcome?.secondLookNow
+        ? s.hifzSabaqSecondLookNow
+        : null;
+  // After a failed check, the look says when the lines come back. Without one they come back as new
+  // lines, or in tomorrow's review once step 6 has completed their page.
+  const doneCaption =
+    outcome?.passed === false
+      ? lookLine
+        ? null
+        : target.completesPage
+          ? s.hifzSabaqNotFluentReview
+          : s.hifzSabaqNotFluent
+      : outcome?.partial
+        ? s.hifzSabaqDonePartial
+        : s.hifzSabaqDone;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -549,7 +649,7 @@ function SabaqScreen() {
             {step === "done" && outcome?.passed === false ? s.hifzSabaqNotFluentTitle : stepTitle[step]}
           </Text>
           {/* The header already names the page and lines, so the intention has no caption. */}
-          {step !== "intention" ? (
+          {step !== "intention" && !(step === "done" && doneCaption === null) ? (
             <Text
               dir={dir}
               align={centered ? "center" : undefined}
@@ -572,24 +672,20 @@ function SabaqScreen() {
                           : step === "similar"
                             ? s.hifzSimilarHint
                             : step === "done"
-                              ? outcome?.passed === false
-                                ? s.hifzSabaqNotFluent
-                                : outcome?.partial
-                                  ? s.hifzSabaqDonePartial
-                                  : s.hifzSabaqDone
+                              ? doneCaption
                               : ""}
             </Text>
           ) : null}
-          {/* SBQ-03: only a second look that will be offered today is promised, with its time. */}
+          {/* SBQ-03: only a second look that will be offered today is promised. */}
           {/* The one thing to act on later, so it reads at body size. */}
-          {step === "done" && outcome?.secondLookAt ? (
+          {lookLine ? (
             <Text
               dir={dir}
               align="center"
               className="mt-2 text-charcoal dark:text-neutral-200"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, lineHeight: 21 }}
             >
-              {interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })}
+              {lookLine}
             </Text>
           ) : null}
           {step === "ayah" && currentAyah ? (
@@ -710,6 +806,7 @@ function SabaqScreen() {
                 className={`flex-1 ${OUTLINE_BORDER}`}
                 variant="outline"
                 label={s.hifzSabaqNotYet}
+                disabled={busy}
                 onPress={() => {
                   setShown(false);
                   setCleanRun(0);
@@ -718,7 +815,15 @@ function SabaqScreen() {
               <Button
                 className="flex-1"
                 label={s.hifzSabaqClean}
+                disabled={busy}
                 onPress={() => {
+                  if (step === "chunk" && cleanRun + 1 >= plan.sabaqRepetitions.cleanInARow) {
+                    // The clean run is met. The lines stay shown until it is saved, so a failed save
+                    // is retried with the same button.
+                    setCleanRun(plan.sabaqRepetitions.cleanInARow);
+                    void saveCleanRun();
+                    return;
+                  }
                   setShown(false);
                   if (step === "ayah") {
                     if (ayahIndex + 1 < target.ayahs.length) setAyahIndex((value) => value + 1);
@@ -726,8 +831,7 @@ function SabaqScreen() {
                     return;
                   }
                   if (step === "chunk") {
-                    if (cleanRun + 1 >= plan.sabaqRepetitions.cleanInARow) goNext();
-                    else setCleanRun((value) => value + 1);
+                    setCleanRun((value) => value + 1);
                     return;
                   }
                   goNext();

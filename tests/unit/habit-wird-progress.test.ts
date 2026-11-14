@@ -511,6 +511,29 @@ describe("a completed sabaq step 6 (STR-01)", () => {
     expect(await tally(TODAY)).toBe(false);
     expect(await tally(addDays(TODAY, -1))).toBe(true);
   });
+
+  it("counts a chunk learned again after a failed check as a step 6 on that day, in SQL and in reconciliation", async () => {
+    const yesterday = addDays(TODAY, -1);
+    const insertAt = (rating: number, at: Date) =>
+      store.sql
+        .prepare(
+          `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
+            local_date, grader, duration_ms, makeup_for) VALUES ('chunk:madani15:8:1-3', ?, 1, ?, 1, 1, 0, 0, ?, ?, 'self', 60000, NULL)`,
+        )
+        .run(rating, at.toISOString(), at.toISOString(), localDateOf(at));
+    // Yesterday: step 6 saved Good, then the fluent check failed, so the lines are offered again.
+    insertAt(3, atLocalTime(yesterday, 9 * 60));
+    insertAt(1, atLocalTime(yesterday, 9 * 60 + 10));
+    // Today: the lesson again, step 6 then a passed check. Only step 6 is a step.
+    insertAt(3, atLocalTime(TODAY, 9 * 60));
+    insertAt(3, atLocalTime(TODAY, 9 * 60 + 10));
+    expect(await tally(yesterday)).toBe(true);
+    expect(await tally(TODAY)).toBe(true);
+    await store.db.withTransactionAsync(async (tx) => {
+      await reconcileHabitDaysFromLogs(tx, { now: atLocalTime(TODAY, 14 * 60), dates: new Set([TODAY]) });
+    });
+    expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
+  });
 });
 
 describe("make-up attribution on each review (STR-08)", () => {
