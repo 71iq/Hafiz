@@ -889,3 +889,22 @@ describe("a day already done under another headline (NOT-04, STR-07)", () => {
     expect(fake.presented.map((item) => item.data.type)).toEqual(["makeup_window"]);
   });
 });
+
+describe("hifz cards in the surah named by reminder copy (NOT-14)", () => {
+  it("names the overdue ayah card's surah even when hundreds of old chunk and page cards are due first", async () => {
+    store.sql
+      .prepare("INSERT OR REPLACE INTO surahs (number, name_arabic, name_english, ayah_count, revelation_type) VALUES (2, 'سورة البقرة', 'The Cow', 286, 'Medinan')")
+      .run();
+    const insert = store.sql.prepare(
+      `INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state,
+        last_review, created_at, updated_at, deleted_at) VALUES (?, ?, ?, 1, 5, 0, 0, 0, 1, 0, 1, NULL, ?, ?, NULL)`,
+    );
+    const old = "2026-01-01T00:00:00.000Z";
+    for (let line = 1; line <= 320; line++) insert.run(`chunk:madani15:${line}:1-4`, "hifz-sabaq", old, old, old);
+    insert.run("2:255", "smart-retention", at(addDays(TODAY, -1), 8).toISOString(), old, old);
+
+    const context = await loadReminderContext(store.db, { now: at(TODAY, 3), language: "en" });
+
+    expect(context.input.facts(TODAY)).toEqual({ surah: 2 });
+  });
+});

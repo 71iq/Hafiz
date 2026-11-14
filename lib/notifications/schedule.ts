@@ -57,6 +57,7 @@ import {
   writeLocalSetting,
 } from "@/lib/notifications/settings";
 import { NO_REPEAT_DAYS, renderNotification, type Language, type SurahNames } from "@/lib/notifications/templates";
+import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID } from "@/lib/hifz/units";
 import { WIRD_TYPES, type NotificationLogRow, type PlannedSlot, type ReminderPrefs } from "@/lib/notifications/types";
 
 const DAY_MS = 86_400_000;
@@ -99,11 +100,16 @@ export function setReminderAccountSource(source: () => string | null): void {
 
 const SURAH_CARD = /^(\d{1,3}):\d{1,3}$/;
 
-/** The most overdue ayah card's surah for each date, so copy can name it (NOT-14). */
+/**
+ * The most overdue ayah card's surah for each date, so copy can name it (NOT-14). Hifz decks hold no
+ * ayah cards, and their old page and chunk due dates would crowd the ayah cards out of the window.
+ */
 async function readDueSurahs(db: DatabaseExecutor, through: Date): Promise<{ surah: number; due: string }[]> {
   const rows = await db.getAllAsync<{ id: string; due: string }>(
-    "SELECT id, due FROM study_cards WHERE deleted_at IS NULL AND suspended_at IS NULL AND due <= ? ORDER BY due LIMIT 300",
-    [through.toISOString()],
+    `SELECT id, due FROM study_cards
+     WHERE deleted_at IS NULL AND suspended_at IS NULL AND due <= ? AND deck_id NOT IN (?, ?)
+     ORDER BY due LIMIT 300`,
+    [through.toISOString(), HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID],
   );
   return rows.flatMap((row) => {
     const match = SURAH_CARD.exec(row.id);

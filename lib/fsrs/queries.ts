@@ -64,6 +64,7 @@ import {
 import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import { deviceTimeZone, localDateOf } from "@/lib/habit/dates";
 import type { Grader } from "@/lib/hifz/grading";
+import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID } from "@/lib/hifz/units";
 
 type ReviewActivityDay = { date: string; count: number };
 
@@ -875,13 +876,20 @@ export async function setStudyCardDueDate(
   });
 }
 
+/**
+ * The flashcard summary's next review: the earliest card the flashcard queues will show. Hifz page,
+ * half-page, seam, gap and sabaq chunk cards are reviewed in the hifz flows, and a chunk past its day
+ * keeps a due date no flow shows (SBQ-03), so their decks are left out.
+ */
 export async function getNextEligibleReviewDate(db: DatabaseExecutor): Promise<string | null> {
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT *
        FROM study_cards
       WHERE deleted_at IS NULL
         AND suspended_at IS NULL
-      ORDER BY due ASC`
+        AND deck_id NOT IN (?, ?)
+      ORDER BY due ASC`,
+    [HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID]
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
   const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(
