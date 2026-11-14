@@ -358,6 +358,21 @@ describe("rescheduleReminders", () => {
     },
   );
 
+  it("keeps the original when the system refuses to schedule its follow-up (NOT-05b)", async () => {
+    await seed(lastDays(5));
+    await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
+    const original = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
+    osFires(at(TODAY, 5, 21));
+    fake.presented = [...fake.presented, { osId: original.osId, data: original.data }];
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const schedule = jest.spyOn(reminderPlatform, "schedule").mockRejectedValue(new Error("Synthetic scheduling failure"));
+    const response: ReminderResponse = { data: original.data, action: "remind_later", osId: original.osId };
+    expect(await requestRemindLater(store.db, response, { now: at(TODAY, 5, 30) })).toBe(false);
+    schedule.mockRestore();
+    expect(fake.scheduled.some((item) => item.data.type === "remind_later")).toBe(false);
+    expect(fake.presented.some((item) => item.osId === original.osId)).toBe(true);
+  });
+
   it("keeps an overdue follow-up the OS still holds while today is still open", async () => {
     await seed(lastDays(5));
     await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });

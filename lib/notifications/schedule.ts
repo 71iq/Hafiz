@@ -771,11 +771,20 @@ export async function requestRemindLater(
   if (!recorded) return false;
   // Any run queued before the write has started by now, so this is a new run that reads it.
   const result = await rescheduleReminders(db, { now });
-  const scheduled = result.plan?.slots.some((slot) => slot.type === "remind_later") ?? false;
+  const planned = result.plan?.slots.some((slot) => slot.type === "remind_later") ?? false;
+  // The plan can hold the follow-up while the system refused to schedule it, so what counts is a
+  // follow-up the system now holds for that day. A failed read counts as none.
+  const date = response.data.localDate;
+  const scheduled =
+    planned &&
+    (await reminderPlatform
+      .listScheduled()
+      .then((items) => items.some((item) => item.data.type === "remind_later" && item.data.localDate === date))
+      .catch(() => false));
   // NOT-05b: the follow-up replaces the reminder it was asked from. Android keeps a notification in the
   // tray when one of its action buttons is pressed (iOS removes it), and a later swipe there is never
   // reported to the app, so the original is taken out here: the follow-up never outlives an original
-  // the person cleared. A follow-up the plan refused, such as over the daily cap, leaves it in place.
+  // the person cleared. Without a follow-up (over the daily cap, or not scheduled) it stays.
   if (scheduled && response.osId) await reminderPlatform.dismiss([response.osId]).catch(() => undefined);
   return scheduled;
 }
