@@ -402,7 +402,7 @@ export const hifzStrings = {
     hifzSabaqStart: "احفظ أسطرًا جديدة",
     hifzSabaqMore: "احفظ أسطرًا إضافية",
     hifzAssignedByTeacher: "حدّده معلّمك",
-    hifzAssignedLines: "حدّده معلّمك: صفحة {{page}}، الأسطر من {{from}} إلى {{to}}",
+    hifzAssignedLines: "حفظك الجديد من معلّمك: صفحة {{page}}، الأسطر من {{from}} إلى {{to}}",
     hifzCatchUpFirst: "لنُتمَّ المراجعة أولًا، ويُستأنف الحفظ الجديد حين تنتظم المراجعة.",
     hifzSetupTitle: "أعدّ خطة حفظك",
     hifzSetupBody: "اختر ما تحفظه ووتيرتك اليومية، ويُخطَّط وِردك على أساسهما.",

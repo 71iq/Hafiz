@@ -100,12 +100,23 @@ export function Switch({ value, onValueChange, disabled, accessibilityLabel }: P
     <Pressable
       {...switchControlProps({ value, onValueChange, disabled })}
       accessibilityLabel={accessibilityLabel}
-      style={look.track}
+      // A 44 px target around the 24 px track on every platform (web ignores hitSlop), without moving
+      // the layout around it.
+      style={STANDALONE_TARGET}
     >
-      <Animated.View style={look.thumb} />
+      <View style={look.track}>
+        <Animated.View style={look.thumb} />
+      </View>
     </Pressable>
   );
 }
+
+const STANDALONE_TARGET = {
+  paddingVertical: 10,
+  paddingHorizontal: 4,
+  marginVertical: -10,
+  marginHorizontal: -4,
+} as const;
 
 /**
  * The switch's look inside a SwitchRow. The row is the switch, so the track has no role, name,

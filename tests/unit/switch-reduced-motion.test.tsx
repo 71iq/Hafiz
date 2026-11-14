@@ -148,7 +148,16 @@ it.each([false, true])("preserves disabled feedback and prevents writes for stat
   fireEvent.press(view.getByRole("switch", { disabled: true }));
   expect(callback).not.toHaveBeenCalled();
   const control = view.getByRole("switch", { disabled: true });
+  // A 44 px target around the 24 px track, with no shift of the layout around it.
   expect(StyleSheet.flatten(control.props.style)).toEqual({
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    marginVertical: -10,
+    marginHorizontal: -4,
+  });
+  const track = control.children[0];
+  if (!track || typeof track === "string") throw new Error("Missing switch track");
+  expect(StyleSheet.flatten(track.props.style)).toEqual({
     width: 44,
     height: 24,
     borderRadius: 12,
@@ -161,8 +170,9 @@ it.each([false, true])("preserves disabled feedback and prevents writes for stat
     checked: value,
     disabled: true,
   });
-  const thumb = control.children[0];
-  if (!thumb || typeof thumb === "string") throw new Error("Missing switch thumb");
+  // The round thumb inside the track.
+  const thumb = track.findAll((node) => StyleSheet.flatten(node.props.style)?.borderRadius === 10)[0];
+  if (!thumb) throw new Error("Missing switch thumb");
   const { left, ...thumbStyle } = StyleSheet.flatten(thumb.props.style);
   if (left instanceof Animated.Value) {
     const read = jest.fn();

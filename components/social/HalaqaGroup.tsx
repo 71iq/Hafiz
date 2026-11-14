@@ -69,7 +69,7 @@ export function HalaqaGroup({
           </Text>
           <Text variant="caption">
             {interpolate(s.halaqaMemberCount, { n: socialNumber(group.memberCount, language) })}
-            {group.role === "teacher" ? ` · ${s.halaqaTeacherBadge}` : ""}
+            {group.role === "teacher" ? ` · ${s.halaqaYouTeach}` : ""}
           </Text>
         </View>
 
@@ -82,7 +82,7 @@ export function HalaqaGroup({
           style={socialRowStyle(isRTL)}
         >
           <Eye size={16} color={accent} />
-          <Text variant="label-lg" className="text-primary-accent dark:text-primary-bright">
+          <Text variant="label-lg" className="text-primary-muted dark:text-primary-bright">
             {s.halaqaSharingTitle}
           </Text>
         </Pressable>
@@ -237,7 +237,7 @@ function MemberRow({
             {member.isMe ? ` · ${s.halaqaYou}` : ""}
           </Text>
           {member.role === "teacher" ? (
-            <Text variant="label-md" className="text-primary-accent dark:text-primary-bright">
+            <Text variant="label-md" className="text-primary-muted dark:text-primary-bright">
               {s.halaqaTeacherBadge}
             </Text>
           ) : null}
@@ -291,7 +291,7 @@ function MemberRow({
               style={socialRowStyle(isRTL)}
             >
               <ClipboardList size={16} color={accent} />
-              <Text variant="label-lg" className="text-primary-accent dark:text-primary-bright">
+              <Text variant="label-lg" className="text-primary-muted dark:text-primary-bright">
                 {s.halaqaTeacherView}
               </Text>
             </Pressable>
@@ -312,7 +312,7 @@ function MemberRow({
               <Text
                 variant="label-lg"
                 className={
-                  isTeacher ? "text-warm-500 dark:text-neutral-400" : "text-primary-accent dark:text-primary-bright"
+                  isTeacher ? "text-warm-500 dark:text-neutral-400" : "text-primary-muted dark:text-primary-bright"
                 }
               >
                 {isTeacher ? s.halaqaRemoveTeacher : s.halaqaMakeTeacher}

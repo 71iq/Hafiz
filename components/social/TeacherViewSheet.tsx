@@ -126,7 +126,11 @@ export function TeacherViewSheet({
                 {s.teacherViewPlan}
               </Text>
               {view.plan === null ? (
-                <Text variant="body-sm">{s.teacherViewNotShared}</Text>
+                <>
+                  <Text variant="body-sm">{s.teacherViewNotShared}</Text>
+                  {/* SOC-03: why there is no next-sabaq form here. */}
+                  {assign ? <Text variant="caption">{s.teacherAssignNeedsPlan}</Text> : null}
+                </>
               ) : (
                 <>
                   {view.plan.hifzPlan ? (

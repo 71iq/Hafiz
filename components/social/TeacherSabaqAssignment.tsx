@@ -82,7 +82,7 @@ export function TeacherSabaqAssignment({
           </Text>
           <Text variant="caption">
             {interpolate(s.teacherAssignBy, {
-              name: current.teacherName ?? "",
+              name: current.teacherName || s.teacherAssignSomeTeacher,
               date: formatSocialDate(current.assignedAt, language),
             })}
           </Text>
