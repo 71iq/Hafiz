@@ -9,15 +9,22 @@ import type { StudyCardRow } from "@/lib/fsrs/types";
 import type { DhuhrResolver } from "@/lib/habit/cutoff";
 import { addDays, deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { putHabitDay } from "@/lib/habit/queries";
-import type { RecitationErrorInput, RecitationErrorType } from "@/lib/hifz/errors";
+import { verseRef, type RecitationErrorInput, type RecitationErrorType, type VerseKey } from "@/lib/hifz/errors";
 import { capRating, proposeRating, type AttemptEvents, type Rating, type SupportLevel } from "@/lib/hifz/grading";
 import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import type { HifzPlan } from "@/lib/hifz/plan";
-import { derivePageTiers, ensureManzilCycleStart, loadPageCard, MANZIL_CYCLE_START_KEY, T_REV_KEY } from "@/lib/hifz/pages";
+import {
+  derivePageTiers,
+  ensureManzilCycleStart,
+  loadPageCard,
+  MANZIL_CYCLE_START_KEY,
+  readMemorizedPageNumbers,
+  T_REV_KEY,
+} from "@/lib/hifz/pages";
 import { isManzil, pagePolicy, tierFor, type PageHistory, type Tier } from "@/lib/hifz/tiers";
 import { errorHalf, hasSeamAfter, remediateHalf, remediationPolicy, reviewSeam, type Half } from "@/lib/hifz/remediation";
-import { HIFZ_PAGES_DECK_ID, parsePageUnit } from "@/lib/hifz/units";
-import { bringSimilarCardsForward } from "@/lib/hifz/similar";
+import { HIFZ_PAGES_DECK_ID, pageCardId, parsePageUnit } from "@/lib/hifz/units";
+import { bringSimilarCardsForward, pickDriftSibling, similarGroupsForAyahs } from "@/lib/hifz/similar";
 
 /** One location in a recitation attempt, as the user marked or revealed it. */
 export type AttemptMark = Readonly<{ token: PageToken; type: RecitationErrorType }>;
@@ -118,12 +125,23 @@ function location(token: PageToken): Pick<RecitationErrorInput, "surah" | "ayah"
   return { surah: token.surah, ayah: token.ayah, word: token.wordPos };
 }
 
-/** ERR-01: the errors to log for an attempt. Slips have no word position; they use the page's first ayah. */
-export function attemptErrors(attempt: Attempt, firstToken: PageToken): RecitationErrorInput[] {
+/**
+ * ERR-01: the errors to log for an attempt. Slips have no word position; they use the page's first ayah.
+ * A drift carries the sibling it went into, from `driftSiblings` keyed by the drifted ayah's 's:a'.
+ */
+export function attemptErrors(
+  attempt: Attempt,
+  firstToken: PageToken,
+  driftSiblings: ReadonlyMap<string, string> = new Map(),
+): RecitationErrorInput[] {
   const errors: RecitationErrorInput[] = [
     ...attempt.peeked.map((token) => ({ type: "skip_word" as const, corrected: "tanbih" as const, ...location(token) })),
     ...attempt.shown.map((token) => ({ type: "skip_word" as const, corrected: "fath" as const, ...location(token) })),
-    ...[...attempt.marks.values()].map((mark) => ({ type: mark.type, corrected: "none" as const, ...location(mark.token) })),
+    ...[...attempt.marks.values()].map((mark) =>
+      mark.type === "mutashabih_drift"
+        ? { type: mark.type, corrected: "none" as const, ...location(mark.token), siblingRef: driftSiblings.get(verseRef(mark.token)) ?? null }
+        : { type: mark.type, corrected: "none" as const, ...location(mark.token) },
+    ),
   ];
   for (let i = 0; i < attempt.slips; i += 1) {
     errors.push({ type: "wrong_word", corrected: "self", surah: firstToken.surah, ayah: null, word: null });
@@ -132,6 +150,53 @@ export function attemptErrors(attempt: Attempt, firstToken: PageToken): Recitati
     errors.push({ type: "seam", corrected: "none", surah: attempt.seam.surah, ayah: attempt.seam.ayah, word: null });
   }
   return errors;
+}
+
+/** The ayat an attempt drifted from into a similar verse, by 's:a'. */
+function driftedAyahs(attempt: Attempt): Map<string, VerseKey> {
+  const drifted = new Map<string, VerseKey>();
+  for (const mark of attempt.marks.values()) {
+    if (mark.type === "mutashabih_drift") drifted.set(verseRef(mark.token), { surah: mark.token.surah, ayah: mark.token.ayah });
+  }
+  return drifted;
+}
+
+async function readPageStability(db: DatabaseExecutor, pages: readonly number[]): Promise<Map<number, number>> {
+  if (pages.length === 0) return new Map();
+  const rows = await db.getAllAsync<{ id: string; stability: number }>(
+    `SELECT id, stability FROM study_cards WHERE id IN (${pages.map(() => "?").join(", ")}) AND deleted_at IS NULL`,
+    pages.map(pageCardId),
+  );
+  return new Map(
+    rows.flatMap((row): [number, number][] => {
+      const unit = parsePageUnit(row.id);
+      return unit?.kind === "page" ? [[unit.page, row.stability]] : [];
+    }),
+  );
+}
+
+/**
+ * SCH-07, ERR-01: the sibling each drifted ayah went into, keyed by the drifted ayah's 's:a'. The mark
+ * names only the word, so the sibling comes from the similar-verse groups (pickDriftSibling). Read
+ * before the grade's transaction; the errors that carry it are written inside it.
+ */
+async function resolveDriftSiblings(db: DatabaseExecutor, attempt: Attempt): Promise<Map<string, string>> {
+  const siblings = new Map<string, string>();
+  const drifted = driftedAyahs(attempt);
+  if (drifted.size === 0) return siblings;
+  const memorized = await readMemorizedPageNumbers(db);
+  for (const [key, ayah] of drifted) {
+    const groups = await similarGroupsForAyahs(db, [ayah]);
+    const pages = [...new Set(groups.flatMap((group) => group.siblings.map((sibling) => sibling.page)))].filter((page) => memorized.has(page));
+    const sibling = pickDriftSibling(groups, memorized, await readPageStability(db, pages));
+    if (sibling) siblings.set(key, verseRef(sibling));
+  }
+  return siblings;
+}
+
+/** SCH-07: each drift brings its similar-verse cards due within a day, inside the grade's transaction. */
+async function bringDriftCardsForward(tx: DatabaseExecutor, attempt: Attempt, now: Date): Promise<void> {
+  for (const ayah of driftedAyahs(attempt).values()) await bringSimilarCardsForward(tx, { ...ayah, now });
 }
 
 export { MANZIL_CYCLE_START_KEY };
@@ -261,6 +326,7 @@ export async function savePageGrade(
         : attempt.seam?.clean && rating >= 3
           ? "clean"
           : null;
+  const driftSiblings = recited ? await resolveDriftSiblings(db, attempt) : new Map<string, string>();
   const result = await persistReviewTransition({
     db,
     cardId: input.card.id,
@@ -293,7 +359,8 @@ export async function savePageGrade(
       supportLevel: input.grader === "salah" ? null : level,
       proposedRating: proposed === 0 ? null : proposed,
       grader: input.grader ?? "self",
-      errors: input.grader === "salah" ? [] : attemptErrors(attempt, input.firstToken),
+      // A drift's error names the sibling it went into, so the next sessions drill the pair (MUT-04).
+      errors: input.grader === "salah" ? [] : attemptErrors(attempt, input.firstToken, driftSiblings),
       dhuhr: input.dhuhr,
     },
     extraWork: async (tx) => {
@@ -301,11 +368,7 @@ export async function savePageGrade(
       if (half && pageNumber !== null) await remediateHalf(tx, { page: pageNumber, half, now });
       if (seam && pageNumber !== null) await reviewSeam(tx, { page: pageNumber, clean: seam === "clean", now });
       // SCH-07, MUT-04: a drift into a similar verse brings that pair's cards due within a day.
-      if (input.grader !== "salah") {
-        for (const mark of attempt.marks.values()) {
-          if (mark.type === "mutashabih_drift") await bringSimilarCardsForward(tx, { surah: mark.token.surah, ayah: mark.token.ayah, now });
-        }
-      }
+      if (recited) await bringDriftCardsForward(tx, attempt, now);
     },
   });
   if (after === null) throw new Error("The page grade was saved without its tier.");
@@ -334,6 +397,8 @@ export async function saveRemediationGrade(db: AppDatabase, input: RemediationGr
   const rating = capRating(input.rating as Rating, level) as Grade;
   const base = await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID);
   const proposed = proposedRating(input.attempt);
+  // A half page is part of a page, so a drift marked on it is handled as on the page (SCH-07).
+  const driftSiblings = await resolveDriftSiblings(db, input.attempt);
   return persistReviewTransition({
     db,
     cardId: input.card.id,
@@ -353,9 +418,10 @@ export async function saveRemediationGrade(db: AppDatabase, input: RemediationGr
       supportLevel: level,
       proposedRating: proposed === 0 ? null : proposed,
       grader: input.grader ?? "self",
-      errors: input.firstToken ? attemptErrors(input.attempt, input.firstToken) : [],
+      errors: input.firstToken ? attemptErrors(input.attempt, input.firstToken, driftSiblings) : [],
       dhuhr: input.dhuhr,
     },
+    extraWork: (tx) => bringDriftCardsForward(tx, input.attempt, now),
   });
 }
 

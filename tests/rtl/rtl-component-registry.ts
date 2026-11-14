@@ -155,6 +155,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Decorative character art; it is hidden from screen readers and never mirrors.",
   ),
   entry(
+    "components/hifz/DriftPairPrompt.tsx",
+    "card",
+    "rntl",
+    "Question and feedback text follow the interface direction; the two verses stay right to left, and each reference follows the interface once revealed.",
+  ),
+  entry(
     "components/hifz/HifzProgressCard.tsx",
     "progress-chart",
     "source",
@@ -195,6 +201,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "card",
     "rntl",
     "Second look header mirrors through MirroredRow and its text follows the interface direction; the chunk's Quran lines stay right to left.",
+  ),
+  entry(
+    "components/hifz/SimilarVerseLine.tsx",
+    "card",
+    "source",
+    "The verse stays right to left in both interface directions; its reference follows the interface direction and digits.",
   ),
   entry(
     "components/hifz/WelcomeBackCard.tsx",

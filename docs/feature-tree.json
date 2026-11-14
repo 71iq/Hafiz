@@ -1094,6 +1094,15 @@
               "children": []
             },
             {
+              "id": "hifz.review.driftPair",
+              "title": "Similar-verse drift: sibling page and pair prompt",
+              "kind": "widget",
+              "cases": ["PLAN-14"],
+              "uses": ["hifz.review.drills"],
+              "native": false,
+              "children": []
+            },
+            {
               "id": "hifz.review.cloze",
               "title": "Weak spots: Mushaf marker and fill-the-gap card",
               "kind": "widget",

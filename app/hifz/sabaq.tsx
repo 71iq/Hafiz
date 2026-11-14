@@ -23,6 +23,7 @@ import {
 import { ZaytMood } from "@/components/habit/ZaytMood";
 import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
 import { SabaqSecondLook } from "@/components/hifz/SabaqSecondLook";
+import { SimilarVerseLine } from "@/components/hifz/SimilarVerseLine";
 import { loadPageWordsData } from "@/components/mushaf/MushafPage";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
@@ -37,7 +38,7 @@ import { readHabitSettings } from "@/lib/habit/settings";
 import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
 import type { PageToken } from "@/lib/hifz/page-data";
 import { loadTodayWird, newMemorizationOpen, readMemorizedPageNumbers } from "@/lib/hifz/pages";
-import { similarGroupsForAyahs, withMemorizedSiblings, type SimilarGroup, type SimilarRef } from "@/lib/hifz/similar";
+import { similarGroupsForAyahs, withMemorizedSiblings, type SimilarGroup } from "@/lib/hifz/similar";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import {
   addCoveredSabaqPages,
@@ -810,9 +811,9 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
           <View style={{ width: pageWidth - 16, gap: 10 }}>
             {similar.map((group) => (
               <Card key={`${group.groupId}-${group.self.surah}:${group.self.ayah}`} elevation="low" className="p-4" style={{ gap: 10 }}>
-                <SimilarLine reference={group.self} isRTL={isRTL} accent={accent} />
+                <SimilarVerseLine reference={group.self} isRTL={isRTL} accent={accent} />
                 {group.siblings.map((sibling) => (
-                  <SimilarLine key={`${sibling.surah}:${sibling.ayah}`} reference={sibling} isRTL={isRTL} accent={accent} muted />
+                  <SimilarVerseLine key={`${sibling.surah}:${sibling.ayah}`} reference={sibling} isRTL={isRTL} accent={accent} muted />
                 ))}
               </Card>
             ))}
@@ -1004,25 +1005,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         }}
       />
     </SafeAreaView>
-  );
-}
-
-/** One similar verse with its reference and the shared wording marked (MUT-01, MUT-05). */
-function SimilarLine({ reference, isRTL, accent, muted = false }: { reference: SimilarRef; isRTL: boolean; accent: string; muted?: boolean }) {
-  return (
-    <View style={{ gap: 4 }}>
-      <Text dir={isRTL ? "rtl" : "ltr"} variant="caption">
-        {`${reference.surahName} ${formatAyahRef(isRTL, reference.surah, reference.ayah)}`}
-      </Text>
-      <Text
-        style={{ writingDirection: "rtl", textAlign: "right", fontSize: 19, lineHeight: 34, opacity: muted ? 0.85 : 1 }}
-        className="text-charcoal dark:text-neutral-100"
-      >
-        {reference.pre ? `${reference.pre} ` : ""}
-        <Text style={{ color: accent, fontWeight: "700" }}>{reference.similar}</Text>
-        {reference.post ? ` ${reference.post}` : ""}
-      </Text>
-    </View>
   );
 }
 

@@ -179,6 +179,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - PLAN-11. View hifz progress: memorized pages, how many are steady, fair, or need review, completed juz, and steady weeks.
 - PLAN-12. Leave a hifz review after grading a page. Confirm leaving first, then read the summary with pages, clean pages, spots marked, half pages and seams, minutes, and the wird cards.
 - PLAN-13. Miss the same word in 3 or more sessions. It becomes a weak spot: the Mushaf marks it with a small dot (a dotted underline in verse view on some devices) unless turned off, and a fill-the-gap card shows its ayah with that word hidden until Check, then asks whether it was recited cleanly. Mistakes from other devices count, including after signing in on a new device. Dismissing a mistake on any device removes the card once the word is wrong in fewer than 3 sessions.
+- PLAN-14. Drift into a similar verse while reciting a page. Mark the word as a drift: the next session adds the page of the verse it drifted into, and a "Which one?" prompt shows both verses with their shared wording marked until one is chosen. The prompt returns in the next 3 sessions.
 
 ## Reflection journey
 

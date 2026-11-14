@@ -87,6 +87,40 @@ export function withMemorizedSiblings(groups: readonly SimilarGroup[], memorized
     .filter((group) => group.siblings.length > 0);
 }
 
+type VerseKey = Readonly<{ surah: number; ayah: number }>;
+
+/**
+ * SCH-07: the sibling a drift most likely went into, from the groups of the drifted ayah. A drift goes
+ * into a verse the reciter knows, so siblings on memorized pages come first, and among several the one
+ * on the most firmly held page (highest stability) wins, since the stronger memory is the one that
+ * takes over a recitation. Ties keep the dataset's order. With nothing memorized, an ayah with a single
+ * sibling still names it; with several, the drift is left without one rather than guessed.
+ */
+export function pickDriftSibling(
+  groups: readonly SimilarGroup[],
+  memorizedPages: ReadonlySet<number>,
+  pageStability: ReadonlyMap<number, number>,
+): SimilarRef | null {
+  const unique = (refs: readonly SimilarRef[]) => [...new Map(refs.map((ref) => [`${ref.surah}:${ref.ayah}`, ref])).values()];
+  const all = unique(groups.flatMap((group) => group.siblings));
+  const memorized = unique(withMemorizedSiblings(groups, memorizedPages).flatMap((group) => group.siblings));
+  if (memorized.length === 0) return all.length === 1 ? all[0] : null;
+  return memorized.reduce((best, ref) => ((pageStability.get(ref.page) ?? 0) > (pageStability.get(best.page) ?? 0) ? ref : best));
+}
+
+/** MUT-04: a drifted ayah and the sibling it went into, as one similar-verse pair. */
+export type SimilarPair = Readonly<{ groupId: string; self: SimilarRef; sibling: SimilarRef }>;
+
+/** The pair of `self` and `sibling` from a group holding both, or null when no group does. */
+export async function similarPair(db: DatabaseExecutor, self: VerseKey, sibling: VerseKey): Promise<SimilarPair | null> {
+  const groups = await similarGroupsForAyahs(db, [self]);
+  for (const group of groups) {
+    const match = group.siblings.find((ref) => ref.surah === sibling.surah && ref.ayah === sibling.ayah);
+    if (match) return { groupId: group.groupId, self: group.self, sibling: match };
+  }
+  return null;
+}
+
 const DAY_MS = 86_400_000;
 
 /**

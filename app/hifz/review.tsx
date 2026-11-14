@@ -22,6 +22,7 @@ import {
   strongerWirdEvent,
   type SessionHabitInput,
 } from "@/components/habit/SessionHabitCards";
+import { DriftPairPrompt } from "@/components/hifz/DriftPairPrompt";
 import { MistakeTypeSheet, errorTypeLabel } from "@/components/hifz/MistakeTypeSheet";
 import {
   HIDDEN,
@@ -41,7 +42,16 @@ import type { DeckReviewSettings } from "@/lib/fsrs/types";
 import { localDateOf } from "@/lib/habit/dates";
 import { loadHabitOverview, type WirdProgressEvent } from "@/lib/habit/queries";
 import { useActiveClock } from "@/lib/habit/use-active-clock";
-import { dismissInboxItem, INBOX_ITEMS_PER_REVIEW, readMistakeInbox, recordDrillResult, type InboxItem, type RecitationErrorType } from "@/lib/hifz/errors";
+import {
+  dismissInboxItem,
+  INBOX_ITEMS_PER_REVIEW,
+  loadDriftDrills,
+  readMistakeInbox,
+  recordDrillResult,
+  type InboxItem,
+  type RecitationErrorType,
+} from "@/lib/hifz/errors";
+import type { SimilarPair } from "@/lib/hifz/similar";
 import { GRADE_CAP, defaultSupportLevel, isGradable, SUPPORT_LEVELS, type SupportLevel } from "@/lib/hifz/grading";
 import { loadRecitationPage, type PageToken, type RecitationPage as PageData } from "@/lib/hifz/page-data";
 import { loadPageCards, loadTodayWird, toPlanPage, type PageCard } from "@/lib/hifz/pages";
@@ -82,11 +92,20 @@ import { hapticMedium } from "@/lib/haptics";
 type AyahText = { qcf2: string; page: number; surah: number; ayah: number };
 
 type QueueItem =
-  | { kind: "page"; card: PageCard; retrievability: number | null; again?: boolean }
+  | {
+      kind: "page";
+      card: PageCard;
+      retrievability: number | null;
+      again?: boolean;
+      /** SCH-07: a page drilled because it holds the sibling an earlier drift went into, outside today's plan. */
+      drift?: SimilarPair;
+    }
   | { kind: "half"; card: StudyCardRow; page: number; half: Half }
   | { kind: "seam"; card: StudyCardRow; page: number; prompt: AyahText | null; answer: AyahText | null }
   | { kind: "cloze"; card: StudyCardRow; surah: number; ayah: number; word: number; page: number }
-  | { kind: "drill"; item: InboxItem; text: { qcf2: string; page: number } | null };
+  | { kind: "drill"; item: InboxItem; text: { qcf2: string; page: number } | null }
+  /** MUT-04: which of a drifted pair is which, asked about one verse of the pair. */
+  | { kind: "pair"; errorId: string; pair: SimilarPair; target: "self" | "sibling" };
 
 type Phase = "loading" | "recite" | "check" | "summary" | "empty" | "error";
 
@@ -156,6 +175,8 @@ function HifzReviewScreen() {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, fontSize, lineHeight } = useSettings();
+  // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
+  const headerJoin = uiLanguage === "ar" ? "، " : " · ";
   const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ mode?: string; level?: string }>();
@@ -256,11 +277,14 @@ function HifzReviewScreen() {
       setSurahNames(new Map(names.map((row) => [row.number, row.name_arabic])));
       setBaseSettings(base);
       const items: QueueItem[] = [];
+      /** The page cards, read for the plan or, in a mistakes session, once a drift's sibling page needs one. */
+      let pageCards: PageCard[] | null = null;
       if (wird && !drillsOnly) {
         setPlan(wird.plan);
         minutesPerPage.current = wird.minutesPerReviewPage;
         setPlanProgress({ done: wird.done.length, total: wird.total });
         const cards = await loadPageCards(db, { today, plan: wird.plan });
+        pageCards = cards;
         const byId = new Map(cards.map((card) => [card.row.id, card]));
         setHeldPages(new Set(cards.filter((card) => card.tier !== "sabaq").map((card) => card.page)));
         let todo = monthlyCheck
@@ -308,6 +332,20 @@ function HifzReviewScreen() {
           [item.surah, item.ayah],
         );
         items.push({ kind: "drill", item, text: row ? { qcf2: row.text_qcf2, page: row.v2_page } : null });
+      }
+      // SCH-07, MUT-04: after a drift into a known sibling, the next session recites the sibling's page,
+      // and the next three ask which verse of the pair is which. The ayah's own drill stays above.
+      for (const drill of monthlyCheck ? [] : await loadDriftDrills(db, today)) {
+        const page = drill.siblingPage;
+        if (page !== null && wird && !items.some((item) => item.kind === "page" && item.card.page === page)) {
+          pageCards ??= await loadPageCards(db, { today, plan: wird.plan });
+          const card = pageCards.find((candidate) => candidate.page === page);
+          if (card) {
+            items.push({ kind: "page", card, retrievability: toPlanPage(card, today, now).retrievability, drift: drill.pair });
+          }
+        }
+        // The prompt alternates between the two verses across its sessions.
+        items.push({ kind: "pair", errorId: drill.errorId, pair: drill.pair, target: drill.sessionsSince % 2 === 0 ? "self" : "sibling" });
       }
       sessionRef.current = startReviewSession(
         drillsOnly ? "mistakes" : welcomeBack ? "welcome_back" : monthlyCheck ? "portion_check" : "wird",
@@ -655,7 +693,8 @@ function HifzReviewScreen() {
       const markedCount = grader === "salah" ? 0 : usedAttempt.marks.size + usedAttempt.peeked.length + usedAttempt.shown.length;
       // A page counts once toward today's plan, however often a learning step brings it back.
       const coveredBefore = card.history.grades.some((grade) => grade.date === reviewedOn);
-      if (!coveredBefore) setPlanProgress((value) => (value ? { ...value, done: value.done + 1 } : value));
+      // A drift's sibling page is drilled outside today's plan, so it does not advance the plan.
+      if (!coveredBefore && !current.drift) setPlanProgress((value) => (value ? { ...value, done: value.done + 1 } : value));
       // A wird milestone is the bigger news; the half page shows up in the queue either way.
       const wirdShown = showWirdNotice(result.wird);
       if (!wirdShown && result.remediation.half) {
@@ -687,6 +726,9 @@ function HifzReviewScreen() {
       return { totals, requeue };
     });
   };
+
+  /** MUT-04: a pair prompt saves nothing, but still advances only once. */
+  const pairDone = () => runItemAction("Pair", async () => ({ totals: totalsRef.current }));
 
   const drillResult = async (result: "clean" | "again" | "not_a_mistake") => {
     if (!current || current.kind !== "drill") return;
@@ -911,7 +953,13 @@ function HifzReviewScreen() {
 
   // Items, not queue entries: a page back for its learning step keeps its place ("1 / 1", "Once more").
   const itemKey = (item: QueueItem): string =>
-    item.kind === "drill" ? `drill:${item.item.id}` : item.kind === "page" ? `page:${item.card.row.id}` : `${item.kind}:${item.card.id}`;
+    item.kind === "drill"
+      ? `drill:${item.item.id}`
+      : item.kind === "pair"
+        ? `pair:${item.errorId}`
+        : item.kind === "page"
+          ? `page:${item.card.row.id}`
+          : `${item.kind}:${item.card.id}`;
   const progressLabel = `${formatNumber(new Set(queue.slice(0, index + 1).map(itemKey)).size, uiLanguage)} / ${formatNumber(new Set(queue.map(itemKey)).size, uiLanguage)}`;
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   // Teal text under 14 px uses the darker token in light mode to stay readable on tinted chips.
@@ -1008,6 +1056,20 @@ function HifzReviewScreen() {
             </View>
           )}
         </ScrollView>
+      ) : current?.kind === "pair" ? (
+        <DriftPairPrompt
+          // A fresh prompt per item, so a choice never carries into the next pair.
+          key={`pair:${current.errorId}:${index}`}
+          pair={current.pair}
+          target={current.target}
+          dir={dir}
+          s={s}
+          accent={accent}
+          accentText={accentText}
+          busy={busy}
+          error={error}
+          onNext={pairDone}
+        />
       ) : current?.kind === "drill" ? (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 16, alignItems: "center" }}>
           <Text dir={dir} variant="title-md">
@@ -1097,10 +1159,10 @@ function HifzReviewScreen() {
                   className="flex-1 text-charcoal dark:text-neutral-100"
                 >
                   {current.kind === "half"
-                    ? `${interpolate(s.hifzPageN, { n: formatNumber(current.page, uiLanguage) })} · ${current.half === "a" ? s.hifzHalfA : s.hifzHalfB}`
+                    ? `${interpolate(s.hifzPageN, { n: formatNumber(current.page, uiLanguage) })}${headerJoin}${current.half === "a" ? s.hifzHalfA : s.hifzHalfB}`
                     : current.kind === "page" && inHalves
-                      ? `${interpolate(s.hifzPageN, { n: formatNumber(current.card.page, uiLanguage) })} · ${part === "a" ? s.hifzHalfA : s.hifzHalfB}`
-                    : `${interpolate(s.hifzPageN, { n: formatNumber(current.card.page, uiLanguage) })} · ${interpolate(s.hifzJuzN, { n: formatNumber(juzOfPage(current.card.page), uiLanguage) })}`}
+                      ? `${interpolate(s.hifzPageN, { n: formatNumber(current.card.page, uiLanguage) })}${headerJoin}${part === "a" ? s.hifzHalfA : s.hifzHalfB}`
+                    : `${interpolate(s.hifzPageN, { n: formatNumber(current.card.page, uiLanguage) })}${headerJoin}${interpolate(s.hifzJuzN, { n: formatNumber(juzOfPage(current.card.page), uiLanguage) })}`}
                 </Text>
                 <View className="rounded-full px-3 py-1 bg-primary-accent/10 dark:bg-primary-bright/15">
                   <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: accentText }}>
@@ -1108,10 +1170,20 @@ function HifzReviewScreen() {
                       ? s.hifzStrengthenChip
                       : current.kind === "page" && current.again
                         ? s.hifzOnceMore
-                        : tierLabel(current.card.tier, s)}
+                        : current.kind === "page" && current.drift
+                          ? s.hifzSimilarTitle
+                          : tierLabel(current.card.tier, s)}
                   </Text>
                 </View>
               </MirroredRow>
+              {current.kind === "page" && current.drift ? (
+                <Text dir={dir} variant="body-sm">
+                  {interpolate(s.hifzDriftPage, {
+                    sibling: formatAyahRef(isRTL, current.drift.sibling.surah, current.drift.sibling.ayah),
+                    ref: formatAyahRef(isRTL, current.drift.self.surah, current.drift.self.ayah),
+                  })}
+                </Text>
+              ) : null}
 
               {phase === "recite" ? (
                 <View style={{ gap: 6 }}>

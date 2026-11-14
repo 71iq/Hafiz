@@ -1,6 +1,7 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { addDays, localDateOf, type LocalDate } from "@/lib/habit/dates";
+import { similarPair, type SimilarPair } from "@/lib/hifz/similar";
 import { removeClearedWeakSpotCards, WEAK_SPOT_ERROR_SQL, WEAK_SPOT_SESSIONS } from "@/lib/hifz/weak-spots";
 import { createId } from "@/lib/id";
 
@@ -26,6 +27,19 @@ export type Severity = "jali" | "khafi";
 /** Tajweed errors (lahn khafi) are a separate track and never affect hifz scheduling (4.2.1). */
 function severityOf(type: RecitationErrorType): Severity {
   return type === "tajweed" ? "khafi" : "jali";
+}
+
+export type VerseKey = Readonly<{ surah: number; ayah: number }>;
+
+/** ERR-01 `sibling_ref`: the verse a drift went into, as 's:a'. */
+export function verseRef({ surah, ayah }: VerseKey): string {
+  return `${surah}:${ayah}`;
+}
+
+/** Read a stored `sibling_ref`. It syncs as free text, so anything other than 's:a' reads as none. */
+export function parseVerseRef(ref: string | null): VerseKey | null {
+  const match = ref ? /^(\d+):(\d+)$/.exec(ref) : null;
+  return match ? { surah: Number(match[1]), ayah: Number(match[2]) } : null;
 }
 
 export type RecitationErrorInput = Readonly<{
@@ -205,6 +219,69 @@ export async function readMistakeInbox(db: DatabaseExecutor, today: LocalDate, l
     localDate: row.local_date,
     cleanCount: row.clean_count,
   }));
+}
+
+/** MUT-04: a drift's pair is drilled in this many sessions after it; SCH-07: its sibling page in the first. */
+export const DRIFT_FOLLOW_UP_SESSIONS = 3;
+
+/**
+ * A logged drift into a known sibling whose follow-up sessions are not used up. `sessionsSince`
+ * counts the review sessions that build a drill list (wird, mistakes, welcome back), on any device,
+ * started after the drift was logged. A session has a row once it grades something, so one opened and
+ * left without a grade does not use up a follow-up.
+ */
+export type DriftFollowUp = Readonly<{ id: string; surah: number; ayah: number; sibling: VerseKey; sessionsSince: number }>;
+
+/**
+ * MUT-04, SCH-07: the drifts the next sessions still drill, oldest first. A drift dismissed as not a
+ * mistake has none, and one older than the inbox window (ERR-03) has expired. Whether its inbox item is
+ * still open does not matter: the pair is drilled for its three sessions either way.
+ */
+export async function readDriftFollowUps(db: DatabaseExecutor, today: LocalDate): Promise<DriftFollowUp[]> {
+  // Times compare through julianday, since synced rows can carry an offset instead of Z.
+  const rows = await db.getAllAsync<{ id: string; surah: number; ayah: number; sibling_ref: string; sessions_since: number }>(
+    `SELECT e.id, e.surah, e.ayah, e.sibling_ref,
+            (SELECT COUNT(*) FROM review_sessions s
+              WHERE s.deleted_at IS NULL AND s.kind IN ('wird', 'mistakes', 'welcome_back')
+                AND julianday(s.started_at) > julianday(e.created_at)) AS sessions_since
+       FROM recitation_errors e
+      WHERE e.type = 'mutashabih_drift' AND e.sibling_ref IS NOT NULL AND e.ayah IS NOT NULL
+        AND e.deleted_at IS NULL AND e.local_date >= ?
+      ORDER BY e.created_at ASC`,
+    [addDays(today, -INBOX_EXPIRY_DAYS)],
+  );
+  return rows.flatMap((row) => {
+    const sibling = parseVerseRef(row.sibling_ref);
+    if (!sibling || row.sessions_since >= DRIFT_FOLLOW_UP_SESSIONS) return [];
+    return [{ id: row.id, surah: row.surah, ayah: row.ayah, sibling, sessionsSince: row.sessions_since }];
+  });
+}
+
+/** What one drift adds to the next session's drill list (SCH-07, MUT-04). */
+export type DriftDrill = Readonly<{
+  errorId: string;
+  pair: SimilarPair;
+  /** SCH-07: the sibling's page, in the first session after the drift only. */
+  siblingPage: number | null;
+  /** Sessions since the latest drift into this pair: 0 for the first after it, up to 2. */
+  sessionsSince: number;
+}>;
+
+/**
+ * SCH-07, MUT-04: the drill list a new session adds for recent drifts, oldest first: each pair's
+ * discrimination prompt for 3 sessions, and the sibling's page in the first. Drifts into the same pair
+ * share one prompt, taken from the latest of them, which has had the fewest sessions since.
+ */
+export async function loadDriftDrills(db: DatabaseExecutor, today: LocalDate): Promise<DriftDrill[]> {
+  const drills = new Map<string, DriftDrill>();
+  for (const followUp of await readDriftFollowUps(db, today)) {
+    const pair = await similarPair(db, followUp, followUp.sibling);
+    if (!pair) continue;
+    const key = [verseRef(pair.self), verseRef(pair.sibling)].sort().join("|");
+    const { sessionsSince } = followUp;
+    drills.set(key, { errorId: followUp.id, pair, siblingPage: sessionsSince === 0 ? pair.sibling.page : null, sessionsSince });
+  }
+  return [...drills.values()];
 }
 
 export async function countMistakeInbox(db: DatabaseExecutor, today: LocalDate): Promise<number> {
