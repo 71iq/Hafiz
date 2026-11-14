@@ -1,6 +1,11 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
-import { reviewsPages, switchToAyahReview, switchToPageReview } from "@/lib/hifz/unit-switch";
+import { putCardRow } from "@/lib/fsrs/queries";
+import { laterThanAll } from "@/lib/fsrs/card-stamps";
+import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
+import type { StudyCardRow } from "@/lib/fsrs/types";
+import { HIFZ_PAGES_DECK_ID } from "@/lib/hifz/units";
+import { isUnitSwitchSuspension, reviewsPages, switchToAyahReview, switchToPageReview } from "@/lib/hifz/unit-switch";
 
 type Unit = HifzPlan["unit"];
 
@@ -47,35 +52,69 @@ export async function applyUnitSwitch(
 }
 
 /**
- * After sync brings a plan saved on another device, the cards here follow its unit (7.6): two
- * devices that switched differently end with the winning plan's cards active on both, since the
- * device that applies the switch last uploads the result. Does nothing while the unit applied here
- * is the plan's kind of review, or without a plan.
+ * The cards of the plan's own unit that carry the switch mark (lib/hifz/unit-switch): ayah cards in
+ * ayah review, page, half-page and seam cards in page review. Only a switch writes the mark, so these
+ * came from another device's switch to the other unit whose plan did not win, or a restore of cards
+ * left that way. A card the person suspended has a real time and is left alone.
  */
+async function markedActiveCards(db: DatabaseExecutor, unit: Unit): Promise<StudyCardRow[]> {
+  const rows =
+    unit === "ayah"
+      ? await db.getAllAsync<StudyCardRow>(
+          "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND suspended_at IS NOT NULL",
+          [SMART_DECK_IDS.retention],
+        )
+      : await db.getAllAsync<StudyCardRow>(
+          `SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND suspended_at IS NOT NULL
+             AND (id LIKE 'page:%' OR id LIKE 'half:%' OR id LIKE 'seam:%')`,
+          [HIFZ_PAGES_DECK_ID],
+        );
+  return rows.filter((row) => isUnitSwitchSuspension(row.suspended_at));
+}
+
+/** Brings back the plan's own cards that another device's switch set aside (see markedActiveCards). */
+async function restoreMarkedActiveCards(db: DatabaseExecutor, unit: Unit, now: Date): Promise<void> {
+  for (const row of await markedActiveCards(db, unit)) {
+    await putCardRow(db, { ...row, suspended_at: null, updated_at: laterThanAll(now, [row.updated_at]) });
+  }
+}
+
 /** Whether reconcileUnitAfterSync has anything to do, read without writing, so a sync opens no transaction for it otherwise. */
 export async function unitReconcileNeeded(db: DatabaseExecutor): Promise<boolean> {
   const plan = await readHifzPlan(db);
   if (!plan) return false;
   const applied = await readAppliedUnit(db);
-  return applied === null || reviewsPages(applied) !== reviewsPages(plan.unit);
+  if (applied === null || reviewsPages(applied) !== reviewsPages(plan.unit)) return true;
+  return (await markedActiveCards(db, plan.unit)).length > 0;
 }
 
+/**
+ * After sync, the cards here follow the winning plan's unit (7.6). When the cards were last set for
+ * the other kind of review, the switch runs. Whatever was applied here, the plan's own cards never
+ * keep the switch mark: another device may have switched to the other unit and lost to a later plan
+ * edit, and its pulled suspensions would otherwise disable the winning unit's cards. The device that
+ * fixes them uploads the result. Does nothing without a plan.
+ */
 export async function reconcileUnitAfterSync(db: DatabaseExecutor, now: Date): Promise<void> {
   const plan = await readHifzPlan(db);
   if (!plan) return;
   const applied = await readAppliedUnit(db);
-  if (applied !== null && reviewsPages(applied) === reviewsPages(plan.unit)) return;
   if (applied === null) {
     // No record yet: the cards were set under this plan by this app version or before it.
     await writeAppliedUnit(db, plan.unit, now);
-    return;
+  } else if (reviewsPages(applied) !== reviewsPages(plan.unit)) {
+    await applyUnitSwitch(db, { unit: plan.unit, previousPlanUnit: applied, now });
   }
-  await applyUnitSwitch(db, { unit: plan.unit, previousPlanUnit: applied, now });
+  await restoreMarkedActiveCards(db, plan.unit, now);
 }
 
-/** After an account restore the cards come from the server as the plan left them. */
+/** After an account restore the cards come from the server as the plan left them, the plan's own cards active. */
 export async function markUnitAppliedFromPlan(db: DatabaseExecutor, now: Date): Promise<void> {
   const plan = await readHifzPlan(db);
-  if (plan) await writeAppliedUnit(db, plan.unit, now);
-  else await db.runAsync("DELETE FROM user_settings WHERE key = ?", [APPLIED_UNIT_KEY]);
+  if (!plan) {
+    await db.runAsync("DELETE FROM user_settings WHERE key = ?", [APPLIED_UNIT_KEY]);
+    return;
+  }
+  await writeAppliedUnit(db, plan.unit, now);
+  await restoreMarkedActiveCards(db, plan.unit, now);
 }

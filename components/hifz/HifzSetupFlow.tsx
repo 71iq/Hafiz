@@ -80,7 +80,14 @@ function anchorPhrase(anchor: Anchor, language: "en" | "ar", s: UIStrings): stri
   return interpolate(s.hifzWhenAtTime, { time });
 }
 
-type StepEntry = Readonly<{ plan: HifzPlan; preset: PlanPreset | null; surahs: Set<number>; juz: Set<number> }>;
+type StepEntry = Readonly<{
+  plan: HifzPlan;
+  preset: PlanPreset | null;
+  surahs: Set<number>;
+  juz: Set<number>;
+  /** The unit chosen on the tracks step, so skipping that step does not leave its choice behind. */
+  chosenUnit: HifzPlan["unit"];
+}>;
 
 function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: string; selected: boolean; onPress: () => void }) {
   return (
@@ -247,6 +254,8 @@ export type SetupSaved = Readonly<{
   firstPlan: boolean;
   /** The recitation unit changed between page and ayah review. */
   unitSwitched: boolean;
+  /** The recitation unit changed at all, page and half page included; it applies at once. */
+  unitChanged: boolean;
   repetitionsChanged: boolean;
 }>;
 
@@ -257,6 +266,8 @@ export function setupSavedNotice(saved: SetupSaved, s: UIStrings, language: "en"
   if (saved.unitSwitched && saved.migratedPages > 0) {
     return interpolate(s.hifzPlanSavedToPages, { pages: formatPages(saved.migratedPages, language) });
   }
+  // A unit change applies to the next review at once, not from tomorrow.
+  if (saved.unitChanged) return saved.plan.unit === "half" ? s.hifzPlanSavedUnitHalf : s.hifzPlanSavedUnitPage;
   return saved.repetitionsChanged && saved.plan.method !== "review_only" ? s.hifzPlanSaved : s.hifzPlanSavedReview;
 }
 
@@ -297,7 +308,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   // What the current step showed when it opened, so "Not now" can leave it untouched.
   const stepEntry = useRef<StepEntry | null>(null);
   const goToStep = (index: number) => {
-    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz };
+    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit };
     setStepIndex(index);
   };
 
@@ -326,9 +337,9 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
       onCancel?.();
       return;
     }
-    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz };
+    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit };
     setStepIndex(stepIndex - 1);
-  }, [onCancel, plan, preset, selectedJuz, selectedSurahs, stepIndex]);
+  }, [chosenUnit, onCancel, plan, preset, selectedJuz, selectedSurahs, stepIndex]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -362,6 +373,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         migratedPages: result.migratedPages,
         firstPlan: initialPlan === null,
         unitSwitched: initialPlan !== null && (initialPlan.unit === "ayah") !== (finalPlan.unit === "ayah"),
+        unitChanged: initialPlan !== null && initialPlan.unit !== finalPlan.unit,
         repetitionsChanged:
           initialPlan !== null && JSON.stringify(initialPlan.sabaqRepetitions) !== JSON.stringify(finalPlan.sabaqRepetitions),
       });
@@ -386,8 +398,9 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
       setPreset(entry.preset);
       setSelectedSurahs(entry.surahs);
       setSelectedJuz(entry.juz);
+      setChosenUnit(entry.chosenUnit);
     }
-    stepEntry.current = entry ? { ...entry } : { plan, preset, surahs: selectedSurahs, juz: selectedJuz };
+    stepEntry.current = entry ? { ...entry } : { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit };
     setStepIndex(stepIndex + 1);
   };
 

@@ -146,6 +146,27 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
     expect((store.sql.prepare("SELECT COUNT(*) AS n FROM sync_queue").get() as { n: number }).n).toBe(queued.n);
   });
 
+  it("brings back ayah cards another device's losing switch set aside, keeping the person's own suspension", async () => {
+    await setup(ayahPlan);
+    // Another device switched to pages; its ayah suspensions arrive, but this device's later ayah plan won.
+    store.sql.prepare("UPDATE study_cards SET suspended_at = ? WHERE id IN ('1:1', '1:2')").run(UNIT_SWITCH_SUSPENDED_AT);
+    const later = new Date(now.getTime() + 60_000);
+    await store.db.withTransactionAsync((tx) => reconcileUnitAfterSync(tx, later));
+    expect(suspendedAt("1:1")).toBeNull();
+    expect(suspendedAt("1:2")).toBeNull();
+    expect(suspendedAt("1:4")).toBe(USER_SUSPENDED_AT);
+    expect(lastQueued("study_cards", "1:1")).toMatchObject({ suspended_at: null });
+  });
+
+  it("brings back page cards another device's losing switch set aside", async () => {
+    await setup(pagePlan);
+    store.sql.prepare("UPDATE study_cards SET suspended_at = ? WHERE id = ?").run(UNIT_SWITCH_SUSPENDED_AT, pageCardId(1));
+    await store.db.withTransactionAsync((tx) => reconcileUnitAfterSync(tx, new Date(now.getTime() + 60_000)));
+    expect(suspendedAt(pageCardId(1))).toBeNull();
+    // The ayah cards this device set aside for page review stay set aside.
+    expect(suspendedAt("1:1")).toBe(UNIT_SWITCH_SUSPENDED_AT);
+  });
+
   it("lists a migrated page in today's wird although today's list was first built in ayah review", async () => {
     await setup(ayahPlan);
     const before = (await loadTodayWird(store.db, now))!;

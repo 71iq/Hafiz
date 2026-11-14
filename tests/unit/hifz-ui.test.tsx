@@ -124,6 +124,22 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
     expect(view.queryByText(s.hifzRepsTitle)).toBeNull();
   });
 
+  it("does not bring back a unit chosen on a step that was skipped", async () => {
+    const view = render(
+      <DirectionProvider dir="ltr">
+        <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={{ ...savedPlan, unit: "page" }} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    for (let step = 0; step < 2; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    // On the tracks step: choose ayah, then skip the step, which drops that choice.
+    fireEvent.press(radio(view, s.hifzUnitAyah));
+    fireEvent.press(view.getByText(s.hifzNotNow));
+    expect(view.getByText(s.hifzPaceTitle)).toBeTruthy();
+    fireEvent.press(radio(view, s.hifzPresetFullTime));
+    expect((await saveAndReadPlan(view)).unit).toBe("page");
+  });
+
   it("restores the unit chosen earlier when a pace other than short surahs is picked", async () => {
     const view = await openPace({ ...savedPlan, unit: "page" });
     fireEvent.press(radio(view, s.hifzPresetShort));
@@ -202,7 +218,15 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
 });
 
 describe("the notice after saving a plan (7.6)", () => {
-  const base = { plan: DEFAULT_HIFZ_PLAN, declaredPages: 0, migratedPages: 0, firstPlan: false, unitSwitched: false, repetitionsChanged: false };
+  const base = {
+    plan: DEFAULT_HIFZ_PLAN,
+    declaredPages: 0,
+    migratedPages: 0,
+    firstPlan: false,
+    unitSwitched: false,
+    unitChanged: false,
+    repetitionsChanged: false,
+  };
   it("says only what the save changes", () => {
     expect(setupSavedNotice({ ...base, firstPlan: true }, strings.en, "en")).toBe(strings.en.hifzPlanSavedFirst);
     expect(setupSavedNotice(base, strings.en, "en")).toBe(strings.en.hifzPlanSavedReview);
@@ -215,6 +239,10 @@ describe("the notice after saving a plan (7.6)", () => {
     );
     expect(setupSavedNotice({ ...base, unitSwitched: true, plan: { ...DEFAULT_HIFZ_PLAN, unit: "ayah" } }, strings.en, "en")).toBe(
       strings.en.hifzPlanSavedToAyat,
+    );
+    // Page to half page applies to the next review, not from tomorrow.
+    expect(setupSavedNotice({ ...base, unitChanged: true, plan: { ...DEFAULT_HIFZ_PLAN, unit: "half" } }, strings.en, "en")).toBe(
+      strings.en.hifzPlanSavedUnitHalf,
     );
   });
 });
