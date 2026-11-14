@@ -113,7 +113,8 @@ export function SabaqSecondLook({
           >
             {s.hifzSecondLookTitle}
           </Text>
-          <Text dir={dir} variant="muted" style={{ lineHeight: 20 }}>
+          {/* Readable at 4.5:1 in both themes; the shared muted tone is lighter. */}
+          <Text dir={dir} variant="muted" className="text-warm-600 dark:text-neutral-400" style={{ lineHeight: 20 }}>
             {s.hifzSecondLookHint}
           </Text>
           {total > 1 ? (
@@ -139,22 +140,28 @@ export function SabaqSecondLook({
           />
         </Card>
 
-        {error ? (
-          <Text dir={dir} className="text-red-600 dark:text-red-400" accessibilityRole="alert">
-            {error}
-          </Text>
-        ) : null}
       </ScrollView>
 
       <View className="px-4 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
         <View style={{ width: "100%", maxWidth: pageWidth, gap: 10 }}>
+          {/* A failed save shows here, by the grade the person just pressed. */}
+          {error ? (
+            <Text
+              dir={dir}
+              className="text-red-600 dark:text-red-400"
+              accessibilityRole="alert"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 }}
+            >
+              {error}
+            </Text>
+          ) : null}
           {shown ? (
             <GradingButtons onGrade={onGrade} previews={{}} isDark={isDark} s={s} disabled={busy} />
           ) : (
             <Button label={s.hifzDrillShow} onPress={() => setShown(true)} />
           )}
           <Button variant="outline" className={OUTLINE_BORDER} label={s.hifzNotNow} onPress={onSkip} disabled={busy} />
-          <Text dir={dir} align="center" variant="caption" style={{ lineHeight: 18 }}>
+          <Text dir={dir} align="center" variant="caption" className="text-warm-600 dark:text-neutral-400" style={{ lineHeight: 18 }}>
             {s.hifzSecondLookSkipHint}
           </Text>
         </View>

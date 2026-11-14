@@ -20,8 +20,9 @@ export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction,
   const { themeColors } = useSettings();
   const iconColor = isDark ? "#525252" : "#DFD9D1";
   const iconBg = withThemeOpacity(themeColors.surfaceHigh, isDark ? 0.4 : 0.6);
-  const titleColor = isDark ? "#a3a3a3" : "#8a7058";
-  const subtitleColor = isDark ? "#737373" : "#A39B93";
+  // Readable at 4.5:1 or more on the surface in both themes; the title stays a step stronger.
+  const titleColor = isDark ? "#e5e5e5" : "#2D2D2D";
+  const subtitleColor = isDark ? "#a3a3a3" : "#6e5a47";
   const accentColor = isDark ? "#2dd4bf" : "#0d9488";
 
   return (

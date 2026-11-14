@@ -641,7 +641,8 @@ export function CommentsSheet({
                   closeForNavigation();
                   router.push("/auth/login");
                 }}
-                className="mt-3 self-start rounded-full bg-primary-accent px-4 py-2 dark:bg-primary-bright"
+                accessibilityRole="button"
+                className="mt-3 min-h-[44px] justify-center self-start rounded-full bg-primary-accent px-4 py-2 dark:bg-primary-bright"
                 style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, alignSelf: isRTL ? "flex-end" : "flex-start" })}
               >
                 <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#FFFFFF" }}>{s.authLogin}</Text>

@@ -65,7 +65,8 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
       answerRamadanOffer(db, { hijriYear: banner.hijriYear, choice }).catch(() => {});
     };
     return (
-      <Card elevation="mid" className="p-4 gap-3" accessibilityRole="alert">
+      // Its own top gap, since it renders nothing when there is no reminder (Home's header sits above).
+      <Card elevation="mid" className="mt-4 p-4 gap-3" accessibilityRole="alert">
         <Text variant="body">{s.notifRamadanOffer}</Text>
         <MirroredRow className="flex-wrap gap-2">
           <Button size="sm" className="h-11" onPress={() => choose("after_taraweeh")} label={s.notifRamadanAfterTaraweeh} />
@@ -83,7 +84,7 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
   };
 
   return (
-    <Card elevation="mid" className="p-4" accessibilityRole="alert" accessibilityLabel={`${s.notifBannerLabel}: ${banner.title}`}>
+    <Card elevation="mid" className="mt-4 p-4" accessibilityRole="alert" accessibilityLabel={`${s.notifBannerLabel}: ${banner.title}`}>
       <MirroredRow className="items-start gap-2">
         <View style={{ flex: 1, gap: 4 }}>
           <Text variant="title-md">{banner.title}</Text>
