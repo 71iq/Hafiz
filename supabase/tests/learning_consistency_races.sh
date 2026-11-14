@@ -21,6 +21,11 @@ as_user() {
   printf "\\o /dev/null\nSELECT set_config('request.jwt.claims', '{\"sub\":\"%s\",\"role\":\"authenticated\"}', false);\n\\o\nSET ROLE authenticated;\n%s\n" "$1" "$2"
 }
 
+# Runs SQL signed out, as PostgREST would for anon, and prints its result.
+as_anon() {
+  printf "SET ROLE anon;\n%s\n" "$1" | docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA
+}
+
 # Runs SQL as `uid` in its own session in the background. The file gets its output and a last line
 # "ok" or "failed".
 session() {
@@ -106,9 +111,9 @@ uid() { printf '00000000-0000-4000-8009-%012d' "$1"; }
 
 admin >/dev/null <<SQL
 INSERT INTO auth.users (id, email) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race' || i || '@example.invalid'
-FROM generate_series(1, 23) AS i;
+FROM generate_series(1, 24) AS i;
 INSERT INTO public.profiles (id, username) SELECT ('00000000-0000-4000-8009-' || lpad(i::TEXT, 12, '0'))::UUID, 'race_user_' || i
-FROM generate_series(1, 23) AS i;
+FROM generate_series(1, 24) AS i;
 SQL
 
 TODAY="$(admin -c "SELECT to_char((now() AT TIME ZONE 'UTC')::DATE, 'YYYY-MM-DD')")"
@@ -482,12 +487,13 @@ check "withdrawal finished" "$(tail -1 "$WORK/withdraw_hold")" ok
 check "the promised-private write is refused" "$(grep -c privacy_changed "$WORK/promised" || true)" 1
 check "nothing was published" "$(admin -c "SELECT count(*) FROM public.reflections WHERE user_id = '$(uid 20)'")" 0
 
-# Reflection counts compared with a full recount, as "stored/counted" pairs for likes and comments.
+# Reflection counts compared with a full recount, as "stored/counted" pairs for likes and comments. A
+# row counts when it was not written privately and its author is not a minor now.
 recount() {
   admin -c "SELECT r.likes_count || '/' || (SELECT count(*) FROM public.reflection_likes AS l
-      WHERE l.reflection_id = r.id AND NOT private.is_minor(l.user_id))
+      WHERE l.reflection_id = r.id AND NOT l.is_private AND NOT private.is_minor(l.user_id))
     || ' ' || r.comments_count || '/' || (SELECT count(*) FROM public.reflection_comments AS c
-      WHERE c.reflection_id = r.id AND NOT private.is_minor(c.user_id))
+      WHERE c.reflection_id = r.id AND NOT c.is_private AND NOT private.is_minor(c.user_id))
     FROM public.reflections AS r WHERE r.id = '$1'"
 }
 
@@ -539,6 +545,39 @@ check "account deletion finished" "$(tail -1 "$WORK/dc_delete")" ok
 check "the comment deletion finished or found the account gone" \
   "$(if [ "$(tail -1 "$WORK/dc_comment")" = ok ] || grep -q not_authenticated "$WORK/dc_comment"; then echo yes; else echo no; fi)" yes
 check "the comment is gone" "$(admin -c "SELECT count(*) FROM public.reflection_comments WHERE id = '$OCOMMENT'")" 0
+check "the counts match a recount" "$(recount "$DREFLECTION")" "0/0 0/0"
+
+# ─── Seventh review: private writes in flight while minority is withdrawn stay private ─────────
+# User 24 is a minor. Their like and comment on user 22's reflection stay open in one transaction
+# until the withdrawal of their minority is blocked. Each write holds user 24's profiles row FOR SHARE
+# and stores itself as private from the minority it read there, so the withdrawal waits for them, and
+# its recount then leaves them out by that flag. A recount that went by current minority alone would
+# add both to the public counts, and every reader would see them.
+rm -f "$WORK"/*
+admin -c "INSERT INTO public.profile_privacy (user_id, is_minor) VALUES ('$(uid 24)', true)" >/dev/null
+session private_hold "$(uid 24)" "BEGIN;
+SELECT public.set_reflection_like('$(uid 24)', '$DREFLECTION', true);
+SELECT (public.add_reflection_comment('$(uid 24)', '$DREFLECTION', 'A private race comment', true)).id;
+RESET ROLE;
+DO \$\$ BEGIN
+  FOR i IN 1 .. 200 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    EXIT WHEN (SELECT count(*) FROM pg_stat_activity WHERE application_name = 'race_private_withdraw' AND wait_event_type = 'Lock') >= 1;
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+END \$\$;
+COMMIT;"
+wait_for_hold private_hold
+session private_withdraw "$(uid 24)" "SELECT public.set_profile_privacy(false, false, false)->>'is_minor';"
+wait
+check "private writes finished" "$(tail -1 "$WORK/private_hold")" ok
+check "withdrawal finished" "$(tail -1 "$WORK/private_withdraw")" ok
+check "the withdrawal leaves the private like and comment out of the counts" \
+  "$(admin -c "SELECT likes_count || '/' || comments_count FROM public.reflections WHERE id = '$DREFLECTION'")" 0/0
+check "anon reads neither" \
+  "$(as_anon "SELECT (SELECT count(*) FROM public.reflection_likes WHERE user_id = '$(uid 24)') + (SELECT count(*) FROM public.reflection_comments WHERE user_id = '$(uid 24)');")" 0
+check "both are stored private" \
+  "$(admin -c "SELECT (SELECT bool_and(is_private) FROM public.reflection_likes WHERE user_id = '$(uid 24)')::TEXT || '/' || (SELECT bool_and(is_private) FROM public.reflection_comments WHERE user_id = '$(uid 24)')::TEXT")" true/true
 check "the counts match a recount" "$(recount "$DREFLECTION")" "0/0 0/0"
 
 echo "learning_consistency_races.sh: all races passed"

@@ -1534,15 +1534,16 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Withdrawing minority counts the activity again and stating it again leaves it out; removing a
--- like that was never counted, or the whole account, changes no count.
+-- Withdrawing minority counts again what they wrote as an adult, never what they wrote as a minor,
+-- and stating it again leaves it out; removing a like that was never counted, or the whole account,
+-- changes no count.
 SELECT hz_test.login('00000000-0000-4000-8008-000000000001');
 SET ROLE authenticated;
 DO $$
 BEGIN
   PERFORM public.set_profile_privacy(false, false, false);
-  PERFORM hz_test.eq('withdrawing minority counts the activity again', hz_test.adult_counts(),
-    '2 likes, 3 comments, comment liked 1');
+  PERFORM hz_test.eq('withdrawing minority counts again only what was written as an adult', hz_test.adult_counts(),
+    '2 likes, 2 comments, comment liked 1');
   PERFORM public.set_profile_privacy(false, false, true);
   PERFORM hz_test.eq('stating it again leaves it out again', hz_test.adult_counts(), '1 likes, 1 comments, comment liked 0');
   PERFORM public.set_reflection_like(auth.uid(), (SELECT value FROM hz_test.state WHERE key = 'adult_reflection')::UUID, false);
@@ -1563,22 +1564,23 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Stored counts that differ from a full recount, as text, or 'none'.
+-- Stored counts that differ from a full recount, as text, or 'none'. A row counts when it was not
+-- written privately and its author is not a minor now.
 CREATE FUNCTION hz_test.count_drift() RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT COALESCE(string_agg(drift, '; ' ORDER BY drift), 'none') FROM (
     SELECT format('reflection %s: %s likes stored, %s counted; %s comments stored, %s counted',
       r.content, r.likes_count, likes.n, r.comments_count, comments.n) AS drift
     FROM public.reflections AS r
     CROSS JOIN LATERAL (SELECT count(*) AS n FROM public.reflection_likes AS l
-      WHERE l.reflection_id = r.id AND NOT private.is_minor(l.user_id)) AS likes
+      WHERE l.reflection_id = r.id AND NOT l.is_private AND NOT private.is_minor(l.user_id)) AS likes
     CROSS JOIN LATERAL (SELECT count(*) AS n FROM public.reflection_comments AS c
-      WHERE c.reflection_id = r.id AND NOT private.is_minor(c.user_id)) AS comments
+      WHERE c.reflection_id = r.id AND NOT c.is_private AND NOT private.is_minor(c.user_id)) AS comments
     WHERE r.likes_count IS DISTINCT FROM likes.n OR r.comments_count IS DISTINCT FROM comments.n
     UNION ALL
     SELECT format('comment %s: %s likes stored, %s counted', c.content, c.likes_count, likes.n)
     FROM public.reflection_comments AS c
     CROSS JOIN LATERAL (SELECT count(*) AS n FROM public.reflection_comment_likes AS cl
-      WHERE cl.comment_id = c.id AND NOT private.is_minor(cl.user_id)) AS likes
+      WHERE cl.comment_id = c.id AND NOT cl.is_private AND NOT private.is_minor(cl.user_id)) AS likes
     WHERE c.likes_count IS DISTINCT FROM likes.n
   ) AS d
 $$;
@@ -1847,6 +1849,257 @@ BEGIN
     public.join_board('Other Star', true, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
 END $$;
 RESET ROLE;
+
+-- Seventh review: what a minor writes stays private for good. Each reflection, comment and like keeps
+-- whether it was written privately, so withdrawing minority later, through set_profile_privacy or
+-- join_board, never shows it to anyone else or adds it to a public count, and its owner still reads
+-- and deletes it. 8030-1 is an adult author. 8030-2 writes as a minor and withdraws through
+-- set_profile_privacy, 8030-3 through join_board. 8030-4 writes as an adult, becomes a minor and
+-- withdraws, so their rows hide and show again as before. 8030-5 is a signed-in stranger.
+SELECT hz_test.make_user(('00000000-0000-4000-8030-' || lpad(i::TEXT, 12, '0'))::UUID, 'seventh_user_' || i, 'Seventh ' || i)
+FROM generate_series(1, 5) AS i;
+-- The counts on 8030-1's reflection and on their comment there, as the caller reads them.
+CREATE FUNCTION hz_test.seventh_counts() RETURNS TEXT LANGUAGE sql STABLE AS $$
+  SELECT r.likes_count || ' likes, ' || r.comments_count || ' comments, comment liked ' || COALESCE((
+    SELECT c.likes_count FROM public.reflection_comments AS c WHERE c.content = 'Seventh adult comment'
+  )::TEXT, '-')
+  FROM public.reflections AS r WHERE r.content = 'Seventh adult reflection'
+$$;
+-- The reflections, comments, likes and comment likes by `author` that the caller can read.
+CREATE FUNCTION hz_test.rows_by(author UUID) RETURNS TEXT LANGUAGE sql STABLE AS $$
+  SELECT (SELECT count(*) FROM public.reflections WHERE user_id = author) || '/'
+    || (SELECT count(*) FROM public.reflection_comments WHERE user_id = author) || '/'
+    || (SELECT count(*) FROM public.reflection_likes WHERE user_id = author) || '/'
+    || (SELECT count(*) FROM public.reflection_comment_likes WHERE user_id = author)
+$$;
+-- The likes and comments on 8030-1's reflection and the likes on their comment that the caller can read.
+CREATE FUNCTION hz_test.seventh_rows() RETURNS TEXT LANGUAGE sql STABLE AS $$
+  SELECT (SELECT count(*) FROM public.reflection_likes AS l JOIN public.reflections AS r ON r.id = l.reflection_id
+      WHERE r.content = 'Seventh adult reflection') || ' likes, '
+    || (SELECT count(*) FROM public.reflection_comments AS c JOIN public.reflections AS r ON r.id = c.reflection_id
+      WHERE r.content = 'Seventh adult reflection') || ' comments, comment liked '
+    || (SELECT count(*) FROM public.reflection_comment_likes AS cl JOIN public.reflection_comments AS c ON c.id = cl.comment_id
+      WHERE c.content = 'Seventh adult comment')
+$$;
+GRANT EXECUTE ON FUNCTION hz_test.seventh_counts(), hz_test.rows_by(UUID), hz_test.seventh_rows() TO anon, authenticated;
+
+SET ROLE authenticated;
+DO $$
+DECLARE
+  adult_reflection UUID;
+  adult_comment UUID;
+BEGIN
+  PERFORM hz_test.login('00000000-0000-4000-8030-000000000001');
+  adult_reflection := (public.create_reflection(auth.uid(), 3, 1, 1, 1, 1, 'Seventh adult reflection', false)).id;
+  adult_comment := (public.add_reflection_comment(auth.uid(), adult_reflection, 'Seventh adult comment', false)).id;
+  INSERT INTO hz_test.state VALUES ('seventh_reflection', adult_reflection::TEXT), ('seventh_comment', adult_comment::TEXT);
+
+  PERFORM hz_test.login('00000000-0000-4000-8030-000000000004');
+  PERFORM public.create_reflection(auth.uid(), 3, 2, 2, 1, 1, 'Seventh reflection shared as an adult', false);
+  PERFORM public.add_reflection_comment(auth.uid(), adult_reflection, 'Seventh comment shared as an adult', false);
+  PERFORM public.set_reflection_like(auth.uid(), adult_reflection, true);
+  PERFORM public.set_reflection_comment_like(auth.uid(), adult_comment, true);
+  PERFORM hz_test.eq('seventh: an adult''s activity is counted', hz_test.seventh_counts(), '1 likes, 2 comments, comment liked 1');
+
+  PERFORM hz_test.login('00000000-0000-4000-8030-000000000002');
+  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM public.create_reflection(auth.uid(), 3, 3, 3, 1, 1, 'Seventh private reflection by two', true);
+  PERFORM public.add_reflection_comment(auth.uid(), adult_reflection, 'Seventh private comment by two', true);
+  PERFORM public.set_reflection_like(auth.uid(), adult_reflection, true);
+  PERFORM public.set_reflection_comment_like(auth.uid(), adult_comment, true);
+
+  PERFORM hz_test.login('00000000-0000-4000-8030-000000000003');
+  PERFORM public.join_board('Seventh Kid', true, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM public.create_reflection(auth.uid(), 3, 4, 4, 1, 1, 'Seventh private reflection by three', true);
+  PERFORM public.add_reflection_comment(auth.uid(), adult_reflection, 'Seventh private comment by three', true);
+  PERFORM public.set_reflection_like(auth.uid(), adult_reflection, true);
+  PERFORM public.set_reflection_comment_like(auth.uid(), adult_comment, true);
+  PERFORM hz_test.eq('seventh: what minors write is not counted', hz_test.seventh_counts(), '1 likes, 2 comments, comment liked 1');
+
+  -- Existing behavior: an adult who becomes a minor has their earlier rows hidden while they are one.
+  PERFORM hz_test.login('00000000-0000-4000-8030-000000000004');
+  PERFORM public.set_profile_privacy(false, false, true);
+  PERFORM hz_test.eq('seventh: becoming a minor leaves earlier activity out', hz_test.seventh_counts(),
+    '0 likes, 1 comments, comment liked 0');
+END $$;
+RESET ROLE;
+
+SELECT hz_test.login(NULL);
+SET ROLE anon;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('seventh: anon reads nothing of a current minor written as an adult',
+    hz_test.rows_by('00000000-0000-4000-8030-000000000004'), '0/0/0/0');
+  PERFORM hz_test.eq('seventh: anon reads only the adult author''s rows', hz_test.seventh_rows(),
+    '0 likes, 1 comments, comment liked 0');
+END $$;
+RESET ROLE;
+
+-- Minority ends, each way it can. Rows written privately stay out of the counts; rows written as
+-- an adult return to them.
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM hz_test.login('00000000-0000-4000-8030-000000000002');
+  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM hz_test.eq('seventh: withdrawing through set_profile_privacy keeps private rows out of the counts',
+    hz_test.seventh_counts(), '0 likes, 1 comments, comment liked 0');
+  PERFORM hz_test.login('00000000-0000-4000-8030-000000000003');
+  PERFORM public.join_board(NULL, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM hz_test.eq('seventh: withdrawing through join_board keeps private rows out of the counts',
+    hz_test.seventh_counts(), '0 likes, 1 comments, comment liked 0');
+  PERFORM hz_test.login('00000000-0000-4000-8030-000000000004');
+  PERFORM public.set_profile_privacy(false, false, false);
+  PERFORM hz_test.eq('seventh: withdrawing counts again what was written as an adult', hz_test.seventh_counts(),
+    '1 likes, 2 comments, comment liked 1');
+END $$;
+RESET ROLE;
+
+SELECT hz_test.login(NULL);
+SET ROLE anon;
+DO $$
+DECLARE
+  visible TEXT := hz_test.public_activity();
+BEGIN
+  PERFORM hz_test.eq('seventh: anon reads no row written as a minor, withdrawn through set_profile_privacy',
+    hz_test.rows_by('00000000-0000-4000-8030-000000000002'), '0/0/0/0');
+  PERFORM hz_test.eq('seventh: anon reads no row written as a minor, withdrawn through join_board',
+    hz_test.rows_by('00000000-0000-4000-8030-000000000003'), '0/0/0/0');
+  PERFORM hz_test.eq('seventh: anon reads no id or words written as a minor',
+    position('00000000-0000-4000-8030-000000000002' IN visible) + position('00000000-0000-4000-8030-000000000003' IN visible)
+    + position('Seventh private' IN visible), 0);
+  PERFORM hz_test.eq('seventh: anon reads no profile name through a private row', (
+    SELECT count(*) FROM public.reflections AS r JOIN public.profiles AS p ON p.id = r.user_id
+    WHERE p.username IN ('seventh_user_2', 'seventh_user_3')
+  ), 0::BIGINT);
+  PERFORM hz_test.eq('seventh: anon reads an adult''s earlier rows again once their minority ends',
+    hz_test.rows_by('00000000-0000-4000-8030-000000000004'), '1/1/1/1');
+  PERFORM hz_test.eq('seventh: anon reads the counts without private rows', hz_test.seventh_counts(),
+    '1 likes, 2 comments, comment liked 1');
+  PERFORM hz_test.eq('seventh: anon reads as many rows as the counts say', hz_test.seventh_rows(),
+    '1 likes, 2 comments, comment liked 1');
+END $$;
+RESET ROLE;
+
+SELECT hz_test.login('00000000-0000-4000-8030-000000000005');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  visible TEXT := hz_test.public_activity();
+BEGIN
+  PERFORM hz_test.eq('seventh: a signed-in stranger reads no row written as a minor',
+    hz_test.rows_by('00000000-0000-4000-8030-000000000002') || ' ' || hz_test.rows_by('00000000-0000-4000-8030-000000000003'),
+    '0/0/0/0 0/0/0/0');
+  PERFORM hz_test.eq('seventh: a signed-in stranger reads no id or words written as a minor',
+    position('00000000-0000-4000-8030-000000000002' IN visible) + position('00000000-0000-4000-8030-000000000003' IN visible)
+    + position('Seventh private' IN visible), 0);
+  PERFORM hz_test.eq('seventh: a signed-in stranger reads the counts without private rows', hz_test.seventh_counts(),
+    '1 likes, 2 comments, comment liked 1');
+  PERFORM hz_test.eq('seventh: a signed-in stranger reads as many rows as the counts say', hz_test.seventh_rows(),
+    '1 likes, 2 comments, comment liked 1');
+END $$;
+RESET ROLE;
+
+-- The flag is stored from the writer's minority when each row was written.
+DO $$
+BEGIN
+  PERFORM hz_test.eq('seventh: rows written as a minor are stored private', (
+    SELECT string_agg(kind || '=' || is_private, ', ' ORDER BY kind) FROM (
+      SELECT 'comment' AS kind, is_private FROM public.reflection_comments WHERE user_id = '00000000-0000-4000-8030-000000000003'
+      UNION ALL SELECT 'comment like', is_private FROM public.reflection_comment_likes WHERE user_id = '00000000-0000-4000-8030-000000000003'
+      UNION ALL SELECT 'like', is_private FROM public.reflection_likes WHERE user_id = '00000000-0000-4000-8030-000000000003'
+      UNION ALL SELECT 'reflection', is_private FROM public.reflections WHERE user_id = '00000000-0000-4000-8030-000000000003'
+    ) AS written), 'comment=true, comment like=true, like=true, reflection=true');
+  PERFORM hz_test.eq('seventh: rows written as an adult are stored public', (
+    SELECT count(*) FILTER (WHERE is_private) || '/' || count(*) FROM (
+      SELECT is_private FROM public.reflections WHERE user_id IN ('00000000-0000-4000-8030-000000000001', '00000000-0000-4000-8030-000000000004')
+      UNION ALL SELECT is_private FROM public.reflection_comments WHERE user_id IN ('00000000-0000-4000-8030-000000000001', '00000000-0000-4000-8030-000000000004')
+      UNION ALL SELECT is_private FROM public.reflection_likes WHERE user_id = '00000000-0000-4000-8030-000000000004'
+      UNION ALL SELECT is_private FROM public.reflection_comment_likes WHERE user_id = '00000000-0000-4000-8030-000000000004'
+    ) AS written), '0/6');
+END $$;
+INSERT INTO hz_test.state
+SELECT 'seventh_private_reflection', id::TEXT FROM public.reflections WHERE content = 'Seventh private reflection by two'
+UNION ALL
+SELECT 'seventh_private_comment', id::TEXT FROM public.reflection_comments WHERE content = 'Seventh private comment by two';
+
+-- A stranger cannot react to a row written privately, even though its author is no longer a minor.
+SELECT hz_test.login('00000000-0000-4000-8030-000000000005');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  private_reflection UUID := (SELECT value FROM hz_test.state WHERE key = 'seventh_private_reflection')::UUID;
+  private_comment UUID := (SELECT value FROM hz_test.state WHERE key = 'seventh_private_comment')::UUID;
+BEGIN
+  PERFORM hz_test.expect_error(format('SELECT public.set_reflection_like(%L, %L, true)', auth.uid(), private_reflection),
+    'reflection_not_found');
+  PERFORM hz_test.expect_error(format($q$SELECT public.add_reflection_comment(%L, %L, 'Hello there', false)$q$,
+    auth.uid(), private_reflection), 'reflection_not_found');
+  PERFORM hz_test.expect_error(format('SELECT public.set_reflection_comment_like(%L, %L, true)', auth.uid(), private_comment),
+    'comment_not_found');
+END $$;
+RESET ROLE;
+
+-- The owner still reads, likes and deletes what they wrote as a minor, and what they write now as an
+-- adult is public.
+SELECT hz_test.login('00000000-0000-4000-8030-000000000003');
+SET ROLE authenticated;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('seventh: the owner reads their private rows after withdrawing through join_board',
+    hz_test.rows_by(auth.uid()), '1/1/1/1');
+END $$;
+RESET ROLE;
+SELECT hz_test.login('00000000-0000-4000-8030-000000000002');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  adult_reflection UUID := (SELECT value FROM hz_test.state WHERE key = 'seventh_reflection')::UUID;
+  adult_comment UUID := (SELECT value FROM hz_test.state WHERE key = 'seventh_comment')::UUID;
+  private_reflection UUID := (SELECT value FROM hz_test.state WHERE key = 'seventh_private_reflection')::UUID;
+  private_comment UUID := (SELECT value FROM hz_test.state WHERE key = 'seventh_private_comment')::UUID;
+BEGIN
+  PERFORM hz_test.eq('seventh: the owner reads their private rows after withdrawing through set_profile_privacy',
+    hz_test.rows_by(auth.uid()), '1/1/1/1');
+  PERFORM hz_test.eq('seventh: and their words', (
+    SELECT string_agg(content, '; ' ORDER BY content) FROM (
+      SELECT content FROM public.reflections WHERE user_id = auth.uid()
+      UNION ALL SELECT content FROM public.reflection_comments WHERE user_id = auth.uid()
+    ) AS mine), 'Seventh private comment by two; Seventh private reflection by two');
+  PERFORM hz_test.eq('seventh: the owner may comment on their own private reflection', (
+    public.add_reflection_comment(auth.uid(), private_reflection, 'Seventh note on my own reflection', false)).is_private, false);
+  PERFORM public.add_reflection_comment(auth.uid(), adult_reflection, 'Seventh public comment by two', false);
+  PERFORM hz_test.eq('seventh: a write after the withdrawal is counted', hz_test.seventh_counts(),
+    '1 likes, 3 comments, comment liked 1');
+  PERFORM hz_test.eq('seventh: liking again keeps the private like', public.set_reflection_like(auth.uid(), adult_reflection, true), true);
+  PERFORM hz_test.eq('seventh: and leaves it out of the count', hz_test.seventh_counts(), '1 likes, 3 comments, comment liked 1');
+  PERFORM public.set_reflection_like(auth.uid(), adult_reflection, false);
+  PERFORM public.set_reflection_comment_like(auth.uid(), adult_comment, false);
+  PERFORM hz_test.eq('seventh: removing private likes changes no count', hz_test.seventh_counts(),
+    '1 likes, 3 comments, comment liked 1');
+  PERFORM hz_test.eq('seventh: the owner deletes a private comment', public.delete_reflection_comment(auth.uid(), private_comment), true);
+  PERFORM hz_test.eq('seventh: the owner deletes a private reflection', public.delete_reflection(auth.uid(), private_reflection), true);
+  PERFORM hz_test.eq('seventh: deleting private rows changes no count', hz_test.seventh_counts(),
+    '1 likes, 3 comments, comment liked 1');
+END $$;
+RESET ROLE;
+
+SELECT hz_test.login(NULL);
+SET ROLE anon;
+DO $$
+DECLARE
+  visible TEXT := hz_test.public_activity();
+BEGIN
+  PERFORM hz_test.eq('seventh: anon reads what the former minor wrote as an adult',
+    position('Seventh public comment by two' IN visible) > 0, true);
+  PERFORM hz_test.eq('seventh: anon still reads no private words', position('Seventh private' IN visible)
+    + position('Seventh note on my own reflection' IN visible), 0);
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  PERFORM hz_test.eq('seventh: private rows keep every count exact', hz_test.count_drift(), 'none');
+END $$;
 
 SELECT hz_test.login(NULL);
 SET client_min_messages = warning;

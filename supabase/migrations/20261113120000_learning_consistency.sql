@@ -11,7 +11,9 @@
 --   strangers, and the public avatars bucket refuses their uploads. Invite halaqas stay.
 -- - A minor's reflections, comments and likes carry their id, so they are readable only by that minor,
 --   and the public like and comment counts leave them out. Clients write them only through RPCs, and
---   a write the app showed as private is refused once the writer is no longer a minor.
+--   a write the app showed as private is refused once the writer is no longer a minor. Each row stores
+--   whether it was written privately, from the writer's minority at that moment, so what a minor wrote
+--   stays readable only by them after minority is withdrawn.
 -- - Helpers that RLS policies call live in the rls schema, which PostgREST does not expose, so a
 --   client cannot call them as RPCs.
 -- - Board and visibility choices live in profile_privacy, readable only by the owner, because
@@ -437,38 +439,64 @@ DROP FUNCTION IF EXISTS public.profile_identity_visible(UUID);
 -- so a hidden profiles row alone would still show a minor's id and words here. A minor may still
 -- write them: their rows are readable only by them, so the app keeps working for the minor and
 -- strangers never see the rows, and the public counts leave them out (private.recount_reflection).
--- A comment or like also follows its parent, so one on a minor's reflection or comment is hidden
--- with it, and a stranger cannot react to what they cannot read.
+-- A row also stores whether it was written privately (section 5, reflection writes): a row a minor
+-- wrote stays readable only by them for good, even after they withdraw minority, while rows they wrote
+-- as an adult are hidden only while they are a minor. Nothing publishes a private row later. A
+-- comment or like also follows its parent, so one on a hidden reflection or comment is hidden with
+-- it, and a stranger cannot react to what they cannot read.
+ALTER TABLE public.reflections ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.reflection_comments ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.reflection_likes ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.reflection_comment_likes ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
+
+-- Whether the caller may read a reflection, comment or like: always their own, and anyone else's only
+-- when it was not written privately and its author is not a minor now. The public counts apply the
+-- same rule to every reader (private.activity_public).
+CREATE OR REPLACE FUNCTION rls.activity_visible(author UUID, written_private BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SET search_path = ''
+AS $$
+  SELECT author = (SELECT auth.uid()) OR (NOT written_private AND rls.profile_identity_visible(author));
+$$;
+REVOKE ALL ON FUNCTION rls.activity_visible(UUID, BOOLEAN) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION rls.activity_visible(UUID, BOOLEAN) TO anon, authenticated;
+
 DROP POLICY IF EXISTS "Active reflections are publicly readable" ON public.reflections;
 DROP POLICY IF EXISTS "Active reflections are readable unless the author is a minor" ON public.reflections;
-CREATE POLICY "Active reflections are readable unless the author is a minor"
+DROP POLICY IF EXISTS "Active reflections are readable unless private" ON public.reflections;
+CREATE POLICY "Active reflections are readable unless private"
   ON public.reflections FOR SELECT
-  USING (status = 'active' AND rls.profile_identity_visible(user_id));
+  USING (status = 'active' AND rls.activity_visible(user_id, is_private));
 
 DROP POLICY IF EXISTS "Likes follow reflection visibility" ON public.reflection_likes;
 DROP POLICY IF EXISTS "Likes follow their reflection unless the liker is a minor" ON public.reflection_likes;
-CREATE POLICY "Likes follow their reflection unless the liker is a minor"
+DROP POLICY IF EXISTS "Likes follow their reflection unless private" ON public.reflection_likes;
+CREATE POLICY "Likes follow their reflection unless private"
   ON public.reflection_likes FOR SELECT
   USING (
-    rls.profile_identity_visible(user_id)
+    rls.activity_visible(user_id, is_private)
     AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
   );
 
 DROP POLICY IF EXISTS "Comments follow reflection visibility" ON public.reflection_comments;
 DROP POLICY IF EXISTS "Comments follow their reflection unless the author is a minor" ON public.reflection_comments;
-CREATE POLICY "Comments follow their reflection unless the author is a minor"
+DROP POLICY IF EXISTS "Comments follow their reflection unless private" ON public.reflection_comments;
+CREATE POLICY "Comments follow their reflection unless private"
   ON public.reflection_comments FOR SELECT
   USING (
-    rls.profile_identity_visible(user_id)
+    rls.activity_visible(user_id, is_private)
     AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
   );
 
 DROP POLICY IF EXISTS "Comment likes follow reflection visibility" ON public.reflection_comment_likes;
 DROP POLICY IF EXISTS "Comment likes follow their comment unless the liker is a minor" ON public.reflection_comment_likes;
-CREATE POLICY "Comment likes follow their comment unless the liker is a minor"
+DROP POLICY IF EXISTS "Comment likes follow their comment unless private" ON public.reflection_comment_likes;
+CREATE POLICY "Comment likes follow their comment unless private"
   ON public.reflection_comment_likes FOR SELECT
   USING (
-    rls.profile_identity_visible(user_id)
+    rls.activity_visible(user_id, is_private)
     AND EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id)
   );
 
@@ -544,6 +572,18 @@ STABLE
 SET search_path = ''
 AS $$
   SELECT EXISTS (SELECT 1 FROM public.profile_privacy AS pp WHERE pp.user_id = member AND pp.is_minor);
+$$;
+
+-- Whether a reflection, comment or like is public, so the public counts include it: it was not
+-- written privately and its author is not a minor now. rls.activity_visible applies the same rule
+-- to readers other than the author.
+CREATE OR REPLACE FUNCTION private.activity_public(author UUID, written_private BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SET search_path = ''
+AS $$
+  SELECT NOT written_private AND NOT private.is_minor(author);
 $$;
 
 -- Every write that can change is_minor (set_profile_privacy, join_board) calls this before it writes,
@@ -625,11 +665,12 @@ CREATE TRIGGER profiles_minor_photo BEFORE INSERT OR UPDATE OF avatar_url ON pub
   FOR EACH ROW EXECUTE FUNCTION private.profiles_minor_photo();
 
 -- ETH-07: like and comment counts are public, so they count only likes and comments that others can
--- read, never a minor's. A single new or deleted like or comment adds or subtracts one when its author
--- is not a minor (private.visible_step). A statement that changes several rows, a cascade from a
--- deleted account, and recording or withdrawing minority recount each count they affect once
--- instead. A recount locks its row first, in its own statement, so the count reads every like and
--- comment committed before it, and a later change waits for this one.
+-- read: never one written privately, and never a current minor's (private.activity_public). A single
+-- new or deleted like or comment adds or subtracts one when it was not written privately and its
+-- author is not a minor (private.visible_step); a private one never moves a count. A statement that
+-- changes several rows, a cascade from a deleted account, and recording or withdrawing minority
+-- recount each count they affect once instead. A recount locks its row first, in its own statement,
+-- so the count reads every like and comment committed before it, and a later change waits for this one.
 CREATE OR REPLACE FUNCTION private.recount_reflection(target UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -640,11 +681,11 @@ BEGIN
   UPDATE public.reflections SET
     likes_count = (
       SELECT count(*) FROM public.reflection_likes AS l
-      WHERE l.reflection_id = target AND NOT private.is_minor(l.user_id)
+      WHERE l.reflection_id = target AND private.activity_public(l.user_id, l.is_private)
     ),
     comments_count = (
       SELECT count(*) FROM public.reflection_comments AS c
-      WHERE c.reflection_id = target AND NOT private.is_minor(c.user_id)
+      WHERE c.reflection_id = target AND private.activity_public(c.user_id, c.is_private)
     )
   WHERE id = target;
 END;
@@ -659,16 +700,18 @@ BEGIN
   PERFORM 1 FROM public.reflection_comments WHERE id = target FOR NO KEY UPDATE;
   UPDATE public.reflection_comments SET likes_count = (
     SELECT count(*) FROM public.reflection_comment_likes AS cl
-    WHERE cl.comment_id = target AND NOT private.is_minor(cl.user_id)
+    WHERE cl.comment_id = target AND private.activity_public(cl.user_id, cl.is_private)
   )
   WHERE id = target;
 END;
 $$;
 
 -- How one like or comment by `author` moves a public count: by `step` when others can read it, not
--- at all when the author is a minor. The author's profiles row stays locked FOR SHARE until commit,
--- and recording or withdrawing minority holds it FOR NO KEY UPDATE (private.lock_minor_change), so
--- the minority read here holds until the count commits, and a minority write after it recounts.
+-- at all when the author is a minor. The counter triggers call this only for a row not written
+-- privately, since a private row never counts whatever its author's minority. The author's profiles
+-- row stays locked FOR SHARE until commit, and recording or withdrawing minority holds it FOR NO KEY
+-- UPDATE (private.lock_minor_change), so the minority read here holds until the count commits, and a
+-- minority write after it recounts.
 -- NULL means the author's profile was deleted in this transaction: their privacy row may already be
 -- gone, so the caller recounts instead.
 CREATE OR REPLACE FUNCTION private.visible_step(author UUID, step INTEGER)
@@ -689,6 +732,8 @@ $$;
 -- those rows until they commit, so it would not recount them. Their profiles rows are therefore
 -- locked FOR SHARE first, in id order, as in private.visible_step. Rows being deleted stay visible to
 -- a minority write until the deletion commits, so a recount after a deletion needs no author lock.
+-- Privately written rows never count, so their authors are not locked and their parents are not
+-- recounted for them.
 CREATE OR REPLACE FUNCTION private.lock_activity_authors(authors UUID[])
 RETURNS VOID
 LANGUAGE plpgsql
@@ -711,14 +756,15 @@ AS $$
 DECLARE
   parent UUID;
   author UUID;
+  written_private BOOLEAN;
   step INTEGER;
 BEGIN
   IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_likes' OR TG_LEVEL <> 'STATEMENT' THEN
     RAISE EXCEPTION 'update_reflection_likes_count only maintains public.reflection_likes';
   END IF;
   IF (SELECT count(*) FROM changed) = 1 THEN
-    SELECT c.reflection_id, c.user_id INTO parent, author FROM changed AS c;
-    IF NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = parent) THEN
+    SELECT c.reflection_id, c.user_id, c.is_private INTO parent, author, written_private FROM changed AS c;
+    IF written_private OR NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = parent) THEN
       RETURN NULL;
     END IF;
     step := private.visible_step(author, CASE TG_OP WHEN 'INSERT' THEN 1 ELSE -1 END);
@@ -730,11 +776,11 @@ BEGIN
     RETURN NULL;
   END IF;
   IF TG_OP = 'INSERT' THEN
-    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c));
+    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c WHERE NOT c.is_private));
   END IF;
   FOR parent IN
     SELECT DISTINCT c.reflection_id FROM changed AS c
-    WHERE EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = c.reflection_id)
+    WHERE NOT c.is_private AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = c.reflection_id)
     ORDER BY 1
   LOOP
     PERFORM private.recount_reflection(parent);
@@ -752,14 +798,15 @@ AS $$
 DECLARE
   parent UUID;
   author UUID;
+  written_private BOOLEAN;
   step INTEGER;
 BEGIN
   IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comments' OR TG_LEVEL <> 'STATEMENT' THEN
     RAISE EXCEPTION 'update_reflection_comments_count only maintains public.reflection_comments';
   END IF;
   IF (SELECT count(*) FROM changed) = 1 THEN
-    SELECT c.reflection_id, c.user_id INTO parent, author FROM changed AS c;
-    IF NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = parent) THEN
+    SELECT c.reflection_id, c.user_id, c.is_private INTO parent, author, written_private FROM changed AS c;
+    IF written_private OR NOT EXISTS (SELECT 1 FROM public.reflections WHERE id = parent) THEN
       RETURN NULL;
     END IF;
     step := private.visible_step(author, CASE TG_OP WHEN 'INSERT' THEN 1 ELSE -1 END);
@@ -771,11 +818,11 @@ BEGIN
     RETURN NULL;
   END IF;
   IF TG_OP = 'INSERT' THEN
-    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c));
+    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c WHERE NOT c.is_private));
   END IF;
   FOR parent IN
     SELECT DISTINCT c.reflection_id FROM changed AS c
-    WHERE EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = c.reflection_id)
+    WHERE NOT c.is_private AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = c.reflection_id)
     ORDER BY 1
   LOOP
     PERFORM private.recount_reflection(parent);
@@ -793,14 +840,15 @@ AS $$
 DECLARE
   parent UUID;
   author UUID;
+  written_private BOOLEAN;
   step INTEGER;
 BEGIN
   IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comment_likes' OR TG_LEVEL <> 'STATEMENT' THEN
     RAISE EXCEPTION 'update_reflection_comment_likes_count only maintains public.reflection_comment_likes';
   END IF;
   IF (SELECT count(*) FROM changed) = 1 THEN
-    SELECT c.comment_id, c.user_id INTO parent, author FROM changed AS c;
-    IF NOT EXISTS (SELECT 1 FROM public.reflection_comments WHERE id = parent) THEN
+    SELECT c.comment_id, c.user_id, c.is_private INTO parent, author, written_private FROM changed AS c;
+    IF written_private OR NOT EXISTS (SELECT 1 FROM public.reflection_comments WHERE id = parent) THEN
       RETURN NULL;
     END IF;
     step := private.visible_step(author, CASE TG_OP WHEN 'INSERT' THEN 1 ELSE -1 END);
@@ -812,11 +860,11 @@ BEGIN
     RETURN NULL;
   END IF;
   IF TG_OP = 'INSERT' THEN
-    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c));
+    PERFORM private.lock_activity_authors(ARRAY(SELECT c.user_id FROM changed AS c WHERE NOT c.is_private));
   END IF;
   FOR parent IN
     SELECT DISTINCT c.comment_id FROM changed AS c
-    WHERE EXISTS (SELECT 1 FROM public.reflection_comments AS rc WHERE rc.id = c.comment_id)
+    WHERE NOT c.is_private AND EXISTS (SELECT 1 FROM public.reflection_comments AS rc WHERE rc.id = c.comment_id)
     ORDER BY 1
   LOOP
     PERFORM private.recount_comment(parent);
@@ -852,7 +900,8 @@ CREATE TRIGGER trg_reflection_comment_likes_count_delete AFTER DELETE ON public.
 -- Recording minority, or withdrawing it, changes which of the person's likes and comments the
 -- public counts include, so every count they touched is recounted once: reflections in id order,
 -- then comments in id order. The callers hold private.lock_minor_change, so none of the person's
--- own likes or comments is in flight.
+-- own likes or comments is in flight. What they wrote privately counts neither way, so withdrawing
+-- minority adds only what they wrote as an adult, and their private rows need no recount.
 CREATE OR REPLACE FUNCTION private.recount_minor_activity()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -865,15 +914,17 @@ BEGIN
     RETURN NULL;
   END IF;
   FOR target IN
-    SELECT l.reflection_id FROM public.reflection_likes AS l WHERE l.user_id = NEW.user_id
+    SELECT l.reflection_id FROM public.reflection_likes AS l WHERE l.user_id = NEW.user_id AND NOT l.is_private
     UNION
-    SELECT c.reflection_id FROM public.reflection_comments AS c WHERE c.user_id = NEW.user_id
+    SELECT c.reflection_id FROM public.reflection_comments AS c WHERE c.user_id = NEW.user_id AND NOT c.is_private
     ORDER BY 1
   LOOP
     PERFORM private.recount_reflection(target);
   END LOOP;
   FOR target IN
-    SELECT cl.comment_id FROM public.reflection_comment_likes AS cl WHERE cl.user_id = NEW.user_id ORDER BY 1
+    SELECT cl.comment_id FROM public.reflection_comment_likes AS cl
+    WHERE cl.user_id = NEW.user_id AND NOT cl.is_private
+    ORDER BY 1
   LOOP
     PERFORM private.recount_comment(target);
   END LOOP;
@@ -981,6 +1032,8 @@ $$;
 -- (private.lock_activity_writer), so this reads the committed minority. A write promised to stay
 -- private is refused once the writer is no longer a minor, and the app reloads their privacy so they
 -- can decide again. Writing as an adult when the server has a minor only makes the text more private.
+-- Each write then stores the minority it read under the same lock as the row's is_private, so the
+-- promise holds after the writer withdraws minority too. The flag never comes from the client.
 CREATE OR REPLACE FUNCTION private.check_promised_visibility(author UUID, promised_private BOOLEAN)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -997,8 +1050,8 @@ BEGIN
 END;
 $$;
 
--- Locks a reflection the caller may react to, which is one the read policy shows them: active, and not
--- a minor's unless it is the caller's own.
+-- Locks a reflection the caller may react to, which is one the read policy shows them: active, and
+-- neither written privately nor a current minor's, unless it is the caller's own.
 CREATE OR REPLACE FUNCTION private.lock_readable_reflection(target UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1007,9 +1060,11 @@ AS $$
 DECLARE
   author UUID;
   state TEXT;
+  written_private BOOLEAN;
 BEGIN
-  SELECT r.user_id, r.status INTO author, state FROM public.reflections AS r WHERE r.id = target FOR NO KEY UPDATE;
-  IF NOT FOUND OR state IS DISTINCT FROM 'active' OR NOT rls.profile_identity_visible(author) THEN
+  SELECT r.user_id, r.status, r.is_private INTO author, state, written_private
+  FROM public.reflections AS r WHERE r.id = target FOR NO KEY UPDATE;
+  IF NOT FOUND OR state IS DISTINCT FROM 'active' OR NOT rls.activity_visible(author, written_private) THEN
     RAISE EXCEPTION 'reflection_not_found';
   END IF;
 END;
@@ -1025,12 +1080,13 @@ AS $$
 DECLARE
   author UUID;
   parent UUID;
+  written_private BOOLEAN;
 BEGIN
-  SELECT c.user_id, c.reflection_id INTO author, parent
+  SELECT c.user_id, c.reflection_id, c.is_private INTO author, parent, written_private
   FROM public.reflection_comments AS c WHERE c.id = target FOR NO KEY UPDATE;
-  IF NOT FOUND OR NOT rls.profile_identity_visible(author) OR NOT EXISTS (
+  IF NOT FOUND OR NOT rls.activity_visible(author, written_private) OR NOT EXISTS (
     SELECT 1 FROM public.reflections AS r
-    WHERE r.id = parent AND r.status = 'active' AND rls.profile_identity_visible(r.user_id)
+    WHERE r.id = parent AND r.status = 'active' AND rls.activity_visible(r.user_id, r.is_private)
   ) THEN
     RAISE EXCEPTION 'comment_not_found';
   END IF;
@@ -1057,8 +1113,8 @@ DECLARE
   created public.reflections;
 BEGIN
   PERFORM private.check_promised_visibility(uid, p_private);
-  INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
-  VALUES (uid, p_surah, p_ayah_start, p_ayah_end, p_juz_start, p_juz_end, p_content)
+  INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content, is_private)
+  VALUES (uid, p_surah, p_ayah_start, p_ayah_end, p_juz_start, p_juz_end, p_content, private.is_minor(uid))
   RETURNING * INTO created;
   RETURN created;
 END;
@@ -1081,14 +1137,15 @@ DECLARE
 BEGIN
   PERFORM private.check_promised_visibility(uid, p_private);
   PERFORM private.lock_readable_reflection(p_reflection_id);
-  INSERT INTO public.reflection_comments (reflection_id, user_id, content)
-  VALUES (p_reflection_id, uid, p_content)
+  INSERT INTO public.reflection_comments (reflection_id, user_id, content, is_private)
+  VALUES (p_reflection_id, uid, p_content, private.is_minor(uid))
   RETURNING * INTO created;
   RETURN created;
 END;
 $$;
 
--- Likes and unlikes are idempotent: the result is the state the caller asked for.
+-- Likes and unlikes are idempotent: the result is the state the caller asked for. A like stores the
+-- writer's minority as it is now, and liking again keeps the stored like as it was written.
 CREATE OR REPLACE FUNCTION public.set_reflection_like(p_user_id UUID, p_reflection_id UUID, p_liked BOOLEAN)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -1103,7 +1160,8 @@ BEGIN
   END IF;
   IF p_liked THEN
     PERFORM private.lock_readable_reflection(p_reflection_id);
-    INSERT INTO public.reflection_likes (user_id, reflection_id) VALUES (uid, p_reflection_id) ON CONFLICT DO NOTHING;
+    INSERT INTO public.reflection_likes (user_id, reflection_id, is_private)
+    VALUES (uid, p_reflection_id, private.is_minor(uid)) ON CONFLICT DO NOTHING;
   ELSE
     PERFORM 1 FROM public.reflections WHERE id = p_reflection_id FOR NO KEY UPDATE;
     DELETE FROM public.reflection_likes WHERE user_id = uid AND reflection_id = p_reflection_id;
@@ -1126,7 +1184,8 @@ BEGIN
   END IF;
   IF p_liked THEN
     PERFORM private.lock_readable_comment(p_comment_id);
-    INSERT INTO public.reflection_comment_likes (user_id, comment_id) VALUES (uid, p_comment_id) ON CONFLICT DO NOTHING;
+    INSERT INTO public.reflection_comment_likes (user_id, comment_id, is_private)
+    VALUES (uid, p_comment_id, private.is_minor(uid)) ON CONFLICT DO NOTHING;
   ELSE
     PERFORM 1 FROM public.reflection_comments WHERE id = p_comment_id FOR NO KEY UPDATE;
     DELETE FROM public.reflection_comment_likes WHERE user_id = uid AND comment_id = p_comment_id;
@@ -2796,6 +2855,7 @@ REVOKE ALL ON FUNCTION
   private.merge_habit_day(public.habit_days, public.habit_days),
   private.habit_days_before_write(),
   private.is_minor(UUID),
+  private.activity_public(UUID, BOOLEAN),
   private.lock_minor_change(UUID),
   private.apply_minor_privacy(),
   private.recount_reflection(UUID),
