@@ -32,6 +32,7 @@ import {
 } from "@/lib/ui/viewport";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
 import { textStartStyle } from "@/lib/ui/direction";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -39,9 +40,6 @@ const ACTIVE_BG = "#1B4D4F";
 const ACTIVE_TEXT = "#FDDC91";
 const INACTIVE_LIGHT = "rgba(45, 45, 45, 0.5)";
 const INACTIVE_DARK = "rgba(232, 225, 218, 0.5)";
-/** Bottom tab labels are 10 px, so inactive ones use solid colors that stay readable on the bar. */
-const INACTIVE_TAB_LIGHT = "#6b7280";
-const INACTIVE_TAB_DARK = "#a3a3a3";
 const PANEL_WIDTH = 248;
 const SIDEBAR_PRIMARY_ROUTES = [
   "home",
@@ -83,7 +81,7 @@ function BottomTabItem({
   isFocused,
   onPress,
   onLongPress,
-  isDark,
+  inactiveColor,
   compact,
   labelScaleCap,
 }: {
@@ -92,7 +90,11 @@ function BottomTabItem({
   isFocused: boolean;
   onPress: () => void;
   onLongPress: () => void;
-  isDark: boolean;
+  /**
+   * Bottom tab labels are 10 px, so inactive ones use the theme's solid secondary text colour, which
+   * reads at 4.5:1 or more on the bar.
+   */
+  inactiveColor: string;
   compact: boolean;
   /** The largest system text scale at which all six labels still fit this bar. */
   labelScaleCap: number;
@@ -109,7 +111,7 @@ function BottomTabItem({
 
   const { options } = descriptor;
   const label = options.title ?? route.name;
-  const iconColor = isFocused ? ACTIVE_TEXT : isDark ? INACTIVE_TAB_DARK : INACTIVE_TAB_LIGHT;
+  const iconColor = isFocused ? ACTIVE_TEXT : inactiveColor;
 
   return (
     <AnimatedPressable
@@ -144,7 +146,8 @@ function BottomBar(props: BottomTabBarProps) {
   const { state, descriptors, navigation } = props;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { isDark, themeSurface } = useSettings();
+  const { isDark, themeSurface, effectiveTheme } = useSettings();
+  const inactiveTabColor = mutedIconColor(effectiveTheme);
   const visibleRoutes = getVisibleRoutes(state, descriptors);
   const compact = width < VIEWPORT_BREAKPOINTS.phoneCompact;
   const { visible, immersive } = useChrome();
@@ -214,7 +217,7 @@ function BottomBar(props: BottomTabBarProps) {
             isFocused={isFocused}
             onPress={onPress}
             onLongPress={onLongPress}
-            isDark={isDark}
+            inactiveColor={inactiveTabColor}
             compact={compact}
             labelScaleCap={width < 360 ? 1 : width < 390 ? 1.08 : 1.2}
           />

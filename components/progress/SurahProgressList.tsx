@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { BookOpen, ChevronDown } from "lucide-react-native";
 import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { useSettings } from "@/lib/settings/context";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
 import { toArabicNumber } from "@/lib/arabic";
@@ -41,7 +42,9 @@ export function SurahProgressList({
   s,
 }: Props) {
   const openMushaf = useOpenMushaf();
-  const { themeColors } = useSettings();
+  const { themeColors, effectiveTheme } = useSettings();
+  // The theme's secondary text colour; the surah's second name is 11 px, so it needs 4.5:1.
+  const mutedText = mutedIconColor(effectiveTheme);
   const previewData = previewLimit ? data.slice(0, previewLimit) : data;
   const isHorizontalPreview = !!previewLimit;
 
@@ -119,7 +122,7 @@ export function SurahProgressList({
                     style={{
                       fontFamily: "Manrope_400Regular",
                       fontSize: 11,
-                      color: isDark ? "#737373" : "#8B8178",
+                      color: mutedText,
                       ...textStartStyle(isRTL),
                       writingDirection: secondaryDirection,
                     }}
@@ -134,7 +137,7 @@ export function SurahProgressList({
               style={{
                 fontFamily: "Manrope_600SemiBold",
                 fontSize: 13,
-                color: isDark ? "#a3a3a3" : "#6e5a47",
+                color: mutedText,
                 writingDirection: "ltr",
               }}
             >
