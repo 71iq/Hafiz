@@ -408,8 +408,8 @@ describe("minimum wird (STR-01)", () => {
 
   it("counts meanings only when the user turned that on, and only by time", () => {
     const words = Array.from({ length: 40 }, (_, i) => ({ cardId: `word:2:255:${i + 1}`, durationMs: 10_000 }));
-    expect(tallyReviews(words, { studyCounts: false })).toEqual({ pageUnits: 0, countedMs: 0 });
-    expect(tallyReviews(words, { studyCounts: true })).toEqual({ pageUnits: 0, countedMs: 400_000 });
+    expect(tallyReviews(words, { studyCounts: false })).toEqual({ pageUnits: 0, countedMs: 0, sabaqStep: false });
+    expect(tallyReviews(words, { studyCounts: true })).toEqual({ pageUnits: 0, countedMs: 400_000, sabaqStep: false });
   });
 
   it("counts a page card or a finished sabaq chunk on its own", () => {

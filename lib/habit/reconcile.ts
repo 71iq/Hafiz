@@ -9,6 +9,7 @@ import type { HabitDayRow } from "@/lib/habit/types";
 type LoggedReview = {
   local_date: LocalDate;
   card_id: string;
+  rating: number;
   duration_ms: number | null;
   reviewed_at: string;
   grader: string | null;
@@ -54,17 +55,22 @@ export async function reconcileHabitDaysFromLogs(
   // After an incremental pull only the pulled reviews' days can change, so only those are read.
   const only = dates ? [...dates] : null;
   const marks = only ? only.map(() => "?").join(", ") : "";
-  const [settings, logs, habitRows] = await Promise.all([
+  const [settings, logs, habitRows, firstPasses] = await Promise.all([
     readHabitSettings(db),
     db.getAllAsync<LoggedReview>(
       only
-        ? `SELECT local_date, card_id, duration_ms, reviewed_at, grader, makeup_for FROM study_log
+        ? `SELECT local_date, card_id, rating, duration_ms, reviewed_at, grader, makeup_for FROM study_log
             WHERE local_date IN (${marks}) OR makeup_for IN (${marks})`
-        : "SELECT local_date, card_id, duration_ms, reviewed_at, grader, makeup_for FROM study_log WHERE local_date IS NOT NULL",
+        : "SELECT local_date, card_id, rating, duration_ms, reviewed_at, grader, makeup_for FROM study_log WHERE local_date IS NOT NULL",
       only ? [...only, ...only] : [],
     ),
     db.getAllAsync<HabitDayRow>("SELECT * FROM habit_days WHERE status IS NOT NULL"),
+    // The day each sabaq chunk first passed: its completed step 6 (STR-01), as DAY_TALLY_SQL reads it.
+    db.getAllAsync<{ card_id: string; first: LocalDate }>(
+      "SELECT card_id, MIN(local_date) AS first FROM study_log WHERE card_id LIKE 'chunk:%' AND rating >= 3 AND local_date IS NOT NULL GROUP BY card_id",
+    ),
   ]);
+  const firstPassOn = new Map(firstPasses.map((row) => [row.card_id, row.first]));
   const days = new Map(habitRows.map((row) => [row.local_date, row]));
   const own = new Map<LocalDate, LoggedReview[]>();
   const makeUps = new Map<LocalDate, LoggedReview[]>();
@@ -78,7 +84,11 @@ export async function reconcileHabitDaysFromLogs(
   const meets = (reviews: LoggedReview[]) =>
     meetsMinimum(
       tallyReviews(
-        reviews.map((review) => ({ cardId: review.card_id, durationMs: review.duration_ms })),
+        reviews.map((review) => ({
+          cardId: review.card_id,
+          durationMs: review.duration_ms,
+          sabaqStep: review.rating >= 3 && firstPassOn.get(review.card_id) === review.local_date,
+        })),
         { studyCounts: settings.studyCountsTowardMinimum },
       ),
       settings.minimum,

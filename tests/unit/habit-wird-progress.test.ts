@@ -412,7 +412,10 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
             reviews.map((review) => ({ cardId: `${review.prefix}${review.n}`, durationMs: review.duration })),
             { studyCounts },
           );
-          expect({ pageUnits: Number(row?.page_units), countedMs: Number(row?.counted_ms) }).toEqual(expected);
+          expect({ pageUnits: Number(row?.page_units), countedMs: Number(row?.counted_ms) }).toEqual({
+            pageUnits: expected.pageUnits,
+            countedMs: expected.countedMs,
+          });
         },
       ),
       { numRuns: 60 },
@@ -453,6 +456,41 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
       }),
       { numRuns: 80 },
     );
+  });
+});
+
+describe("a completed sabaq step 6 (STR-01)", () => {
+  function insertLog(cardId: string, date: string, rating: number, makeupFor: string | null = null) {
+    const at = atLocalTime(date, 9 * 60).toISOString();
+    store.sql
+      .prepare(
+        `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
+          local_date, grader, duration_ms, makeup_for) VALUES (?, ?, 1, ?, 1, 1, 0, 0, ?, ?, 'self', 60000, ?)`,
+      )
+      .run(cardId, rating, at, at, date, makeupFor);
+  }
+  const tally = async (day: string) => {
+    const row = await store.db.getFirstAsync<{ sabaq_step: number }>(DAY_TALLY_SQL, [0, day]);
+    return Number(row?.sabaq_step) > 0;
+  };
+
+  it("counts a short chunk's first pass as a wird day, in SQL and in sync reconciliation", async () => {
+    // Three lines and one minute: 12 sixtieths and well under five minutes, yet a completed step 6.
+    insertLog("chunk:madani15:5:1-3", TODAY, 3);
+    expect(await tally(TODAY)).toBe(true);
+    await store.db.withTransactionAsync(async (tx) => {
+      await reconcileHabitDaysFromLogs(tx, { now: atLocalTime(TODAY, 14 * 60), dates: new Set([TODAY]) });
+    });
+    expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
+  });
+
+  it("does not count a failed check, or a chunk's second look on a later day, as a step 6", async () => {
+    insertLog("chunk:madani15:5:1-3", TODAY, 1);
+    expect(await tally(TODAY)).toBe(false);
+    insertLog("chunk:madani15:6:1-3", addDays(TODAY, -1), 3);
+    insertLog("chunk:madani15:6:1-3", TODAY, 3);
+    expect(await tally(TODAY)).toBe(false);
+    expect(await tally(addDays(TODAY, -1))).toBe(true);
   });
 });
 
@@ -501,6 +539,22 @@ describe("make-up attribution on each review (STR-08)", () => {
     const next = startReviewSession("wird", { now: atLocalTime(TODAY, 15 * 60) });
     for (let i = 0; i < 10; i += 1) await grade(`5:${i + 1}`, atLocalTime(TODAY, 15 * 60 + i), Rating.Good, { session: next });
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done", source_session_id: next.id });
+  });
+
+  it("keeps a make-up session with yesterday when sync replaces the made-up day's source session", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    const session = startReviewSession("wird", { now: atLocalTime(TODAY, 9 * 60) });
+    for (let i = 0; i < 10; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i), Rating.Good, { session });
+    expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "made_up", source_session_id: session.id });
+    // Another device's made-up row wins the merge, with its own session id.
+    store.sql.prepare("UPDATE habit_days SET source_session_id = 'session-other-device' WHERE local_date = ?").run(yesterday);
+
+    for (let i = 0; i < 10; i += 1) await grade(`3:${i + 1}`, atLocalTime(TODAY, 9 * 60 + 20 + i), Rating.Good, { session });
+    expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
+    const fromSession = store.sql
+      .prepare("SELECT DISTINCT makeup_for FROM study_log WHERE session_id = ?")
+      .all(session.id) as { makeup_for: string | null }[];
+    expect(fromSession).toEqual([{ makeup_for: yesterday }]);
   });
 
   it("credits reviews pulled from another device to the day they made up, never to today", async () => {

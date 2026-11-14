@@ -74,8 +74,14 @@ export function recitationUnits(cardId: string): number {
   return PAGE_UNITS / 10;
 }
 
-export type ReviewContribution = Readonly<{ cardId: string; durationMs: number | null }>;
-export type WirdTally = Readonly<{ pageUnits: number; countedMs: number }>;
+/**
+ * `sabaqStep`: the review is a sabaq chunk's first pass, its completed step 6 (SBQ-02): a passing
+ * grade of a chunk card with no passing grade on an earlier day. STR-01 counts it as a wird day on
+ * its own, however short the chunk. A second look falls on the same day as that pass (SBQ-03), so it
+ * adds no step of its own.
+ */
+export type ReviewContribution = Readonly<{ cardId: string; durationMs: number | null; sabaqStep?: boolean }>;
+export type WirdTally = Readonly<{ pageUnits: number; countedMs: number; sabaqStep: boolean }>;
 
 export function tallyReviews(
   reviews: readonly ReviewContribution[],
@@ -83,24 +89,30 @@ export function tallyReviews(
 ): WirdTally {
   let pageUnits = 0;
   let countedMs = 0;
+  let sabaqStep = false;
   for (const review of reviews) {
+    if (review.sabaqStep) sabaqStep = true;
     const role = cardRole(review.cardId);
     if (role === "study" && !options.studyCounts) continue;
     pageUnits += recitationUnits(review.cardId);
     const duration = review.durationMs ?? 0;
     if (Number.isFinite(duration) && duration > 0) countedMs += Math.min(duration, MAX_COUNTED_REVIEW_MS);
   }
-  return { pageUnits, countedMs };
+  return { pageUnits, countedMs, sabaqStep };
 }
 
+/** STR-01: a page of graded recitation, the minutes of graded review, or a completed sabaq step 6. */
 export function meetsMinimum(tally: WirdTally, minimum: WirdMinimum): boolean {
   return (
-    tally.pageUnits >= Math.round(minimum.pages * PAGE_UNITS) || tally.countedMs >= minimum.minutes * 60_000
+    tally.sabaqStep ||
+    tally.pageUnits >= Math.round(minimum.pages * PAGE_UNITS) ||
+    tally.countedMs >= minimum.minutes * 60_000
   );
 }
 
 /** Progress toward the minimum as a fraction from 0 to 1, by whichever path is further along. */
 export function minimumProgress(tally: WirdTally, minimum: WirdMinimum): number {
+  if (tally.sabaqStep) return 1;
   const byPages = tally.pageUnits / Math.max(1, Math.round(minimum.pages * PAGE_UNITS));
   const byMinutes = tally.countedMs / Math.max(1, minimum.minutes * 60_000);
   return Math.min(1, Math.max(byPages, byMinutes));
@@ -125,8 +137,13 @@ const TALLY_SELECT = `SELECT
     ELSE ${PAGE_UNITS / 10} END), 0) AS page_units,
   COALESCE(SUM(CASE
     WHEN ${STUDY_SQL} AND ? = 0 THEN 0
-    ELSE MIN(MAX(COALESCE(duration_ms, 0), 0), ${MAX_COUNTED_REVIEW_MS}) END), 0) AS counted_ms
-  FROM (SELECT card_id, duration_ms, local_date, makeup_for, ${LINES_SEG_SQL} AS lines_seg FROM study_log)`;
+    ELSE MIN(MAX(COALESCE(duration_ms, 0), 0), ${MAX_COUNTED_REVIEW_MS}) END), 0) AS counted_ms,
+  COALESCE(MAX(CASE
+    WHEN card_id LIKE 'chunk:%' AND rating >= 3 AND NOT EXISTS (
+      SELECT 1 FROM study_log AS earlier
+      WHERE earlier.card_id = tallied.card_id AND earlier.rating >= 3 AND earlier.local_date < tallied.local_date
+    ) THEN 1 ELSE 0 END), 0) AS sabaq_step
+  FROM (SELECT card_id, rating, duration_ms, local_date, makeup_for, ${LINES_SEG_SQL} AS lines_seg FROM study_log) AS tallied`;
 
 /**
  * The same tally as tallyReviews, computed by SQLite, so a grade does not load the day's rows. Keep

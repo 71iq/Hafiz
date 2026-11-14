@@ -156,11 +156,11 @@ export async function readWirdTally(
   db: DatabaseExecutor,
   { day, makeUp, settings }: { day: LocalDate; makeUp: boolean; settings: HabitSettings },
 ): Promise<WirdTally> {
-  const row = await db.getFirstAsync<{ page_units: number; counted_ms: number }>(makeUp ? MAKEUP_TALLY_SQL : DAY_TALLY_SQL, [
-    settings.studyCountsTowardMinimum ? 1 : 0,
-    day,
-  ]);
-  return { pageUnits: Number(row?.page_units ?? 0), countedMs: Number(row?.counted_ms ?? 0) };
+  const row = await db.getFirstAsync<{ page_units: number; counted_ms: number; sabaq_step: number }>(
+    makeUp ? MAKEUP_TALLY_SQL : DAY_TALLY_SQL,
+    [settings.studyCountsTowardMinimum ? 1 : 0, day],
+  );
+  return { pageUnits: Number(row?.page_units ?? 0), countedMs: Number(row?.counted_ms ?? 0), sabaqStep: Number(row?.sabaq_step ?? 0) > 0 };
 }
 
 /**
@@ -179,14 +179,20 @@ export async function makeUpTarget(
   const today = localDateOf(now);
   const yesterday = addDays(today, -1);
   const dayBefore = addDays(today, -2);
-  // STR-08: a single session never counts for both days. Once this session made yesterday up, the
-  // rest of it stays with yesterday, even past the cutoff; the next session counts for today.
+  // STR-08: a single session never counts for both days. Once yesterday is made up and this session
+  // graded reviews toward it, the rest of the session stays with yesterday, even past the cutoff; the
+  // next session counts for today. The session's part is read from its own reviews, which are
+  // immutable and sync as they are, not from the made-up day's source session, which sync can replace
+  // with another device's session.
   if (sessionId) {
-    const madeUp = await db.getFirstAsync<{ status: string | null; source_session_id: string | null }>(
-      "SELECT status, source_session_id FROM habit_days WHERE local_date = ?",
-      [yesterday],
-    );
-    if (madeUp?.status === "made_up" && madeUp.source_session_id === sessionId) return yesterday;
+    const madeUp = await db.getFirstAsync<{ status: string | null }>("SELECT status FROM habit_days WHERE local_date = ?", [yesterday]);
+    if (madeUp?.status === "made_up") {
+      const contributed = await db.getFirstAsync<{ found: number }>(
+        "SELECT 1 AS found FROM study_log WHERE makeup_for = ? AND session_id = ? LIMIT 1",
+        [yesterday, sessionId],
+      );
+      if (contributed) return yesterday;
+    }
   }
   const dhuhr = given ?? (await readDhuhrResolver(db));
   if (now.getTime() >= makeUpCutoffFor(yesterday, dhuhr).getTime()) return null;
