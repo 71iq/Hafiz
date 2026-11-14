@@ -94,7 +94,7 @@ export async function persistReviewTransition({
     const dhuhr = context.dhuhr ?? (await readDhuhrResolver(tx));
     // STR-07, STR-08: decided before the log is written and stored on it, so every device credits
     // this review to the same day.
-    const makeupFor = await makeUpTarget(tx, { now: reviewedAt, dhuhr });
+    const makeupFor = await makeUpTarget(tx, { now: reviewedAt, dhuhr, sessionId: context.session?.id ?? null });
     const entry: StudyLogInput = {
       cardId,
       rating: reviewRecord.rating,

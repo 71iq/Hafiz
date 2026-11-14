@@ -166,18 +166,28 @@ export async function readWirdTally(
 /**
  * STR-07, STR-08: the missed day a review graded now counts toward, decided before the review is
  * logged and stored on it. While yesterday is missed, the day before is covered and the make-up
- * window is open, every review goes to yesterday until yesterday is made up; then reviews count for
- * today again. Because the choice is stored on the review, every device credits it to the same day,
+ * window is open, every review goes to yesterday until yesterday is made up; then reviews of a later
+ * session count for today again, while the rest of the session that made it up stays with yesterday
+ * (STR-08). Because the choice is stored on the review, every device credits it to the same day,
  * whatever order sync brings rows in, and no review counts for two days. A make-up that is not
  * finished before the cutoff keeps its reviews; they do not move to today.
  */
 export async function makeUpTarget(
   db: DatabaseExecutor,
-  { now, dhuhr: given }: { now: Date; dhuhr?: DhuhrResolver },
+  { now, dhuhr: given, sessionId = null }: { now: Date; dhuhr?: DhuhrResolver; sessionId?: string | null },
 ): Promise<LocalDate | null> {
   const today = localDateOf(now);
   const yesterday = addDays(today, -1);
   const dayBefore = addDays(today, -2);
+  // STR-08: a single session never counts for both days. Once this session made yesterday up, the
+  // rest of it stays with yesterday, even past the cutoff; the next session counts for today.
+  if (sessionId) {
+    const madeUp = await db.getFirstAsync<{ status: string | null; source_session_id: string | null }>(
+      "SELECT status, source_session_id FROM habit_days WHERE local_date = ?",
+      [yesterday],
+    );
+    if (madeUp?.status === "made_up" && madeUp.source_session_id === sessionId) return yesterday;
+  }
   const dhuhr = given ?? (await readDhuhrResolver(db));
   if (now.getTime() >= makeUpCutoffFor(yesterday, dhuhr).getTime()) return null;
   const rows = await db.getAllAsync<{ local_date: LocalDate; status: string | null }>(

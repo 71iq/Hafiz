@@ -482,6 +482,27 @@ describe("make-up attribution on each review (STR-08)", () => {
     expect(rows[10]).toEqual({ makeup_for: null });
   });
 
+  it("keeps the rest of the session that made yesterday up with yesterday, even past the cutoff", async () => {
+    await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
+    const session = startReviewSession("wird", { now: atLocalTime(TODAY, 9 * 60) });
+    for (let i = 0; i < 10; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i), Rating.Good, { session });
+    expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "made_up", source_session_id: session.id });
+
+    // The same session goes on, before and after the cutoff: nothing of it counts for today.
+    for (let i = 0; i < 10; i += 1) await grade(`3:${i + 1}`, atLocalTime(TODAY, 9 * 60 + 20 + i), Rating.Good, { session });
+    for (let i = 0; i < 10; i += 1) await grade(`4:${i + 1}`, atLocalTime(TODAY, 13 * 60 + i), Rating.Good, { session });
+    expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
+    const fromSession = store.sql
+      .prepare("SELECT DISTINCT makeup_for FROM study_log WHERE session_id = ?")
+      .all(session.id) as { makeup_for: string | null }[];
+    expect(fromSession).toEqual([{ makeup_for: yesterday }]);
+
+    // The next session counts for today as usual.
+    const next = startReviewSession("wird", { now: atLocalTime(TODAY, 15 * 60) });
+    for (let i = 0; i < 10; i += 1) await grade(`5:${i + 1}`, atLocalTime(TODAY, 15 * 60 + i), Rating.Good, { session: next });
+    expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done", source_session_id: next.id });
+  });
+
   it("credits reviews pulled from another device to the day they made up, never to today", async () => {
     await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
     for (let i = 0; i < 10; i += 1) insertLog(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i), yesterday);
