@@ -925,6 +925,11 @@ CREATE TRIGGER profiles_lock_activity BEFORE DELETE ON public.profiles
 -- profile and then deletes the row. A direct insert key-shares its parent before the profile.
 REVOKE INSERT, DELETE ON public.reflections, public.reflection_likes, public.reflection_comments,
   public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
+-- The app never edits a stored reflection. An owner who could update the row could also set its like
+-- and comment counts, which now leave minors out, or show a post that moderation hid.
+REVOKE UPDATE ON public.reflections, public.reflection_likes, public.reflection_comments,
+  public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
+DROP POLICY IF EXISTS "Users can update own reflections" ON public.reflections;
 DROP POLICY IF EXISTS "Users can insert own reflections" ON public.reflections;
 DROP POLICY IF EXISTS "Users can delete own reflections" ON public.reflections;
 DROP POLICY IF EXISTS "Users can insert own likes" ON public.reflection_likes;

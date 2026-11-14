@@ -1648,6 +1648,9 @@ BEGIN
     auth.uid(), target), 'permission denied');
   PERFORM hz_test.expect_error('DELETE FROM public.reflection_comments WHERE user_id = auth.uid()', 'permission denied');
   PERFORM hz_test.expect_error('DELETE FROM public.reflections WHERE user_id = auth.uid()', 'permission denied');
+  -- An owner cannot edit counts or un-hide a post either.
+  PERFORM hz_test.expect_error('UPDATE public.reflections SET likes_count = 99 WHERE user_id = auth.uid()', 'permission denied');
+  PERFORM hz_test.expect_error($q$UPDATE public.reflections SET status = 'active' WHERE user_id = auth.uid()$q$, 'permission denied');
   PERFORM hz_test.eq('the minor reads what they wrote', (
     SELECT string_agg(content, '; ' ORDER BY content) FROM public.reflections WHERE user_id = auth.uid()
   ), 'Kept private as promised; Shown as public to an adult; Shown as public, kept private for a minor');

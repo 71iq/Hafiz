@@ -302,11 +302,6 @@ GRANT SELECT ON reflection_comment_likes TO anon, authenticated;
 -- ─── Reflections, likes and comments: readable unless the author is a minor (active reflections
 -- only), and created or deleted only through the reflection write RPCs, which are defined with
 -- profile privacy below, as are the read policies. Authors may still update their reflections.
-CREATE POLICY "Users can update own reflections"
-  ON reflections FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
 -- ─── Reports: only author can see own, insert requires auth
 CREATE POLICY "Users can see own reports"
   ON reports FOR SELECT
@@ -1643,6 +1638,10 @@ CREATE TRIGGER profiles_lock_activity BEFORE DELETE ON public.profiles
 -- that holds the profile and then recounts that row, or with an account deletion that holds the
 -- profile and then deletes the row. A direct insert key-shares its parent before the profile.
 REVOKE INSERT, DELETE ON public.reflections, public.reflection_likes, public.reflection_comments,
+  public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
+-- The app never edits a stored reflection. An owner who could update the row could also set its like
+-- and comment counts, which now leave minors out, or show a post that moderation hid.
+REVOKE UPDATE ON public.reflections, public.reflection_likes, public.reflection_comments,
   public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
 
 -- The signed-in writer. Their profiles row stays locked FOR SHARE until commit, so a minority write
