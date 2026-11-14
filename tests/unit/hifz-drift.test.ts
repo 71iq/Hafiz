@@ -4,8 +4,8 @@ import { Rating } from "@/lib/fsrs/scheduler";
 import { addDays, atLocalTime } from "@/lib/habit/dates";
 import { DRIFT_FOLLOW_UP_SESSIONS, loadDriftDrills, readMistakeInbox } from "@/lib/hifz/errors";
 import type { PageToken } from "@/lib/hifz/page-data";
-import { declareMemorizedPages, loadPageCards } from "@/lib/hifz/pages";
-import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
+import { declareMemorizedPages, loadPageCards, loadTodayWird } from "@/lib/hifz/pages";
+import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { emptyAttempt, savePageGrade, type Attempt } from "@/lib/hifz/review";
 import { pickDriftSibling, similarGroupsForAyahs } from "@/lib/hifz/similar";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
@@ -126,6 +126,44 @@ describe("drift into a similar verse (SCH-07, MUT-04)", () => {
     }
     // The ayah's own drill is untouched by the follow-ups ending.
     expect(await readMistakeInbox(store.db, TODAY)).toHaveLength(1);
+  });
+
+  it("keeps the day's list count when a sibling page outside it is reviewed (SCH-07)", async () => {
+    await writeHifzPlan(store.db, plan);
+    const now = atLocalTime(TODAY, 600);
+    // Today's list holds page 2 only.
+    store.sql
+      .prepare("INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES ('device_hifz_today_plan', ?, ?, NULL)")
+      .run(JSON.stringify({ date: TODAY, ids: ["page:madani15:2"], newLines: 0, unit: "page" }), now.toISOString());
+    const sibling = (await loadPageCards(store.db, { today: TODAY, plan })).find((card) => card.page === 411)!;
+    await savePageGrade(store.db, {
+      card: sibling.row,
+      history: sibling.history,
+      plan,
+      attempt: emptyAttempt(4),
+      rating: Rating.Good,
+      firstToken: token(5, 1),
+      session: startReviewSession("mistakes", { now }),
+      durationMs: 60_000,
+      now,
+    });
+    const wird = (await loadTodayWird(store.db, new Date(now.getTime() + 60_000)))!;
+    expect(wird.done).toEqual([]);
+    expect(wird.total).toBe(1);
+    expect(wird.todo.map((page) => page.page)).toEqual([2]);
+  });
+
+  it("orders drifts by instant, so a newer drift of the pair keeps its fresh follow-ups whatever the offsets", async () => {
+    await gradeDrift(new Date("2026-11-13T08:00:00.000Z"));
+    await sessionAt(new Date("2026-11-13T08:10:00.000Z"));
+    await gradeDrift(new Date("2026-11-13T08:30:00.000Z"));
+    // Synced with another offset, the older drift's text sorts after the newer one's.
+    const ids = store.sql.prepare("SELECT id FROM recitation_errors WHERE type = 'mutashabih_drift' ORDER BY created_at").all() as { id: string }[];
+    expect(ids).toHaveLength(2);
+    store.sql.prepare("UPDATE recitation_errors SET created_at = ? WHERE id = ?").run("2026-11-13T10:00:00.000+02:00", ids[0].id);
+    const drills = await loadDriftDrills(store.db, TODAY);
+    expect(drills).toHaveLength(1);
+    expect(drills[0]).toMatchObject({ errorId: ids[1].id, sessionsSince: 0, siblingPage: 411 });
   });
 
   it("commits the sibling with the grade, so a failed grade leaves no sibling and no drills", async () => {

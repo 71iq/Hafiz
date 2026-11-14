@@ -411,9 +411,12 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
       return page?.reviewedToday ? [page] : [];
     });
   const todo = [...planned, ...steps];
-  const done = pages.filter((page) => page.reviewedToday);
+  // The day's list counts only its own pages: a page reviewed outside it, such as the sibling page a
+  // drift adds (SCH-07), keeps its credit and history but does not change the list's done count.
+  const listed = new Set(snapshot.ids);
+  const done = pages.filter((page) => page.reviewedToday && listed.has(page.cardId));
   // A step not due yet brings its page back later today; Home refreshes then (useTodayWird).
-  const reviewedToday = new Set(done.map((page) => page.cardId));
+  const reviewedToday = new Set(pages.filter((page) => page.reviewedToday).map((page) => page.cardId));
   const nextStepAt =
     cards
       .filter(

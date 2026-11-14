@@ -238,22 +238,39 @@ export type DriftFollowUp = Readonly<{ id: string; surah: number; ayah: number; 
  * still open does not matter: the pair is drilled for its three sessions either way.
  */
 export async function readDriftFollowUps(db: DatabaseExecutor, today: LocalDate): Promise<DriftFollowUp[]> {
-  // Times compare through julianday, since synced rows can carry an offset instead of Z.
-  const rows = await db.getAllAsync<{ id: string; surah: number; ayah: number; sibling_ref: string; sessions_since: number }>(
-    `SELECT e.id, e.surah, e.ayah, e.sibling_ref,
-            (SELECT COUNT(*) FROM review_sessions s
-              WHERE s.deleted_at IS NULL AND s.kind IN ('wird', 'mistakes', 'welcome_back')
-                AND julianday(s.started_at) > julianday(e.created_at)) AS sessions_since
-       FROM recitation_errors e
-      WHERE e.type = 'mutashabih_drift' AND e.sibling_ref IS NOT NULL AND e.ayah IS NOT NULL
-        AND e.deleted_at IS NULL AND e.local_date >= ?
-      ORDER BY e.created_at ASC`,
+  const rows = await db.getAllAsync<{ id: string; surah: number; ayah: number; sibling_ref: string; local_date: LocalDate; created_at: string }>(
+    `SELECT id, surah, ayah, sibling_ref, local_date, created_at FROM recitation_errors
+      WHERE type = 'mutashabih_drift' AND sibling_ref IS NOT NULL AND ayah IS NOT NULL
+        AND deleted_at IS NULL AND local_date >= ?`,
     [addDays(today, -INBOX_EXPIRY_DAYS)],
   );
-  return rows.flatMap((row) => {
+  // Oldest first by instant, since synced rows can carry an offset instead of Z ("10:00+02:00" is
+  // before "08:30Z"); the id settles a tie.
+  const drifts = rows
+    .map((row) => ({ row, at: Date.parse(row.created_at) }))
+    .filter((drift) => Number.isFinite(drift.at))
+    .sort((a, b) => a.at - b.at || (a.row.id < b.row.id ? -1 : a.row.id > b.row.id ? 1 : 0));
+  if (drifts.length === 0) return [];
+  // A drift is done once DRIFT_FOLLOW_UP_SESSIONS sessions started after it, so only the latest that
+  // many session starts matter: the sessions after a drift are always among the latest. They are read
+  // once, through the local_date index, from the day before the oldest drift's (another device's
+  // local day can differ by one).
+  const earliestDay = drifts.reduce((day, drift) => (drift.row.local_date < day ? drift.row.local_date : day), drifts[0].row.local_date);
+  const sessions = await db.getAllAsync<{ started_at: string }>(
+    `SELECT started_at FROM review_sessions
+      WHERE deleted_at IS NULL AND kind IN ('wird', 'mistakes', 'welcome_back') AND local_date >= ?`,
+    [addDays(earliestDay, -1)],
+  );
+  const latestStarts = sessions
+    .map((session) => Date.parse(session.started_at))
+    .filter((at) => Number.isFinite(at))
+    .sort((a, b) => b - a)
+    .slice(0, DRIFT_FOLLOW_UP_SESSIONS);
+  return drifts.flatMap(({ row, at }) => {
     const sibling = parseVerseRef(row.sibling_ref);
-    if (!sibling || row.sessions_since >= DRIFT_FOLLOW_UP_SESSIONS) return [];
-    return [{ id: row.id, surah: row.surah, ayah: row.ayah, sibling, sessionsSince: row.sessions_since }];
+    const sessionsSince = latestStarts.filter((start) => start > at).length;
+    if (!sibling || sessionsSince >= DRIFT_FOLLOW_UP_SESSIONS) return [];
+    return [{ id: row.id, surah: row.surah, ayah: row.ayah, sibling, sessionsSince }];
   });
 }
 

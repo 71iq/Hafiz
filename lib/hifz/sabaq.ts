@@ -435,7 +435,20 @@ async function pageStartFromChunks(tx: DatabaseExecutor, page: number, now: Date
  */
 async function addPageIfComplete(
   tx: DatabaseExecutor,
-  { page, pageLines, plan, now }: { page: number; pageLines: readonly number[]; plan: HifzPlan; now: Date },
+  {
+    page,
+    pageLines,
+    plan,
+    now,
+    completedOn = localDateOf(now),
+  }: {
+    page: number;
+    pageLines: readonly number[];
+    plan: HifzPlan;
+    now: Date;
+    /** The local day the page was completed, which its first due day follows; the day of `now` by default. */
+    completedOn?: LocalDate;
+  },
 ): Promise<boolean> {
   if (pageLines.length === 0) return false;
   const live = await tx.getFirstAsync<{ found: number }>("SELECT 1 AS found FROM study_cards WHERE id = ? AND deleted_at IS NULL", [pageCardId(page)]);
@@ -445,7 +458,7 @@ async function addPageIfComplete(
   // The stored plan decides, since the unit may have changed after the screen loaded its copy.
   const ayahReview = ((await readHifzPlan(tx))?.unit ?? plan.unit) === "ayah";
   if (ayahReview) await coverPageInAyahReview(tx, page);
-  const due = atLocalTime(addDays(localDateOf(now), 1), 0);
+  const due = atLocalTime(addDays(completedOn, 1), 0);
   const start = await pageStartFromChunks(tx, page, now);
   const added = await insertNewStudyCard(tx, { id: pageCardId(page), deckId: HIFZ_PAGES_DECK_ID, due, tier: "sabqi", now: now.toISOString(), start });
   if (ayahReview) await addSabaqPageToAyahReview(tx, { page, start, due, now });
@@ -488,25 +501,31 @@ export async function addCoveredSabaqPages(
     const pageLines = pageLineNumbers(await loadRecitationPage(db, page, pageWords(page)));
     if (pageLines.length === 0 || !pageLines.every((lineNumber) => coveredBy(done, lineNumber))) return added;
     const ids = done.map((chunk) => chunkCardId(chunk.page, chunk.fromLine, chunk.toLine));
-    const logs = await db.getAllAsync<{ card_id: string; rating: number; reviewed_at: string }>(
-      `SELECT card_id, rating, reviewed_at FROM study_log WHERE card_id IN (${ids.map(() => "?").join(", ")})`,
+    const logs = await db.getAllAsync<{ card_id: string; rating: number; reviewed_at: string; local_date: LocalDate | null }>(
+      `SELECT card_id, rating, reviewed_at, local_date FROM study_log WHERE card_id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
-    let completedAt = Number.NEGATIVE_INFINITY;
+    // The completing grade: the latest of the chunks' completed steps, with the local day stored on
+    // it, which stays right after the person changes time zone.
+    let completed: { at: number; day: LocalDate } | null = null;
     for (const id of ids) {
       const reviews = logs
         .filter((log) => log.card_id === id)
-        .map((log) => ({ at: Date.parse(log.reviewed_at), rating: log.rating }))
+        .map((log) => {
+          const at = Date.parse(log.reviewed_at);
+          return { at, rating: log.rating, day: log.local_date ?? (Number.isFinite(at) ? localDateOf(new Date(at)) : null) };
+        })
         .filter((review) => Number.isFinite(review.at))
         .sort((a, b) => a.at - b.at);
       const steps = sabaqStepFlags(reviews);
-      const learnedAt = reviews.filter((_, index) => steps[index]).at(-1)?.at;
-      if (learnedAt !== undefined) completedAt = Math.max(completedAt, learnedAt);
+      const learned = reviews.filter((_, index) => steps[index]).at(-1);
+      if (learned?.day && (completed === null || learned.at > completed.at)) completed = { at: learned.at, day: learned.day };
     }
-    if (!Number.isFinite(completedAt)) return added;
+    if (completed === null) return added;
+    const { at: completedAt, day: completedOn } = completed;
     let pageAdded = false;
     await db.withTransactionAsync(async (tx) => {
-      pageAdded = await addPageIfComplete(tx, { page, pageLines, plan, now: new Date(completedAt) });
+      pageAdded = await addPageIfComplete(tx, { page, pageLines, plan, now: new Date(completedAt), completedOn });
     });
     if (!pageAdded) return added;
     added += 1;
