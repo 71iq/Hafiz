@@ -98,6 +98,21 @@ export function useReminderScheduling(): void {
  * hour" sets the follow-up. A cold-start tap waits until the start route has redirected, and is not
  * routed while onboarding is open.
  */
+/**
+ * Responses already handled in this app process, by notification and action. A notification is acted
+ * on once; the same response can arrive twice, live and again as the launch response the OS keeps, or
+ * again when the listener subscribes anew, and must not schedule a follow-up or navigate twice.
+ */
+const handledResponses = new Set<string>();
+
+/** Records the response and says whether it is new. */
+export function firstDelivery(response: ReminderResponse): boolean {
+  const key = `${response.data.logId}:${response.action}`;
+  if (handledResponses.has(key)) return false;
+  handledResponses.add(key);
+  return true;
+}
+
 export function useReminderResponses(): void {
   const { db, isReady } = useDatabaseStatus();
   const pathname = usePathname();
@@ -108,7 +123,7 @@ export function useReminderResponses(): void {
     if (!db || !isReady) return;
     let active = true;
     const handle = (response: ReminderResponse) => {
-      if (!active) return;
+      if (!active || !firstDelivery(response)) return;
       if (response.action === "remind_later") {
         requestRemindLater(db, response).catch(warn);
         return;

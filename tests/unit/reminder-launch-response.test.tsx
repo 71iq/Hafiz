@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react-native";
+import { act, renderHook, waitFor } from "@testing-library/react-native";
 import type { ReminderResponse } from "@/lib/notifications/platform-types";
 import { recordReminderOpened, requestRemindLater } from "@/lib/notifications/schedule";
 import { useReminderResponses } from "@/lib/notifications/use-reminder-scheduling";
@@ -8,6 +8,7 @@ import { useReminderResponses } from "@/lib/notifications/use-reminder-schedulin
 
 const mockDb = { name: "synthetic" };
 let mockLaunch: ReminderResponse | null = null;
+let mockLive: ((response: ReminderResponse) => void) | null = null;
 
 jest.mock("expo-router", () => ({
   usePathname: () => "/(tabs)/home",
@@ -19,7 +20,12 @@ jest.mock("@/lib/settings/context", () => ({ useSettings: () => ({ isLoaded: tru
 jest.mock("@/lib/notifications/platform", () => ({
   reminderPlatform: {
     takeLaunchResponse: async () => mockLaunch,
-    subscribeResponses: () => () => undefined,
+    subscribeResponses: (listener: (response: ReminderResponse) => void) => {
+      mockLive = listener;
+      return () => {
+        if (mockLive === listener) mockLive = null;
+      };
+    },
   },
 }));
 jest.mock("@/lib/notifications/reminder-route", () => ({ openReminderRoute: jest.fn(async () => undefined) }));
@@ -57,5 +63,34 @@ describe("a reminder action that opened the app (NOT-05b)", () => {
     renderHook(() => useReminderResponses());
     await waitFor(() => expect(recordReminderOpened).toHaveBeenCalledWith(mockDb, data));
     expect(requestRemindLater).not.toHaveBeenCalled();
+  });
+
+  it("acts once when a live response also arrives as the launch response, or on a new subscription", async () => {
+    const live: ReminderResponse = { data: { ...data, logId: "notif-live" }, action: "remind_later" };
+    mockLaunch = null;
+    const first = renderHook(() => useReminderResponses());
+    await waitFor(() => expect(mockLive).not.toBeNull());
+    act(() => mockLive!(live));
+    expect(requestRemindLater).toHaveBeenCalledTimes(1);
+
+    // The OS kept it as the last response, and the listener subscribes again (database ready again).
+    mockLaunch = live;
+    first.unmount();
+    const second = renderHook(() => useReminderResponses());
+    await waitFor(() => expect(mockLive).not.toBeNull());
+    act(() => mockLive!(live));
+    await act(async () => undefined);
+    expect(requestRemindLater).toHaveBeenCalledTimes(1);
+    second.unmount();
+  });
+
+  it("navigates once for a plain tap delivered twice", async () => {
+    const tap: ReminderResponse = { data: { ...data, logId: "notif-tap" }, action: "open" };
+    mockLaunch = tap;
+    renderHook(() => useReminderResponses());
+    await waitFor(() => expect(mockLive).not.toBeNull());
+    act(() => mockLive!(tap));
+    await act(async () => undefined);
+    expect(recordReminderOpened).toHaveBeenCalledTimes(1);
   });
 });

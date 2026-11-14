@@ -142,7 +142,10 @@ export const reminderPlatform: ReminderPlatform = {
   subscribeResponses(listener) {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const parsed = toResponse(response);
-      if (parsed) listener(parsed);
+      if (!parsed) return;
+      listener(parsed);
+      // Expo keeps the last response for the next launch; this one is handled, so it must not replay.
+      Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
     });
     return () => subscription.remove();
   },
