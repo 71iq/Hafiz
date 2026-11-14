@@ -1360,6 +1360,22 @@ CREATE TABLE IF NOT EXISTS public.halaqa_encouragements (
   CHECK (from_user <> to_user)
 );
 
+-- SOC-03: a teacher's next sabaq for a member of their halaqa, a page and a range of its lines. One per
+-- member and halaqa; the member's app memorizes those lines next (lib/hifz/teacher-sabaq.ts). Written
+-- and read only through RPCs, and only while the member shares their plan with teachers.
+CREATE TABLE IF NOT EXISTS public.halaqa_sabaq_assignments (
+  group_id UUID NOT NULL REFERENCES public.halaqa_groups(id) ON DELETE CASCADE,
+  learner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  teacher_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  page INTEGER NOT NULL CHECK (page BETWEEN 1 AND 604),
+  from_line INTEGER NOT NULL CHECK (from_line BETWEEN 1 AND 15),
+  to_line INTEGER NOT NULL CHECK (to_line BETWEEN 1 AND 15),
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_id, learner_id),
+  CHECK (from_line <= to_line),
+  CHECK (learner_id <> teacher_id)
+);
+
 -- SOC-05 review partners. The table and its read rule ship now; pairing RPCs come with the partner UI.
 CREATE TABLE IF NOT EXISTS public.review_partners (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1382,12 +1398,15 @@ CREATE INDEX IF NOT EXISTS idx_halaqa_groups_matched
 CREATE INDEX IF NOT EXISTS idx_halaqa_encouragements_to_user ON public.halaqa_encouragements(to_user, created_at, id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_encouragements_sender_day
   ON public.halaqa_encouragements(group_id, from_user, sent_on);
+-- Serves get_my_sabaq_assignment, which reads across the learner's halaqas.
+CREATE INDEX IF NOT EXISTS idx_halaqa_sabaq_assignments_learner ON public.halaqa_sabaq_assignments(learner_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_review_partners_active_pair
   ON public.review_partners(user_a, user_b) WHERE ended_at IS NULL;
 
 ALTER TABLE public.halaqa_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.halaqa_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.halaqa_encouragements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.halaqa_sabaq_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.review_partners ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Partners can read their pairing" ON public.review_partners;
@@ -1397,6 +1416,7 @@ CREATE POLICY "Partners can read their pairing"
 
 REVOKE ALL ON public.halaqa_groups, public.halaqa_members, public.halaqa_encouragements, public.review_partners
   FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON public.halaqa_sabaq_assignments FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.review_partners TO authenticated;
 
 -- ─── 7. Board (5.7.2) ────────────────────────────────────────────────────────
@@ -2100,6 +2120,9 @@ BEGIN
   IF NOT FOUND THEN
     RETURN false;
   END IF;
+  -- SOC-03: a member who leaves takes their next sabaq with them, and a teacher the ones they set.
+  DELETE FROM public.halaqa_sabaq_assignments
+  WHERE group_id = target_group AND (learner_id = member OR teacher_id = member);
   IF private.halaqa_active_count(target_group) = 0 THEN
     UPDATE public.halaqa_groups SET deleted_at = now() WHERE id = target_group;
   END IF;
@@ -2210,6 +2233,10 @@ BEGIN
     share_plan_with_teachers = p_share_plan_with_teachers,
     share_grades_with_teachers = p_share_grades_with_teachers
   WHERE group_id = p_group_id AND user_id = uid;
+  -- SOC-03: a teacher's next sabaq needs the plan shared; sharing it again does not bring one back.
+  IF NOT p_share_plan_with_teachers THEN
+    DELETE FROM public.halaqa_sabaq_assignments WHERE group_id = p_group_id AND learner_id = uid;
+  END IF;
   RETURN private.halaqa_summary(p_group_id, uid);
 END;
 $$;
@@ -2235,6 +2262,9 @@ BEGIN
   END IF;
   PERFORM private.require_halaqa_member(p_group_id, p_member_id);
   UPDATE public.halaqa_members SET role = p_role WHERE group_id = p_group_id AND user_id = p_member_id;
+  IF p_role <> 'teacher' THEN
+    DELETE FROM public.halaqa_sabaq_assignments WHERE group_id = p_group_id AND teacher_id = p_member_id;
+  END IF;
 END;
 $$;
 
@@ -2463,8 +2493,45 @@ BEGIN
 END;
 $$;
 
+-- SOC-03: a member's next sabaq from a teacher counts while both are still in the halaqa, the teacher
+-- still teaches there and the member still shares their plan with teachers. Leaving, a change of role
+-- and withdrawn sharing also delete it; this check keeps a read right while one of those commits.
+CREATE OR REPLACE FUNCTION private.live_sabaq_assignments(learner UUID)
+RETURNS SETOF public.halaqa_sabaq_assignments
+LANGUAGE sql
+STABLE
+SET search_path = ''
+AS $$
+  SELECT a.*
+  FROM public.halaqa_sabaq_assignments AS a
+  JOIN public.halaqa_groups AS g ON g.id = a.group_id AND g.deleted_at IS NULL
+  JOIN public.halaqa_members AS lm ON lm.group_id = a.group_id AND lm.user_id = a.learner_id
+    AND lm.left_at IS NULL AND lm.share_plan_with_teachers
+  JOIN public.halaqa_members AS tm ON tm.group_id = a.group_id AND tm.user_id = a.teacher_id
+    AND tm.left_at IS NULL AND tm.role = 'teacher'
+  WHERE a.learner_id = learner;
+$$;
+
+CREATE OR REPLACE FUNCTION private.sabaq_assignment_json(assignment public.halaqa_sabaq_assignments)
+RETURNS JSONB
+LANGUAGE sql
+STABLE
+SET search_path = ''
+AS $$
+  SELECT jsonb_build_object(
+    'group_id', assignment.group_id,
+    'group_name', (SELECT g.name FROM public.halaqa_groups AS g WHERE g.id = assignment.group_id),
+    'teacher_name', private.member_name(assignment.teacher_id),
+    'page', assignment.page,
+    'from_line', assignment.from_line,
+    'to_line', assignment.to_line,
+    'assigned_at', assignment.assigned_at
+  );
+$$;
+
 -- SOC-03: a teacher sees a member's plan and tiers, and recent grades and mistake-inbox count, each
--- only with that member's consent in this halaqa. Null sections were not shared.
+-- only with that member's consent in this halaqa, with the next sabaq a teacher set. Null sections
+-- were not shared.
 CREATE OR REPLACE FUNCTION public.get_halaqa_teacher_view(p_group_id UUID, p_member_id UUID, p_today TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -2497,6 +2564,10 @@ BEGIN
           WHERE c.user_id = p_member_id AND c.deleted_at IS NULL AND c.tier IS NOT NULL
           GROUP BY c.tier
         ) AS t
+      ),
+      'sabaq_assignment', (
+        SELECT private.sabaq_assignment_json(a) FROM private.live_sabaq_assignments(p_member_id) AS a
+        WHERE a.group_id = p_group_id
       )
     ) END,
     'grades', CASE WHEN theirs.share_grades_with_teachers THEN jsonb_build_object(
@@ -2523,6 +2594,98 @@ BEGIN
           AND e.local_date >= to_char(today - 28, 'YYYY-MM-DD')
       )
     ) END
+  );
+END;
+$$;
+
+-- SOC-03: a teacher sets a member's next sabaq, replacing any earlier one in this halaqa, while the member
+-- shares their plan with teachers. The group is locked as leaving locks it, then both memberships, so a
+-- concurrent leave, change of role or withdrawn sharing either commits first and refuses this, or waits
+-- and then deletes what this wrote.
+CREATE OR REPLACE FUNCTION public.set_halaqa_sabaq_assignment(
+  p_group_id UUID,
+  p_member_id UUID,
+  p_page INTEGER,
+  p_from_line INTEGER,
+  p_to_line INTEGER
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.require_user();
+  saved public.halaqa_sabaq_assignments;
+BEGIN
+  PERFORM 1 FROM public.halaqa_groups WHERE id = p_group_id AND deleted_at IS NULL FOR SHARE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'not_a_member' USING ERRCODE = '42501';
+  END IF;
+  PERFORM 1 FROM public.halaqa_members
+  WHERE group_id = p_group_id AND user_id = uid AND left_at IS NULL AND role = 'teacher'
+  FOR SHARE;
+  IF NOT FOUND OR p_member_id IS NULL OR p_member_id = uid THEN
+    RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
+  END IF;
+  PERFORM 1 FROM public.halaqa_members
+  WHERE group_id = p_group_id AND user_id = p_member_id AND left_at IS NULL AND share_plan_with_teachers
+  FOR SHARE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'plan_not_shared' USING ERRCODE = '42501';
+  END IF;
+  IF p_page IS NULL OR p_from_line IS NULL OR p_to_line IS NULL OR p_page NOT BETWEEN 1 AND 604
+    OR p_from_line NOT BETWEEN 1 AND 15 OR p_to_line NOT BETWEEN p_from_line AND 15 THEN
+    RAISE EXCEPTION 'invalid_assignment';
+  END IF;
+  INSERT INTO public.halaqa_sabaq_assignments (group_id, learner_id, teacher_id, page, from_line, to_line)
+  VALUES (p_group_id, p_member_id, uid, p_page, p_from_line, p_to_line)
+  ON CONFLICT (group_id, learner_id) DO UPDATE SET
+    teacher_id = EXCLUDED.teacher_id,
+    page = EXCLUDED.page,
+    from_line = EXCLUDED.from_line,
+    to_line = EXCLUDED.to_line,
+    assigned_at = now()
+  RETURNING * INTO saved;
+  RETURN private.sabaq_assignment_json(saved);
+END;
+$$;
+
+-- SOC-03: any teacher of the halaqa clears a member's next sabaq, whatever the member shares.
+CREATE OR REPLACE FUNCTION public.clear_halaqa_sabaq_assignment(p_group_id UUID, p_member_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.require_user();
+  mine public.halaqa_members;
+BEGIN
+  mine := private.require_halaqa_member(p_group_id, uid);
+  IF mine.role <> 'teacher' THEN
+    RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
+  END IF;
+  DELETE FROM public.halaqa_sabaq_assignments WHERE group_id = p_group_id AND learner_id = p_member_id;
+END;
+$$;
+
+-- SOC-03: the caller's latest next sabaq from a teacher in any of their halaqas, or null.
+CREATE OR REPLACE FUNCTION public.get_my_sabaq_assignment()
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid UUID := private.require_user();
+BEGIN
+  RETURN (
+    SELECT private.sabaq_assignment_json(a)
+    FROM private.live_sabaq_assignments(uid) AS a
+    ORDER BY a.assigned_at DESC, a.group_id
+    LIMIT 1
   );
 END;
 $$;
@@ -2999,6 +3162,8 @@ REVOKE ALL ON FUNCTION
   private.halaqa_summary(UUID, UUID),
   private.new_invite_code(),
   private.halaqa_goal(UUID, DATE),
+  private.live_sabaq_assignments(UUID),
+  private.sabaq_assignment_json(public.halaqa_sabaq_assignments),
   private.board_cohort_size(UUID),
   private.board_choose_cohort(DATE, TEXT, TEXT, INTEGER, UUID),
   private.board_place(UUID, DATE, TEXT, TEXT, INTEGER),
@@ -3029,6 +3194,9 @@ REVOKE ALL ON FUNCTION
   public.send_halaqa_encouragement(UUID, UUID, TEXT, TEXT, TEXT),
   public.get_received_encouragements(TIMESTAMPTZ, UUID),
   public.get_halaqa_teacher_view(UUID, UUID, TEXT),
+  public.set_halaqa_sabaq_assignment(UUID, UUID, INTEGER, INTEGER, INTEGER),
+  public.clear_halaqa_sabaq_assignment(UUID, UUID),
+  public.get_my_sabaq_assignment(),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.join_board(TEXT, BOOLEAN, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),
@@ -3057,6 +3225,9 @@ GRANT EXECUTE ON FUNCTION
   public.send_halaqa_encouragement(UUID, UUID, TEXT, TEXT, TEXT),
   public.get_received_encouragements(TIMESTAMPTZ, UUID),
   public.get_halaqa_teacher_view(UUID, UUID, TEXT),
+  public.set_halaqa_sabaq_assignment(UUID, UUID, INTEGER, INTEGER, INTEGER),
+  public.clear_halaqa_sabaq_assignment(UUID, UUID),
+  public.get_my_sabaq_assignment(),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.join_board(TEXT, BOOLEAN, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),

@@ -27,6 +27,8 @@ const SOCIAL_REJECTION_CODES = [
   "invalid_nickname",
   "invalid_privacy",
   "invalid_week_start",
+  "plan_not_shared",
+  "invalid_assignment",
 ] as const;
 /**
  * Who a request runs as. The Supabase client is shared, so a request started for one viewer could

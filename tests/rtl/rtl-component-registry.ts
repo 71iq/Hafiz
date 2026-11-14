@@ -592,6 +592,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Loading rows for halaqa members, board standings and the teacher view; rows use the explicit mirrored row style.",
   ),
   entry(
+    "components/social/TeacherSabaqAssignment.tsx",
+    "form-field",
+    "rntl",
+    "Next-sabaq form in the teacher view; the three number fields and buttons mirror, and digits follow the interface.",
+  ),
+  entry(
     "components/social/TeacherViewSheet.tsx",
     "overlay",
     "source",

@@ -32,6 +32,7 @@ function renderCard(props: {
   nextLookAt?: Date | null;
   ayahDue?: number;
   ayahNew?: number;
+  assignedSabaq?: { page: number; fromLine: number; toLine: number } | null;
   language?: "en" | "ar";
 }) {
   const handlers = { onStartReview: jest.fn(), onStartSabaq: jest.fn(), onSetup: jest.fn(), onDrill: jest.fn() };
@@ -43,6 +44,7 @@ function renderCard(props: {
       nextLookAt={props.nextLookAt}
       ayahDue={props.ayahDue}
       ayahNew={props.ayahNew}
+      assignedSabaq={props.assignedSabaq}
       language={props.language ?? "en"}
       isDark={false}
       s={props.language === "ar" ? strings.ar : s}
@@ -59,6 +61,24 @@ describe("the wird card's new lines", () => {
     const done = renderCard({ wird: wird({ newLines: 7, linesToday: 12, todo: 2 }) }).view;
     expect(done.getByText(s.hifzWirdNewDone)).toBeTruthy();
     expect(done.queryByText(interpolate(s.hifzWirdNew, { lines: "7 lines" }))).toBeNull();
+  });
+});
+
+describe("a teacher's next sabaq on Home (SOC-03)", () => {
+  const assignedSabaq = { page: 582, fromLine: 3, toLine: 9 };
+
+  it("names the assigned page and lines with the new lines, in English and Arabic", () => {
+    const english = renderCard({ wird: wird({ newLines: 7, todo: 2 }), assignedSabaq }).view;
+    expect(english.getByText(interpolate(s.hifzAssignedLines, { page: "582", from: "3", to: "9" }))).toBeTruthy();
+    const arabic = renderCard({ wird: wird({ newLines: 7, todo: 2 }), assignedSabaq, language: "ar" }).view;
+    expect(arabic.getByText(interpolate(strings.ar.hifzAssignedLines, { page: "٥٨٢", from: "٣", to: "٩" }))).toBeTruthy();
+  });
+
+  it("says nothing while new lines are paused for a backlog, or with nothing assigned", () => {
+    const paused = renderCard({ wird: wird({ backlog: true, newLines: 7, todo: 2 }), assignedSabaq }).view;
+    expect(paused.queryByText(interpolate(s.hifzAssignedLines, { page: "582", from: "3", to: "9" }))).toBeNull();
+    const none = renderCard({ wird: wird({ newLines: 7, todo: 2 }) }).view;
+    expect(none.queryByText(/582/)).toBeNull();
   });
 });
 

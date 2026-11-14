@@ -1308,7 +1308,7 @@
         },
         {
           "id": "halaqa.teacher",
-          "title": "Teacher role and teacher view",
+          "title": "Teacher role, teacher view and next sabaq",
           "kind": "widget",
           "cases": ["HALAQA-07"],
           "uses": ["shared.overlay", "shared.confirm"],

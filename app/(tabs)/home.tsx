@@ -51,6 +51,7 @@ import { reviewLeftToday } from "@/lib/hifz/pages";
 import { markMonthlyCheck } from "@/lib/hifz/progress";
 import { diffDays } from "@/lib/habit/dates";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
+import { useAssignedSabaq } from "@/lib/halaqa/use-assigned-sabaq";
 import { reminderHref } from "@/lib/notifications/reminder-route";
 import { putUserSetting } from "@/lib/database/user-settings";
 import {
@@ -132,6 +133,8 @@ export default function HomeScreen() {
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
   const { wird, inboxCount, remediationDue, monthlyCheckDue, secondLooksDue, nextLookAt, refresh: refreshWird } = useTodayWird(db);
+  // SOC-03: a teacher's next sabaq, checked again whenever today's wird is read.
+  const assignedSabaq = useAssignedSabaq(db, user?.id ?? null, wird);
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   const [dueLoaded, setDueLoaded] = useState(false);
@@ -566,6 +569,7 @@ export default function HomeScreen() {
             inboxCount={inboxCount}
             secondLooksDue={secondLooksDue}
             nextLookAt={nextLookAt}
+            assignedSabaq={assignedSabaq}
             ayahDue={ayahReviewsDue}
             ayahNew={smartDecks.reduce((sum, deck) => sum + deck.newCount, 0)}
             language={uiLanguage}

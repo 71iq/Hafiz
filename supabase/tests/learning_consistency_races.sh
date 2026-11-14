@@ -647,4 +647,60 @@ check "the card has B's review and A's suspension" \
     to_char(suspended_at AT TIME ZONE 'UTC', 'HH24:MI'), to_char(updated_at AT TIME ZONE 'UTC', 'HH24:MI'))
     FROM public.study_cards WHERE user_id = '$(uid 26)' AND id = '5:1'")" "3/4/1/09:03/09:05/09:05"
 
+# ─── SOC-03: a teacher's next sabaq cannot outlive withdrawn plan sharing ─────
+# User 30 teaches a halaqa that user 31 shares their plan with. User 31 withdraws sharing in a
+# transaction that stays open until the teacher's assignment is blocked. The assignment locks the
+# member's row FOR SHARE, so it waits, then reads the withdrawal and is refused. One that read the
+# sharing without the lock would store an assignment that sharing the plan again would bring back.
+rm -f "$WORK"/*
+admin >/dev/null <<SQL
+INSERT INTO auth.users (id, email) VALUES ('$(uid 30)', 'race30@example.invalid'), ('$(uid 31)', 'race31@example.invalid');
+INSERT INTO public.profiles (id, username) VALUES ('$(uid 30)', 'race_user_30'), ('$(uid 31)', 'race_user_31');
+SQL
+SABAQ_CODE="$(as_user "$(uid 30)" "SELECT public.create_invite_halaqa('Sabaq race', true)->>'invite_code';" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
+SABAQ_GROUP="$(admin -c "SELECT id FROM public.halaqa_groups WHERE invite_code = '$SABAQ_CODE'")"
+as_user "$(uid 31)" "SELECT public.join_halaqa_by_code('$SABAQ_CODE');
+SELECT public.set_halaqa_sharing('$SABAQ_GROUP', true, true, true, false);" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
+session sabaq_withdraw "$(uid 31)" "BEGIN;
+SELECT public.set_halaqa_sharing('$SABAQ_GROUP', true, true, false, false) IS NOT NULL;
+RESET ROLE;
+DO \$\$ BEGIN
+  FOR i IN 1 .. 200 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    EXIT WHEN (SELECT count(*) FROM pg_stat_activity WHERE application_name = 'race_sabaq_assign' AND wait_event_type = 'Lock') >= 1;
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+END \$\$;
+COMMIT;"
+wait_for_hold sabaq_withdraw
+session sabaq_assign "$(uid 30)" "SELECT public.set_halaqa_sabaq_assignment('$SABAQ_GROUP', '$(uid 31)', 582, 3, 9) IS NOT NULL;"
+wait
+check "withdrawal finished" "$(tail -1 "$WORK/sabaq_withdraw")" ok
+check "the assignment is refused" "$(grep -c plan_not_shared "$WORK/sabaq_assign" || true)" 1
+check "no assignment stored" \
+  "$(admin -c "SELECT count(*) FROM public.halaqa_sabaq_assignments WHERE learner_id = '$(uid 31)'")" 0
+
+# ─── SOC-03: an assignment and the member leaving cannot deadlock ──────────────
+# User 31 shares again and leaves while the teacher assigns. The controller holds user 31's membership
+# row. The assignment takes the group row before the memberships, as leaving does, so it waits on the
+# membership row holding the group and the leave waits on the group. An assignment that locked the
+# memberships first and the group only at its insert would deadlock with the leave here. Leaving then
+# deletes the assignment that committed first.
+rm -f "$WORK"/*
+as_user "$(uid 31)" "SELECT public.set_halaqa_sharing('$SABAQ_GROUP', true, true, true, false);" |
+  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
+controller sabaq_leave "SELECT 1 FROM public.halaqa_members WHERE group_id = '$SABAQ_GROUP' AND user_id = '$(uid 31)' FOR UPDATE;" 2
+wait_for_controller sabaq_leave
+session sq_assign "$(uid 30)" "SELECT public.set_halaqa_sabaq_assignment('$SABAQ_GROUP', '$(uid 31)', 582, 3, 9) IS NOT NULL;"
+wait_for_waiters 1
+session sq_leave "$(uid 31)" "SELECT public.leave_halaqa('$SABAQ_GROUP');"
+wait
+check "no deadlock" "$(cat "$WORK"/sq_assign "$WORK"/sq_leave | grep -c 'deadlock detected' || true)" 0
+check "assignment finished" "$(tail -1 "$WORK/sq_assign")" ok
+check "leave finished" "$(tail -1 "$WORK/sq_leave")" ok
+check "leaving deleted the assignment" \
+  "$(admin -c "SELECT count(*) FROM public.halaqa_sabaq_assignments WHERE learner_id = '$(uid 31)'")" 0
+
 echo "learning_consistency_races.sh: all races passed"

@@ -72,6 +72,7 @@ export function HalaqaSharingSheet({
         <SocialToggleRow label={s.halaqaShareJuz} value={draft.juz} onValueChange={set("juz")} disabled={pending} />
         <SocialToggleRow
           label={s.halaqaSharePlan}
+          hint={s.halaqaSharePlanHint}
           value={draft.planWithTeachers}
           onValueChange={set("planWithTeachers")}
           disabled={pending}

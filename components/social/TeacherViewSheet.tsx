@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Text } from "@/components/ui/Text";
 import type { TeacherView } from "@/lib/halaqa/api";
+import type { AssignedSabaq } from "@/lib/hifz/sabaq";
 import { parsePageUnit } from "@/lib/hifz/units";
 import { formatDays, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -12,6 +13,7 @@ import { formatSocialDate, socialNumber } from "@/lib/social/text";
 import { newPagesPerDay } from "@/lib/social/bands";
 import { socialRowStyle } from "./SocialControls";
 import { TeacherViewSkeleton } from "./SocialSkeletons";
+import { TeacherSabaqAssignment } from "./TeacherSabaqAssignment";
 
 type Language = "en" | "ar";
 
@@ -69,21 +71,35 @@ export function teacherCardLabel(cardId: string, language: Language, s: UIString
   return s.teacherViewUnitOther;
 }
 
+/** The screen's side of setting a member's next sabaq (SOC-03). */
+export type TeacherAssignControls = Readonly<{
+  pending: boolean;
+  error: string | null;
+  saved: string | null;
+  /** Offline: nothing can be sent. */
+  disabled: boolean;
+  onSave: (range: AssignedSabaq) => void;
+  onClear: () => void;
+}>;
+
 /**
  * SOC-03: what a member chose to share with this halaqa's teachers. Sections the member did not share
- * say so; mistakes themselves and recordings are never part of it.
+ * say so; mistakes themselves and recordings are never part of it. With the plan shared, the teacher
+ * can also set the member's next sabaq.
  */
 export function TeacherViewSheet({
   memberName,
   view,
   loading,
   error,
+  assign = null,
   onClose,
 }: {
   memberName: string | null;
   view: TeacherView | null;
   loading: boolean;
   error: string | null;
+  assign?: TeacherAssignControls | null;
   onClose: () => void;
 }) {
   const s = useStrings();
@@ -136,6 +152,23 @@ export function TeacherViewSheet({
                       <Text variant="title-sm">{socialNumber(view.plan?.tiers[tier] ?? 0, language)}</Text>
                     </View>
                   ))}
+                  {assign ? (
+                    <TeacherSabaqAssignment
+                      // A new member or a new assignment starts the form from what is set now.
+                      key={`${name}-${view.plan.sabaqAssignment?.assignedAt ?? "none"}`}
+                      memberName={name}
+                      current={view.plan.sabaqAssignment}
+                      pending={assign.pending}
+                      error={assign.error}
+                      saved={assign.saved}
+                      disabled={assign.disabled}
+                      language={language}
+                      isRTL={isRTL}
+                      s={s}
+                      onSave={assign.onSave}
+                      onClear={assign.onClear}
+                    />
+                  ) : null}
                 </>
               )}
             </Card>

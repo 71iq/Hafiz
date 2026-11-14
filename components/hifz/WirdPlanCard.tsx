@@ -20,6 +20,8 @@ type Props = {
   secondLooksDue?: number;
   /** When the next of today's second looks opens, while none is due yet. */
   nextLookAt?: Date | null;
+  /** SOC-03: a teacher's next sabaq whose lines are not memorized yet, which sabaq offers first. */
+  assignedSabaq?: Readonly<{ page: number; fromLine: number; toLine: number }> | null;
   /** Ayah review: the ayah cards due now, since the plan lists no pages then (UNIT-02). */
   ayahDue?: number;
   /** Ayah review: the new ayah cards on offer, shown apart from those due, as extra (ETH-05). */
@@ -43,6 +45,7 @@ export function WirdPlanCard({
   inboxCount,
   secondLooksDue = 0,
   nextLookAt = null,
+  assignedSabaq = null,
   ayahDue = 0,
   ayahNew = 0,
   language,
@@ -167,6 +170,16 @@ export function WirdPlanCard({
       {wird.daily.backlog ? (
         <Text dir={dir} className="mt-2" variant="caption" style={{ lineHeight: 18 }}>
           {s.hifzCatchUpFirst}
+        </Text>
+      ) : null}
+
+      {showSabaq && assignedSabaq ? (
+        <Text dir={dir} className="mt-2" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, lineHeight: 19, color: accentText }}>
+          {interpolate(s.hifzAssignedLines, {
+            page: formatNumber(assignedSabaq.page, language),
+            from: formatNumber(assignedSabaq.fromLine, language),
+            to: formatNumber(assignedSabaq.toLine, language),
+          })}
         </Text>
       ) : null}
 

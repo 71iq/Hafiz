@@ -137,6 +137,7 @@ const target = {
   ayahs: [{ surah: 2, ayah: 2 }],
   linkAyahs: [],
   completesPage: false,
+  assigned: false,
 } satisfies SabaqTarget;
 type LookSave = Awaited<ReturnType<typeof saveSecondLook>>;
 type ChunkSave = Awaited<ReturnType<typeof completeSabaqChunk>>;

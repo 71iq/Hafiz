@@ -141,7 +141,8 @@ BEGIN
         'get_halaqa_goal', 'get_halaqa_detail', 'send_halaqa_encouragement', 'get_halaqa_teacher_view',
         'get_profile_privacy', 'set_profile_privacy', 'get_profile_summary', 'halaqa_shares_with_me',
         'habit_days_before_write', 'profile_identity_visible', 'caller_is_minor', 'get_received_encouragements',
-        'refresh_board_bands', 'requeue_board_after_wird_day')
+        'refresh_board_bands', 'requeue_board_after_wird_day', 'set_halaqa_sabaq_assignment',
+        'clear_halaqa_sabaq_assignment', 'get_my_sabaq_assignment')
       AND NOT (COALESCE(p.proconfig, '{}') @> ARRAY['search_path=""'])
   ), 0::BIGINT);
   PERFORM hz_test.eq('every definer function above exists', (
@@ -622,6 +623,93 @@ BEGIN
   PERFORM hz_test.eq('mistake inbox count shared', (view->'grades'->>'mistake_inbox_count')::INTEGER, 1);
 END $$;
 RESET ROLE;
+
+-- SOC-03: a teacher's next sabaq for a member who shares their plan with teachers. It ends when the
+-- member stops sharing, a teacher clears it, the teacher stops teaching or either of them leaves.
+SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000d', 'teacher_d', 'Teacher D', NULL);
+SET ROLE authenticated;
+DO $$
+DECLARE
+  gid UUID := (SELECT value FROM hz_test.state WHERE key = 'group')::UUID;
+  code TEXT := (SELECT value FROM hz_test.state WHERE key = 'code');
+  a UUID := '00000000-0000-4000-8000-00000000000a';
+  b UUID := '00000000-0000-4000-8000-00000000000b';
+  d UUID := '00000000-0000-4000-8000-00000000000d';
+  saved JSONB;
+  mine JSONB;
+BEGIN
+  PERFORM hz_test.login(a);
+  saved := public.set_halaqa_sabaq_assignment(gid, b, 582, 3, 9);
+  PERFORM hz_test.eq('assignment saved', saved->>'page', '582');
+  PERFORM hz_test.eq('assignment names its teacher', saved->>'teacher_name', 'Teacher A');
+  PERFORM hz_test.eq('teacher view shows the assignment',
+    public.get_halaqa_teacher_view(gid, b, hz_test.today_text())->'plan'->'sabaq_assignment'->>'from_line', '3');
+  PERFORM public.set_halaqa_sabaq_assignment(gid, b, 1, 1, 15);
+  PERFORM hz_test.eq('a new assignment replaces the last',
+    public.get_halaqa_teacher_view(gid, b, hz_test.today_text())->'plan'->'sabaq_assignment'->>'page', '1');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 0, 1, 15)$q$, gid, b), 'invalid_assignment');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 605, 1, 15)$q$, gid, b), 'invalid_assignment');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 0, 15)$q$, gid, b), 'invalid_assignment');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 16)$q$, gid, b), 'invalid_assignment');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 9, 3)$q$, gid, b), 'invalid_assignment');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, NULL, 1, 3)$q$, gid, b), 'invalid_assignment');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid, a), 'not_allowed');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid,
+    '00000000-0000-4000-8000-00000000000c'), 'plan_not_shared');
+  PERFORM hz_test.expect_error($q$SELECT count(*) FROM public.halaqa_sabaq_assignments$q$, 'permission denied');
+
+  -- B reads it, and cannot set, clear or read the table.
+  PERFORM hz_test.login(b);
+  mine := public.get_my_sabaq_assignment();
+  PERFORM hz_test.eq('learner reads the assignment', mine->>'page' || ':' || (mine->>'from_line') || '-' || (mine->>'to_line'), '1:1-15');
+  PERFORM hz_test.eq('learner reads the halaqa and teacher', (mine->>'group_name') || '/' || (mine->>'teacher_name'), 'Family halaqa/Teacher A');
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid, a), 'not_allowed');
+  PERFORM hz_test.expect_error(format($q$SELECT public.clear_halaqa_sabaq_assignment(%L, %L)$q$, gid, b), 'not_allowed');
+  PERFORM hz_test.expect_error($q$SELECT count(*) FROM public.halaqa_sabaq_assignments$q$, 'permission denied');
+  -- Withdrawing plan sharing ends it, and sharing again does not bring it back.
+  PERFORM public.set_halaqa_sharing(gid, false, true, false, true);
+  PERFORM hz_test.eq('withdrawn sharing ends the assignment', public.get_my_sabaq_assignment(), NULL::JSONB);
+  PERFORM public.set_halaqa_sharing(gid, false, true, true, true);
+  PERFORM hz_test.eq('sharing again brings none back', public.get_my_sabaq_assignment(), NULL::JSONB);
+
+  -- A teacher clears it.
+  PERFORM hz_test.login(a);
+  PERFORM public.set_halaqa_sabaq_assignment(gid, b, 2, 1, 8);
+  PERFORM public.clear_halaqa_sabaq_assignment(gid, b);
+  PERFORM hz_test.eq('cleared assignment gone from the teacher view',
+    public.get_halaqa_teacher_view(gid, b, hz_test.today_text())->'plan'->'sabaq_assignment', 'null'::JSONB);
+
+  -- D teaches, assigns, and is made a member again: the assignment ends.
+  PERFORM hz_test.login(d);
+  PERFORM public.join_halaqa_by_code(code);
+  PERFORM public.set_halaqa_sharing(gid, true, true, true, false);
+  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid, b), 'not_allowed');
+  PERFORM hz_test.login(a);
+  PERFORM public.set_halaqa_member_role(gid, d, 'teacher');
+  PERFORM hz_test.login(d);
+  PERFORM public.set_halaqa_sabaq_assignment(gid, b, 3, 2, 6);
+  PERFORM hz_test.login(b);
+  PERFORM hz_test.eq('second teacher''s assignment', public.get_my_sabaq_assignment()->>'teacher_name', 'Teacher D');
+  PERFORM hz_test.login(a);
+  PERFORM public.set_halaqa_member_role(gid, d, 'member');
+  PERFORM hz_test.login(b);
+  PERFORM hz_test.eq('a teacher made a member takes their assignment', public.get_my_sabaq_assignment(), NULL::JSONB);
+
+  -- A assigns D, then D leaves: the assignment ends with the membership.
+  PERFORM hz_test.login(a);
+  PERFORM public.set_halaqa_sabaq_assignment(gid, d, 4, 1, 15);
+  PERFORM hz_test.login(d);
+  PERFORM hz_test.eq('member reads their assignment', public.get_my_sabaq_assignment()->>'page', '4');
+  PERFORM public.leave_halaqa(gid);
+  PERFORM hz_test.eq('leaving ends the assignment', public.get_my_sabaq_assignment(), NULL::JSONB);
+END $$;
+RESET ROLE;
+
+DO $$
+BEGIN
+  PERFORM hz_test.eq('ended assignments are deleted, not hidden',
+    (SELECT count(*) FROM public.halaqa_sabaq_assignments), 0::BIGINT);
+END $$;
 
 SELECT hz_test.login('00000000-0000-4000-8000-00000000000c');
 SET ROLE authenticated;

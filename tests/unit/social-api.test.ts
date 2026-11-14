@@ -12,6 +12,12 @@ import {
   setHalaqaMemberRole,
   setHalaqaSharing,
 } from "@/lib/halaqa/api";
+import {
+  clearSabaqAssignment,
+  loadMySabaqAssignment,
+  parseAssignmentInput,
+  setSabaqAssignment,
+} from "@/lib/halaqa/sabaq-assignment";
 import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
 import { strings } from "@/lib/i18n/strings";
 import {
@@ -642,6 +648,127 @@ describe("teacher role (SOC-03)", () => {
     const error = await setHalaqaMemberRole(GROUP, OTHER, "teacher", owner()).catch((caught: unknown) => caught);
     expect(socialFailureOf(error)).toEqual({ kind: "rejected", code: "not_allowed" });
     expect(socialFailureMessage(error, strings.ar)).toBe(strings.ar.socialErrorGeneric);
+  });
+});
+
+describe("a teacher's next sabaq (SOC-03)", () => {
+  const stored = {
+    group_id: GROUP,
+    group_name: "Family",
+    teacher_name: "Teacher A",
+    page: 582,
+    from_line: 3,
+    to_line: 9,
+    assigned_at: "2026-11-13T08:00:00+00:00",
+  };
+
+  it("sets and clears a member's next sabaq, as the account that started it", async () => {
+    mockRpc.mockResolvedValueOnce({ data: stored, error: null }).mockResolvedValueOnce({ data: null, error: null });
+    await expect(
+      setSabaqAssignment({ groupId: GROUP, memberId: OTHER, page: 582, fromLine: 3, toLine: 9 }, owner()),
+    ).resolves.toMatchObject({ page: 582, fromLine: 3, toLine: 9, teacherName: "Teacher A" });
+    await expect(clearSabaqAssignment(GROUP, OTHER, owner())).resolves.toBeUndefined();
+    expect(mockRpc.mock.calls).toEqual([
+      [
+        "set_halaqa_sabaq_assignment",
+        { p_group_id: GROUP, p_member_id: OTHER, p_page: 582, p_from_line: 3, p_to_line: 9 },
+      ],
+      ["clear_halaqa_sabaq_assignment", { p_group_id: GROUP, p_member_id: OTHER }],
+    ]);
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+  });
+
+  it("shows the server's refusals in the reader's language", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: "42501", message: "plan_not_shared" } });
+    const refused = await setSabaqAssignment({ groupId: GROUP, memberId: OTHER, page: 1, fromLine: 1, toLine: 15 }, owner()).catch(
+      (caught: unknown) => caught,
+    );
+    expect(socialFailureOf(refused)).toEqual({ kind: "rejected", code: "plan_not_shared" });
+    expect(socialFailureMessage(refused, strings.ar)).toBe(strings.ar.socialErrorPlanNotShared);
+    mockRpc.mockResolvedValue({ data: null, error: { message: "invalid_assignment" } });
+    const invalid = await setSabaqAssignment({ groupId: GROUP, memberId: OTHER, page: 1, fromLine: 9, toLine: 3 }, owner()).catch(
+      (caught: unknown) => caught,
+    );
+    expect(socialFailureMessage(invalid, strings.en)).toBe(strings.en.teacherAssignInvalid);
+  });
+
+  it("reads the assignment with the plan in the teacher view, and an older server's view without it", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: { name: "Member B", plan: { hifz_plan: null, tiers: {}, sabaq_assignment: stored }, grades: null },
+      error: null,
+    });
+    const view = await fetchTeacherView(GROUP, OTHER, "2026-11-13", owner());
+    expect(view.plan?.sabaqAssignment).toMatchObject({ page: 582, fromLine: 3, toLine: 9 });
+    mockRpc.mockResolvedValueOnce({ data: { name: null, plan: { hifz_plan: null, tiers: {} }, grades: null }, error: null });
+    expect((await fetchTeacherView(GROUP, OTHER, "2026-11-13", owner())).plan?.sabaqAssignment).toBeNull();
+  });
+
+  it("rejects a stored range the app could not use", async () => {
+    mockRpc.mockResolvedValue({ data: { ...stored, from_line: 9, to_line: 3 }, error: null });
+    const error = await setSabaqAssignment({ groupId: GROUP, memberId: OTHER, page: 1, fromLine: 1, toLine: 1 }, owner()).catch(
+      (caught: unknown) => caught,
+    );
+    expect(socialFailureOf(error)).toEqual({ kind: "invalid_response" });
+  });
+
+  it("gives the lesson the server's assignment, keeps it for offline, and never fails the lesson", async () => {
+    mockRpc.mockResolvedValue({ data: stored, error: null });
+    await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
+    expect(mockRpc).toHaveBeenCalledWith("get_my_sabaq_assignment", {});
+    // Offline, and when the request cannot reach the server or fails, the saved copy decides.
+    mockRpc.mockReset();
+    await expect(loadMySabaqAssignment(USER, true)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
+    expect(mockRpc).not.toHaveBeenCalled();
+    mockRpc.mockRejectedValue(new TypeError("Network request failed"));
+    await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
+    mockRpc.mockResolvedValue({ data: null, error: { message: "upstream exploded" } });
+    await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
+    // A cleared assignment replaces the copy.
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await expect(loadMySabaqAssignment(USER, false)).resolves.toBeNull();
+    await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
+    // Signed out, or another account: nothing.
+    await expect(loadMySabaqAssignment(null, false)).resolves.toBeNull();
+    signIn(signedIn(OTHER));
+    mockRpc.mockResolvedValue({ data: stored, error: null });
+    await expect(loadMySabaqAssignment(USER, false)).resolves.toBeNull();
+  });
+
+  it("uses the saved copy when the server is slow, and keeps the late answer for next time", async () => {
+    mockRpc.mockResolvedValueOnce({ data: stored, error: null });
+    await loadMySabaqAssignment(USER, false);
+    jest.useFakeTimers();
+    try {
+      let answer: (value: { data: unknown; error: unknown }) => void = () => undefined;
+      mockRpc.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+      const lesson = loadMySabaqAssignment(USER, false);
+      await jest.advanceTimersByTimeAsync(5_000);
+      await expect(lesson).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
+      answer({ data: { ...stored, page: 2 }, error: null });
+      await jest.advanceTimersByTimeAsync(0);
+    } finally {
+      jest.useRealTimers();
+    }
+    mockRpc.mockRejectedValue(new TypeError("Network request failed"));
+    await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 2, fromLine: 3, toLine: 9 });
+  });
+
+  it("reads a typed range in Western or Arabic-Indic digits, inside the mushaf's pages and lines", () => {
+    expect(parseAssignmentInput("582", "3", "9")).toEqual({ page: 582, fromLine: 3, toLine: 9 });
+    expect(parseAssignmentInput("٥٨٢", "٣", "٩")).toEqual({ page: 582, fromLine: 3, toLine: 9 });
+    expect(parseAssignmentInput(" 1 ", "1", "15")).toEqual({ page: 1, fromLine: 1, toLine: 15 });
+    for (const [page, from, to] of [
+      ["0", "1", "15"],
+      ["605", "1", "15"],
+      ["", "1", "15"],
+      ["1", "0", "15"],
+      ["1", "1", "16"],
+      ["1", "9", "3"],
+      ["1.5", "1", "2"],
+      ["-1", "1", "2"],
+    ]) {
+      expect(parseAssignmentInput(page, from, to)).toBeNull();
+    }
   });
 });
 

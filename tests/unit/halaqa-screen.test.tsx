@@ -149,7 +149,10 @@ const cachedAdult = {
 
 const queryClients: QueryClient[] = [];
 function renderScreen(seed?: (client: QueryClient) => void) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  // No collection timers, so a finished mutation does not keep Jest running for five minutes.
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { gcTime: Infinity } },
+  });
   queryClients.push(client);
   seed?.(client);
   return render(
@@ -615,6 +618,115 @@ describe("Halaqa tab", () => {
       fireEvent.press(inDialog(arabic).getByRole("button", { name: strings.ar.halaqaMakeTeacherConfirm }));
       expect(await arabic.findByRole("button", { name: removeLabel("Yusuf", "ar") })).toBeTruthy();
       expect(arabic.getByText(strings.ar.halaqaRemoveTeacher)).toBeTruthy();
+    });
+  });
+
+  describe("a teacher's next sabaq (SOC-03)", () => {
+    const teacherSummary = { ...summary, role: "teacher" };
+    const sharingDetail = {
+      ...detail,
+      group: teacherSummary,
+      members: [{ ...detail.members[0], role: "teacher" }, { ...detail.members[1], teacher_view: true }],
+    };
+    const assignment = {
+      group_id: GROUP,
+      group_name: "Family halaqa",
+      teacher_name: "Amina",
+      page: 582,
+      from_line: 3,
+      to_line: 9,
+      assigned_at: "2026-11-13T08:00:00+00:00",
+    };
+    /** The server: the teacher view, with the plan shared or not, and set and clear writes it stores. */
+    function serveTeacherView(planShared: boolean) {
+      let stored: typeof assignment | null = null;
+      mockRpc.mockImplementation(async (fn, args) => {
+        switch (fn) {
+          case "get_my_halaqas":
+            return { data: [teacherSummary], error: null };
+          case "get_halaqa_detail":
+            return { data: sharingDetail, error: null };
+          case "get_halaqa_teacher_view":
+            return {
+              data: { name: "Yusuf", plan: planShared ? { hifz_plan: null, tiers: {}, sabaq_assignment: stored } : null, grades: null },
+              error: null,
+            };
+          case "set_halaqa_sabaq_assignment":
+            stored = { ...assignment, page: args.p_page as number, from_line: args.p_from_line as number, to_line: args.p_to_line as number };
+            return { data: stored, error: null };
+          case "clear_halaqa_sabaq_assignment":
+            stored = null;
+            return { data: null, error: null };
+          default:
+            throw new Error(`Unexpected RPC ${fn}`);
+        }
+      });
+    }
+    const writes = () => mockRpc.mock.calls.filter(([fn]) => fn.endsWith("_sabaq_assignment"));
+    const openView = async (screen: ReturnType<typeof renderScreen>, language: "en" | "ar" = "en") => {
+      fireEvent.press(
+        await screen.findByRole("button", { name: interpolate(strings[language].halaqaTeacherViewA11y, { name: "Yusuf" }) }),
+      );
+    };
+
+    it("sets a checked page and lines, shows what the server stored, and clears it", async () => {
+      signIn(USER);
+      serveTeacherView(true);
+      const screen = renderScreen();
+      await openView(screen);
+      expect(await screen.findByText(strings.en.teacherAssignNone)).toBeTruthy();
+
+      // Lines out of order are refused before anything is sent.
+      fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignPage), "582");
+      fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignFrom), "9");
+      fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignTo), "3");
+      fireEvent.press(screen.getByRole("button", { name: strings.en.teacherAssignSave }));
+      expect(screen.getByText(strings.en.teacherAssignInvalid)).toBeTruthy();
+      expect(writes()).toHaveLength(0);
+
+      fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignFrom), "3");
+      fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignTo), "9");
+      fireEvent.press(screen.getByRole("button", { name: strings.en.teacherAssignSave }));
+      expect(
+        await screen.findByText(interpolate(strings.en.teacherAssignCurrent, { page: "582", from: "3", to: "9" })),
+      ).toBeTruthy();
+      expect(screen.getByText(strings.en.teacherAssignSaved)).toBeTruthy();
+      expect(writes()).toEqual([
+        ["set_halaqa_sabaq_assignment", { p_group_id: GROUP, p_member_id: OTHER, p_page: 582, p_from_line: 3, p_to_line: 9 }],
+      ]);
+      expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+
+      fireEvent.press(screen.getByRole("button", { name: strings.en.teacherAssignClear }));
+      expect(await screen.findByText(strings.en.teacherAssignNone)).toBeTruthy();
+      expect(screen.getByText(strings.en.teacherAssignCleared)).toBeTruthy();
+      expect(writes().at(-1)).toEqual(["clear_halaqa_sabaq_assignment", { p_group_id: GROUP, p_member_id: OTHER }]);
+    });
+
+    it("reads Arabic-Indic digits from an Arabic teacher", async () => {
+      mockSettings.isRTL = true;
+      mockSettings.uiLanguage = "ar";
+      signIn(USER);
+      serveTeacherView(true);
+      const screen = renderScreen();
+      await openView(screen, "ar");
+      fireEvent.changeText(await screen.findByLabelText(strings.ar.teacherAssignPage), "٥٨٢");
+      fireEvent.changeText(screen.getByLabelText(strings.ar.teacherAssignFrom), "٣");
+      fireEvent.changeText(screen.getByLabelText(strings.ar.teacherAssignTo), "٩");
+      fireEvent.press(screen.getByRole("button", { name: strings.ar.teacherAssignSave }));
+      expect(
+        await screen.findByText(interpolate(strings.ar.teacherAssignCurrent, { page: "٥٨٢", from: "٣", to: "٩" })),
+      ).toBeTruthy();
+      expect(writes()[0][1]).toMatchObject({ p_page: 582, p_from_line: 3, p_to_line: 9 });
+    });
+
+    it("offers no assignment for a member who does not share their plan", async () => {
+      signIn(USER);
+      serveTeacherView(false);
+      const screen = renderScreen();
+      await openView(screen);
+      expect(await screen.findAllByText(strings.en.teacherViewNotShared)).toHaveLength(2);
+      expect(screen.queryByText(strings.en.teacherAssignTitle)).toBeNull();
+      expect(screen.queryByRole("button", { name: strings.en.teacherAssignSave })).toBeNull();
     });
   });
 

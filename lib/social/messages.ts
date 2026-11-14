@@ -12,6 +12,8 @@ const REJECTION_MESSAGES: Partial<Record<SocialRejectionCode, keyof UIStrings>> 
   already_encouraged_today: "socialErrorAlreadyEncouraged",
   not_a_member: "socialErrorNotMember",
   invalid_local_date: "socialErrorDate",
+  plan_not_shared: "socialErrorPlanNotShared",
+  invalid_assignment: "teacherAssignInvalid",
 };
 
 /** The user-facing message for a failed halaqa or board request, by cause (DEL-08). */

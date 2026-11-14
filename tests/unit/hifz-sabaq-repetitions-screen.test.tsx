@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import SabaqRoute from "@/app/hifz/sabaq";
 import { endReviewSession, startReviewSession } from "@/lib/fsrs/review-sessions";
+import { loadMySabaqAssignment } from "@/lib/halaqa/sabaq-assignment";
 import { loadHabitOverview } from "@/lib/habit/queries";
 import { readHabitSettings } from "@/lib/habit/settings";
 import type { PageToken, RecitationPage } from "@/lib/hifz/page-data";
@@ -60,6 +61,7 @@ jest.mock("@/components/ui/ConfirmDialog", () => ({ ConfirmDialog: () => null })
 jest.mock("@/lib/fsrs/review-sessions", () => ({ startReviewSession: jest.fn(), endReviewSession: jest.fn() }));
 jest.mock("@/lib/habit/queries", () => ({ loadHabitOverview: jest.fn() }));
 jest.mock("@/lib/habit/settings", () => ({ readHabitSettings: jest.fn() }));
+jest.mock("@/lib/halaqa/sabaq-assignment", () => ({ loadMySabaqAssignment: jest.fn() }));
 jest.mock("@/lib/habit/use-habit-overview", () => ({ emitHabitChanged: jest.fn() }));
 jest.mock("@/lib/hifz/pages", () => ({
   newMemorizationOpen: jest.requireActual<typeof import("@/lib/hifz/pages")>("@/lib/hifz/pages").newMemorizationOpen,
@@ -93,6 +95,7 @@ const target = {
   ayahs: [{ surah: 2, ayah: 1 }],
   linkAyahs: [],
   completesPage: false,
+  assigned: false,
 } satisfies SabaqTarget;
 
 function Wrapper({ children }: React.PropsWithChildren) {
@@ -138,6 +141,26 @@ beforeEach(() => {
   jest.mocked(similarGroupsForAyahs).mockResolvedValue([]);
   jest.mocked(withMemorizedSiblings).mockReturnValue([]);
   jest.mocked(readMemorizedPageNumbers).mockResolvedValue(new Set());
+  jest.mocked(loadMySabaqAssignment).mockResolvedValue(null);
+});
+
+describe("a teacher's next sabaq (SOC-03)", () => {
+  it("chooses the lesson from the assigned lines and says the teacher assigned them", async () => {
+    jest.mocked(loadMySabaqAssignment).mockResolvedValue({ page: 1, fromLine: 2, toLine: 4 });
+    jest.mocked(nextSabaqTarget).mockResolvedValue({ ...target, assigned: true });
+    await openWith(DEFAULT_HIFZ_PLAN.sabaqRepetitions);
+    expect(nextSabaqTarget).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ assigned: { page: 1, fromLine: 2, toLine: 4 } }),
+    );
+    expect(screen.getByText(s.hifzAssignedByTeacher)).toBeTruthy();
+  });
+
+  it("shows no teacher label on the plan's own lines", async () => {
+    await openWith(DEFAULT_HIFZ_PLAN.sabaqRepetitions);
+    expect(nextSabaqTarget).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ assigned: null }));
+    expect(screen.queryByText(s.hifzAssignedByTeacher)).toBeNull();
+  });
 });
 
 describe("sabaq repetition counts (SBQ-01)", () => {

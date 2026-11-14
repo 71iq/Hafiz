@@ -779,6 +779,7 @@ describe("sabaq screen", () => {
     ayahs: [{ surah: 2, ayah: 1 }],
     linkAyahs: [],
     completesPage: false,
+    assigned: false,
   } satisfies SabaqTarget;
 
   const press = (name: string) => fireEvent.press(screen.getByRole("button", { name }));

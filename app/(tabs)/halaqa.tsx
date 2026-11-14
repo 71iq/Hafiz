@@ -34,6 +34,8 @@ import {
   type HalaqaMember,
   type HalaqaSharing,
 } from "@/lib/halaqa/api";
+import { clearSabaqAssignment, setSabaqAssignment } from "@/lib/halaqa/sabaq-assignment";
+import type { AssignedSabaq } from "@/lib/hifz/sabaq";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import {
   fetchProfilePrivacy,
@@ -273,6 +275,36 @@ function HalaqaContent({ userId }: { userId: string }) {
   const removesTeacher = roleTarget?.role === "teacher";
   const roleName = { name: roleTarget?.name ?? "" };
 
+  // SOC-03: a teacher sets or clears a member's next sabaq from the teacher view. The view then reads
+  // again, so it shows what the server stored; a refusal, such as sharing withdrawn meanwhile, shows in
+  // the sheet. Each change names its halaqa and member, so closing the sheet mid-save cannot redirect it.
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignSaved, setAssignSaved] = useState<string | null>(null);
+  const assignMutationKey = [...halaqaKeys.all(userId), "sabaq-assignment"];
+  const assignSabaq = useMutation({
+    mutationKey: assignMutationKey,
+    mutationFn: async (change: { groupId: string; memberId: string; range: AssignedSabaq | null }) => {
+      const owner = requireSocialOwner(userId);
+      if (change.range) await setSabaqAssignment({ groupId: change.groupId, memberId: change.memberId, ...change.range }, owner);
+      else await clearSabaqAssignment(change.groupId, change.memberId, owner);
+    },
+    onSuccess: (_, change) => setAssignSaved(change.range ? s.teacherAssignSaved : s.teacherAssignCleared),
+    onError: (error) => setAssignError(socialFailureMessage(error, s)),
+    onSettled: (_, __, change) =>
+      queryClient.invalidateQueries({ queryKey: halaqaKeys.teacher(userId, change.groupId, change.memberId, today) }),
+  });
+  const changeAssignment = (range: AssignedSabaq | null) => {
+    if (!active || !teacherTarget || queryClient.isMutating({ mutationKey: assignMutationKey }) > 0) return;
+    setAssignError(null);
+    setAssignSaved(null);
+    assignSabaq.mutate({ groupId: active.id, memberId: teacherTarget.userId, range });
+  };
+  const openTeacherView = (member: HalaqaMember | null) => {
+    setAssignError(null);
+    setAssignSaved(null);
+    setTeacherTarget(member);
+  };
+
   const shareCode = async (code: string) => {
     const message = interpolate(s.halaqaShareMessage, { code });
     try {
@@ -362,7 +394,7 @@ function HalaqaContent({ userId }: { userId: string }) {
               setEncourageError(null);
               setEncourageTarget(member);
             }}
-            onTeacherView={setTeacherTarget}
+            onTeacherView={openTeacherView}
             onChangeRole={(member) => {
               setRoleError(null);
               setRoleTarget(member);
@@ -419,7 +451,15 @@ function HalaqaContent({ userId }: { userId: string }) {
               ? socialFailureMessage(teacherView.error, s)
               : null
         }
-        onClose={() => setTeacherTarget(null)}
+        assign={{
+          pending: assignSabaq.isPending,
+          error: assignError,
+          saved: assignSaved,
+          disabled: offline,
+          onSave: (range) => changeAssignment(range),
+          onClear: () => changeAssignment(null),
+        }}
+        onClose={() => openTeacherView(null)}
       />
 
       {active && sharingOpen ? (

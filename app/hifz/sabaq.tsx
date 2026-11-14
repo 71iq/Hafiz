@@ -52,6 +52,9 @@ import {
   type SecondLooks,
 } from "@/lib/hifz/sabaq";
 import { formatAyahRef } from "@/lib/arabic";
+import { useAuthStore } from "@/lib/auth/store";
+import { loadMySabaqAssignment } from "@/lib/halaqa/sabaq-assignment";
+import { useIsOffline } from "@/lib/social/use-social-query";
 import { formatNumber } from "@/lib/i18n/count";
 import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -95,6 +98,11 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   const doneWidth = Math.min(pageWidth, 384);
   const dir = isRTL ? "rtl" : "ltr";
   const { playRange, rangeState, stop, togglePause } = useAyahAudio();
+  /** SOC-03: who asks for a teacher's next sabaq, and whether to ask the server or the saved copy. */
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const offline = useIsOffline();
+  const assignmentSource = useRef({ userId, offline });
+  assignmentSource.current = { userId, offline };
 
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<SabaqTarget | null>(null);
@@ -203,6 +211,8 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // SOC-03: read alongside the lesson's data; it never fails, and it waits at most a few seconds.
+    const assignment = loadMySabaqAssignment(assignmentSource.current.userId, assignmentSource.current.offline);
     try {
       const [wird, words, names] = await Promise.all([
         loadTodayWird(db),
@@ -235,6 +245,8 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
             // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
             wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
             pageWords,
+            // SOC-03: a teacher's next sabaq comes first while its lines are not memorized.
+            assigned: await assignment,
           }
         : null;
       const [next, secondLooks] = await Promise.all([
@@ -709,9 +721,16 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
             >
               <X size={18} color={muted} />
             </Pressable>
-            <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="text-warm-700 dark:text-neutral-400">
-              {portion}
-            </Text>
+            <View className="flex-shrink items-center" style={{ gap: 2 }}>
+              <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="text-warm-700 dark:text-neutral-400">
+                {portion}
+              </Text>
+              {target.assigned ? (
+                <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, color: accent }}>
+                  {s.hifzAssignedByTeacher}
+                </Text>
+              ) : null}
+            </View>
             <View style={{ width: 44 }} />
           </MirroredRow>
           {step !== "done" ? (

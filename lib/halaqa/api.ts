@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sabaqAssignmentSchema } from "@/lib/halaqa/sabaq-assignment";
 import { parseHifzPlan } from "@/lib/hifz/plan";
 import type { SocialOwner } from "@/lib/social/owner";
 import { callSocialRpc, localDateSchema, readSocial, voidResult, type SocialRead } from "@/lib/social/remote";
@@ -139,7 +140,12 @@ const teacherViewSchema = z
   .object({
     name: z.string().nullable(),
     plan: z
-      .object({ hifz_plan: z.string().nullable(), tiers: z.record(z.string(), count) })
+      .object({
+        hifz_plan: z.string().nullable(),
+        tiers: z.record(z.string(), count),
+        // SOC-03: the next sabaq a teacher set, shown with the plan it changes.
+        sabaq_assignment: sabaqAssignmentSchema.nullable().optional(),
+      })
       .nullable(),
     grades: z
       .object({
@@ -161,7 +167,13 @@ const teacherViewSchema = z
     name: row.name,
     // The member's synced hifz_plan setting, read with the app's own plan schema (spec 3.3). Null
     // when they have no plan or it cannot be read.
-    plan: row.plan ? { hifzPlan: parseHifzPlan(row.plan.hifz_plan), tiers: row.plan.tiers } : null,
+    plan: row.plan
+      ? {
+          hifzPlan: parseHifzPlan(row.plan.hifz_plan),
+          tiers: row.plan.tiers,
+          sabaqAssignment: row.plan.sabaq_assignment ?? null,
+        }
+      : null,
     grades: row.grades
       ? {
           mistakeInboxCount: row.grades.mistake_inbox_count,
