@@ -2215,6 +2215,31 @@ describe("Flashcard session due-date editor characterization", () => {
         },
       );
 
+      it("starts the next card's time when an unrevealed card is buried, so one grade never carries both", async () => {
+        jest.mocked(setStudyCardBuried).mockResolvedValueOnce(firstCard);
+        const view = renderSession();
+        await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+        // Three minutes on the first card without revealing it, then it is buried.
+        act(() => {
+          jest.setSystemTime(new Date(2026, 10, 2, 12, 3, 0));
+        });
+        fireEvent.press(menuButton(view));
+        await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+        fireEvent.press(view.getByRole("button", { name: directCardActionLabel(s, "bury") }));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        // Two minutes on the second card, then its grade.
+        act(() => {
+          jest.setSystemTime(new Date(2026, 10, 2, 12, 5, 0));
+        });
+        await reveal(view, secondCue);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(putStudyLogRow).toHaveBeenCalledTimes(1));
+        // About two minutes (waitFor moves the fake clock a little), never the five spent across both cards.
+        const duration = jest.mocked(putStudyLogRow).mock.calls[0][1].durationMs ?? 0;
+        expect(duration).toBeGreaterThan(110_000);
+        expect(duration).toBeLessThanOrEqual(120_000);
+      });
+
       it("disables the card menu while a grade is unresolved", async () => {
         const write = createDeferred<void>();
         jest.mocked(putCardRow).mockReturnValueOnce(write.promise);

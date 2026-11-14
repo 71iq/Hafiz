@@ -480,10 +480,13 @@ function FlashcardSessionScreen() {
   ]);
 
   const currentCard = cards[currentIndex] ?? null;
-  // Time on a card runs from when its front is shown to its grade (study_log.duration_ms).
+  // Time on a card runs from when its front is shown to its grade (study_log.duration_ms). A card
+  // removed unrevealed (buried, suspended) leaves the index where it was, so the next card's id starts
+  // its own time too.
+  const currentCardId = currentCard?.card.id ?? null;
   useEffect(() => {
     if (phase === "front") cardShownAtRef.current = Date.now();
-  }, [phase, currentIndex]);
+  }, [phase, currentIndex, currentCardId]);
   const gradePreviews = useMemo(
     () => currentCard ? getGradeSchedulePreviews(currentCard.card, currentCard.settings, isRTL) : {},
     [currentCard, isRTL]

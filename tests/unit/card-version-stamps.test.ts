@@ -47,6 +47,18 @@ describe("card version stamps", () => {
     expect(row().updated_at).toBe(NOW.toISOString());
   });
 
+  it("stamps a card created again over a deletion from a clock running ahead after that deletion", async () => {
+    store.sql.prepare("UPDATE study_cards SET deleted_at = ? WHERE id = ?").run(AHEAD, ID);
+    let created = false;
+    await store.db.withTransactionAsync(async (tx) => {
+      created = await insertNewStudyCard(tx, { id: ID, deckId: "hifz-pages", due: NOW, now: NOW.toISOString() });
+    });
+    expect(created).toBe(true);
+    expect(row().deleted_at).toBeNull();
+    expect(Date.parse(row().updated_at)).toBeGreaterThan(Date.parse(AHEAD));
+    expect(lastUpload().updated_at).toBe(row().updated_at);
+  });
+
   it("stamps a deletion after the version it replaces", async () => {
     await store.db.withTransactionAsync(async (tx) => {
       await deleteStudyCardRow(tx, "hifz-pages", ID);

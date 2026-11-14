@@ -3,6 +3,7 @@ import { enqueueSync } from "@/lib/database/sync-queue";
 import { putUserSetting, removeUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { createEmptyCard } from "./scheduler";
 import { reviewDueCutoff } from "./review-transition";
+import { stampsOverDeletedCards } from "./card-stamps";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
   ALL_NEW_REVIEW_ORDERS,
@@ -702,7 +703,13 @@ export async function materializeSmartDeckCards(
     // A card id is global. Skip ids that are live in any deck now, including rows a sync pull wrote
     // after the deck-scoped read above; queueing an empty card for them would overwrite real progress.
     const live = await getLiveStudyCardIds(tx, createdRows.map((row) => row.id));
-    const insertedRows = createdRows.filter((row) => !live.has(row.id));
+    const fresh = createdRows.filter((row) => !live.has(row.id));
+    // A card created again over a deletion is stamped later than that deletion.
+    const overDeleted = await stampsOverDeletedCards(tx, fresh.map((row) => row.id), new Date(nowIso));
+    const insertedRows = fresh.map((row) => {
+      const stamp = overDeleted.get(row.id);
+      return stamp ? { ...row, updated_at: stamp } : row;
+    });
     insertedCount = insertedRows.length;
     for (let i = 0; i < insertedRows.length; i += INSERT_BATCH) {
       const batch = insertedRows.slice(i, i + INSERT_BATCH);

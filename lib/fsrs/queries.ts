@@ -35,7 +35,7 @@ import {
   type WordTestMode,
 } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
+import { laterThanAll, stampsOverDeletedCards } from "./card-stamps";
 import { putUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import {
   dayDiffLocal,
@@ -335,6 +335,8 @@ async function insertMeaningCardRows(
     }));
   }
 
+  // Created again over a deletion, the card is stamped later than that deletion.
+  const updatedAt = (await stampsOverDeletedCards(db, [cardId], new Date(now))).get(cardId) ?? now;
   const result = await db.runAsync(
     `INSERT INTO study_cards
       (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at, deleted_at)
@@ -369,7 +371,7 @@ async function insertMeaningCardRows(
       emptyCard.state,
       null,
       now,
-      now,
+      updatedAt,
     ]
   );
 
@@ -392,7 +394,7 @@ async function insertMeaningCardRows(
       buried_until: null,
       marked_at: null,
       created_at: now,
-      updated_at: now,
+      updated_at: updatedAt,
       deleted_at: null,
     });
   }
@@ -735,21 +737,7 @@ export async function deleteStudyCard(database: AppDatabase, deckId: string, car
   await database.withTransactionAsync((db) => deleteStudyCardRow(db, deckId, cardId));
 }
 
-/**
- * An ISO instant later than `now` and every given stamp, so a write made now supersedes all of them.
- * Card writes stamp past the version they replace: a version stamped by a clock running ahead
- * (another device's deletion, or a restore after it) must not make this device's later grades look
- * older and lose to it in sync. Review times (reviewed_at, last_review, due) stay the real ones.
- */
-function laterThanAll(now: Date, stamps: readonly (string | null | undefined)[]): string {
-  let at = now.toISOString();
-  for (const stamp of stamps) {
-    if (!stamp || compareSyncTimestamps(stamp, at) < 0) continue;
-    const next = Date.parse(stamp) + 1;
-    if (Number.isFinite(next)) at = new Date(next).toISOString();
-  }
-  return at;
-}
+
 
 /** Soft-delete a card with its upload queued, using the caller's executor (inside its transaction). */
 export async function deleteStudyCardRow(db: DatabaseExecutor, deckId: string, cardId: string): Promise<void> {
@@ -1279,6 +1267,8 @@ export async function insertNewStudyCard(
   { id, deckId, due, tier = null, now }: { id: string; deckId: string; due: Date; tier?: string | null; now: string },
 ): Promise<boolean> {
   const empty = createEmptyCard(due);
+  // Created again over a deletion, the card is stamped later than that deletion.
+  const updatedAt = (await stampsOverDeletedCards(db, [id], new Date(now))).get(id) ?? now;
   const result = await db.runAsync(
     `INSERT INTO study_cards
       (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review,
@@ -1294,12 +1284,12 @@ export async function insertNewStudyCard(
      WHERE study_cards.deleted_at IS NOT NULL`,
     [
       id, deckId, empty.due.toISOString(), empty.stability, empty.difficulty, empty.elapsed_days, empty.scheduled_days,
-      empty.learning_steps, empty.reps, empty.lapses, empty.state, now, now, tier, tier ? now : null,
+      empty.learning_steps, empty.reps, empty.lapses, empty.state, now, updatedAt, tier, tier ? now : null,
     ]
   );
   if ((result.changes ?? 0) === 0) return false;
   const row = newStudyCardRow({ id, deckId, due, tier, now });
-  await enqueueSync(db, "study_cards", "INSERT", id, cardToSyncData(row));
+  await enqueueSync(db, "study_cards", "INSERT", id, cardToSyncData({ ...row, updated_at: updatedAt }));
   return true;
 }
 

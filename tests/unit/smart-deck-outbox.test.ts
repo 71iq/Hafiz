@@ -81,4 +81,25 @@ describe("RF-178 smart decks and their upload queue", () => {
     expect(count("study_cards", `deck_id = '${SMART_DECK_IDS.qiraat}'`)).toBe(3);
     expect(count("sync_queue", "table_name = 'study_cards' AND operation = 'INSERT'")).toBe(3);
   });
+
+  it("stamps a smart-deck card created again over a deletion from a clock running ahead after that deletion", async () => {
+    const ahead = "2099-01-15T10:00:00.000Z";
+    store.sql.prepare("INSERT INTO qiraat_encyclopedia (surah, ayah, text) VALUES (2, 1, 'synthetic qiraat')").run();
+    await expect(materializeSmartDeckCards(store.db, SMART_DECK_IDS.qiraat, 1, 1)).resolves.toBe(1);
+    const { id } = store.sql.prepare("SELECT id FROM study_cards").get() as { id: string };
+    store.sql.prepare("UPDATE study_cards SET deleted_at = ?, updated_at = ? WHERE id = ?").run(ahead, ahead, id);
+
+    await expect(materializeSmartDeckCards(store.db, SMART_DECK_IDS.qiraat, 1, 1)).resolves.toBe(1);
+
+    const row = store.sql.prepare("SELECT updated_at, deleted_at FROM study_cards WHERE id = ?").get(id) as {
+      updated_at: string;
+      deleted_at: string | null;
+    };
+    expect(row.deleted_at).toBeNull();
+    expect(Date.parse(row.updated_at)).toBeGreaterThan(Date.parse(ahead));
+    const upload = store.sql
+      .prepare("SELECT data FROM sync_queue WHERE table_name = 'study_cards' AND row_id = ? ORDER BY id DESC LIMIT 1")
+      .get(id) as { data: string };
+    expect(JSON.parse(upload.data).updated_at).toBe(row.updated_at);
+  });
 });
