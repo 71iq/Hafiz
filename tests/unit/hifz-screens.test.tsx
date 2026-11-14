@@ -6,6 +6,7 @@ import HifzReviewRoute from "@/app/hifz/review";
 import SabaqRoute from "@/app/hifz/sabaq";
 import type { GradingButtons } from "@/components/flashcards/GradingButtons";
 import type { SessionHabitInput } from "@/components/habit/SessionHabitCards";
+import type { RecitationPage as RecitationPageView } from "@/components/hifz/RecitationPage";
 import { endReviewSession, startReviewSession } from "@/lib/fsrs/review-sessions";
 import { readDeckReviewSettings } from "@/lib/fsrs/queries";
 import type { StudyCardRow } from "@/lib/fsrs/types";
@@ -24,6 +25,7 @@ import { strings } from "@/lib/i18n/strings";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 
 type GradingProps = React.ComponentProps<typeof GradingButtons>;
+type RecitationProps = React.ComponentProps<typeof RecitationPageView>;
 
 const s = strings.en;
 const mockDatabase = {
@@ -35,6 +37,8 @@ const mockDatabase = {
 };
 let mockParams: Record<string, string> = {};
 let mockGrading: GradingProps | null = null;
+/** What the review screen last passed to the recitation page. */
+let mockRecitation: RecitationProps | null = null;
 let mockHabitInput: SessionHabitInput | null = null;
 // A stable object: the sabaq screen reloads whenever `stop` changes identity.
 const mockAudio = {
@@ -111,7 +115,10 @@ jest.mock("@/lib/audio/ayah-audio", () => ({ useAyahAudio: () => mockAudio }));
 jest.mock("@/components/mushaf/MushafPage", () => ({ loadPageWordsData: jest.fn(async () => null) }));
 jest.mock("@/components/hifz/RecitationPage", () => ({
   HIDDEN: { all: false, count: 0, touchedLines: new Set() },
-  RecitationPage: () => null,
+  RecitationPage: (props: RecitationProps) => {
+    mockRecitation = props;
+    return null;
+  },
   visibleLines: (page: RecitationPage, lineNumbers: ReadonlySet<number> | null) =>
     page.lines.filter((line) => lineNumbers === null || lineNumbers.has(line.lineNumber)),
   orderedTokens: (lines: RecitationPage["lines"]) => lines.flatMap((line) => line.tokens),
@@ -308,6 +315,7 @@ beforeEach(() => {
   });
   mockParams = {};
   mockGrading = null;
+  mockRecitation = null;
   mockHabitInput = null;
   warnings = jest.spyOn(console, "warn").mockImplementation(() => undefined);
   jest.mocked(startReviewSession).mockReturnValue({ id: "session-1" } as never);
@@ -387,6 +395,59 @@ describe("hifz review screen", () => {
     await flush();
     return grading();
   }
+
+  it("recites a page as its first half, then its second, and grades it once with the lower half's proposal (UNIT-02)", async () => {
+    jest.mocked(loadTodayWird).mockResolvedValue({
+      plan: { ...DEFAULT_HIFZ_PLAN, unit: "half" },
+      minutesPerReviewPage: 3,
+      done: [],
+      todo: [{ cardId: row.id, page: 5, tier: "manzil", lastReviewDate: null, reviewedToday: false, dueDate: "2026-11-13", retrievability: 0.95 }],
+      total: 1,
+    } as never);
+    const fourLines: RecitationPage = {
+      page: 5,
+      lines: [1, 2, 3, 4].map((n) => ({ lineNumber: n, kind: "ayah" as const, centered: false, surahNumber: null, tokens: [token(n, 1), token(n, 2)] })),
+      ayahs: [1, 2, 3, 4].map((ayah) => ({ surah: 2, ayah })),
+    };
+    jest.mocked(loadRecitationPage).mockResolvedValue(fourLines);
+    jest.mocked(savePageGrade).mockResolvedValue(saved);
+    render(<HifzReviewRoute />, { wrapper: Wrapper });
+    await flush();
+
+    expect(screen.getByText("1 / 1 · First half")).toBeTruthy();
+    expect([...mockRecitation!.lineNumbers!]).toEqual([1, 2]);
+    expect(screen.getByText(s.hifzRecitePromptHalf)).toBeTruthy();
+    expect(screen.getByText(s.hifzReciteInSalah)).toBeTruthy();
+    // A peek in the first half, then its own check, with nothing graded yet.
+    fireEvent.press(screen.getByText(s.hifzPeek));
+    fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
+    await flush();
+    expect(screen.getByText(s.hifzMarkMistakesHalf)).toBeTruthy();
+    expect(mockGrading).toBeNull();
+    fireEvent.press(screen.getByRole("button", { name: s.hifzNextHalf }));
+    await flush();
+
+    expect(screen.getByText("1 / 1 · Second half")).toBeTruthy();
+    expect([...mockRecitation!.lineNumbers!]).toEqual([3, 4]);
+    expect(screen.queryByText(s.hifzReciteInSalah)).toBeNull();
+    fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
+    await flush();
+    // The clean second half would propose Good; the page takes the first half's Hard.
+    expect(grading().proposed).toBe(2);
+    await act(async () => {
+      void grading().onGrade(3);
+    });
+    await flush();
+
+    expect(savePageGrade).toHaveBeenCalledTimes(1);
+    const input = jest.mocked(savePageGrade).mock.calls[0][1];
+    expect(input.attempt).toBeUndefined();
+    expect(input).toMatchObject({ card: row, rating: 3, page: fourLines, firstToken: fourLines.lines[0].tokens[0] });
+    expect(input.halves?.a.peeked).toEqual([fourLines.lines[0].tokens[0]]);
+    expect(input.halves?.b).toMatchObject({ level: 4, peeked: [], shown: [] });
+    expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
+    expect(screen.getByText("Wird 1 of 1 pages")).toBeTruthy();
+  });
 
   it("saves a page once when its grade is tapped twice before the busy state renders", async () => {
     const save = deferred<typeof saved>();

@@ -49,6 +49,7 @@ import { MonthlyCheckCard } from "@/components/hifz/MonthlyCheckCard";
 import { markMonthlyCheck } from "@/lib/hifz/progress";
 import { diffDays } from "@/lib/habit/dates";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
+import { reminderHref } from "@/lib/notifications/reminder-route";
 import { putUserSetting } from "@/lib/database/user-settings";
 import {
   migrateLegacyRetentionDecks,
@@ -562,7 +563,8 @@ export default function HomeScreen() {
             language={uiLanguage}
             isDark={isDark}
             s={s}
-            onStartReview={() => router.push("/hifz/review" as Href)}
+            // Like the wird reminder: the page review, or the ayah review when the plan reviews ayat (UNIT-02).
+            onStartReview={() => router.push(reminderHref("wird", wird?.plan ?? null))}
             onStartSabaq={() => router.push("/hifz/sabaq" as Href)}
             onSetup={() => router.push("/hifz/setup" as Href)}
             onDrill={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}

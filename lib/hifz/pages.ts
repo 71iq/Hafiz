@@ -360,7 +360,9 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
       [today],
     ),
   ]);
-  const pages = cards.map((card) => toPlanPage(card, today, now));
+  // UNIT-02: ayah review has no page tasks. A switch sets every page card aside, but a page card
+  // still live (synced from a device that had not switched yet) stays out of the day's list too.
+  const pages = plan.unit === "ayah" ? [] : cards.map((card) => toPlanPage(card, today, now));
   const daily = buildDailyPlan({
     pages,
     plan,

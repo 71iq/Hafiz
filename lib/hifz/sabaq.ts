@@ -8,8 +8,9 @@ import type { Grade } from "@/lib/fsrs/scheduler";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { addDays, atLocalTime, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { loadRecitationPage, type PageLine, type PageWordsLines, type RecitationPage } from "@/lib/hifz/page-data";
-import type { HifzPlan } from "@/lib/hifz/plan";
+import { readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { pagePolicy } from "@/lib/hifz/tiers";
+import { addSabaqPageToAyahReview, coverPageInAyahReview } from "@/lib/hifz/unit-switch";
 import {
   chunkCardId,
   chunkCardPrefix,
@@ -357,6 +358,8 @@ async function pageStartFromChunks(tx: DatabaseExecutor, page: number, now: Date
 /**
  * SBQ-02: after the fluent check, the chunk becomes a sabaq card with that grade as its first review,
  * and the page joins review (sabqi, due tomorrow) once its last chunk passes. One transaction.
+ * In ayah review (UNIT-02) the page is reviewed as ayat instead: its card is set aside for a switch
+ * to pages, and its ayat get ayah cards in the ayah deck (addSabaqPageToAyahReview).
  * `secondLookAt` is when the chunk's second look comes due, while that is still today (SBQ-03).
  */
 export async function completeSabaqChunk(
@@ -372,6 +375,11 @@ export async function completeSabaqChunk(
 ): Promise<ReviewSaveResult & { pageAdded: boolean; secondLookAt: Date | null }> {
   const id = chunkCardId(target.page, Math.max(1, target.fromLine), Math.min(LINES_PER_PAGE, target.toLine));
   const addsPage = target.completesPage && rating >= 3;
+  // The stored plan decides, since the unit may have changed after the screen loaded its copy.
+  const ayahReview = addsPage && ((await readHifzPlan(db))?.unit ?? plan.unit) === "ayah";
+  // The ayah decks take in the page's ayat before the grade, so a failure here leaves the chunk
+  // ungraded and safe to grade again.
+  if (ayahReview) await coverPageInAyahReview(db, target.page);
   let pageAdded = false;
   // A chunk that failed its fluent check before is checked again on the same card.
   const result = await saveChunkGrade(db, {
@@ -384,14 +392,17 @@ export async function completeSabaqChunk(
     create: true,
     extraWork: addsPage
       ? async (tx) => {
+          const due = atLocalTime(addDays(localDateOf(now), 1), 0);
+          const start = await pageStartFromChunks(tx, target.page, now);
           pageAdded = await insertNewStudyCard(tx, {
             id: pageCardId(target.page),
             deckId: HIFZ_PAGES_DECK_ID,
-            due: atLocalTime(addDays(localDateOf(now), 1), 0),
+            due,
             tier: "sabqi",
             now: now.toISOString(),
-            start: await pageStartFromChunks(tx, target.page, now),
+            start,
           });
+          if (ayahReview) await addSabaqPageToAyahReview(tx, { page: target.page, start, due, now });
         }
       : undefined,
   });

@@ -54,14 +54,17 @@ import {
 import { markMonthlyCheck, monthlyCheckCandidates, pickMonthlyCheck } from "@/lib/hifz/progress";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import {
+  combineHalves,
   emptyAttempt,
   endOfLineAt,
   nextHiddenWord,
+  proposedHalvesRating,
   proposedRating,
   recordReviewPace,
   savePageGrade,
   saveRemediationGrade,
   type Attempt,
+  type HalfAttempts,
 } from "@/lib/hifz/review";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { pagePolicy, type Tier } from "@/lib/hifz/tiers";
@@ -144,7 +147,9 @@ function gradeLabel(rating: number, s: UIStrings): string {
 /**
  * The wird review (4.4.2): today's planned pages in order, sabqi then manzil, each recited at a
  * support level, checked word by word, and graded with the rubric's proposal (4.2), followed by up
- * to 6 drills from the mistake inbox (ERR-04). Progress saves after every page (REV-01).
+ * to 6 drills from the mistake inbox (ERR-04). Progress saves after every page (REV-01). With the
+ * half-page unit (UNIT-02) each page is recited and checked as its first half, then its second, and
+ * graded once as the page.
  */
 function HifzReviewScreen() {
   const db = useDatabase();
@@ -174,6 +179,10 @@ function HifzReviewScreen() {
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [surahNames, setSurahNames] = useState<Map<number, string>>(new Map());
   const [attempt, setAttempt] = useState<Attempt>(emptyAttempt(4));
+  /** Half-page review (UNIT-02): the half of the current page on screen. */
+  const [part, setPart] = useState<Half>("a");
+  /** Half-page review: the first half's attempt, kept once its check is done, for the page's grade. */
+  const [firstHalf, setFirstHalf] = useState<Attempt | null>(null);
   const [reveal, setReveal] = useState<RevealState>(HIDDEN);
   const [markingKey, setMarkingKey] = useState<string | null>(null);
   const [markingToken, setMarkingToken] = useState<PageToken | null>(null);
@@ -224,6 +233,12 @@ function HifzReviewScreen() {
   const seamScrolledFor = useRef<number | null>(null);
 
   const current = queue[index] ?? null;
+  // UNIT-02: with the half-page unit, a page is recited in two halves; remediation items stay as they are.
+  const inHalves = current?.kind === "page" && plan?.unit === "half";
+  /** Both halves of the page, once the second is on screen: what the page's grade is built from. */
+  const halves: HalfAttempts | null = inHalves && part === "b" && firstHalf ? { a: firstHalf, b: attempt } : null;
+  /** What the check grades: the page's whole attempt, from both halves once the second is checked. */
+  const gradedAttempt = halves ? combineHalves(halves) : attempt;
 
   const load = useCallback(async () => {
     setPhase("loading");
@@ -317,6 +332,8 @@ function HifzReviewScreen() {
   useEffect(() => {
     setSeamText(null);
     setSeamShown(false);
+    setPart("a");
+    setFirstHalf(null);
     if (!current || (current.kind !== "page" && current.kind !== "half" && current.kind !== "cloze")) {
       setPageData(null);
       if (current) {
@@ -359,6 +376,7 @@ function HifzReviewScreen() {
   const lineNumbers = useMemo(() => {
     if (!pageData) return null;
     if (current?.kind === "half") return halfLineNumbers(pageData, current.half);
+    if (inHalves) return halfLineNumbers(pageData, part);
     // A cloze shows only the lines that hold its ayah.
     if (current?.kind === "cloze") {
       return new Set(
@@ -368,15 +386,19 @@ function HifzReviewScreen() {
       );
     }
     return null;
-  }, [current, pageData]);
+  }, [current, inHalves, pageData, part]);
   const clozeWord = useMemo(
     () => (current?.kind === "cloze" ? { surah: current.surah, ayah: current.ayah, wordPos: current.word } : null),
     [current],
   );
   const lines = useMemo(() => (pageData ? visibleLines(pageData, lineNumbers) : []), [lineNumbers, pageData]);
-  // SCH-06: after a page whose next page the user also holds, the check offers its seam.
+  // SCH-06: after a page whose next page the user also holds, the check offers its seam; in halves,
+  // the second half's check, where the page ends.
   const seamPage =
-    current?.kind === "page" && hasSeamAfter(current.card.page) && heldPages.has(current.card.page + 1)
+    current?.kind === "page" &&
+    (!inHalves || part === "b") &&
+    hasSeamAfter(current.card.page) &&
+    heldPages.has(current.card.page + 1)
       ? current.card.page + 1
       : null;
 
@@ -490,8 +512,30 @@ function HifzReviewScreen() {
     }
   };
 
-  /** Next at an ungraded support level: nothing is saved, but it still advances only once. */
-  const skip = () => runItemAction("Skip", async () => ({ totals: totalsRef.current }));
+  /**
+   * Half-page review: the first half is checked, so the second half is recited next, starting at the
+   * level the first half used. Nothing is saved until the page is graded after the second half.
+   */
+  const nextHalf = () => {
+    if (!inHalves || part !== "a" || actionLock.current) return;
+    setFirstHalf(attempt);
+    setAttempt(emptyAttempt(attempt.level));
+    setReveal(HIDDEN);
+    setMarkingKey(null);
+    setError(null);
+    setPart("b");
+    setPhase("recite");
+    requestAnimationFrame(() => pageScrollRef.current?.scrollTo({ y: 0, animated: false }));
+  };
+
+  /**
+   * Next at an ungraded support level: nothing is saved, but it still advances only once. Reading the
+   * first half of a page in halves goes on to the second half.
+   */
+  const skip = () => {
+    if (inHalves && part === "a") nextHalf();
+    else runItemAction("Skip", async () => ({ totals: totalsRef.current }));
+  };
 
   const setLevel = (level: SupportLevel) => {
     setAttempt((value) => ({ ...value, level }));
@@ -578,10 +622,15 @@ function HifzReviewScreen() {
     }
     const grader = source === "salah" ? "salah" : listener ? "teacher" : "self";
     if (!current || current.kind !== "page" || !plan) return;
+    // In halves, a recited page is graded once, after its second half's check.
+    const recitedHalves = grader !== "salah" && inHalves ? halves : null;
+    if (grader !== "salah" && inHalves && !recitedHalves) return;
     const card = current.card;
-    const firstToken = tokens.find((token) => !token.isMarker) ?? tokens[0];
+    // Slips are logged at the page's first word, which in halves is on the first half.
+    const pageTokens = recitedHalves && pageData ? orderedTokens(visibleLines(pageData, null)) : tokens;
+    const firstToken = pageTokens.find((token) => !token.isMarker) ?? pageTokens[0];
     if (!firstToken && grader !== "salah") return;
-    const usedAttempt = grader === "salah" ? emptyAttempt(4) : attempt;
+    const usedAttempt = grader === "salah" ? emptyAttempt(4) : gradedAttempt;
     const firstInSession = !gradedPages.current.has(card.row.id);
     await runItemAction("Grade", async () => {
       const reviewedOn = localDateOf(new Date());
@@ -589,7 +638,7 @@ function HifzReviewScreen() {
         card: card.row,
         history: card.history,
         plan,
-        attempt: usedAttempt,
+        ...(recitedHalves ? { halves: recitedHalves } : { attempt: usedAttempt }),
         rating,
         firstToken: firstToken ?? { glyph: "", surah: 1, ayah: 1, wordPos: null, isMarker: true, firstLetter: null },
         session: sessionRef.current,
@@ -726,8 +775,10 @@ function HifzReviewScreen() {
     else leave();
   };
 
-  const proposal = proposedRating(attempt);
+  // A page in halves proposes the lower of its halves' grades, capped by the lower of their levels.
+  const proposal = halves ? proposedHalvesRating(halves) : proposedRating(attempt);
   const cap = GRADE_CAP[attempt.level];
+  const gradeCap = GRADE_CAP[gradedAttempt.level];
   const policyPreviews = useMemo(() => {
     if (!current || !baseSettings) return {};
     if (current.kind === "half") return getGradeSchedulePreviews(current.card, remediationPolicy(baseSettings), isRTL);
@@ -847,7 +898,9 @@ function HifzReviewScreen() {
     );
   }
 
-  const progressLabel = `${formatNumber(index + 1, uiLanguage)} / ${formatNumber(queue.length, uiLanguage)}`;
+  const itemsLabel = `${formatNumber(index + 1, uiLanguage)} / ${formatNumber(queue.length, uiLanguage)}`;
+  // In halves, the progress also says which half of the page is showing.
+  const progressLabel = inHalves ? `${itemsLabel} · ${part === "a" ? s.hifzHalfA : s.hifzHalfB}` : itemsLabel;
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   // Teal text under 14 px uses the darker token in light mode to stay readable on tinted chips.
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
@@ -1099,7 +1152,9 @@ function HifzReviewScreen() {
                         ? s.hifzSwipeHint
                         : cap < Rating.Easy
                           ? interpolate(s.hifzLevelCap, { grade: gradeLabel(cap, s) })
-                          : s.hifzRecitePrompt}
+                          : inHalves
+                            ? s.hifzRecitePromptHalf
+                            : s.hifzRecitePrompt}
                   </Text>
                 </View>
               ) : (
@@ -1108,7 +1163,7 @@ function HifzReviewScreen() {
                     {s.hifzCheckTitle}
                   </Text>
                   <Text dir={dir} variant="caption">
-                    {s.hifzMarkMistakes}
+                    {inHalves && part === "a" ? s.hifzMarkMistakesHalf : s.hifzMarkMistakes}
                   </Text>
                 </View>
               )}
@@ -1292,7 +1347,8 @@ function HifzReviewScreen() {
                   ) : (
                     <Button label={s.hifzSabaqNext} onPress={skip} disabled={busy} />
                   )}
-                  {current.kind === "page" ? (
+                  {/* Recited in salah logs the whole page, so in halves it is offered before the first half only. */}
+                  {current.kind === "page" && (!inHalves || part === "a") ? (
                     <Pressable
                       accessibilityRole="button"
                       accessibilityHint={s.hifzReciteInSalahHint}
@@ -1311,21 +1367,33 @@ function HifzReviewScreen() {
                 </>
               ) : (
                 <>
-                  {attempt.marks.size > 0 ? (
+                  {gradedAttempt.marks.size > 0 ? (
                     <Text dir={dir} variant="caption">
-                      {interpolate(s.hifzErrorsCount, { n: formatNumber(attempt.marks.size, uiLanguage) })}
+                      {interpolate(s.hifzErrorsCount, { n: formatNumber(gradedAttempt.marks.size, uiLanguage) })}
                     </Text>
                   ) : null}
-                  <GradingButtons
-                    onGrade={(rating) => grade(rating)}
-                    previews={policyPreviews}
-                    isDark={isDark}
-                    s={s}
-                    disabled={busy}
-                    proposed={proposal === 0 ? null : proposal}
-                    maxRating={(cap === 0 ? Rating.Easy : cap) as Grade}
-                    dir={dir}
-                  />
+                  {inHalves && part === "a" ? (
+                    <Button label={s.hifzNextHalf} onPress={nextHalf} disabled={busy} />
+                  ) : halves && gradeCap === 0 ? (
+                    // The first half was read at full text, so the page is not graded (GRD-03).
+                    <>
+                      <Text dir={dir} variant="caption">
+                        {s.hifzHalfNotGraded}
+                      </Text>
+                      <Button label={s.hifzSabaqNext} onPress={skip} disabled={busy} />
+                    </>
+                  ) : (
+                    <GradingButtons
+                      onGrade={(rating) => grade(rating)}
+                      previews={policyPreviews}
+                      isDark={isDark}
+                      s={s}
+                      disabled={busy}
+                      proposed={proposal === 0 ? null : proposal}
+                      maxRating={(gradeCap === 0 ? Rating.Easy : gradeCap) as Grade}
+                      dir={dir}
+                    />
+                  )}
                 </>
               )}
             </View>

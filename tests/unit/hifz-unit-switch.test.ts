@@ -6,6 +6,7 @@ import { declareMemorizedPages, isMemorized, loadPageCards, loadTodayWird, toPla
 import { reconcileUnitAfterSync } from "@/lib/hifz/unit-applied";
 import { isSyncableUserSetting } from "@/lib/database/user-settings";
 import { DEFAULT_HIFZ_PLAN, readHifzPlan, writeHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
+import { loadDueRemediation } from "@/lib/hifz/remediation";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { tierFor } from "@/lib/hifz/tiers";
 import { pageCardId } from "@/lib/hifz/units";
@@ -218,13 +219,58 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
       suspended_at: UNIT_SWITCH_SUSPENDED_AT,
     });
     expect(lastQueued("study_cards", pageCardId(1))).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT });
-    expect(cardRow(pageCardId(2))).toMatchObject({ deleted_at: null, suspended_at: null });
+    // A declared page with no ayah cards behind it is set aside too: ayah review has no page tasks.
+    expect(cardRow(pageCardId(2))).toMatchObject({ deleted_at: null, suspended_at: UNIT_SWITCH_SUSPENDED_AT });
 
     // Page review again: the kept page card comes back as it was and its ayah cards step aside again.
     await expect(setup(pagePlan, new Date(later.getTime() + DAY))).resolves.toMatchObject({ migratedPages: 0 });
     expect(cardRow(pageCardId(1))).toMatchObject({ stability: 10, due: days(1), suspended_at: null });
+    expect(cardRow(pageCardId(2))).toMatchObject({ tier: "manzil.unverified", suspended_at: null });
     for (const id of ["1:1", "1:2", "1:3"]) expect(suspendedAt(id)).toBe(UNIT_SWITCH_SUSPENDED_AT);
     expect(await newCardsLimit()).toBe(0);
+  });
+
+  it("sets every page, half-page and seam card aside in ayah review, lists no page task, and brings them all back for pages", async () => {
+    await declareMemorizedPages(store.db, { pages: [3, 4], cycleDays: 1, now });
+    await setup(pagePlan);
+    const pageWird = (await loadTodayWird(store.db, now))!;
+    expect(pageWird.todo.length).toBeGreaterThan(0);
+    // A half page relearning after a missed page, a seam, and a page the user suspended by hand.
+    for (const id of ["half:madani15:3:b", "seam:madani15:3"]) {
+      store.sql
+        .prepare(
+          `INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses,
+             state, created_at, updated_at)
+           VALUES (?, 'hifz-pages', ?, 1, 5, 0, 0, 1, 1, 1, 3, ?, ?)`,
+        )
+        .run(id, now.toISOString(), now.toISOString(), now.toISOString());
+    }
+    store.sql.prepare("UPDATE study_cards SET suspended_at = ? WHERE id = ?").run(USER_SUSPENDED_AT, pageCardId(4));
+
+    const later = new Date(now.getTime() + 60_000);
+    await setup(ayahPlan, later);
+    for (const id of [pageCardId(1), pageCardId(2), pageCardId(3), "half:madani15:3:b", "seam:madani15:3"]) {
+      expect(suspendedAt(id)).toBe(UNIT_SWITCH_SUSPENDED_AT);
+      expect(lastQueued("study_cards", id)).toMatchObject({ suspended_at: UNIT_SWITCH_SUSPENDED_AT });
+    }
+    expect(suspendedAt(pageCardId(4))).toBe(USER_SUSPENDED_AT);
+    const ayahWird = (await loadTodayWird(store.db, later))!;
+    expect(ayahWird).toMatchObject({ todo: [], done: [], total: 0 });
+    expect(await loadDueRemediation(store.db, new Date(later.getTime() + DAY))).toEqual([]);
+
+    await setup(pagePlan, new Date(later.getTime() + 60_000));
+    for (const id of [pageCardId(1), pageCardId(2), pageCardId(3), "half:madani15:3:b", "seam:madani15:3"]) {
+      expect(suspendedAt(id)).toBeNull();
+    }
+    expect(suspendedAt(pageCardId(4))).toBe(USER_SUSPENDED_AT);
+    expect((await loadTodayWird(store.db, new Date(later.getTime() + 120_000)))!.todo.length).toBeGreaterThan(0);
+  });
+
+  it("lists no page task in ayah review for a page card still live, as one synced from a device that had not switched", async () => {
+    await setup(ayahPlan);
+    await declareMemorizedPages(store.db, { pages: [3], cycleDays: 1, now });
+    expect(suspendedAt(pageCardId(3))).toBeNull();
+    expect((await loadTodayWird(store.db, now))!).toMatchObject({ todo: [], total: 0 });
   });
 
   it("derives a page made from ayah cards as manzil and memorized before its first page grade", async () => {

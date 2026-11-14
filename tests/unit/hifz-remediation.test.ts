@@ -12,7 +12,14 @@ import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { startReviewSession } from "@/lib/fsrs/review-sessions";
 import { parseHabitSettings } from "@/lib/habit/settings";
 import { addDays } from "@/lib/habit/dates";
-import { emptyAttempt, savePageGrade, saveRemediationGrade, type Attempt } from "@/lib/hifz/review";
+import {
+  combineHalves,
+  emptyAttempt,
+  proposedHalvesRating,
+  savePageGrade,
+  saveRemediationGrade,
+  type Attempt,
+} from "@/lib/hifz/review";
 import { Rating } from "@/lib/fsrs/scheduler";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
@@ -115,6 +122,58 @@ describe("half pages and seams from a page grade", () => {
     expect(again?.row.id).toBe("half:madani15:5:b");
     await graded(again.row, nextDay);
     expect(await ids(new Date(nextDay.getTime() + 40 * 24 * 60 * MINUTE))).toEqual([]);
+  });
+
+  it("grades a page recited in halves once, proposing the lower half's grade and relearning the half that held the errors (UNIT-02)", async () => {
+    const cards = await loadPageCards(store.db, { today: TODAY, plan });
+    const card = cards.find((candidate) => candidate.page === 5)!;
+    // The first half is clean at hidden text; the second needed Show me at first letters.
+    const a: Attempt = emptyAttempt(4);
+    const b: Attempt = { ...emptyAttempt(1), shown: [wordOn(12)], slips: 1 };
+    expect(proposedHalvesRating({ a, b })).toBe(Rating.Again);
+    expect(proposedHalvesRating({ a, b: { ...emptyAttempt(4), peeked: [wordOn(10)] } })).toBe(Rating.Hard);
+    expect(proposedHalvesRating({ a: emptyAttempt(0), b })).toBe(0);
+    const result = await savePageGrade(store.db, {
+      card: card.row,
+      history: card.history,
+      plan,
+      halves: { a, b },
+      rating: Rating.Again,
+      firstToken: page.lines[0].tokens[0],
+      session: null,
+      durationMs: 3 * MINUTE,
+      now: start,
+      page,
+    });
+    expect(result.remediation).toEqual({ half: "b", seam: null });
+    // One review of the page, at the lower half's level, with the lower half's proposal.
+    expect(store.sql.prepare("SELECT card_id, rating, support_level, proposed_rating, error_count FROM study_log").all()).toEqual([
+      { card_id: card.row.id, rating: Rating.Again, support_level: 1, proposed_rating: Rating.Again, error_count: 2 },
+    ]);
+    expect(await ids(new Date(start.getTime() + 10 * MINUTE))).toEqual(["half:madani15:5:b"]);
+  });
+
+  it("caps a page recited in halves by the lower half's support level", async () => {
+    const cards = await loadPageCards(store.db, { today: TODAY, plan });
+    const card = cards.find((candidate) => candidate.page === 5)!;
+    expect(combineHalves({ a: emptyAttempt(4), b: emptyAttempt(1) }).level).toBe(1);
+    await savePageGrade(store.db, {
+      card: card.row,
+      history: card.history,
+      plan,
+      halves: { a: emptyAttempt(1), b: { ...emptyAttempt(4), seam: { clean: true, surah: 2, ayah: 16 } } },
+      rating: Rating.Easy,
+      firstToken: page.lines[0].tokens[0],
+      session: null,
+      durationMs: 3 * MINUTE,
+      now: start,
+      page,
+    });
+    expect(store.sql.prepare("SELECT rating, support_level, proposed_rating FROM study_log").get()).toEqual({
+      rating: Rating.Hard,
+      support_level: 1,
+      proposed_rating: Rating.Hard,
+    });
   });
 
   it("leaves halves alone when errors span the page or the grade is not Again", async () => {

@@ -85,6 +85,35 @@ export function proposedRating(attempt: Attempt): 0 | Rating {
   return proposeRating(attemptEvents(attempt), attempt.level, { fluent: false });
 }
 
+/**
+ * UNIT-02 half-page review: one page recited as its first half, then its second, each revealed and
+ * checked on its own. The page is still the card that is graded and logged, once.
+ */
+export type HalfAttempts = Readonly<{ a: Attempt; b: Attempt }>;
+
+/**
+ * The page's attempt from its two halves: every error of either half, at the lower support level of
+ * the two, since a lower level caps the grade (GRD-03). The seam is checked after the second half.
+ * Mark keys name the word's position, so the halves' marks never collide.
+ */
+export function combineHalves({ a, b }: HalfAttempts): Attempt {
+  return {
+    level: Math.min(a.level, b.level) as SupportLevel,
+    peeked: [...a.peeked, ...b.peeked],
+    shown: [...a.shown, ...b.shown],
+    slips: a.slips + b.slips,
+    marks: new Map([...a.marks, ...b.marks]),
+    seam: b.seam,
+  };
+}
+
+/** A page recited in halves proposes the lower of its halves' grades, and none when either half was not gradable. */
+export function proposedHalvesRating(halves: HalfAttempts): 0 | Rating {
+  const a = proposedRating(halves.a);
+  const b = proposedRating(halves.b);
+  return a === 0 || b === 0 ? 0 : (Math.min(a, b) as Rating);
+}
+
 function location(token: PageToken): Pick<RecitationErrorInput, "surah" | "ayah" | "word"> {
   return { surah: token.surah, ayah: token.ayah, word: token.wordPos };
 }
@@ -168,12 +197,16 @@ async function completeManzilCycleIfDone(
   return true;
 }
 
-export type PageGradeInput = Readonly<{
+/** How the page was recited: whole, or in two halves (UNIT-02), whose combined attempt is graded. */
+type PageRecitation =
+  | Readonly<{ attempt: Attempt; halves?: undefined }>
+  | Readonly<{ halves: HalfAttempts; attempt?: undefined }>;
+
+export type PageGradeInput = PageRecitation & Readonly<{
   /** The page as the screen loaded it. The grade reads the current card and history in its transaction. */
   card: StudyCardRow;
   history: PageHistory;
   plan: HifzPlan;
-  attempt: Attempt;
   rating: Grade;
   firstToken: PageToken;
   session: ReviewSessionRef | null;
@@ -204,26 +237,28 @@ export async function savePageGrade(
 ): Promise<ReviewSaveResult & { tier: Tier; remediation: PageRemediation }> {
   const now = input.now ?? new Date();
   const today: LocalDate = localDateOf(now);
-  const level = input.attempt.level;
+  // Errors marked in either half count as the page's, for the log, SCH-08 and SCH-06 alike.
+  const attempt = input.halves ? combineHalves(input.halves) : input.attempt;
+  const level = attempt.level;
   const rating = input.grader === "salah" ? input.rating : (capRating(input.rating as Rating, level) as Grade);
   const base = await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID);
   /** The page's tier after this grade, derived inside the transaction from its current history. */
   let after = null as Tier | null;
-  const proposed = input.grader === "salah" ? null : proposedRating(input.attempt);
+  const proposed =
+    input.grader === "salah" ? null : input.halves ? proposedHalvesRating(input.halves) : proposedRating(attempt);
   const recited = input.grader !== "salah";
   const page = parsePageUnit(input.card.id);
   const pageNumber = page?.kind === "page" ? page.page : null;
   // SCH-08: an Again with every error in one half relearns that half from 10 minutes.
-  const half = recited && rating === 1 && input.page ? errorHalf(input.page, errorTokens(input.attempt)) : null;
+  const half = recited && rating === 1 && input.page ? errorHalf(input.page, errorTokens(attempt)) : null;
   // SCH-06: a clean continuation counts for the seam after a Good or Easy page; a stumble always does.
-  const seamStumbled =
-    input.attempt.seam?.clean === false || [...input.attempt.marks.values()].some((mark) => mark.type === "seam");
+  const seamStumbled = attempt.seam?.clean === false || [...attempt.marks.values()].some((mark) => mark.type === "seam");
   const seam: PageRemediation["seam"] =
     !recited || pageNumber === null || !hasSeamAfter(pageNumber)
       ? null
       : seamStumbled
         ? "lapsed"
-        : input.attempt.seam?.clean && rating >= 3
+        : attempt.seam?.clean && rating >= 3
           ? "clean"
           : null;
   const result = await persistReviewTransition({
@@ -258,7 +293,7 @@ export async function savePageGrade(
       supportLevel: input.grader === "salah" ? null : level,
       proposedRating: proposed === 0 ? null : proposed,
       grader: input.grader ?? "self",
-      errors: input.grader === "salah" ? [] : attemptErrors(input.attempt, input.firstToken),
+      errors: input.grader === "salah" ? [] : attemptErrors(attempt, input.firstToken),
       dhuhr: input.dhuhr,
     },
     extraWork: async (tx) => {
@@ -267,7 +302,7 @@ export async function savePageGrade(
       if (seam && pageNumber !== null) await reviewSeam(tx, { page: pageNumber, clean: seam === "clean", now });
       // SCH-07, MUT-04: a drift into a similar verse brings that pair's cards due within a day.
       if (input.grader !== "salah") {
-        for (const mark of input.attempt.marks.values()) {
+        for (const mark of attempt.marks.values()) {
           if (mark.type === "mutashabih_drift") await bringSimilarCardsForward(tx, { surah: mark.token.surah, ayah: mark.token.ayah, now });
         }
       }

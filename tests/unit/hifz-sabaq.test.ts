@@ -10,6 +10,8 @@ import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { getDeckTodayStats, loadReviewQueue, readDeckReviewSettings, REVIEW_DECK_IDS } from "@/lib/fsrs/queries";
 import { Rating, State, type Grade } from "@/lib/fsrs/scheduler";
 import type { StudyCardRow } from "@/lib/fsrs/types";
+import { getSmartDeckCandidateCardIds, readSmartDeckFilter, SMART_DECK_IDS, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
+import { filterCoveringSpans, switchToPageReview, UNIT_SWITCH_SUSPENDED_AT } from "@/lib/hifz/unit-switch";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 const TODAY = "2026-11-13";
@@ -42,6 +44,39 @@ describe("new page order (3.3)", () => {
     expect(order.slice(0, 3)).toEqual([21, 41, 61]);
     expect(order[29]).toBe(604);
     expect(order[30]).toBe(20);
+  });
+});
+
+describe("the ayah decks' scope for a page memorized in ayah review (UNIT-02)", () => {
+  const span = (surah: number, first: number, last: number, count: number) => ({ surah, first, last, count });
+
+  it("takes in a new surah whole or as the page's range, and grows a range to take the page", () => {
+    const filter = { type: "surah" as const, surahs: [2], ranges: [{ surah: 2, ayahStart: 6, ayahEnd: 16 }] };
+    expect(filterCoveringSpans(filter, [span(1, 1, 7, 7), span(78, 31, 40, 40)])).toEqual({
+      type: "surah",
+      surahs: [1, 2, 78],
+      ranges: [
+        { surah: 2, ayahStart: 6, ayahEnd: 16 },
+        { surah: 78, ayahStart: 31, ayahEnd: 40 },
+      ],
+    });
+    expect(filterCoveringSpans(filter, [span(2, 1, 5, 286)])).toEqual({
+      type: "surah",
+      surahs: [2],
+      ranges: [{ surah: 2, ayahStart: 1, ayahEnd: 16 }],
+    });
+    // A range that reaches the whole surah becomes the whole surah.
+    expect(filterCoveringSpans({ type: "surah", surahs: [78], ranges: [{ surah: 78, ayahStart: 31, ayahEnd: 40 }] }, [span(78, 1, 30, 40)])).toEqual({
+      type: "surah",
+      surahs: [78],
+    });
+  });
+
+  it("changes nothing that already covers the page", () => {
+    expect(filterCoveringSpans({ type: "surah", surahs: [1] }, [span(1, 1, 7, 7)])).toBeNull();
+    expect(filterCoveringSpans({ type: "surah", surahs: [2], ranges: [{ surah: 2, ayahStart: 1, ayahEnd: 16 }] }, [span(2, 6, 16, 286)])).toBeNull();
+    expect(filterCoveringSpans({ type: "all" }, [span(1, 1, 7, 7)])).toBeNull();
+    expect(filterCoveringSpans({ type: "juz", juzNumbers: [30] }, [span(1, 1, 7, 7)])).toBeNull();
   });
 });
 
@@ -119,6 +154,53 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(today.todo).toEqual([]);
     const tomorrow = (await loadTodayWird(store.db, atLocalTime(addDays(TODAY, 1), 9 * 60)))!;
     expect(tomorrow.todo.map((page) => page.cardId)).toEqual([pageCardId(1)]);
+  });
+
+  it("in ayah review, sets a completed page aside and gives its ayat ayah cards within the ayah decks' scope (UNIT-02)", async () => {
+    const ayahPlan = { ...plan, unit: "ayah" as const };
+    await writeHifzPlan(store.db, ayahPlan);
+    // The ayah decks follow the memorized surahs, which do not include al-Fatihah yet.
+    await writeAllDecksFilter(store.db, { type: "surah", surahs: [2] });
+    // An ayah card already reviewed keeps its own schedule.
+    store.sql
+      .prepare(
+        `INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses,
+           state, last_review, created_at, updated_at)
+         VALUES ('1:7', ?, '2026-11-20T00:00:00.000Z', 30, 4, 0, 7, 0, 3, 0, 2, '2026-11-10T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')`,
+      )
+      .run(SMART_DECK_IDS.retention);
+    const whole = (await nextSabaqTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null }))!;
+    const now = atLocalTime(TODAY, 600);
+    const saved = await completeSabaqChunk(store.db, { target: whole, plan: ayahPlan, rating: Rating.Good, session: null, durationMs: 600_000, now });
+    expect(saved.pageAdded).toBe(true);
+
+    // The page card is kept for page review but set aside like a switch, so no page task appears.
+    expect(store.sql.prepare("SELECT tier, created_at, suspended_at FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual({
+      tier: "sabqi",
+      created_at: now.toISOString(),
+      suspended_at: UNIT_SWITCH_SUSPENDED_AT,
+    });
+    const tomorrow = atLocalTime(addDays(TODAY, 1), 9 * 60);
+    expect((await loadTodayWird(store.db, tomorrow))!).toMatchObject({ todo: [], total: 0 });
+    expect(await nextSabaqTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null })).toBeNull();
+
+    // Each new ayah enters ayah review from the chunk's schedule, due tomorrow.
+    const chunk = store.sql.prepare("SELECT stability, difficulty FROM study_cards WHERE id LIKE 'chunk:%'").get() as { stability: number; difficulty: number };
+    const due = atLocalTime(addDays(TODAY, 1), 0).toISOString();
+    expect(store.sql.prepare("SELECT id, state, stability, difficulty, due, suspended_at FROM study_cards WHERE deck_id = ? ORDER BY id").all(SMART_DECK_IDS.retention)).toEqual([
+      ...[1, 2, 3, 4, 5, 6].map((ayah) => ({ id: `1:${ayah}`, state: State.Review, ...chunk, due, suspended_at: null })),
+      { id: "1:7", state: State.Review, stability: 30, difficulty: 4, due: "2026-11-20T00:00:00.000Z", suspended_at: null },
+    ]);
+    expect(await readSmartDeckFilter(store.db, SMART_DECK_IDS.retention)).toEqual({ type: "surah", surahs: [1, 2] });
+    expect(await getSmartDeckCandidateCardIds(store.db, SMART_DECK_IDS.retention)).toEqual([1, 2, 3, 4, 5, 6, 7].map((ayah) => `1:${ayah}`));
+
+    // A switch to page review brings the page back as a sabqi page.
+    await writeHifzPlan(store.db, plan);
+    await store.db.withTransactionAsync(async (tx) => {
+      await switchToPageReview(tx, { previousUnit: "ayah", now: atLocalTime(addDays(TODAY, 1), 8 * 60) });
+    });
+    const pages = (await loadTodayWird(store.db, tomorrow))!;
+    expect(pages.todo.map((page) => [page.cardId, page.tier])).toEqual([[pageCardId(1), "sabqi"]]);
   });
 
   it("does not add the page when the fluent check of its last chunk fails", async () => {
