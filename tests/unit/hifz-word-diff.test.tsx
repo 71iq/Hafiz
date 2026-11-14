@@ -55,6 +55,9 @@ describe("words that tell similar verses apart", () => {
       ["ٱلصَّلَوٰةَ", "الصَّلَاةَ"],
       ["ٱلسَّمَٰوَٰتِ", "السَّمَاوَاتِ"],
       ["أُو۟لَٰٓئِكَ", "أُولَـٰئِكَ"],
+      // Inside a word, before a suffix, alif maqsura with a dagger alif is written as alif (79:32, 47:17).
+      ["أَرْسَىٰهَا", "أَرْسَاهَا"],
+      ["تَقْوَىٰهُمْ", "تَقْوَاهُمْ"],
     ]) {
       expect(wordKey(uthmani)).toBe(wordKey(plain));
     }

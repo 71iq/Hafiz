@@ -23,13 +23,16 @@ export function differingWords(own: readonly string[], others: readonly (readonl
  * A word as compared: Uthmani and plain spellings of one word match. The dagger alif of the Uthmani
  * text stands for the full alif of the plain one ("خَٰلِدِينَ", "خَالِدِينَ"), and runs of alif collapse,
  * since normalizeArabicWord drops the dagger alif but keeps a full one. Over alif maqsura it is only
- * the vowel, which plain spelling leaves out ("يَسْعَىٰ", "يَسْعَى"), so it is dropped there. A waw
+ * the vowel, which plain spelling leaves out ("يَسْعَىٰ", "يَسْعَى"), so it is dropped there; inside a
+ * word, before a suffix, plain spelling writes that sound as alif ("أَرْسَىٰهَا", "أَرْسَاهَا"). A waw
  * that carries it with no vowel of its own is the Uthmani way of writing that alif ("ٱلصَّلَوٰةَ",
  * "الصَّلَاةَ"); a waw with its own vowel, as in "ٱلسَّمَٰوَٰتِ", stays a waw.
  */
 export function wordKey(word: string): string {
   return remembered(wordKeys, word, () => {
     const spelled = word
+      // Inside a word, before a suffix, it is written as alif ("أَرْسَىٰهَا", "أَرْسَاهَا").
+      .replace(/\u0649\u0670(?=[\u064B-\u065F\u06D6-\u06ED]*[\u0621-\u064A])/g, "ا")
       .replace(/\u0649\u0670/g, "\u0649")
       .replace(/\u0648\u0670/g, "ا")
       .replace(/\u0670/g, "ا");
