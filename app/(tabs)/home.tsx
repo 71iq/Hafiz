@@ -106,6 +106,8 @@ export default function HomeScreen() {
   const mirroredRowStyle = isRTL ? ({ direction: "ltr" } as const) : undefined;
   const compactDeckCards = width <= VIEWPORT_BREAKPOINTS.phoneLarge;
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
+  /** The header row's width, measured, so Start Review can take its own full-width line when needed. */
+  const [headerWidth, setHeaderWidth] = useState(0);
   const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({
     total: 0,
     dueCount: 0,
@@ -118,6 +120,8 @@ export default function HomeScreen() {
     (sum, deck) => sum + deck.dueCount + deck.newCount,
     vocabStats.dueCount + vocabStats.newCount,
   );
+  // Due counts of three digits widen the big number by about 38 px.
+  const headerStacked = headerWidth > 0 && headerWidth < (totalDue >= 100 ? 370 : 330);
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
   const { wird, inboxCount, monthlyCheckDue, refresh: refreshWird } = useTodayWird(db);
@@ -451,11 +455,13 @@ export default function HomeScreen() {
         {latestUnlock && <AchievementUnlockToast unlock={latestUnlock} onDismiss={dismissLatestUnlock} />}
 
         <View className="mb-6">
-          {/* The counts keep their own width; Start Review moves to its own line when they need the
-              room (a narrow phone, or a three-digit due count), instead of running into them. */}
+          {/* The counts and Start Review share a row when there is room (about 330 px, 370 px with a
+              three-digit due count). Otherwise Start Review takes its own full-width line below the
+              counts, the same in both languages, instead of wrapping as a stray pill. */}
           <View
-            className={`flex-row flex-wrap items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
-            style={mirroredRowStyle}
+            onLayout={(event) => setHeaderWidth(Math.round(event.nativeEvent.layout.width))}
+            className={headerStacked ? "gap-3" : `flex-row items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+            style={headerStacked ? undefined : mirroredRowStyle}
           >
             <View
               className={`grow shrink-0 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
@@ -498,7 +504,7 @@ export default function HomeScreen() {
             {totalDue > 0 && (
               <Pressable
                 onPress={() => handleStartReview()}
-                className={`rounded-full bg-primary-accent px-4 py-3 flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
+                className={`rounded-full bg-primary-accent px-4 py-3 flex-row items-center gap-2 ${headerStacked ? "justify-center" : ""} ${isRTL ? "flex-row-reverse" : ""}`}
                 accessibilityRole="button"
                 style={({ pressed }) => ({ ...(mirroredRowStyle ?? {}), transform: [{ scale: pressed ? 0.97 : 1 }] })}
               >

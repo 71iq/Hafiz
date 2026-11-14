@@ -14,10 +14,12 @@ type Props = {
   confirmLabel: string;
   destructive?: boolean;
   /**
-   * "warning" (the default) shows the alert icon. "neutral" is for a confirmation that loses nothing,
-   * such as leaving a review whose grades are already saved.
+   * "warning" (the default) shows the alert icon. "neutral" leaves it out, for a calm confirmation
+   * such as leaving a review whose grades are already saved, or a lesson that can be started again.
    */
   tone?: "warning" | "neutral";
+  /** "cancel" fills the cancel button instead, when staying is the choice to encourage. */
+  emphasis?: "confirm" | "cancel";
   confirmLoading?: boolean;
   confirmDisabled?: boolean;
   error?: string | null;
@@ -35,6 +37,7 @@ export function ConfirmDialog({
   confirmLabel,
   destructive,
   tone = "warning",
+  emphasis = "confirm",
   confirmLoading = false,
   confirmDisabled = false,
   error,
@@ -90,21 +93,32 @@ export function ConfirmDialog({
         </View>
       </OverlayBody>
       <OverlayFooter isRTL={isRTL}>
-        <Button variant="outline" onPress={onCancel} disabled={confirmLoading} className="flex-1">
-          <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+        <Button
+          variant={emphasis === "cancel" ? "default" : "outline"}
+          onPress={onCancel}
+          disabled={confirmLoading}
+          className="flex-1"
+        >
+          <Text
+            className={emphasis === "cancel" ? "text-white" : "text-charcoal dark:text-neutral-200"}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+          >
             {cancelLabel}
           </Text>
         </Button>
         <Button
-          variant={destructive ? "destructive" : "default"}
+          variant={emphasis === "cancel" ? "outline" : destructive ? "destructive" : "default"}
           onPress={onConfirm}
           disabled={confirmLoading || confirmDisabled}
           className="flex-1"
         >
           {confirmLoading ? (
-            <BusyIndicator size="small" color="#FFFFFF" />
+            <BusyIndicator size="small" color={emphasis === "cancel" ? (isDark ? "#e5e5e5" : "#2B2B2B") : "#FFFFFF"} />
           ) : (
-            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+            <Text
+              className={emphasis === "cancel" ? "text-charcoal dark:text-neutral-200" : "text-white"}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+            >
               {confirmLabel}
             </Text>
           )}

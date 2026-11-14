@@ -187,6 +187,39 @@ describe("Board tab", () => {
     );
   });
 
+  it("says the matched halaqa was left after joining as a reader under 18 (ETH-07)", async () => {
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation(async (fn, args) =>
+      fn === "get_my_halaqas"
+        ? {
+            data: [
+              {
+                id: "10000000-0000-4000-8000-0000000000aa",
+                kind: "matched",
+                name: null,
+                invite_code: null,
+                member_count: 12,
+                role: "member",
+                is_creator: false,
+                share_consistency: true,
+                share_juz: false,
+                share_plan_with_teachers: false,
+                share_grades_with_teachers: false,
+              },
+            ],
+            error: null,
+          }
+        : base(fn, args),
+    );
+    const screen = renderScreen();
+    await screen.findByText(strings.en.boardIntentionTitle);
+    fireEvent.press(screen.getByRole("switch", { name: strings.en.boardMinorToggle }));
+    fireEvent.changeText(screen.getByLabelText(strings.en.boardNicknameLabel), "Little Star");
+    fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
+    expect(await screen.findByText(strings.en.socialLeftMatched)).toBeTruthy();
+  });
+
   it("shows standings with name, points and streak, and leaves in one tap (BRD-05, BRD-04)", async () => {
     signIn(USER);
     boardState = ready;

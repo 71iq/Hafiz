@@ -109,7 +109,7 @@ export function HalaqaStart({
               {s.halaqaEmptyTitle}
             </Text>
             <Text variant="body-sm" align="center" className="text-warm-700 dark:text-neutral-300">
-              {s.halaqaEmptyBody}
+              {matchedAllowed ? s.halaqaEmptyBody : s.halaqaEmptyBodyInviteOnly}
             </Text>
           </View>
         )}
@@ -131,10 +131,18 @@ export function HalaqaStart({
                 </Text>
               </>
             ) : null}
-            <Button variant="outline" className="border border-warm-300 dark:border-neutral-700" onPress={() => open("join")} disabled={pending}>
+            {/* Without the matched join (under 18), joining with a code is the main action. */}
+            <Button
+              variant={matchedAllowed ? "outline" : "default"}
+              className={matchedAllowed ? "border border-warm-300 dark:border-neutral-700" : undefined}
+              onPress={() => open("join")}
+              disabled={pending}
+            >
               <View className="items-center gap-2" style={socialRowStyle(isRTL)}>
-                <KeyRound size={16} color={accent} />
-                <Text variant="title-sm">{s.halaqaJoinCode}</Text>
+                <KeyRound size={16} color={matchedAllowed ? accent : "#FFFFFF"} />
+                <Text variant="title-sm" className={matchedAllowed ? undefined : "text-white"}>
+                  {s.halaqaJoinCode}
+                </Text>
               </View>
             </Button>
             <Button variant="outline" className="border border-warm-300 dark:border-neutral-700" onPress={() => open("create")} disabled={pending}>

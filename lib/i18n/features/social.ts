@@ -47,6 +47,7 @@ export const socialStrings = {
     halaqaEmptyTitle: "Find your halaqa",
     halaqaEmptyBody:
       "Join friends, family or a class with an invite code, or let Hafiz match you with about 20 people at a similar level and pace.",
+    halaqaEmptyBodyInviteOnly: "Join friends, family or a class with an invite code, or create a halaqa of your own.",
     halaqaCreate: "Create a halaqa",
     halaqaJoinCode: "Join with a code",
     halaqaJoinMatched: "Join a matched halaqa",
@@ -125,6 +126,7 @@ export const socialStrings = {
       "Under 18s are never shown on public profiles, and appear on the Board only under a nickname and without a photo. If you turn this on, you leave your matched halaqa, since matched halaqas are for adults. Halaqas you joined with an invite code are kept.",
     socialSaved: "Saved",
     socialSavedLeftMatched: "Saved. You have left your matched halaqa, which is for adults. Your invite halaqas are unchanged.",
+    socialLeftMatched: "You have left your matched halaqa, which is for adults. Your invite halaqas are unchanged.",
 
     teacherViewTitle: "{{name}}'s progress",
     teacherViewNote: "Hafiz supports a teacher's work and never replaces it.",
@@ -222,6 +224,7 @@ export const socialStrings = {
     halaqaSignInBody: "الحلقة ترافقك في وِردك مع الأصدقاء أو الأهل أو الفصل أو مجموعة مقترحة. القراءة والسلسلة تعملان دون حساب.",
     halaqaEmptyTitle: "اعثر على حلقتك",
     halaqaEmptyBody: "انضم إلى الأصدقاء أو الأهل أو فصلك برمز دعوة، أو دع حافظ يقترح لك حلقة من نحو عشرين شخصًا في مستوى ووتيرة قريبين.",
+    halaqaEmptyBodyInviteOnly: "انضم إلى الأصدقاء أو الأهل أو فصلك برمز دعوة، أو أنشئ حلقة خاصة بك.",
     halaqaCreate: "أنشئ حلقة",
     halaqaJoinCode: "انضم برمز",
     halaqaJoinMatched: "انضم إلى حلقة مقترحة",
@@ -299,6 +302,7 @@ export const socialStrings = {
       "لا يظهر من هم دون الثامنة عشرة في الملفات العامة، ولا يظهرون في اللوحة إلا بلقب ودون صورة. عند تفعيل هذا الخيار تغادر حلقتك المقترحة لأنها للبالغين، وتبقى في الحلقات التي انضممت إليها برمز دعوة.",
     socialSaved: "حُفظ",
     socialSavedLeftMatched: "حُفظ. غادرتَ حلقتك المقترحة لأنها للبالغين، وحلقات الدعوة باقية كما هي.",
+    socialLeftMatched: "غادرتَ حلقتك المقترحة لأنها للبالغين، وحلقات الدعوة باقية كما هي.",
 
     teacherViewTitle: "تقدّم {{name}}",
     teacherViewNote: "يعين حافظ المعلّم في عمله ولا يغني عنه.",

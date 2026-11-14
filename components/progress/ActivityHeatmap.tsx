@@ -310,9 +310,10 @@ export function ActivityHeatmap({
                         fontFamily: "Manrope_500Medium",
                         fontSize: 10,
                         color: LABEL_COLOR(isDark),
-                        paddingEnd: DAY_LABEL_GAP,
-                        // Toward the grid: the end of the label column.
+                        // Toward the grid: the end of the label column. The grid row is laid out
+                        // left to right in both languages, so the gap is a physical side.
                         ...textEndStyle(isRTL),
+                        ...(isRTL ? { paddingLeft: DAY_LABEL_GAP } : { paddingRight: DAY_LABEL_GAP }),
                         writingDirection: isRTL ? "rtl" : "ltr",
                         width: DAY_LABEL_WIDTH,
                       }}

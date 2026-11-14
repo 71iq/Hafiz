@@ -3,7 +3,9 @@ import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } fr
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { ChevronDown, Heart, Send } from "lucide-react-native";
 import { router } from "expo-router";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
+import { requireSocialOwner } from "@/lib/social/owner";
 import { useAuthStore } from "@/lib/auth/store";
 import { hapticLight } from "@/lib/haptics";
 import { useSettings } from "@/lib/settings/context";
@@ -61,6 +63,14 @@ export function CommentsSheet({
   const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
+  // ETH-07: a stated minor's comments are visible only to them, read from the cache the app-wide
+  // minor check keeps (useMinorPhotoCleanup).
+  const ownPrivacy = useQuery({
+    queryKey: profilePrivacyKeys.mine(user?.id ?? null),
+    queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
+    enabled: false,
+  });
+  const isMinor = ownPrivacy.data?.isMinor === true;
   const [localComments, setLocalComments] = useState<ReflectionComment[]>([]);
   const [sort, setSort] = useState<ReflectionCommentSort>("oldest");
   const [sortOpen, setSortOpen] = useState(false);
@@ -508,6 +518,21 @@ export function CommentsSheet({
             )}
           </OverlayBody>
 
+          {user && isMinor ? (
+            <Text
+              className="mx-5 mb-2"
+              style={{
+                fontFamily: "Manrope_400Regular",
+                fontSize: 12,
+                lineHeight: 18,
+                color: isDark ? "#a3a3a3" : "#6E5A47",
+                ...textStartStyle(isRTL),
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {s.reflectionMinorPrivate}
+            </Text>
+          ) : null}
           {user ? (
             <View
               className={`mx-5 mb-4 items-center gap-2 rounded-2xl border border-warm-200 bg-surface-low px-3.5 py-2.5 dark:border-neutral-700 dark:bg-surface-dark-low ${isRTL ? "flex-row-reverse" : "flex-row"}`}

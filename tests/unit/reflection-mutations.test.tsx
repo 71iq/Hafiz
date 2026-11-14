@@ -383,6 +383,7 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     });
     const minor = render(sheet, { wrapper });
     expect(minor.getByText(strings[locale].reflectionMinorPrivate)).toBeTruthy();
+    expect(minor.getByPlaceholderText(strings[locale].reflectionPlaceholderPrivate)).toBeTruthy();
   });
   it("does not dispatch a public post after its index wait loses the source", async () => {
     const pending = deferred(index);

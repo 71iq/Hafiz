@@ -82,8 +82,9 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
   },
   {
     file: "components/progress/ActivityHeatmap.tsx",
-    pattern: /left|marginLeft|marginRight/,
-    reason: "Heatmap cells and month labels use chart coordinates; chronology must be checked explicitly later.",
+    pattern: /left|marginLeft|marginRight|paddingLeft|paddingRight/,
+    reason:
+      "Heatmap cells and month labels use chart coordinates in a row laid out left to right; the weekday labels' gap toward the grid is a physical side for the same reason. Chronology must be checked explicitly later.",
   },
   {
     file: "components/ui/AppNavigation.tsx",

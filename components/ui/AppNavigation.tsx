@@ -85,6 +85,7 @@ function BottomTabItem({
   onLongPress,
   isDark,
   compact,
+  labelScaleCap,
 }: {
   route: any;
   descriptor: any;
@@ -93,6 +94,8 @@ function BottomTabItem({
   onLongPress: () => void;
   isDark: boolean;
   compact: boolean;
+  /** The largest system text scale at which all six labels still fit this bar. */
+  labelScaleCap: number;
 }) {
   const scale = useSharedValue(1);
   const reduceMotion = useReducedMotionPreference();
@@ -127,8 +130,9 @@ function BottomTabItem({
       {/* The pill hugs the label; the press target is the item's whole share of the bar. */}
       <View style={[styles.bottomTabItem, compact && styles.bottomTabItemCompact, isFocused && styles.bottomTabItemActive]}>
         {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
-        {/* Six labels fill a 320 px bar, so larger system text is capped at 1.2x to keep them whole. */}
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={[styles.bottomLabel, { color: iconColor }]}>
+        {/* Six labels fill the bar: at 320 px they need all of it, at 360 px they fit up to about 1.08x
+            and from 390 px up to about 1.2x, so larger system text is capped by width to keep them whole. */}
+        <Text numberOfLines={1} maxFontSizeMultiplier={labelScaleCap} style={[styles.bottomLabel, { color: iconColor }]}>
           {label}
         </Text>
       </View>
@@ -212,6 +216,7 @@ function BottomBar(props: BottomTabBarProps) {
             onLongPress={onLongPress}
             isDark={isDark}
             compact={compact}
+            labelScaleCap={width < 360 ? 1 : width < 390 ? 1.08 : 1.2}
           />
         );
       })}

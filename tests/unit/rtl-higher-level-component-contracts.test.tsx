@@ -178,6 +178,24 @@ describe("RTL higher-level component contracts", () => {
     warning.unmount();
     const neutral = renderInSafeArea(dialog("neutral"));
     expect(warningIcons(neutral)).toHaveLength(0);
+    neutral.unmount();
+    // Emphasis on staying fills the cancel button and outlines the confirm one.
+    const stay = renderInSafeArea(
+      <ConfirmDialog
+        visible
+        title="Leave this lesson?"
+        message="These lines are saved only after the fluent check."
+        cancelLabel="Keep going"
+        confirmLabel="Leave"
+        tone="neutral"
+        emphasis="cancel"
+        isDark={false}
+        onCancel={jest.fn()}
+        onConfirm={jest.fn()}
+      />,
+    );
+    expect(stay.getByText("Keep going").props.className).toContain("text-white");
+    expect(stay.getByText("Leave").props.className).not.toContain("text-white");
   });
 
   it("ConfirmDialog passes explicit RTL direction through message and action chrome", () => {

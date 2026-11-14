@@ -10,6 +10,7 @@ import { SocialScreen } from "@/components/social/SocialScreen";
 import { StandingsSkeleton } from "@/components/social/SocialSkeletons";
 import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys, boardRead, joinBoard, leaveBoard } from "@/lib/board/api";
+import { myHalaqasRead } from "@/lib/halaqa/api";
 import { useDatabase } from "@/lib/database/provider";
 import { localDateOf } from "@/lib/habit/dates";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -17,6 +18,7 @@ import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { useSettings } from "@/lib/settings/context";
 import { socialFailureMessage } from "@/lib/social/messages";
 import { requireSocialOwner } from "@/lib/social/owner";
+import { readSocial } from "@/lib/social/remote";
 import { readLocalBoardInputs } from "@/lib/social/queries";
 import { formatSocialDate } from "@/lib/social/text";
 import { useIsOffline, useSocialQuery } from "@/lib/social/use-social-query";
@@ -65,6 +67,7 @@ function BoardContent({ userId }: { userId: string }) {
   const today = localDateOf(new Date());
   const [joinError, setJoinError] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Bands come from the local plan and memorized cards (8.13), and the week start from the wird
   // settings; the server picks the cohort.
@@ -93,11 +96,23 @@ function BoardContent({ userId }: { userId: string }) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) });
 
   const join = useMutation({
-    mutationFn: (choice: { nickname: string | null; isMinor: boolean }) => {
+    mutationFn: async (choice: { nickname: string | null; isMinor: boolean }) => {
       if (!inputs.data) throw new Error("Board inputs are not ready");
-      return joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
+      const owner = requireSocialOwner(userId);
+      // ETH-07: joining as a minor for the first time leaves a matched halaqa, so the screen says so.
+      // Whether there was one is read first; a failed read only means the note is not shown.
+      const leavesMatched =
+        choice.isMinor && privacy.data?.isMinor !== true
+          ? await readSocial(myHalaqasRead(), owner).then(
+              (groups) => groups.some((group) => group.kind === "matched"),
+              () => false,
+            )
+          : false;
+      await joinBoard({ ...choice, inputs: inputs.data, today }, owner);
+      return { leavesMatched };
     },
-    onSuccess: async (_result, choice) => {
+    onSuccess: async (result, choice) => {
+      if (result.leavesMatched) setNotice(s.socialLeftMatched);
       await Promise.all([
         refresh(),
         queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) }),
@@ -129,6 +144,7 @@ function BoardContent({ userId }: { userId: string }) {
         <SocialNotice icon={CloudOff} message={interpolate(s.socialCachedAt, { date: formatSocialDate(savedAt, language, true) })} />
       ) : null}
       {leaveError ? <SocialNotice message={leaveError} actionLabel={s.socialDismiss} onAction={() => setLeaveError(null)} /> : null}
+      {notice ? <SocialNotice message={notice} actionLabel={s.socialDismiss} onAction={() => setNotice(null)} /> : null}
 
       {loading ? (
         <StandingsSkeleton label={s.loading} />

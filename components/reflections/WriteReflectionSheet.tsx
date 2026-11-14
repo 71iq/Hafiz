@@ -233,7 +233,7 @@ export function WriteReflectionSheet({
               editable={!submitting}
               value={content}
               onChangeText={setContent}
-              placeholder={s.reflectionPlaceholder}
+              placeholder={isMinor ? s.reflectionPlaceholderPrivate : s.reflectionPlaceholder}
               placeholderTextColor={mutedColor}
               multiline
               maxLength={5000}
@@ -269,7 +269,9 @@ export function WriteReflectionSheet({
                   fontFamily: "Manrope_400Regular",
                   fontSize: 12,
                   lineHeight: 18,
-                  color: mutedColor,
+                  // A readable tone (about 6:1 and 7:1), not the placeholder's: this line tells a
+                  // young writer who can see what they write.
+                  color: isDark ? "#a3a3a3" : "#6E5A47",
                   marginBottom: 8,
                   ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",

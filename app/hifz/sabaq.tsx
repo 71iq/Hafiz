@@ -581,6 +581,7 @@ function SabaqScreen() {
         cancelLabel={s.hifzSabaqExitStay}
         confirmLabel={s.hifzSabaqExitLeave}
         tone="neutral"
+        emphasis="cancel"
         isDark={isDark}
         isRTL={isRTL}
         onCancel={() => {

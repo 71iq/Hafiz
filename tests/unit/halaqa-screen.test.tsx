@@ -228,6 +228,9 @@ describe("Halaqa tab", () => {
     expect(await screen.findByText(strings.en.halaqaEmptyTitle)).toBeTruthy();
     expect(screen.queryByRole("button", { name: strings.en.halaqaJoinMatched })).toBeNull();
     expect(screen.getByText(strings.en.halaqaJoinCode)).toBeTruthy();
+    // The card does not describe matching it cannot offer.
+    expect(screen.getByText(strings.en.halaqaEmptyBodyInviteOnly)).toBeTruthy();
+    expect(screen.queryByText(strings.en.halaqaEmptyBody)).toBeNull();
   });
 
   it("says the matched halaqa was left when saving turns on under 18 there", async () => {
