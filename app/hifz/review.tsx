@@ -1304,6 +1304,7 @@ function HifzReviewScreen() {
       <ConfirmDialog
         visible={exitOpen}
         title={s.habitExitTitle}
+        tone="neutral"
         message={s.habitExitBody}
         cancelLabel={s.habitExitStay}
         confirmLabel={s.habitExitLeave}

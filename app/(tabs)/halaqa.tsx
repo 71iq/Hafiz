@@ -180,8 +180,12 @@ function HalaqaContent({ userId }: { userId: string }) {
     onError: (error) => setEncourageError(socialFailureMessage(error, s)),
   });
 
+  // ETH-07: the server takes a minor out of matched halaqas, so the matched join is not offered. The
+  // privacy is read from the cache the app-wide minor check keeps (useMinorPhotoCleanup).
+  const isMinor = privacy.data?.isMinor === true;
+
   const saveSharing = useMutation({
-    mutationFn: async (input: { sharing: HalaqaSharing; visibility: ProfileVisibility | null }) => {
+    mutationFn: async (input: { sharing: HalaqaSharing; visibility: ProfileVisibility | null; leavesMatched: boolean }) => {
       if (!active) return;
       // One owner for both writes: the second is refused before it is sent if the account changed.
       const owner = requireSocialOwner(userId);
@@ -190,7 +194,8 @@ function HalaqaContent({ userId }: { userId: string }) {
     },
     onSuccess: async (_result, input) => {
       setSharingOpen(false);
-      setNotice(s.socialSaved);
+      // Saying one is under 18 leaves the matched halaqa (ETH-07); the notice says so, not only "Saved".
+      setNotice(input.leavesMatched ? s.socialSavedLeftMatched : s.socialSaved);
       await Promise.all([
         refreshAll(),
         queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) }),
@@ -283,6 +288,7 @@ function HalaqaContent({ userId }: { userId: string }) {
         />
       ) : groups.length === 0 ? (
         <HalaqaStart
+          matchedAllowed={!isMinor}
           pending={busy}
           error={startError}
           onClearError={() => setStartError(null)}
@@ -311,6 +317,7 @@ function HalaqaContent({ userId }: { userId: string }) {
           />
           <HalaqaStart
             compact
+            matchedAllowed={!isMinor}
             pending={busy}
             error={startError}
             onClearError={() => setStartError(null)}
@@ -363,7 +370,8 @@ function HalaqaContent({ userId }: { userId: string }) {
           error={sharingError}
           onSave={(sharing, visibility) => {
             setSharingError(null);
-            saveSharing.mutate({ sharing, visibility });
+            const leavesMatched = visibility?.isMinor === true && !isMinor && groups.some((group) => group.kind === "matched");
+            saveSharing.mutate({ sharing, visibility, leavesMatched });
           }}
           onClose={() => setSharingOpen(false)}
         />

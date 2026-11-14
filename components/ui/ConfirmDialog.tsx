@@ -13,6 +13,11 @@ type Props = {
   cancelLabel: string;
   confirmLabel: string;
   destructive?: boolean;
+  /**
+   * "warning" (the default) shows the alert icon. "neutral" is for a confirmation that loses nothing,
+   * such as leaving a review whose grades are already saved.
+   */
+  tone?: "warning" | "neutral";
   confirmLoading?: boolean;
   confirmDisabled?: boolean;
   error?: string | null;
@@ -29,6 +34,7 @@ export function ConfirmDialog({
   cancelLabel,
   confirmLabel,
   destructive,
+  tone = "warning",
   confirmLoading = false,
   confirmDisabled = false,
   error,
@@ -50,9 +56,11 @@ export function ConfirmDialog({
         isRTL={isRTL}
         onClose={handleClose}
         leading={
-          <View className="h-11 w-11 items-center justify-center rounded-full bg-red-500/10">
-            <AlertTriangle size={20} color={isDark ? "#f87171" : "#dc2626"} />
-          </View>
+          tone === "warning" ? (
+            <View className="h-11 w-11 items-center justify-center rounded-full bg-red-500/10">
+              <AlertTriangle size={20} color={isDark ? "#f87171" : "#dc2626"} />
+            </View>
+          ) : undefined
         }
       />
       <OverlayBody scrollEnabled={false}>

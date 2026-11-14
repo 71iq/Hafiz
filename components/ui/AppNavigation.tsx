@@ -127,7 +127,8 @@ function BottomTabItem({
       {/* The pill hugs the label; the press target is the item's whole share of the bar. */}
       <View style={[styles.bottomTabItem, compact && styles.bottomTabItemCompact, isFocused && styles.bottomTabItemActive]}>
         {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
-        <Text numberOfLines={1} style={[styles.bottomLabel, { color: iconColor }]}>
+        {/* Six labels fill a 320 px bar, so larger system text is capped at 1.2x to keep them whole. */}
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={[styles.bottomLabel, { color: iconColor }]}>
           {label}
         </Text>
       </View>
@@ -645,9 +646,9 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 8,
   },
-  // Six English labels at 10 px measure about 204 px. With 8 px item padding they fit the 320 px
-  // bar of a 360 px phone; below that the bar and items tighten so they still fit at 320 px.
-  // flexShrink, minWidth 0 and the one-line label keep any longer translation inside the bar.
+  // Six English labels at 10 px measure about 204 px. Below 360 px the bar and pills tighten so every
+  // tab keeps its whole label and a 44 px target at 320 px (bottomTabSlot); the one-line label cuts a
+  // longer translation rather than overflowing the bar.
   bottomContainerCompact: {
     paddingHorizontal: 4,
   },

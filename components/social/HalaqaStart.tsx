@@ -42,6 +42,7 @@ function CompactAction({ icon: Icon, label, disabled, onPress }: { icon: LucideI
  */
 export function HalaqaStart({
   compact = false,
+  matchedAllowed = true,
   pending,
   error,
   onCreate,
@@ -50,6 +51,8 @@ export function HalaqaStart({
   onClearError,
 }: {
   compact?: boolean;
+  /** False for an account under 18: matched halaqas are for adults (ETH-07), so the join is not offered. */
+  matchedAllowed?: boolean;
   pending: boolean;
   error: string | null;
   onCreate: (name: string, asTeacher: boolean) => Promise<boolean>;
@@ -113,17 +116,21 @@ export function HalaqaStart({
         {compact ? (
           // Under a joined halaqa these are secondary: plain stacked rows, no filled button.
           <View>
-            <CompactAction icon={Users} label={s.halaqaJoinMatched} disabled={pending} onPress={onJoinMatched} />
+            {matchedAllowed ? <CompactAction icon={Users} label={s.halaqaJoinMatched} disabled={pending} onPress={onJoinMatched} /> : null}
             <CompactAction icon={KeyRound} label={s.halaqaJoinCode} disabled={pending} onPress={() => open("join")} />
             <CompactAction icon={Plus} label={s.halaqaCreate} disabled={pending} onPress={() => open("create")} />
             {mode === null ? <SocialErrorText message={error} /> : null}
           </View>
         ) : (
           <View className="gap-3">
-            <Button label={s.halaqaJoinMatched} onPress={onJoinMatched} disabled={pending} />
-            <Text variant="caption" align="center">
-              {s.halaqaMatchedNote}
-            </Text>
+            {matchedAllowed ? (
+              <>
+                <Button label={s.halaqaJoinMatched} onPress={onJoinMatched} disabled={pending} />
+                <Text variant="caption" align="center">
+                  {s.halaqaMatchedNote}
+                </Text>
+              </>
+            ) : null}
             <Button variant="outline" className="border border-warm-300 dark:border-neutral-700" onPress={() => open("join")} disabled={pending}>
               <View className="items-center gap-2" style={socialRowStyle(isRTL)}>
                 <KeyRound size={16} color={accent} />

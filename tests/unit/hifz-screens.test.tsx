@@ -559,13 +559,33 @@ describe("sabaq screen", () => {
     expect(endReviewSession).toHaveBeenCalled();
   });
 
-  it("prevents removal, the native swipe included, only while the check's grade is unresolved", async () => {
+  it("asks before Close or a back press leaves an unsaved lesson, and goes once confirmed", async () => {
+    await openSabaqCheck();
+    // Close asks, and staying keeps the lesson.
+    press(s.genericClose);
+    expect(screen.getByText(s.hifzSabaqExitTitle)).toBeTruthy();
+    press(s.hifzSabaqExitStay);
+    await flush();
+    expect(returnToTabs).not.toHaveBeenCalled();
+    // A back press asks the same, and leaving carries it out.
+    let held = false;
+    act(() => {
+      held = back();
+    });
+    expect(held).toBe(true);
+    press(s.hifzSabaqExitLeave);
+    await flush();
+    expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK);
+    expect(endReviewSession).toHaveBeenCalled();
+  });
+
+  it("prevents removal, the native swipe included, through the unsaved lesson and its save, and not once saved", async () => {
     const save = deferred<ChunkSave>();
     jest.mocked(completeSabaqChunk).mockReturnValue(save.promise);
     const overview = deferred<null>();
     jest.mocked(loadHabitOverview).mockReturnValue(overview.promise as never);
     const buttons = await openSabaqCheck();
-    expect(preventing()).toBe(false);
+    expect(preventing()).toBe(true);
     await act(async () => {
       void buttons.onGrade(3);
     });
@@ -584,16 +604,21 @@ describe("sabaq screen", () => {
     const save = deferred<ChunkSave>();
     jest.mocked(completeSabaqChunk).mockReturnValueOnce(save.promise).mockResolvedValueOnce(chunkSaved);
     const buttons = await openSabaqCheck();
-    expect(back()).toBe(false);
     await act(async () => {
       void buttons.onGrade(3);
     });
-    expect(back()).toBe(true);
+    let held = false;
+    act(() => {
+      held = back();
+    });
+    expect(held).toBe(true);
+    // During the save the press waits for it rather than asking.
+    expect(screen.queryByText(s.hifzSabaqExitTitle)).toBeNull();
     await act(async () => save.reject(new Error("disk full")));
     await flush();
     expect(returnToTabs).not.toHaveBeenCalled();
+    expect(mockNavigation.dispatch).not.toHaveBeenCalledWith(BACK);
     expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
-    expect(preventing()).toBe(false);
     await act(async () => {
       void grading().onGrade(3);
     });

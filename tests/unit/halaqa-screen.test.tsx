@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import HalaqaScreen from "@/app/(tabs)/halaqa";
 import { strings } from "@/lib/i18n/strings";
+import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { flattenStyle } from "../rtl/rtl-test-utils";
 import { bearerSubject, signedIn, signedOut, type FakeAuthState } from "./social-test-auth";
@@ -56,6 +57,17 @@ jest.mock("@/lib/supabase", () => ({
     rpc: (fn: string, args: Record<string, unknown>) =>
       require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
     auth: { getSession: async () => ({ data: { session: mockAuth.session }, error: null }) },
+    // Saying one is under 18 first deletes the account's stored photos; this account has none.
+    storage: {
+      from: () => {
+        const files = {
+          setHeader: () => files,
+          list: async () => ({ data: [], error: null }),
+          remove: async () => ({ data: [], error: null }),
+        };
+        return files;
+      },
+    },
   },
 }));
 jest.mock("@react-native-community/netinfo", () => ({
@@ -197,6 +209,44 @@ describe("Halaqa tab", () => {
     );
     // The join runs as the account this screen belongs to.
     expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+  });
+
+  it("does not offer a matched halaqa to an account under 18 (ETH-07)", async () => {
+    signIn(USER);
+    respond({ get_my_halaqas: [] });
+    const screen = renderScreen();
+    expect(await screen.findByText(strings.en.halaqaEmptyTitle)).toBeTruthy();
+    expect(screen.getByRole("button", { name: strings.en.halaqaJoinMatched })).toBeTruthy();
+    // The app-wide minor check keeps the account's own privacy in the cache.
+    act(() => {
+      queryClients[queryClients.length - 1].setQueryData(profilePrivacyKeys.mine(USER), {
+        boardJoined: false,
+        boardNickname: null,
+        showStreak: false,
+        showJuzCompletions: false,
+        isMinor: true,
+      });
+    });
+    await waitFor(() => expect(screen.queryByRole("button", { name: strings.en.halaqaJoinMatched })).toBeNull());
+    expect(screen.getByText(strings.en.halaqaJoinCode)).toBeTruthy();
+  });
+
+  it("says the matched halaqa was left when saving turns on under 18 there", async () => {
+    signIn(USER);
+    const matched = { ...summary, kind: "matched", name: null, invite_code: null };
+    respond({
+      get_my_halaqas: [matched],
+      get_halaqa_detail: { ...detail, group: matched },
+      get_profile_privacy: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: false },
+      set_halaqa_sharing: matched,
+      set_profile_privacy: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: true },
+    });
+    const screen = renderScreen();
+    fireEvent.press(await screen.findByLabelText(strings.en.halaqaSharingA11y));
+    fireEvent(await screen.findByRole("switch", { name: strings.en.profileIsMinor }), "valueChange", true);
+    fireEvent.press(screen.getByRole("button", { name: strings.en.socialSave }));
+    expect(await screen.findByText(strings.en.socialSavedLeftMatched)).toBeTruthy();
+    expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", expect.objectContaining({ p_is_minor: true }));
   });
 
   it("shows the shared goal and only what each member shared, with no ranking", async () => {

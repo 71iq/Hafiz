@@ -451,12 +451,14 @@ export default function HomeScreen() {
         {latestUnlock && <AchievementUnlockToast unlock={latestUnlock} onDismiss={dismissLatestUnlock} />}
 
         <View className="mb-6">
+          {/* The counts keep their own width; Start Review moves to its own line when they need the
+              room (a narrow phone, or a three-digit due count), instead of running into them. */}
           <View
-            className={`flex-row items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+            className={`flex-row flex-wrap items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
             style={mirroredRowStyle}
           >
             <View
-              className={`flex-1 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+              className={`grow shrink-0 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
               style={mirroredRowStyle}
             >
               <View className={isRTL ? "items-end" : "items-start"}>
@@ -473,8 +475,7 @@ export default function HomeScreen() {
                   {s.flashcardsDueToday}
                 </Text>
               </View>
-              {/* Shrinks so its label wraps instead of running under Start Review on narrow phones. */}
-              <View className={`min-w-0 shrink pb-1 ${isRTL ? "items-end" : "items-start"}`}>
+              <View className={`pb-1 ${isRTL ? "items-end" : "items-start"}`}>
                 <Text
                   className="text-warm-500 dark:text-neutral-400"
                   style={{

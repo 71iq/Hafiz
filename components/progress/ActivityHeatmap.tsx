@@ -78,6 +78,10 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
 }
 
 const BASE_CELL_SIZE = 13;
+/** Month and weekday labels share one readable tone at 10 px: about 7:1 in dark and 6:1 in light. */
+const LABEL_COLOR = (isDark: boolean) => (isDark ? "#a3a3a3" : "#6E5A47");
+/** Space between the weekday labels and the grid. */
+const DAY_LABEL_GAP = 6;
 const TOTAL_WEEKS = 13;
 const SUMMARY_BREAKPOINT = 560;
 
@@ -157,8 +161,9 @@ export function ActivityHeatmap({
         : showSummary
           ? 15
           : BASE_CELL_SIZE;
-  // The Arabic day names are about 26 px at 10 px; their column sits close to the grid.
-  const DAY_LABEL_WIDTH = isArabic ? (showSummary ? 44 : 38) : (showSummary ? 34 : 28);
+  // The Arabic day names are about 26 px at 10 px; their column sits close to the grid, with the 6 px
+  // gap the labels keep from it (DAY_LABEL_GAP) inside the width.
+  const DAY_LABEL_WIDTH = isArabic ? (showSummary ? 50 : 44) : (showSummary ? 40 : 34);
   const reservedSummaryWidth = showSummary ? (isSidebarWidth ? 200 : 150) : 0;
   const reservedSummaryGap = showSummary ? (isSidebarWidth ? 32 : 20) : 0;
   const availableWidth = Math.max(220, layoutWidth);
@@ -269,7 +274,7 @@ export function ActivityHeatmap({
               style={{
                 fontFamily: "Manrope_500Medium",
                 fontSize: 10,
-                color: isDark ? "#737373" : "#8B8178",
+                color: LABEL_COLOR(isDark),
                 position: "absolute",
                 left: m.left,
                 ...textStartStyle(isRTL),
@@ -304,7 +309,8 @@ export function ActivityHeatmap({
                         // The rows follow the chosen week start, so these labels must be easy to read.
                         fontFamily: "Manrope_500Medium",
                         fontSize: 10,
-                        color: isDark ? "#a3a3a3" : "#8B8178",
+                        color: LABEL_COLOR(isDark),
+                        paddingEnd: DAY_LABEL_GAP,
                         // Toward the grid: the end of the label column.
                         ...textEndStyle(isRTL),
                         writingDirection: isRTL ? "rtl" : "ltr",

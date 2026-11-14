@@ -6,6 +6,7 @@ import { usePreventRemove, type NavigationAction } from "@react-navigation/nativ
 import { BookOpenCheck, Pause, Play, RotateCcw, X } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Progress } from "@/components/ui/Progress";
@@ -73,6 +74,9 @@ function SabaqScreen() {
   const [shown, setShown] = useState(false);
   const [meanings, setMeanings] = useState<{ key: string; text: string }[]>([]);
   const [busy, setBusy] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
+  /** The rendered copy of `saveLock === "saved"`: the lesson is saved, so leaving asks nothing. */
+  const [lessonSaved, setLessonSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
   const [showZayt, setShowZayt] = useState(false);
@@ -190,18 +194,27 @@ function SabaqScreen() {
     [db],
   );
 
-  // Hardware back, a back gesture or the iOS swipe during an unresolved grade waits for it, the same as
-  // Close. usePreventRemove, unlike a bare beforeRemove listener, also tells native-stack to block the
-  // native dismissal, so the swipe cannot take the screen away while the grade is still saving.
-  usePreventRemove(saving, ({ data }) => {
-    // The screen's own exit goes on, as does a back press after a save this render has not caught up
-    // with; React Navigation marks the action as already checked for this screen.
-    if (exiting.current || saveLock.current !== "saving") navigation.dispatch(data.action);
-    else {
+  /**
+   * The lesson is under way and nothing of it is saved yet: its lines are saved only by the final
+   * check, so leaving asks first, as the hifz review does with graded pages.
+   */
+  const lessonUnsaved = stepIndex > 0 && !habitResult && !saving && !lessonSaved;
+
+  // Close, hardware back, a back gesture and the iOS swipe behave alike: during an unresolved grade
+  // they wait for it, and in an unsaved lesson they ask first. usePreventRemove, unlike a bare
+  // beforeRemove listener, also tells native-stack to block the native dismissal.
+  usePreventRemove(saving || lessonUnsaved, ({ data }) => {
+    // The screen's own exit goes on, as does a back press this render has not caught up with (the
+    // grade saved, the summary still loading); React Navigation marks the action as already checked.
+    if (exiting.current || saveLock.current === "saved") navigation.dispatch(data.action);
+    else if (saveLock.current === "saving") {
       pendingBack.current = data.action;
       leaveWhenSaved.current = true;
       setLeavePending(true);
-    }
+    } else if (lessonUnsaved) {
+      pendingBack.current = data.action;
+      setExitOpen(true);
+    } else navigation.dispatch(data.action);
   });
 
   /** Leave now, or once the check's unresolved grade settles (see leaveWhenSaved). */
@@ -210,6 +223,12 @@ function SabaqScreen() {
       leaveWhenSaved.current = true;
       setLeavePending(true);
     } else exit();
+  };
+
+  /** Close: an unsaved lesson asks first. */
+  const close = () => {
+    if (lessonUnsaved) setExitOpen(true);
+    else leave();
   };
 
   const finish = async (rating: Grade) => {
@@ -228,6 +247,7 @@ function SabaqScreen() {
       });
       saveLock.current = "saved";
       setSaving(false);
+      setLessonSaved(true);
       if (leaveWhenSaved.current) {
         emitHabitChanged();
         exit();
@@ -324,7 +344,7 @@ function SabaqScreen() {
           <MirroredRow dir={dir} className="items-center justify-between px-5 pt-3 pb-2">
             {/* Dimmed while Close waits for the grade it was pressed during. */}
             <Pressable
-              onPress={leave}
+              onPress={close}
               disabled={leavePending}
               accessibilityRole="button"
               accessibilityLabel={s.genericClose}
@@ -554,6 +574,24 @@ function SabaqScreen() {
           ) : null}
         </View>
       </View>
+      <ConfirmDialog
+        visible={exitOpen}
+        title={s.hifzSabaqExitTitle}
+        message={s.hifzSabaqExitBody}
+        cancelLabel={s.hifzSabaqExitStay}
+        confirmLabel={s.hifzSabaqExitLeave}
+        tone="neutral"
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => {
+          setExitOpen(false);
+          pendingBack.current = null;
+        }}
+        onConfirm={() => {
+          setExitOpen(false);
+          leave();
+        }}
+      />
     </SafeAreaView>
   );
 }

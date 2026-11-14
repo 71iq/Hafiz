@@ -156,6 +156,30 @@ describe("RTL higher-level component contracts", () => {
     });
   });
 
+  it("ConfirmDialog shows the warning icon by default and none in the neutral tone", () => {
+    setMockSettings({ isRTL: false, uiLanguage: "en" });
+    const dialog = (tone?: "neutral") => (
+      <ConfirmDialog
+        visible
+        title="Leave this review?"
+        message="Every grade you gave is already saved."
+        cancelLabel="Keep reviewing"
+        confirmLabel="Leave"
+        tone={tone}
+        isDark={false}
+        onCancel={jest.fn()}
+        onConfirm={jest.fn()}
+      />
+    );
+    const warningIcons = (view: ReturnType<typeof renderInSafeArea>) =>
+      view.UNSAFE_root.findAll((node: RtlTestNode) => typeof node.props?.className === "string" && node.props.className.includes("bg-red-500/10"));
+    const warning = renderInSafeArea(dialog());
+    expect(warningIcons(warning).length).toBeGreaterThan(0);
+    warning.unmount();
+    const neutral = renderInSafeArea(dialog("neutral"));
+    expect(warningIcons(neutral)).toHaveLength(0);
+  });
+
   it("ConfirmDialog passes explicit RTL direction through message and action chrome", () => {
     setMockSettings({ isRTL: true, uiLanguage: "ar" });
 

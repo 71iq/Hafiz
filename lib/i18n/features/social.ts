@@ -122,8 +122,9 @@ export const socialStrings = {
       "\"Actions are judged by intentions\" (Bukhari 1). Share to encourage and be encouraged, not to be seen.",
     profileIsMinor: "I'm under 18",
     profileIsMinorHint:
-      "Under 18s are never shown on public profiles, and appear on the Board only under a nickname and without a photo. Turning this on leaves your matched halaqa. Halaqas you joined with an invite code stay.",
+      "Under 18s are never shown on public profiles, and appear on the Board only under a nickname and without a photo. If you turn this on, you leave your matched halaqa, since matched halaqas are for adults. Halaqas you joined with an invite code are kept.",
     socialSaved: "Saved",
+    socialSavedLeftMatched: "Saved. You have left your matched halaqa, which is for adults. Your invite halaqas are unchanged.",
 
     teacherViewTitle: "{{name}}'s progress",
     teacherViewNote: "Hafiz supports a teacher's work and never replaces it.",
@@ -171,7 +172,7 @@ export const socialStrings = {
     boardNicknameHint: "With a nickname your photo is not shown.",
     boardMinorToggle: "I'm under 18",
     boardMinorHint:
-      "You'll appear under a nickname, without a photo. This also leaves your matched halaqa. Halaqas you joined with an invite code stay.",
+      "You'll appear under a nickname, without a photo. You also leave your matched halaqa, since matched halaqas are for adults. Halaqas you joined with an invite code are kept.",
     boardJoin: "Join this week's Board",
     boardLeave: "Leave the Board",
     boardWeekOf: "Week of {{date}}",
@@ -295,8 +296,9 @@ export const socialStrings = {
     socialIntentionNote: "«إنما الأعمال بالنيات» (البخاري ١). شارك لتُشجِّع وتُشجَّع، لا ليراك الناس.",
     profileIsMinor: "عمري دون الثامنة عشرة",
     profileIsMinorHint:
-      "لا يظهر من هم دون الثامنة عشرة في الملفات العامة، ولا يظهرون في اللوحة إلا بلقب ودون صورة. تفعيل هذا يُخرجك من الحلقة المقترحة، وتبقى الحلقات التي انضممت إليها برمز دعوة.",
+      "لا يظهر من هم دون الثامنة عشرة في الملفات العامة، ولا يظهرون في اللوحة إلا بلقب ودون صورة. عند تفعيل هذا الخيار تغادر حلقتك المقترحة لأنها للبالغين، وتبقى في الحلقات التي انضممت إليها برمز دعوة.",
     socialSaved: "حُفظ",
+    socialSavedLeftMatched: "حُفظ. غادرتَ حلقتك المقترحة لأنها للبالغين، وحلقات الدعوة باقية كما هي.",
 
     teacherViewTitle: "تقدّم {{name}}",
     teacherViewNote: "يعين حافظ المعلّم في عمله ولا يغني عنه.",
@@ -342,7 +344,7 @@ export const socialStrings = {
     boardNicknameHint: "مع اللقب لا تظهر صورتك.",
     boardMinorToggle: "عمري دون الثامنة عشرة",
     boardMinorHint:
-      "ستظهر بلقب ودون صورة. ويُخرجك هذا أيضًا من الحلقة المقترحة، وتبقى الحلقات التي انضممت إليها برمز دعوة.",
+      "ستظهر بلقب ودون صورة. وتغادر كذلك حلقتك المقترحة لأنها للبالغين، وتبقى في الحلقات التي انضممت إليها برمز دعوة.",
     boardJoin: "انضم إلى لوحة هذا الأسبوع",
     boardLeave: "غادر اللوحة",
     boardWeekOf: "أسبوع {{date}}",
