@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useUIDirection, type Direction, textStartStyle } from "@/lib/ui/direction";
 import { useSettings } from "@/lib/settings/context";
+import { useStrings } from "@/lib/i18n/useStrings";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { cn } from "@/lib/utils";
 
@@ -326,6 +327,7 @@ export function OverlayHeader({
 }: OverlayHeaderProps) {
   const dir = useUIDirection(explicitDir);
   const { effectiveTheme, isDark } = useSettings();
+  const s = useStrings();
   const isRTL = explicitIsRTL ?? dir === "rtl";
   const rowClassName = isRTL ? "flex-row-reverse" : "flex-row";
   const closeIconColor = isDark ? "#a3a3a3" : effectiveTheme === "white" ? "#71717A" : "#8B8178";
@@ -381,6 +383,8 @@ export function OverlayHeader({
           {onClose ? (
             <Pressable
               onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel={s.genericClose}
               hitSlop={8}
               className="h-9 w-9 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
               style={{ cursor: Platform.OS === "web" ? "pointer" : undefined }}

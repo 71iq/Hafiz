@@ -21,6 +21,17 @@ import { State } from "@/lib/fsrs/scheduler";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { expectTextAlignStart, expectWritingDirection, flattenStyle } from "../rtl/rtl-test-utils";
 
+/**
+ * The dialog's own buttons. The sheet behind it is in the same modal tree, and its header's Close
+ * button is a button too, so it is left out here.
+ */
+function dialogButtons(modal: Parameters<typeof within>[0]) {
+  const close = new Set([strings.en.genericClose, strings.ar.genericClose]);
+  return within(modal)
+    .getAllByRole("button")
+    .filter((button) => !close.has(button.props.accessibilityLabel));
+}
+
 const mockDatabase = { name: "isolated-deck-cards-fixture" };
 const mockSettings = {
   effectiveTheme: "beige",
@@ -768,7 +779,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           fireEvent(busyModal, "requestClose");
           const guardedModal = getVisibleModalForNode(view.getByText(s.cardDeleteConfirm));
           expect(within(guardedModal).getByText(s.cardDeleteConfirm)).toBeTruthy();
-          fireEvent.press(within(guardedModal).getAllByRole("button")[1]);
+          fireEvent.press(dialogButtons(guardedModal)[1]);
           expect(deleteStudyCard).toHaveBeenCalledTimes(1);
           expect(deleteStudyCard).toHaveBeenCalledWith(mockDatabase, secondCard.deck_id, secondCard.id);
           expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
@@ -786,7 +797,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           expect(error.props.accessibilityLiveRegion).toBe("polite");
           expectWritingDirection(error, language === "ar" ? "rtl" : "ltr");
           expect(within(failedModal).getByText(s.cardDeleteConfirm)).toBeTruthy();
-          const enabledButtons = within(failedModal).getAllByRole("button");
+          const enabledButtons = dialogButtons(failedModal);
           expect(enabledButtons).toHaveLength(2);
           for (const button of enabledButtons) expect(button.props.accessibilityState?.disabled).toBe(false);
           expect(view.getByText(firstCard.title)).toBeTruthy();
@@ -894,7 +905,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           fireEvent(busyModal, "requestClose");
           const guardedModal = getVisibleModalForNode(view.getByText(s.cardResetConfirm));
           expect(within(guardedModal).getByText(s.cardResetConfirm)).toBeTruthy();
-          fireEvent.press(within(guardedModal).getAllByRole("button")[1]);
+          fireEvent.press(dialogButtons(guardedModal)[1]);
           expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
           expect(resetStudyCardProgress).toHaveBeenCalledWith(mockDatabase, secondCard.deck_id, secondCard.id, {
             requireLive: true,
@@ -914,7 +925,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           expect(error.props.accessibilityLiveRegion).toBe("polite");
           expectWritingDirection(error, language === "ar" ? "rtl" : "ltr");
           expect(within(failedModal).getByText(s.cardResetConfirm)).toBeTruthy();
-          const enabledButtons = within(failedModal).getAllByRole("button");
+          const enabledButtons = dialogButtons(failedModal);
           expect(enabledButtons).toHaveLength(2);
           for (const button of enabledButtons) expect(button.props.accessibilityState?.disabled).toBe(false);
           expect(view.getByText(firstCard.title)).toBeTruthy();

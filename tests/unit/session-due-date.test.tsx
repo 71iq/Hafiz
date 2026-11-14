@@ -45,6 +45,17 @@ import {
 } from "@/lib/fonts/loader";
 import { expectTextAlignStart, expectWritingDirection, flattenStyle } from "../rtl/rtl-test-utils";
 
+/**
+ * The dialog's own buttons. The sheet behind it is in the same modal tree, and its header's Close
+ * button is a button too, so it is left out here.
+ */
+function dialogButtons(modal: Parameters<typeof within>[0]) {
+  const close = new Set([strings.en.genericClose, strings.ar.genericClose]);
+  return within(modal)
+    .getAllByRole("button")
+    .filter((button) => !close.has(button.props.accessibilityLabel));
+}
+
 const NativeModal = ReactNative.Modal;
 // Review persistence runs its card and log writes inside one transaction on this database. A grade
 // reads the card there first; with no row it grades the queued copy.
@@ -662,14 +673,13 @@ async function openConfirmCardAction(
 }
 
 function expectExactlyTwoDisabledDialogButtons(modal: RenderedNode): void {
-  const disabledButtons = within(modal)
-    .getAllByRole("button")
+  const disabledButtons = dialogButtons(modal)
     .filter((button) => button.props.accessibilityState?.disabled === true);
   expect(disabledButtons).toHaveLength(2);
 }
 
 function expectExactlyTwoEnabledDialogButtons(modal: RenderedNode): void {
-  const buttons = within(modal).getAllByRole("button");
+  const buttons = dialogButtons(modal);
   expect(buttons).toHaveLength(2);
   for (const button of buttons) {
     expect(button.props.accessibilityState?.disabled).toBe(false);
