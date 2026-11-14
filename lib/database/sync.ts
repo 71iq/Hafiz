@@ -26,6 +26,7 @@ import { isSyncableUserSetting, putUserSetting, userSettingToSyncData } from "@/
 import { errorMessage } from "@/lib/error-message";
 import { applyRemoteHabitDay, habitDaySyncData } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
+import { markUnitAppliedFromPlan, reconcileUnitAfterSync, unitReconcileNeeded } from "@/lib/hifz/unit-applied";
 import {
   createWeakSpotCards,
   parseClozeCardId,
@@ -311,6 +312,15 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       });
     }
 
+    // 7.6: a plan saved on another device with the other kind of review brings the cards here in line.
+    owner.requireCurrent();
+    if (await unitReconcileNeeded(db)) {
+      await db.withTransactionAsync(async (tx) => {
+        owner.requireCurrent();
+        await reconcileUnitAfterSync(tx, new Date());
+      });
+    }
+
     owner.requireCurrent();
     await backfillAchievements(db, { notify: false });
     owner.requireCurrent();
@@ -473,6 +483,9 @@ async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Pr
     owner.requireCurrent();
     // Reviews from app versions before wird days were synced still count for their days.
     await reconcileHabitDaysFromLogs(tx, { now: new Date() });
+    owner.requireCurrent();
+    // The restored cards are as the restored plan left them.
+    await markUnitAppliedFromPlan(tx, new Date());
     owner.requireCurrent();
     // ERR-06: weak spots that formed across devices get their cloze card from the restored errors,
     // and a card whose weak spot restored dismissals ended goes.

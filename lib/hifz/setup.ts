@@ -3,7 +3,7 @@ import { materializeAllSmartDeckCards, writeAllDecksFilter } from "@/lib/fsrs/sm
 import { declareMemorizedPages } from "@/lib/hifz/pages";
 import { putHifzPlan, readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { pagesOfJuz } from "@/lib/hifz/units";
-import { switchToAyahReview, switchToPageReview } from "@/lib/hifz/unit-switch";
+import { applyUnitSwitch } from "@/lib/hifz/unit-applied";
 
 /** Pages whose every ayah belongs to one of the surahs (a page shared with an unchosen surah is left out). */
 async function pagesCoveredBySurahs(db: DatabaseExecutor, surahs: readonly number[]): Promise<number[]> {
@@ -55,10 +55,10 @@ export async function applyHifzSetup(
   const now = setup.now ?? new Date();
   let migratedPages = 0;
   await db.withTransactionAsync(async (tx) => {
-    const previousUnit = (await readHifzPlan(tx))?.unit ?? null;
+    const previousPlanUnit = (await readHifzPlan(tx))?.unit ?? null;
     await putHifzPlan(tx, plan);
-    if (plan.unit === "ayah") await switchToAyahReview(tx, { previousUnit, now });
-    else migratedPages = await switchToPageReview(tx, { previousUnit, now });
+    // Only a change between page and ayah review switches the cards (lib/hifz/unit-applied).
+    migratedPages = await applyUnitSwitch(tx, { unit: plan.unit, previousPlanUnit, now });
   });
   const pages = new Set<number>(await pagesCoveredBySurahs(db, setup.memorizedSurahs));
   for (const juz of setup.memorizedJuz) for (const page of pagesOfJuz(juz)) pages.add(page);

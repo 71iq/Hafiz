@@ -273,14 +273,20 @@ function learningStepDue(row: StudyCardRow, now: Date): boolean {
 
 const TODAY_PLAN_KEY = "device_hifz_today_plan";
 
-type TodaySnapshot = { date: LocalDate; ids: string[]; newLines: number };
+/** Today's page list as first built on this device, for the recitation unit it was built under. */
+type TodaySnapshot = { date: LocalDate; ids: string[]; newLines: number; unit: HifzPlan["unit"] | null };
 
 function parseSnapshot(value: string | undefined): TodaySnapshot | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value);
     if (typeof parsed?.date !== "string" || !Array.isArray(parsed.ids) || typeof parsed.newLines !== "number") return null;
-    return { date: parsed.date, ids: parsed.ids.filter((id: unknown): id is string => typeof id === "string"), newLines: parsed.newLines };
+    return {
+      date: parsed.date,
+      ids: parsed.ids.filter((id: unknown): id is string => typeof id === "string"),
+      newLines: parsed.newLines,
+      unit: typeof parsed.unit === "string" ? parsed.unit : null,
+    };
   } catch {
     return null;
   }
@@ -365,8 +371,10 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
   });
 
   let snapshot = parseSnapshot(snapshotRow?.value);
-  if (snapshot?.date !== today) {
-    snapshot = { date: today, ids: daily.review.map((page) => page.cardId), newLines: daily.newLines };
+  // A switch of recitation unit changes which cards are active (lib/hifz/unit-switch), so a list
+  // built under another unit is built again; otherwise the list holds for the day (PLAN-01).
+  if (snapshot?.date !== today || snapshot.unit !== plan.unit) {
+    snapshot = { date: today, ids: daily.review.map((page) => page.cardId), newLines: daily.newLines, unit: plan.unit };
     await database.runAsync(
       "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, ?, ?, NULL)",
       [TODAY_PLAN_KEY, JSON.stringify(snapshot), now.toISOString()],

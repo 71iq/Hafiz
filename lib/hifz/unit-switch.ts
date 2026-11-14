@@ -37,7 +37,7 @@ export const AYAH_NEW_CARDS_LIMIT_KEY = "hifz_ayah_new_cards_limit";
 
 type Unit = HifzPlan["unit"];
 
-function reviewsPages(unit: Unit | null): boolean {
+export function reviewsPages(unit: Unit | null): boolean {
   return unit === "page" || unit === "half";
 }
 

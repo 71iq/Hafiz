@@ -2,7 +2,8 @@ import { readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/quer
 import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_DECK_NEW_CARD_LIMIT, type StudyCardRow } from "@/lib/fsrs/types";
 import { atLocalTime, localDateOf } from "@/lib/habit/dates";
-import { declareMemorizedPages, isMemorized, loadPageCards, toPlanPage } from "@/lib/hifz/pages";
+import { declareMemorizedPages, isMemorized, loadPageCards, loadTodayWird, toPlanPage } from "@/lib/hifz/pages";
+import { reconcileUnitAfterSync } from "@/lib/hifz/unit-applied";
 import { isSyncableUserSetting } from "@/lib/database/user-settings";
 import { DEFAULT_HIFZ_PLAN, readHifzPlan, writeHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { applyHifzSetup } from "@/lib/hifz/setup";
@@ -116,6 +117,44 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
 
   const setup = (plan: HifzPlan, at = now) =>
     applyHifzSetup(store.db, { plan, memorizedSurahs: [1, 2], memorizedJuz: [], now: at });
+
+  it("keeps an ayah resumed by hand when a plan edit keeps page review", async () => {
+    await setup(pagePlan);
+    expect(suspendedAt("1:2")).toBe(UNIT_SWITCH_SUSPENDED_AT);
+    store.sql.prepare("UPDATE study_cards SET suspended_at = NULL WHERE id = '1:2'").run();
+
+    await expect(setup({ ...pagePlan, dailyBudgetMin: 45 }, new Date(now.getTime() + 60_000))).resolves.toMatchObject({ migratedPages: 0 });
+    expect(suspendedAt("1:2")).toBeNull();
+    // Page and half page are the same kind of review: no switch either.
+    await setup({ ...pagePlan, unit: "half" }, new Date(now.getTime() + 120_000));
+    expect(suspendedAt("1:2")).toBeNull();
+  });
+
+  it("brings the cards in line with a plan another device saved with the other kind of review", async () => {
+    await setup(pagePlan);
+    expect(suspendedAt("1:1")).toBe(UNIT_SWITCH_SUSPENDED_AT);
+    // Sync brings the other device's ayah plan; this device's cards are still set for pages.
+    await writeHifzPlan(store.db, { ...ayahPlan, dailyBudgetMin: 50 });
+    const later = new Date(now.getTime() + 60_000);
+    await store.db.withTransactionAsync((tx) => reconcileUnitAfterSync(tx, later));
+    expect(suspendedAt("1:1")).toBeNull();
+    expect(suspendedAt(pageCardId(1))).toBe(UNIT_SWITCH_SUSPENDED_AT);
+    // Nothing more to do once the cards follow the plan.
+    const queued = store.sql.prepare("SELECT COUNT(*) AS n FROM sync_queue").get() as { n: number };
+    await store.db.withTransactionAsync((tx) => reconcileUnitAfterSync(tx, new Date(later.getTime() + 60_000)));
+    expect((store.sql.prepare("SELECT COUNT(*) AS n FROM sync_queue").get() as { n: number }).n).toBe(queued.n);
+  });
+
+  it("lists a migrated page in today's wird although today's list was first built in ayah review", async () => {
+    await setup(ayahPlan);
+    const before = (await loadTodayWird(store.db, now))!;
+    expect(before.todo).toEqual([]);
+    await setup(pagePlan, new Date(now.getTime() + 60_000));
+    const after = (await loadTodayWird(store.db, new Date(now.getTime() + 120_000)))!;
+    expect(after.total).toBeGreaterThan(0);
+    expect(after.daily.review.map((page) => page.cardId)).toEqual(expect.arrayContaining(after.todo.map((page) => page.cardId)));
+    expect(after.todo.length).toBe(after.daily.review.length);
+  });
 
   it("makes a manzil page card from a page's reviewed ayah cards and suspends them, declaring a page with a new ayah", async () => {
     await expect(setup(pagePlan)).resolves.toEqual({ declaredPages: 1, migratedPages: 1 });
