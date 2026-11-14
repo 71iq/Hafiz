@@ -354,6 +354,19 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
     expect(screen.queryByText(verseText(refRows[1]))).toBeNull();
   });
 
+  it("reads the memorized pages again when the marks come back on screen, so a change made meanwhile shows", async () => {
+    const first = renderPageView(language);
+    await settle();
+    expect(await screen.findByLabelText(markerLabel(language, MARKED))).toBeTruthy();
+    first.unmount();
+    // While no reader is open, the sibling's page stops being memorized (a sync, a deletion).
+    fixture.memorizedPages = [PAGE];
+    renderPageView(language);
+    await settle();
+    expect(screen.getByText(MARKED_GLYPHS[0])).toBeTruthy();
+    expect(screen.queryByTestId("similar-verse-marker")).toBeNull();
+  });
+
   it("marks nothing on a page whose similar verses are not memorized", async () => {
     fixture.memorizedPages = [PAGE];
     renderPageView(language);

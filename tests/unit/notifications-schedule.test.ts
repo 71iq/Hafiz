@@ -495,8 +495,13 @@ describe("rescheduleReminders", () => {
     const original = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
     await addLogRow("group-1", "group_encouragement", at(TODAY, 9));
     osFires(at(TODAY, 10));
-    expect(await requestRemindLater(store.db, { data: original.data, action: "remind_later" }, { now: at(TODAY, 10) })).toBe(false);
+    // It showed and is still in the tray.
+    fake.presented = [...fake.presented, { osId: original.osId, data: original.data }];
+    const response = { data: original.data, action: "remind_later" as const, osId: original.osId };
+    expect(await requestRemindLater(store.db, response, { now: at(TODAY, 10) })).toBe(false);
     expect(fake.scheduled.some((item) => item.data.type === "remind_later")).toBe(false);
+    // With no follow-up coming, the original stays where it is.
+    expect(fake.presented.some((item) => item.osId === original.osId)).toBe(true);
   });
 
   it("keeps back-off until the next session, however old the ignored reminders are (NOT-09)", async () => {

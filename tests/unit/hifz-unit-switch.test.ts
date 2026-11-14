@@ -8,7 +8,7 @@ import {
 import { getDueCardsForReview, SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_DECK_NEW_CARD_LIMIT, type StudyCardRow } from "@/lib/fsrs/types";
 import { atLocalTime, localDateOf } from "@/lib/habit/dates";
-import { declareMemorizedPages, isMemorized, loadPageCards, loadTodayWird, toPlanPage } from "@/lib/hifz/pages";
+import { declareMemorizedPages, isMemorized, loadPageCards, loadTodayWird, readMemorizedPageNumbers, toPlanPage } from "@/lib/hifz/pages";
 import { markUnitAppliedFromPlan, reconcileUnitAfterSync, unitReconcileNeeded } from "@/lib/hifz/unit-applied";
 import { isSyncableUserSetting } from "@/lib/database/user-settings";
 import { DEFAULT_HIFZ_PLAN, readHifzPlan, writeHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
@@ -176,6 +176,18 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
     expect(suspendedAt(pageCardId(1))).toBeNull();
     // The ayah cards this device set aside for page review stay set aside.
     expect(suspendedAt("1:1")).toBe(UNIT_SWITCH_SUSPENDED_AT);
+  });
+
+  it("still counts as known, for the similar verses, a page that ayah review set aside, but not one suspended by hand", async () => {
+    await setup(pagePlan);
+    expect(suspendedAt(pageCardId(1))).toBeNull();
+    // Ayah review set the page aside with the switch mark; the person suspends another page by hand.
+    store.sql.prepare("UPDATE study_cards SET suspended_at = ? WHERE id = ?").run(UNIT_SWITCH_SUSPENDED_AT, pageCardId(1));
+    await declareMemorizedPages(store.db, { pages: [2], cycleDays: 30, now });
+    store.sql.prepare("UPDATE study_cards SET suspended_at = ? WHERE id = ?").run(now.toISOString(), pageCardId(2));
+    const known = await readMemorizedPageNumbers(store.db);
+    expect(known.has(1)).toBe(true);
+    expect(known.has(2)).toBe(false);
   });
 
   it("lists a migrated page in today's wird although today's list was first built in ayah review", async () => {

@@ -769,14 +769,15 @@ export async function requestRemindLater(
     return true;
   });
   if (!recorded) return false;
+  // Any run queued before the write has started by now, so this is a new run that reads it.
+  const result = await rescheduleReminders(db, { now });
+  const scheduled = result.plan?.slots.some((slot) => slot.type === "remind_later") ?? false;
   // NOT-05b: the follow-up replaces the reminder it was asked from. Android keeps a notification in the
   // tray when one of its action buttons is pressed (iOS removes it), and a later swipe there is never
   // reported to the app, so the original is taken out here: the follow-up never outlives an original
-  // the person cleared. A refused follow-up leaves the original where it is.
-  if (response.osId) await reminderPlatform.dismiss([response.osId]).catch(() => undefined);
-  // Any run queued before the write has started by now, so this is a new run that reads it.
-  const result = await rescheduleReminders(db, { now });
-  return result.plan?.slots.some((slot) => slot.type === "remind_later") ?? false;
+  // the person cleared. A follow-up the plan refused, such as over the daily cap, leaves it in place.
+  if (scheduled && response.osId) await reminderPlatform.dismiss([response.osId]).catch(() => undefined);
+  return scheduled;
 }
 
 /** The account an encouragement arrival belongs to, and whether it is still the signed-in one. */

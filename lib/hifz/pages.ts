@@ -493,10 +493,20 @@ export async function ensureManzilCycleStart(db: DatabaseExecutor, fallback: Loc
   return fallback;
 }
 
-/** The pages that have a page card, for the memorized-portion picker. */
+/**
+ * The pages the person knows, for the similar verses (MUT-01 to MUT-04): those with a live page card,
+ * and in ayah review those whose page card a unit switch set aside (UNIT-02). The switch marks its
+ * suspension with the Unix epoch (UNIT_SWITCH_SUSPENDED_AT in lib/hifz/unit-switch, which imports
+ * this module); a page the person suspended by hand stays out.
+ */
 export async function readMemorizedPageNumbers(db: DatabaseExecutor): Promise<Set<number>> {
-  const rows = await readPageRows(db);
+  const rows = await db.getAllAsync<{ id: string; suspended_at: string | null }>(
+    `SELECT id, suspended_at FROM study_cards
+      WHERE deck_id = ? AND id LIKE 'page:%' AND deleted_at IS NULL`,
+    [HIFZ_PAGES_DECK_ID],
+  );
   return new Set(rows.flatMap((row) => {
+    if (row.suspended_at && Date.parse(row.suspended_at) !== 0) return [];
     const unit = parsePageUnit(row.id);
     return unit?.kind === "page" ? [unit.page] : [];
   }));

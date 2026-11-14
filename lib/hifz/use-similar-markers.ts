@@ -144,6 +144,9 @@ function subscribe(listener: () => void): () => void {
     if (listeners.size === 0 && stopEvents) {
       stopEvents();
       stopEvents = null;
+      // Reviews, plan changes and syncs go unheard from now on, so the memorized pages are read again
+      // when the marks are next shown. The page groups come from bundled data and stay.
+      publish({ memorized: null });
     }
   };
 }
