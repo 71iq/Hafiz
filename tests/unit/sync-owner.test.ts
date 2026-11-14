@@ -288,6 +288,8 @@ it.each([false, true])("preserves a current-owner restore and subsequent phases,
     pulled: nonempty ? 1 : 0,
     accountRestored: nonempty,
     localDataReplaced: false,
+    // Either way this sync finished the account's restore on the device.
+    restoreCompleted: true,
   });
   expect(mockPending).toHaveBeenCalledTimes(1);
   // Nine original tables plus wird days, review sessions and recitation errors.

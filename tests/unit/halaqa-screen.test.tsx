@@ -131,9 +131,10 @@ const detail = {
 };
 
 const queryClients: QueryClient[] = [];
-function renderScreen() {
+function renderScreen(seed?: (client: QueryClient) => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   queryClients.push(client);
+  seed?.(client);
   return render(
     <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
       <QueryClientProvider client={client}>
@@ -214,20 +215,18 @@ describe("Halaqa tab", () => {
   it("does not offer a matched halaqa to an account under 18 (ETH-07)", async () => {
     signIn(USER);
     respond({ get_my_halaqas: [] });
-    const screen = renderScreen();
-    expect(await screen.findByText(strings.en.halaqaEmptyTitle)).toBeTruthy();
-    expect(screen.getByRole("button", { name: strings.en.halaqaJoinMatched })).toBeTruthy();
     // The app-wide minor check keeps the account's own privacy in the cache.
-    act(() => {
-      queryClients[queryClients.length - 1].setQueryData(profilePrivacyKeys.mine(USER), {
+    const screen = renderScreen((client) =>
+      client.setQueryData(profilePrivacyKeys.mine(USER), {
         boardJoined: false,
         boardNickname: null,
         showStreak: false,
         showJuzCompletions: false,
         isMinor: true,
-      });
-    });
-    await waitFor(() => expect(screen.queryByRole("button", { name: strings.en.halaqaJoinMatched })).toBeNull());
+      }),
+    );
+    expect(await screen.findByText(strings.en.halaqaEmptyTitle)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: strings.en.halaqaJoinMatched })).toBeNull();
     expect(screen.getByText(strings.en.halaqaJoinCode)).toBeTruthy();
   });
 
