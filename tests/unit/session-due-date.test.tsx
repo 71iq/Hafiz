@@ -55,6 +55,31 @@ const mockDatabase = Object.freeze({
 });
 const mockRouterReplace = jest.fn();
 
+type RemoveAction = { type: string };
+type PreventRemove = { prevent: boolean; callback: (options: { data: { action: RemoveAction } }) => void };
+/** What the screen last passed to usePreventRemove. The prevent flag is what native-stack uses to block the iOS swipe. */
+let mockPreventRemove: PreventRemove | null = null;
+const mockNavigation = { getState: () => undefined, dispatch: jest.fn() };
+/** A hardware back press, a back gesture, or the pop native-stack sends after it blocks the iOS swipe. */
+const BACK: RemoveAction = { type: "GO_BACK" };
+/** The navigation returnToTabs sends when the screen leaves on purpose. */
+const EXIT: RemoveAction = { type: "REPLACE" };
+
+/**
+ * Remove the screen as React Navigation does: when the latest render prevents removal, the action is
+ * stopped and handed to the callback, which may continue it with navigation.dispatch. Returns whether
+ * the screen stayed.
+ */
+function remove(action: RemoveAction): boolean {
+  const guard = mockPreventRemove;
+  if (!guard?.prevent) return false;
+  const before = mockNavigation.dispatch.mock.calls.length;
+  guard.callback({ data: { action } });
+  return !mockNavigation.dispatch.mock.calls.slice(before).some(([dispatched]) => dispatched === action);
+}
+const back = () => remove(BACK);
+const preventing = () => mockPreventRemove?.prevent ?? false;
+
 const mockSettings: ReturnType<typeof useSettings> = {
   fontSizeIndex: 2,
   fontSize: 20,
@@ -119,8 +144,15 @@ const originalScreenDimensions = ReactNative.Dimensions.get("screen");
 
 jest.mock("expo-router", () => ({
   router: { replace: (...args: unknown[]) => mockRouterReplace(...args), dismissTo: jest.fn() },
-  useNavigation: () => ({ getState: () => undefined }),
+  useNavigation: () => mockNavigation,
   useLocalSearchParams: () => ({ deckId: "fixture-session-deck" }),
+}));
+
+jest.mock("@react-navigation/native", () => ({
+  ...jest.requireActual<typeof import("@react-navigation/native")>("@react-navigation/native"),
+  usePreventRemove: (prevent: boolean, callback: PreventRemove["callback"]) => {
+    mockPreventRemove = { prevent, callback };
+  },
 }));
 
 jest.mock("@/lib/database/provider", () => ({
@@ -647,6 +679,7 @@ function expectNoUnrelatedCardActionServiceCalls(): void {
 describe("Flashcard session due-date editor characterization", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockPreventRemove = null;
     mockDatabase.getFirstAsync.mockResolvedValue(null);
     jest.mocked(startReviewSession).mockReturnValue(fixtureSession);
     jest.mocked(recordSessionProgress).mockResolvedValue({} as never);
@@ -1936,6 +1969,205 @@ describe("Flashcard session due-date editor characterization", () => {
       fireEvent.press(getTextButton(view, s.habitExitLeave));
       expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
       expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
+
+    describe("leaving while a grade is unresolved", () => {
+      /** Each time the screen left on purpose, whether React Navigation let it go or held it. */
+      let exits: ("left" | "held")[] = [];
+      const failure = new Error("synthetic card failure");
+
+      beforeEach(() => {
+        exits = [];
+        mockRouterReplace.mockImplementation(() => {
+          exits.push(remove(EXIT) ? "held" : "left");
+        });
+      });
+
+      function closeButton(view: ReturnType<typeof render>): RenderedNode {
+        return view.getByRole("button", { name: s.genericClose });
+      }
+
+      /** Grade the first card with its card write held open, so the grade stays unresolved. */
+      async function startFirstGrade(write: Deferred<void>) {
+        jest.mocked(putCardRow).mockReturnValueOnce(write.promise);
+        const view = renderSession();
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(putCardRow).toHaveBeenCalledTimes(1));
+        return view;
+      }
+
+      it("waits for an unresolved first grade before leaving on Close, then leaves once it is saved", async () => {
+        const write = createDeferred<void>();
+        const view = await startFirstGrade(write);
+        // No grade is saved yet, so Close leaves without asking, but only after the grade settles.
+        fireEvent.press(closeButton(view));
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        expect(view.queryByText(s.habitExitTitle)).toBeNull();
+        // Close is dimmed while the leave waits for the grade.
+        expect(closeButton(view).props.accessibilityState).toMatchObject({ disabled: true });
+        expect(closeButton(view).props.className).toContain("opacity-50");
+        await act(async () => write.resolve());
+        await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home"));
+        // The grade is saved in full before the screen leaves, and the screen's own leave is not held.
+        expect(putStudyLogRow).toHaveBeenCalledTimes(1);
+        expect(recordSessionProgress).toHaveBeenCalledTimes(1);
+        expect(exits).toEqual(["left"]);
+        expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
+      });
+
+      it("stays on the card to show a failed grade when Close was pressed while it was unresolved", async () => {
+        const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const write = createDeferred<void>();
+        const view = await startFirstGrade(write);
+        fireEvent.press(closeButton(view));
+        await act(async () => write.reject(failure));
+        await waitFor(() => expect(view.getByText(s.flashcardsReviewSaveFailed)).toBeTruthy());
+        expect(warning).toHaveBeenCalledWith("[FlashcardSession] Failed to grade card:", failure);
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        expect(endReviewSession).not.toHaveBeenCalled();
+        expect(view.queryByText(secondCue)).toBeNull();
+        expect(closeButton(view).props.accessibilityState).toMatchObject({ disabled: false });
+        // The card is still open, and the cancelled Close does not carry over to the retry.
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        expect(putCardRow).toHaveBeenCalledTimes(2);
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+      });
+
+      it("prevents removal, the native swipe included, while a grade is unresolved or saved grades would be left", async () => {
+        jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const first = createDeferred<void>();
+        const second = createDeferred<void>();
+        jest.mocked(putCardRow).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+        const view = renderSession();
+        await reveal(view);
+        expect(preventing()).toBe(false);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(putCardRow).toHaveBeenCalledTimes(1));
+        expect(preventing()).toBe(true);
+        await act(async () => first.reject(failure));
+        await waitFor(() => expect(view.getByText(s.flashcardsReviewSaveFailed)).toBeTruthy());
+        expect(preventing()).toBe(false);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(putCardRow).toHaveBeenCalledTimes(2));
+        expect(preventing()).toBe(true);
+        await act(async () => second.resolve());
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        // Leaving now would leave a saved grade behind, so removal stays prevented until the summary.
+        expect(preventing()).toBe(true);
+        await reveal(view, secondCue);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+        expect(preventing()).toBe(false);
+      });
+
+      it("holds a back press during an unresolved grade, then goes back once it is saved", async () => {
+        const write = createDeferred<void>();
+        const view = await startFirstGrade(write);
+        let held = false;
+        act(() => {
+          held = back();
+        });
+        expect(held).toBe(true);
+        expect(view.queryByText(s.habitExitTitle)).toBeNull();
+        expect(closeButton(view).props.accessibilityState).toMatchObject({ disabled: true });
+        await act(async () => write.resolve());
+        // The held back press goes on to where it was going, not to the tabs.
+        await waitFor(() => expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK));
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        expect(putStudyLogRow).toHaveBeenCalledTimes(1);
+        expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
+      });
+
+      it("holds a back press during an unresolved grade, and stays to show a failure without carrying the leave over", async () => {
+        jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const write = createDeferred<void>();
+        const view = await startFirstGrade(write);
+        let held = false;
+        act(() => {
+          held = back();
+        });
+        expect(held).toBe(true);
+        await act(async () => write.reject(failure));
+        await waitFor(() => expect(view.getByText(s.flashcardsReviewSaveFailed)).toBeTruthy());
+        expect(mockNavigation.dispatch).not.toHaveBeenCalled();
+        expect(closeButton(view).props.accessibilityState).toMatchObject({ disabled: false });
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        expect(mockNavigation.dispatch).not.toHaveBeenCalled();
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+      });
+
+      it("asks before a back press leaves a saved grade, and goes back once confirmed", async () => {
+        const view = renderSession();
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        let held = false;
+        act(() => {
+          held = back();
+        });
+        expect(held).toBe(true);
+        await waitFor(() => expect(view.getByText(s.habitExitLeave)).toBeTruthy());
+        fireEvent.press(getTextButton(view, s.habitExitLeave));
+        expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK);
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
+      });
+
+      it("drops a held back press on Stay, so a later Close returns to the tabs", async () => {
+        const view = renderSession();
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        act(() => {
+          back();
+        });
+        await waitFor(() => expect(view.getByText(s.habitExitStay)).toBeTruthy());
+        fireEvent.press(getTextButton(view, s.habitExitStay));
+        await waitFor(() => expect(view.queryByText(s.habitExitTitle)).toBeNull());
+        expect(view.getByText(secondCue)).toBeTruthy();
+        expect(endReviewSession).not.toHaveBeenCalled();
+        fireEvent.press(closeButton(view));
+        await waitFor(() => expect(view.getByText(s.habitExitLeave)).toBeTruthy());
+        fireEvent.press(getTextButton(view, s.habitExitLeave));
+        expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
+        expect(mockNavigation.dispatch).not.toHaveBeenCalledWith(BACK);
+        expect(exits).toEqual(["left"]);
+      });
+
+      it("asks on Close with a saved grade while a later grade is unresolved, then leaves once it is saved", async () => {
+        const write = createDeferred<void>();
+        jest.mocked(putCardRow).mockResolvedValueOnce(undefined).mockReturnValueOnce(write.promise);
+        const view = renderSession();
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        await reveal(view, secondCue);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(putCardRow).toHaveBeenCalledTimes(2));
+        fireEvent.press(closeButton(view));
+        await waitFor(() => expect(view.getByText(s.habitExitLeave)).toBeTruthy());
+        fireEvent.press(getTextButton(view, s.habitExitLeave));
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        expect(closeButton(view).props.accessibilityState).toMatchObject({ disabled: true });
+        await act(async () => write.resolve());
+        await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home"));
+        expect(putStudyLogRow).toHaveBeenCalledTimes(2);
+        expect(exits).toEqual(["left"]);
+        expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
+      });
+
+      it("ends the session when the screen is removed without Close", async () => {
+        const view = renderSession();
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        expect(endReviewSession).not.toHaveBeenCalled();
+        view.unmount();
+        expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
+      });
     });
 
     it("announces the day's minimum wird and ends the first week with a commitment (STR-20)", async () => {

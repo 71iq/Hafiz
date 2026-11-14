@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useNavigation } from "expo-router";
+import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
@@ -215,7 +216,20 @@ function FlashcardSessionScreen() {
   // A learning card can come back several times in one session; the summary counts each card once, by
   // the state it had when first graded, so "cards reviewed" is not the number of grades.
   const reviewedCardIdsRef = useRef(new Set<string>());
+  /** The rendered copy of a non-empty reviewedCardIdsRef, so the remove guard below updates with it. */
+  const [hasReviewed, setHasReviewed] = useState(false);
   const gradingInFlightRef = useRef(false);
+  /**
+   * Close, a back press or a gesture came while a grade was unresolved. The screen leaves once the
+   * grade is saved, or stays on the card to show a failed save, which would otherwise reach a departed screen.
+   */
+  const leaveWhenSettledRef = useRef(false);
+  /** Set once the screen leaves on purpose, so the remove guard below lets that navigation through. */
+  const exitingRef = useRef(false);
+  /** A back press or gesture held for the leave confirmation or a grade; leaving carries it out. */
+  const pendingBackRef = useRef<NavigationAction | null>(null);
+  /** The rendered copy of leaveWhenSettledRef, so Close shows that its press is waiting for the grade. */
+  const [leavePending, setLeavePending] = useState(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
@@ -238,6 +252,7 @@ function FlashcardSessionScreen() {
     setExitConfirmOpen(false);
     reviewedCountsRef.current = { total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 };
     reviewedCardIdsRef.current = new Set();
+    setHasReviewed(false);
     setCards([]);
     setSessionCardTotal(0);
     setCurrentIndex(0);
@@ -570,6 +585,7 @@ function FlashcardSessionScreen() {
   const recordReviewedCard = useCallback((cardId: string, state: number) => {
     if (reviewedCardIdsRef.current.has(cardId)) return;
     reviewedCardIdsRef.current.add(cardId);
+    setHasReviewed(true);
     const next = { ...reviewedCountsRef.current, total: reviewedCountsRef.current.total + 1 };
     if (state === State.New) next.newCount += 1;
     else if (state === State.Relearning) next.relearningCount += 1;
@@ -717,6 +733,31 @@ function FlashcardSessionScreen() {
     });
   }, [answerEditMode, answerEditText, currentCard, currentIndex, db, runCardAction]);
 
+  const leaveSession = () => {
+    exitingRef.current = true;
+    const session = sessionRef.current;
+    if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
+    // A held back press goes where it was going; Close returns to the tabs.
+    const back = pendingBackRef.current;
+    pendingBackRef.current = null;
+    resetSessionProgress();
+    setSummary(null);
+    setPhase("loading");
+    if (back) navigation.dispatch(back);
+    else returnToTabs(navigation.getState(), "/(tabs)/home");
+  };
+
+  /** Leave now, or once the grade being saved settles (see leaveWhenSettledRef). */
+  const leave = () => {
+    if (gradingInFlightRef.current) {
+      leaveWhenSettledRef.current = true;
+      setLeavePending(true);
+    } else leaveSession();
+  };
+
+  /** A saved grade would be left behind mid-session. Read from the ref, which a saved grade updates at once. */
+  const hasReviewedProgress = () => phase !== "summary" && reviewedCardIdsRef.current.size > 0;
+
   const handleGrade = async (rating: Grade) => {
     if (!currentCard || gradingInFlightRef.current) return;
     gradingInFlightRef.current = true;
@@ -772,22 +813,33 @@ function FlashcardSessionScreen() {
         }).catch(console.warn);
       }
 
-      if (requeuedCard) {
-        setCards((prev) => [...prev, requeuedCard]);
+      // A leave held for this grade goes ahead now that it is saved, without showing the next card.
+      if (!leaveWhenSettledRef.current) {
+        if (requeuedCard) {
+          setCards((prev) => [...prev, requeuedCard]);
+        }
+
+        if (currentIndex < cards.length - 1 || requeuedCard) {
+          setCurrentIndex((i) => i + 1);
+          setCurrentSideIndex(0);
+          setRevealed(false);
+          setPhase("front");
+        } else {
+          await finishSessionWithSummary();
+          hapticSuccess();
+        }
       }
-
-      if (currentIndex < cards.length - 1 || requeuedCard) {
-        setCurrentIndex((i) => i + 1);
-        setCurrentSideIndex(0);
-        setRevealed(false);
-        setPhase("front");
-      } else {
-        await finishSessionWithSummary();
-        hapticSuccess();
-
+      // Also covers a leave that came while the summary was being prepared.
+      if (leaveWhenSettledRef.current) {
+        leaveWhenSettledRef.current = false;
+        leaveSession();
       }
     } catch (e) {
       console.warn("[FlashcardSession] Failed to grade card:", e);
+      // The held leave is dropped: the card stays open with its error, and a retry does not leave.
+      leaveWhenSettledRef.current = false;
+      pendingBackRef.current = null;
+      setLeavePending(false);
       if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
       else setSessionError(s.flashcardsReviewSaveFailed);
     } finally {
@@ -796,23 +848,40 @@ function FlashcardSessionScreen() {
     }
   };
 
-  const leaveSession = () => {
-    const session = sessionRef.current;
-    if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
-    resetSessionProgress();
-    setSummary(null);
-    setPhase("loading");
-    returnToTabs(navigation.getState(), "/(tabs)/home");
-  };
-
   // SES-02: leaving mid-session asks once. Every grade is already saved, so this only confirms.
   const handleEndSession = () => {
-    if (phase !== "summary" && reviewedCardIdsRef.current.size > 0) {
+    if (hasReviewedProgress()) {
       setExitConfirmOpen(true);
       return;
     }
-    leaveSession();
+    leave();
   };
+
+  // Leaving by any route that ends the screen without leaveSession still ends the session.
+  useEffect(
+    () => () => {
+      const session = sessionRef.current;
+      if (session) endReviewSession(db, { session }).catch(console.warn);
+    },
+    [db],
+  );
+
+  // Back presses, gestures and the iOS swipe behave like Close: with saved grades they ask first, and
+  // during an unresolved grade they wait for it. usePreventRemove, unlike a bare beforeRemove listener,
+  // also tells native-stack to block the native dismissal. `gradingBusy` is the rendered copy of the lock.
+  usePreventRemove(gradingBusy || (phase !== "summary" && hasReviewed), ({ data }) => {
+    // The screen's own leave goes on, as does a back press this render has not caught up with; React
+    // Navigation marks the action as already checked for this screen.
+    if (exitingRef.current) navigation.dispatch(data.action);
+    else if (hasReviewedProgress()) {
+      pendingBackRef.current = data.action;
+      setExitConfirmOpen(true);
+    } else if (gradingInFlightRef.current) {
+      pendingBackRef.current = data.action;
+      leaveWhenSettledRef.current = true;
+      setLeavePending(true);
+    } else navigation.dispatch(data.action);
+  });
 
   // ─── Render ────────────────────────────────────────────────
 
@@ -869,9 +938,12 @@ function FlashcardSessionScreen() {
           >
             <Pressable
               onPress={handleEndSession}
+              disabled={leavePending}
               accessibilityRole="button"
               accessibilityLabel={s.genericClose}
-              className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+              accessibilityState={{ disabled: leavePending }}
+              // Dimmed while Close waits for the grade it was pressed during.
+              className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${leavePending ? "opacity-50" : ""}`}
             >
               <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             </Pressable>
@@ -1125,14 +1197,18 @@ function FlashcardSessionScreen() {
         visible={exitConfirmOpen}
         title={s.habitExitTitle}
         message={s.habitExitBody}
+        tone="neutral"
         cancelLabel={s.habitExitStay}
         confirmLabel={s.habitExitLeave}
         isDark={isDark}
         isRTL={isRTL}
-        onCancel={() => setExitConfirmOpen(false)}
+        onCancel={() => {
+          setExitConfirmOpen(false);
+          pendingBackRef.current = null;
+        }}
         onConfirm={() => {
           setExitConfirmOpen(false);
-          leaveSession();
+          leave();
         }}
       />
       {wirdNotice ? <Toast message={wirdNotice} onDismiss={() => setWirdNotice(null)} duration={3500} announce /> : null}
