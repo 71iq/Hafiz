@@ -1827,11 +1827,16 @@ BEGIN
   PERFORM public.join_matched_halaqa('juz_amma', 'light', 180);
   PERFORM hz_test.eq('joining as a minor reports leaving the matched halaqa',
     public.join_board('Small Star', true, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'true');
-  PERFORM hz_test.eq('and the matched membership has ended', (
-    SELECT count(*) FROM public.halaqa_members WHERE user_id = auth.uid() AND kind = 'matched' AND left_at IS NULL
-  ), 0::BIGINT);
 END $$;
 RESET ROLE;
+-- Clients cannot read memberships directly; the owner checks that it really ended.
+DO $$
+BEGIN
+  PERFORM hz_test.eq('and the matched membership has ended', (
+    SELECT count(*) FROM public.halaqa_members
+    WHERE user_id = '00000000-0000-4000-8020-000000000001' AND kind = 'matched' AND left_at IS NULL
+  ), 0::BIGINT);
+END $$;
 SELECT hz_test.login('00000000-0000-4000-8020-000000000002');
 SET ROLE authenticated;
 DO $$
