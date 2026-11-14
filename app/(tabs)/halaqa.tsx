@@ -390,8 +390,8 @@ function HalaqaContent({ userId }: { userId: string }) {
 
       {active && sharingOpen ? (
         <HalaqaSharingPanel
-          // A reconnect mounts it afresh, so it reads the stored choices again.
-          key={`${active.id}:${offline ? "offline" : "online"}`}
+          // One sheet per open; a reconnect reads the stored choices again without dropping its drafts.
+          key={active.id}
           userId={userId}
           offline={offline}
           sharing={active.sharing}
@@ -475,8 +475,6 @@ function HalaqaSharingPanel({
 
   return (
     <HalaqaSharingSheet
-      // Restarts from new stored values; a refetch that returns the same ones keeps what was changed.
-      key={fresh ? `fresh:${fresh.isMinor}:${fresh.showStreak}:${fresh.showJuzCompletions}` : "none"}
       open
       sharing={sharing}
       privacy={fresh}

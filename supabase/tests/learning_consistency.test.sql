@@ -181,6 +181,11 @@ BEGIN
   PERFORM hz_test.eq('unique key on the server day', (
     SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indexrelid = 'public.idx_halaqa_encouragements_sender_day'::regclass
   ), 'CREATE UNIQUE INDEX idx_halaqa_encouragements_sender_day ON public.halaqa_encouragements USING btree (group_id, from_user, sent_on)');
+  -- Ninth review, finding 5: the board pass reads pending users in the index's order, user id last,
+  -- so it stops after its batch instead of sorting every pending row.
+  PERFORM hz_test.eq('board pending index ends with user id', (
+    SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indexrelid = 'public.idx_profile_privacy_board_pending'::regclass
+  ), 'CREATE INDEX idx_profile_privacy_board_pending ON public.profile_privacy USING btree (board_week_start, board_enrolled_week, user_id) WHERE board_joined');
 END $$;
 
 -- ─── 2. Wird-day merge equals lib/habit/merge.ts (fixture from the TypeScript merge) ─────

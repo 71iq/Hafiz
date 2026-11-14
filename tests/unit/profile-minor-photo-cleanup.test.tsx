@@ -3,6 +3,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import { QueryClient, QueryClientProvider, focusManager, onlineManager } from "@tanstack/react-query";
 import { act, cleanup, render, waitFor } from "@testing-library/react-native";
 import { halaqaKeys } from "@/lib/halaqa/api";
+import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import { OWN_PRIVACY_REVALIDATE_MS, cleanUpMinorPhotos, useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
 import { createAppQueryClient } from "@/lib/query/native-lifecycle";
 import { socialFailureOf } from "@/lib/social/remote";
@@ -159,6 +160,35 @@ describe("minor photo cleanup (ETH-07)", () => {
     await waitFor(() => expect(mockRpc).toHaveBeenCalledTimes(2));
     await act(async () => undefined);
     expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]);
+  });
+
+  it("cleans up again in a later minority after it was withdrawn", async () => {
+    const user = account(6);
+    signIn(signedIn(user));
+    let minor = true;
+    mockRpc.mockImplementation(async () => privacy(minor));
+    let onAppState: ((state: AppStateStatus) => void) | null = null;
+    jest.spyOn(AppState, "addEventListener").mockImplementation((_type, listener) => {
+      onAppState = listener as (state: AppStateStatus) => void;
+      return { remove: () => undefined } as ReturnType<typeof AppState.addEventListener>;
+    });
+    const client = newClient();
+    mount(client);
+    await waitFor(() => expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]));
+
+    // This device reads the withdrawal, then a minority recorded again on another device whose last
+    // photo pass left a file behind, and comes back to the foreground.
+    minor = false;
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user) });
+    });
+    minor = true;
+    mockAvatarFiles.add(`${user}/uploaded-meanwhile.jpg`);
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user) });
+    });
+    await act(async () => onAppState?.("active"));
+    await waitFor(() => expect(mockAvatarFiles.has(`${user}/uploaded-meanwhile.jpg`)).toBe(false));
   });
 
   it("leaves an adult's photos alone", async () => {

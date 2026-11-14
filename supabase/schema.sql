@@ -1278,7 +1278,7 @@ CREATE TABLE IF NOT EXISTS public.profile_privacy (
 
 -- Users a board pass still has to place, by week start and the last week they were considered for.
 CREATE INDEX IF NOT EXISTS idx_profile_privacy_board_pending
-  ON public.profile_privacy(board_week_start, board_enrolled_week) WHERE board_joined;
+  ON public.profile_privacy(board_week_start, board_enrolled_week, user_id) WHERE board_joined;
 
 ALTER TABLE public.profile_privacy ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own profile privacy" ON public.profile_privacy;

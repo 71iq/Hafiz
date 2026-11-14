@@ -401,9 +401,12 @@ CREATE TABLE IF NOT EXISTS public.profile_privacy (
   )
 );
 
--- Users a board pass still has to place, by week start and the last week they were considered for.
-CREATE INDEX IF NOT EXISTS idx_profile_privacy_board_pending
-  ON public.profile_privacy(board_week_start, board_enrolled_week) WHERE board_joined;
+-- Users a board pass still has to place, by week start and the last week they were considered for,
+-- then user id: the pass reads them in that order, so with user_id in the index it stops after its
+-- batch of 100 instead of sorting every pending row (earlier drafts lacked user_id).
+DROP INDEX IF EXISTS public.idx_profile_privacy_board_pending;
+CREATE INDEX idx_profile_privacy_board_pending
+  ON public.profile_privacy(board_week_start, board_enrolled_week, user_id) WHERE board_joined;
 
 ALTER TABLE public.profile_privacy ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own profile privacy" ON public.profile_privacy;

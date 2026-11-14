@@ -300,6 +300,38 @@ describe("Halaqa tab", () => {
     expect(minor.props.accessibilityState).toMatchObject({ checked: true });
   });
 
+  it("keeps a halaqa choice changed before the profile choices arrive", async () => {
+    signIn(USER);
+    let releasePrivacy: (() => void) | undefined;
+    mockRpc.mockImplementation(async (fn) => {
+      switch (fn) {
+        case "get_my_halaqas":
+          return { data: [summary], error: null };
+        case "get_halaqa_detail":
+          return { data: detail, error: null };
+        case "get_profile_privacy":
+          await new Promise<void>((resolve) => (releasePrivacy = resolve));
+          return { data: adultPrivacy, error: null };
+        default:
+          throw new Error(`Unexpected RPC ${fn}`);
+      }
+    });
+    const screen = renderScreen();
+    fireEvent.press(await screen.findByLabelText(strings.en.halaqaSharingA11y));
+    await waitFor(() => expect(releasePrivacy).toBeDefined());
+    const consistency = () => screen.getByRole("switch", { name: strings.en.halaqaShareConsistency });
+    const before = consistency().props.accessibilityState.checked as boolean;
+    fireEvent.press(consistency());
+    expect(consistency().props.accessibilityState).toMatchObject({ checked: !before });
+
+    await act(async () => {
+      releasePrivacy!();
+    });
+    expect(await screen.findByRole("switch", { name: strings.en.profileIsMinor })).toBeTruthy();
+    // The profile choices arrived; the halaqa choice the person changed stays.
+    expect(consistency().props.accessibilityState).toMatchObject({ checked: !before });
+  });
+
   it("says the age setting changed on another device and reloads it when the save is refused (ETH-07)", async () => {
     signIn(USER);
     let stored = adultPrivacy;

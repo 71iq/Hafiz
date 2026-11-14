@@ -318,7 +318,8 @@ describe("Board tab", () => {
     await act(async () => {
       await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
     });
-    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
+    // Query notifies on its own tick, so wait for the restart rather than asserting at once.
+    await waitFor(() => expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star"));
     expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
   });
 

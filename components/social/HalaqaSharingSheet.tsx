@@ -15,10 +15,11 @@ export type ProfileVisibilityChange = ProfileVisibility & { expectedMinor: boole
 
 /**
  * Sharing choices (SOC-01, SOC-03, ETH-07): what this halaqa's members and teachers see, and what the
- * public profile shows. Mount it with a key per open so the drafts start from the saved values, and
- * again whenever `privacy` changes. Pass `privacy` only from a read that completed while the sheet is
- * open: saving a stale copy is refused by the server. Without it the profile choices are not shown or
- * saved, and `privacyNotice` says why.
+ * public profile shows. Mount it with a key per open so the drafts start from the saved values. Pass
+ * `privacy` only from a read that completed while the sheet is open: saving a stale copy is refused by
+ * the server. Without it the profile choices are not shown or saved, and `privacyNotice` says why.
+ * When `privacy` arrives or its stored values change, only the profile choices start again from it;
+ * the halaqa choices the person already changed stay.
  */
 export function HalaqaSharingSheet({
   open,
@@ -42,12 +43,15 @@ export function HalaqaSharingSheet({
   const s = useStrings();
   const { isRTL } = useSettings();
   const [draft, setDraft] = useState(sharing);
-  // What the sheet loaded, kept for the save even if the parent passes another copy without a remount.
-  const [loaded] = useState(privacy);
-  const [visibility, setVisibility] = useState(privacy);
+  // The profile choices start from the stored values they were loaded from, which the save sends as
+  // the expected minority, and start again only when those stored values change.
+  const privacyKey = privacy ? `${privacy.isMinor}:${privacy.showStreak}:${privacy.showJuzCompletions}` : null;
+  const [profile, setProfile] = useState({ key: privacyKey, loaded: privacy, visibility: privacy });
+  if (profile.key !== privacyKey) setProfile({ key: privacyKey, loaded: privacy, visibility: privacy });
+  const { loaded, visibility } = profile.key === privacyKey ? profile : { loaded: privacy, visibility: privacy };
   const set = (key: keyof HalaqaSharing) => (value: boolean) => setDraft((current) => ({ ...current, [key]: value }));
   const setVisible = (key: keyof ProfileVisibility) => (value: boolean) =>
-    setVisibility((current) => (current ? { ...current, [key]: value } : current));
+    setProfile((current) => (current.visibility ? { ...current, visibility: { ...current.visibility, [key]: value } } : current));
   const close = () => {
     if (!pending) onClose();
   };

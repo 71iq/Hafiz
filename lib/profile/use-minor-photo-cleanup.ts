@@ -8,10 +8,13 @@ import { captureSocialOwner, requireSocialOwner } from "@/lib/social/owner";
 import { socialFailureOf } from "@/lib/social/remote";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
-// Accounts that had no photo files left at some point in this app session.
+// Accounts that had no photo files left during their current minority in this app session.
 const cleaned = new Set<string>();
 // One cleanup at a time per account.
 const running = new Map<string, Promise<boolean>>();
+// Bumped when an account is known not to be a minor, so a cleanup that started before cannot mark a
+// later minority as cleaned.
+const minorities = new Map<string, number>();
 
 /**
  * ETH-07: removes the photo files a minor account still has in the public avatars bucket, at most
@@ -24,15 +27,28 @@ export function cleanUpMinorPhotos(userId: string): Promise<boolean> {
   if (cleaned.has(userId)) return Promise.resolve(true);
   const current = running.get(userId);
   if (current) return current;
-  const run = (async () => {
+  const minority = minorities.get(userId) ?? 0;
+  const run: Promise<boolean> = (async () => {
     const owner = captureSocialOwner(userId);
     if (!owner) return false;
     await deleteOwnAvatarFiles(owner);
-    cleaned.add(userId);
+    if ((minorities.get(userId) ?? 0) === minority) cleaned.add(userId);
     return true;
-  })().finally(() => running.delete(userId));
+  })().finally(() => {
+    if (running.get(userId) === run) running.delete(userId);
+  });
   running.set(userId, run);
   return run;
+}
+
+/**
+ * The account is not a minor now, so its finished cleanup belongs to a past minority. A later one,
+ * recorded on this or another device whose last photo pass was cut short, gets a fresh cleanup.
+ */
+export function forgetMinorPhotoCleanup(userId: string): void {
+  cleaned.delete(userId);
+  running.delete(userId);
+  minorities.set(userId, (minorities.get(userId) ?? 0) + 1);
 }
 
 /**
@@ -54,7 +70,12 @@ export function useMinorPhotoCleanup(): void {
   const queryClient = useQueryClient();
   const privacy = useQuery({
     queryKey: profilePrivacyKeys.mine(userId),
-    queryFn: () => fetchProfilePrivacy(requireSocialOwner(userId ?? "")),
+    queryFn: async () => {
+      const read = await fetchProfilePrivacy(requireSocialOwner(userId ?? ""));
+      // Known as an adult as soon as a read says so, even if a later read lands before a render.
+      if (userId && !read.isMinor) forgetMinorPhotoCleanup(userId);
+      return read;
+    },
     enabled: userId !== null && isSupabaseConfigured(),
     retry: false,
     staleTime: OWN_PRIVACY_REVALIDATE_MS,
@@ -63,6 +84,11 @@ export function useMinorPhotoCleanup(): void {
     refetchOnReconnect: true,
   });
   const isMinor = privacy.data?.isMinor === true;
+  const knownAdult = privacy.data?.isMinor === false;
+
+  useEffect(() => {
+    if (userId && knownAdult) forgetMinorPhotoCleanup(userId);
+  }, [userId, knownAdult]);
 
   useEffect(() => {
     if (!userId || !isMinor) return;
