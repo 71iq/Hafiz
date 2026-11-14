@@ -735,13 +735,29 @@ export async function deleteStudyCard(database: AppDatabase, deckId: string, car
   await database.withTransactionAsync((db) => deleteStudyCardRow(db, deckId, cardId));
 }
 
+/**
+ * An ISO instant later than `now` and every given stamp, so a write made now supersedes all of them.
+ * Card writes stamp past the version they replace: a version stamped by a clock running ahead
+ * (another device's deletion, or a restore after it) must not make this device's later grades look
+ * older and lose to it in sync. Review times (reviewed_at, last_review, due) stay the real ones.
+ */
+function laterThanAll(now: Date, stamps: readonly (string | null | undefined)[]): string {
+  let at = now.toISOString();
+  for (const stamp of stamps) {
+    if (!stamp || compareSyncTimestamps(stamp, at) < 0) continue;
+    const next = Date.parse(stamp) + 1;
+    if (Number.isFinite(next)) at = new Date(next).toISOString();
+  }
+  return at;
+}
+
 /** Soft-delete a card with its upload queued, using the caller's executor (inside its transaction). */
 export async function deleteStudyCardRow(db: DatabaseExecutor, deckId: string, cardId: string): Promise<void> {
   const row = await db.getFirstAsync<StudyCardRow>(
     "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [cardId, deckId]
   );
-  const deletedAt = new Date().toISOString();
+  const deletedAt = laterThanAll(new Date(), [row?.updated_at]);
   const result = await db.runAsync(
     "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [deletedAt, deletedAt, cardId, deckId]
@@ -1170,6 +1186,12 @@ async function updateStudyCardInTransaction(
 export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Promise<void> {
   // A row that carries a tier (page cards) writes it; other callers leave the cached tier alone.
   const writesTier = card.tier !== undefined;
+  const stored = await db.getFirstAsync<{ updated_at: string | null }>(
+    "SELECT updated_at FROM study_cards WHERE id = ? AND deleted_at IS NULL",
+    [card.id],
+  );
+  const written = Date.parse(card.updated_at);
+  const updatedAt = laterThanAll(Number.isFinite(written) ? new Date(written) : new Date(), [stored?.updated_at]);
   const result = await db.runAsync(
     `UPDATE study_cards SET
       due = ?, stability = ?, difficulty = ?, elapsed_days = ?, scheduled_days = ?,
@@ -1179,26 +1201,16 @@ export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Prom
     [
       card.due, card.stability, card.difficulty, card.elapsed_days, card.scheduled_days,
       card.learning_steps, card.reps, card.lapses, card.state, card.last_review,
-      card.suspended_at, card.buried_until, card.marked_at, card.updated_at,
+      card.suspended_at, card.buried_until, card.marked_at, updatedAt,
       ...(writesTier ? [card.tier ?? null, card.tier_changed_at ?? null] : []),
       card.id,
     ]
   );
   if ((result.changes ?? 0) === 0) throw new StudyCardDeletedError();
 
-  await enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card));
+  await enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData({ ...card, updated_at: updatedAt }));
 }
 
-/** An ISO instant later than `now` and every given stamp, so a write made now supersedes all of them. */
-function laterThanAll(now: Date, stamps: readonly (string | null | undefined)[]): string {
-  let at = now.toISOString();
-  for (const stamp of stamps) {
-    if (!stamp || compareSyncTimestamps(stamp, at) < 0) continue;
-    const next = Date.parse(stamp) + 1;
-    if (Number.isFinite(next)) at = new Date(next).toISOString();
-  }
-  return at;
-}
 
 /**
  * Undoes a card's deletion: it comes back with its schedule and history as they were, so its training

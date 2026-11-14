@@ -879,7 +879,7 @@ it.each(
   expect(transactions).toBe(1);
 });
 
-it.each(["restore", "incremental"])("preserves omitted-state tombstone defaults during %s", async (mode) => {
+it.each(["restore", "incremental"])("applies an omitted-state tombstone during %s", async (mode) => {
   const tombstone = { id: "2:255", updated_at: NEW, deleted_at: NEW };
   if (mode === "restore") mockRestoreCards = [tombstone];
   else {
@@ -887,11 +887,13 @@ it.each(["restore", "incremental"])("preserves omitted-state tombstone defaults 
     mockIncrementalCards = [tombstone];
   }
   await fullSync(db);
-  expect(sql.prepare("SELECT state, deck_id, deleted_at FROM study_cards WHERE id = '2:255'").get()).toEqual({
-    state: State.New,
-    deck_id: "deleted",
-    deleted_at: NEW,
-  });
+  // Restore starts from no local row, so the omitted fields take their defaults. A card this device
+  // already holds is deleted but keeps its own deck and schedule, which a restore would bring back.
+  expect(sql.prepare("SELECT state, deck_id, deleted_at FROM study_cards WHERE id = '2:255'").get()).toEqual(
+    mode === "restore"
+      ? { state: State.New, deck_id: "deleted", deleted_at: NEW }
+      : { state: State.Review, deck_id: "synthetic", deleted_at: NEW },
+  );
 });
 
 it.each([OLD, NEW])(
@@ -1663,6 +1665,28 @@ it("brings back a cloze card another device deleted while the word is still weak
   };
   expect(restored).toMatchObject({ reps: 7, state: State.Review, stability: 5 });
   expect(Date.parse(restored.updated_at)).toBeGreaterThan(Date.parse(deletedAt));
+});
+
+it("keeps this device's newer training when a deletion from a device behind on reviews arrives", async () => {
+  restoreComplete();
+  mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  // This device trained the card nine times, the last review an hour ago.
+  const lastReview = new Date(Date.now() - 60 * 60_000).toISOString();
+  sql.prepare("UPDATE study_cards SET reps = 9, last_review = ?, updated_at = ? WHERE id = 'cloze:2:255:4'").run(lastReview, lastReview);
+  // Another device that saw only seven reviews deleted it later.
+  const deletedAt = new Date(Date.now() + 60_000).toISOString();
+  mockTableRows.set("recitation_errors:incremental", []);
+  mockTableRows.set("study_cards:incremental", [
+    {
+      ...clozeCard({ reps: 7, last_review: OLD, updated_at: deletedAt, deleted_at: deletedAt }),
+      synced_at: "2099-01-01T00:00:00.000Z",
+    },
+  ]);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  // The word is still weak here, so the card comes back with the nine reviews.
+  expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
+  expect(sql.prepare("SELECT reps, last_review FROM study_cards WHERE id = 'cloze:2:255:4'").get()).toEqual({ reps: 9, last_review: lastReview });
 });
 
 it("removes a restored cloze card whose weak spot a restored dismissal ended", async () => {

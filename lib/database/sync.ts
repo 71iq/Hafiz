@@ -1045,11 +1045,25 @@ async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"
   // Last-write-wins: only update if remote is newer
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
   if (!remoteUpdatedAt) throw new Error("Invalid synced study_cards payload");
-  const local = await db.getFirstAsync<{ updated_at: string }>("SELECT updated_at FROM study_cards WHERE id = ?", [
-    row.id,
-  ]);
+  const local = await db.getFirstAsync<{ updated_at: string; last_review: string | null }>(
+    "SELECT updated_at, last_review FROM study_cards WHERE id = ?",
+    [row.id],
+  );
 
   if (local && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return; // Local is newer
+
+  // A deletion is newer, but its schedule can be older than this device's: a device that had not
+  // pulled the latest reviews deleted the card. The card is deleted either way; it keeps the more
+  // recently reviewed schedule, which is what comes back if the card is restored (a cloze card whose
+  // word is still weak here, lib/hifz/weak-spots.ts).
+  if (row.deleted_at != null && local && !reviewedLater(row.last_review ?? null, local.last_review)) {
+    await db.runAsync("UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ?", [
+      remoteUpdatedAt,
+      row.deleted_at,
+      row.id,
+    ]);
+    return;
+  }
 
   if (row.deleted_at != null) {
     await db.runAsync(
@@ -1257,6 +1271,13 @@ async function upsertReviewSession(db: DatabaseExecutor, row: SyncRows["review_s
 }
 
 type ErrorLocationRow = { surah: number; ayah: number | null; word: number | null };
+
+/** Whether `remote` is a later review than `local`; a review beats none. */
+function reviewedLater(remote: string | null, local: string | null): boolean {
+  if (!remote) return false;
+  if (!local) return true;
+  return compareSyncTimestamps(remote, local) > 0;
+}
 
 async function isLiveRecitationError(db: DatabaseExecutor, id: string): Promise<boolean> {
   return (await db.getFirstAsync("SELECT 1 FROM recitation_errors WHERE id = ? AND deleted_at IS NULL", [id])) != null;
