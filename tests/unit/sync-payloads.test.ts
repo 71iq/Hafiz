@@ -910,6 +910,108 @@ it.each([OLD, NEW])(
   },
 );
 
+describe("card merge: the schedule by review time, the rest by row time", () => {
+  // Device B grades the card Again at 09:03. Device A, offline with the 08:00 schedule, suspends it at
+  // 09:05 (a unit switch writes the whole row). Each device ends with B's schedule and A's suspension.
+  const at = (time: string) => `2026-11-13T${time}:00.000Z`;
+  const seen = {
+    ...card(),
+    due: "2026-11-20T08:00:00.000Z",
+    stability: 10,
+    difficulty: 5,
+    elapsed_days: 3,
+    scheduled_days: 7,
+    reps: 3,
+    lapses: 0,
+    state: State.Review,
+    last_review: at("08:00"),
+    updated_at: at("09:00"),
+  };
+  const bAgain = {
+    ...seen,
+    due: at("09:13"),
+    stability: 2,
+    difficulty: 7,
+    elapsed_days: 0,
+    scheduled_days: 0,
+    reps: 4,
+    lapses: 1,
+    state: State.Relearning,
+    last_review: at("09:03"),
+    updated_at: at("09:03"),
+  };
+  const aSuspended = { ...seen, suspended_at: at("09:05"), updated_at: at("09:05") };
+  // The row the server stores once both uploads have met (private.study_cards_merge_schedule).
+  const merged = { ...bAgain, suspended_at: at("09:05"), updated_at: at("09:05") };
+  const stored = () =>
+    sql
+      .prepare(
+        `SELECT id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state,
+          last_review, suspended_at, buried_until, marked_at, created_at, updated_at, deleted_at
+         FROM study_cards WHERE id = '2:255'`,
+      )
+      .get();
+  const holdLocally = (row: Record<string, SQLInputValue>) => {
+    sql.prepare("DELETE FROM study_cards WHERE id = '2:255'").run();
+    putCard(row);
+  };
+  const queued = () => sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get();
+
+  it.each([
+    { label: "B's own upload", remote: bAgain },
+    { label: "the server's merged row, which keeps A's row time", remote: merged },
+  ])("device A takes a later review over its newer suspension from $label", async ({ remote }) => {
+    restoreComplete();
+    holdLocally(aSuspended);
+    mockIncrementalCards = [remote];
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+    expect(stored()).toEqual(merged);
+    expect(transactions).toBe(1);
+    expect(queued()).toEqual({ count: 0 });
+  });
+
+  it.each([
+    { label: "A's own upload", remote: aSuspended },
+    { label: "the server's merged row", remote: merged },
+  ])("device B keeps its later review under a newer suspension from $label", async ({ remote }) => {
+    restoreComplete();
+    holdLocally(bAgain);
+    mockIncrementalCards = [remote];
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+    expect(stored()).toEqual(merged);
+    expect(transactions).toBe(1);
+    expect(queued()).toEqual({ count: 0 });
+  });
+
+  it("keeps whole-row last write wins for equal review times, so a due-date change applies", async () => {
+    restoreComplete();
+    holdLocally(seen);
+    mockIncrementalCards = [{ ...seen, due: "2026-11-25T08:00:00.000Z", updated_at: at("09:05") }];
+    await fullSync(db);
+    expect(stored()).toEqual({ ...seen, due: "2026-11-25T08:00:00.000Z", updated_at: at("09:05") });
+  });
+
+  it("keeps a deletion made on a stale copy deleted, with the later review it had not seen", async () => {
+    restoreComplete();
+    holdLocally({ ...seen, updated_at: at("09:05"), deleted_at: at("09:05") });
+    mockIncrementalCards = [bAgain];
+    await fullSync(db);
+    expect(stored()).toEqual({ ...bAgain, updated_at: at("09:05"), deleted_at: at("09:05") });
+  });
+
+  it.each([
+    { label: "B's review first", snapshot: [bAgain, aSuspended] },
+    { label: "A's suspension first", snapshot: [aSuspended, bAgain] },
+  ])("merges both versions of a card met in one restore snapshot: $label", async ({ snapshot }) => {
+    // Offset paging by synced_at can return a card twice when it is uploaded during the restore.
+    mockRestoreCards = snapshot;
+    await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+    expect(stored()).toEqual(merged);
+    expect(transactions).toBe(1);
+    expect(queued()).toEqual({ count: 0 });
+  });
+});
+
 describe("word meaning restore and incremental recovery", () => {
   it.each([
     ["first", 0],

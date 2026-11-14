@@ -567,6 +567,45 @@ it("keeps the existing valid newer-remote timestamp precedence", async () => {
   expect(queueState(id)).toEqual({ status: "synced" });
 });
 
+describe("card upload under a remote row written later", () => {
+  // The queued card was reviewed at NEW. The server's row was written later, at LATER.
+  const LATER = "2026-03-01T00:00:00.000Z";
+  async function queueReviewedCard(): Promise<number> {
+    await enqueueSync(db, "study_cards", "UPDATE", "qiraat:2:255", { ...card(), last_review: NEW });
+    return (await getPendingSyncEntries(db, 1))[0].id;
+  }
+
+  it.each([
+    { label: "an earlier review", lastReview: OLD },
+    { label: "no review", lastReview: null },
+  ])("uploads a later review over a remote row with $label, for the server to merge", async ({ lastReview }) => {
+    const id = await queueReviewedCard();
+    mockProbeData = [{ updated_at: LATER, last_review: lastReview }];
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+    expect(remoteWrites).toMatchObject([{ table: "study_cards", kind: "upsert", row: { last_review: NEW } }]);
+    expect(queueState(id)).toEqual({ status: "synced" });
+  });
+
+  it.each([
+    { label: "the same review", lastReview: NEW },
+    { label: "a later review", lastReview: "2026-02-15T00:00:00.000Z" },
+  ])("skips an upload whose review the newer remote row already has: $label", async ({ lastReview }) => {
+    const id = await queueReviewedCard();
+    mockProbeData = [{ updated_at: LATER, last_review: lastReview }];
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+    expect(remoteWrites).toEqual([]);
+    expect(queueState(id)).toEqual({ status: "synced" });
+  });
+
+  it("does not acknowledge an upload on a malformed remote review time", async () => {
+    const id = await queueReviewedCard();
+    mockProbeData = [{ updated_at: LATER, last_review: "9999-invalid" }];
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pushed: 0 });
+    expect(remoteWrites).toEqual([]);
+    expect(queueState(id)).toEqual({ status: "failed" });
+  });
+});
+
 it.each([{}, [], { id: null }, { id: "nonsense" }, { id: 1, user_id: OTHER_USER_ID }])(
   "does not acknowledge a queued review from malformed existence data %p",
   async (data) => {

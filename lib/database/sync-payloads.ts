@@ -534,6 +534,20 @@ export function decodeSyncFreshness(table: SyncTable, input: unknown, ownerId: s
   return value;
 }
 
+const cardReview = z.object({ last_review: optionalTimestamp });
+
+/** A card's freshness and review time: an upload reviewed later still brings its schedule. */
+export function decodeStudyCardFreshness(
+  input: unknown,
+  ownerId: string,
+): { at: string; lastReview: string | null } | null {
+  const at = decodeSyncFreshness("study_cards", input, ownerId);
+  if (at === null) return null;
+  const parsed = cardReview.safeParse((input as unknown[])[0]);
+  if (!parsed.success) fail("study_cards");
+  return { at, lastReview: parsed.data.last_review ?? null };
+}
+
 const existingLog = z.object({ id: numericId, user_id: identity.optional() });
 export function decodeSyncedStudyLogExists(input: unknown, ownerId: string): boolean {
   if (input === null) return false;

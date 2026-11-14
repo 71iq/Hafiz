@@ -1239,6 +1239,51 @@ DROP TRIGGER IF EXISTS habit_days_merge ON public.habit_days;
 CREATE TRIGGER habit_days_merge BEFORE INSERT OR UPDATE ON public.habit_days
   FOR EACH ROW EXECUTE FUNCTION private.habit_days_before_write();
 
+-- ─── Card schedule merge ─────────────────────────────────────
+-- A card's schedule comes from the version reviewed later and every other column from the version
+-- written later, as upsertStudyCard in lib/database/sync.ts does. Runs before sync_keep_newer_row
+-- (BEFORE triggers fire in name order); see migration 20261113120000 for each case.
+CREATE OR REPLACE FUNCTION private.study_cards_merge_schedule()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.last_review IS NOT DISTINCT FROM OLD.last_review THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.last_review IS NOT NULL AND (OLD.last_review IS NULL OR NEW.last_review > OLD.last_review) THEN
+    IF NEW.updated_at < OLD.updated_at THEN
+      NEW.deck_id := OLD.deck_id;
+      NEW.suspended_at := OLD.suspended_at;
+      NEW.buried_until := OLD.buried_until;
+      NEW.marked_at := OLD.marked_at;
+      NEW.tier := OLD.tier;
+      NEW.tier_changed_at := OLD.tier_changed_at;
+      NEW.created_at := OLD.created_at;
+      NEW.deleted_at := OLD.deleted_at;
+      NEW.updated_at := OLD.updated_at;
+    END IF;
+  ELSE
+    NEW.due := OLD.due;
+    NEW.stability := OLD.stability;
+    NEW.difficulty := OLD.difficulty;
+    NEW.elapsed_days := OLD.elapsed_days;
+    NEW.scheduled_days := OLD.scheduled_days;
+    NEW.learning_steps := OLD.learning_steps;
+    NEW.reps := OLD.reps;
+    NEW.lapses := OLD.lapses;
+    NEW.state := OLD.state;
+    NEW.last_review := OLD.last_review;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS study_cards_merge_schedule ON public.study_cards;
+CREATE TRIGGER study_cards_merge_schedule BEFORE UPDATE ON public.study_cards
+  FOR EACH ROW EXECUTE FUNCTION private.study_cards_merge_schedule();
+
 -- ─── Profile privacy (SOC-01, ETH-07) ───────────────────────
 -- is_minor and the board nickname live here, owner-only, never next to the profile's identity.
 CREATE TABLE IF NOT EXISTS public.profile_privacy (
@@ -3571,6 +3616,7 @@ REVOKE ALL ON FUNCTION
   private.effective_habit_status(TEXT, TEXT),
   private.merge_habit_day(public.habit_days, public.habit_days),
   private.habit_days_before_write(),
+  private.study_cards_merge_schedule(),
   private.is_minor(UUID),
   private.activity_public(UUID, BOOLEAN),
   private.lock_minor_change(UUID),

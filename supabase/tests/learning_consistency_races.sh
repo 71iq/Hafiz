@@ -606,4 +606,45 @@ check "the stale join is refused" "$(grep -c privacy_changed "$WORK/stale_join" 
 check "minority stays recorded and the Board is not joined" \
   "$(admin -c "SELECT is_minor::TEXT || '/' || board_joined::TEXT FROM public.profile_privacy WHERE user_id = '$(uid 25)'")" true/false
 
+# ─── Card merge: two devices upload one card at once ─────────────────────────────
+# Device B graded the card Again at 09:03; device A suspended its 08:00 copy at 09:05. The controller
+# holds the card row, so both uploads (INSERT ... ON CONFLICT DO UPDATE, as PostgREST sends them) wait
+# and then apply one after the other in either order, each merging with the row the other committed.
+rm -f "$WORK"/*
+admin >/dev/null <<SQL
+INSERT INTO auth.users (id, email) VALUES ('$(uid 26)', 'race26@example.invalid');
+INSERT INTO public.profiles (id, username) VALUES ('$(uid 26)', 'race_user_26');
+INSERT INTO public.study_cards (id, user_id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
+  learning_steps, reps, lapses, state, last_review, created_at, updated_at)
+VALUES ('5:1', '$(uid 26)', 'default', '2026-11-20T08:00:00Z', 10, 5, 3, 7, 0, 3, 0, 2, '2026-11-13T08:00:00Z',
+  '2026-11-01T00:00:00Z', '2026-11-13T09:00:00Z');
+SQL
+# Upload SQL for card 5:1: schedule as "due, stability, difficulty, elapsed, scheduled, reps, lapses, state,
+# last_review", then suspended_at and updated_at.
+card_upload() {
+  printf "INSERT INTO public.study_cards (id, user_id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
+  learning_steps, reps, lapses, state, last_review, created_at, suspended_at, updated_at, synced_at)
+VALUES ('5:1', '%s', 'default', %s, 0, %s, '2026-11-01T00:00:00Z', %s, clock_timestamp())
+ON CONFLICT (user_id, id) DO UPDATE SET due = EXCLUDED.due, stability = EXCLUDED.stability,
+  difficulty = EXCLUDED.difficulty, elapsed_days = EXCLUDED.elapsed_days, scheduled_days = EXCLUDED.scheduled_days,
+  learning_steps = EXCLUDED.learning_steps, reps = EXCLUDED.reps, lapses = EXCLUDED.lapses, state = EXCLUDED.state,
+  last_review = EXCLUDED.last_review, suspended_at = EXCLUDED.suspended_at, created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at, synced_at = EXCLUDED.synced_at;" "$(uid 26)" "$1" "$2" "$3"
+}
+SCHEDULE_A="'2026-11-20T08:00:00Z', 10, 5, 3, 7"
+SCHEDULE_A_TAIL="3, 0, 2, '2026-11-13T08:00:00Z'"
+SCHEDULE_B="'2026-11-13T09:13:00Z', 2, 7, 0, 0"
+SCHEDULE_B_TAIL="4, 1, 3, '2026-11-13T09:03:00Z'"
+controller card "SELECT 1 FROM public.study_cards WHERE user_id = '$(uid 26)' AND id = '5:1' FOR UPDATE;" 2
+wait_for_controller card
+session card_a "$(uid 26)" "$(card_upload "${SCHEDULE_A}" "${SCHEDULE_A_TAIL}" "'2026-11-13T09:05:00Z', '2026-11-13T09:05:00Z'")"
+session card_b "$(uid 26)" "$(card_upload "${SCHEDULE_B}" "${SCHEDULE_B_TAIL}" "NULL, '2026-11-13T09:03:00Z'")"
+wait
+check "device A's upload finished" "$(tail -1 "$WORK/card_a")" ok
+check "device B's upload finished" "$(tail -1 "$WORK/card_b")" ok
+check "the card has B's review and A's suspension" \
+  "$(admin -c "SELECT concat_ws('/', state, reps, lapses, to_char(last_review AT TIME ZONE 'UTC', 'HH24:MI'),
+    to_char(suspended_at AT TIME ZONE 'UTC', 'HH24:MI'), to_char(updated_at AT TIME ZONE 'UTC', 'HH24:MI'))
+    FROM public.study_cards WHERE user_id = '$(uid 26)' AND id = '5:1'")" "3/4/1/09:03/09:05/09:05"
+
 echo "learning_consistency_races.sh: all races passed"

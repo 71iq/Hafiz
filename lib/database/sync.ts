@@ -7,6 +7,7 @@ import {
   decodeSyncPage,
   decodeSyncQueueEntry,
   decodeSyncFreshness,
+  decodeStudyCardFreshness,
   decodeSyncedStudyLogExists,
   type SyncRows,
   type SyncTable,
@@ -797,7 +798,11 @@ async function remoteIsNewer(tableName: SyncTable, row: Record<string, any>, use
   if (!localTimestamp || tableName === "study_log") return false;
 
   const timestampColumns =
-    tableName === "achievement_unlocks" ? "unlocked_at, synced_at" : "updated_at, created_at, synced_at";
+    tableName === "achievement_unlocks"
+      ? "unlocked_at, synced_at"
+      : tableName === "study_cards"
+        ? "updated_at, created_at, synced_at, last_review"
+        : "updated_at, created_at, synced_at";
   let query = supabase.from(tableName).select(timestampColumns).eq("user_id", userId).limit(1);
 
   switch (tableName) {
@@ -832,6 +837,13 @@ async function remoteIsNewer(tableName: SyncTable, row: Record<string, any>, use
 
   const { data, error } = await query;
   if (error) throw error;
+  if (tableName === "study_cards") {
+    // A card written later remotely still takes this upload's schedule when this device reviewed it
+    // later (private.study_cards_merge_schedule), so only an upload reviewed no later is skipped.
+    const remote = decodeStudyCardFreshness(data, userId);
+    if (!remote || compareSyncTimestamps(remote.at, localTimestamp) <= 0) return false;
+    return !reviewedLater(row.last_review ?? null, remote.lastReview);
+  }
   const remoteTimestamp = decodeSyncFreshness(tableName, data, userId);
   return Boolean(remoteTimestamp && compareSyncTimestamps(remoteTimestamp, localTimestamp) > 0);
 }
@@ -1054,55 +1066,102 @@ async function upsertUserWordMeaning(db: DatabaseExecutor, row: SyncRows["user_w
   );
 }
 
+/** Columns that come from the version reviewed later. */
+const CARD_SCHEDULE_COLUMNS = [
+  "due",
+  "stability",
+  "difficulty",
+  "elapsed_days",
+  "scheduled_days",
+  "learning_steps",
+  "reps",
+  "lapses",
+  "state",
+  "last_review",
+] as const;
+/** Columns that come, with updated_at and deleted_at, from the version written later. */
+const CARD_STATUS_COLUMNS = [
+  "deck_id",
+  "suspended_at",
+  "buried_until",
+  "marked_at",
+  "tier",
+  "tier_changed_at",
+  "created_at",
+] as const;
+const NULLABLE_CARD_COLUMNS: ReadonlySet<string> = new Set([
+  "last_review",
+  "suspended_at",
+  "buried_until",
+  "marked_at",
+  "tier",
+  "tier_changed_at",
+]);
+
+/**
+ * A pulled card merges with this device's copy in two groups, as private.study_cards_merge_schedule
+ * does on the server. The schedule comes from the version reviewed later, so a suspension, bury, mark,
+ * due-date change or unit switch made on a device holding an older schedule never replaces a review
+ * made since on another device. Every other column comes with updated_at from the version written
+ * later, as before. Equal review times, both null included, keep whole-row last write wins, and no
+ * review counts as the earliest.
+ *
+ * A deletion is one of the other columns: a card deleted on a device behind on reviews is deleted
+ * here with this device's later schedule, which is what comes back if the card is restored (a cloze
+ * card whose word is still weak here, lib/hifz/weak-spots.ts). A partial tombstone's omitted fields
+ * keep this device's values.
+ *
+ * The merge is not queued for upload: the server already holds the pulled version and merges this
+ * device's pending upload the same way.
+ */
 async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"]): Promise<void> {
-  // Last-write-wins: only update if remote is newer
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
   if (!remoteUpdatedAt) throw new Error("Invalid synced study_cards payload");
   const local = await db.getFirstAsync<{ updated_at: string; last_review: string | null }>(
     "SELECT updated_at, last_review FROM study_cards WHERE id = ?",
     [row.id],
   );
-
-  if (local && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return; // Local is newer
-
-  // A deletion is newer, but its schedule can be older than this device's: a device that had not
-  // pulled the latest reviews deleted the card. The card is deleted either way; it keeps the more
-  // recently reviewed schedule, which is what comes back if the card is restored (a cloze card whose
-  // word is still weak here, lib/hifz/weak-spots.ts).
-  if (row.deleted_at != null && local && !reviewedLater(row.last_review ?? null, local.last_review)) {
-    await db.runAsync("UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ?", [
-      remoteUpdatedAt,
-      row.deleted_at,
-      row.id,
-    ]);
+  if (!local) {
+    await insertRemoteStudyCard(db, row, remoteUpdatedAt);
     return;
   }
 
+  const statusFromRemote = compareSyncTimestamps(local.updated_at, remoteUpdatedAt) < 0;
+  const remoteReview = row.last_review ?? null;
+  const scheduleFromRemote =
+    reviewedLater(remoteReview, local.last_review) ||
+    (statusFromRemote && !reviewedLater(local.last_review, remoteReview));
+
+  const assignments: string[] = [];
+  const values: (string | number | null)[] = [];
+  const take = (column: string, value: string | number | null | undefined) => {
+    if (value === undefined || (value === null && !NULLABLE_CARD_COLUMNS.has(column))) return;
+    assignments.push(`${column} = ?`);
+    values.push(value);
+  };
+  if (scheduleFromRemote) for (const column of CARD_SCHEDULE_COLUMNS) take(column, row[column]);
+  if (statusFromRemote) {
+    for (const column of CARD_STATUS_COLUMNS) take(column, row[column]);
+    take("updated_at", remoteUpdatedAt);
+    take("deleted_at", row.deleted_at ?? null);
+  }
+  if (assignments.length === 0) return;
+  await db.runAsync(`UPDATE study_cards SET ${assignments.join(", ")} WHERE id = ?`, [...values, row.id]);
+}
+
+/** A pulled card this device does not hold yet. */
+async function insertRemoteStudyCard(
+  db: DatabaseExecutor,
+  row: SyncRows["study_cards"],
+  remoteUpdatedAt: string,
+): Promise<void> {
   if (row.deleted_at != null) {
     await db.runAsync(
       `INSERT INTO study_cards
        (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
         learning_steps, reps, lapses, state, last_review, suspended_at, buried_until,
         marked_at, created_at, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-        deck_id = excluded.deck_id,
-        due = excluded.due,
-        stability = excluded.stability,
-        difficulty = excluded.difficulty,
-        elapsed_days = excluded.elapsed_days,
-        scheduled_days = excluded.scheduled_days,
-        learning_steps = excluded.learning_steps,
-        reps = excluded.reps,
-        lapses = excluded.lapses,
-        state = excluded.state,
-        last_review = excluded.last_review,
-        suspended_at = excluded.suspended_at,
-        buried_until = excluded.buried_until,
-        marked_at = excluded.marked_at,
-        created_at = excluded.created_at,
-        updated_at = excluded.updated_at,
-        deleted_at = excluded.deleted_at`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.deck_id ?? "deleted",
@@ -1129,7 +1188,7 @@ async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"
 
   // The cached page tier travels with the card, so a restored device knows its manzil pages.
   await db.runAsync(
-    `INSERT OR REPLACE INTO study_cards
+    `INSERT INTO study_cards
      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
       learning_steps, reps, lapses, state, last_review, suspended_at, buried_until,
       marked_at, created_at, updated_at, deleted_at, tier, tier_changed_at)

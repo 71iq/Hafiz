@@ -2234,6 +2234,131 @@ BEGIN
 END $$;
 RESET ROLE;
 
+-- ─── 8. Card merge: the schedule by review time, the rest by row time ────────
+-- Device B grades a card Again at 09:03. Device A, offline with the 08:00 schedule, suspends it at
+-- 09:05 (a unit switch writes the whole row). Whichever upload arrives first, the server ends with
+-- B's schedule and A's suspension.
+SELECT hz_test.make_user('00000000-0000-4000-8000-0000000000ab', 'card_merge', NULL, NULL);
+
+-- An upload as PostgREST makes it for pushUpsert in lib/database/sync.ts: every column the client
+-- sends, with a fresh synced_at, through INSERT ... ON CONFLICT DO UPDATE.
+CREATE FUNCTION hz_test.upload_card(card JSONB) RETURNS VOID LANGUAGE sql AS $$
+  INSERT INTO public.study_cards (id, user_id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
+    learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at,
+    deleted_at, synced_at, tier, tier_changed_at)
+  SELECT id, auth.uid(), deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses,
+    state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at, deleted_at, clock_timestamp(), tier,
+    tier_changed_at
+  FROM jsonb_populate_record(NULL::public.study_cards, card)
+  ON CONFLICT (user_id, id) DO UPDATE SET deck_id = EXCLUDED.deck_id, due = EXCLUDED.due,
+    stability = EXCLUDED.stability, difficulty = EXCLUDED.difficulty, elapsed_days = EXCLUDED.elapsed_days,
+    scheduled_days = EXCLUDED.scheduled_days, learning_steps = EXCLUDED.learning_steps, reps = EXCLUDED.reps,
+    lapses = EXCLUDED.lapses, state = EXCLUDED.state, last_review = EXCLUDED.last_review,
+    suspended_at = EXCLUDED.suspended_at, buried_until = EXCLUDED.buried_until, marked_at = EXCLUDED.marked_at,
+    created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at, deleted_at = EXCLUDED.deleted_at,
+    synced_at = EXCLUDED.synced_at, tier = EXCLUDED.tier, tier_changed_at = EXCLUDED.tier_changed_at
+$$;
+
+-- The stored card: schedule as state/reps/lapses/stability/last review/due, then the other columns.
+CREATE FUNCTION hz_test.stored_card(card_id TEXT) RETURNS JSONB LANGUAGE sql STABLE AS $$
+  SELECT jsonb_build_object(
+    'schedule', concat_ws('/', state, reps, lapses, stability,
+      COALESCE(to_char(last_review AT TIME ZONE 'UTC', 'HH24:MI'), '-'), to_char(due AT TIME ZONE 'UTC', 'DD HH24:MI')),
+    'suspended_at', to_char(suspended_at AT TIME ZONE 'UTC', 'HH24:MI'),
+    'deleted_at', to_char(deleted_at AT TIME ZONE 'UTC', 'HH24:MI'),
+    'updated_at', to_char(updated_at AT TIME ZONE 'UTC', 'HH24:MI'))
+  FROM public.study_cards WHERE user_id = auth.uid() AND id = card_id
+$$;
+
+-- Versions of one card. Everyone held `seen`; B graded it Again; A suspended its copy of `seen`.
+CREATE FUNCTION hz_test.card_version(card_id TEXT, version TEXT) RETURNS JSONB LANGUAGE sql IMMUTABLE AS $$
+  SELECT jsonb_build_object('id', card_id, 'deck_id', 'default', 'created_at', '2026-11-01T00:00:00Z',
+    'buried_until', NULL, 'marked_at', NULL, 'tier', NULL, 'tier_changed_at', NULL, 'deleted_at', NULL) ||
+  CASE WHEN version = 'b_again' THEN jsonb_build_object('due', '2026-11-13T09:13:00Z', 'stability', 2,
+      'difficulty', 7, 'elapsed_days', 0, 'scheduled_days', 0, 'learning_steps', 0, 'reps', 4, 'lapses', 1, 'state', 3,
+      'last_review', '2026-11-13T09:03:00Z', 'suspended_at', NULL, 'updated_at', '2026-11-13T09:03:00Z')
+    ELSE jsonb_build_object('due', '2026-11-20T08:00:00Z', 'stability', 10, 'difficulty', 5, 'elapsed_days', 3,
+      'scheduled_days', 7, 'learning_steps', 0, 'reps', 3, 'lapses', 0, 'state', 2,
+      'last_review', '2026-11-13T08:00:00Z', 'suspended_at', NULL, 'updated_at', '2026-11-13T09:00:00Z') ||
+      CASE version
+        WHEN 'seen' THEN '{}'::JSONB
+        WHEN 'a_suspended' THEN '{"suspended_at": "2026-11-13T09:05:00Z", "updated_at": "2026-11-13T09:05:00Z"}'::JSONB
+        WHEN 'a_deleted' THEN '{"deleted_at": "2026-11-13T09:05:00Z", "updated_at": "2026-11-13T09:05:00Z"}'::JSONB
+      END
+  END
+$$;
+
+GRANT EXECUTE ON FUNCTION hz_test.upload_card(JSONB), hz_test.stored_card(TEXT), hz_test.card_version(TEXT, TEXT)
+  TO authenticated;
+
+SELECT hz_test.login('00000000-0000-4000-8000-0000000000ab');
+SET ROLE authenticated;
+DO $$
+DECLARE
+  merged CONSTANT JSONB := '{"schedule": "3/4/1/2/09:03/13 09:13", "suspended_at": "09:05", "deleted_at": null,
+    "updated_at": "09:05"}';
+  synced_before TIMESTAMPTZ;
+BEGIN
+  PERFORM hz_test.eq('the merge trigger runs before sync_keep_newer_row', (
+    SELECT array_agg(tgname::TEXT ORDER BY tgname) FROM pg_trigger
+    WHERE tgrelid = 'public.study_cards'::regclass AND NOT tgisinternal AND tgtype & 2 = 2 AND tgtype & 16 = 16
+  ), ARRAY['study_cards_merge_schedule', 'sync_keep_newer_row']);
+
+  -- B's review arrives first; A's suspension, written later on the older schedule, arrives second.
+  PERFORM hz_test.upload_card(hz_test.card_version('3:1', 'seen'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:1', 'b_again'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:1', 'a_suspended'));
+  PERFORM hz_test.eq('newer status on an older schedule keeps the stored review', hz_test.stored_card('3:1'), merged);
+
+  -- A's suspension arrives first; B's review, written earlier but reviewed later, arrives second.
+  PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'seen'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'a_suspended'));
+  SELECT synced_at INTO synced_before FROM public.study_cards WHERE id = '3:2';
+  PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'b_again'));
+  PERFORM hz_test.eq('older status with a later review brings its schedule', hz_test.stored_card('3:2'), merged);
+  PERFORM hz_test.eq('the merged row is pulled again',
+    (SELECT synced_at > synced_before FROM public.study_cards WHERE id = '3:2'), true);
+  -- Retried uploads of either queue entry change nothing.
+  PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'a_suspended'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'b_again'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'seen'));
+  PERFORM hz_test.eq('retried uploads converge', hz_test.stored_card('3:2'), merged);
+
+  -- Equal review times keep whole-row last write wins: a due-date change without a review applies,
+  -- and an older write with the same review is skipped.
+  PERFORM hz_test.upload_card(hz_test.card_version('3:3', 'seen'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:3', 'seen') ||
+    '{"due": "2026-11-25T08:00:00Z", "updated_at": "2026-11-13T09:05:00Z"}');
+  PERFORM hz_test.upload_card(hz_test.card_version('3:3', 'seen') ||
+    '{"suspended_at": "2026-11-13T09:04:00Z", "updated_at": "2026-11-13T09:04:00Z"}');
+  PERFORM hz_test.eq('equal review: the later write wins whole', hz_test.stored_card('3:3'),
+    '{"schedule": "2/3/0/10/08:00/25 08:00", "suspended_at": null, "deleted_at": null, "updated_at": "09:05"}'::JSONB);
+
+  -- A deletion on a device behind on reviews stays a deletion with the later schedule, in both orders.
+  PERFORM hz_test.upload_card(hz_test.card_version('3:4', 'seen'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:4', 'b_again'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:4', 'a_deleted'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:5', 'seen'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:5', 'a_deleted'));
+  PERFORM hz_test.upload_card(hz_test.card_version('3:5', 'b_again'));
+  PERFORM hz_test.eq('deleted after a review it had not seen', hz_test.stored_card('3:4'),
+    '{"schedule": "3/4/1/2/09:03/13 09:13", "suspended_at": null, "deleted_at": "09:05", "updated_at": "09:05"}'::JSONB);
+  PERFORM hz_test.eq('a review arriving after the deletion', hz_test.stored_card('3:5'),
+    '{"schedule": "3/4/1/2/09:03/13 09:13", "suspended_at": null, "deleted_at": "09:05", "updated_at": "09:05"}'::JSONB);
+
+  -- No review is the earliest. A never-reviewed card suspended later takes B's first review, and the
+  -- public surah progress counts it as memorized.
+  PERFORM hz_test.upload_card(hz_test.card_version('4:1', 'seen') ||
+    '{"reps": 0, "state": 0, "last_review": null, "suspended_at": "2026-11-13T09:05:00Z", "updated_at": "2026-11-13T09:05:00Z"}');
+  PERFORM hz_test.eq('unreviewed card is not memorized',
+    (SELECT memorized_cards FROM public.public_surah_progress WHERE surah = 4), 0);
+  PERFORM hz_test.upload_card(hz_test.card_version('4:1', 'b_again'));
+  PERFORM hz_test.eq('a first review merges into a later status', hz_test.stored_card('4:1'), merged);
+  PERFORM hz_test.eq('surah progress sees the merged review',
+    (SELECT memorized_cards FROM public.public_surah_progress WHERE surah = 4), 1);
+END $$;
+RESET ROLE;
+
 SELECT hz_test.login(NULL);
 SET client_min_messages = warning;
 DROP SCHEMA hz_test CASCADE;

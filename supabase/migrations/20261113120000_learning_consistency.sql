@@ -77,6 +77,63 @@ ALTER TABLE public.study_cards
     CHECK (tier IN ('sabaq', 'sabqi', 'manzil', 'manzil.needs_work', 'manzil.unverified')),
   ADD COLUMN IF NOT EXISTS tier_changed_at TIMESTAMPTZ;
 
+-- A card merges in two groups, as upsertStudyCard in lib/database/sync.ts does on each device. The
+-- schedule (due through last_review) comes from the version reviewed later; every other column and
+-- updated_at come from the version written later, as sync_keep_newer_row decides. Whole-row last
+-- write wins let a status change (suspend, bury, mark, due date, unit switch) made on a device holding
+-- an older schedule replace a review made since on another device.
+--
+-- Postgres runs BEFORE triggers in name order, so this one runs before sync_keep_newer_row:
+-- - An upload reviewed earlier keeps the stored schedule. If it is written later, it brings the rest.
+-- - An upload reviewed later but written earlier brings only its schedule. The stored row keeps its
+--   other columns and updated_at, so sync_keep_newer_row sees equal times and lets it through, and the
+--   new synced_at sends the merged row to other devices.
+-- - Equal review times, both null included, leave the whole row to sync_keep_newer_row, so a due-date
+--   change without a review still follows updated_at. No review counts as the earliest.
+-- A deletion is one of the other columns: a card deleted on a device behind on reviews stays deleted
+-- with the later schedule, which is what comes back if the card is restored. A repair that moves
+-- last_review earlier without a later updated_at keeps the stored schedule; disable the trigger for it.
+CREATE OR REPLACE FUNCTION private.study_cards_merge_schedule()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.last_review IS NOT DISTINCT FROM OLD.last_review THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.last_review IS NOT NULL AND (OLD.last_review IS NULL OR NEW.last_review > OLD.last_review) THEN
+    IF NEW.updated_at < OLD.updated_at THEN
+      NEW.deck_id := OLD.deck_id;
+      NEW.suspended_at := OLD.suspended_at;
+      NEW.buried_until := OLD.buried_until;
+      NEW.marked_at := OLD.marked_at;
+      NEW.tier := OLD.tier;
+      NEW.tier_changed_at := OLD.tier_changed_at;
+      NEW.created_at := OLD.created_at;
+      NEW.deleted_at := OLD.deleted_at;
+      NEW.updated_at := OLD.updated_at;
+    END IF;
+  ELSE
+    NEW.due := OLD.due;
+    NEW.stability := OLD.stability;
+    NEW.difficulty := OLD.difficulty;
+    NEW.elapsed_days := OLD.elapsed_days;
+    NEW.scheduled_days := OLD.scheduled_days;
+    NEW.learning_steps := OLD.learning_steps;
+    NEW.reps := OLD.reps;
+    NEW.lapses := OLD.lapses;
+    NEW.state := OLD.state;
+    NEW.last_review := OLD.last_review;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS study_cards_merge_schedule ON public.study_cards;
+CREATE TRIGGER study_cards_merge_schedule BEFORE UPDATE ON public.study_cards
+  FOR EACH ROW EXECUTE FUNCTION private.study_cards_merge_schedule();
+
 -- ─── 2. Wird days (DB-02) ────────────────────────────────────────────────────
 -- One row per user-local day. The earned status only rises in precedence; the excuse is a separate
 -- last-write-wins register so a withdrawn excuse never comes back. There is no deleted_at.
@@ -2894,6 +2951,7 @@ REVOKE ALL ON FUNCTION
   private.effective_habit_status(TEXT, TEXT),
   private.merge_habit_day(public.habit_days, public.habit_days),
   private.habit_days_before_write(),
+  private.study_cards_merge_schedule(),
   private.is_minor(UUID),
   private.activity_public(UUID, BOOLEAN),
   private.lock_minor_change(UUID),
