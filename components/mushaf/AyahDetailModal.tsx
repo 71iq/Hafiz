@@ -36,11 +36,10 @@ import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
 import { useSimilarAyah } from "@/lib/hifz/use-similar-markers";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
-import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import {
   addBookmark as dbAddBookmark,
-  fetchSurahName,
+  buildAyahCopyText,
   removeBookmark as dbRemoveBookmark,
 } from "@/lib/selection/queries";
 import { useSelection } from "@/lib/selection/context";
@@ -312,10 +311,9 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     if (!activeTarget || !ayahRow || shareBusy) return;
     setShareBusy(true);
     try {
-      const surahName = await fetchSurahName(db, activeTarget.surah);
-      await Clipboard.setStringAsync(
-        formatForCopy(ayahRow.text_uthmani, surahName, activeTarget.surah, activeTarget.ayah, activeTarget.ayah)
-      );
+      const text = await buildAyahCopyText(db, activeTarget.surah, activeTarget.ayah, activeTarget.ayah, uiLanguage);
+      if (!text) throw new Error("Ayah text is unavailable");
+      await Clipboard.setStringAsync(text);
       if (!systemConfirmsCopy()) showToast(s.copied);
     } catch (e) {
       console.warn("[AyahDetailModal] Failed to copy share text:", e);
@@ -323,7 +321,7 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     } finally {
       setShareBusy(false);
     }
-  }, [ayahRow, shareBusy, db, activeTarget?.surah, activeTarget?.ayah, showToast, s.copied, s.copyFailed]);
+  }, [ayahRow, shareBusy, db, activeTarget?.surah, activeTarget?.ayah, uiLanguage, showToast, s.copied, s.copyFailed]);
 
   const handleAudioPress = useCallback(async () => {
     if (!activeTarget) return;

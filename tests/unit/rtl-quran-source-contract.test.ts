@@ -90,12 +90,14 @@ describe("Quran RTL source invariants", () => {
   });
 
   it("keeps copy/share behavior tied to Uthmani text, not QCF display glyphs", () => {
-    expectSourceContainsAll("components/mushaf/AyahBlock.tsx", [
-      "fetchUthmaniRange",
-      "formatForCopy(text, surahName, surah, ayah, ayah)",
+    expectSourceContainsAll("components/mushaf/AyahBlock.tsx", ["buildAyahCopyText(db, surah, ayah, ayah, uiLanguage)"]);
+    expectSourceContainsAll("lib/selection/queries.ts", [
+      "SELECT ayah, text_uthmani FROM quran_text WHERE surah = ? AND ayah >= ? AND ayah <= ? ORDER BY ayah",
     ]);
-    expect(read("components/mushaf/AyahBlock.tsx")).not.toContain("formatForCopy(textQcf2");
-    expect(read("components/mushaf/AyahBlock.tsx")).not.toContain("formatForCopy(wordTokens");
+    for (const file of ["components/mushaf/AyahBlock.tsx", "lib/selection/queries.ts", "lib/selection/format.ts"]) {
+      expect(read(file)).not.toMatch(/formatQuranCopy\([^)]*(textQcf2|text_qcf2|wordTokens)/);
+    }
+    expect(read("lib/selection/queries.ts")).not.toMatch(/buildAyahCopyText[\s\S]*?text_qcf2[\s\S]*?fetchAyahOpenings/);
   });
 });
 

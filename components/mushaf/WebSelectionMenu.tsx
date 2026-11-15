@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { Copy, Highlighter } from "lucide-react-native";
+import { Copy, Eraser, Highlighter, Share2 } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useSelection } from "@/lib/selection/context";
-import { HIGHLIGHT_COLORS } from "@/lib/selection/types";
+import { formatQuranCopy } from "@/lib/selection/format";
+import { HIGHLIGHT_COLORS, highlightColorNameKey } from "@/lib/selection/types";
 import {
   fetchUthmaniWordsForSelection,
   type QuranSelectionWordRef,
-  type UthmaniSelectionText,
 } from "@/lib/selection/queries";
 
 type MenuState = {
@@ -21,24 +21,38 @@ type MenuState = {
   copyText: string | null;
 };
 
+type BusyAction = "copy" | "share" | "highlight" | "erase";
+
 const TOKEN_SELECTOR = "[data-hafiz-quran-token]";
-const MENU_WIDTH = 246;
-const MENU_COLLAPSED_HEIGHT = 44;
-const MENU_EXPANDED_HEIGHT = 92;
+const MENU_WIDTH = 312;
+const MENU_COLLAPSED_HEIGHT = 52;
+const MENU_EXPANDED_HEIGHT = 112;
 const VIEWPORT_GUTTER = 8;
 const SELECTION_STYLE_ID = "hafiz-quran-selection-style";
+
+function canWebShare(): boolean {
+  return Platform.OS === "web" && typeof navigator !== "undefined" && typeof navigator.share === "function";
+}
+
+function isAbortError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { name?: string }).name === "AbortError";
+}
 
 export function WebSelectionMenu() {
   const db = useDatabase();
   const s = useStrings();
-  const { isDark, isRTL, themeSurface } = useSettings();
-  const { showToast, addHighlightForRefs } = useSelection();
+  const { isDark, isRTL, themeSurface, uiLanguage } = useSettings();
+  const { showToast, addHighlightForRefs, highlightIdsForRefs, removeHighlightsForRefs } = useSelection();
   const [menu, setMenu] = useState<MenuState | null>(null);
-  const [copyBusy, setCopyBusy] = useState(false);
-  const [highlightBusy, setHighlightBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [menuHeight, setMenuHeight] = useState(MENU_COLLAPSED_HEIGHT);
   const latestMenuRef = useRef<MenuState | null>(null);
   const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Where keyboard focus was when the menu opened, so closing returns it to the reader.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const busy = busyAction !== null;
+  const shareSupported = canWebShare();
 
   useEffect(() => {
     latestMenuRef.current = menu;
@@ -51,9 +65,28 @@ export function WebSelectionMenu() {
   const buildCopyText = useCallback(
     async (refs: QuranSelectionWordRef[]) => {
       const selectionText = await fetchUthmaniWordsForSelection(db, refs);
-      return selectionText ? formatSelectionForCopy(selectionText) : null;
+      return selectionText
+        ? formatQuranCopy({ text: selectionText.text, ranges: selectionText.ranges, language: uiLanguage })
+        : null;
     },
-    [db],
+    [db, uiLanguage],
+  );
+
+  const restoreReaderFocus = useCallback(() => {
+    const target = returnFocusRef.current;
+    returnFocusRef.current = null;
+    if (target && typeof document !== "undefined" && document.contains(target)) {
+      requestAnimationFrame(() => target.focus?.());
+    }
+  }, []);
+
+  const closeMenu = useCallback(
+    (options: { clearSelection?: boolean } = {}) => {
+      if (options.clearSelection) window.getSelection()?.removeAllRanges();
+      setMenu(null);
+      restoreReaderFocus();
+    },
+    [restoreReaderFocus],
   );
 
   const copyRefsToClipboard = useCallback(
@@ -61,12 +94,11 @@ export function WebSelectionMenu() {
       const copyText = await buildCopyText(refs);
       if (!copyText) return false;
       await Clipboard.setStringAsync(copyText);
-      window.getSelection()?.removeAllRanges();
-      setMenu(null);
+      closeMenu({ clearSelection: true });
       showToast(s.copied);
       return true;
     },
-    [buildCopyText, s.copied, showToast],
+    [buildCopyText, closeMenu, s.copied, showToast],
   );
 
   useEffect(() => {
@@ -93,16 +125,17 @@ export function WebSelectionMenu() {
   const positionForSelection = useCallback((
     selection: Selection,
     fallback?: { x: number; y: number },
-    menuHeight = MENU_COLLAPSED_HEIGHT,
+    height = MENU_COLLAPSED_HEIGHT,
   ) => {
     const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
     const rect = range?.getBoundingClientRect();
+    const width = Math.min(MENU_WIDTH, window.innerWidth - VIEWPORT_GUTTER * 2);
     const rawX = rect && rect.width > 0 ? rect.left + rect.width / 2 : fallback?.x ?? 0;
-    const rawY = rect && rect.height > 0 ? rect.top - menuHeight - 8 : (fallback?.y ?? 0) - menuHeight - 8;
+    const rawY = rect && rect.height > 0 ? rect.top - height - 8 : (fallback?.y ?? 0) - height - 8;
     const belowY = rect && rect.height > 0 ? rect.bottom + 8 : (fallback?.y ?? 0) + 8;
-    const maxX = Math.max(VIEWPORT_GUTTER, window.innerWidth - MENU_WIDTH - VIEWPORT_GUTTER);
-    const maxY = Math.max(VIEWPORT_GUTTER, window.innerHeight - menuHeight - VIEWPORT_GUTTER);
-    const x = Math.min(Math.max(rawX - MENU_WIDTH / 2, VIEWPORT_GUTTER), maxX);
+    const maxX = Math.max(VIEWPORT_GUTTER, window.innerWidth - width - VIEWPORT_GUTTER);
+    const maxY = Math.max(VIEWPORT_GUTTER, window.innerHeight - height - VIEWPORT_GUTTER);
+    const x = Math.min(Math.max(rawX - width / 2, VIEWPORT_GUTTER), maxX);
     const y = Math.min(Math.max(rawY < VIEWPORT_GUTTER ? belowY : rawY, VIEWPORT_GUTTER), maxY);
     return { x, y };
   }, []);
@@ -121,6 +154,9 @@ export function WebSelectionMenu() {
         return false;
       }
 
+      if (!latestMenuRef.current && typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+        returnFocusRef.current = document.activeElement;
+      }
       const refsKey = getRefsKey(refs);
       setMenu({ ...positionForSelection(selection, fallback), refs, refsKey, copyText: null });
       void buildCopyText(refs)
@@ -152,8 +188,26 @@ export function WebSelectionMenu() {
       scheduleSelectionMenu({ x: event.clientX, y: event.clientY });
     };
 
-    const handleKeyUp = () => {
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Escape" || event.key === "ContextMenu" || event.key === "F10") return;
       scheduleSelectionMenu();
+    };
+
+    // C02/C07: the menu is the topmost surface while open, so Escape closes it (and clears the
+    // selection) before any reader shortcut. Shift+F10 or the context-menu key opens it.
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
+      if (event.key === "Escape" && latestMenuRef.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeMenu({ clearSelection: true });
+        return;
+      }
+      const opensMenu = event.key === "ContextMenu" || (event.shiftKey && event.key === "F10");
+      if (opensMenu && showForCurrentSelection()) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     };
 
     const handleScroll = () => setMenu(null);
@@ -197,8 +251,7 @@ export function WebSelectionMenu() {
       if (cachedCopyText && event.clipboardData) {
         event.clipboardData.setData("text/plain", cachedCopyText);
         window.setTimeout(() => {
-          window.getSelection()?.removeAllRanges();
-          setMenu(null);
+          closeMenu({ clearSelection: true });
           showToast(s.copied);
         }, 0);
         return;
@@ -212,6 +265,7 @@ export function WebSelectionMenu() {
 
     document.addEventListener("mouseup", handleMouseUp);
     document.addEventListener("keyup", handleKeyUp);
+    document.addEventListener("keydown", handleKeyDown, true);
     document.addEventListener("scroll", handleScroll, true);
     document.addEventListener("pointerdown", handlePointerDown, true);
     document.addEventListener("pointerup", handlePointerUp, true);
@@ -226,6 +280,7 @@ export function WebSelectionMenu() {
       }
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("keyup", handleKeyUp);
+      document.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("scroll", handleScroll, true);
       document.removeEventListener("pointerdown", handlePointerDown, true);
       document.removeEventListener("pointerup", handlePointerUp, true);
@@ -233,28 +288,47 @@ export function WebSelectionMenu() {
       document.removeEventListener("contextmenu", handleContextMenu, true);
       document.removeEventListener("copy", handleCopyEvent);
     };
-  }, [copyRefsToClipboard, s.copied, s.copyFailed, showForCurrentSelection, showToast]);
+  }, [closeMenu, copyRefsToClipboard, s.copied, s.copyFailed, showForCurrentSelection, showToast]);
 
   const handleCopy = useCallback(async () => {
-    if (!menu || copyBusy) return;
-    setCopyBusy(true);
+    if (!menu || busy) return;
+    setBusyAction("copy");
     try {
       const copyText = menu.copyText ?? await buildCopyText(menu.refs);
-      if (!copyText) return;
+      if (!copyText) throw new Error("Selected text is unavailable");
       await Clipboard.setStringAsync(copyText);
-      window.getSelection()?.removeAllRanges();
-      setMenu(null);
+      closeMenu({ clearSelection: true });
       showToast(s.copied);
     } catch (e) {
       console.warn("[WebSelectionMenu] Failed to copy selected text:", e);
       showToast(s.copyFailed);
     } finally {
-      setCopyBusy(false);
+      setBusyAction(null);
     }
-  }, [buildCopyText, copyBusy, menu, s.copied, s.copyFailed, showToast]);
+  }, [buildCopyText, busy, closeMenu, menu, s.copied, s.copyFailed, showToast]);
+
+  // Web Share runs only from this press (a user action) and carries the same text as Copy. A
+  // dismissed share sheet is not a failure and is not announced as a success either.
+  const handleShare = useCallback(async () => {
+    if (!menu || busy || !canWebShare()) return;
+    setBusyAction("share");
+    try {
+      const text = menu.copyText ?? await buildCopyText(menu.refs);
+      if (!text) throw new Error("Selected text is unavailable");
+      await navigator.share({ text });
+      closeMenu({ clearSelection: true });
+    } catch (e) {
+      if (!isAbortError(e)) {
+        console.warn("[WebSelectionMenu] Failed to share selected text:", e);
+        showToast(s.readerShareFailed);
+      }
+    } finally {
+      setBusyAction(null);
+    }
+  }, [buildCopyText, busy, closeMenu, menu, s.readerShareFailed, showToast]);
 
   const handleToggleColorPicker = useCallback(() => {
-    if (!menu || highlightBusy) return;
+    if (!menu || busy) return;
     if (!colorPickerOpen) {
       const selection = window.getSelection();
       if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
@@ -264,26 +338,40 @@ export function WebSelectionMenu() {
       }
     }
     setColorPickerOpen((open) => !open);
-  }, [colorPickerOpen, highlightBusy, menu, positionForSelection]);
+  }, [busy, colorPickerOpen, menu, positionForSelection]);
 
   const handleHighlight = useCallback(
     async (color: string) => {
-      if (!menu || highlightBusy) return;
-      setHighlightBusy(true);
+      if (!menu || busy) return;
+      setBusyAction("highlight");
       try {
         await addHighlightForRefs(menu.refs, color);
-        window.getSelection()?.removeAllRanges();
-        setMenu(null);
+        closeMenu({ clearSelection: true });
         showToast(s.highlightAdded);
       } catch (e) {
         console.warn("[WebSelectionMenu] Failed to highlight selected text:", e);
         showToast(s.highlightActionFailed);
       } finally {
-        setHighlightBusy(false);
+        setBusyAction(null);
       }
     },
-    [addHighlightForRefs, highlightBusy, menu, s.highlightActionFailed, s.highlightAdded, showToast],
+    [addHighlightForRefs, busy, closeMenu, menu, s.highlightActionFailed, s.highlightAdded, showToast],
   );
+
+  const handleErase = useCallback(async () => {
+    if (!menu || busy) return;
+    setBusyAction("erase");
+    try {
+      await removeHighlightsForRefs(menu.refs);
+      closeMenu({ clearSelection: true });
+      showToast(s.highlightRemoved);
+    } catch (e) {
+      console.warn("[WebSelectionMenu] Failed to remove the selected highlight:", e);
+      showToast(s.highlightActionFailed);
+    } finally {
+      setBusyAction(null);
+    }
+  }, [busy, closeMenu, menu, removeHighlightsForRefs, s.highlightActionFailed, s.highlightRemoved, showToast]);
 
   if (Platform.OS !== "web" || !menu) return null;
 
@@ -292,6 +380,46 @@ export function WebSelectionMenu() {
   const buttonBackground = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.045)";
   const menuRootProps = { dataSet: { hafizSelectionMenu: "true" } } as any;
   const menuButtonProps = { onMouseDown: (event: any) => event.preventDefault() } as any;
+  const selectionHighlighted = highlightIdsForRefs(menu.refs).length > 0;
+  const menuWidth = Math.min(MENU_WIDTH, window.innerWidth - VIEWPORT_GUTTER * 2);
+  // The measured height keeps the menu inside the viewport when its labels wrap.
+  const top = Math.max(VIEWPORT_GUTTER, Math.min(menu.y, window.innerHeight - menuHeight - VIEWPORT_GUTTER));
+
+  const actionButton = (
+    key: BusyAction | "highlight-toggle",
+    label: string,
+    icon: ReactNode,
+    onPress: () => void,
+    pressedState = false,
+  ) => {
+    const ownBusy = busyAction === key;
+    return (
+      <Pressable
+        key={key}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled: busy, busy: ownBusy, ...(key === "highlight-toggle" ? { expanded: colorPickerOpen } : null) }}
+        onPress={onPress}
+        disabled={busy}
+        style={({ pressed }) => ({
+          flex: 1,
+          minHeight: 44,
+          borderRadius: 12,
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: isRTL ? "row-reverse" : "row",
+          gap: 6,
+          paddingHorizontal: 6,
+          opacity: busy && !ownBusy ? 0.45 : pressed ? 0.78 : 1,
+          backgroundColor: pressed || pressedState ? buttonBackground : "transparent",
+        } as any)}
+        {...menuButtonProps}
+      >
+        {ownBusy ? <ActivityIndicator size={14} color={foreground} /> : icon}
+        <MenuLabel color={foreground}>{label}</MenuLabel>
+      </Pressable>
+    );
+  };
 
   return (
     <View
@@ -307,12 +435,16 @@ export function WebSelectionMenu() {
       }}
     >
       <View
+        accessibilityRole="menu"
+        onLayout={(event) => {
+          const height = Math.round(event.nativeEvent.layout.height);
+          if (height > 0) setMenuHeight((current) => (current === height ? current : height));
+        }}
         style={{
           position: "fixed" as any,
           left: menu.x,
-          top: menu.y,
-          width: MENU_WIDTH,
-          minHeight: colorPickerOpen ? MENU_EXPANDED_HEIGHT : MENU_COLLAPSED_HEIGHT,
+          top,
+          width: menuWidth,
           borderRadius: 16,
           borderWidth: 1,
           borderColor: border,
@@ -324,87 +456,88 @@ export function WebSelectionMenu() {
       >
         <View
           style={{
-            height: 36,
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center",
             gap: 4,
           }}
         >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={s.copy}
-            onPress={handleCopy}
-            disabled={copyBusy || highlightBusy}
-            style={({ pressed }) => ({
-              flex: 1,
-              height: 36,
-              borderRadius: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: isRTL ? "row-reverse" : "row",
-              gap: 8,
-              opacity: copyBusy ? 0.55 : pressed ? 0.78 : 1,
-              backgroundColor: pressed ? buttonBackground : "transparent",
-            } as any)}
-            {...menuButtonProps}
-          >
-            <Copy size={16} color={foreground} />
-            <MenuLabel color={foreground}>{s.copy}</MenuLabel>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={s.highlight}
-            onPress={handleToggleColorPicker}
-            disabled={highlightBusy}
-            style={({ pressed }) => ({
-              flex: 1,
-              height: 36,
-              borderRadius: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: isRTL ? "row-reverse" : "row",
-              gap: 8,
-              opacity: highlightBusy ? 0.55 : pressed || colorPickerOpen ? 0.86 : 1,
-              backgroundColor: pressed || colorPickerOpen ? buttonBackground : "transparent",
-            } as any)}
-            {...menuButtonProps}
-          >
-            <Highlighter size={16} color={foreground} />
-            <MenuLabel color={foreground}>{s.highlight}</MenuLabel>
-          </Pressable>
+          {actionButton("copy", s.copy, <Copy size={16} color={foreground} />, handleCopy)}
+          {shareSupported
+            ? actionButton("share", s.readerShare, <Share2 size={16} color={foreground} />, handleShare)
+            : null}
+          {actionButton(
+            "highlight-toggle",
+            s.highlight,
+            <Highlighter size={16} color={foreground} />,
+            handleToggleColorPicker,
+            colorPickerOpen,
+          )}
         </View>
 
         {colorPickerOpen && (
           <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel={s.highlight}
             style={{
               flexDirection: isRTL ? "row-reverse" : "row",
+              flexWrap: "wrap",
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: 6,
-              paddingTop: 8,
-              paddingHorizontal: 6,
+              justifyContent: "center",
+              gap: 2,
+              paddingTop: 4,
             }}
           >
-            {HIGHLIGHT_COLORS.map((color, index) => (
+            {HIGHLIGHT_COLORS.map((color) => (
               <Pressable
                 key={color}
                 accessibilityRole="button"
-                accessibilityLabel={`${s.highlight} ${index + 1}`}
+                accessibilityLabel={s[highlightColorNameKey(color)]}
                 onPress={() => handleHighlight(color)}
-                disabled={highlightBusy}
+                disabled={busy}
                 style={({ pressed }) => ({
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  backgroundColor: color,
-                  borderWidth: 2,
-                  borderColor: pressed ? foreground : withThemeOpacity(themeSurface, 0.98),
-                  opacity: highlightBusy ? 0.5 : pressed ? 0.78 : 1,
-                  boxShadow: isDark ? "0 0 0 1px rgba(255,255,255,0.12)" : "0 0 0 1px rgba(0,0,0,0.08)",
+                  width: 36,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: busy ? 0.45 : pressed ? 0.78 : 1,
                 } as any)}
                 {...menuButtonProps}
-              />
+              >
+                <View
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: color,
+                    borderWidth: 2,
+                    borderColor: withThemeOpacity(themeSurface, 0.98),
+                    boxShadow: isDark ? "0 0 0 1px rgba(255,255,255,0.12)" : "0 0 0 1px rgba(0,0,0,0.08)",
+                  } as any}
+                />
+              </Pressable>
             ))}
+            {selectionHighlighted ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={s.readerRemoveHighlight}
+                onPress={handleErase}
+                disabled={busy}
+                style={({ pressed }) => ({
+                  width: 36,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: busy && busyAction !== "erase" ? 0.45 : pressed ? 0.78 : 1,
+                } as any)}
+                {...menuButtonProps}
+              >
+                {busyAction === "erase" ? (
+                  <ActivityIndicator size={14} color={foreground} />
+                ) : (
+                  <Eraser size={18} color={foreground} />
+                )}
+              </Pressable>
+            ) : null}
           </View>
         )}
       </View>
@@ -415,12 +548,14 @@ export function WebSelectionMenu() {
 function MenuLabel({ color, children }: { color: string; children: ReactNode }) {
   return (
     <Text
-      numberOfLines={1}
+      numberOfLines={2}
       style={{
         color,
         fontFamily: "Manrope_600SemiBold",
         fontSize: 13,
         lineHeight: 18,
+        textAlign: "center",
+        flexShrink: 1,
       }}
     >
       {children}
@@ -465,16 +600,4 @@ function getRefsKey(refs: QuranSelectionWordRef[]): string {
   return refs
     .map((ref) => `${ref.surah}:${ref.ayah}:${ref.wordPos}:${ref.literalText ?? ""}:${ref.isMarker ? 1 : 0}`)
     .join("|");
-}
-
-function formatSelectionForCopy(selection: UthmaniSelectionText): string {
-  const refs = selection.ranges.map((range) => {
-    const ref =
-      range.ayahStart === range.ayahEnd
-        ? `${range.surahName} : ${range.ayahStart}`
-        : `${range.surahName} : ${range.ayahStart}-${range.ayahEnd}`;
-    return `[${ref}]`;
-  });
-
-  return `"${selection.text.trim()}"\n${refs.join(" ")}\nhttps://hafizquran.app/open?surah=${selection.firstSurah}&ayah=${selection.firstAyah}`;
 }

@@ -32,3 +32,22 @@ export const HIGHLIGHT_COLORS = [
   "#FB7185", // Rose
   "#38BDF8", // Sky
 ] as const;
+
+export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number];
+
+const HIGHLIGHT_COLOR_NAME_KEYS = {
+  "#FBBF24": "highlightColorAmber",
+  "#34D399": "highlightColorGreen",
+  "#60A5FA": "highlightColorBlue",
+  "#F472B6": "highlightColorPink",
+  "#A78BFA": "highlightColorViolet",
+  "#FB7185": "highlightColorRose",
+  "#38BDF8": "highlightColorSky",
+} as const satisfies Record<HighlightColor, string>;
+
+export type HighlightColorNameKey = (typeof HIGHLIGHT_COLOR_NAME_KEYS)[HighlightColor];
+
+/** The localized name key for a palette color (both ayah actions and the web selection menu use it). */
+export function highlightColorNameKey(color: HighlightColor): HighlightColorNameKey {
+  return HIGHLIGHT_COLOR_NAME_KEYS[color];
+}

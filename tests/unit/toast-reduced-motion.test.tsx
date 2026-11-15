@@ -110,9 +110,10 @@ it("keeps the existing text, pointer behavior, and styles", () => {
       zIndex: 9999,
     }),
   );
+  // Light themes draw the notice on the deep teal inverse surface; dark themes use the pale one.
   expect(StyleSheet.flatten(text.props.style)).toEqual({
     backgroundColor: "#003638",
-    color: "#fff",
+    color: "#FFFFFF",
     fontFamily: "Manrope_600SemiBold",
     fontSize: 13,
     paddingHorizontal: 20,

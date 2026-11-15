@@ -4,6 +4,7 @@ import {
   addBookmark,
   addHighlightsForSelectionRefs,
   removeBookmark,
+  removeHighlightsByIds,
   removeHighlightsForAyah,
   replaceAyahHighlight,
 } from "@/lib/selection/queries";
@@ -117,6 +118,38 @@ describe("RF-175 bookmarks, highlights and their upload queues", () => {
 
     expect(highlightColors(2, 255)).toEqual([]);
     expect(count("sync_queue", "operation = 'DELETE'")).toBe(1);
+  });
+
+  it("changes or removes only the whole-ayah highlight and keeps word-range highlights", async () => {
+    await addHighlightsForSelectionRefs(
+      store.db,
+      [
+        { surah: 2, ayah: 255, wordPos: 3 },
+        { surah: 2, ayah: 255, wordPos: 4 },
+      ],
+      "blue",
+    );
+    await replaceAyahHighlight(store.db, 2, 255, "yellow");
+    await replaceAyahHighlight(store.db, 2, 255, "green");
+
+    expect(highlightColors(2, 255)).toEqual(["blue", "green"]);
+
+    await removeHighlightsForAyah(store.db, 2, 255);
+
+    expect(highlightColors(2, 255)).toEqual(["blue"]);
+    expect(count("highlights", "word_start = 3 AND word_end = 4")).toBe(1);
+  });
+
+  it("erases exactly the chosen highlight rows with a queued tombstone each", async () => {
+    await addHighlightsForSelectionRefs(store.db, [{ surah: 2, ayah: 255, wordPos: 1 }], "blue");
+    await addHighlightsForSelectionRefs(store.db, [{ surah: 2, ayah: 256, wordPos: 2 }], "pink");
+    const [first] = store.sql.prepare("SELECT id FROM highlights WHERE ayah = 255").all() as { id: number }[];
+
+    await removeHighlightsByIds(store.db, [first.id]);
+
+    expect(highlightColors(2, 255)).toEqual([]);
+    expect(highlightColors(2, 256)).toEqual(["pink"]);
+    expect(count("sync_queue", "table_name = 'highlights' AND operation = 'DELETE'")).toBe(1);
   });
 
   it("keeps the previous highlight when a color change cannot be queued", async () => {

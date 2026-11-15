@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { AccessibilityInfo, Animated, Platform, Text } from "react-native";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
+import { inverseSurfaceColors } from "@/lib/ui/inverse-surface";
+import { useSettings } from "@/lib/settings/context";
 
 type Props = {
   message: string | null;
@@ -32,6 +34,7 @@ export function Toast({ message, onDismiss, duration: explicitDuration, announce
   const latestReduceMotion = useRef(true);
   const phase = useRef<Phase | null>(null);
   const reduceMotion = useReducedMotionPreference();
+  const colors = inverseSurfaceColors(useSettings().isDark);
 
   const updateOpacity = useCallback(
     (target: 0 | 1, remaining: number) => {
@@ -119,8 +122,8 @@ export function Toast({ message, onDismiss, duration: explicitDuration, announce
         accessibilityLiveRegion={announce ? "polite" : undefined}
         aria-live={announce ? "polite" : undefined}
         style={{
-          backgroundColor: "#003638",
-          color: "#fff",
+          backgroundColor: colors.background,
+          color: colors.text,
           fontFamily: "Manrope_600SemiBold",
           fontSize: 13,
           paddingHorizontal: 20,
