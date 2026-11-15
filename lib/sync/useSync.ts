@@ -11,6 +11,7 @@ import {
   cancelRestoreConsent,
   clearRestoreConsentRequests,
   fullSync,
+  hasCompletedAccountRestore,
   readRestorePause,
   type SyncResult,
   type SyncStatus,
@@ -35,11 +36,31 @@ const PERIODIC_SYNC_INTERVAL_MS = 5 * 60_000;
 export const RECONNECT_SYNC_DEBOUNCE_MS = 2_000;
 
 /**
- * `auto` is every automatic trigger and obeys a stored restore pause. `resume` is the owner's explicit
- * Resume sync or Prepare again. `accept` submits a prepared consent token.
+ * `auto` is every automatic trigger and obeys a stored restore pause. `manual` is the owner's Sync now
+ * or Retry: it waits for a run in progress instead of dropping, and still obeys the pause. `resume` is
+ * the owner's explicit Resume sync or Prepare again. `accept` submits a prepared consent token.
  */
-type SyncMode = { kind: "auto" } | { kind: "resume" } | { kind: "accept"; token: string };
+type SyncMode = { kind: "auto" } | { kind: "manual" } | { kind: "resume" } | { kind: "accept"; token: string };
 const AUTO: SyncMode = { kind: "auto" };
+const MANUAL: SyncMode = { kind: "manual" };
+
+/**
+ * Why the last run did not finish cleanly, for the account status. `offline`: no connection.
+ * `partial`: some changes stayed queued. `failed`: the account could not be reached.
+ */
+export type SyncFailure = "offline" | "partial" | "failed";
+
+// The last complete sync per account in this process, so a remounted view keeps it.
+const lastSyncedAtByUser = new Map<string, string>();
+
+/** Pending writes the status may report. Quran Foundation rows stay stored but count only while its gate is on. */
+async function readPendingCount(db: Parameters<typeof getPendingSyncCount>[0]): Promise<number> {
+  const [accountCount, qfCount] = await Promise.all([
+    getPendingSyncCount(db),
+    isQfSyncEnabled() ? getPendingQfSyncCount(db) : Promise.resolve(0),
+  ]);
+  return accountCount + qfCount;
+}
 
 type SyncView = { start: () => Promise<void> };
 // The optional status overlay can remount while its database work is still pending.
@@ -93,6 +114,10 @@ export function useSync() {
   const identityKey = identity.kind === "identified" ? JSON.stringify(identity) : `${identity.kind}:${userId ?? ""}`;
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [pendingCount, setPendingCount] = useState(0);
+  const [failure, setFailure] = useState<SyncFailure | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() =>
+    userId ? (lastSyncedAtByUser.get(userId) ?? null) : null,
+  );
   const mounted = useRef(false);
   const lifecycle = useRef(0);
   const viewOwner = useRef<SyncView>({ start: async () => {} });
@@ -122,6 +147,8 @@ export function useSync() {
     sequence.current += 1;
     setStatus("idle");
     setPendingCount(0);
+    setFailure(null);
+    setLastSyncedAt(userId ? (lastSyncedAtByUser.get(userId) ?? null) : null);
     // An account or session transition retires any prepared consent and its UI at once.
     if (consentIdentityKey !== identityKey) {
       consentIdentityKey = identityKey;
@@ -146,6 +173,7 @@ export function useSync() {
         !isTranslationLoading;
       if (!eligible() || !userId) return;
       const explicit = mode.kind !== "auto";
+      const obeysPause = mode.kind === "auto" || mode.kind === "manual";
       if (physicalSyncRun) {
         // Automatic triggers drop while another run holds the lease; an explicit action waits for it.
         if (!explicit) return;
@@ -183,13 +211,15 @@ export function useSync() {
           if (!isCurrent()) return;
           if (netState.isConnected === false) {
             setStatus("offline");
+            setFailure("offline");
             return;
           }
           // Unknown connectivity is not offline, but it is not a connection to sync over either.
           if (netState.isConnected !== true) return;
         }
-        if (mode.kind === "auto") {
-          // A stored pause stops every automatic trigger before any account work. fullSync checks again.
+        if (obeysPause) {
+          // A stored pause stops every automatic trigger and Sync now before any account work; only
+          // Resume sync continues. fullSync checks again.
           const pause = await readRestorePause(db, userId);
           if (!isCurrent()) return;
           if (pause) {
@@ -199,6 +229,7 @@ export function useSync() {
           }
         }
         setStatus("syncing");
+        setFailure(null);
         let result =
           mode.kind === "accept"
             ? await acceptRestoreConsent(db, mode.token)
@@ -249,7 +280,10 @@ export function useSync() {
         if (!isCurrent()) return;
         const qfResult = isQfSyncEnabled() ? await fullQfUserSync(db) : null;
         if (!isCurrent()) return;
-        const counts = await Promise.all([getPendingSyncCount(db), getPendingQfSyncCount(db)]);
+        const counts = await Promise.all([
+          getPendingSyncCount(db),
+          qfResult === null ? Promise.resolve(0) : getPendingQfSyncCount(db),
+        ]);
         if (!isCurrent()) return;
         setPendingCount(counts[0] + counts[1]);
         const complete =
@@ -259,7 +293,13 @@ export function useSync() {
             qfResult.status === "not_connected" ||
             (qfResult.status === "synced" && counts[1] === 0));
         setStatus(complete ? "synced" : "error");
-        if (!complete) return;
+        if (!complete) {
+          setFailure(result.status === "failed" ? "failed" : "partial");
+          return;
+        }
+        const finishedAt = new Date().toISOString();
+        lastSyncedAtByUser.set(userId, finishedAt);
+        setLastSyncedAt(finishedAt);
         const timer = setTimeout(() => {
           if (idleTimer.current !== timer) return;
           idleTimer.current = null;
@@ -274,12 +314,13 @@ export function useSync() {
         if (isCurrent()) {
           console.warn("[Sync] Error:", error instanceof Error ? error.message : String(error));
           setStatus("error");
+          setFailure("failed");
           // A failed acceptance rolled back and retired its token; consent must be prepared again.
           if (mode.kind === "accept") updateRestoreConsent(userId, { busy: null, issue: "failed" });
           else if (mode.kind === "resume") updateRestoreConsent(userId, { busy: null });
           try {
-            const counts = await Promise.all([getPendingSyncCount(db), getPendingQfSyncCount(db)]);
-            if (isCurrent()) setPendingCount(counts[0] + counts[1]);
+            const count = await readPendingCount(db);
+            if (isCurrent()) setPendingCount(count);
           } catch (countError) {
             if (isCurrent())
               console.warn(
@@ -300,6 +341,7 @@ export function useSync() {
     [db, userId, identityKey, isLoaded, isTranslationLoading, clearIdleTimer],
   );
   const doSync = useCallback(() => runSync(AUTO), [runSync]);
+  const syncNow = useCallback(() => runSync(MANUAL), [runSync]);
 
   const cancelRestore = useCallback(async () => {
     if (!userId) return;
@@ -394,6 +436,7 @@ export function useSync() {
         cancelReconnect();
         clearIdleTimer();
         setStatus("offline");
+        setFailure("offline");
         return;
       }
       // Unknown connectivity is neither offline nor a reconnect.
@@ -423,9 +466,9 @@ export function useSync() {
       return;
     }
     let active = true;
-    Promise.all([getPendingSyncCount(db), getPendingQfSyncCount(db)])
-      .then(([supabaseCount, qfCount]) => {
-        if (active && mounted.current && isAuthCurrent()) setPendingCount(supabaseCount + qfCount);
+    readPendingCount(db)
+      .then((count) => {
+        if (active && mounted.current && isAuthCurrent()) setPendingCount(count);
       })
       .catch((error) => {
         if (active && isAuthCurrent()) console.warn(error);
@@ -435,5 +478,28 @@ export function useSync() {
     };
   }, [db, userId, identityKey, status]);
 
-  return { status, pendingCount, triggerSync: doSync };
+  // Before this session's first complete run, the last complete pull recorded for this account's
+  // restored dataset stands in. It is read only once the account restore is complete on this device.
+  useEffect(() => {
+    if (!userId || lastSyncedAtByUser.has(userId)) return;
+    const isAuthCurrent = captureSyncOwner(userId);
+    if (!isAuthCurrent) return;
+    let active = true;
+    (async () => {
+      if (!(await hasCompletedAccountRestore(db, userId))) return;
+      const row = await db.getFirstAsync<{ value: string }>(
+        "SELECT value FROM user_settings WHERE key = 'last_pull_at'",
+      );
+      const value = row?.value;
+      if (!value || Number.isNaN(Date.parse(value)) || Date.parse(value) <= 0) return;
+      if (!active || !isAuthCurrent() || lastSyncedAtByUser.has(userId)) return;
+      lastSyncedAtByUser.set(userId, value);
+      setLastSyncedAt(value);
+    })().catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [db, userId, identityKey]);
+
+  return { status, pendingCount, failure, lastSyncedAt, triggerSync: doSync, syncNow };
 }

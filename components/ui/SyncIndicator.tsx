@@ -3,6 +3,7 @@ import { BusyIndicator } from "@/components/ui/BusyIndicator";
 import { View } from "react-native";
 import { Cloud, CloudOff, Check, AlertCircle } from "lucide-react-native";
 import type { SyncStatus } from "@/lib/database/sync";
+import type { SyncFailure } from "@/lib/sync/useSync";
 import { useStrings } from "@/lib/i18n/useStrings";
 import type { UIStringKey } from "@/lib/i18n/strings";
 
@@ -23,12 +24,35 @@ export const SYNC_STATUS_LABEL_KEYS: Record<Exclude<SyncStatus, "idle">, UIStrin
 };
 
 /**
- * The tab layout owns the one sync runner (useSync). Navigation surfaces read its status here
- * instead of mounting another runner, which would change which view owns sync.
+ * What the one sync runner reports. `failure` names why the last run did not finish cleanly;
+ * `lastSyncedAt` is the last complete sync for this account; `syncNow` is the guarded manual run.
  */
-const SyncStatusContext = createContext<SyncStatus>("idle");
+export type SyncStatusDetails = Readonly<{
+  status: SyncStatus;
+  pendingCount: number;
+  failure: SyncFailure | null;
+  lastSyncedAt: string | null;
+  syncNow: () => Promise<void>;
+}>;
+
+const IDLE_DETAILS: SyncStatusDetails = {
+  status: "idle",
+  pendingCount: 0,
+  failure: null,
+  lastSyncedAt: null,
+  syncNow: async () => {},
+};
+
+/**
+ * The tab layout owns the one sync runner (useSync). Navigation surfaces and Settings read its status
+ * here instead of mounting another runner, which would change which view owns sync.
+ */
+const SyncStatusContext = createContext<SyncStatusDetails>(IDLE_DETAILS);
 export const SyncStatusProvider = SyncStatusContext.Provider;
 export function useSyncStatusView(): SyncStatus {
+  return useContext(SyncStatusContext).status;
+}
+export function useSyncStatusDetails(): SyncStatusDetails {
   return useContext(SyncStatusContext);
 }
 
