@@ -50,7 +50,11 @@ jest.mock("@react-navigation/native", () => {
   const { useEffect } = jest.requireActual<typeof import("react")>("react");
   return { useFocusEffect: (effect: () => void) => useEffect(effect, [effect]) };
 });
-jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockRouterPush }) }));
+jest.mock("expo-router", () => ({
+  useRouter: () => ({ push: mockRouterPush, setParams: jest.fn() }),
+  useLocalSearchParams: () => ({}),
+  router: { navigate: jest.fn() },
+}));
 jest.mock("@/lib/auth/store", () => ({ useAuthStore: () => ({ id: "isolated-home-user" }) }));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDatabase }));
 jest.mock("@/lib/settings/context", () => ({ useSettings: () => mockSettings }));

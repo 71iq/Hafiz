@@ -1,6 +1,6 @@
 import React from "react";
 import * as ReactNative from "react-native";
-import { AccessibilityInfo, Pressable, Text, View } from "react-native";
+import { AccessibilityInfo, BackHandler, Pressable, Text, View } from "react-native";
 import { act, cleanup, fireEvent, render, renderHook } from "@testing-library/react-native";
 import { NavigationContainer, NavigationIndependentTree } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -35,8 +35,9 @@ jest.mock("@/lib/settings/context", () => ({
   withThemeOpacity: (color: string) => color,
 }));
 jest.mock("@/lib/auth/store", () => ({ useAuthStore: () => ({ user: null, profile: null }) }));
-jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
+jest.mock("expo-router", () => ({ router: { push: jest.fn(), navigate: jest.fn() } }));
 const Tabs = createBottomTabNavigator<{ home: undefined; mushaf: undefined }>();
+let initialRoute: "home" | "mushaf" = "home";
 function Home() {
   return <Text>Home screen</Text>;
 }
@@ -55,6 +56,7 @@ function Body({ isRTL = false }: { isRTL?: boolean }) {
       <NavigationIndependentTree>
         <NavigationContainer>
           <Tabs.Navigator
+            initialRouteName={initialRoute}
             screenOptions={{ headerShown: false, animation: "none" }}
             tabBar={(props) => <AppNavigation {...props} isRTL={isRTL} />}
           >
@@ -100,6 +102,7 @@ let dimensions: jest.SpyInstance;
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  initialRoute = "home";
   dimensions = jest
     .spyOn(require("react-native"), "useWindowDimensions")
     .mockReturnValue({ width: 800, height: 900, scale: 1, fontScale: 1 });
@@ -140,14 +143,10 @@ function ownTimings() {
 }
 
 function trigger(view: ReturnType<typeof render>) {
-  const node = view.UNSAFE_root.findAll((n) => n.props.onHoverIn && n.props.onPress)[0];
-  if (!node) throw Error("Missing floating trigger");
-  return node;
+  return view.getByRole("button", { name: "Navigation menu" });
 }
-function edge(view: ReturnType<typeof render>) {
-  const node = view.UNSAFE_root.findAll((n) => n.props.onHoverIn && n.props.style?.width === 16)[0];
-  if (!node) throw Error("Missing floating edge");
-  return node;
+function outside(view: ReturnType<typeof render>) {
+  return view.queryByTestId("navigation-outside-layer", { includeHiddenElements: true });
 }
 function panel(view: ReturnType<typeof render>) {
   const node = view.UNSAFE_root.findAll((n) => ReactNative.StyleSheet.flatten(n.props.style)?.width === 248)[0];
@@ -158,14 +157,60 @@ it("starts closed with unknown preference without timing", () => {
   const view = render(fixture());
   expect(hidden()).toBe(0);
   expect(panel(view).props.pointerEvents).toBe("none");
+  expect(outside(view)).toBeNull();
   expect(ownTimings()).toHaveLength(0);
 });
-it.each(["hoverIn", "focus", "press"])("snaps unknown opening via %s", (name) => {
+it("opens only by press; hover and focus never open it and there is no hover edge", () => {
   const view = render(fixture());
-  fireEvent(trigger(view), name);
+  const node = trigger(view);
+  expect(node.props.onHoverIn).toBeUndefined();
+  expect(view.UNSAFE_root.findAll((n) => n.props.onHoverIn && n.props.style?.width === 16)).toHaveLength(0);
+  fireEvent(node, "focus");
+  expect(hidden()).toBe(0);
+  fireEvent.press(node);
   expect(hidden()).toBe(1);
   expect(panel(view).props.pointerEvents).toBe("auto");
+  expect(trigger(view).props.accessibilityState).toEqual({ expanded: true });
   expect(ownTimings()).toHaveLength(0);
+});
+it("gives the trigger a 44px target with a localized name", () => {
+  const view = render(fixture());
+  expect(ReactNative.StyleSheet.flatten(trigger(view).props.style).width).toBeGreaterThanOrEqual(44);
+});
+it("the first outside press only dismisses through a capturing layer above the content", async () => {
+  const view = render(fixture());
+  await preference(true);
+  fireEvent.press(trigger(view));
+  const layer = outside(view);
+  expect(layer).not.toBeNull();
+  expect(ReactNative.StyleSheet.flatten(layer!.props.style)).toEqual(
+    expect.objectContaining({ top: 0, bottom: 0, left: 0, right: 0, zIndex: 50 }),
+  );
+  fireEvent.press(layer!);
+  expect(hidden()).toBe(0);
+  expect(outside(view)).toBeNull();
+  expect(view.getByText("Home screen")).toBeTruthy();
+});
+it("the labeled Close button and Android Back dismiss it", async () => {
+  const handlers: (() => boolean)[] = [];
+  const remove = jest.fn();
+  jest.spyOn(BackHandler, "addEventListener").mockImplementation((_event, handler) => {
+    handlers.push(handler as () => boolean);
+    return { remove };
+  });
+  const view = render(fixture());
+  await preference(true);
+  fireEvent.press(trigger(view));
+  event(view, "Close navigation");
+  expect(hidden()).toBe(0);
+  fireEvent.press(trigger(view));
+  let handled = false;
+  act(() => {
+    handled = handlers.at(-1)!();
+  });
+  expect(handled).toBe(true);
+  expect(hidden()).toBe(0);
+  expect(remove).toHaveBeenCalled();
 });
 it("reduced click toggles immediate feedback in both directions", async () => {
   const view = render(fixture());
@@ -175,30 +220,6 @@ it("reduced click toggles immediate feedback in both directions", async () => {
   fireEvent.press(trigger(view));
   expect(hidden()).toBe(0);
   expect(ownTimings()).toHaveLength(0);
-});
-it.each(["hoverOut", "blur"])("retains the distinct 180ms %s hide delay", async (name) => {
-  const view = render(fixture());
-  await preference(true);
-  fireEvent(trigger(view), "focus");
-  fireEvent(trigger(view), name);
-  act(() => jest.advanceTimersByTime(179));
-  expect(hidden()).toBe(1);
-  act(() => jest.advanceTimersByTime(1));
-  expect(hidden()).toBe(0);
-  expect(ownTimings()).toHaveLength(0);
-});
-it("edge re-entry cancels the pending hide without losing later hide", async () => {
-  const view = render(fixture());
-  await preference(true);
-  fireEvent(edge(view), "hoverIn");
-  fireEvent(edge(view), "hoverOut");
-  act(() => jest.advanceTimersByTime(90));
-  fireEvent(edge(view), "hoverIn");
-  act(() => jest.advanceTimersByTime(300));
-  expect(hidden()).toBe(1);
-  fireEvent(edge(view), "hoverOut");
-  act(() => jest.advanceTimersByTime(180));
-  expect(hidden()).toBe(0);
 });
 it("allowed timing keeps both endpoints, 180ms and explicit Never", async () => {
   const view = render(fixture());
@@ -218,54 +239,65 @@ it.each([true, false])("live reduction snaps the latest open=%s endpoint", async
   expect(hidden()).toBe(open ? 1 : 0);
   expect(ownTimings()).toHaveLength(count);
 });
-it("late opt-in uses explicit Never after reduced startup", async () => {
-  const view = render(fixture());
-  await preference(true);
-  fireEvent(trigger(view), "focus");
-  act(() => changed(false));
-  expect(ownTimings().at(-1)).toEqual([1, { duration: 180, reduceMotion: Reanimated.ReduceMotion.Never }]);
-});
-it.each([false, true])("preserves RTL=%s offset, prevented press and route-close behavior", async (rtl) => {
+it.each([false, true])("preserves RTL=%s offset, prevented press and closes on destination", async (rtl) => {
   const view = render(fixture(rtl));
   await preference(true);
   expect(ReactNative.StyleSheet.flatten(panel(view).props.style).transform).toEqual([{ translateX: rtl ? 24 : -24 }]);
-  fireEvent(trigger(view), "focus");
+  fireEvent.press(trigger(view));
   event(view, "Mushaf");
   expect(pressed).toHaveBeenCalledTimes(1);
   expect(hidden()).toBe(0);
-  expect(view.getByRole("button", { name: "Home" }).props.accessibilityState.selected).toBe(true);
   expect(view.getByText("Home screen")).toBeTruthy();
+});
+it("lists Search with the destinations", async () => {
+  const view = render(fixture());
+  await preference(true);
+  fireEvent.press(trigger(view));
+  expect(view.getByRole("button", { name: "Search" })).toBeTruthy();
+  expect(view.getByRole("button", { name: "Home" }).props.accessibilityState.selected).toBe(true);
 });
 it("immersive mode removes the panel and returns closed", async () => {
   const view = render(fixture());
   await preference(true);
-  fireEvent(trigger(view), "focus");
+  fireEvent.press(trigger(view));
   event(view, "Immersive on");
   expect(hidden()).toBe(0);
-  expect(view.UNSAFE_root.findAll((n) => Boolean(n.props.onHoverIn))).toHaveLength(0);
+  expect(view.queryByRole("button", { name: "Navigation menu" })).toBeNull();
   event(view, "Immersive off");
   expect(panel(view).props.pointerEvents).toBe("none");
 });
-it("unmount clears pending hide and releases the shared observer", async () => {
+it("hidden reader chrome hides the trigger", async () => {
+  const view = render(fixture());
+  await preference(true);
+  event(view, "Hide");
+  expect(view.queryByRole("button", { name: "Navigation menu" })).toBeNull();
+  event(view, "Show");
+  expect(trigger(view)).toBeTruthy();
+});
+it("unmount releases the shared observer", async () => {
   const observer = renderHook(() => useReducedMotionPreference());
   const view = render(fixture());
   await preference(true);
-  const timers = jest.spyOn(global, "setTimeout");
-  const cleared = jest.spyOn(global, "clearTimeout");
-  fireEvent(trigger(view), "focus");
-  fireEvent(trigger(view), "blur");
-  const handle = timers.mock.results.at(-1)?.value;
-  expect(timers.mock.calls.at(-1)?.[1]).toBe(180);
   view.unmount();
   expect(remove).not.toHaveBeenCalled();
   observer.unmount();
   expect(remove).toHaveBeenCalledTimes(1);
-  expect(cleared).toHaveBeenCalledWith(handle);
 });
-it("1024px uses the persistent sidebar instead of floating timing", async () => {
+it("1024px uses the nonmodal persistent sidebar without an outside layer", async () => {
   dimensions.mockReturnValue({ width: 1024, height: 900, scale: 1, fontScale: 1 });
   const view = render(fixture());
   await preference(false);
-  expect(view.UNSAFE_root.findAll((n) => Boolean(n.props.onHoverIn))).toHaveLength(0);
+  expect(view.queryByRole("button", { name: "Navigation menu" })).toBeNull();
+  expect(outside(view)).toBeNull();
+  expect(view.getByRole("button", { name: "Search" })).toBeTruthy();
   expect(ownTimings()).toHaveLength(0);
+});
+it("wide Mushaf keeps the edge trigger instead of hiding navigation", async () => {
+  dimensions.mockReturnValue({ width: 1440, height: 900, scale: 1, fontScale: 1 });
+  initialRoute = "mushaf";
+  const view = render(fixture());
+  await preference(true);
+  expect(view.getByText("Mushaf screen")).toBeTruthy();
+  fireEvent.press(trigger(view));
+  expect(outside(view)).not.toBeNull();
 });

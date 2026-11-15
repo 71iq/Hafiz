@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, Text, Pressable, StyleSheet, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, StyleSheet, useWindowDimensions, type ScrollView } from "react-native";
 import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
-import { useRouter, type Href } from "expo-router";
+import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   Play,
@@ -70,6 +70,8 @@ import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
 import { DESKTOP_CONTENT_MAX_WIDTH, VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
 import { AppReleaseCard } from "@/components/app-update/AppReleaseCard";
 import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
+import { SecondaryDestinations } from "@/components/ui/SecondaryDestinations";
+import { consumeSearchRequest, usePendingSearchRequest } from "@/lib/navigation/search-launcher";
 
 type SmartDeckDisplay = {
   id: SmartDeckId;
@@ -139,6 +141,25 @@ export default function HomeScreen() {
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   const [dueLoaded, setDueLoaded] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  // Search opened from the sidebar, Ctrl/Cmd+K or the legacy /search?q= link (search-launcher).
+  const searchRequest = usePendingSearchRequest();
+  useEffect(() => {
+    if (!searchRequest) return;
+    const request = consumeSearchRequest(searchRequest.id);
+    if (!request) return;
+    setSearchQuery(request.query);
+    setShowSearch(true);
+  }, [searchRequest]);
+  // The legacy /flashcards link lands here with section=decks and scrolls to the deck cards once.
+  const { section } = useLocalSearchParams<{ section?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const [decksY, setDecksY] = useState<number | null>(null);
+  useEffect(() => {
+    if (section !== "decks" || decksY === null) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, decksY - 16), animated: false });
+    router.setParams({ section: undefined });
+  }, [section, decksY, router]);
   const [toast, setToast] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [filterDeckId, setFilterDeckId] = useState<SmartDeckId | null>(null);
@@ -412,7 +433,7 @@ export default function HomeScreen() {
 
   return (
     <Screen>
-      <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} bottomInset={TAB_SCREEN_BOTTOM_INSET}>
+      <ScreenScrollView ref={scrollRef} maxWidth={DESKTOP_CONTENT_MAX_WIDTH} bottomInset={TAB_SCREEN_BOTTOM_INSET}>
         <View className="pt-6 pb-3">
           <View
             className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}
@@ -750,8 +771,14 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
+        <SecondaryDestinations destinations={["halaqa", "leaderboard"]} />
+
         {/* Hand-mirrored alignment pins LTR coordinates; under the RTL tab root it flipped twice. */}
-        <View className={`mb-3 ${isRTL ? "items-end" : "items-start"}`} style={{ direction: "ltr" }}>
+        <View
+          className={`mb-3 ${isRTL ? "items-end" : "items-start"}`}
+          style={{ direction: "ltr" }}
+          onLayout={(event) => setDecksY(event.nativeEvent.layout.y)}
+        >
           <Text
             className="text-charcoal dark:text-neutral-100"
             style={{
@@ -797,7 +824,14 @@ export default function HomeScreen() {
         </View>
       </ScreenScrollView>
 
-      <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchCommand
+        visible={showSearch}
+        initialQuery={searchQuery}
+        onClose={() => {
+          setShowSearch(false);
+          setSearchQuery("");
+        }}
+      />
 
       <SmartDeckFilterSheet
         visible={!!filterDeckId}
