@@ -18,8 +18,10 @@ import {
 import { useSurahNameFont } from "@/lib/fonts/use-surah-name-font";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { shouldJustifyMushafLine } from "@/lib/mushaf/page-layout";
+import { claimReaderTap } from "@/lib/mushaf/reader-tap-guard";
+import { formatAyahRef } from "@/lib/arabic";
 
 export type PageWordsByLine = Record<string, string>;
 export type PageWordsData = PageWordsByLine[];
@@ -102,6 +104,15 @@ type Props = {
   allowLineWrap?: boolean;
   showLoadingIndicator?: boolean;
   hifzVisibility?: HifzVisibility | null;
+  /** Localized marker names from the page list, so each page does not subscribe to UI strings. */
+  markerLabels?: AyahMarkerLabels;
+};
+
+export type AyahMarkerLabels = {
+  /** "Ayah {{ref}}" */
+  label: string;
+  openDetails: string;
+  select: string;
 };
 
 // Identity for a single visual word on the page
@@ -121,7 +132,6 @@ const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ 
 
 const MUSHAF_LINE_WIDTH_SCALE = 19.5;
 const MUSHAF_LINE_WIDTH_SCALE_V4_TAJWEED = 21.5;
-const MARKER_DOUBLE_TAP_MS = 260;
 
 export function mushafLineWidthScale(fontStyle: string): number {
   return fontStyle === "v4" || fontStyle === "v4-tajweed"
@@ -208,6 +218,7 @@ function MushafPageInner({
   allowLineWrap = false,
   showLoadingIndicator = true,
   hifzVisibility = null,
+  markerLabels,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
   // A failed page font load showed a spinner forever; it now offers a retry.
@@ -231,7 +242,10 @@ function MushafPageInner({
     effectiveTheme,
     markSimilarVerses,
     isLoaded: settingsLoaded,
+    isDark,
+    isRTL,
   } = useSettings();
+  const arrivalWash = isDark ? "rgba(45, 212, 191, 0.15)" : "rgba(13, 148, 136, 0.15)";
   // MUT-02: the page's similar-verse marks sit on its ayah end markers, so hidden markers mark nothing.
   // Nothing is read until the saved setting is known, so a reader who turned the marks off reads none.
   const { db } = useDatabaseStatus();
@@ -244,7 +258,7 @@ function MushafPageInner({
       onOpenSimilarVerses !== undefined &&
       ayahs.length > 0,
   );
-  const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
+  // A long press selects the ayah; its release must not also open the ayah's details.
   const skipNextMarkerPressRef = useRef<string | null>(null);
 
   // On web, trigger async load of page-words data
@@ -325,6 +339,13 @@ function MushafPageInner({
     [ayahIndexByKey, hifzVisibility, pageNumber]
   );
 
+  // A single marker tap opens ayah details on every platform. The press claims the touch so the
+  // reader's tap layer does not also toggle the controls.
+  const handleMarkerPressIn = useCallback(() => {
+    skipNextMarkerPressRef.current = null;
+    claimReaderTap();
+  }, []);
+
   const handleMarkerPress = useCallback((surah: number, ayah: number) => {
     if (!onOpenAyahDetail) return;
     const key = `${surah}:${ayah}`;
@@ -332,31 +353,20 @@ function MushafPageInner({
       skipNextMarkerPressRef.current = null;
       return;
     }
-    if (Platform.OS === "web") {
-      onOpenAyahDetail(surah, ayah);
-      return;
-    }
-    const now = Date.now();
-    const lastTap = lastMarkerTapRef.current;
-    if (lastTap?.key === key && now - lastTap.at <= MARKER_DOUBLE_TAP_MS) {
-      lastMarkerTapRef.current = null;
-      onOpenAyahDetail(surah, ayah);
-      return;
-    }
-    lastMarkerTapRef.current = { key, at: now };
+    onOpenAyahDetail(surah, ayah);
   }, [onOpenAyahDetail]);
 
   const handleMarkerLongPress = useCallback((surah: number, ayah: number) => {
     const key = `${surah}:${ayah}`;
     skipNextMarkerPressRef.current = key;
-    lastMarkerTapRef.current = null;
+    claimReaderTap();
     selectAyah(surah, ayah);
   }, [selectAyah]);
 
   // The similar-verse mark covers its ayah end marker and takes its presses, so the marker's own
   // long-press guard is not set: no marker press follows to skip.
   const handleSimilarLongPress = useCallback((surah: number, ayah: number) => {
-    lastMarkerTapRef.current = null;
+    claimReaderTap();
     selectAyah(surah, ayah);
   }, [selectAyah]);
 
@@ -513,11 +523,10 @@ function MushafPageInner({
               const isTargetAyah =
                 !highlightedWord &&
                 highlightedAyahKey === `${identity.surah}:${identity.ayah}`;
-              const hlColor =
-                isTargetWord || isTargetAyah || isSelectedAyah(identity.surah, identity.ayah)
-                  ? "#0d9488"
-                  : getWordHighlightColor(identity.surah, identity.ayah, identity.wordPos) ??
-                    getHighlightColor(identity.surah, identity.ayah);
+              const hlColor = isSelectedAyah(identity.surah, identity.ayah)
+                ? "#0d9488"
+                : getWordHighlightColor(identity.surah, identity.ayah, identity.wordPos) ??
+                  getHighlightColor(identity.surah, identity.ayah);
               return (
                 <WordToken
                   key={`w-${lineNumber}-${i}`}
@@ -531,6 +540,7 @@ function MushafPageInner({
                   wordPos={identity.wordPos}
                   v2Page={pageNumber}
                   highlightColor={hlColor}
+                  arrivalWash={isTargetWord || isTargetAyah ? arrivalWash : undefined}
                   hidden={isHifzWordHidden(identity)}
                   weakSpot={isWeakSpot(identity.surah, identity.ayah, identity.wordPos)}
                   compactLayout
@@ -547,11 +557,35 @@ function MushafPageInner({
               return (
                 <Pressable
                   key={`w-${lineNumber}-${i}`}
+                  onPressIn={handleMarkerPressIn}
                   onPress={() => handleMarkerPress(identity.surah, identity.ayah)}
                   onLongPress={() => handleMarkerLongPress(identity.surah, identity.ayah)}
                   delayLongPress={300}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    markerLabels
+                      ? interpolate(markerLabels.label, { ref: formatAyahRef(isRTL, identity.surah, identity.ayah) })
+                      : formatAyahRef(isRTL, identity.surah, identity.ayah)
+                  }
+                  accessibilityActions={
+                    markerLabels
+                      ? [
+                          { name: "activate", label: markerLabels.openDetails },
+                          { name: "longpress", label: markerLabels.select },
+                        ]
+                      : undefined
+                  }
+                  onAccessibilityAction={(event) => {
+                    if (event.nativeEvent.actionName === "longpress") selectAyah(identity.surah, identity.ayah);
+                    else onOpenAyahDetail?.(identity.surah, identity.ayah);
+                  }}
                   {...(Platform.OS === "web"
                     ? ({
+                        // Shift+F10 or the context-menu key on a focused marker selects the ayah.
+                        onContextMenu: (event: any) => {
+                          event?.preventDefault?.();
+                          handleMarkerLongPress(identity.surah, identity.ayah);
+                        },
                         dataSet: {
                           hafizQuranToken: "marker",
                           hafizSurah: String(identity.surah),
@@ -583,7 +617,7 @@ function MushafPageInner({
                       writingDirection: "rtl",
                       ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                       ...(isTargetAyah && {
-                        backgroundColor: "rgba(13, 148, 136, 0.125)",
+                        backgroundColor: arrivalWash,
                         borderRadius: 6,
                       }),
                     }}

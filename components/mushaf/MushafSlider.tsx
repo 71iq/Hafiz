@@ -5,6 +5,7 @@ import {
   Pressable,
   FlatList,
   Platform,
+  useWindowDimensions,
   type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -14,7 +15,9 @@ import { ChevronsUp } from "lucide-react-native";
 import { toArabicNumber } from "@/lib/arabic";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
-import type { MushafIndex } from "@/lib/mushaf/position";
+import { findJuzForAyah, juzStartPages, type MushafIndex } from "@/lib/mushaf/position";
+import { inverseSurfaceColors } from "@/lib/ui/inverse-surface";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 type Props = {
   /** Current page (1-604) */
@@ -48,6 +51,11 @@ export function MushafSlider({
 }: Props) {
   const { isRTL, isDark, uiLanguage } = useSettings();
   const s = useStrings();
+  const { width: windowWidth } = useWindowDimensions();
+  const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
+  const bubbleColors = inverseSurfaceColors(isDark);
+  // The long ticks mark the 30 juz start pages from the existing mappings.
+  const juzStarts = useMemo(() => (index ? juzStartPages(index) : new Set<number>()), [index]);
   const listRef = useRef<FlatList<number>>(null);
   const railHostRef = useRef<any>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -368,18 +376,27 @@ export function MushafSlider({
 
   const livePage = previewPage ?? currentPage;
   const livePageLabel = isRTL ? toArabicNumber(livePage) : String(livePage);
-  const surahName = index?.pageByNumber.get(livePage)
+  const livePageRow = index?.pageByNumber.get(livePage);
+  const surahName = livePageRow
     ? uiLanguage === "ar"
-      ? index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_arabic ?? null
-      : index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_english ?? null
+      ? index?.surahByNumber.get(livePageRow.surah_start)?.name_arabic ?? null
+      : index?.surahByNumber.get(livePageRow.surah_start)?.name_english ?? null
     : null;
+  const liveJuz = index && livePageRow ? findJuzForAyah(index, livePageRow.surah_start, livePageRow.ayah_start) : null;
   const pageLabel = interpolate(s.pageN, { n: livePageLabel });
+  const previewLabel = [
+    surahName,
+    pageLabel,
+    liveJuz ? interpolate(s.railJuzN, { n: isRTL ? toArabicNumber(liveJuz) : String(liveJuz) }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const renderTick = useCallback(
     ({ item }: ListRenderItemInfo<number>) => {
       const distance = Math.abs(item - livePage);
       const active = distance === 0;
-      const major = item === 1 || item === max || item % 20 === 0;
+      const major = juzStarts.has(item);
       return (
         <View style={{ width: TICK_WIDTH, height: TICK_HEIGHT, alignItems: "center", justifyContent: "center" }}>
           <View
@@ -397,7 +414,7 @@ export function MushafSlider({
         </View>
       );
     },
-    [isDark, livePage, max]
+    [isDark, juzStarts, livePage]
   );
 
   return (
@@ -418,7 +435,8 @@ export function MushafSlider({
         }}
         disabled={!interactive}
         hitSlop={10}
-        accessibilityLabel={s.goTo}
+        accessibilityRole="button"
+        accessibilityLabel={interpolate(s.railGoToLabel, { n: livePageLabel })}
         style={({ pressed }) => ({
           height: 28,
           minWidth: 58,
@@ -464,22 +482,26 @@ export function MushafSlider({
             style={{
               position: "absolute",
               alignSelf: "center",
-              top: -30,
+              top: isPhone ? -40 : -30,
               zIndex: 3,
-              backgroundColor: "#003638",
+              backgroundColor: bubbleColors.background,
               borderRadius: 999,
-              paddingHorizontal: 10,
-              paddingVertical: 3,
+              paddingHorizontal: isPhone ? 14 : 10,
+              paddingVertical: isPhone ? 6 : 3,
               minWidth: 96,
               alignItems: "center",
             }}
           >
             <Text
               numberOfLines={1}
-              style={{ color: "#fff", fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+              style={{
+                color: bubbleColors.text,
+                fontFamily: "Manrope_600SemiBold",
+                fontSize: isPhone ? 13 : 11,
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
             >
-              {surahName ? `${surahName} · ` : ""}
-              {pageLabel}
+              {previewLabel}
             </Text>
           </View>
         )}

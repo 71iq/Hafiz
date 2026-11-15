@@ -10,6 +10,7 @@ import {
   fetchAllHighlights,
   addHighlightsForSelectionRefs,
   removeHighlightsForAyah,
+  removeHighlightsByIds,
   replaceAyahHighlight,
   type QuranSelectionWordRef,
 } from "./queries";
@@ -24,6 +25,10 @@ type SelectionContextType = {
   addHighlightForSelection: (color: string) => Promise<void>;
   addHighlightForRefs: (refs: QuranSelectionWordRef[], color: string) => Promise<void>;
   removeHighlightForSelection: () => Promise<void>;
+  /** Highlight rows that color any selected word (word ranges, or the whole ayah). */
+  highlightIdsForRefs: (refs: QuranSelectionWordRef[]) => number[];
+  /** Removes exactly the highlight rows that color the selected words. */
+  removeHighlightsForRefs: (refs: QuranSelectionWordRef[]) => Promise<void>;
   toggleBookmarkForSelection: () => Promise<"added" | "removed" | null>;
   showToast: (msg: string) => void;
   refreshHighlights: () => Promise<void>;
@@ -43,6 +48,8 @@ const SelectionContext = createContext<SelectionContextType>({
   addHighlightForSelection: async () => {},
   addHighlightForRefs: async () => {},
   removeHighlightForSelection: async () => {},
+  highlightIdsForRefs: () => [],
+  removeHighlightsForRefs: async () => {},
   toggleBookmarkForSelection: async () => null,
   showToast: () => {},
   refreshHighlights: async () => {},
@@ -159,6 +166,41 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     [selection, db, refreshHighlights]
   );
 
+  const highlightIdsForRefs = useCallback(
+    (refs: QuranSelectionWordRef[]): number[] => {
+      const ids = new Set<number>();
+      for (const ref of refs) {
+        for (const entry of highlights.get(ayahKey(ref.surah, ref.ayah)) ?? []) {
+          const wholeAyah = entry.wordStart === null && entry.wordEnd === null;
+          const coversWord =
+            !ref.isMarker &&
+            entry.wordStart !== null &&
+            entry.wordEnd !== null &&
+            ref.wordPos >= entry.wordStart &&
+            ref.wordPos <= entry.wordEnd;
+          if (wholeAyah || coversWord) ids.add(entry.id);
+        }
+      }
+      return Array.from(ids);
+    },
+    [highlights],
+  );
+
+  const removeHighlightsForRefs = useCallback(
+    async (refs: QuranSelectionWordRef[]) => {
+      const ids = highlightIdsForRefs(refs);
+      if (ids.length === 0) return;
+      try {
+        await removeHighlightsByIds(db, ids);
+        await refreshHighlights();
+      } catch (e) {
+        console.warn("[Selection] Failed to remove text highlight:", e);
+        throw e;
+      }
+    },
+    [db, highlightIdsForRefs, refreshHighlights],
+  );
+
   const toggleBookmarkForSelection = useCallback(
     async (): Promise<"added" | "removed" | null> => {
       if (!selection) return null;
@@ -225,6 +267,8 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         addHighlightForSelection,
         addHighlightForRefs,
         removeHighlightForSelection,
+        highlightIdsForRefs,
+        removeHighlightsForRefs,
         toggleBookmarkForSelection,
         showToast,
         refreshHighlights,

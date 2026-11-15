@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, ScrollView, useWindowDimensions } from "react-native";
+import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, ScrollView, Share, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
 import {
@@ -30,11 +30,10 @@ import {
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import {
   addBookmark as dbAddBookmark,
-  fetchSurahName,
-  fetchUthmaniRange,
+  buildAyahCopyText,
   removeBookmark as dbRemoveBookmark,
 } from "@/lib/selection/queries";
-import { formatForCopy } from "@/lib/selection/format";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { audioFailureMessage } from "@/lib/audio/labels";
@@ -98,6 +97,7 @@ function AyahBlockInner({
     recitationId,
     isRTL,
     isDark,
+    uiLanguage,
     quranRenderFontStyle: quranFontStyle,
     quranMarkerStyle,
     showAyahMarkers,
@@ -120,18 +120,25 @@ function AyahBlockInner({
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
 
-  // Target highlight pulses once, then remains visible for navigated/search results.
-  const pulseAnim = useRef(new RNAnimated.Value(0)).current;
+  // C07 arrival wash: a semantic background behind the target that fades in briefly (instantly with
+  // reduced motion). The reader clears it after three seconds or the next deliberate tap.
+  const reduceMotion = useReducedMotionPreference();
+  const washOpacity = useRef(new RNAnimated.Value(highlighted ? 1 : 0)).current;
   useEffect(() => {
-    if (highlighted) {
-      pulseAnim.setValue(1);
-      RNAnimated.timing(pulseAnim, {
-        toValue: 0,
-        duration: 1500,
-        useNativeDriver: true,
-      }).start();
+    if (!highlighted) {
+      washOpacity.setValue(0);
+      return;
     }
-  }, [highlighted, pulseAnim]);
+    if (reduceMotion) {
+      washOpacity.setValue(1);
+      return;
+    }
+    washOpacity.setValue(0);
+    RNAnimated.timing(washOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+  }, [highlighted, reduceMotion, washOpacity]);
+  const arrivalWashColor = isDark ? "rgba(45, 212, 191, 0.15)" : "rgba(13, 148, 136, 0.15)";
+  // A long press on the end marker selects the ayah; the release must not also open its details.
+  const skipMarkerPressRef = useRef(false);
 
   const wordTokens = useMemo(() => {
     const tokens = text.split(" ").filter(Boolean);
@@ -201,23 +208,67 @@ function AyahBlockInner({
     selectAyah(surah, ayah);
   }, [ayah, selectAyah, surah]);
 
+  const handleMarkerPress = useCallback(() => {
+    if (skipMarkerPressRef.current) {
+      skipMarkerPressRef.current = false;
+      return;
+    }
+    openDetail("tafsir");
+  }, [openDetail]);
+
+  const handleMarkerPressIn = useCallback(() => {
+    skipMarkerPressRef.current = false;
+  }, []);
+
+  const handleMarkerLongPress = useCallback(() => {
+    skipMarkerPressRef.current = true;
+    selectAyah(surah, ayah);
+  }, [ayah, selectAyah, surah]);
+
+  const markerAccessibility = {
+    accessibilityRole: "button" as const,
+    accessibilityLabel: interpolate(s.ayahMarkerLabel, { ref: formatAyahRef(isRTL, surah, ayah) }),
+    accessibilityActions: [
+      { name: "activate", label: s.ayahMarkerOpenDetails },
+      { name: "longpress", label: s.ayahMarkerSelect },
+    ],
+    onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
+      if (event.nativeEvent.actionName === "longpress") selectAyah(surah, ayah);
+      else openDetail("tafsir");
+    },
+  };
+
+  // Native opens the system share sheet. Web uses Web Share where the browser offers it and
+  // otherwise copies, and the control is labeled for what it does. A dismissed share sheet or a
+  // failed copy is never announced as a success.
+  const webCanShare = Platform.OS === "web" && typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const shareLabel = Platform.OS !== "web" || webCanShare ? s.readerShareAyah : s.readerCopyAyah;
   const handleShare = useCallback(async () => {
     if (shareBusy) return;
     setShareBusy(true);
     try {
-      const [text, surahName] = await Promise.all([
-        fetchUthmaniRange(db, surah, ayah, ayah),
-        fetchSurahName(db, surah),
-      ]);
-      await Clipboard.setStringAsync(formatForCopy(text, surahName, surah, ayah, ayah));
-      if (!systemConfirmsCopy()) showToast(s.copied);
+      const text = await buildAyahCopyText(db, surah, ayah, ayah, uiLanguage);
+      if (!text) throw new Error("Ayah text is unavailable");
+      if (Platform.OS !== "web") {
+        await Share.share({ message: text });
+      } else if (webCanShare) {
+        try {
+          await navigator.share({ text });
+        } catch (error) {
+          if ((error as { name?: string })?.name === "AbortError") return;
+          throw error;
+        }
+      } else {
+        await Clipboard.setStringAsync(text);
+        if (!systemConfirmsCopy()) showToast(s.copied);
+      }
     } catch (e) {
-      console.warn("[AyahBlock] Failed to copy share text:", e);
-      showToast(s.copyFailed);
+      console.warn("[AyahBlock] Failed to share ayah:", e);
+      showToast(Platform.OS !== "web" || webCanShare ? s.readerShareFailed : s.copyFailed);
     } finally {
       setShareBusy(false);
     }
-  }, [shareBusy, db, surah, ayah, showToast, s.copied, s.copyFailed]);
+  }, [shareBusy, db, surah, ayah, uiLanguage, webCanShare, showToast, s.copied, s.copyFailed, s.readerShareFailed]);
 
   const handleAudioPress = useCallback(async () => {
     const result = await toggleAyah(surah, ayah, recitationId);
@@ -242,7 +293,7 @@ function AyahBlockInner({
         overflow: "visible",
       }}
     >
-      {/* Deep link pulse highlight overlay */}
+      {/* Arrival wash behind the target; glyph, Tajweed and highlight colors stay untouched. */}
       {highlighted && (
         <RNAnimated.View
           pointerEvents="none"
@@ -253,11 +304,8 @@ function AyahBlockInner({
             right: -8,
             bottom: 0,
             borderRadius: 12,
-            backgroundColor: "#0d9488",
-            opacity: pulseAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.08, 0.15],
-            }),
+            backgroundColor: arrivalWashColor,
+            opacity: washOpacity,
           }}
         />
       )}
@@ -309,6 +357,7 @@ function AyahBlockInner({
             icon={shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Share2 size={15} color={iconColor} />}
             onPress={handleShare}
             disabled={shareBusy}
+            accessibilityLabel={shareLabel}
           />
         </View>
 
@@ -330,6 +379,7 @@ function AyahBlockInner({
             }
             onPress={handleBookmark}
             disabled={bookmarkBusy}
+            accessibilityLabel={bookmarked ? s.removeBookmark : s.bookmark}
           />
         </View>
       </View>
@@ -370,9 +420,17 @@ function AyahBlockInner({
               words={wordTokens.words}
               marker={
                 showAyahMarkers && wordTokens.marker ? (
-                  <Text style={markerFontPaletteStyle}>{wordTokens.marker}</Text>
+                  <Text
+                    style={markerFontPaletteStyle}
+                    onPress={handleMarkerPress}
+                    onPressIn={handleMarkerPressIn}
+                    {...markerAccessibility}
+                  >
+                    {wordTokens.marker}
+                  </Text>
                 ) : null
               }
+              onMarkerLongPress={handleMarkerLongPress}
               surah={surah}
               ayah={ayah}
               v2Page={v2Page}
@@ -392,9 +450,8 @@ function AyahBlockInner({
                   paddingVertical: 2,
                 }),
               }}
-              wordHighlightColor={(wordPos) =>
-                highlightedWordPos === wordPos ? "#0d9488" : getWordHighlightColor(surah, ayah, wordPos)
-              }
+              wordHighlightColor={(wordPos) => getWordHighlightColor(surah, ayah, wordPos)}
+              wordArrivalWash={(wordPos) => (highlightedWordPos === wordPos ? arrivalWashColor : undefined)}
               wordWeakSpot={(wordPos) => isWeakSpot(surah, ayah, wordPos)}
             />
           ) : (
@@ -432,11 +489,8 @@ function AyahBlockInner({
                     ayah={ayah}
                     wordPos={wordPos}
                     v2Page={v2Page}
-                    highlightColor={
-                      highlightedWordPos === wordPos
-                        ? "#0d9488"
-                        : getWordHighlightColor(surah, ayah, wordPos)
-                    }
+                    highlightColor={getWordHighlightColor(surah, ayah, wordPos)}
+                    arrivalWash={highlightedWordPos === wordPos ? arrivalWashColor : undefined}
                     weakSpot={isWeakSpot(surah, ayah, wordPos)}
                   />
                 );
@@ -444,6 +498,18 @@ function AyahBlockInner({
               {/* Ayah end marker */}
               {showAyahMarkers && wordTokens.marker && (
                 <Text
+                  onPress={handleMarkerPress}
+                  onPressIn={handleMarkerPressIn}
+                  onLongPress={handleMarkerLongPress}
+                  {...markerAccessibility}
+                  {...(Platform.OS === "web"
+                    ? ({
+                        onContextMenu: (event: any) => {
+                          event?.preventDefault?.();
+                          handleMarkerLongPress();
+                        },
+                      } as any)
+                    : null)}
                   {...(Platform.OS === "web"
                     ? ({
                         selectable: true,

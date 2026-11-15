@@ -7,7 +7,7 @@ import {
   surahNameGlyph,
 } from "@/lib/fonts/loader";
 import { useSurahNameFont } from "@/lib/fonts/use-surah-name-font";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
 import { SurahInfoModal, type SurahInfoTarget } from "./SurahInfoModal";
@@ -52,7 +52,10 @@ export function SurahHeader({
     surahNumber,
     nameArabic,
     nameEnglish,
+    ayahCount,
+    revelationType,
   };
+  const infoLabel = interpolate(s.surahInfoOpenNamed, { name: displayName });
 
   const needsSurahNameFont = Boolean(decorativeNameGlyph || showBismillah);
   const surahNameFontReady = useSurahNameFont(needsSurahNameFont);
@@ -82,7 +85,7 @@ export function SurahHeader({
             <OrnamentLine />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={s.surahInfoOpen}
+              accessibilityLabel={infoLabel}
               onPress={() => setInfoOpen(true)}
               className="mx-3 min-w-[190px] max-w-[340px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-5 py-1"
               style={({ pressed }) => ({
@@ -157,7 +160,7 @@ export function SurahHeader({
         <SurahInfoButton
           isDark={isDark}
           isRTL={isArabicMode}
-          label={s.surahInfoOpen}
+          label={infoLabel}
           onPress={() => setInfoOpen(true)}
         />
         <View className="mb-4 w-full flex-row items-center justify-center">

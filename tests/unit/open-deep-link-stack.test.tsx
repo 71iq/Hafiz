@@ -6,6 +6,7 @@ import OpenDeepLink from "@/app/open";
 import { consumePendingDeepLink } from "@/lib/deep-link";
 import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
+import { strings } from "@/lib/i18n/strings";
 
 function OpenAyahButton({ label }: { label: string }) {
   const openMushaf = useOpenMushaf();
@@ -47,6 +48,7 @@ function renderApp(initialUrl: string) {
         </>
       ),
       "(tabs)/mushaf": () => <Text>Mushaf screen</Text>,
+      "(tabs)/search": () => <Text>Search screen</Text>,
       open: OpenDeepLink,
       profile: () => <OpenAyahButton label="Open from profile" />,
       "flashcards/session": SessionScreen,
@@ -157,5 +159,58 @@ describe("leaving a review session", () => {
 
     expect(screen.getByText("Home screen")).toBeTruthy();
     expect(rootRouteNames(app)).toEqual(["(tabs)"]);
+  });
+});
+
+describe("C06 strict link validation", () => {
+  afterEach(() => {
+    consumePendingDeepLink();
+  });
+
+  it("rejects 2:999 instead of clamping it to another ayah, and keeps the reader untouched", async () => {
+    const app = renderApp("/home");
+    act(() => router.push("/open?surah=2&ayah=999"));
+    await act(async () => {});
+
+    expect(screen.getByText(strings.en.openLinkInvalidTitle)).toBeTruthy();
+    expect(screen.queryByText("Mushaf screen")).toBeNull();
+    expect(consumePendingDeepLink()).toBeNull();
+    expect(rootRouteNames(app)).toEqual(["(tabs)", "open"]);
+  });
+
+  it.each([
+    "/open?surah=2",
+    "/open?surah=115&ayah=1",
+    "/open?surah=2&ayah=2.5",
+    "/open?surah=-2&ayah=1",
+    "/open?surah=2&ayah=255abc",
+  ])("shows the invalid-link state for %s", async (url) => {
+    renderApp(url);
+    await act(async () => {});
+    expect(screen.getByText(strings.en.openLinkInvalidTitle)).toBeTruthy();
+    expect(consumePendingDeepLink()).toBeNull();
+  });
+
+  it("offers Home and Search from an invalid link", async () => {
+    renderApp("/home");
+    act(() => router.push("/open?surah=0&ayah=1"));
+    await act(async () => {});
+    fireEvent.press(screen.getByText(strings.en.tabHome));
+    await act(async () => {});
+    expect(screen.getByText("Home screen")).toBeTruthy();
+  });
+
+  it("accepts Arabic-Indic digits through the shared parser", async () => {
+    renderApp("/open?surah=%D9%A2&ayah=%D9%A2%D9%A5%D9%A5");
+    await act(async () => {});
+    expect(screen.getByText("Mushaf screen")).toBeTruthy();
+    expect(consumePendingDeepLink()).toEqual({ surah: 2, ayah: 255 });
+  });
+
+  it("hands the target to the reader exactly once", async () => {
+    renderApp("/open?surah=18&ayah=10");
+    await act(async () => {});
+    expect(consumePendingDeepLink()).toEqual({ surah: 18, ayah: 10 });
+    expect(consumePendingDeepLink()).toBeNull();
   });
 });

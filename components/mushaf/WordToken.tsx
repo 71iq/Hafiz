@@ -23,6 +23,8 @@ type Props = {
   v2Page: number;
   disabled?: boolean;
   highlightColor?: string;
+  /** C07 arrival wash color behind a navigated-to word; it never recolors the glyph. */
+  arrivalWash?: string;
   hidden?: boolean;
   compactLayout?: boolean;
   /** ERR-06: a short bar under a word missed in 3 or more sessions. Never drawn on a hidden word. */
@@ -53,6 +55,7 @@ function WordTokenInner({
   v2Page,
   disabled = false,
   highlightColor,
+  arrivalWash,
   hidden = false,
   compactLayout = false,
   weakSpot = false,
@@ -87,8 +90,8 @@ function WordTokenInner({
       : {};
 
   // Highlight background for page view (verse view highlights at container level)
-  let bgColor: string | undefined;
-  if (highlightColor) {
+  let bgColor: string | undefined = arrivalWash;
+  if (!bgColor && highlightColor) {
     bgColor = highlightColor + "20";
   }
 

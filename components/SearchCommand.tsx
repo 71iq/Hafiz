@@ -389,21 +389,32 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     inputRef.current?.focus();
   }, [cancelPendingSearch]);
 
-  const handleResultTap = useCallback((surah: number, ayah: number, wordPos?: number) => {
-    const target = { surah, ayah, wordPos };
-    Keyboard.dismiss();
-    if (!onNavigateToAyah) {
+  // C06: a result closes Search first; the target is submitted once the sheet has closed (or this
+  // component unmounted), never after a guessed delay.
+  const pendingResultRef = useRef<{ surah: number; ayah: number; wordPos?: number } | null>(null);
+  const submitPendingResult = useCallback(() => {
+    const target = pendingResultRef.current;
+    if (!target) return;
+    pendingResultRef.current = null;
+    if (onNavigateToAyah) {
+      onNavigateToAyah(target.surah, target.ayah, target.wordPos);
+    } else {
       setPendingDeepLink(target);
+      router.navigate("/(tabs)/mushaf");
     }
+  }, [onNavigateToAyah]);
+  const submitPendingResultRef = useRef(submitPendingResult);
+  submitPendingResultRef.current = submitPendingResult;
+  useEffect(() => {
+    if (!visible) submitPendingResult();
+  }, [submitPendingResult, visible]);
+  useEffect(() => () => submitPendingResultRef.current(), []);
+
+  const handleResultTap = useCallback((surah: number, ayah: number, wordPos?: number) => {
+    Keyboard.dismiss();
+    pendingResultRef.current = { surah, ayah, wordPos };
     onClose();
-    setTimeout(() => {
-      if (onNavigateToAyah) {
-        onNavigateToAyah(target.surah, target.ayah, target.wordPos);
-      } else {
-        router.navigate("/(tabs)/mushaf");
-      }
-    }, 150);
-  }, [onClose, onNavigateToAyah]);
+  }, [onClose]);
 
   const handleHistoryTap = useCallback(
     (entry: HistoryEntry) => {

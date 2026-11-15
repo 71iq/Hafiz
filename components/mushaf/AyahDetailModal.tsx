@@ -28,11 +28,10 @@ import { useDatabase } from "@/lib/database/provider";
 import { setPendingDeepLink } from "@/lib/deep-link";
 import { useSimilarAyah } from "@/lib/hifz/use-similar-markers";
 import { interpolate, stringByKey, useStrings } from "@/lib/i18n/useStrings";
-import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import {
   addBookmark as dbAddBookmark,
-  fetchSurahName,
+  buildAyahCopyText,
   removeBookmark as dbRemoveBookmark,
 } from "@/lib/selection/queries";
 import { useSelection } from "@/lib/selection/context";
@@ -378,12 +377,14 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     }
   }, [bookmarkBusy, bookmarked, db, activeTarget, isRTL, showToast, s, refreshBookmarks]);
 
-  // Copy and Share use the same Unicode text and canonical link, never page-font glyphs.
+  // Copy and Share use the shared Quran copy format: Unicode text, reference and canonical link,
+  // never page-font glyphs.
   const copyText = useCallback(async () => {
     if (!activeTarget || !row) return null;
-    const surahName = await fetchSurahName(db, activeTarget.surah);
-    return formatForCopy(row.text_uthmani, surahName, activeTarget.surah, activeTarget.ayah, activeTarget.ayah);
-  }, [activeTarget, db, row]);
+    const text = await buildAyahCopyText(db, activeTarget.surah, activeTarget.ayah, activeTarget.ayah, uiLanguage);
+    if (!text) throw new Error("Ayah text is unavailable");
+    return text;
+  }, [activeTarget, db, row, uiLanguage]);
 
   const handleCopy = useCallback(async () => {
     if (copyBusy) return;

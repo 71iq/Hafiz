@@ -89,6 +89,11 @@ import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
 import { formatAyahs, formatDays, formatNumber } from "@/lib/i18n/count";
 import { formatAyahRef } from "@/lib/arabic";
 
+/** Focused controls keep Space/Enter for themselves; review shortcuts skip them. */
+const FOCUSED_CONTROL_SELECTOR = ["button", "a", ...["button", "link", "menuitem", "switch", "checkbox", "radio", "tab"].map(
+  (name) => `[role="${name}"]`,
+)].join(", ");
+
 // ─── Types ───────────────────────────────────────────────────
 
 type SessionPhase = "loading" | "error" | "front" | "side" | "grading" | "summary";
@@ -1069,7 +1074,7 @@ function FlashcardSessionScreen() {
       const advanceKey = event.key === " " || event.key === "Enter";
       if (advanceKey) {
         // A focused control handles its own Space and Enter.
-        if (target?.closest?.("button, a, [role='button'], [role='link'], [role='menuitem'], [role='switch'], [role='checkbox'], [role='radio'], [role='tab']")) return;
+        if (target?.closest?.(FOCUSED_CONTROL_SELECTOR)) return;
         if (state.phase === "front") {
           event.preventDefault();
           state.revealFirstSide();

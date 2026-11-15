@@ -72,7 +72,7 @@ describe("RTL disclosure chevron contract", () => {
 
     expectContains("components/mushaf/WordTooltip.tsx", [
       "const TooltipChevron = isRTL ? ChevronLeft : ChevronRight;",
-      "<TooltipChevron size={12} color=\"rgba(255,255,255,0.6)\" />",
+      "<TooltipChevron size={12} color={colors.muted} />",
       'flexDirection: isRTL ? "row-reverse" : "row",',
     ]);
   });

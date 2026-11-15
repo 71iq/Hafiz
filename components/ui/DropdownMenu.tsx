@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
-import { MoreHorizontal } from "lucide-react-native";
+import { Check, MoreHorizontal } from "lucide-react-native";
 import { isTopOverlayLayer, registerOverlayLayer, useOverlayLayerId } from "@/components/ui/ResponsiveOverlay";
 import { useSettings } from "@/lib/settings/context";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
@@ -16,6 +16,10 @@ export type DropdownMenuItem = {
   destructive?: boolean;
   /** Draws a divider above this item. The first destructive item gets one automatically. */
   separatorBefore?: boolean;
+  /** Set for radio choices: the item is a menuitemradio and shows a check when true. */
+  checked?: boolean;
+  /** A heading shown before the first item of each consecutive group. */
+  group?: string;
 };
 
 type AnchorRect = {
@@ -33,6 +37,8 @@ type DropdownMenuProps = {
   width?: number;
   isRTL?: boolean;
   className?: string;
+  /** Replaces the default "more" icon on the trigger. */
+  triggerIcon?: (color: string) => ReactNode;
 };
 
 const MENU_MARGIN = 12;
@@ -99,6 +105,7 @@ export function DropdownMenu({
   width = 220,
   isRTL: explicitIsRTL,
   className,
+  triggerIcon,
 }: DropdownMenuProps) {
   const { height, width: viewportWidth } = useWindowDimensions();
   const triggerRef = useRef<View>(null);
@@ -236,7 +243,7 @@ export function DropdownMenu({
             opacity: disabled ? 0.35 : pressed || anchor ? 0.72 : 1,
           })}
         >
-          <MoreHorizontal size={17} color={iconColor} />
+          {triggerIcon ? triggerIcon(iconColor) : <MoreHorizontal size={17} color={iconColor} />}
         </Pressable>
       </View>
 
@@ -272,47 +279,75 @@ export function DropdownMenu({
                 {items.map((item, index) => {
                   const color = item.disabled ? mutedColor : item.destructive ? destructiveColor : textColor;
                   const divider = index > 0 && (item.separatorBefore || index === firstDestructive);
+                  const heading = item.group && item.group !== items[index - 1]?.group ? item.group : null;
+                  const isRadio = item.checked !== undefined;
                   return (
-                    <Pressable
-                      key={item.key}
-                      ref={(node) => {
-                        itemRefs.current[index] = node;
-                      }}
-                      accessibilityRole="menuitem"
-                      accessibilityLabel={item.label}
-                      accessibilityState={{ disabled: !!item.disabled }}
-                      disabled={item.disabled}
-                      onPress={() => selectItem(item)}
-                      onFocus={() => {
-                        activeIndex.current = index;
-                      }}
-                      className="min-h-11 items-center gap-3 px-3.5 py-2.5"
-                      style={({ pressed, focused }: { pressed: boolean; focused?: boolean }) => ({
-                        backgroundColor: pressed || focused ? themeColors.surfaceLow : "transparent",
-                        borderTopWidth: divider ? 1 : 0,
-                        borderTopColor: borderColor,
-                        direction: "ltr",
-                        flexDirection: isRTL ? "row-reverse" : "row",
-                        opacity: item.disabled ? 0.45 : 1,
-                      })}
-                    >
-                      {item.icon ? (
-                        <View className="h-5 w-5 items-center justify-center">{item.icon(color)}</View>
+                    <View key={item.key}>
+                      {heading ? (
+                        <Text
+                          accessibilityRole="header"
+                          className="px-3.5 pb-1 pt-2"
+                          style={{
+                            color: mutedColor,
+                            fontFamily: "Manrope_600SemiBold",
+                            fontSize: 11,
+                            ...textStartStyle(isRTL),
+                            writingDirection: isRTL ? "rtl" : "ltr",
+                            // A divider sits above the whole group, heading included.
+                            borderTopWidth: divider ? 1 : 0,
+                            borderTopColor: borderColor,
+                          }}
+                        >
+                          {heading}
+                        </Text>
                       ) : null}
-                      <Text
-                        className="min-w-0 flex-1"
-                        style={{
-                          color,
-                          fontFamily: "Manrope_600SemiBold",
-                          fontSize: 14,
-                          lineHeight: 20,
-                          ...textStartStyle(isRTL),
-                          writingDirection: isRTL ? "rtl" : "ltr",
+                      <Pressable
+                        ref={(node) => {
+                          itemRefs.current[index] = node;
                         }}
+                        accessibilityRole={isRadio ? ("menuitemradio" as "menuitem") : "menuitem"}
+                        accessibilityLabel={item.label}
+                        accessibilityState={
+                          isRadio ? { disabled: !!item.disabled, checked: item.checked } : { disabled: !!item.disabled }
+                        }
+                        disabled={item.disabled}
+                        onPress={() => selectItem(item)}
+                        onFocus={() => {
+                          activeIndex.current = index;
+                        }}
+                        className="min-h-11 items-center gap-3 px-3.5 py-2.5"
+                        style={({ pressed, focused }: { pressed: boolean; focused?: boolean }) => ({
+                          backgroundColor: pressed || focused ? themeColors.surfaceLow : "transparent",
+                          borderTopWidth: divider && !heading ? 1 : 0,
+                          borderTopColor: borderColor,
+                          direction: "ltr",
+                          flexDirection: isRTL ? "row-reverse" : "row",
+                          opacity: item.disabled ? 0.45 : 1,
+                        })}
                       >
-                        {item.label}
-                      </Text>
-                    </Pressable>
+                        {item.icon ? (
+                          <View className="h-5 w-5 items-center justify-center">{item.icon(color)}</View>
+                        ) : null}
+                        <Text
+                          className="min-w-0 flex-1"
+                          style={{
+                            color,
+                            fontFamily: "Manrope_600SemiBold",
+                            fontSize: 14,
+                            lineHeight: 20,
+                            ...textStartStyle(isRTL),
+                            writingDirection: isRTL ? "rtl" : "ltr",
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                        {isRadio ? (
+                          <View className="h-5 w-5 items-center justify-center">
+                            {item.checked ? <Check size={16} color={color} /> : null}
+                          </View>
+                        ) : null}
+                      </Pressable>
+                    </View>
                   );
                 })}
               </ScrollView>

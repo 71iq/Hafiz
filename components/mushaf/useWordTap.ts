@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { Platform } from "react-native";
 import { useWordInteraction, type TooltipPosition } from "@/lib/word/context";
 import { useChromeActions } from "@/lib/ui/chrome";
-
-const DOUBLE_TAP_MS = 260;
 
 type WordTapInput = {
   surah: number;
@@ -17,14 +15,21 @@ type WordTapInput = {
 /** Reports where the tapped word is, so the tooltip can anchor to it. */
 export type LocateWord = (done: (position: TooltipPosition) => void) => void;
 
+function hasActiveTextSelection(): boolean {
+  if (Platform.OS !== "web" || typeof window === "undefined") return false;
+  const selection = window.getSelection?.();
+  return Boolean(selection && !selection.isCollapsed && selection.rangeCount > 0);
+}
+
 /**
- * Shared word tap behavior: a single tap (after the double-tap window on touch input) shows the
- * word tooltip, and a long press opens the word detail sheet.
+ * Shared word tap behavior. On web a completed tap or click shows the word gloss at once, in page
+ * and verse views alike; a drag, long press or text selection cancels it, and there is no word
+ * double-tap action. A long press (or right click) opens the word detail sheet. On native a tap
+ * reaches the reader's tap layer and toggles the controls.
  */
 export function useWordTap({ surah, ayah, wordPos, v2Page, disabled = false, hidden = false }: WordTapInput) {
-  const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
+  const { tooltipWord, setTooltipWord, openDetail, detailWord } = useWordInteraction();
   const { markActivity } = useChromeActions();
-  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchInput = useMemo(() => {
     if (Platform.OS !== "web") return true;
     if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) return true;
@@ -34,16 +39,11 @@ export function useWordTap({ surah, ayah, wordPos, v2Page, disabled = false, hid
     return false;
   }, []);
 
-  useEffect(
-    () => () => {
-      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-    },
-    [],
-  );
-
   const wordRef = useMemo(() => ({ surah, ayah, wordPos, v2Page }), [surah, ayah, wordPos, v2Page]);
-  const isTooltipSelected =
-    tooltipWord !== null && tooltipWord.surah === surah && tooltipWord.ayah === ayah && tooltipWord.wordPos === wordPos;
+  const isWord = (word: { surah: number; ayah: number; wordPos: number } | null) =>
+    word != null && word.surah === surah && word.ayah === ayah && word.wordPos === wordPos;
+  // The word stays marked while its gloss or its detail sheet is open.
+  const isTooltipSelected = isWord(tooltipWord) || isWord(detailWord);
 
   const press = useCallback(
     (locate: LocateWord) => {
@@ -51,34 +51,16 @@ export function useWordTap({ surah, ayah, wordPos, v2Page, disabled = false, hid
       // word: nothing showed or cleared that selection and the word stayed highlighted. The tap
       // reaches the reader's tap layer, which toggles the controls.
       if (disabled || hidden || Platform.OS !== "web") return;
-      const showTooltip = () => locate((position) => setTooltipWord(wordRef, position));
-      if (!isTouchInput) {
-        // Mouse / desktop: single click shows the tooltip.
-        showTooltip();
-        return;
-      }
-      // Touch input: keep reader chrome changes owned by the reader tap layer.
-      if (tapTimerRef.current) {
-        clearTimeout(tapTimerRef.current);
-        tapTimerRef.current = null;
-        showTooltip();
-        return;
-      }
-      tapTimerRef.current = setTimeout(() => {
-        tapTimerRef.current = null;
-        showTooltip();
-      }, DOUBLE_TAP_MS);
+      // A press that ends a text selection belongs to the selection menu, not the gloss.
+      if (hasActiveTextSelection()) return;
+      locate((position) => setTooltipWord(wordRef, position));
     },
-    [disabled, hidden, isTouchInput, setTooltipWord, wordRef],
+    [disabled, hidden, setTooltipWord, wordRef],
   );
 
   const longPress = useCallback(() => {
     if (disabled || hidden) return;
     markActivity();
-    if (tapTimerRef.current) {
-      clearTimeout(tapTimerRef.current);
-      tapTimerRef.current = null;
-    }
     openDetail(wordRef);
   }, [disabled, hidden, markActivity, openDetail, wordRef]);
 

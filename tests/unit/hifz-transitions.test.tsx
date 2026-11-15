@@ -70,7 +70,12 @@ jest.mock("@/lib/selection/context", () => ({
   useSelection: () => mockSelection,
 }));
 jest.mock("@/lib/ui/chrome", () => ({ useChrome: () => mockChrome, useChromeActions: () => mockChrome }));
-jest.mock("@/lib/deep-link", () => ({ consumePendingDeepLink: () => null, peekPendingDeepLink: () => null }));
+jest.mock("@/lib/deep-link", () => ({
+  consumePendingDeepLink: () => null,
+  peekPendingDeepLink: () => null,
+  subscribePendingDeepLink: () => () => undefined,
+}));
+jest.mock("@/lib/auth/store", () => ({ useAuthStore: (select: (state: { user: null }) => unknown) => select({ user: null }) }));
 jest.mock("@/lib/quran-foundation/config", () => ({ isQfContentEnabled: () => false, isRecitationEnabled: () => false }));
 jest.mock("@/lib/audio/ayah-audio", () => ({
   useAyahAudio: () => ({
@@ -119,7 +124,7 @@ jest.mock("@/components/mushaf/FocusModeControls", () => ({ FocusModeControls: (
 jest.mock("@/components/mushaf/WordDetailSheet", () => ({ WordDetailSheet: () => null }));
 jest.mock("@/components/mushaf/RecitationRangeSheet", () => ({ RecitationRangeSheet: () => null }));
 jest.mock("@/components/mushaf/ReadingSettingsSheet", () => ({ ReadingSettingsSheet: () => null }));
-jest.mock("@/components/mushaf/PageViewNavigationSheet", () => ({ PageViewNavigationSheet: () => null }));
+jest.mock("@/components/mushaf/PageViewNavigationSheet", () => ({ PageLayoutMenu: () => null, pageLayoutMenuItems: () => [] }));
 jest.mock("@/components/mushaf/WordTooltip", () => ({ FloatingWordTooltip: () => null }));
 jest.mock("@/components/mushaf/SelectionActionBar", () => ({ SelectionActionBar: () => null }));
 jest.mock("@/components/mushaf/WebSelectionMenu", () => ({ WebSelectionMenu: () => null }));
@@ -199,8 +204,12 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
   async function open(enable = true) {
     const view = render(<MushafScreen />, { wrapper: Wrapper });
     await act(async () => {});
-    if (enable) fireEvent.press(view.getByLabelText(s.revealPageMode));
+    if (enable) fireEvent.press(hideToggle(view));
     return view;
+  }
+  // The shared eye toolbar button is named for what it does next.
+  function hideToggle(view: ReturnType<typeof render>) {
+    return view.queryByLabelText(s.readerHideAyahText) ?? view.getByLabelText(s.readerShowAyahText);
   }
   function press(view: ReturnType<typeof render>, label: string) {
     fireEvent.press(view.getByRole("button", { name: label }));
@@ -214,7 +223,7 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
   it("starts disabled and enables with a blank page", async () => {
     const view = await open(false);
     expect(page().hifzVisibility).toBeNull();
-    fireEvent.press(view.getByLabelText(s.revealPageMode));
+    fireEvent.press(hideToggle(view));
     expect(progress()).toEqual(hidden);
     expect(view.getByRole("button", { name: s.hifzHidePreviousAyah })).toBeDisabled();
     expect(view.getByRole("button", { name: s.hifzRevealNextAyah })).toBeEnabled();
@@ -350,10 +359,10 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     const view = await open();
     press(view, s.hifzContinueAutoReveal);
     await tick();
-    fireEvent.press(view.getByLabelText(s.revealPageMode));
+    fireEvent.press(hideToggle(view));
     expect(page().hifzVisibility).toBeNull();
     await tick(2000);
-    fireEvent.press(view.getByLabelText(s.revealPageMode));
+    fireEvent.press(hideToggle(view));
     expect(progress()).toEqual(hidden);
     expect(view.getByRole("button", { name: s.hifzContinueAutoReveal })).toBeOnTheScreen();
   });

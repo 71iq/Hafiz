@@ -119,3 +119,85 @@ export function pageForAyah(index: MushafIndex, surah: number, ayah: number): nu
   }
   return null;
 }
+
+/** The first page of each juz (30 pages), from the existing juz and page mappings. */
+export function juzStartPages(index: MushafIndex): Set<number> {
+  const firstByJuz = new Map<number, { surah: number; ayah: number }>();
+  for (const row of index.juzRows) {
+    const current = firstByJuz.get(row.juz);
+    if (!current || row.surah < current.surah || (row.surah === current.surah && row.ayah_start < current.ayah)) {
+      firstByJuz.set(row.juz, { surah: row.surah, ayah: row.ayah_start });
+    }
+  }
+  const pages = new Set<number>();
+  for (const start of firstByJuz.values()) {
+    const page = pageForAyah(index, start.surah, start.ayah);
+    if (page !== null) pages.add(page);
+  }
+  return pages;
+}
+
+export type ReaderPositionLike = { mode: "page"; page: number } | { mode: "verse"; surah: number; ayah: number };
+
+/**
+ * Converts a saved position to another view: a saved page opens verse view at that page's first
+ * ayah, and a saved ayah opens page view at its page. Null when the mapping has no answer.
+ */
+export function positionForMode(
+  index: MushafIndex,
+  position: ReaderPositionLike,
+  mode: "page" | "verse",
+): ReaderPositionLike | null {
+  if (position.mode === mode) return position;
+  if (position.mode === "page") {
+    const top = topmostAyahForPage(index, position.page);
+    return top ? { mode: "verse", surah: top.surah, ayah: top.ayah } : null;
+  }
+  const page = pageForAyah(index, position.surah, position.ayah);
+  return page ? { mode: "page", page } : null;
+}
+
+type PageLineForEstimate = {
+  line_number: number;
+  line_type: string;
+  first_word_id: number | null;
+  last_word_id: number | null;
+  surah_number: number | null;
+};
+
+/**
+ * Estimates where an ayah starts on its page as a fraction of the page's lines (0 = top), from the
+ * page's line layout. A surah's first ayah is placed at its surah header line, so the header shows
+ * above it. Falls back to the share of glyphs before the ayah when the layout cannot place it.
+ */
+export function estimateAyahLineFraction(
+  ayahs: readonly { surah: number; ayah: number; glyphCount: number }[],
+  target: { surah: number; ayah: number },
+  lineLayout?: readonly PageLineForEstimate[],
+  globalWordOffset?: number,
+): number | null {
+  const targetIndex = ayahs.findIndex((ayah) => ayah.surah === target.surah && ayah.ayah === target.ayah);
+  if (targetIndex < 0) return null;
+  const before = ayahs.slice(0, targetIndex).reduce((sum, ayah) => sum + ayah.glyphCount, 0);
+  const total = ayahs.reduce((sum, ayah) => sum + ayah.glyphCount, 0);
+  if (lineLayout && lineLayout.length > 0) {
+    const lineCount = Math.max(...lineLayout.map((line) => line.line_number));
+    if (target.ayah === 1) {
+      const header = lineLayout.find((line) => line.line_type === "surah_name" && line.surah_number === target.surah);
+      if (header && lineCount > 0) return (header.line_number - 1) / lineCount;
+    }
+    if (typeof globalWordOffset === "number" && lineCount > 0) {
+      const wordId = globalWordOffset + before + 1;
+      const line = lineLayout.find(
+        (row) =>
+          row.line_type === "ayah" &&
+          typeof row.first_word_id === "number" &&
+          typeof row.last_word_id === "number" &&
+          wordId >= row.first_word_id &&
+          wordId <= row.last_word_id,
+      );
+      if (line) return (line.line_number - 1) / lineCount;
+    }
+  }
+  return total > 0 ? before / total : null;
+}

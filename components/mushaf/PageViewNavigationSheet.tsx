@@ -1,137 +1,50 @@
-import { Modal, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { Check, MoveHorizontal, MoveVertical, type LucideIcon } from "lucide-react-native";
-import { useMemo } from "react";
+import { ChevronDown, MoveHorizontal, MoveVertical } from "lucide-react-native";
+import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMenu";
+import type { UIStrings } from "@/lib/i18n/strings";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings, type PageScroll } from "@/lib/settings/context";
-import { textStartStyle } from "@/lib/ui/direction";
 
-export type PageViewNavigationAnchor = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
-type Props = {
-  visible: boolean;
-  anchor: PageViewNavigationAnchor | null;
-  onClose: () => void;
-};
-
-export function PageViewNavigationSheet({
-  visible,
-  anchor,
-  onClose,
-}: Props) {
-  const s = useStrings();
-  const { height, width: viewportWidth } = useWindowDimensions();
-  const { isDark, isRTL, pageScroll, setPageScroll, themeColors } = useSettings();
-  const menuWidth = Math.min(Math.max(anchor?.width ?? 132, 148), viewportWidth - 24);
-  const menuHeight = 108;
-  const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(95,78,64,0.12)";
-
-  const menuPosition = useMemo(() => {
-    if (!anchor) {
-      return {
-        left: Math.max(12, (viewportWidth - menuWidth) / 2),
-        top: 72,
-      };
-    }
-    const requestedLeft = isRTL ? anchor.x + anchor.width - menuWidth : anchor.x;
-    const left = Math.min(Math.max(requestedLeft, 12), viewportWidth - menuWidth - 12);
-    const belowTop = anchor.y + anchor.height + 8;
-    const aboveTop = anchor.y - menuHeight - 8;
-    const top = belowTop + menuHeight <= height - 12 ? belowTop : Math.max(12, aboveTop);
-    return { left, top };
-  }, [anchor, height, isRTL, menuWidth, viewportWidth]);
-
-  const selectPageScroll = (value: PageScroll) => {
-    setPageScroll(value);
-    onClose();
-  };
-
-  const items: {
-    value: PageScroll;
-    label: string;
-    icon: LucideIcon;
-  }[] = [
-    { value: "vertical", label: s.pageScrollVertical, icon: MoveVertical },
-    { value: "horizontal", label: s.pageScrollHorizontal, icon: MoveHorizontal },
+/**
+ * The one Page layout option list (Scroll / Swipe). The wide toolbar's direction chevron and the
+ * shared More menu both render these items, so both use the same direction state and handler.
+ */
+export function pageLayoutMenuItems(
+  s: Pick<UIStrings, "pageScrollVertical" | "pageScrollHorizontal" | "pageLayoutGroup">,
+  pageScroll: PageScroll,
+  setPageScroll: (value: PageScroll) => void,
+): DropdownMenuItem[] {
+  return [
+    {
+      key: "page-layout-vertical",
+      label: s.pageScrollVertical,
+      group: s.pageLayoutGroup,
+      checked: pageScroll === "vertical",
+      icon: (color) => <MoveVertical size={17} color={color} />,
+      onPress: () => setPageScroll("vertical"),
+    },
+    {
+      key: "page-layout-horizontal",
+      label: s.pageScrollHorizontal,
+      group: s.pageLayoutGroup,
+      checked: pageScroll === "horizontal",
+      icon: (color) => <MoveHorizontal size={17} color={color} />,
+      onPress: () => setPageScroll("horizontal"),
+    },
   ];
+}
 
+/** The separate 44px direction chevron, shown at 768px and above while the full toolbar fits. */
+export function PageLayoutMenu() {
+  const s = useStrings();
+  const { pageScroll, setPageScroll, isRTL } = useSettings();
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <View className="flex-1">
-        <Pressable className="absolute inset-0" onPress={onClose} />
-        <View
-          accessibilityRole="menu"
-          className="absolute overflow-hidden rounded-2xl border shadow-2xl"
-          style={{
-            backgroundColor: themeColors.surface,
-            borderColor,
-            left: menuPosition.left,
-            top: menuPosition.top,
-            width: menuWidth,
-            padding: 6,
-            ...(Platform.OS === "web"
-              ? ({ boxShadow: "0 12px 28px rgba(15, 23, 42, 0.14)" } as any)
-              : null),
-          }}
-        >
-          {items.map((item) => {
-            const active = item.value === pageScroll;
-            const Icon = item.icon;
-            const color = active ? (isDark ? "#2dd4bf" : "#0d9488") : isDark ? "#d4d4d4" : "#2D2D2D";
-            return (
-              <Pressable
-                key={item.value}
-                accessibilityRole="menuitem"
-                accessibilityLabel={item.label}
-                accessibilityState={{ selected: active }}
-                onPress={() => selectPageScroll(item.value)}
-                style={({ pressed }) => ({
-                  direction: "ltr",
-                  display: "flex",
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  minHeight: 46,
-                  paddingHorizontal: 10,
-                  borderRadius: 12,
-                  backgroundColor: active || pressed ? themeColors.surfaceLow : "transparent",
-                })}
-              >
-                <View
-                  className={`min-w-0 flex-1 items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
-                  style={{ direction: "ltr" }}
-                >
-                  <View className="h-5 w-5 items-center justify-center">
-                    <Icon size={17} color={color} />
-                  </View>
-                  <Text
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      color,
-                      fontFamily: "Manrope_600SemiBold",
-                      fontSize: 13,
-                      lineHeight: 18,
-                      ...textStartStyle(isRTL),
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                    }}
-                    numberOfLines={1}
-                  >
-                    {item.label}
-                  </Text>
-                </View>
-                <View className="h-5 w-5 items-center justify-center">
-                  {active ? <Check size={17} color={color} /> : null}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-    </Modal>
+    <DropdownMenu
+      triggerLabel={s.pageLayoutGroup}
+      items={pageLayoutMenuItems(s, pageScroll, setPageScroll)}
+      align={isRTL ? "end" : "start"}
+      width={240}
+      className="h-11 w-11 bg-surface-high dark:bg-surface-dark-high"
+      triggerIcon={(color) => <ChevronDown size={17} color={color} />}
+    />
   );
 }

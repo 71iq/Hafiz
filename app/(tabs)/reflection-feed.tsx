@@ -269,9 +269,10 @@ export default function ReflectionFeedScreen() {
     sortOptions.find((option) => option.value === sort)?.label ?? s.reflectionFeedSortNewest
   }`;
 
+  // C06: one target through the shared store, then a tab switch; pushing would stack another tab root.
   const handleReferencePress = useCallback((reflection: Reflection) => {
     setPendingDeepLink({ surah: reflection.surah, ayah: reflection.ayah_start });
-    router.push("/(tabs)/mushaf");
+    router.navigate("/(tabs)/mushaf");
   }, []);
 
   const handleCommentAdded = useCallback(

@@ -1,4 +1,5 @@
 import React from "react";
+import { Text } from "react-native";
 import { fireEvent, render } from "@testing-library/react-native";
 import { AyahWordText } from "@/components/mushaf/WordSpan";
 
@@ -65,5 +66,33 @@ describe("RF-184 Android single-Text ayah words", () => {
 
     expect(mockOpenDetail).toHaveBeenCalledTimes(1);
     expect(mockOpenDetail).toHaveBeenCalledWith({ surah: 1, ayah: 1, wordPos: 2, v2Page: 1 });
+  });
+});
+
+describe("ayah end marker gestures in verse view", () => {
+  it("routes a long press that started on the marker to ayah selection, not word detail", () => {
+    const onMarkerLongPress = jest.fn();
+    const onMarkerPress = jest.fn();
+    const view = render(
+      <AyahWordText
+        words={["ﱁ", "ﱂ"]}
+        marker={<Text onPress={onMarkerPress}>{"ﱃ"}</Text>}
+        surah={2}
+        ayah={255}
+        v2Page={42}
+        fontSize={28}
+        lineHeight={50}
+        testID="ayah-text"
+        wordHighlightColor={() => undefined}
+        onMarkerLongPress={onMarkerLongPress}
+      />,
+    );
+
+    fireEvent(view.getByText("ﱃ"), "pressIn");
+    fireEvent(view.getByTestId("ayah-text"), "longPress");
+
+    expect(onMarkerLongPress).toHaveBeenCalledTimes(1);
+    expect(mockOpenDetail).not.toHaveBeenCalled();
+    expect(onMarkerPress).not.toHaveBeenCalled();
   });
 });
