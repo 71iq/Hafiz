@@ -18,6 +18,7 @@ import {
   List,
 } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
@@ -669,7 +670,8 @@ export default function HomeScreen() {
 
         <AppReleaseCard />
 
-        {!user && !authBannerDismissed && (
+        {/* Hidden when accounts are not configured, so it never leads to the unavailable card. */}
+        {!user && !authBannerDismissed && isSupabaseConfigured() && (
           <Card elevation="low" className="p-4 mb-6">
             <View className="flex-row items-start gap-3">
               <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center">

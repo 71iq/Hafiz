@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, type Href } from "expo-router";
+import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { AlertCircle, BarChart3, BookOpen, ChevronLeft, ChevronRight, Trophy } from "lucide-react-native";
 import { AccountSyncPrompt, type AccountSyncPromptProps } from "@/components/auth/AccountSyncPrompt";
 import { Card } from "@/components/ui/Card";
@@ -339,7 +340,11 @@ export default function ProgressScreen() {
             isDark={isDark}
             isRTL={isRTL}
             // Names Progress as the origin so a successful sign-in can return here (W13 allowlist).
-            onPress={() => router.push({ pathname: "/auth/login", params: { returnTo: "progress" } } as Href)}
+            onPress={() => {
+              // W13: the allowlisted return origin brings the guest back to Progress after sign-in.
+              captureAuthReturn({ route: "progress" });
+              router.push("/auth/login");
+            }}
           />
         )}
 

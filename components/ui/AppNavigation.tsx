@@ -336,8 +336,10 @@ function SidebarSeparator({ isDark, isPersistent }: { isDark: boolean; isPersist
 
 /**
  * The profile entry. Signed out it shows Guest with an optional Log in action; while the session
- * restores it shows Signing in; while account data loads it shows a neutral Profile name. No part of
- * the email address is shown. The sync state sits at the end of the card.
+ * restores it shows Signing in; while account data loads it shows a neutral Profile name, and a
+ * fallback profile shows Hafiz user until the real one loads. No part of the email address is shown.
+ * Only a confirmed session end (not a connectivity error) adds the log-in-again line; local progress
+ * stays. The sync state sits at the end of the card.
  */
 function SidebarProfileCard({
   isDark,
@@ -351,7 +353,7 @@ function SidebarProfileCard({
   onNavigate?: () => void;
 }) {
   const s = useStrings();
-  const { user, profile, isInitialized } = useAuthStore();
+  const { user, profile, isInitialized, sessionEnded } = useAuthStore();
   const syncStatus = useSyncStatusView();
   const configured = isSupabaseConfigured();
   const restoring = configured && isInitialized === false;
@@ -361,7 +363,8 @@ function SidebarProfileCard({
       ? s.navigationGuest
       : !profile
         ? s.authProfile
-        : profile.display_name || profile.username || s.navigationHafizUser;
+        : profile.display_name || (profile.is_fallback ? "" : profile.username) || s.navigationHafizUser;
+  const showSessionEnded = configured && !restoring && !user && sessionEnded;
   const nameColor = isPersistent ? "#FDDC91" : isDark ? "#F5F5F4" : "#2D2D2D";
   const handleColor = isPersistent ? NAV_TOKENS.inactiveOnPrimary : isDark ? "#A3A3A3" : "#6E5A47";
   const cardBg = isPersistent
@@ -379,41 +382,56 @@ function SidebarProfileCard({
   };
 
   return (
-    <View
-      className="flex-row items-center gap-2 rounded-2xl px-3 py-2"
-      style={{ backgroundColor: cardBg, direction: isRTL ? "rtl" : "ltr" }}
-    >
-      <Pressable
-        onPress={openProfile}
-        accessibilityRole="button"
-        accessibilityLabel={`${s.authProfile}: ${displayName}`}
-        className="min-h-11 flex-1 flex-row items-center gap-3 py-1"
-        style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
-      >
-        <ProfileIdentity
-          displayName={displayName}
-          username={user && profile ? profile.username : undefined}
-          avatarUrl={user && profile ? profile.avatar_url : undefined}
-          isDark={isDark}
-          isRTL={isRTL}
-          avatarSize={34}
-          nameSize={13}
-          handleSize={10}
-          nameColor={nameColor}
-          handleColor={handleColor}
-        />
-      </Pressable>
-      {restoring ? <BusyIndicator size={14} color={handleColor} /> : null}
-      {!restoring && !user && configured ? (
+    <View className="rounded-2xl px-3 py-2" style={{ backgroundColor: cardBg, direction: isRTL ? "rtl" : "ltr" }}>
+      <View className="flex-row items-center gap-2">
         <Pressable
-          onPress={openLogin}
+          onPress={openProfile}
           accessibilityRole="button"
-          className="min-h-11 items-center justify-center rounded-full px-3"
+          accessibilityLabel={`${s.authProfile}: ${displayName}`}
+          className="min-h-11 flex-1 flex-row items-center gap-3 py-1"
+          style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
         >
-          <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, color: nameColor }}>{s.navigationLogIn}</Text>
+          <ProfileIdentity
+            displayName={displayName}
+            username={user && profile && !profile.is_fallback ? profile.username : undefined}
+            avatarUrl={user && profile ? profile.avatar_url : undefined}
+            isDark={isDark}
+            isRTL={isRTL}
+            avatarSize={34}
+            nameSize={13}
+            handleSize={10}
+            nameColor={nameColor}
+            handleColor={handleColor}
+          />
         </Pressable>
+        {restoring ? <BusyIndicator size={14} color={handleColor} /> : null}
+        {!restoring && !user && configured ? (
+          <Pressable
+            onPress={openLogin}
+            accessibilityRole="button"
+            className="min-h-11 items-center justify-center rounded-full px-3"
+          >
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, color: nameColor }}>{s.navigationLogIn}</Text>
+          </Pressable>
+        ) : null}
+        {user ? <SyncIndicator status={syncStatus} isDark={isDark} hideSuccess onPrimary={isPersistent} /> : null}
+      </View>
+      {showSessionEnded ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{
+            fontFamily: "Manrope_500Medium",
+            fontSize: 12,
+            lineHeight: 17,
+            color: handleColor,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+            paddingBottom: 2,
+          }}
+        >
+          {s.authSessionEnded}
+        </Text>
       ) : null}
-      {user ? <SyncIndicator status={syncStatus} isDark={isDark} hideSuccess onPrimary={isPersistent} /> : null}
     </View>
   );
 }

@@ -70,6 +70,7 @@ import {
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
+import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
@@ -86,9 +87,6 @@ import { useAppReleaseRows } from "@/components/app-update/use-app-release-row";
 type SettingsCategoryId = "general" | "content" | "account" | "about";
 
 // Login and Sign up opened from Account return there; the auth screens own the allowlisted return.
-const ACCOUNT_RETURN = "/settings?category=account";
-const ACCOUNT_LOGIN_HREF = { pathname: "/auth/login", params: { returnTo: ACCOUNT_RETURN } } as const;
-const ACCOUNT_SIGNUP_HREF = { pathname: "/auth/signup", params: { returnTo: ACCOUNT_RETURN } } as const;
 
 type SettingsCategory = {
   id: SettingsCategoryId;
@@ -144,6 +142,11 @@ export default function SettingsScreen() {
   const appVersion = installedAppVersion();
   const syncDetails = useSyncStatusDetails();
   const router = useRouter();
+  // Sign-in from Settings returns to the Account category through the allowlisted return origin (W13).
+  const openAccountAuth = (pathname: "/auth/login" | "/auth/signup") => {
+    captureAuthReturn({ route: "settings-account" });
+    router.push(pathname);
+  };
   const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string }>();
   const configured = isSupabaseConfigured();
   const qfSyncEnabled = isQfSyncEnabled();
@@ -162,8 +165,8 @@ export default function SettingsScreen() {
   const currentTafseerTitle = stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id);
   const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
-  // A neutral Profile label stands in when the profile has no name yet; never part of the email.
-  const accountName = profile?.display_name || profile?.username || s.authProfile;
+  // Never derive a name from the email; a fallback profile reads "Hafiz user" until the real one loads.
+  const accountName = profile?.display_name || profile?.username || (user ? s.navigationHafizUser : s.authProfile);
   // The sign-out confirmation names the account as the person signed in with it.
   const accountIdentity = user?.email || profile?.username || s.authProfile;
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
@@ -930,7 +933,7 @@ export default function SettingsScreen() {
                 {configured ? (
                   <>
                     <Button
-                      onPress={() => router.push(ACCOUNT_LOGIN_HREF)}
+                      onPress={() => openAccountAuth("/auth/login")}
                       disabled={authLoading}
                       accessibilityState={{ disabled: authLoading, busy: authLoading }}
                     >
@@ -942,7 +945,7 @@ export default function SettingsScreen() {
                     {isEmailAuthFlowsEnabled() && (
                       <Button
                         variant="outline"
-                        onPress={() => router.push(ACCOUNT_SIGNUP_HREF)}
+                        onPress={() => openAccountAuth("/auth/signup")}
                         disabled={authLoading}
                         accessibilityState={{ disabled: authLoading, busy: authLoading }}
                       >

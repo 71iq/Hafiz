@@ -246,7 +246,6 @@ describe("RTL higher-level component contracts", () => {
           subtitle="Welcome back"
           appName="Hafiz"
           brandHeadline="Review with care"
-          brandBody="Keep your wird steady"
           backLabel="Back"
           onBack={onBack}
         >

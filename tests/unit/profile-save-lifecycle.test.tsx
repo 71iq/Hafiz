@@ -76,7 +76,10 @@ jest.mock("@/lib/fsrs/queries", () => ({
 }));
 jest.mock("@/lib/fsrs/leaderboard-sync", () => ({ updateProfileStats: async () => undefined }));
 jest.mock("@/lib/fsrs/review-events", () => ({ subscribeReviewActivity: () => () => undefined }));
-jest.mock("@/lib/sync/events", () => ({ subscribeSyncCompleted: () => () => undefined }));
+jest.mock("@/lib/sync/events", () => ({
+  subscribeSyncCompleted: () => () => undefined,
+  subscribeSyncQueued: () => () => undefined,
+}));
 jest.mock("@/lib/leaderboard/api", () => ({
   fetchPublicProfile: async () => null,
   fetchPublicAchievementUnlocks: async () => [],

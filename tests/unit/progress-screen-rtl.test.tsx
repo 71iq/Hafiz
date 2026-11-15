@@ -1,4 +1,5 @@
 import { textStartStyle } from "@/lib/ui/direction";
+import { peekAuthReturn } from "@/lib/auth/return-origin";
 import React from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { ScrollView } from "react-native";
@@ -246,7 +247,9 @@ describe("ProgressScreen RTL behavior", () => {
 
     await fireEvent.press(arabicButton);
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
-    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/auth/login", params: { returnTo: "progress" } });
+    expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
+    // The return to Progress is captured through the allowlisted origin, not a URL parameter.
+    expect(peekAuthReturn()).toEqual({ route: "progress" });
 
     arabic.unmount();
     mockSettings.isRTL = false;
@@ -295,7 +298,9 @@ describe("ProgressScreen RTL behavior", () => {
 
     await fireEvent.press(englishButton);
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
-    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/auth/login", params: { returnTo: "progress" } });
+    expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
+    // The return to Progress is captured through the allowlisted origin, not a URL parameter.
+    expect(peekAuthReturn()).toEqual({ route: "progress" });
   });
 
   it.each([

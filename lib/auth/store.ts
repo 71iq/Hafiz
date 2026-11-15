@@ -21,6 +21,9 @@ import { captureQfRequestOwner } from "@/lib/quran-foundation/request-owner";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import type { AuthState, AuthActions, Profile, AuthActionHandle, SignUpResult } from "@/lib/auth/types";
 import { errorMessage } from "@/lib/error-message";
+import { clearAuthHandoff } from "@/lib/auth/form-handoff";
+import { clearAuthReturn } from "@/lib/auth/return-origin";
+import { subscribeSyncCompleted, subscribeSyncQueued } from "@/lib/sync/events";
 
 type AuthStore = AuthState & AuthActions;
 
@@ -84,30 +87,37 @@ function publishProfileRead(
   return incoming;
 }
 
-function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
+/**
+ * The profile shown while the real row cannot be read. It never derives a name from the email:
+ * the username stays empty, so screens show the neutral "Hafiz user" until the real profile loads.
+ * A display name the person chose at signup is kept. The next sync retries the read.
+ */
+export function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
   const metadata = user.user_metadata ?? {};
-  const emailName = user.email?.split("@")[0];
-  const providerName =
-    metadata.username || metadata.preferred_username || metadata.name || metadata.full_name || metadata.sub;
-  const suffix = user.id.replace(/-/g, "").slice(0, 8);
-  const baseName = emailName || providerName || `user_${suffix}`;
-  const sanitized =
-    String(baseName)
-      .replace(/[^a-zA-Z0-9_]/g, "_")
-      .replace(/^_+|_+$/g, "") || "user";
-  const username = emailName
-    ? sanitized.slice(0, 20)
-    : `${sanitized.slice(0, Math.max(3, 19 - suffix.length))}_${suffix}`.slice(0, 20);
-
+  const displayName = typeof metadata.display_name === "string" ? metadata.display_name.trim() : "";
   return {
     id: user.id,
-    username,
-    display_name: typeof metadata.display_name === "string" ? metadata.display_name : null,
+    username: "",
+    display_name: displayName || null,
     avatar_url: null,
     bio: null,
     country: null,
     created_at: user.created_at,
+    is_fallback: true,
   };
+}
+
+/** A valid username for a missing profile row: a provider handle or user_<id>, never the email. */
+export function buildInsertUsername(user: NonNullable<AuthState["user"]>): string {
+  const metadata = user.user_metadata ?? {};
+  const providerName = metadata.username || metadata.preferred_username || metadata.user_name;
+  const suffix = user.id.replace(/-/g, "").slice(0, 8);
+  const sanitized =
+    typeof providerName === "string" && !providerName.includes("@")
+      ? providerName.replace(/[^a-zA-Z0-9_]/g, "_").replace(/^_+|_+$/g, "")
+      : "";
+  if (sanitized.length >= 3) return `${sanitized.slice(0, Math.max(3, 19 - suffix.length))}_${suffix}`.slice(0, 20);
+  return `user_${suffix}`;
 }
 
 function connectQfSessionIfAvailable(session: AuthState["session"]): void {
@@ -126,7 +136,7 @@ function buildProfileInsert(user: NonNullable<AuthState["user"]>) {
   const profile = buildFallbackProfile(user);
   return {
     id: profile.id,
-    username: profile.username,
+    username: buildInsertUsername(user),
     display_name: profile.display_name,
   };
 }
@@ -144,13 +154,18 @@ export function getPasswordResetRedirectTo(): string {
   return `${getEmailRedirectTo() ?? PUBLIC_WEB_ORIGIN}/auth/reset-password`;
 }
 
-function setSessionIdentity({ session, user }: Pick<AuthState, "session" | "user">): void {
+function setSessionIdentity({ session, user }: Pick<AuthState, "session" | "user">, sessionEnded?: boolean): void {
   useAuthStore.setState((state) => ({
     session,
     user,
     profile: user && state.user?.id === user.id && state.profile?.id === user.id ? state.profile : null,
+    // A new signed-in session clears an earlier "session ended" notice.
+    sessionEnded: sessionEnded ?? (user ? false : state.sessionEnded),
   }));
 }
+
+// Sign-outs started on this device are deliberate, so their SIGNED_OUT is not reported as expiry.
+let deliberateSignOuts = 0;
 
 // SDK notifications can renew credentials while the provider response is pending.
 // Keep the current matching session rather than republishing the callback snapshot.
@@ -259,8 +274,14 @@ export function finishPasswordRecovery(owner: AuthOwner) {
   return authCommands.owned(
     owner,
     async () => {
-      const { error } = await signOutOwnedSession(owner, useAuthStore.getState().session);
-      if (error) throw error;
+      // Leaving a recovery session is deliberate; Login shows the saved-password notice instead.
+      deliberateSignOuts += 1;
+      try {
+        const { error } = await signOutOwnedSession(owner, useAuthStore.getState().session);
+        if (error) throw error;
+      } finally {
+        deliberateSignOuts -= 1;
+      }
     },
     true,
   );
@@ -273,6 +294,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   profile: null,
   isLoading: false,
   isInitialized: false,
+  sessionEnded: false,
   error: null,
 
   // ─── Actions ────────────────────────────────────────────────
@@ -298,13 +320,19 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             data: { subscription },
           } = supabase.auth.onAuthStateChange((_event, session) => {
             if (!active) return;
+            const duringStartup = acceptsStartupSession;
             if (_event === "INITIAL_SESSION") {
               if (!acceptsStartupSession || !canRestoreAuthSession(readOwner, session)) return;
               acceptsStartupSession = false;
             } else {
               acceptsStartupSession = false;
             }
-            setSessionIdentity({ session, user: session?.user ?? null });
+            // The SDK publishes SIGNED_OUT when it removes a stored session it could not renew at
+            // startup, or a signed-in session ends (renewal rejected, or another tab signed out).
+            // Transient network failures keep the session and publish nothing. Sign-outs started on
+            // this device, and a guest's own sign-up or sign-in commands, are not reported.
+            const ended = _event === "SIGNED_OUT" && deliberateSignOuts === 0 && (get().user !== null || duringStartup);
+            setSessionIdentity({ session, user: session?.user ?? null }, _event === "SIGNED_OUT" ? ended : undefined);
             if (session?.user) {
               connectQfSessionIfAvailable(session);
               get().ensureProfile();
@@ -322,6 +350,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             data: { session },
             error,
           } = await supabase.auth.getSession();
+          // A rejected refresh token confirms expiry; a retryable fetch error is only connectivity.
+          if (error?.name === "AuthApiError" && !get().sessionEnded && !get().session) set({ sessionEnded: true });
           if (error) throw error;
           if (session && acceptsStartupSession && canRestoreAuthSession(readOwner, session)) {
             acceptsStartupSession = false;
@@ -467,13 +497,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   signOut: async () =>
     authCommands.transition(async () => {
       const loading = beginAuthLoading();
+      deliberateSignOuts += 1;
       try {
         const { error } = await supabase.auth.signOut({ scope: "local" });
         if (error) throw error;
       } catch (err) {
         console.warn("[Auth] Sign out error:", errorMessage(err));
       } finally {
-        set({ session: null, user: null, profile: null, error: null });
+        deliberateSignOuts -= 1;
+        set({ session: null, user: null, profile: null, error: null, sessionEnded: false });
         loading.finish();
       }
     }),
@@ -606,4 +638,26 @@ useAuthStore.subscribe((state, previous) => {
   if (state.user?.id !== previous.user?.id || state.session !== previous.session) {
     profileOwnerGeneration += 1;
   }
+  if (state.user?.id !== previous.user?.id) {
+    // Typed auth form values belong to the identity they were typed for.
+    clearAuthHandoff();
+    // A sign-out or account switch abandons a pending return; a guest's first sign-in consumes it.
+    if (previous.user) clearAuthReturn();
+  }
 });
+
+// A fallback profile is replaced by the real row on the next sync, without a remount.
+let fallbackRetry: Promise<unknown> | null = null;
+function retryFallbackProfile(): void {
+  const { user, profile } = useAuthStore.getState();
+  if (!user || !profile?.is_fallback || profile.id !== user.id || fallbackRetry) return;
+  fallbackRetry = useAuthStore
+    .getState()
+    .ensureProfile()
+    .catch(() => null)
+    .finally(() => {
+      fallbackRetry = null;
+    });
+}
+subscribeSyncCompleted(retryFallbackProfile);
+subscribeSyncQueued(retryFallbackProfile);

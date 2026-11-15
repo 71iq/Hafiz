@@ -28,7 +28,7 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
   {
     file: "components/auth/AuthScreenShell.tsx",
     pattern: /left|right|borderLeftWidth|borderRightWidth/,
-    reason: "Auth shell contains non-mirrored brand art and decorative coordinate-based botanical lines.",
+    reason: "Auth shell picks the directional ChevronLeft/ChevronRight back icon by locale; rows pin ltr and mirror explicitly.",
   },
   {
     file: "components/mushaf/AyahBlock.tsx",
