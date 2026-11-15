@@ -240,6 +240,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   ),
   entry("components/mushaf/BookmarksSheet.tsx", "overlay", "playwright", "Bookmark rows and sheet actions mirror."),
   entry(
+    "components/mushaf/DetailTabRow.tsx",
+    "tab-segmented",
+    "rntl",
+    "Text tab row follows UI direction; the active tab scrolls into view with an edge fade on the hidden side.",
+  ),
+  entry(
     "components/mushaf/FocusModeControls.tsx",
     "mushaf-reading",
     "source",
@@ -323,6 +329,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "overlay",
     "source",
     "Reader settings sheet rows and controls mirror.",
+  ),
+  entry(
+    "components/mushaf/RecitationPlayerBar.tsx",
+    "mushaf-reading",
+    "rntl",
+    "Player controls and labels mirror; the reference stays an LTR-isolated token.",
   ),
   entry(
     "components/mushaf/RecitationRangeSheet.tsx",
@@ -420,6 +432,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "tab-segmented",
     "source",
     "Morphology rows mirror while Arabic text stays RTL.",
+  ),
+  entry(
+    "components/notes/AyahEditorPreview.tsx",
+    "quran-text",
+    "source",
+    "Quran preview is RTL content; the localized reference follows the UI direction.",
   ),
   entry("components/notes/PrivateNoteSheet.tsx", "overlay", "source", "Note editor sheet chrome and actions mirror."),
   entry(
@@ -622,6 +640,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Teacher view sheet; stage and grade rows mirror and cards read as pages or ayahs in the interface digits.",
   ),
   entry(
+    "components/sync/RestoreConsent.tsx",
+    "overlay",
+    "rntl",
+    "Reuses ConfirmDialog; counts use locale digits and the paused pill mirrors.",
+  ),
+  entry(
     "components/ui/AppNavigation.tsx",
     "app-shell",
     "source",
@@ -704,6 +728,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "app-shell",
     "source",
     "Content gutters and sidebar offsets use direction-aware padding.",
+  ),
+  entry(
+    "components/ui/SecondaryDestinations.tsx",
+    "app-shell",
+    "rntl",
+    "Halaqa, Board and Journey rows mirror their chevrons and labels.",
   ),
   entry(
     "components/ui/Sheet.tsx",

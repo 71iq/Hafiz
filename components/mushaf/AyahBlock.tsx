@@ -10,6 +10,9 @@ import {
 import { useRecyclingState } from "@shopify/flash-list";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
+import { useHasQiraat } from "@/lib/qiraat/availability";
+import { inverseSurfaceColors } from "@/lib/ui/inverse-surface";
+import { TooltipBubble } from "@/components/mushaf/ReaderToolbar";
 import { formatAyahRef } from "@/lib/arabic";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import { useSelection } from "@/lib/selection/context";
@@ -93,6 +96,7 @@ function AyahBlockInner({
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
+  const hasQiraat = useHasQiraat(db, surah, ayah);
   const {
     recitationId,
     isRTL,
@@ -598,12 +602,15 @@ function AyahBlockInner({
               isRTL={isRTL}
             />
           )}
-          <ActionPill
-            label={s.wordTabQiraat}
-            icon={<BookOpenText size={14} color={iconColor} />}
-            onPress={() => openDetail("qiraat")}
-            isRTL={isRTL}
-          />
+          {/* Shown when the ayah has Qira'at data, or when that could not be read (the tab reports it). */}
+          {hasQiraat !== false ? (
+            <ActionPill
+              label={s.wordTabQiraat}
+              icon={<BookOpenText size={14} color={iconColor} />}
+              onPress={() => openDetail("qiraat")}
+              isRTL={isRTL}
+            />
+          ) : null}
           <ActionPill
             label={s.privateNotes}
             icon={<NotebookPen size={14} color={iconColor} />}
@@ -634,23 +641,41 @@ function ActionIcon({
   disabled?: boolean;
   accessibilityLabel?: string;
 }) {
+  const { isDark } = useSettings();
+  const [tooltip, setTooltip] = useState(false);
+  // Web shows the icon's name on hover or keyboard focus, as the reader toolbar does.
+  const webTooltipProps =
+    Platform.OS === "web" && accessibilityLabel
+      ? ({
+          onHoverIn: () => setTooltip(true),
+          onHoverOut: () => setTooltip(false),
+          onFocus: () => setTooltip(true),
+          onBlur: () => setTooltip(false),
+        } as Record<string, unknown>)
+      : {};
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      hitSlop={8}
-      {...readerControlProps}
-      className="h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
-      style={{
-        opacity: disabled ? 0.45 : 1,
-        // @ts-ignore — cursor is valid on web
-        cursor: disabled ? "auto" : "pointer",
-      }}
-    >
-      {icon}
-    </Pressable>
+    <View style={{ position: "relative" }}>
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        hitSlop={8}
+        {...readerControlProps}
+        {...webTooltipProps}
+        className="h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
+        style={{
+          opacity: disabled ? 0.45 : 1,
+          // @ts-ignore — cursor is valid on web
+          cursor: disabled ? "auto" : "pointer",
+        }}
+      >
+        {icon}
+      </Pressable>
+      {tooltip && accessibilityLabel ? (
+        <TooltipBubble label={accessibilityLabel} colors={inverseSurfaceColors(isDark)} offset={36} />
+      ) : null}
+    </View>
   );
 }
 

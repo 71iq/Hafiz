@@ -262,11 +262,20 @@ function ToolbarTooltip({ label, children }: { label: string; children: ReactNod
   );
 }
 
-function TooltipBubble({ label, colors }: { label: string; colors: ReturnType<typeof inverseSurfaceColors> }) {
+export function TooltipBubble({
+  label,
+  colors,
+  offset = TOOLBAR_TARGET + 4,
+}: {
+  label: string;
+  colors: ReturnType<typeof inverseSurfaceColors>;
+  /** Distance from the top of the anchored control. */
+  offset?: number;
+}) {
   return (
     <View
       pointerEvents="none"
-      style={{ position: "absolute", top: TOOLBAR_TARGET + 4, start: -60, end: -60, alignItems: "center", zIndex: 100 }}
+      style={{ position: "absolute", top: offset, start: -60, end: -60, alignItems: "center", zIndex: 100 }}
     >
       <View
         style={{
