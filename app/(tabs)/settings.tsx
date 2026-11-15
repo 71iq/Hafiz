@@ -149,7 +149,8 @@ export default function SettingsScreen() {
   const currentTafseerTitle = stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id);
   const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
-  const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
+  // Never derive a name from the email; a fallback profile reads "Hafiz user" until the real one loads.
+  const accountName = profile?.display_name || profile?.username || (user ? s.navigationHafizUser : s.authProfile);
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
   const [quranPreview, setQuranPreview] = useState<QuranPreviewAyah | null>(null);
   const quranPreviewFontReady = useQuranPageFontReady(quranRenderFontStyle, quranPreview?.v2Page);
@@ -876,12 +877,15 @@ export default function SettingsScreen() {
                   isDark={isDark}
                   isRTL={isRTL}
                 />
-                <Button onPress={() => router.push("/auth/login")} disabled={authLoading}>
-                  <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
-                    {s.authLogin}
-                  </Text>
-                </Button>
-                {isEmailAuthFlowsEnabled() && (
+                {/* Accounts not configured on this build: no entry point that would only reach the unavailable card. */}
+                {configured && (
+                  <Button onPress={() => router.push("/auth/login")} disabled={authLoading}>
+                    <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+                      {s.authLogin}
+                    </Text>
+                  </Button>
+                )}
+                {configured && isEmailAuthFlowsEnabled() && (
                   <Button variant="outline" onPress={() => router.push("/auth/signup")} disabled={authLoading}>
                     <Text
                       className="text-charcoal dark:text-neutral-200"

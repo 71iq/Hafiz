@@ -270,6 +270,7 @@ async function setup(
     profile: null,
     isLoading: false,
     isInitialized: false,
+    sessionEnded: false,
     error: null,
   });
   mockLastPasswordError = null;
@@ -1575,6 +1576,11 @@ it("real runtime/store preserves cleanup for a refresh failure that was actually
     expect(f.values.has(f.key + "-code-verifier")).toBe(false);
     expect(useAuthStore.getState().session).toBeNull();
     expect(late).toHaveBeenCalledTimes(1);
+    // A rejected renewal is a confirmed session end, so the profile card can say so.
+    expect(useAuthStore.getState().sessionEnded).toBe(true);
+    // A deliberate sign-out on this device is not reported as an ended session.
+    await useAuthStore.getState().signOut();
+    expect(useAuthStore.getState().sessionEnded).toBe(false);
     listener.unsubscribe();
   } finally {
     await f.close();

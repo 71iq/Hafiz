@@ -1,6 +1,7 @@
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { useAuthStore } from "@/lib/auth/store";
 import type { Profile } from "@/lib/auth/types";
+import { emitSyncCompleted, emitSyncQueued } from "@/lib/sync/events";
 
 type Response = { data: Profile | null; error: Error | null };
 type ProfileChain = {
@@ -77,6 +78,17 @@ const session = (id: string): Session => ({
   token_type: "bearer",
   expires_in: 3600,
   user: user(id),
+});
+// The neutral stand-in: no name from the email (user(id) has one), replaced once the row loads.
+const fallbackProfile = (id: string): Profile => ({
+  id,
+  username: "",
+  display_name: null,
+  avatar_url: null,
+  bio: null,
+  country: null,
+  created_at: "2026-01-01",
+  is_fallback: true,
 });
 const profile = (id: string, name = id): Profile => ({
   id,
@@ -218,7 +230,7 @@ it.each(actions.flatMap((action) => ["error", "rejection"].map((outcome) => ({ a
     const work = useAuthStore.getState()[action]();
     finish(pending, outcome);
     const result = await work;
-    expect(useAuthStore.getState().profile).toEqual({ ...profile("a", "a"), display_name: null });
+    expect(useAuthStore.getState().profile).toEqual(fallbackProfile("a"));
     expect(result).toBe(action === "ensureProfile" ? useAuthStore.getState().profile : undefined);
     expect(console.warn).toHaveBeenCalledTimes(1);
   },
@@ -235,11 +247,10 @@ it.each(["success", "empty", "error", "rejection"])(
     await Promise.resolve();
     finish(pending, outcome);
     const result = await work;
-    expect(result).toEqual(
-      outcome === "success" ? profile("a", "old-a") : { ...profile("a", "a"), display_name: null },
-    );
+    expect(result).toEqual(outcome === "success" ? profile("a", "old-a") : fallbackProfile("a"));
     expect(useAuthStore.getState().profile).toBe(result);
-    expect(mockInsert).toHaveBeenCalledWith({ id: "a", username: "a", display_name: null });
+    // The inserted username comes from the account id, never from the email address.
+    expect(mockInsert).toHaveBeenCalledWith({ id: "a", username: "user_a", display_name: null });
   },
 );
 
@@ -386,3 +397,25 @@ it.each(["success", "empty", "error", "rejection"])(
     expect(useAuthStore.getState().profile).toBe(newer);
   },
 );
+
+it.each([
+  ["completed", () => emitSyncCompleted({ pushed: 1, pulled: 0 })],
+  ["queued", () => emitSyncQueued()],
+] as const)("replaces the neutral fallback with the real profile on the next %s sync", async (_name, sync) => {
+  activate(session("a"), fallbackProfile("a"));
+  const real = profile("a", "real-a");
+  mockReads.push(Promise.resolve({ data: real, error: null }));
+  sync();
+  // A second trigger while the read is pending does not start another read.
+  sync();
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  expect(useAuthStore.getState().profile).toEqual(real);
+  expect(mockFrom).toHaveBeenCalledTimes(1);
+});
+
+it("does not re-read a real profile on sync", async () => {
+  activate(session("a"), profile("a"));
+  emitSyncCompleted({ pushed: 1, pulled: 0 });
+  await Promise.resolve();
+  expect(mockFrom).not.toHaveBeenCalled();
+});
