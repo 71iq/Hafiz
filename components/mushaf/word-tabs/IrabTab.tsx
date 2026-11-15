@@ -7,6 +7,7 @@ import {
 } from "@/lib/word/queries";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
+import { textStartStyle } from "@/lib/ui/direction";
 import { useDelayedLoading } from "./use-delayed-loading";
 
 type Props = {
@@ -91,7 +92,7 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
       {uiLanguage !== "ar" ? (
         <Text
           className="mb-3 text-warm-500 dark:text-neutral-400"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20, textAlign: "left", writingDirection: "ltr" }}
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20, ...textStartStyle(false), writingDirection: "ltr" }}
         >
           {s.irabArabicOnly}
         </Text>

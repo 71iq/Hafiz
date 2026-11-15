@@ -87,9 +87,9 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     reason: "Dropdown placement uses measured trigger coordinates before internal menu rows mirror.",
   },
   {
-    file: "components/ui/OfflineBanner.tsx",
-    pattern: /left|right/,
-    reason: "Offline banner is centered with full-width absolute positioning.",
+    file: "components/ui/ResponsiveOverlay.tsx",
+    pattern: /paddingRight/,
+    reason: "Body scroll lock pads by the measured document scrollbar width so the page does not shift; it restores the previous value.",
   },
   {
     file: "components/ui/Skeleton.tsx",
