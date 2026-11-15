@@ -108,3 +108,11 @@ export function formatPlaces(n: number, language: Language): string {
   if (language === "ar") return arabicCount(n, OCCURRENCES);
   return n === 1 ? "1 place" : `${n.toLocaleString("en")} places`;
 }
+
+const JUZ: ArabicForms = { one: "جزء واحد", two: "جزآن", few: "أجزاء", many: "جزءًا" };
+
+/** Whole juz: "1 juz", "3 juz", "جزآن", "٣ أجزاء". */
+export function formatJuz(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, JUZ);
+  return `${n.toLocaleString("en")} juz`;
+}

@@ -46,6 +46,16 @@ export const homeSearchStrings = {
     achievementRarityRare: "Rare",
     achievementRarityEpic: "Epic",
     achievementRarityLegendary: "Legendary",
+    // Setup
+    setupLanguageHint: "Change the app language",
+    setupRetry: "Retry",
+    setupSavingAnnouncement: "Saving",
+    setupSurahSearchPlaceholder: "Search by name or number, e.g. Al-Mulk or 67",
+    setupSelectResults: "Select results",
+    setupClearResults: "Clear results",
+    setupNoSurahMatches: 'No surahs match "{{query}}"',
+    setupSurahsLoading: "Loading surahs...",
+    setupSurahsLoadFailed: "Could not load the surah list.",
   },
   ar: {
     // Search
@@ -91,5 +101,15 @@ export const homeSearchStrings = {
     achievementRarityRare: "نادر",
     achievementRarityEpic: "ملحمي",
     achievementRarityLegendary: "أسطوري",
+    // Setup
+    setupLanguageHint: "تغيير لغة التطبيق",
+    setupRetry: "إعادة المحاولة",
+    setupSavingAnnouncement: "جارٍ الحفظ",
+    setupSurahSearchPlaceholder: "ابحث بالاسم أو الرقم، مثل الملك أو ٦٧",
+    setupSelectResults: "اختر النتائج",
+    setupClearResults: "ألغِ اختيار النتائج",
+    setupNoSurahMatches: 'لا سور تطابق "{{query}}"',
+    setupSurahsLoading: "جارٍ تحميل السور...",
+    setupSurahsLoadFailed: "تعذر تحميل قائمة السور.",
   },
 } as const;
