@@ -264,7 +264,6 @@ export function SelectionActionBar() {
         ayahStart={selection.start.ayah}
         ayahEnd={selection.end.ayah}
         ayahPreview={`${formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}${selection.start.ayah !== selection.end.ayah ? `-${formatAyahRef(isRTL, selection.end.ayah)}` : ""}`}
-        onSuccess={() => showToast(s.reflectionPosted)}
       />
     )}
     {selection && (
@@ -278,7 +277,6 @@ export function SelectionActionBar() {
         ayahStart={selection.start.ayah}
         ayahEnd={selection.end.ayah}
         ayahPreview={`${formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}${selection.start.ayah !== selection.end.ayah ? `-${formatAyahRef(isRTL, selection.end.ayah)}` : ""}`}
-        onSaved={() => showToast(s.privateNoteSaved)}
       />
     )}
     </>
