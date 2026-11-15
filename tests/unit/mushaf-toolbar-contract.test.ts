@@ -94,8 +94,14 @@ describe.each(["en", "ar"] as const)("Reader toolbar at 320px (%s)", (locale) =>
 
   it("names the hide toggle for what it does next and leaves the phone row without a chevron", () => {
     const s = strings[locale];
-    render(toolbar(320, { hideActive: true, isPageMode: true }));
+    render(toolbar(320, { hideActive: true, isPageMode: false }));
     expect(screen.getByLabelText(s.readerShowAyahText)).toBeTruthy();
+  });
+
+  it("labels the page-view eye button as the page reveal mode with selected state", () => {
+    const s = strings[locale];
+    render(toolbar(320, { hideActive: true, isPageMode: true }));
+    expect(screen.getByLabelText(s.revealPageMode)).toBeTruthy();
     expect(screen.queryByLabelText(s.pageLayoutGroup)).toBeNull();
     expect(screen.getAllByRole("button")).toHaveLength(6);
   });

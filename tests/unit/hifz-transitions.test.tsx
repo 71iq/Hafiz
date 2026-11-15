@@ -207,9 +207,13 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     if (enable) fireEvent.press(hideToggle(view));
     return view;
   }
-  // The shared eye toolbar button is named for what it does next.
+  // The shared eye toolbar button: verse view names what it does next, page view is the reveal mode.
   function hideToggle(view: ReturnType<typeof render>) {
-    return view.queryByLabelText(s.readerHideAyahText) ?? view.getByLabelText(s.readerShowAyahText);
+    return (
+      view.queryByLabelText(s.readerHideAyahText) ??
+      view.queryByLabelText(s.readerShowAyahText) ??
+      view.getByLabelText(s.revealPageMode)
+    );
   }
   function press(view: ReturnType<typeof render>, label: string) {
     fireEvent.press(view.getByRole("button", { name: label }));

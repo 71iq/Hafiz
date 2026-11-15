@@ -87,7 +87,8 @@ export function ReaderToolbar({
     current: isPageMode ? s.mushafViewPage : s.mushafViewVerse,
     next: isPageMode ? s.mushafViewVerse : s.mushafViewPage,
   });
-  const hideLabel = hideActive ? s.readerShowAyahText : s.readerHideAyahText;
+  // Verse view hides ayah text; page view toggles the page reveal mode (selected state shows it is on).
+  const hideLabel = isPageMode ? s.revealPageMode : hideActive ? s.readerShowAyahText : s.readerHideAyahText;
   const ModeIcon = isPageMode ? BookOpen : AlignJustify;
 
   const moreItems: DropdownMenuItem[] = [];
