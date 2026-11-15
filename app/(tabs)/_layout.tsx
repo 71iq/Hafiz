@@ -1,6 +1,7 @@
-import { View } from "react-native";
+import { useEffect, useMemo, type ReactNode } from "react";
+import { Platform, View } from "react-native";
 import { Tabs } from "expo-router";
-import { Sparkles, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked, Users } from "lucide-react-native";
+import { House, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked, Users } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -8,25 +9,34 @@ import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { AppNavigation } from "@/components/ui/AppNavigation";
 import { useSync } from "@/lib/sync/useSync";
-import { SyncIndicator } from "@/components/ui/SyncIndicator";
-import { Toast } from "@/components/ui/Toast";
+import { SyncStatusProvider } from "@/components/ui/SyncIndicator";
+import { RestoreConsentDialog, SyncPausedStatus } from "@/components/sync/RestoreConsent";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChromeProvider, useChrome } from "@/lib/ui/chrome";
 import { StatusBar } from "expo-status-bar";
+import { isSearchShortcut, openSearch } from "@/lib/navigation/search-launcher";
 
-function SyncOverlay() {
-  const { status, accountRestoreNotice, dismissAccountRestoreNotice } = useSync();
-  const { isDark, isRTL } = useSettings();
+/**
+ * The one sync runner for the tabs. Its status reaches the profile card and account row through
+ * context; there is no floating indicator over screens. A paused restore (W07) keeps one persistent
+ * Resume sync affordance, and the restore consent confirmation lives beside the results it answers.
+ */
+function SyncOwner({ children }: { children: ReactNode }) {
+  const { immersive } = useChrome();
+  const { status, pendingCount, failure, lastSyncedAt, syncNow } = useSync();
+  const details = useMemo(
+    () => ({ status, pendingCount, failure, lastSyncedAt, syncNow }),
+    [status, pendingCount, failure, lastSyncedAt, syncNow],
+  );
+  const { isRTL } = useSettings();
   const insets = useSafeAreaInsets();
-  const s = useStrings();
-
-  if (status === "idle" && !accountRestoreNotice) return null;
 
   return (
-    <>
-      {status !== "idle" ? (
+    <SyncStatusProvider value={details}>
+      {children}
+      {!immersive ? (
         <View
           style={{
             position: "absolute",
@@ -34,18 +44,29 @@ function SyncOverlay() {
             ...(isRTL ? { left: 16 } : { right: 16 }),
             zIndex: 100,
           }}
-          pointerEvents="none"
+          pointerEvents="box-none"
         >
-          <SyncIndicator status={status} isDark={isDark} />
+          <SyncPausedStatus />
         </View>
       ) : null}
-      <Toast
-        message={accountRestoreNotice ? s.syncAccountRestoredNotice : null}
-        onDismiss={dismissAccountRestoreNotice}
-        duration={5000}
-      />
-    </>
+      <RestoreConsentDialog />
+    </SyncStatusProvider>
   );
+}
+
+/** Ctrl/Cmd+K and `/` open the existing Search outside text editing and open overlays (web). */
+function useSearchShortcut() {
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isSearchShortcut(event)) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      event.preventDefault();
+      openSearch();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 }
 
 // Home is the tab navigator's initial route so Back never lands on the hidden index redirect.
@@ -57,11 +78,11 @@ function TabsWithStrings() {
   const { isDark, isRTL, uiLanguage, themeSurface } = useSettings();
   const { immersive } = useChrome();
   const s = useStrings();
+  useSearchShortcut();
 
   return (
     <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeSurface} />
-      {!immersive && <SyncOverlay />}
       {!immersive && <OfflineBanner uiLanguage={uiLanguage} />}
       <Tabs
         // Android Back from a tab returns to Home, then leaves the app. The hidden index route only
@@ -71,6 +92,10 @@ function TabsWithStrings() {
           headerShown: false,
         }}
         tabBar={(props) => <AppNavigation {...props} isRTL={isRTL} />}
+        // Each tab has its own boundary, so a crash keeps the tab bar and sidebar usable.
+        screenLayout={({ children, route }) => (
+          <ErrorBoundary section={`tab:${route.name}`}>{children}</ErrorBoundary>
+        )}
       >
         {/* Home is declared first: the router takes the first screen as the initial route that
             backBehavior returns to, so the hidden index redirect must not come first (Back from Home
@@ -80,7 +105,7 @@ function TabsWithStrings() {
           options={{
             title: s.tabHome,
             tabBarIcon: ({ color, size }) => (
-              <Sparkles
+              <House
                 size={size}
                 color={color}
                 fill="none"
@@ -125,8 +150,9 @@ function TabsWithStrings() {
             ),
           }}
         />
-        {/* Visible tabs after Home: Mushaf, Halaqa, Board, Progress, Settings. Halaqa is the main social
-            tab and comes before the secondary Board (spec 5.7). The Board keeps the leaderboard route. */}
+        {/* Phones show Home, Mushaf, Progress and Settings (AppNavigation PHONE_TAB_ROUTES); Halaqa and
+            Board are reached from labeled rows on Home and Progress. From 768px the panel and sidebar
+            list all six destinations. The Board keeps the leaderboard route. */}
         <Tabs.Screen
           name="mushaf"
           options={{
@@ -212,7 +238,9 @@ export default function TabLayout() {
   return (
     <ChromeProvider>
       <ErrorBoundary section="TabLayout">
-        <TabsWithStrings />
+        <SyncOwner>
+          <TabsWithStrings />
+        </SyncOwner>
       </ErrorBoundary>
     </ChromeProvider>
   );

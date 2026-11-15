@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import Head from "expo-router/head";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { strings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
@@ -15,6 +16,10 @@ export default function QaReadyScreen() {
 
   return (
     <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
+      {/* A test probe, not a page for search engines. The QA_* tokens below stay in English for tooling. */}
+      <Head>
+        <meta name="robots" content="noindex, nofollow" />
+      </Head>
       <Text
         className="text-charcoal dark:text-neutral-100"
         style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}

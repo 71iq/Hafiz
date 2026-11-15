@@ -1,4 +1,13 @@
-import { Fragment, memo, useCallback, useRef, type ReactNode } from "react";
+import {
+  Fragment,
+  cloneElement,
+  isValidElement,
+  memo,
+  useCallback,
+  useRef,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { Text, type GestureResponderEvent, type StyleProp, type TextStyle } from "react-native";
 import { useSettings } from "@/lib/settings/context";
 import { useWordInteraction } from "@/lib/word/context";
@@ -15,6 +24,7 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   highlightColor?: string;
+  arrivalWash?: string;
   /** ERR-06: nested text cannot hold a separate mark, so a weak spot is a solid underline. */
   weakSpot?: boolean;
   onPressIn?: (wordPos: number) => void;
@@ -34,6 +44,7 @@ function WordSpanInner({
   fontSize,
   lineHeight,
   highlightColor,
+  arrivalWash,
   weakSpot = false,
   onPressIn,
 }: Props) {
@@ -50,11 +61,13 @@ function WordSpanInner({
     [press, fontSize, lineHeight],
   );
 
-  const backgroundColor = highlightColor
-    ? highlightColor + "20"
-    : isTooltipSelected
-      ? "rgba(13, 148, 136, 0.08)"
-      : undefined;
+  const backgroundColor = arrivalWash
+    ? arrivalWash
+    : highlightColor
+      ? highlightColor + "20"
+      : isTooltipSelected
+        ? "rgba(13, 148, 136, 0.08)"
+        : undefined;
 
   return (
     <Text
@@ -95,8 +108,13 @@ type AyahWordTextProps = {
   style?: StyleProp<TextStyle>;
   testID?: string;
   wordHighlightColor: (wordPos: number) => string | undefined;
+  wordArrivalWash?: (wordPos: number) => string | undefined;
   wordWeakSpot?: (wordPos: number) => boolean;
+  /** Long press on the nested end marker selects the ayah (Android delivers it to the ayah Text). */
+  onMarkerLongPress?: () => void;
 };
+
+const MARKER = "marker" as const;
 
 /**
  * One Text for a whole ayah with nested word spans. Android does not deliver long presses to nested
@@ -114,21 +132,30 @@ export function AyahWordText({
   style,
   testID,
   wordHighlightColor,
+  wordArrivalWash,
   wordWeakSpot,
+  onMarkerLongPress,
 }: AyahWordTextProps) {
   const { openDetail } = useWordInteraction();
   const { markActivity } = useChromeActions();
-  const pressedWordRef = useRef<number | null>(null);
+  const pressedWordRef = useRef<number | typeof MARKER | null>(null);
   const recordWord = useCallback((wordPos: number) => {
     pressedWordRef.current = wordPos;
+  }, []);
+  const recordMarker = useCallback(() => {
+    pressedWordRef.current = MARKER;
   }, []);
   const handleLongPress = useCallback(() => {
     const wordPos = pressedWordRef.current;
     pressedWordRef.current = null;
     if (wordPos === null) return;
     markActivity();
+    if (wordPos === MARKER) {
+      onMarkerLongPress?.();
+      return;
+    }
     openDetail({ surah, ayah, wordPos, v2Page });
-  }, [markActivity, openDetail, surah, ayah, v2Page]);
+  }, [markActivity, onMarkerLongPress, openDetail, surah, ayah, v2Page]);
   // A touch that ends without a long press forgets its word, so a later long press on a gap or
   // the marker never opens a stale word.
   const forgetWord = useCallback(() => {
@@ -150,13 +177,21 @@ export function AyahWordText({
               fontSize={fontSize}
               lineHeight={lineHeight}
               highlightColor={wordHighlightColor(wordPos)}
+              arrivalWash={wordArrivalWash?.(wordPos)}
               weakSpot={wordWeakSpot?.(wordPos) ?? false}
               onPressIn={recordWord}
             />{" "}
           </Fragment>
         );
       })}
-      {marker}
+      {isValidElement(marker)
+        ? cloneElement(marker as ReactElement<{ onPressIn?: () => void }>, {
+            onPressIn: () => {
+              (marker as ReactElement<{ onPressIn?: () => void }>).props.onPressIn?.();
+              recordMarker();
+            },
+          })
+        : marker}
     </Text>
   );
 }

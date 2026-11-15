@@ -88,8 +88,6 @@ describe.each([
       activity: dates.map((date, i) => ({ date, count: i === 0 ? 2 : 1 })),
       activeDays: 4,
       totalReviews: 5,
-      averageDailyReviews: 1,
-      longestStreak: 4,
     });
     expect(sql.prepare("SELECT COUNT(*) AS count FROM study_log").get()).toEqual({ count: 6 });
   });

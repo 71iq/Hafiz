@@ -59,16 +59,34 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Download/update card row mirrors with settings RTL; copy aligns to the reading side.",
   ),
   entry(
-    "components/auth/AccountSyncPrompt.tsx",
-    "button",
+    "components/app-update/IssueReporter.tsx",
+    "overlay",
+    "source",
+    "Fallback dialog text and actions mirror; the issue URL stays LTR.",
+  ),
+  entry(
+    "components/app-update/WhatsNewSheet.tsx",
+    "overlay",
+    "source",
+    "Release note bullets follow the UI direction.",
+  ),
+  entry(
+    "components/auth/AccountPromoCard.tsx",
+    "card",
     "rntl",
-    "Controlled compact row is covered by the ProgressScreen and LeaderboardScreen route fixtures.",
+    "Shared guest promotion row, actions and close control mirror; covered by the ProgressScreen and Home fixtures.",
+  ),
+  entry(
+    "components/auth/AuthReopenSurfaces.tsx",
+    "direction-neutral",
+    "source",
+    "Renders the reflection editor or comments sheets, which own their own mirroring.",
   ),
   entry(
     "components/auth/AuthScreenShell.tsx",
     "app-shell",
     "rntl",
-    "Auth chrome mirrors; logo and decorative artwork do not mirror.",
+    "Auth chrome mirrors; the logo and the English | العربية toggle keep their order.",
   ),
   entry(
     "components/auth/OAuthButtons.tsx",
@@ -240,6 +258,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   ),
   entry("components/mushaf/BookmarksSheet.tsx", "overlay", "playwright", "Bookmark rows and sheet actions mirror."),
   entry(
+    "components/mushaf/DetailTabRow.tsx",
+    "tab-segmented",
+    "rntl",
+    "Text tab row follows UI direction; the active tab scrolls into view with an edge fade on the hidden side.",
+  ),
+  entry(
     "components/mushaf/FocusModeControls.tsx",
     "mushaf-reading",
     "source",
@@ -292,7 +316,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/mushaf/PageViewNavigationSheet.tsx",
     "overlay",
     "source",
-    "Page-view menu uses measured coordinates; internal rows mirror.",
+    "Page layout options render through the shared DropdownMenu, whose rows mirror.",
   ),
   entry(
     "components/mushaf/QiraatBlocks.tsx",
@@ -301,10 +325,34 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Supplied Arabic headings and bodies retain RTL alignment and order in both Qiraat callers.",
   ),
   entry(
+    "components/mushaf/QuranLoadError.tsx",
+    "mushaf-reading",
+    "source",
+    "Centered message and Retry; text direction follows the UI locale.",
+  ),
+  entry(
+    "components/mushaf/ReaderHelpSheet.tsx",
+    "overlay",
+    "source",
+    "Shortcut and gesture rows mirror by hand; key names stay LTR.",
+  ),
+  entry(
+    "components/mushaf/ReaderToolbar.tsx",
+    "mushaf-reading",
+    "playwright",
+    "Toolbar order mirrors through direction and wraps; tooltip and menus need rendered checks.",
+  ),
+  entry(
     "components/mushaf/ReadingSettingsSheet.tsx",
     "overlay",
     "source",
     "Reader settings sheet rows and controls mirror.",
+  ),
+  entry(
+    "components/mushaf/RecitationPlayerBar.tsx",
+    "mushaf-reading",
+    "rntl",
+    "Player controls and labels mirror; the reference stays an LTR-isolated token.",
   ),
   entry(
     "components/mushaf/RecitationRangeSheet.tsx",
@@ -403,6 +451,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "source",
     "Morphology rows mirror while Arabic text stays RTL.",
   ),
+  entry(
+    "components/notes/AyahEditorPreview.tsx",
+    "quran-text",
+    "source",
+    "Quran preview is RTL content; the localized reference follows the UI direction.",
+  ),
   entry("components/notes/PrivateNoteSheet.tsx", "overlay", "source", "Note editor sheet chrome and actions mirror."),
   entry(
     "components/notes/PrivateNotesSection.tsx",
@@ -472,6 +526,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Chart layout does not silently reverse chronology.",
   ),
   entry(
+    "components/progress/ProgressStats.tsx",
+    "progress-chart",
+    "source",
+    "Stat tiles wrap from the reading start and the More stats toggle aligns to the start edge.",
+  ),
+  entry(
     "components/progress/SurahProgressList.tsx",
     "progress-chart",
     "source",
@@ -502,6 +562,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Author/action rows mirror; reflection text can use natural direction.",
   ),
   entry(
+    "components/reflections/ReflectionTime.tsx",
+    "feedback",
+    "rntl",
+    "Relative time with the full localized date on hover or long-press; follows the UI direction.",
+  ),
+  entry(
     "components/reflections/ReflectionsSection.tsx",
     "card",
     "source",
@@ -513,6 +579,25 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "playwright",
     "Composer sheet chrome and actions mirror; text input can auto-direct.",
   ),
+  entry(
+    "components/settings/AccountSyncCard.tsx",
+    "card",
+    "source",
+    "Sync status row, message and action mirror with the UI direction.",
+  ),
+  entry(
+    "components/settings/LogoutConfirmDialog.tsx",
+    "overlay",
+    "source",
+    "Uses the shared confirmation dialog, which mirrors.",
+  ),
+  entry(
+    "components/settings/NavigationBarTheme.android.tsx",
+    "direction-neutral",
+    "source",
+    "Renders nothing; sets Android system button contrast only.",
+  ),
+  entry("components/settings/NavigationBarTheme.tsx", "direction-neutral", "source", "Renders nothing on web and iOS."),
   entry(
     "components/settings/ReadingStepper.tsx",
     "button",
@@ -542,6 +627,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "card",
     "rntl",
     "Board intention card; toggle rows mirror and copy aligns to the reading side (tests/unit/board-screen.test.tsx).",
+  ),
+  entry(
+    "components/social/BoardScoringSheet.tsx",
+    "overlay",
+    "rntl",
+    "Read-only scoring rules sheet; headings and paragraphs follow the UI direction.",
   ),
   entry(
     "components/social/BoardStandings.tsx",
@@ -604,6 +695,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Teacher view sheet; stage and grade rows mirror and cards read as pages or ayahs in the interface digits.",
   ),
   entry(
+    "components/sync/RestoreConsent.tsx",
+    "overlay",
+    "rntl",
+    "Reuses ConfirmDialog; counts use locale digits and the paused pill mirrors.",
+  ),
+  entry(
     "components/ui/AppNavigation.tsx",
     "app-shell",
     "source",
@@ -624,6 +721,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "rntl",
     "Startup error typography, locale owner and readiness precedence are covered through all six real routes.",
   ),
+  entry("components/ui/DiscardChangesDialog.tsx", "overlay", "rntl", "Reuses ConfirmDialog; title and actions mirror."),
   entry(
     "components/ui/DropdownMenu.tsx",
     "picker-menu",
@@ -687,6 +785,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Content gutters and sidebar offsets use direction-aware padding.",
   ),
   entry(
+    "components/ui/SecondaryDestinations.tsx",
+    "app-shell",
+    "rntl",
+    "Halaqa, Board and Journey rows mirror their chevrons and labels.",
+  ),
+  entry(
     "components/ui/Sheet.tsx",
     "overlay",
     "source",
@@ -714,6 +818,18 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Centered toast is position-neutral; action order mirrors when present.",
   ),
   entry("components/ui/ToggleGroup.tsx", "tab-segmented", "rntl", "Segment order and active item placement mirror."),
+  entry(
+    "components/zayt/ZaytPreviewScreen.tsx",
+    "app-shell",
+    "source",
+    "Development preview header and controls mirror; artwork stays unmirrored.",
+  ),
+  entry(
+    "components/zayt/ZaytPreviewStates.tsx",
+    "media-preview",
+    "source",
+    "Centered loading and error states are position-neutral.",
+  ),
   entry(
     "components/zayt/ZaytRivePreview.native.tsx",
     "media-preview",

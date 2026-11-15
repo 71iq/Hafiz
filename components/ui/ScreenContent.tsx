@@ -6,9 +6,15 @@ import { useSettings } from "@/lib/settings/context";
 import {
   DESKTOP_CONTENT_GUTTER,
   DESKTOP_CONTENT_MAX_WIDTH,
+  FLOATING_NAV_TRIGGER_SIZE,
   PERSISTENT_SIDEBAR_BREAKPOINT,
   PERSISTENT_SIDEBAR_WIDTH,
+  SIDEBAR_BREAKPOINT,
+  VIEWPORT_BREAKPOINTS,
 } from "@/lib/ui/viewport";
+
+/** Phone content gutters (below 768px). */
+export const PHONE_CONTENT_GUTTER = 16;
 
 export const TAB_SCREEN_BOTTOM_INSET = 100;
 export const COMPACT_SCREEN_BOTTOM_INSET = 48;
@@ -33,6 +39,7 @@ type ScreenScrollViewProps = ScrollViewProps & {
   topInset?: number;
   bottomInset?: number;
   contentClassName?: string;
+  ref?: React.Ref<ScrollView>;
   children: React.ReactNode;
 };
 
@@ -46,7 +53,7 @@ export function Screen({ background = "surface", className, children, ...props }
 
 export function useScreenContentLayout({
   maxWidth = DESKTOP_CONTENT_MAX_WIDTH,
-  phoneGutter = 24,
+  phoneGutter = PHONE_CONTENT_GUTTER,
   desktopGutter = DESKTOP_CONTENT_GUTTER,
 }: {
   maxWidth?: number;
@@ -56,8 +63,17 @@ export function useScreenContentLayout({
   const { width } = useWindowDimensions();
   const { isRTL } = useSettings();
   const hasPersistentSidebar = width >= PERSISTENT_SIDEBAR_BREAKPOINT;
-  const sideWithSidebar = hasPersistentSidebar ? PERSISTENT_SIDEBAR_WIDTH + desktopGutter : phoneGutter;
-  const openSide = hasPersistentSidebar ? desktopGutter : phoneGutter;
+  const hasEdgeTrigger = !hasPersistentSidebar && width >= SIDEBAR_BREAKPOINT;
+  // Below the 360px compact step the phone gutter tightens to 12px.
+  const phoneSide = width < VIEWPORT_BREAKPOINTS.phoneCompact ? Math.min(phoneGutter, 12) : phoneGutter;
+  // The rail is centered in the space beside the navigation: the persistent sidebar's side reserves
+  // its width, and from 768px the edge trigger's side keeps its 44px target clear of content.
+  const sideWithSidebar = hasPersistentSidebar
+    ? PERSISTENT_SIDEBAR_WIDTH + desktopGutter
+    : hasEdgeTrigger
+      ? FLOATING_NAV_TRIGGER_SIZE + 8
+      : phoneSide;
+  const openSide = hasPersistentSidebar || hasEdgeTrigger ? desktopGutter : phoneSide;
 
   const contentContainerStyle = useMemo<ViewStyle>(
     () => ({
@@ -86,7 +102,7 @@ export function useScreenContentLayout({
 
 export function ScreenScrollView({
   maxWidth = DESKTOP_CONTENT_MAX_WIDTH,
-  phoneGutter = 24,
+  phoneGutter = PHONE_CONTENT_GUTTER,
   desktopGutter = DESKTOP_CONTENT_GUTTER,
   topInset = 0,
   bottomInset = 0,

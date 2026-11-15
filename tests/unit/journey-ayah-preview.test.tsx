@@ -36,6 +36,8 @@ const mockSettings: Pick<
   | "quranRenderFontStyle"
   | "quranMarkerStyle"
   | "effectiveTheme"
+  | "recitationId"
+  | "themeColors"
 > = {
   isDark: false,
   isRTL: false,
@@ -46,7 +48,16 @@ const mockSettings: Pick<
   quranRenderFontStyle: "qcf2",
   quranMarkerStyle: "auto",
   effectiveTheme: "white",
+  recitationId: 7,
+  themeColors: { surfaceHigh: "#E5E7EB" } as ReturnType<typeof useSettings>["themeColors"],
 };
+const mockOpenMushaf = jest.fn();
+type AudioFixture = {
+  session: { kind: "range"; target: { surah: number; ayah: number } } | null;
+  playRange: jest.Mock;
+  stop: jest.Mock;
+};
+let mockAudio: AudioFixture | null = null;
 let mockDetail: DetailProps | undefined;
 let frames: FrameRequestCallback[];
 const literal = "نص تجريبي <b>literal</b>\n e\u0301  ";
@@ -59,6 +70,8 @@ const quranRows: QuranRow[] = [
 
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDatabase }));
 jest.mock("@/lib/settings/context", () => ({ useSettings: () => mockSettings }));
+jest.mock("@/lib/navigation/open-mushaf", () => ({ useOpenMushaf: () => mockOpenMushaf }));
+jest.mock("@/lib/audio/ayah-audio", () => ({ useOptionalAyahAudio: () => mockAudio }));
 jest.mock("@/components/mushaf/AyahDetailModal", () => ({
   AyahDetailModal: (props: DetailProps) => {
     mockDetail = props;
@@ -127,19 +140,25 @@ function expectTarget(
     control = control.parent;
   }
   if (!control) throw new Error("Missing pressable preview row");
-  expect(control.props.className).toBe("rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4");
-  expect(control.props.style({ pressed: false })).toEqual({ transform: [{ scale: 1 }] });
-  expect(control.props.style({ pressed: true })).toEqual({ transform: [{ scale: 0.99 }] });
+  expect(control.props.className).toBe("rounded-3xl px-4 py-4");
+  expect(control.props.style({ pressed: false })).toEqual({ flex: 1, minWidth: 0, transform: [{ scale: 1 }] });
+  expect(control.props.style({ pressed: true })).toEqual({ flex: 1, minWidth: 0, transform: [{ scale: 0.99 }] });
   fireEvent.press(label);
   expect(detail().target).toEqual(target);
   expect(detail().initialTab).toBe(tab);
   act(() => detail().onClose());
   expect(detail().target).toBeNull();
+  // The separate book action opens the Mushaf at the same ayah through the shared helper.
+  fireEvent.press(
+    view.getByLabelText(strings[mockSettings.uiLanguage].journeyOpenInMushaf.replace("{{ref}}", reference)),
+  );
+  expect(mockOpenMushaf).toHaveBeenLastCalledWith(target);
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockDetail = undefined;
+  mockAudio = null;
   frames = [];
   mockDatabase.getAllAsync.mockResolvedValue([]);
   jest.mocked(isQuranPageFontLoaded).mockReturnValue(true);
@@ -188,7 +207,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real journey card in %s",
     await settle();
     expectQuery("quran_text", [7, 3, 5]);
     expect(view.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0);
-    expect(view.getAllByText(strings[language].loading)).toHaveLength(3);
+    expect(view.getAllByTestId("journey-quran-line-placeholder")).toHaveLength(3);
     expect(view.queryByText("glyph-a")).toBeNull();
     expect(isQuranPageFontLoaded).toHaveBeenCalledTimes(2);
     expect(isQuranPageFontLoaded).toHaveBeenNthCalledWith(1, "qcf2", 9);
@@ -199,7 +218,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real journey card in %s",
     expect(frames).toHaveLength(1);
     expect(view.queryByText("glyph-a")).toBeNull();
     finishFrames();
-    expect(view.queryByText(strings[language].loading)).toBeNull();
+    expect(view.queryAllByTestId("journey-quran-line-placeholder")).toHaveLength(0);
     for (const token of ["glyph-a", "glyph-b", "glyph-c", "marker-a", "marker-b", "marker-c"]) {
       const marker = token.startsWith("marker");
       const page = token === "marker-c" ? 10 : 9;
@@ -360,17 +379,87 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real journey card in %s",
     expectTarget(view, "8:2", { surah: 8, ayah: 2 }, "tafsir");
   });
 
-  it("preserves the existing empty completion and warning after query rejection", async () => {
+  it("shows a section failure with Retry inside the card and reloads on Retry", async () => {
     const failure = new Error("Synthetic database read failure");
     const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    mockDatabase.getAllAsync.mockRejectedValue(failure);
+    mockDatabase.getAllAsync.mockRejectedValueOnce(failure);
     const view = render(<JourneyAyahCard block={{ type: "translation", ...range }} />);
     await settle();
-    expect(warning).toHaveBeenCalledTimes(1);
     expect(warning).toHaveBeenCalledWith("[JourneyAyahCard] Failed to load block:", failure);
     expect(view.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0);
-    expect(view.getByText(strings[language].reflectionJourneyBlockHint)).toBeTruthy();
+    expect(view.getByText(strings[language].journeySectionLoadFailed)).toBeTruthy();
+    expect(view.queryByText(strings[language].reflectionJourneyBlockHint)).toBeNull();
+
+    mockDatabase.getAllAsync.mockResolvedValueOnce([{ surah: 7, ayah: 4, text_en: literal }]);
+    fireEvent.press(view.getByText(strings[language].reflectionJourneyRetry));
+    await settle();
+    expect(view.queryByText(strings[language].journeySectionLoadFailed)).toBeNull();
+    expect(view.getByText(literal, { normalizer: (value) => value })).toBeTruthy();
     expect(detail().target).toBeNull();
+  });
+
+  it.each([
+    { block: { type: "translation", ...range } as Block, code: "en", name: "Saheeh International", direction: "ltr" },
+    { block: { type: "translation", ...range } as Block, code: "ur", name: "اردو", direction: "rtl" },
+    {
+      block: { type: "tafseer", source: "settings", ...range } as Block,
+      code: "en",
+      name: "في ظلال القرآن",
+      direction: "rtl",
+    },
+    {
+      block: { type: "tafseer", source: "muyassar", ...range } as Block,
+      code: "en",
+      name: "التفسير الميسر",
+      direction: "rtl",
+    },
+  ])("names the $block.type source $name in its own direction", async ({ block, code, name, direction }) => {
+    mockSettings.translationLanguage = code;
+    mockDatabase.getAllAsync.mockResolvedValue([{ surah: 7, ayah: 4, text: literal, text_en: literal }]);
+    const view = render(<JourneyAyahCard block={block} />);
+    await settle();
+    const label = view.getByText(name);
+    expect(StyleSheet.flatten(label.props.style)).toMatchObject({
+      fontSize: 12,
+      ...textStartStyle(direction === "rtl"),
+      writingDirection: direction,
+    });
+  });
+
+  it("plays the block's range only on Play, with the user's reciter, and stops it from the same button", async () => {
+    mockAudio = { session: null, playRange: jest.fn(async () => ({ ok: true })), stop: jest.fn() };
+    const block: Block = { type: "recitation_placeholder", surah: 7, ayahStart: 3, ayahEnd: 5 };
+    const view = render(<JourneyAyahCard block={block} />);
+    await settle();
+    expect(mockAudio.playRange).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.press(view.getByText(strings[language].journeyPlay));
+    });
+    expect(mockAudio.playRange).toHaveBeenCalledWith({
+      ayahs: [
+        { surah: 7, ayah: 3 },
+        { surah: 7, ayah: 4 },
+        { surah: 7, ayah: 5 },
+      ],
+      recitationId: 7,
+    });
+
+    mockAudio.session = { kind: "range", target: { surah: 7, ayah: 4 } };
+    view.rerender(<JourneyAyahCard block={block} />);
+    fireEvent.press(view.getByText(strings[language].journeyStop));
+    expect(mockAudio.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains an offline recitation failure inline", async () => {
+    mockAudio = { session: null, playRange: jest.fn(async () => ({ ok: false, failure: "offline" })), stop: jest.fn() };
+    const view = render(
+      <JourneyAyahCard block={{ type: "recitation_placeholder", surah: 7, ayahStart: 4, ayahEnd: 4 }} />,
+    );
+    await settle();
+    await act(async () => {
+      fireEvent.press(view.getByText(strings[language].journeyPlay));
+    });
+    expect(view.getByRole("alert")).toBeTruthy();
   });
 
   it("preserves the current font-rejection fallback rather than inventing missing content", async () => {

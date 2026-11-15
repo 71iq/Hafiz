@@ -28,7 +28,7 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
   {
     file: "components/auth/AuthScreenShell.tsx",
     pattern: /left|right|borderLeftWidth|borderRightWidth/,
-    reason: "Auth shell contains non-mirrored brand art and decorative coordinate-based botanical lines.",
+    reason: "Auth shell picks the directional ChevronLeft/ChevronRight back icon by locale; rows pin ltr and mirror explicitly.",
   },
   {
     file: "components/mushaf/AyahBlock.tsx",
@@ -41,11 +41,6 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     reason: "Focus controls include full-width phone chrome and progress-thumb coordinates.",
   },
   {
-    file: "components/mushaf/GoToNavigator.tsx",
-    pattern: /textAlign: "right"/,
-    reason: "Navigator displays fixed Arabic surah labels that intentionally align RTL.",
-  },
-  {
     file: "components/mushaf/MushafSlider.tsx",
     pattern: /paddingLeft|paddingRight/,
     reason: "Slider center padding is symmetric wheel geometry, not semantic inline spacing.",
@@ -54,11 +49,6 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     file: "components/mushaf/PageMushaf.tsx",
     pattern: /left|right/,
     reason: "Page reader uses horizontal page coordinates and full-width overlays around unmirrored Mushaf content.",
-  },
-  {
-    file: "components/mushaf/PageViewNavigationSheet.tsx",
-    pattern: /left|marginLeft|marginRight/,
-    reason: "Floating page menu uses measured viewport coordinates and direction-aware icon spacing.",
   },
   {
     file: "components/mushaf/SurahHeader.tsx",
@@ -97,9 +87,9 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     reason: "Dropdown placement uses measured trigger coordinates before internal menu rows mirror.",
   },
   {
-    file: "components/ui/OfflineBanner.tsx",
-    pattern: /left|right/,
-    reason: "Offline banner is centered with full-width absolute positioning.",
+    file: "components/ui/ResponsiveOverlay.tsx",
+    pattern: /paddingRight/,
+    reason: "Body scroll lock pads by the measured document scrollbar width so the page does not shift; it restores the previous value.",
   },
   {
     file: "components/ui/Skeleton.tsx",

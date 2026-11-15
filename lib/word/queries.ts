@@ -170,6 +170,10 @@ export type WordMeaningArRow = {
   word_pos: number;
   word: string | null;
   meaning: string | null;
+  /** Where the shown meaning comes from. A bundled meaning takes precedence over a custom one. */
+  source: "bundled" | "custom" | null;
+  /** The custom row's creation time, only when the custom meaning is the one shown. */
+  custom_created_at: string | null;
 };
 
 export type WordIrabDaasRow = {
@@ -208,7 +212,10 @@ type UserWordMeaningInput = {
   meaning: string;
 };
 
-/** Save a custom word meaning. The row and its upload queue entry commit together or not at all. */
+/**
+ * Save a custom word meaning. The row and its upload queue entry commit together or not at all. An
+ * edit keeps the row's original created_at.
+ */
 export async function upsertUserWordMeaning(database: AppDatabase, params: UserWordMeaningInput): Promise<void> {
   await database.withTransactionAsync((db) => upsertUserWordMeaningRow(db, params));
 }
@@ -234,6 +241,61 @@ async function upsertUserWordMeaningRow(db: DatabaseExecutor, params: UserWordMe
   }
 }
 
+export type CustomWordMeaningKey = Readonly<{
+  surah: number;
+  ayah: number;
+  wordPos: number;
+  /** The meaning and creation time the person saw when they chose Delete. */
+  meaning: string;
+  createdAt: string;
+}>;
+
+/**
+ * Delete one custom meaning by its canonical key. In one transaction the local row goes and a
+ * user_word_meanings DELETE is queued with updated_at and deleted_at both equal to one fresh deletion
+ * time (also the queue time), so the existing tombstone reaches devices holding the unchanged row
+ * while a genuinely newer edit elsewhere still wins. Returns "changed", writing nothing, when the
+ * row is gone or no longer the one the person saw.
+ */
+export async function deleteUserWordMeaning(
+  database: AppDatabase,
+  key: CustomWordMeaningKey,
+): Promise<"deleted" | "changed"> {
+  let outcome = "changed" as "deleted" | "changed";
+  await database.withTransactionAsync(async (db) => {
+    const row = await db.getFirstAsync<{ word: string | null; meaning: string; created_at: string }>(
+      "SELECT word, meaning, created_at FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?",
+      [key.surah, key.ayah, key.wordPos],
+    );
+    if (!row || row.meaning !== key.meaning || row.created_at !== key.createdAt) return;
+    const deletedAt = new Date().toISOString();
+    await db.runAsync("DELETE FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?", [
+      key.surah,
+      key.ayah,
+      key.wordPos,
+    ]);
+    await enqueueSync(
+      db,
+      "user_word_meanings",
+      "DELETE",
+      `${key.surah}:${key.ayah}:${key.wordPos}`,
+      {
+        surah: key.surah,
+        ayah: key.ayah,
+        word_pos: key.wordPos,
+        word: row.word,
+        meaning: row.meaning,
+        created_at: row.created_at,
+        updated_at: deletedAt,
+        deleted_at: deletedAt,
+      },
+      deletedAt,
+    );
+    outcome = "deleted";
+  });
+  return outcome;
+}
+
 export async function fetchWordMeaningAr(
   db: DatabaseExecutor,
   surah: number,
@@ -249,7 +311,16 @@ export async function fetchWordMeaningAr(
        CASE
          WHEN base.meaning IS NOT NULL AND TRIM(base.meaning) != '' THEN base.meaning
          ELSE custom.meaning
-       END AS meaning
+       END AS meaning,
+       CASE
+         WHEN base.meaning IS NOT NULL AND TRIM(base.meaning) != '' THEN 'bundled'
+         WHEN custom.meaning IS NOT NULL THEN 'custom'
+         ELSE NULL
+       END AS source,
+       CASE
+         WHEN base.meaning IS NOT NULL AND TRIM(base.meaning) != '' THEN NULL
+         ELSE custom.created_at
+       END AS custom_created_at
      FROM (SELECT ? AS surah, ? AS ayah, ? AS word_pos) key
      LEFT JOIN word_meanings_ar base
        ON base.surah = key.surah AND base.ayah = key.ayah AND base.word_pos = key.word_pos

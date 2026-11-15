@@ -6,13 +6,15 @@ import {
   Pressable,
   ScrollView,
   Animated as RNAnimated,
+  BackHandler,
+  Platform,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
+import { BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, NotebookPen, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -26,6 +28,7 @@ import type { Grade } from "@/lib/fsrs/scheduler";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { persistReviewTransition, readCurrentCard } from "@/lib/fsrs/persist-review";
 import {
+  MEANINGS_DECK_ID,
   MUTASHABIHAT_DECK_ID,
   loadReviewQueue,
   deleteStudyCard,
@@ -43,11 +46,16 @@ import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import type { DeckReviewSettings, StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
-import {
-  DEFAULT_DECK_LEARNING_STEPS,
-  DEFAULT_DECK_RELEARNING_STEPS,
-  TEST_MODE_COLORS,
-} from "@/lib/fsrs/types";
+import { cardStateColor, reviewSideColor, type ReviewSideTone } from "@/lib/fsrs/review-colors";
+import { formatLongCardDate, formatShortCardDate } from "@/lib/fsrs/card-dates";
+import { TAFSIR_SOURCES } from "@/lib/tafsir/sources";
+import { surahTransliteration } from "@/lib/search/surah-match";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
+import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
+import { subscribeSyncCompleted } from "@/lib/sync/events";
+import { getPendingSyncCount } from "@/lib/database/sync-queue";
+import { useAuthStore } from "@/lib/auth/store";
+import { DiscardChangesDialog, isEditableTextDirty, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
 import { DueDateSheet } from "@/components/flashcards/DueDateSheet";
@@ -56,6 +64,7 @@ import { FieldMessage } from "@/components/ui/Field";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import {
   getSmartCardContent,
+  SMART_DECK_IDS,
   type SmartCardKind,
   type SmartDeckRef,
 } from "@/lib/fsrs/smart-decks";
@@ -76,11 +85,18 @@ import {
 } from "@/components/habit/SessionHabitCards";
 import { Toast } from "@/components/ui/Toast";
 import { getGradeSchedulePreviews, GradingButtons } from "@/components/flashcards/GradingButtons";
-import { formatDays, formatNumber } from "@/lib/i18n/count";
+import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
+import { formatAyahs, formatDays, formatNumber } from "@/lib/i18n/count";
+import { formatAyahRef } from "@/lib/arabic";
+
+/** Focused controls keep Space/Enter for themselves; review shortcuts skip them. */
+const FOCUSED_CONTROL_SELECTOR = ["button", "a", ...["button", "link", "menuitem", "switch", "checkbox", "radio", "tab"].map(
+  (name) => `[role="${name}"]`,
+)].join(", ");
 
 // ─── Types ───────────────────────────────────────────────────
 
-type SessionPhase = "loading" | "front" | "side" | "grading" | "summary";
+type SessionPhase = "loading" | "error" | "front" | "side" | "grading" | "summary";
 
 type CardData = {
   kind: "ayah" | "word" | SmartCardKind;
@@ -127,6 +143,8 @@ type CardData = {
 };
 
 type SessionSummary = {
+  /** The queue was empty when the session opened: there was nothing to review. */
+  emptyQueue?: boolean;
   total: number;
   newCount: number;
   reviewCount: number;
@@ -152,16 +170,32 @@ function emptySummary(): SessionSummary {
 
 type SmartTestMode = "smartRefs" | "qiraatReading" | "asbabReading";
 type ReviewMode = TestMode | WordTestMode | SmartTestMode;
-const WORD_TEST_MODE_COLORS: Record<WordTestMode, string> = {
-  wordMeaningArabic: "#0d9488",
-  wordMeaningTranslation: "#3b82f6",
+/** Each side's semantic tone; the colors per theme come from review-colors. */
+const REVIEW_MODE_TONES: Record<ReviewMode, ReviewSideTone> = {
+  nextAyah: "blue",
+  previousAyah: "violet",
+  translation: "teal",
+  tafseer: "amber",
+  surahName: "rose",
+  wordMeaningArabic: "teal",
+  wordMeaningTranslation: "blue",
+  smartRefs: "teal",
+  qiraatReading: "violet",
+  asbabReading: "amber",
 };
-const SMART_TEST_MODE_COLORS: Record<SmartTestMode, string> = {
-  smartRefs: "#0d9488",
-  qiraatReading: "#8b5cf6",
-  asbabReading: "#d97706",
+const GRADE_KEYS: Record<string, Grade> = {
+  "1": Rating.Again,
+  "2": Rating.Hard,
+  "3": Rating.Good,
+  "4": Rating.Easy,
+  "١": Rating.Again,
+  "٢": Rating.Hard,
+  "٣": Rating.Good,
+  "٤": Rating.Easy,
 };
 const CARD_ANSWER_SETTING_PREFIX = "card_answer_";
+/** The Arabic reading face on web; native keeps the system Arabic face rather than the Latin UI font. */
+const ARABIC_READING_FONT = Platform.OS === "web" ? "IBMPlexSansArabic, NotoSansArabic, system-ui" : undefined;
 const EDITABLE_ANSWER_MODES: ReviewMode[] = [
   "previousAyah",
   "nextAyah",
@@ -202,6 +236,9 @@ function FlashcardSessionScreen() {
   const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
   const navigation = useNavigation();
+  const openMushaf = useOpenMushaf();
+  const reduceMotion = useReducedMotionPreference();
+  const authUserId = useAuthStore((state) => state.user?.id ?? null);
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
   const { width } = useWindowDimensions();
   const maxWidth = Math.min(width, 600);
@@ -212,8 +249,17 @@ function FlashcardSessionScreen() {
   const [sessionCardTotal, setSessionCardTotal] = useState(0);
   const [currentSideIndex, setCurrentSideIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  // W03 note entry point: the card back offers Add note for the ayah under review.
+  const [noteOpen, setNoteOpen] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  /** The queue could not load: an error with Try again, never an empty completion. */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  /** The grade whose save failed, repeated as is by Try again. */
+  const [failedGrade, setFailedGrade] = useState<Grade | null>(null);
+  /** A short confirmation such as "Card moved to 19 Nov". */
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   /** The rendered copy of mutationLockRef: grades, card actions and the card menu are disabled while it is held. */
   const [mutationBusy, setMutationBusy] = useState(false);
   /** A card action (not a grade) is saving: only then does the card menu dim, so it does not blink on every grade. */
@@ -264,6 +310,8 @@ function FlashcardSessionScreen() {
     mutationLockRef.current = false;
     setMutationBusy(false);
     setSessionError(null);
+    setLoadError(null);
+    setFailedGrade(null);
     wirdEventRef.current = null;
     againCountRef.current = 0;
     setWirdNotice(null);
@@ -300,8 +348,11 @@ function FlashcardSessionScreen() {
         const queue = await loadReviewQueue(db, normalizedDeckId);
         if (cancelled) return;
         if (queue.length === 0) {
+          // Nothing to review: say when the next card is due instead of a summary of zeros.
+          const nextReviewDate = await getNextEligibleReviewDate(db).catch(() => null);
+          if (cancelled) return;
           resetSessionProgress();
-          setSummary(emptySummary());
+          setSummary({ ...emptySummary(), emptyQueue: true, nextReviewDate });
           setPhase("summary");
           return;
         }
@@ -462,9 +513,9 @@ function FlashcardSessionScreen() {
         if (cancelled) return;
         console.warn("[FlashcardSession] Failed to load session:", e);
         resetSessionProgress();
-        setSessionError(s.genericActionFailed);
-        setSummary(emptySummary());
-        setPhase("summary");
+        // A failed load is an error with Try again, never a completed session.
+        setLoadError(s.sessionLoadFailed);
+        setPhase("error");
       }
     }
     load();
@@ -482,8 +533,9 @@ function FlashcardSessionScreen() {
     s.smartDeckSimilarTailsTitle,
     s.smartDeckQiraatTitle,
     s.smartDeckReasonsTitle,
-    s.genericActionFailed,
+    s.sessionLoadFailed,
     s.noWordMeaningFallback,
+    loadAttempt,
   ]);
 
   const currentCard = cards[currentIndex] ?? null;
@@ -529,6 +581,11 @@ function FlashcardSessionScreen() {
   const isLastSide = currentSideIndex >= activeModes.length - 1;
 
   const animateFlip = useCallback(() => {
+    // With reduced motion the answer shows at once, without the spring.
+    if (reduceMotion) {
+      flipAnim.setValue(1);
+      return;
+    }
     flipAnim.setValue(0);
     RNAnimated.spring(flipAnim, {
       toValue: 1,
@@ -536,7 +593,7 @@ function FlashcardSessionScreen() {
       stiffness: 200,
       useNativeDriver: true,
     }).start();
-  }, [flipAnim]);
+  }, [flipAnim, reduceMotion]);
 
   const revealFirstSide = () => {
     if (activeModes.length === 0) {
@@ -638,11 +695,17 @@ function FlashcardSessionScreen() {
    * neither present it as unsaved nor offer it again. Close or a back press during the change waits
    * for it: the screen leaves once it is saved, or stays to show its failure.
    */
-  const runCardMutation = async (failureLog: string, failureMessage: string, save: () => Promise<SavedChange>) => {
+  const runCardMutation = async (
+    failureLog: string,
+    failureMessage: string,
+    save: () => Promise<SavedChange>,
+    onFailure?: () => void,
+  ) => {
     if (mutationLockRef.current || !currentCard) return;
     mutationLockRef.current = true;
     setMutationBusy(true);
     setSessionError(null);
+    setFailedGrade(null);
     try {
       let change: SavedChange;
       try {
@@ -654,7 +717,10 @@ function FlashcardSessionScreen() {
         pendingBackRef.current = null;
         setLeavePending(false);
         if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
-        else setSessionError(failureMessage);
+        else {
+          setSessionError(failureMessage);
+          onFailure?.();
+        }
         return;
       }
       try {
@@ -686,37 +752,62 @@ function FlashcardSessionScreen() {
     }
   };
 
+  // Direct actions keep the sheet open until they are saved, so a failure shows above its rows.
   const handleSuspendCard = () => {
     if (!currentCard) return;
     const { card } = currentCard;
-    setCardMenuOpen(false);
     void runCardAction(async () => {
       hapticMedium();
       await setStudyCardSuspended(db, card.deck_id, card.id, true, LIVE_CARD);
-      return { advance: advanceAfterRemovingCurrentCard };
+      return {
+        advance: async () => {
+          setCardMenuOpen(false);
+          await advanceAfterRemovingCurrentCard();
+        },
+      };
     });
   };
 
   const handleBuryCard = () => {
     if (!currentCard) return;
     const { card } = currentCard;
-    setCardMenuOpen(false);
     void runCardAction(async () => {
       hapticMedium();
+      // Buried until the scheduler's next-day cutoff, as setStudyCardBuried defines it.
       await setStudyCardBuried(db, card.deck_id, card.id, true, LIVE_CARD);
-      return { advance: advanceAfterRemovingCurrentCard };
+      return {
+        advance: async () => {
+          setCardMenuOpen(false);
+          await advanceAfterRemovingCurrentCard();
+        },
+      };
     });
   };
 
   const handleToggleMarkCard = () => {
     if (!currentCard) return;
     const { card } = currentCard;
-    setCardMenuOpen(false);
     void runCardAction(async () => {
       hapticMedium();
       const updated = await setStudyCardMarked(db, card.deck_id, card.id, !card.marked_at, LIVE_CARD);
-      return { advance: () => updateCurrentCardRow(updated) };
+      return {
+        advance: () => {
+          setCardMenuOpen(false);
+          updateCurrentCardRow(updated);
+        },
+      };
     });
+  };
+
+  /** Opens the Mushaf at this card's ayah. Every grade is already saved, so the session ends here. */
+  const handleOpenInReader = () => {
+    if (!currentCard || mutationLockRef.current) return;
+    const target = { surah: currentCard.surah, ayah: currentCard.ayah, ...(currentCard.wordPos ? { wordPos: currentCard.wordPos } : {}) };
+    setCardMenuOpen(false);
+    exitingRef.current = true;
+    const session = sessionRef.current;
+    if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
+    openMushaf(target);
   };
 
   const handleConfirmCardAction = () => {
@@ -769,6 +860,7 @@ function FlashcardSessionScreen() {
       hapticMedium();
       await setStudyCardDueDate(db, card.deck_id, card.id, parsed.date, LIVE_CARD);
       return {
+        record: () => setActionNotice(interpolate(s.sessionCardMoved, { date: formatShortCardDate(parsed.date, uiLanguage) })),
         advance: async () => {
           setDueDateOpen(false);
           setDueDateError(null);
@@ -906,7 +998,7 @@ function FlashcardSessionScreen() {
           }
         },
       };
-    });
+    }, () => setFailedGrade(rating));
   };
 
   // SES-02: leaving mid-session asks once. Every grade is already saved, so this only confirms.
@@ -947,7 +1039,7 @@ function FlashcardSessionScreen() {
 
   // No path should leave the index past the cards, but if one does the session finishes to the summary
   // instead of rendering nothing: a blank screen has no Close. Every card change is saved by then.
-  const cardMissing = phase !== "loading" && phase !== "summary" && !currentCard;
+  const cardMissing = phase !== "loading" && phase !== "summary" && phase !== "error" && !currentCard;
   useEffect(() => {
     if (!cardMissing || mutationBusy) return;
     let cancelled = false;
@@ -960,6 +1052,60 @@ function FlashcardSessionScreen() {
       cancelled = true;
     };
   }, [buildSummary, cardMissing, mutationBusy]);
+
+  const overlayOpen = cardMenuOpen || !!confirmCardAction || dueDateOpen || answerEditOpen || exitConfirmOpen || noteOpen;
+  const gradingVisible = (phase === "side" && revealed && isLastSide) || phase === "grading";
+  // The latest handlers and state for the key and Back listeners, which are registered once.
+  const inputRef = useRef({ phase, revealed, isLastSide, gradingVisible, overlayOpen, revealFirstSide, handleNext, handleGrade, handleEndSession });
+  inputRef.current = { phase, revealed, isLastSide, gradingVisible, overlayOpen, revealFirstSide, handleNext, handleGrade, handleEndSession };
+
+  // Keyboard on web: Space or Enter reveals and steps through sides; 1 to 4 grade Again, Hard, Good and
+  // Easy by meaning, whatever the visual order. Only the topmost surface owns keys, so text entry, IME
+  // composition, an open sheet or dialog, a held key and a focused control are left alone.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.isComposing || event.keyCode === 229) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const state = inputRef.current;
+      if (state.overlayOpen || mutationLockRef.current) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return;
+      const advanceKey = event.key === " " || event.key === "Enter";
+      if (advanceKey) {
+        // A focused control handles its own Space and Enter.
+        if (target?.closest?.(FOCUSED_CONTROL_SELECTOR)) return;
+        if (state.phase === "front") {
+          event.preventDefault();
+          state.revealFirstSide();
+        } else if (state.phase === "side" && state.revealed && !state.isLastSide) {
+          event.preventDefault();
+          state.handleNext();
+        }
+        return;
+      }
+      const grade = GRADE_KEYS[event.key];
+      if (grade !== undefined && state.gradingVisible) {
+        event.preventDefault();
+        state.handleGrade(grade);
+      }
+    };
+    const doc = document;
+    doc.addEventListener("keydown", onKeyDown);
+    return () => doc.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Android Back runs the same end-review path as the labeled X. An open sheet or dialog takes Back
+  // first through its own modal, so this only sees presses on the review itself.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (inputRef.current.overlayOpen) return false;
+      inputRef.current.handleEndSession();
+      return true;
+    });
+    return () => subscription.remove();
+  }, []);
 
   // ─── Render ────────────────────────────────────────────────
 
@@ -975,7 +1121,32 @@ function FlashcardSessionScreen() {
           db={db}
           language={uiLanguage}
           commitLabel={commitLabel}
+          ownerId={authUserId}
         />
+      </SafeAreaView>
+    );
+  }
+
+  if (phase === "error") {
+    return (
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <View className="flex-1 items-center justify-center px-6" style={{ gap: 16 }}>
+          <Text
+            accessibilityRole="alert"
+            className="text-center text-red-600 dark:text-red-400"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, lineHeight: 24, writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {loadError ?? s.sessionLoadFailed}
+          </Text>
+          <Button onPress={() => setLoadAttempt((n) => n + 1)} className="w-full max-w-sm">
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.decksTryAgain}</Text>
+          </Button>
+          <Button variant="outline" onPress={handleEndSession} className="w-full max-w-sm">
+            <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+              {s.sessionEndReview}
+            </Text>
+          </Button>
+        </View>
       </SafeAreaView>
     );
   }
@@ -1017,7 +1188,7 @@ function FlashcardSessionScreen() {
               onPress={handleEndSession}
               disabled={leavePending}
               accessibilityRole="button"
-              accessibilityLabel={s.genericClose}
+              accessibilityLabel={s.sessionEndReview}
               accessibilityState={{ disabled: leavePending }}
               // Dimmed while Close waits for the grade or card action it was pressed during.
               className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${leavePending ? "opacity-50" : ""}`}
@@ -1025,18 +1196,30 @@ function FlashcardSessionScreen() {
               <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             </Pressable>
 
-            <Text
-              className="text-warm-500 dark:text-neutral-400"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-            >
-              {currentProgress} / {sessionTotal}
-            </Text>
+            <View className="min-w-0 flex-1 items-center px-2">
+              {/* Review all mixes decks, so the current card's deck is named above the counter. */}
+              {!normalizedDeckId ? (
+                <Text
+                  className="text-warm-500 dark:text-neutral-400"
+                  numberOfLines={1}
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, writingDirection: isRTL ? "rtl" : "ltr" }}
+                >
+                  {deckTitleFor(currentCard.card.deck_id, s)}
+                </Text>
+              ) : null}
+              <Text
+                className="text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, writingDirection: "ltr" }}
+              >
+                {formatNumber(currentProgress, uiLanguage)} / {formatNumber(sessionTotal, uiLanguage)}
+              </Text>
+            </View>
 
             <View
               className="items-center gap-2"
               style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
             >
-              <CardStateBadge state={currentCard.card.state} s={s} />
+              <CardStateBadge state={currentCard.card.state} isDark={isDark} s={s} />
               <Pressable
                 onPress={() => setCardMenuOpen(true)}
                 // Disabled while any change to the card saves; dimmed only for a card action, so it does
@@ -1065,6 +1248,7 @@ function FlashcardSessionScreen() {
           activeModes={activeModes}
           currentSideIndex={currentSideIndex}
           maxWidth={maxWidth}
+          isDark={isDark}
           isRTL={isRTL}
           s={s}
         />
@@ -1096,9 +1280,8 @@ function FlashcardSessionScreen() {
                   className="text-warm-400 dark:text-neutral-500 text-center mb-3"
                   style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
                 >
-                  {interpolate(s.flashcardsContextCount, {
-                    n: currentCard.uniqueFront.contextCount,
-                    label: currentCard.uniqueFront.contextCount === 1 ? s.flashcardsContextAyah : s.flashcardsContextAyahs,
+                  {interpolate(s.sessionContextShown, {
+                    ayahs: formatAyahs(currentCard.uniqueFront.contextCount, uiLanguage),
                   })}
                 </Text>
               )}
@@ -1127,7 +1310,15 @@ function FlashcardSessionScreen() {
               {revealed && (
                 <RNAnimated.View style={{ transform: [{ translateY }], opacity }}>
                   <Card elevation="mid" className="p-6 rounded-3xl bg-surface-bright dark:bg-surface-dark-mid">
-                    <TestModeAnswer mode={currentMode} card={currentCard} fontSize={fontSize} lineHeight={lineHeight} s={s} />
+                    <TestModeAnswer
+                      mode={currentMode}
+                      card={currentCard}
+                      fontSize={fontSize}
+                      lineHeight={lineHeight}
+                      s={s}
+                      isRTL={isRTL}
+                      tafseerSourceLabel={tafseerSourceLabel(tafseerSource, s)}
+                    />
                   </Card>
                 </RNAnimated.View>
               )}
@@ -1153,10 +1344,33 @@ function FlashcardSessionScreen() {
                   {currentCard.textUthmani}
                 </Text>
               )}
+              {currentCard.surah > 0 && currentCard.ayah > 0 ? (
+                <Pressable
+                  onPress={() => setNoteOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.noteAdd}
+                  className="mt-4 min-h-11 self-center flex-row items-center justify-center gap-2 rounded-full px-4"
+                  style={{ direction: isRTL ? "rtl" : "ltr" }}
+                >
+                  <NotebookPen size={16} color={isDark ? "#5eead4" : "#0d9488"} />
+                  <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+                    {s.noteAdd}
+                  </Text>
+                </Pressable>
+              ) : null}
             </Card>
           )}
         </View>
       </ScrollView>
+      {currentCard.surah > 0 && currentCard.ayah > 0 ? (
+        <PrivateNoteSheet
+          open={noteOpen}
+          onClose={() => setNoteOpen(false)}
+          surah={currentCard.surah}
+          ayahStart={currentCard.ayah}
+          ayahEnd={currentCard.ayah}
+        />
+      ) : null}
 
       {/* Bottom action area */}
       <View
@@ -1164,13 +1378,28 @@ function FlashcardSessionScreen() {
         style={{ backgroundColor: withThemeOpacity(themeSurface, 0.95) }}
       >
         <View style={{ width: "100%", maxWidth }}>
-          {sessionError && (
-            <Text
-              className="mb-3 text-red-600 dark:text-red-400"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: "center" }}
-            >
-              {sessionError}
-            </Text>
+          {sessionError && !overlayOpen && (
+            <View className="mb-3 items-center" style={{ gap: 4 }} accessibilityRole="alert">
+              <Text
+                className="text-red-600 dark:text-red-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: "center", writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {sessionError}
+              </Text>
+              {/* The same grade again, through the same atomic save: one attempt, one review log. */}
+              {failedGrade !== null ? (
+                <Pressable
+                  onPress={() => handleGrade(failedGrade)}
+                  disabled={mutationBusy}
+                  accessibilityRole="button"
+                  className="min-h-11 justify-center px-4"
+                >
+                  <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+                    {s.decksTryAgain}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           )}
 
           {phase === "front" && (
@@ -1188,7 +1417,10 @@ function FlashcardSessionScreen() {
                 style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
               >
                 <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-                  {s.flashcardsNext}
+                  {interpolate(s.sessionNextSide, {
+                    current: formatNumber(currentSideIndex + 2, uiLanguage),
+                    total: formatNumber(activeModes.length, uiLanguage),
+                  })}
                 </Text>
                 <NextIcon size={18} color="#fff" />
               </View>
@@ -1197,7 +1429,15 @@ function FlashcardSessionScreen() {
 
           {/* Grading: show directly after last side is revealed, or in grading phase */}
           {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
-            <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} disabled={mutationBusy} />
+            <GradingButtons
+              onGrade={handleGrade}
+              previews={gradePreviews}
+              isDark={isDark}
+              s={s}
+              disabled={mutationBusy}
+              dir={isRTL ? "rtl" : "ltr"}
+              mirrorInRTL
+            />
           )}
         </View>
       </View>
@@ -1208,8 +1448,12 @@ function FlashcardSessionScreen() {
         isDark={isDark}
         isRTL={isRTL}
         busy={mutationBusy}
+        error={cardMenuOpen ? sessionError : null}
         s={s}
-        onClose={() => setCardMenuOpen(false)}
+        onClose={() => {
+          if (!mutationBusy) setCardMenuOpen(false);
+        }}
+        onOpenInReader={handleOpenInReader}
         onDelete={() => {
           setCardMenuOpen(false);
           setSessionError(null);
@@ -1230,6 +1474,8 @@ function FlashcardSessionScreen() {
       <AnswerEditSheet
         visible={answerEditOpen}
         value={answerEditText}
+        defaultValue={currentCard && answerEditMode ? getDefaultAnswerText(currentCard, answerEditMode, s) : ""}
+        baseline={currentCard && answerEditMode ? (getCardAnswerOverride(currentCard, answerEditMode) ?? getDefaultAnswerText(currentCard, answerEditMode, s)) : ""}
         error={sessionError}
         busy={mutationBusy}
         isDark={isDark}
@@ -1259,11 +1505,14 @@ function FlashcardSessionScreen() {
       />
       <ConfirmDialog
         visible={!!confirmCardAction}
-        title={confirmCardAction === "delete" ? s.cardDeleteTitle : s.cardResetTitle}
+        title={interpolate(confirmCardAction === "delete" ? s.cardDeleteNamed : s.cardResetNamed, {
+          card: sessionCardName(currentCard, uiLanguage),
+        })}
         message={confirmCardAction === "delete" ? s.cardDeleteConfirm : s.cardResetConfirm}
         cancelLabel={s.flashcardsCancel}
         confirmLabel={confirmCardAction === "delete" ? s.flashcardsDelete : s.cardResetProgress}
-        destructive={confirmCardAction === "delete"}
+        destructive
+        itemName={currentCard ? `${currentCard.surahName} ${formatAyahRef(isRTL, currentCard.surah, currentCard.ayah)}` : undefined}
         confirmLoading={mutationBusy}
         error={sessionError}
         isDark={isDark}
@@ -1292,6 +1541,7 @@ function FlashcardSessionScreen() {
         }}
       />
       {wirdNotice ? <Toast message={wirdNotice} onDismiss={() => setWirdNotice(null)} duration={3500} announce /> : null}
+      {actionNotice && !wirdNotice ? <Toast message={actionNotice} onDismiss={() => setActionNotice(null)} announce /> : null}
     </SafeAreaView>
   );
 }
@@ -1348,14 +1598,17 @@ function containsArabic(value: string): boolean {
   return /[\u0600-\u06FF]/.test(value);
 }
 
+/** Card-list order (Mark, Suspend, Bury, Set Due Date), then this session's extras, then Reset and Delete after a divider. */
 function CardActionsSheet({
   visible,
   card,
   isDark,
   isRTL,
   busy,
+  error,
   s,
   onClose,
+  onOpenInReader,
   onDelete,
   onSuspend,
   onBury,
@@ -1370,8 +1623,11 @@ function CardActionsSheet({
   isDark: boolean;
   isRTL: boolean;
   busy: boolean;
+  /** A failed action keeps the sheet open with its error above the rows. */
+  error: string | null;
   s: UIStrings;
   onClose: () => void;
+  onOpenInReader: () => void;
   onDelete: () => void;
   onSuspend: () => void;
   onBury: () => void;
@@ -1384,37 +1640,20 @@ function CardActionsSheet({
   const marked = !!card?.card.marked_at;
   const mutedColor = isDark ? "#a3a3a3" : "#8B8178";
   return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={420}
-      maxHeight="80%"
-    >
-      <OverlayHeader title={s.cardActionsTitle} onClose={onClose} isRTL={isRTL} showHandle />
-      <OverlayBody scrollEnabled={false} contentContainerClassName="px-4 py-3">
+    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={420} maxHeight="80%">
+      <OverlayHeader title={s.cardActionsTitle} onClose={onClose} isRTL={isRTL} />
+      <OverlayBody contentContainerClassName="px-4 py-3">
+        {error ? (
+          <FieldMessage
+            dir={isRTL ? "rtl" : "ltr"}
+            className="mb-3 w-full self-stretch text-red-600 dark:text-red-400"
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+          >
+            {error}
+          </FieldMessage>
+        ) : null}
         <View className="gap-2">
-          <CardActionRow
-            icon={<Trash2 size={18} color={isDark ? "#f87171" : "#dc2626"} />}
-            label={s.cardDelete}
-            disabled={busy}
-            destructive
-            isRTL={isRTL}
-            onPress={onDelete}
-          />
-          <CardActionRow
-            icon={<PauseCircle size={18} color={mutedColor} />}
-            label={s.cardSuspend}
-            disabled={busy}
-            isRTL={isRTL}
-            onPress={onSuspend}
-          />
-          <CardActionRow
-            icon={<Clock3 size={18} color={isDark ? "#fbbf24" : "#d97706"} />}
-            label={s.cardBury}
-            disabled={busy}
-            isRTL={isRTL}
-            onPress={onBury}
-          />
           <CardActionRow
             icon={<Star size={18} color={isDark ? "#facc15" : "#ca8a04"} fill={marked ? (isDark ? "#facc15" : "#ca8a04") : "transparent"} />}
             label={marked ? s.cardUnmark : s.cardMark}
@@ -1422,6 +1661,15 @@ function CardActionsSheet({
             isRTL={isRTL}
             onPress={onToggleMark}
           />
+          <CardActionRow icon={<PauseCircle size={18} color={mutedColor} />} label={s.cardSuspend} disabled={busy} isRTL={isRTL} onPress={onSuspend} />
+          <CardActionRow
+            icon={<Clock3 size={18} color={isDark ? "#fbbf24" : "#d97706"} />}
+            label={s.cardBury}
+            disabled={busy}
+            isRTL={isRTL}
+            onPress={onBury}
+          />
+          <CardActionRow icon={<CalendarDays size={18} color={mutedColor} />} label={s.cardSetDueDate} disabled={busy} isRTL={isRTL} onPress={onSetDueDate} />
           <CardActionRow
             icon={<Pencil size={18} color={isDark ? "#5eead4" : "#0d9488"} />}
             label={s.cardEditAnswer}
@@ -1429,19 +1677,16 @@ function CardActionsSheet({
             isRTL={isRTL}
             onPress={onEditAnswer}
           />
+          <CardActionRow icon={<BookOpen size={18} color={mutedColor} />} label={s.cardOpenInReader} disabled={busy} isRTL={isRTL} onPress={onOpenInReader} />
+          <View className="my-1 h-px bg-surface-high dark:bg-surface-dark-high" />
+          <CardActionRow icon={<RotateCcw size={18} color={mutedColor} />} label={s.cardResetProgress} disabled={busy} isRTL={isRTL} onPress={onReset} />
           <CardActionRow
-            icon={<RotateCcw size={18} color={mutedColor} />}
-            label={s.cardResetProgress}
+            icon={<Trash2 size={18} color={isDark ? "#f87171" : "#dc2626"} />}
+            label={s.cardDelete}
             disabled={busy}
+            destructive
             isRTL={isRTL}
-            onPress={onReset}
-          />
-          <CardActionRow
-            icon={<CalendarDays size={18} color={mutedColor} />}
-            label={s.cardSetDueDate}
-            disabled={busy}
-            isRTL={isRTL}
-            onPress={onSetDueDate}
+            onPress={onDelete}
           />
         </View>
       </OverlayBody>
@@ -1498,6 +1743,8 @@ function CardActionRow({
 function AnswerEditSheet({
   visible,
   value,
+  defaultValue,
+  baseline,
   error,
   busy,
   isDark,
@@ -1509,6 +1756,10 @@ function AnswerEditSheet({
 }: {
   visible: boolean;
   value: string;
+  /** The standard answer, shown for reference; a personal answer never replaces it in the data. */
+  defaultValue: string;
+  /** What the field held when it opened, for the discard check. */
+  baseline: string;
   error: string | null;
   busy: boolean;
   isDark: boolean;
@@ -1519,56 +1770,94 @@ function AnswerEditSheet({
   onSave: () => void;
 }) {
   const answerIsRTL = isRTL || containsArabic(value);
+  const { guard, dialogProps } = useDiscardGuard(visible && isEditableTextDirty(value, baseline));
+  // Close, Cancel, Back, Escape and the backdrop all ask before dropping an edit.
+  const requestClose = () => {
+    if (!busy) guard(onClose);
+  };
   return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={520}
-      maxHeight="80%"
-      avoidKeyboard
-    >
-      <OverlayHeader title={s.cardEditAnswerTitle} subtitle={s.cardEditAnswerHint} onClose={onClose} isRTL={isRTL} showHandle />
-      <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          placeholder={s.cardEditAnswerPlaceholder}
-          placeholderTextColor={isDark ? "#737373" : "#b9a085"}
-          multiline
-          textAlignVertical="top"
-          className="min-h-[160px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 text-charcoal dark:text-neutral-100"
-          style={{
-            fontFamily: "Manrope_500Medium",
-            fontSize: 16,
-            lineHeight: 25,
-            ...inputTextStartStyle(answerIsRTL),
-            writingDirection: answerIsRTL ? "rtl" : "ltr",
-          }}
-        />
-        {error ? (
-          <FieldMessage
-            dir={isRTL ? "rtl" : "ltr"}
-            className="mt-3 w-full self-stretch text-red-600 dark:text-red-400"
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
-          >
-            {error}
-          </FieldMessage>
-        ) : null}
-      </OverlayBody>
-      <OverlayFooter isRTL={isRTL}>
-        <Button variant="outline" onPress={onClose} disabled={busy} className="flex-1">
-          <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {s.flashcardsCancel}
-          </Text>
-        </Button>
-        <Button onPress={onSave} disabled={busy} className="flex-1">
-          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {s.cardSaveAnswer}
-          </Text>
-        </Button>
-      </OverlayFooter>
-    </ResponsiveSheet>
+    <>
+      <ResponsiveSheet open={visible} onClose={requestClose} maxWidth={520} maxHeight="80%" avoidKeyboard>
+        <OverlayHeader title={s.cardEditAnswerTitle} subtitle={s.cardEditAnswerHint} onClose={requestClose} isRTL={isRTL} />
+        <OverlayBody contentContainerClassName="px-5 py-5">
+          <TextInput
+            value={value}
+            onChangeText={onChange}
+            accessibilityLabel={s.cardEditAnswerTitle}
+            placeholder={s.cardEditAnswerPlaceholder}
+            placeholderTextColor={isDark ? "#737373" : "#8B8178"}
+            multiline
+            textAlignVertical="top"
+            className="min-h-[160px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 text-charcoal dark:text-neutral-100"
+            style={{
+              fontFamily: "Manrope_500Medium",
+              fontSize: 16,
+              lineHeight: 25,
+              ...inputTextStartStyle(answerIsRTL),
+              writingDirection: answerIsRTL ? "rtl" : "ltr",
+            }}
+          />
+          <View className="mt-2 items-center" style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
+            <Pressable
+              onPress={() => onChange("")}
+              disabled={busy || value.length === 0}
+              accessibilityRole="button"
+              accessibilityLabel={s.cardAnswerUseDefault}
+              className="min-h-11 justify-center"
+              style={({ pressed }) => ({ opacity: busy || value.length === 0 ? 0.45 : pressed ? 0.7 : 1 })}
+            >
+              <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                {s.cardAnswerUseDefault}
+              </Text>
+            </Pressable>
+          </View>
+          {defaultValue ? (
+            <View className="mt-2" style={{ gap: 4 }}>
+              <Text
+                className="text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {s.cardAnswerDefaultLabel}
+              </Text>
+              <Text
+                className="text-warm-500 dark:text-neutral-400"
+                style={{
+                  fontSize: 14,
+                  lineHeight: 22,
+                  ...textStartStyle(containsArabic(defaultValue)),
+                  writingDirection: containsArabic(defaultValue) ? "rtl" : "ltr",
+                }}
+              >
+                {defaultValue}
+              </Text>
+            </View>
+          ) : null}
+          {error ? (
+            <FieldMessage
+              dir={isRTL ? "rtl" : "ltr"}
+              className="mt-3 w-full self-stretch text-red-600 dark:text-red-400"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
+              {error}
+            </FieldMessage>
+          ) : null}
+        </OverlayBody>
+        <OverlayFooter isRTL={isRTL}>
+          <Button variant="outline" onPress={requestClose} disabled={busy} className="flex-1">
+            <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+              {s.flashcardsCancel}
+            </Text>
+          </Button>
+          <Button onPress={onSave} disabled={busy} className="flex-1">
+            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+              {s.cardSaveAnswer}
+            </Text>
+          </Button>
+        </OverlayFooter>
+      </ResponsiveSheet>
+      <DiscardChangesDialog {...dialogProps} />
+    </>
   );
 }
 
@@ -1578,41 +1867,43 @@ function ModeTagsRow({
   activeModes,
   currentSideIndex,
   maxWidth,
+  isDark,
   isRTL,
   s,
 }: {
   activeModes: ReviewMode[];
   currentSideIndex: number;
   maxWidth: number;
+  isDark: boolean;
   isRTL: boolean;
   s: UIStrings;
 }) {
   return (
     <View className="items-center px-6 pb-3">
-      <View
-        className="flex-row flex-wrap gap-2"
-        style={{ width: "100%", maxWidth, flexDirection: isRTL ? "row-reverse" : "row" }}
-      >
+      <View className="flex-row flex-wrap gap-2" style={{ width: "100%", maxWidth, flexDirection: isRTL ? "row-reverse" : "row" }}>
         {activeModes.map((mode, i) => {
-          const color = getModeColor(mode);
+          const color = reviewSideColor(REVIEW_MODE_TONES[mode], isDark);
           const isActive = i === currentSideIndex;
           const isDone = i < currentSideIndex;
           return (
             <View
               key={mode}
-              className="px-3 py-1.5 rounded-full"
+              className="items-center gap-1 px-3 py-1.5 rounded-full"
               style={{
-                backgroundColor: isActive ? color : "transparent",
+                backgroundColor: isActive ? color.fill : "transparent",
                 borderWidth: 1.5,
-                borderColor: color,
-                opacity: isDone ? 0.4 : 1,
+                borderColor: isActive ? color.fill : color.text,
+                direction: "ltr",
+                flexDirection: isRTL ? "row-reverse" : "row",
               }}
             >
+              {/* A finished side keeps full contrast and gains a check instead of fading. */}
+              {isDone ? <Check size={12} color={color.text} /> : null}
               <Text
                 style={{
                   fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
                   fontSize: 11,
-                  color: isActive ? "#fff" : color,
+                  color: isActive ? color.onFill : color.text,
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
@@ -1659,13 +1950,14 @@ function TestModePrompt({
 }
 
 function TestModeAnswer({
-  mode, card, fontSize, lineHeight, s,
+  mode, card, fontSize, lineHeight, s, isRTL, tafseerSourceLabel,
 }: {
-  mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: UIStrings;
+  mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: UIStrings; isRTL: boolean;
+  tafseerSourceLabel: string | null;
 }) {
   const customAnswer = getCardAnswerOverride(card, mode);
   if (customAnswer) {
-    return <CustomAnswerText text={customAnswer} fontSize={Math.max(15, fontSize * 0.55)} />;
+    return <CustomAnswerText text={customAnswer} fontSize={Math.max(15, fontSize * 0.55)} label={s.sessionPersonalAnswer} isRTL={isRTL} />;
   }
 
   switch (mode) {
@@ -1687,20 +1979,30 @@ function TestModeAnswer({
       );
     case "translation":
       return (
-        <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 24 }}>
-          {card.translation}
-        </Text>
+        <View>
+          <Text
+            className="text-charcoal dark:text-neutral-200"
+            // English translation stays LTR in either interface language.
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 24, ...textStartStyle(false), writingDirection: "ltr" }}
+          >
+            {card.translation}
+          </Text>
+          <SourceLine text={interpolate(s.sessionSourceLabel, { source: s.sessionTranslationSource })} isRTL={isRTL} />
+        </View>
       );
     case "tafseer":
       return (
-        <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
-          <Text
-            className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, writingDirection: "rtl" }}
-          >
-            {card.tafseer}
-          </Text>
-        </ScrollView>
+        <View>
+          <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+            <Text
+              className="text-charcoal dark:text-neutral-200"
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, textAlign: "right", writingDirection: "rtl" }}
+            >
+              {card.tafseer}
+            </Text>
+          </ScrollView>
+          {tafseerSourceLabel ? <SourceLine text={interpolate(s.sessionSourceLabel, { source: tafseerSourceLabel })} isRTL={isRTL} /> : null}
+        </View>
       );
     case "surahName":
       return (
@@ -1724,31 +2026,55 @@ function TestModeAnswer({
         </Text>
       );
     case "smartRefs":
-      return <SmartRefsAnswer card={card} fontSize={fontSize * 0.82} lineHeight={lineHeight * 0.82} s={s} />;
+      return <SmartRefsAnswer card={card} fontSize={fontSize * 0.82} lineHeight={lineHeight * 0.82} s={s} isRTL={isRTL} />;
     case "qiraatReading":
-      return <QiraatAnswer card={card} s={s} />;
+      return <QiraatAnswer card={card} s={s} isRTL={isRTL} />;
     case "asbabReading":
-      return <AsbabAnswer card={card} s={s} />;
+      return <AsbabAnswer card={card} s={s} isRTL={isRTL} />;
     default:
       return null;
   }
 }
 
-function CustomAnswerText({ text, fontSize }: { text: string; fontSize: number }) {
-  const answerIsRTL = containsArabic(text);
+/** The answer's source, small and muted under translation and tafsir answers. */
+function SourceLine({ text, isRTL }: { text: string; isRTL: boolean }) {
   return (
     <Text
-      className="text-charcoal dark:text-neutral-100"
-      style={{
-        fontFamily: "Manrope_400Regular",
-        fontSize,
-        lineHeight: Math.round(fontSize * 1.62),
-        ...textStartStyle(answerIsRTL),
-        writingDirection: answerIsRTL ? "rtl" : "ltr",
-      }}
+      className="mt-3 text-warm-500 dark:text-neutral-400"
+      style={{ fontFamily: "Manrope_500Medium", fontSize: 11, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
     >
       {text}
     </Text>
+  );
+}
+
+/**
+ * A personal answer, labeled as the user's own so it is never read as the standard text. Line
+ * breaks are kept; Arabic uses the reader's Arabic face instead of the Latin UI font.
+ */
+function CustomAnswerText({ text, fontSize, label, isRTL }: { text: string; fontSize: number; label: string; isRTL: boolean }) {
+  const answerIsRTL = containsArabic(text);
+  return (
+    <View style={{ gap: 6 }}>
+      <Text
+        className="text-warm-500 dark:text-neutral-400"
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+      >
+        {label}
+      </Text>
+      <Text
+        className="text-charcoal dark:text-neutral-100"
+        style={{
+          ...(answerIsRTL ? (ARABIC_READING_FONT ? { fontFamily: ARABIC_READING_FONT } : null) : { fontFamily: "Manrope_400Regular" }),
+          fontSize,
+          lineHeight: Math.round(fontSize * 1.62),
+          ...textStartStyle(answerIsRTL),
+          writingDirection: answerIsRTL ? "rtl" : "ltr",
+        }}
+      >
+        {text}
+      </Text>
+    </View>
   );
 }
 
@@ -1843,11 +2169,13 @@ function SmartRefsAnswer({
   fontSize,
   lineHeight,
   s,
+  isRTL,
 }: {
   card: CardData;
   fontSize: number;
   lineHeight: number;
   s: UIStrings;
+  isRTL: boolean;
 }) {
   const refs = card.smartRefs ?? [];
   const target = card.smartTargetRef ?? refs[0] ?? null;
@@ -1859,7 +2187,7 @@ function SmartRefsAnswer({
     <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
       <Text
         className="text-warm-400 dark:text-neutral-500 uppercase mb-3"
-        style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, textAlign: "right", writingDirection: "rtl" }}
+        style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
       >
         {title}
       </Text>
@@ -1894,7 +2222,7 @@ function SmartRefsAnswer({
           <>
             <Text
               className="text-warm-400 dark:text-neutral-500 uppercase mt-2"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, textAlign: "right", writingDirection: "rtl" }}
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
             >
               {s.smartDeckRelatedAyahs}
             </Text>
@@ -1944,7 +2272,7 @@ function SmartRefCard({
   );
 }
 
-function QiraatAnswer({ card, s }: { card: CardData; s: UIStrings }) {
+function QiraatAnswer({ card, s, isRTL }: { card: CardData; s: UIStrings; isRTL: boolean }) {
   const blocks = parseQiraatText(card.qiraatText ?? "");
   if (blocks.length === 0) {
     return (
@@ -1963,7 +2291,7 @@ function QiraatAnswer({ card, s }: { card: CardData; s: UIStrings }) {
     <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
       <Text
         className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-3"
-        style={{ writingDirection: "rtl", textAlign: "right" }}
+        style={{ ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
       >
         {s.qiraatHeader}
       </Text>
@@ -1984,7 +2312,7 @@ function QiraatAnswer({ card, s }: { card: CardData; s: UIStrings }) {
   );
 }
 
-function AsbabAnswer({ card, s }: { card: CardData; s: UIStrings }) {
+function AsbabAnswer({ card, s, isRTL }: { card: CardData; s: UIStrings; isRTL: boolean }) {
   const occasions = card.asbabOccasions ?? [];
   if (occasions.length === 0) {
     return (
@@ -2003,7 +2331,7 @@ function AsbabAnswer({ card, s }: { card: CardData; s: UIStrings }) {
     <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
       <Text
         className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-3"
-        style={{ writingDirection: "rtl", textAlign: "right" }}
+        style={{ ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
       >
         {s.asbabHeader}
       </Text>
@@ -2047,18 +2375,17 @@ function AsbabAnswer({ card, s }: { card: CardData; s: UIStrings }) {
 
 // ─── Card State Badge ────────────────────────────────────────
 
-function CardStateBadge({ state, s }: { state: number; s: UIStrings }) {
-  const config: Record<number, { label: string; bg: string }> = {
-    [State.New]: { label: s.flashcardsSummaryNew, bg: "#3b82f6" },
-    [State.Learning]: { label: s.flashcardsSummaryLearning, bg: "#f97316" },
-    [State.Review]: { label: s.flashcardsSummaryReview, bg: "#22c55e" },
-    [State.Relearning]: { label: s.flashcardsSummaryRelearning, bg: "#ef4444" },
+function CardStateBadge({ state, isDark, s }: { state: number; isDark: boolean; s: UIStrings }) {
+  const labels: Record<number, string> = {
+    [State.New]: s.flashcardsSummaryNew,
+    [State.Learning]: s.flashcardsSummaryLearning,
+    [State.Review]: s.flashcardsSummaryReview,
+    [State.Relearning]: s.flashcardsSummaryRelearning,
   };
-  const c = config[state] ?? config[State.New];
-
+  const token = cardStateColor(state, isDark);
   return (
-    <View className="px-3 py-1 rounded-full" style={{ backgroundColor: c.bg }}>
-      <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, color: "#fff" }}>{c.label}</Text>
+    <View className="px-3 py-1 rounded-full" style={{ backgroundColor: token.fill }}>
+      <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, color: token.onFill }}>{labels[state] ?? labels[State.New]}</Text>
     </View>
   );
 }
@@ -2074,6 +2401,7 @@ function SessionSummaryView({
   db,
   language,
   commitLabel,
+  ownerId,
 }: {
   summary: SessionSummary;
   onDone: () => void;
@@ -2084,11 +2412,50 @@ function SessionSummaryView({
   language: "en" | "ar";
   /** STR-20's commitment, read when the session opened (useCommitmentLabel). */
   commitLabel: string;
+  /** The signed-in account, if any: only its confirmed sync may say Synced. */
+  ownerId: string | null;
 }) {
   const { width, height } = useWindowDimensions();
-  const durationMin = Math.max(1, Math.round(summary.durationMs / 60000));
-  const nextReview = formatNextReviewDate(summary.nextReviewDate, s);
   const compact = width < 430 || height < 760;
+  const synced = useConfirmedSync(db, ownerId, summary.total > 0);
+  const n = (value: number) => formatNumber(value, language);
+  const seconds = Math.round(summary.durationMs / 1000);
+  // Under a minute reads in seconds instead of rounding up to 1 min.
+  const duration =
+    seconds < 60
+      ? interpolate(s.sessionSeconds, { n: n(Math.max(seconds, summary.total > 0 ? 1 : 0)) })
+      : interpolate(s.flashcardsSummaryMinutes, { n: n(Math.round(summary.durationMs / 60000)) });
+  const nextReview = formatNextReviewDate(summary.nextReviewDate, s, language);
+
+  if (summary.emptyQueue) {
+    return (
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 20, paddingVertical: 32 }}
+      >
+        <Text
+          className="text-center text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "NotoSerif_700Bold", fontSize: compact ? 21 : 24, marginBottom: 12 }}
+        >
+          {/* Cards exist but none were due: say so with the next due time. No cards at all: nothing to review. */}
+          {nextReview ? s.sessionNothingWasDue : s.sessionNothingToReview}
+        </Text>
+        {nextReview ? (
+          <Text
+            className="text-center text-warm-500 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 14, lineHeight: 21, writingDirection: language === "ar" ? "rtl" : "ltr" }}
+          >
+            {interpolate(s.sessionNextDue, { when: nextReview })}
+          </Text>
+        ) : null}
+        <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: 28 }}>
+          <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.flashcardsSummaryDone}</Text>
+        </Button>
+      </ScrollView>
+    );
+  }
+
+  const states = { new: cardStateColor(State.New, isDark), review: cardStateColor(State.Review, isDark), relearning: cardStateColor(State.Relearning, isDark) };
 
   // Scrolls so the habit cards never push the Done button off a small screen.
   return (
@@ -2131,13 +2498,13 @@ function SessionSummaryView({
       </Text>
 
       <View className="w-full max-w-sm" style={{ gap: compact ? 10 : 14 }}>
-        <SummaryRow label={s.flashcardsSummaryReviewed} value={String(summary.total)} compact={compact} />
+        <SummaryRow label={s.flashcardsSummaryReviewed} value={n(summary.total)} compact={compact} />
         <View className="flex-row" style={{ gap: compact ? 8 : 12 }}>
-          <SummaryCard label={s.flashcardsSummaryNew} value={String(summary.newCount)} color="#3b82f6" compact={compact} />
-          <SummaryCard label={s.flashcardsSummaryReview} value={String(summary.reviewCount)} color="#22c55e" compact={compact} />
-          <SummaryCard label={s.flashcardsSummaryRelearning} value={String(summary.relearningCount)} color="#ef4444" compact={compact} />
+          <SummaryCard label={s.flashcardsSummaryNew} value={n(summary.newCount)} color={states.new.text} compact={compact} />
+          <SummaryCard label={s.flashcardsSummaryReview} value={n(summary.reviewCount)} color={states.review.text} compact={compact} />
+          <SummaryCard label={s.flashcardsSummaryRelearning} value={n(summary.relearningCount)} color={states.relearning.text} compact={compact} />
         </View>
-        <SummaryRow label={s.flashcardsSummaryDuration} value={interpolate(s.flashcardsSummaryMinutes, { n: String(durationMin) })} compact={compact} />
+        <SummaryRow label={s.flashcardsSummaryDuration} value={duration} compact={compact} />
         {/* No date (none scheduled, or it could not load) leaves the row out rather than a lone dash. */}
         {nextReview ? <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} compact={compact} /> : null}
       </View>
@@ -2148,13 +2515,49 @@ function SessionSummaryView({
         </View>
       ) : null}
 
+      {/* Done never waits for the network: grades are already saved here. */}
       <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
         <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 15 : 16, color: "#fff" }}>
           {showsCommitment(summary.habit) ? commitLabel : s.flashcardsSummaryDone}
         </Text>
       </Button>
+      {summary.total > 0 ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          className="mt-2 text-center text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+        >
+          {synced ? s.sessionSynced : s.sessionSavedOnDevice}
+        </Text>
+      ) : null}
     </ScrollView>
   );
+}
+
+/**
+ * True once a sync for the current account has finished with nothing left to upload. It never
+ * blocks Done, and an account change or a pending upload keeps it at "Saved on this device".
+ */
+function useConfirmedSync(db: AppDatabase, ownerId: string | null, enabled: boolean): boolean {
+  const [synced, setSynced] = useState(false);
+  useEffect(() => {
+    setSynced(false);
+    if (!ownerId || !enabled) return;
+    let active = true;
+    const check = () => {
+      getPendingSyncCount(db)
+        .then((pending) => {
+          if (active && pending === 0 && useAuthStore.getState().user?.id === ownerId) setSynced(true);
+        })
+        .catch(() => undefined);
+    };
+    const unsubscribe = subscribeSyncCompleted(check);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [db, enabled, ownerId]);
+  return synced;
 }
 
 function SummaryRow({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
@@ -2190,11 +2593,11 @@ function localEndOfTodayIso(base = new Date()): string {
   return end.toISOString();
 }
 
-function formatNextReviewDate(value: string | null, s: UIStrings): string | null {
+function formatNextReviewDate(value: string | null, s: UIStrings, language: "en" | "ar"): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date <= new Date(localEndOfTodayIso()) ? s.flashcardsToday : date.toLocaleDateString();
+  return date <= new Date(localEndOfTodayIso()) ? s.flashcardsToday : formatLongCardDate(date, language);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -2215,26 +2618,38 @@ function getModeName(mode: ReviewMode, s: UIStrings): string {
   return map[mode] ?? mode;
 }
 
-function getModeColor(mode: ReviewMode): string {
-  if (isWordTestMode(mode)) return WORD_TEST_MODE_COLORS[mode];
-  if (isSmartTestMode(mode)) return SMART_TEST_MODE_COLORS[mode];
-  return TEST_MODE_COLORS[mode];
+/** The deck a card belongs to, named during Review all. */
+function deckTitleFor(deckId: string, s: UIStrings): string {
+  if (deckId === MEANINGS_DECK_ID) return s.vocabDeckTitle;
+  if (deckId === SMART_DECK_IDS.retention) return s.smartDeckRetentionTitle;
+  if (deckId === SMART_DECK_IDS.mutashabihat) return s.smartDeckMutashabihatTitle;
+  if (deckId === SMART_DECK_IDS.similarTails) return s.smartDeckSimilarTailsTitle;
+  if (deckId === SMART_DECK_IDS.qiraat) return s.smartDeckQiraatTitle;
+  if (deckId === SMART_DECK_IDS.reasonsOfRevelation) return s.smartDeckReasonsTitle;
+  return "";
+}
+
+function tafseerSourceLabel(sourceId: string, s: UIStrings): string | null {
+  const source = TAFSIR_SOURCES.find((item) => item.id === sourceId);
+  const label = source ? (s as unknown as Record<string, string | undefined>)[source.labelKey] : undefined;
+  return label ?? null;
+}
+
+/** "Al-Baqara 2:255" / "البقرة ٢:٢٥٥", or the saved word, for a confirmation title. */
+function sessionCardName(card: CardData | null, language: "en" | "ar"): string {
+  if (!card) return "";
+  if (card.isWordCard && card.wordText) return card.wordText;
+  const name = language === "ar" ? card.surahName : (surahTransliteration(card.surah) ?? "");
+  const reference = language === "ar" ? `${toArabicNumeral(card.surah)}:${toArabicNumeral(card.ayah)}` : `${card.surah}:${card.ayah}`;
+  return name ? `${name} ${reference}` : reference;
 }
 
 function isWordTestMode(mode: ReviewMode): mode is WordTestMode {
   return mode === "wordMeaningArabic" || mode === "wordMeaningTranslation";
 }
 
-function isSmartTestMode(mode: ReviewMode): mode is SmartTestMode {
-  return mode === "smartRefs" || mode === "qiraatReading" || mode === "asbabReading";
-}
-
 function isSmartReviewCard(card: CardData): boolean {
   return card.kind === "mutashabihat" || card.kind === "similarTail" || card.kind === "qiraat" || card.kind === "asbab";
-}
-
-function formatCompactNumber(value: number, isRTL: boolean): string {
-  return isRTL ? toArabicNumeral(value) : String(value);
 }
 
 function getSmartDeckTitleForKind(kind: SmartCardKind, s: UIStrings): string {

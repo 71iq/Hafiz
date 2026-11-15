@@ -156,9 +156,9 @@ describe("RTL higher-level component contracts", () => {
     });
   });
 
-  it("ConfirmDialog shows the warning icon by default and none in the neutral tone", () => {
+  it("ConfirmDialog warns for destructive actions, informs otherwise and has no icon in the neutral tone", () => {
     setMockSettings({ isRTL: false, uiLanguage: "en" });
-    const dialog = (tone?: "neutral") => (
+    const dialog = (tone?: "neutral", destructive?: boolean) => (
       <ConfirmDialog
         visible
         title="Leave this review?"
@@ -166,6 +166,7 @@ describe("RTL higher-level component contracts", () => {
         cancelLabel="Keep reviewing"
         confirmLabel="Leave"
         tone={tone}
+        destructive={destructive}
         isDark={false}
         onCancel={jest.fn()}
         onConfirm={jest.fn()}
@@ -173,11 +174,21 @@ describe("RTL higher-level component contracts", () => {
     );
     const warningIcons = (view: ReturnType<typeof renderInSafeArea>) =>
       view.UNSAFE_root.findAll((node: RtlTestNode) => typeof node.props?.className === "string" && node.props.className.includes("bg-red-500/10"));
-    const warning = renderInSafeArea(dialog());
+    const infoIcons = (view: ReturnType<typeof renderInSafeArea>) =>
+      view.UNSAFE_root.findAll(
+        (node: RtlTestNode) => typeof node.props?.className === "string" && node.props.className.includes("bg-primary-accent/10"),
+      );
+    const warning = renderInSafeArea(dialog(undefined, true));
     expect(warningIcons(warning).length).toBeGreaterThan(0);
+    expect(infoIcons(warning)).toHaveLength(0);
     warning.unmount();
+    const info = renderInSafeArea(dialog());
+    expect(warningIcons(info)).toHaveLength(0);
+    expect(infoIcons(info).length).toBeGreaterThan(0);
+    info.unmount();
     const neutral = renderInSafeArea(dialog("neutral"));
     expect(warningIcons(neutral)).toHaveLength(0);
+    expect(infoIcons(neutral)).toHaveLength(0);
     neutral.unmount();
     // Emphasis on staying fills the cancel button and outlines the confirm one.
     const stay = renderInSafeArea(
@@ -235,7 +246,6 @@ describe("RTL higher-level component contracts", () => {
           subtitle="Welcome back"
           appName="Hafiz"
           brandHeadline="Review with care"
-          brandBody="Keep your wird steady"
           backLabel="Back"
           onBack={onBack}
         >

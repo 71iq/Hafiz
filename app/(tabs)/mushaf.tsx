@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
-import { View, Text, Pressable, ActivityIndicator, Platform, ScrollView, useWindowDimensions, BackHandler } from "react-native";
+import { AuthReopenSurfaces } from "@/components/auth/AuthReopenSurfaces";
+import { View, Text, Pressable, Platform, useWindowDimensions, BackHandler, AppState } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -9,41 +10,74 @@ import Animated, {
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
-import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine, ChevronDown, SlidersHorizontal, Pause, Play, Square } from "lucide-react-native";
+import { Undo2 } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useWeakSpotMarker, useWeakSpotsLoader } from "@/lib/hifz/use-weak-spots";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { WordInteractionProvider, useWordInteraction } from "@/lib/word/context";
 import { SelectionProvider, useSelection } from "@/lib/selection/context";
 import { SurahHeader } from "@/components/mushaf/SurahHeader";
 import { AyahBlock } from "@/components/mushaf/AyahBlock";
 import { PageMushaf } from "@/components/mushaf/PageMushaf";
-import { GoToNavigator } from "@/components/mushaf/GoToNavigator";
+import { GoToNavigator, type GoToTab, type GoToTarget } from "@/components/mushaf/GoToNavigator";
 import { MushafIndicator } from "@/components/mushaf/MushafIndicator";
 import { MushafSlider } from "@/components/mushaf/MushafSlider";
 import { FocusModeControls } from "@/components/mushaf/FocusModeControls";
 import { HifzControls } from "@/components/mushaf/HifzControls";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
 import { RecitationRangeSheet } from "@/components/mushaf/RecitationRangeSheet";
+import { RecitationPlayerBar } from "@/components/mushaf/RecitationPlayerBar";
+import { keepPageReveals, NO_VERSE_REVEALS, setVerseReveal, type VerseReveals } from "@/components/mushaf/verse-reveals";
 import { ReadingSettingsSheet } from "@/components/mushaf/ReadingSettingsSheet";
-import { PageViewNavigationSheet, type PageViewNavigationAnchor } from "@/components/mushaf/PageViewNavigationSheet";
+import { ReaderToolbar } from "@/components/mushaf/ReaderToolbar";
+import { ReaderHelpSheet } from "@/components/mushaf/ReaderHelpSheet";
+import { QuranLoadError } from "@/components/mushaf/QuranLoadError";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { WEAK_SPOT_DARK, WEAK_SPOT_LIGHT } from "@/components/mushaf/WordToken";
 import { textStartStyle } from "@/lib/ui/direction";
 import type { HifzVisibility } from "@/components/mushaf/MushafPage";
-import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, pageForAyah, type MushafIndex } from "@/lib/mushaf/position";
-import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import {
+  loadMushafIndex,
+  findJuzForAyah,
+  findHizbForAyah,
+  topmostAyahForPage,
+  pageForAyah,
+  positionForMode,
+  type MushafIndex,
+} from "@/lib/mushaf/position";
+import { useAyahAudio, type AyahAudioTarget } from "@/lib/audio/ayah-audio";
+import { useFollowRecitation } from "@/lib/audio/use-follow-recitation";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
 import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
 import { WebSelectionMenu } from "@/components/mushaf/WebSelectionMenu";
 import { BookmarksSheet } from "@/components/mushaf/BookmarksSheet";
 import { Toast } from "@/components/ui/Toast";
+import { hasOpenOverlay } from "@/components/ui/ResponsiveOverlay";
 import { SearchCommand } from "@/components/SearchCommand";
-import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
+import { consumePendingDeepLink, peekPendingDeepLink, subscribePendingDeepLink } from "@/lib/deep-link";
+import {
+  ARRIVAL_MS,
+  INITIAL_POSITION_SESSION,
+  RETURN_PILL_MS,
+  captureReturnToken,
+  expireReturnToken,
+  mayApplySavedPosition,
+  mayPersistPosition,
+  parseSavedPosition,
+  reducePositionSession,
+  serializePosition,
+  takeReturnToken,
+  type ReaderPosition,
+  type ReaderPositionEvent,
+  type ReturnToken,
+} from "@/lib/navigation/reader-session";
+import { isReaderTapClaimed, releaseReaderTap } from "@/lib/mushaf/reader-tap-guard";
+import { useAuthStore } from "@/lib/auth/store";
 import { isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { loadQuranPageFont } from "@/lib/fonts/loader";
-import { scrollToVisibleIndex } from "@/lib/mushaf/scroll-to-visible-index";
+import { scrollToVisibleIndex, type VerseScrollResult } from "@/lib/mushaf/scroll-to-visible-index";
 import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import {
   SIDEBAR_BREAKPOINT,
@@ -61,6 +95,10 @@ const PAGE_RAIL_MAX_WIDTH = 760;
 const USER_SCROLL_INPUT_WINDOW_MS = 2500;
 // Matches the ayah marker delayLongPress in MushafPage, so a press that selects an ayah never also toggles chrome.
 const LONG_PRESS_MS = 300;
+// Downward scrolling hides the controls only after this much travel, so small adjustments do not flicker them.
+const CHROME_HIDE_SCROLL_PX = 24;
+// A press that moves less than this is a tap (it clears an arrival wash); more is a scroll.
+const TAP_SLOP_PX = 8;
 const HEADER_CONTENT_STYLE = { position: "absolute", top: 0, left: 0, right: 0 } as const;
 const SCROLL_KEYS = new Set(["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "]);
 const READER_INTERACTION_SELECTOR = '[data-hafiz-quran-token], [data-hafiz-word-tooltip="true"], [data-hafiz-reader-interaction="true"]';
@@ -81,6 +119,25 @@ function isFromReaderInteraction(event: any) {
     typeof target.closest === "function" &&
     target.closest(READER_INTERACTION_SELECTOR)
   );
+}
+
+/** C07: shortcuts never act while the reader types, composes text or works a focused control. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+}
+
+const ACTIVATABLE_ROLES = ["button", "link", "menuitem", "tab", "checkbox", "radio", "switch"];
+const ACTIVATABLE_SELECTOR = ["button", "a[href]", "summary", ...ACTIVATABLE_ROLES.map((name) => `[role="${name}"]`)].join(", ");
+
+function isActivatableControl(target: EventTarget | null): boolean {
+  if (typeof Element === "undefined" || !(target instanceof Element)) return false;
+  return Boolean(target.closest(ACTIVATABLE_SELECTOR));
+}
+
+function anyModalOpen(): boolean {
+  return typeof document !== "undefined" && document.querySelector('[aria-modal="true"]') !== null;
 }
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
@@ -133,131 +190,6 @@ type MushafItem =
       v2Page: number;
     };
 
-function ViewModeToggle({
-  isPageMode,
-  isDark,
-  isRTL,
-  label,
-  compact,
-  iconOnly = false,
-  glass,
-  onPress,
-  onPageMenuPress,
-  pageMenuLabel,
-}: {
-  isPageMode: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-  label: string;
-  compact: boolean;
-  /** Hides the label when the phone toolbar would otherwise clip its icons. */
-  iconOnly?: boolean;
-  glass: boolean;
-  onPress: () => void;
-  onPageMenuPress?: (anchor: PageViewNavigationAnchor | null) => void;
-  pageMenuLabel?: string;
-}) {
-  const Icon = isPageMode ? BookOpen : AlignJustify;
-  const { themeSurface } = useSettings();
-  const pageMenuAnchorRef = useRef<any>(null);
-  const showPageMenu = isPageMode && !!onPageMenuPress;
-  const mutedIconColor = isDark ? "#737373" : "#8B8178";
-  const dividerColor = glass
-    ? "rgba(255,255,255,0.14)"
-    : isDark
-      ? "rgba(255,255,255,0.08)"
-      : "rgba(0,54,56,0.08)";
-  const pageMenuSlotWidth = compact ? 30 : 32;
-
-  return (
-    <View
-      ref={pageMenuAnchorRef}
-      collapsable={false}
-      className={`rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"} ${
-        glass ? "" : "bg-surface-high dark:bg-surface-dark-high"
-      }`}
-      style={{
-        ...(Platform.OS === "web" ? ({ appearance: "none", outlineStyle: "none" } as any) : null),
-        direction: "ltr",
-        flexDirection: isRTL ? "row-reverse" : "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 0,
-        paddingVertical: 0,
-        borderWidth: glass ? 1 : 0,
-        borderStyle: "solid",
-        borderColor: glass ? "rgba(255,255,255,0.15)" : "transparent",
-        backgroundColor: glass ? withThemeOpacity(themeSurface, 0.82) : undefined,
-        ...(glass && Platform.OS === "web"
-          ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
-          : null),
-      }}
-    >
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityState={{ selected: true }}
-        accessibilityLabel={label}
-        className={`flex-row items-center justify-center gap-1.5 rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"}`}
-        style={({ pressed }) => ({
-          display: "flex",
-          flexShrink: 0,
-          direction: "ltr",
-          flexDirection: isRTL ? "row-reverse" : "row",
-          alignItems: "center",
-          justifyContent: "center",
-          flexWrap: "nowrap",
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-        })}
-      >
-        <Icon size={16} color={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={2} />
-        {!iconOnly && <Text
-          className="text-primary-accent dark:text-primary-bright"
-          numberOfLines={1}
-          style={{
-            flexShrink: 0,
-            fontFamily: "Manrope_600SemiBold",
-            fontSize: compact ? 12 : 13,
-            lineHeight: compact ? 18 : 19,
-            textAlign: "center",
-            writingDirection: isRTL ? "rtl" : "ltr",
-            ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
-          }}
-        >
-          {label}
-        </Text>}
-      </Pressable>
-      {showPageMenu && (
-        <Pressable
-          onPress={() => {
-            const trigger = pageMenuAnchorRef.current;
-            if (trigger?.measureInWindow) {
-              trigger.measureInWindow((x: number, y: number, width: number, height: number) => {
-                onPageMenuPress({ x, y, width, height });
-              });
-              return;
-            }
-            onPageMenuPress(null);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={pageMenuLabel}
-          className="h-full items-center justify-center px-2.5"
-          style={({ pressed }) => ({
-            width: pageMenuSlotWidth,
-            alignSelf: "stretch",
-            borderLeftWidth: isRTL ? 0 : 1,
-            borderRightWidth: isRTL ? 1 : 0,
-            borderColor: dividerColor,
-            transform: [{ scale: pressed ? 0.96 : 1 }],
-          })}
-        >
-          <ChevronDown size={15} color={mutedIconColor} />
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
 export default function MushafScreen() {
   return (
     <WordInteractionProvider>
@@ -282,6 +214,7 @@ function MushafInner() {
     hifzAutoAdvancePage,
     focusScrollSpeed,
     setFocusScrollSpeed,
+    audioFollow,
     isDark,
     isRTL,
     themeSurface,
@@ -294,16 +227,22 @@ function MushafInner() {
   const insets = useSafeAreaInsets();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   const isTablet = windowWidth >= SIDEBAR_BREAKPOINT && windowWidth < VIEWPORT_BREAKPOINTS.desktop;
-  // Compact layout under ~480px tightens phone chrome spacing.
-  const isNarrow = windowWidth < 480;
   const { selection } = useSelection();
-  const { navigateToAyah, detailWord } = useWordInteraction();
+  const { detailWord } = useWordInteraction();
   const { visible: chromeVisible, setVisible: setChromeVisible, setImmersive } = useChrome();
   const lastScrollYRef = useRef(0);
   const touchStartRef = useRef<{ x: number; y: number; at?: number } | null>(null);
   const touchMovedRef = useRef(false);
   const tapRevealGuardUntilRef = useRef(0);
   const lastUserScrollInputRef = useRef(0);
+  const downwardTravelRef = useRef(0);
+  // C06 saved-position bookkeeping: an explicit target outranks hydration, and an arrival is not saved
+  // until the reader deliberately scrolls, pages or switches view.
+  const positionSessionRef = useRef(INITIAL_POSITION_SESSION);
+  const dispatchPosition = useCallback((event: ReaderPositionEvent) => {
+    positionSessionRef.current = reducePositionSession(positionSessionRef.current, event);
+  }, []);
+  const markDeliberateMovement = useCallback(() => dispatchPosition("deliberate-move"), [dispatchPosition]);
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     const markInput = () => {
@@ -352,6 +291,8 @@ function MushafInner() {
     setFocusControlsVisible(true);
   }, [clearFocusControlsTimer, focusModeActive]);
 
+  // Set once the follow-recitation owner exists below: the reader's own scrolling or paging suspends it.
+  const suspendFollowRef = useRef<() => void>(() => {});
   const handleScrollChrome = useCallback((e: any) => {
     const y = e?.nativeEvent?.contentOffset?.y;
     if (typeof y !== "number") return;
@@ -361,31 +302,52 @@ function MushafInner() {
     }
     const dy = y - lastScrollYRef.current;
     const now = Date.now();
+    if (Math.abs(dy) > 8 && now - lastUserScrollInputRef.current < USER_SCROLL_INPUT_WINDOW_MS) {
+      suspendFollowRef.current();
+    }
     // A step larger than the screen is a programmatic jump (restoring the saved position, opening
     // a search result), not the reader scrolling, so it must not hide the controls.
     if (now <= tapRevealGuardUntilRef.current || Math.abs(dy) > windowHeight) {
       lastScrollYRef.current = y;
+      downwardTravelRef.current = 0;
       return;
     }
+    const ownScroll = now - lastUserScrollInputRef.current < USER_SCROLL_INPUT_WINDOW_MS;
+    if (ownScroll && dy !== 0) markDeliberateMovement();
     if (dy < -8) {
+      downwardTravelRef.current = 0;
       setChromeVisible(true);
-    } else if (dy > 8 && now - lastUserScrollInputRef.current < USER_SCROLL_INPUT_WINDOW_MS) {
-      // Only the reader's own scrolling hides the controls. Lists also move while items measure,
-      // retry a scroll to a target or restore a position, and those must leave the controls shown.
-      setChromeVisible(false);
+    } else if (dy > 0 && ownScroll) {
+      // Only the reader's own scrolling hides the controls, and only after 24 px of travel. Lists
+      // also move while items measure, retry a scroll to a target or restore a position, and those
+      // must leave the controls shown.
+      downwardTravelRef.current += dy;
+      if (downwardTravelRef.current >= CHROME_HIDE_SCROLL_PX) {
+        downwardTravelRef.current = 0;
+        setChromeVisible(false);
+      }
+    } else if (dy < 0) {
+      downwardTravelRef.current = 0;
     }
     lastScrollYRef.current = y;
-  }, [focusModeActive, setChromeVisible, windowHeight]);
+  }, [focusModeActive, markDeliberateMovement, setChromeVisible, windowHeight]);
 
+  // A short tap on empty reading space shows or hides the controls at every width. A tap an ayah
+  // marker already handled is not counted twice.
   const toggleChromeFromReaderTap = useCallback(() => {
-    if (focusModeActive) {
-      pauseFocusAutoScroll();
+    if (isReaderTapClaimed()) {
+      releaseReaderTap();
       return;
     }
-    if (!isPhone && !isTablet) return;
+    if (focusModeActive) {
+      // A tap on the reader brings back the full controls collapsed to the Pause pill.
+      if (focusModePlaying && !focusControlsVisible) revealFocusControls();
+      else pauseFocusAutoScroll();
+      return;
+    }
     tapRevealGuardUntilRef.current = Date.now() + 700;
     setChromeVisible((visible) => !visible);
-  }, [focusModeActive, isPhone, isTablet, pauseFocusAutoScroll, setChromeVisible]);
+  }, [focusControlsVisible, focusModeActive, focusModePlaying, pauseFocusAutoScroll, revealFocusControls, setChromeVisible]);
 
   const keepChromeVisibleDuringFontChange = useCallback(() => {
     if (focusModeActive) return;
@@ -396,7 +358,6 @@ function MushafInner() {
   const readerTapProps = Platform.OS === "web"
     ? ({
         onPointerDown: (e: any) => {
-          if (!focusModeActive && !isPhone && !isTablet) return;
           if (isFromFocusModeControls(e) || isFromReaderInteraction(e)) {
             touchStartRef.current = null;
             return;
@@ -408,7 +369,6 @@ function MushafInner() {
           touchMovedRef.current = false;
         },
         onPointerMove: (e: any) => {
-          if (!focusModeActive && !isPhone && !isTablet) return;
           if (isFromFocusModeControls(e) || isFromReaderInteraction(e)) return;
           const start = touchStartRef.current;
           if (!start) return;
@@ -423,7 +383,6 @@ function MushafInner() {
           }
         },
         onPointerUp: (e: any) => {
-          if (!focusModeActive && !isPhone && !isTablet) return;
           if (isFromFocusModeControls(e) || isFromReaderInteraction(e)) {
             touchStartRef.current = null;
             return;
@@ -453,6 +412,7 @@ function MushafInner() {
           ) {
             touchMovedRef.current = true;
             lastUserScrollInputRef.current = Date.now();
+            markDeliberateMovement();
           }
         },
         onTouchEnd: () => {
@@ -497,15 +457,20 @@ function MushafInner() {
 
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed Quran-data query shows Retry instead of an empty reader.
+  const [quranLoadFailed, setQuranLoadFailed] = useState(false);
+  const [quranLoadAttempt, setQuranLoadAttempt] = useState(0);
   const [showNavigator, setShowNavigator] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showRecitation, setShowRecitation] = useState(false);
   const [showReadingSettings, setShowReadingSettings] = useState(false);
-  const [showPageViewNavigation, setShowPageViewNavigation] = useState(false);
-  const [pageViewNavigationAnchor, setPageViewNavigationAnchor] = useState<PageViewNavigationAnchor | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [navigatorTab, setNavigatorTab] = useState<GoToTab>("surah");
   const [currentPage, setCurrentPage] = useState(1);
   const [verseHideMode, setVerseHideMode] = useState(false);
+  // Hide mode: revealed ayahs (key to page) live here so virtualization never re-hides them.
+  const [verseReveals, setVerseReveals] = useState<VerseReveals>(NO_VERSE_REVEALS);
   const [hifzEnabled, setHifzEnabled] = useState(false);
   const [hifzRevealedAyahCount, setHifzRevealedAyahCount] = useState(0);
   const [hifzActiveAyahKey, setHifzActiveAyahKey] = useState<string | null>(null);
@@ -515,20 +480,9 @@ function MushafInner() {
   const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const [pageModeHifzAyahs, setPageModeHifzAyahs] = useState<HifzPageAyah[]>([]);
   const isPageMode = viewMode === "page";
-  // The phone toolbar scrolls sideways when its icons do not fit, which hid the last ones with no
-  // hint. Once that happens at this width and mode, drop the view toggle's label instead.
-  const toolbarLayoutKey = `${windowWidth}:${isPageMode ? "page" : "verse"}:${isRTL ? "rtl" : "ltr"}`;
-  const [toolbarOverflowKey, setToolbarOverflowKey] = useState<string | null>(null);
-  const toolbarToggleIconOnly = toolbarOverflowKey === toolbarLayoutKey;
-  const toolbarViewportWidthRef = useRef(0);
-  const toolbarContentWidthRef = useRef(0);
-  const checkToolbarOverflow = useCallback(() => {
-    const viewport = toolbarViewportWidthRef.current;
-    const content = toolbarContentWidthRef.current;
-    if (viewport > 0 && content > viewport + 1) setToolbarOverflowKey(toolbarLayoutKey);
-  }, [toolbarLayoutKey]);
   const currentPageRef = useRef(1);
-  const deepLinkHandledRef = useRef(false);
+  const topAyahRef = useRef<{ surah: number; ayah: number } | null>(null);
+  topAyahRef.current = topAyah;
   const hifzCurrentPageAyahsRef = useRef<HifzPageAyah[]>([]);
   const hifzEnabledRef = useRef(false);
   const hifzAutoAdvancePageRef = useRef(false);
@@ -542,20 +496,54 @@ function MushafInner() {
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
   const pendingVersePageRef = useRef<number | null>(null);
+  // The view-switch anchor from page view: the ayah at the top of the viewport.
+  const pendingVerseAnchorRef = useRef<{ surah: number; ayah: number } | null>(null);
+  const pageTopAyahRef = useRef<(() => { surah: number; ayah: number } | null) | null>(null);
   const verseScrollRequestRef = useRef(0);
 
-  const [surahHeaderIndices, setSurahHeaderIndices] = useState<
-    Map<number, number>
-  >(new Map());
 
-  // Target highlight: "surah:ayah" key from deep links, search, and cross-screen navigation.
-  const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  // C07 arrival: one wash per arrival with its own generation, cleared after three seconds or by the
+  // next deliberate tap. An older timer can never clear a newer arrival.
+  const [arrival, setArrival] = useState<{ id: number; surah: number; ayah: number; wordPos: number | null } | null>(null);
+  const arrivalSeqRef = useRef(0);
+  const arrivalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startArrival = useCallback((target: MushafTarget) => {
+    const id = ++arrivalSeqRef.current;
+    if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current);
+    setArrival({
+      id,
+      surah: target.surah,
+      ayah: target.ayah,
+      wordPos: typeof target.wordPos === "number" ? target.wordPos : null,
+    });
+    arrivalTimerRef.current = setTimeout(() => {
+      arrivalTimerRef.current = null;
+      setArrival((current) => (current?.id === id ? null : current));
+    }, ARRIVAL_MS);
+  }, []);
+  const clearArrival = useCallback(() => {
+    if (arrivalTimerRef.current) {
+      clearTimeout(arrivalTimerRef.current);
+      arrivalTimerRef.current = null;
+    }
+    setArrival((current) => (current ? null : current));
+  }, []);
+  useEffect(
+    () => () => {
+      if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current);
+    },
+    [],
+  );
+  const highlightedKey = arrival ? `${arrival.surah}:${arrival.ayah}` : null;
+  const highlightedWord = useMemo(
+    () => (arrival && arrival.wordPos !== null ? { surah: arrival.surah, ayah: arrival.ayah, wordPos: arrival.wordPos } : null),
+    [arrival],
+  );
   // A running recitation highlights the ayah being recited, ahead of an arrival highlight.
-  const { rangeState: recitation, stop: stopRecitation, togglePause: toggleRecitationPause } = useAyahAudio();
+  const { rangeState: recitation, session: audioSession } = useAyahAudio();
   const recitingKey =
     recitation.active && recitation.currentAyah ? `${recitation.currentAyah.surah}:${recitation.currentAyah.ayah}` : null;
   const displayedHighlightKey = recitingKey ?? highlightedKey;
-  const [highlightedWord, setHighlightedWord] = useState<{ surah: number; ayah: number; wordPos: number } | null>(null);
 
   const commitCurrentPage = useCallback((page: number) => {
     const next = Math.max(1, Math.min(604, Number.isFinite(page) ? Math.round(page) : 1));
@@ -583,24 +571,37 @@ function MushafInner() {
     [clearVerseScrollRetry]
   );
 
-  const highlightTarget = useCallback((target: MushafTarget) => {
-    setHighlightedKey(`${target.surah}:${target.ayah}`);
-    setHighlightedWord(
-      typeof target.wordPos === "number"
-        ? { surah: target.surah, ayah: target.ayah, wordPos: target.wordPos }
-        : null
-    );
-  }, []);
-
-  const clearTargetHighlight = useCallback(() => {
-    if (!highlightedKey && !highlightedWord) return;
-    setHighlightedKey(null);
-    setHighlightedWord(null);
-  }, [highlightedKey, highlightedWord]);
-
+  // A deliberate tap anywhere clears the arrival wash; a scroll, even a small one, does not.
+  const screenTapStartRef = useRef<{ x: number; y: number } | null>(null);
   const screenDismissHighlightProps = Platform.OS === "web"
-    ? ({ onPointerDown: clearTargetHighlight } as Record<string, unknown>)
-    : ({ onTouchStart: clearTargetHighlight } as Record<string, unknown>);
+    ? ({
+        onPointerDown: (e: any) => {
+          screenTapStartRef.current = { x: e?.nativeEvent?.clientX ?? 0, y: e?.nativeEvent?.clientY ?? 0 };
+        },
+        onPointerUp: (e: any) => {
+          const start = screenTapStartRef.current;
+          screenTapStartRef.current = null;
+          if (!start) return;
+          const dx = Math.abs((e?.nativeEvent?.clientX ?? start.x) - start.x);
+          const dy = Math.abs((e?.nativeEvent?.clientY ?? start.y) - start.y);
+          if (dx < TAP_SLOP_PX && dy < TAP_SLOP_PX) clearArrival();
+        },
+      } as Record<string, unknown>)
+    : ({
+        onTouchStart: (e: any) => {
+          const touch = e?.nativeEvent?.touches?.[0];
+          screenTapStartRef.current = touch ? { x: touch.pageX ?? 0, y: touch.pageY ?? 0 } : null;
+        },
+        onTouchEnd: (e: any) => {
+          const start = screenTapStartRef.current;
+          screenTapStartRef.current = null;
+          const touch = e?.nativeEvent?.changedTouches?.[0];
+          if (!start || !touch) return;
+          if (Math.abs((touch.pageX ?? start.x) - start.x) < TAP_SLOP_PX && Math.abs((touch.pageY ?? start.y) - start.y) < TAP_SLOP_PX) {
+            clearArrival();
+          }
+        },
+      } as Record<string, unknown>);
 
   // Load shared juz/surah/page index once for the indicator
   useEffect(() => {
@@ -623,6 +624,7 @@ function MushafInner() {
     async function loadQuran() {
       try {
         setLoading(true);
+        setQuranLoadFailed(false);
         const surahs = await db.getAllAsync<SurahRow>(
           "SELECT number, name_arabic, name_english, ayah_count, revelation_type FROM surahs ORDER BY number"
         );
@@ -636,7 +638,6 @@ function MushafInner() {
         );
 
         const flatItems: MushafItem[] = [];
-        const headerIndices = new Map<number, number>();
         let currentSurah = 0;
 
         for (const row of ayahs) {
@@ -644,7 +645,6 @@ function MushafInner() {
             currentSurah = row.surah;
             const surah = surahMap.get(currentSurah);
             if (surah) {
-              headerIndices.set(surah.number, flatItems.length);
               flatItems.push({
                 type: "surah-header",
                 surahNumber: surah.number,
@@ -667,10 +667,10 @@ function MushafInner() {
 
         if (!cancelled) {
           setItems(flatItems);
-          setSurahHeaderIndices(headerIndices);
         }
       } catch (err) {
         console.error("[Mushaf] Failed to load Quran data:", err);
+        if (!cancelled) setQuranLoadFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -680,7 +680,7 @@ function MushafInner() {
     return () => {
       cancelled = true;
     };
-  }, [db, items.length, viewMode]);
+  }, [db, items.length, viewMode, quranLoadAttempt]);
 
   const verseModeHifzAyahs = useMemo<HifzPageAyah[]>(
     () =>
@@ -794,11 +794,12 @@ function MushafInner() {
     setHifzAutoRunning(false);
   }, [clearHifzTimer]);
 
+  // Navigation stops auto reveal; the progress resets only if the page actually changes (see the
+  // currentPage effect), so same-page jumps and view switches keep what was revealed.
   const resetHifzForNavigation = useCallback(() => {
     if (!hifzEnabledRef.current) return;
     stopHifzAuto();
-    resetHifzProgress();
-  }, [resetHifzProgress, stopHifzAuto]);
+  }, [stopHifzAuto]);
 
   const handleHifzPageComplete = useCallback(() => {
     const page = currentPageRef.current;
@@ -811,7 +812,9 @@ function MushafInner() {
     stopHifzAuto();
   }, [resetHifzProgress, stopHifzAuto]);
 
-  const stepHifzAuto = useCallback(() => {
+  // One reveal step: the next word, finishing the ayah at its last word. A manual step never
+  // completes or advances the page.
+  const stepHifzAuto = useCallback((manual = false) => {
     if (!hifzEnabledRef.current) {
       stopHifzAuto();
       return;
@@ -828,7 +831,7 @@ function MushafInner() {
 
     if (activeIndex < 0) {
       if (progress.revealedAyahCount >= pageAyahs.length) {
-        handleHifzPageComplete();
+        if (!manual) handleHifzPageComplete();
         return;
       }
       activeIndex = progress.revealedAyahCount;
@@ -838,7 +841,7 @@ function MushafInner() {
 
     const activeAyah = pageAyahs[activeIndex];
     if (!activeAyah || !activeAyahKey) {
-      handleHifzPageComplete();
+      if (!manual) handleHifzPageComplete();
       return;
     }
 
@@ -849,7 +852,7 @@ function MushafInner() {
         activeAyahKey: null,
         activeVisibleWordCount: 0,
       });
-      if (revealedAyahCount >= pageAyahs.length) {
+      if (revealedAyahCount >= pageAyahs.length && !manual) {
         if (!hifzAutoAdvancePageRef.current || currentPageRef.current >= 604) {
           handleHifzPageComplete();
         }
@@ -887,7 +890,7 @@ function MushafInner() {
   useEffect(() => {
     clearHifzTimer();
     if (!hifzAutoRunning) return;
-    hifzAutoTimerRef.current = setInterval(stepHifzAuto, hifzAutoDelayMs);
+    hifzAutoTimerRef.current = setInterval(() => stepHifzAuto(), hifzAutoDelayMs);
     return clearHifzTimer;
   }, [clearHifzTimer, hifzAutoDelayMs, hifzAutoRunning, stepHifzAuto]);
 
@@ -900,7 +903,7 @@ function MushafInner() {
   }, [clearVerseScrollRetry]);
 
   const scrollToTarget = useCallback(
-    async (target: MushafTarget, animated = true) => {
+    async (target: MushafTarget, animated = true): Promise<VerseScrollResult | null> => {
       if (viewMode === "verse") {
         const idx = items.findIndex(
           (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
@@ -916,13 +919,14 @@ function MushafInner() {
             target.ayah === 1 && previous?.type === "surah-header" && previous.surahNumber === target.surah
               ? idx - 1
               : idx;
-          await scheduleVerseScrollToIndex(scrollIndex, animated);
+          const result = await scheduleVerseScrollToIndex(scrollIndex, animated);
           setTopAyah({ surah: target.surah, ayah: target.ayah });
           if (item?.type === "ayah") {
             commitCurrentPage(item.v2Page);
           }
+          return result;
         }
-        return;
+        return null;
       }
 
       const ayahItem = items.find(
@@ -939,37 +943,191 @@ function MushafInner() {
       if (page && goToPageRef.current) {
         goToPageRef.current(page);
       }
+      return null;
     },
     [commitCurrentPage, db, items, quranFontStyle, scheduleVerseScrollToIndex, viewMode]
   );
 
+  const [retryTarget, setRetryTarget] = useState<MushafTarget | null>(null);
   const navigateToTarget = useCallback(
     (target: MushafTarget, animated = true) => {
       tapRevealGuardUntilRef.current = Date.now() + 1500;
       pauseFocusAutoScroll();
+      // Auto reveal stops; its progress resets only if the page actually changes (see the
+      // currentPage effect), so a same-page jump keeps what was revealed.
       resetHifzForNavigation();
+      suspendFollowRef.current();
+      setRetryTarget(null);
       void scrollToTarget(target, animated)
+        .then((result) => {
+          // Measurement never confirmed the target: offer an explicit retry instead of guessing.
+          if (result === "failed") setRetryTarget(target);
+        })
         .catch((e) => {
           console.warn("[Mushaf] target navigation failed:", e);
         })
         .finally(() => {
-          highlightTarget(target);
+          startArrival(target);
         });
     },
-    [highlightTarget, pauseFocusAutoScroll, resetHifzForNavigation, scrollToTarget]
+    [pauseFocusAutoScroll, resetHifzForNavigation, scrollToTarget, startArrival]
   );
 
-  // Consume pending deep link on tab focus (supports both hafiz:// links and search navigation)
+  // ---- C06 target contract and the shared "Back to where I was" pill ----
+  const ownerId = useAuthStore((state) => state.user?.id ?? null);
+  const ownerRef = useRef(ownerId);
+  ownerRef.current = ownerId;
+  // The saved position, read once so a jump can offer it back and hydration can apply it.
+  const savedPositionRef = useRef<ReaderPosition | null>(null);
+  const [savedPositionLoaded, setSavedPositionLoaded] = useState(false);
+  useEffect(() => {
+    let active = true;
+    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'last_mushaf_position'")
+      .then((row) => {
+        if (active) savedPositionRef.current = parseSavedPosition(row?.value);
+      })
+      .catch((e) => console.warn("[Mushaf] reading the saved position failed:", e))
+      .finally(() => {
+        if (active) setSavedPositionLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [db]);
+
+  const [returnToken, setReturnToken] = useState<ReturnToken | null>(null);
+  const returnSeqRef = useRef(0);
+  const returnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissReturn = useCallback(() => {
+    if (returnTimerRef.current) {
+      clearTimeout(returnTimerRef.current);
+      returnTimerRef.current = null;
+    }
+    setReturnToken((current) => (current ? null : current));
+  }, []);
+  useEffect(() => dismissReturn, [dismissReturn]);
+  // Another account never restores this account's position.
+  useEffect(() => {
+    dismissReturn();
+  }, [dismissReturn, ownerId]);
+
+  const currentReaderPosition = useCallback((): ReaderPosition | null => {
+    if (!positionSessionRef.current.restoreSettled) return savedPositionRef.current;
+    if (isPageMode) return { mode: "page", page: currentPageRef.current };
+    const top = topAyahRef.current;
+    return top ? { mode: "verse", surah: top.surah, ayah: top.ayah } : savedPositionRef.current;
+  }, [isPageMode]);
+
+  /** An explicit jump: capture the return position once, hold saving, then move and wash. */
+  const performJump = useCallback(
+    (target: MushafTarget) => {
+      const id = ++returnSeqRef.current;
+      const token = captureReturnToken(currentReaderPosition(), ownerRef.current, id);
+      if (returnTimerRef.current) clearTimeout(returnTimerRef.current);
+      returnTimerRef.current = token
+        ? setTimeout(() => {
+            returnTimerRef.current = null;
+            setReturnToken((current) => expireReturnToken(current, id));
+          }, RETURN_PILL_MS)
+        : null;
+      setReturnToken(token);
+      dispatchPosition("explicit-jump");
+      navigateToTarget(target, false);
+    },
+    [currentReaderPosition, dispatchPosition, navigateToTarget]
+  );
+
+  // A target waits until no reader overlay is open (the commit that closed the opening sheet) and
+  // the reader's data is ready, then moves the reader exactly once.
+  const queuedTargetRef = useRef<MushafTarget | null>(null);
+  const [targetQueueVersion, setTargetQueueVersion] = useState(0);
+  const requestTarget = useCallback(
+    (target: MushafTarget) => {
+      queuedTargetRef.current = target;
+      // Recorded now, so a saved-position read finishing later cannot move the reader away.
+      dispatchPosition("explicit-jump");
+      setTargetQueueVersion((version) => version + 1);
+    },
+    [dispatchPosition]
+  );
+  const readerOverlayOpen =
+    showNavigator || showBookmarks || showSearch || showRecitation || showReadingSettings || showHelp || detailWord !== null;
+  const readerDataReady = settingsLoaded && !loading && (isPageMode || items.length > 0);
+  useEffect(() => {
+    const target = queuedTargetRef.current;
+    if (!target || readerOverlayOpen || !readerDataReady) return;
+    queuedTargetRef.current = null;
+    performJump(target);
+  }, [performJump, readerDataReady, readerOverlayOpen, targetQueueVersion]);
+
+  // Links, Search, bookmarks and other screens submit through the target store; it is consumed once.
+  const consumeLinkTarget = useCallback(() => {
+    const target = consumePendingDeepLink();
+    if (target) requestTarget(target);
+  }, [requestTarget]);
   useFocusEffect(
     useCallback(() => {
-      if (!settingsLoaded || loading || (!isPageMode && items.length === 0)) return;
-      const target = consumePendingDeepLink();
-      if (!target) return;
-
-      deepLinkHandledRef.current = true;
-      setTimeout(() => navigateToTarget(target, false), 100);
-    }, [isPageMode, loading, items.length, navigateToTarget, settingsLoaded])
+      consumeLinkTarget();
+      const unsubscribe = subscribePendingDeepLink(consumeLinkTarget);
+      return () => {
+        unsubscribe();
+        // Leaving the reader dismisses the return pill.
+        dismissReturn();
+      };
+    }, [consumeLinkTarget, dismissReturn])
   );
+
+  // Restores a captured or saved position in its own mode, switching view first when needed.
+  const pendingPositionRef = useRef<ReaderPosition | null>(null);
+  const [pendingPositionVersion, setPendingPositionVersion] = useState(0);
+  const applyPosition = useCallback(
+    (position: ReaderPosition) => {
+      tapRevealGuardUntilRef.current = Date.now() + 1500;
+      if (position.mode === "page") {
+        if (goToPageRef.current) goToPageRef.current(position.page);
+        else commitCurrentPage(position.page);
+        return;
+      }
+      const idx = items.findIndex((it) => it.type === "ayah" && it.surah === position.surah && it.ayah === position.ayah);
+      if (idx < 0) return;
+      setTopAyah({ surah: position.surah, ayah: position.ayah });
+      void scheduleVerseScrollToIndex(idx, false);
+    },
+    [commitCurrentPage, items, scheduleVerseScrollToIndex]
+  );
+  useEffect(() => {
+    const position = pendingPositionRef.current;
+    if (!position || position.mode !== viewMode || !readerDataReady) return;
+    pendingPositionRef.current = null;
+    applyPosition(position);
+  }, [applyPosition, pendingPositionVersion, readerDataReady, viewMode]);
+
+  const restoreReturn = useCallback(() => {
+    const current = returnToken;
+    if (!current) return;
+    const { position } = takeReturnToken(current, current.id, ownerRef.current);
+    dismissReturn();
+    if (!position) return;
+    markDeliberateMovement();
+    // Returning is explicit navigation: a following recitation waits for Back to ayah.
+    suspendFollowRef.current();
+    pendingPositionRef.current = position;
+    if (position.mode !== viewMode) setViewMode(position.mode);
+    setPendingPositionVersion((version) => version + 1);
+  }, [dismissReturn, markDeliberateMovement, returnToken, setViewMode, viewMode]);
+
+  const handleVerseRevealChange = useCallback((surah: number, ayah: number, revealed: boolean, page: number) => {
+    setVerseReveals((prev) => setVerseReveal(prev, surah, ayah, page, revealed));
+  }, []);
+  // Turning hide mode on or off starts from no reveals.
+  const toggleVerseHideMode = useCallback(() => {
+    setVerseHideMode((prev) => !prev);
+    setVerseReveals(NO_VERSE_REVEALS);
+  }, []);
+  // A deliberate scroll or jump to another page keeps only that page's reveals.
+  useEffect(() => {
+    setVerseReveals((prev) => keepPageReveals(prev, currentPage));
+  }, [currentPage]);
 
   const renderItem = useCallback(
     ({ item }: { item: MushafItem }) => {
@@ -993,6 +1151,8 @@ function MushafInner() {
           fontSize={fontSize}
           lineHeight={lineHeight}
           hideMode={verseHideMode}
+          revealed={verseReveals.has(`${item.surah}:${item.ayah}`)}
+          onRevealChange={handleVerseRevealChange}
           highlighted={displayedHighlightKey === `${item.surah}:${item.ayah}`}
           highlightedWordPos={
             highlightedWord?.surah === item.surah && highlightedWord?.ayah === item.ayah
@@ -1002,7 +1162,7 @@ function MushafInner() {
         />
       );
     },
-    [fontSize, lineHeight, verseHideMode, displayedHighlightKey, highlightedWord]
+    [fontSize, lineHeight, verseHideMode, verseReveals, handleVerseRevealChange, displayedHighlightKey, highlightedWord]
   );
 
   const getItemType = useCallback((item: MushafItem) => item.type, []);
@@ -1015,35 +1175,30 @@ function MushafInner() {
     []
   );
 
-  const handleGoToPage = useCallback(
-    (page: number) => {
-      resetHifzForNavigation();
-      if (viewMode === "page" && goToPageRef.current) {
-        goToPageRef.current(page);
+  // Go to closes first; the target then waits for that close like any other explicit jump.
+  const handleGoToTarget = useCallback(
+    (target: GoToTarget) => {
+      setShowNavigator(false);
+      if (target.kind === "ayah") {
+        requestTarget({ surah: target.surah, ayah: target.ayah });
+        return;
+      }
+      const first = mushafIndex ? topmostAyahForPage(mushafIndex, target.page) : null;
+      if (first) requestTarget(first);
+      else if (goToPageRef.current) {
+        resetHifzForNavigation();
+        suspendFollowRef.current();
+        goToPageRef.current(target.page);
       }
     },
-    [resetHifzForNavigation, viewMode]
-  );
-
-  const handleGoToSurahVerse = useCallback(
-    (surahNumber: number) => {
-      resetHifzForNavigation();
-      const index = surahHeaderIndices.get(surahNumber);
-      if (index !== undefined && flashListRef.current) {
-        flashListRef.current.scrollToIndex({
-          index,
-          animated: true,
-        });
-      }
-    },
-    [resetHifzForNavigation, surahHeaderIndices]
+    [mushafIndex, requestTarget, resetHifzForNavigation]
   );
 
   const handleBookmarkNavigate = useCallback(
     (surah: number, ayah: number, wordPos?: number) => {
-      navigateToAyah(surah, ayah, wordPos);
+      requestTarget({ surah, ayah, wordPos });
     },
-    [navigateToAyah]
+    [requestTarget]
   );
 
   const handleOpenBookmarks = useCallback(() => {
@@ -1053,47 +1208,43 @@ function MushafInner() {
 
   const handleOpenSearch = useCallback(() => {
     pauseFocusAutoScroll();
-    resetHifzForNavigation();
     setShowSearch(true);
-  }, [pauseFocusAutoScroll, resetHifzForNavigation]);
+  }, [pauseFocusAutoScroll]);
 
   const handleOpenRecitation = useCallback(() => {
     pauseFocusAutoScroll();
     setShowRecitation(true);
   }, [pauseFocusAutoScroll]);
 
-  const handleOpenNavigator = useCallback(() => {
+  const handleOpenNavigator = useCallback((tab: GoToTab = "surah") => {
     pauseFocusAutoScroll();
-    resetHifzForNavigation();
+    setNavigatorTab(tab);
     setShowNavigator(true);
-  }, [pauseFocusAutoScroll, resetHifzForNavigation]);
+  }, [pauseFocusAutoScroll]);
+
+  const handleOpenHelp = useCallback(() => {
+    pauseFocusAutoScroll();
+    setShowHelp(true);
+  }, [pauseFocusAutoScroll]);
 
   const handleOpenReadingSettings = useCallback(() => {
     pauseFocusAutoScroll();
     setShowReadingSettings(true);
   }, [pauseFocusAutoScroll]);
 
-  const handleOpenPageViewNavigation = useCallback((anchor: PageViewNavigationAnchor | null) => {
-    if (!isPageMode) return;
-    pauseFocusAutoScroll();
-    setPageViewNavigationAnchor(anchor);
-    setShowPageViewNavigation(true);
-  }, [isPageMode, pauseFocusAutoScroll]);
-
-  const handleClosePageViewNavigation = useCallback(() => {
-    setShowPageViewNavigation(false);
-    setPageViewNavigationAnchor(null);
-  }, []);
-
   const handleGoHome = useCallback(() => {
     pauseFocusAutoScroll();
     router.navigate("/(tabs)/home");
   }, [pauseFocusAutoScroll]);
 
-  const viewModeLabel = isPageMode ? s.mushafViewPage : s.mushafViewVerse;
+  // A view switch keeps the top visible ayah (including a tall one) and washes it so it is easy to
+  // find in the other view. It counts as deliberate movement, so the new position is saved.
   const toggleViewMode = useCallback(() => {
+    markDeliberateMovement();
     if (isPageMode) {
       pendingVersePageRef.current = currentPageRef.current;
+      pendingVerseAnchorRef.current =
+        pageTopAyahRef.current?.() ?? (mushafIndex ? topmostAyahForPage(mushafIndex, currentPageRef.current) : null);
       setViewMode("verse");
       return;
     }
@@ -1104,9 +1255,10 @@ function MushafInner() {
       if (ayahItem?.type === "ayah") {
         commitCurrentPage(ayahItem.v2Page);
       }
+      startArrival(topAyah);
     }
     setViewMode("page");
-  }, [commitCurrentPage, isPageMode, items, setViewMode, topAyah]);
+  }, [commitCurrentPage, isPageMode, items, markDeliberateMovement, mushafIndex, setViewMode, startArrival, topAyah]);
   const canUseFocusMode = isPageMode && pageScroll === "vertical" && !hifzEnabled;
   const showHifzControls = isPageMode && hifzEnabled && !focusModeActive;
   const showBottomSlider = isPageMode && !focusModeActive && !hifzEnabled;
@@ -1135,6 +1287,13 @@ function MushafInner() {
     (hifzRevealedAyahCount < currentPageHifzAyahs.length || hifzActiveAyahKey !== null);
   const canHidePreviousHifzAyah =
     showHifzControls && (hifzRevealedAyahCount > 0 || hifzActiveAyahKey !== null);
+  // While auto reveal still runs (about to advance a page) Pause stays reachable instead.
+  const hifzPageComplete =
+    showHifzControls &&
+    !hifzAutoRunning &&
+    currentPageHifzAyahs.length > 0 &&
+    hifzActiveAyahKey === null &&
+    hifzRevealedAyahCount >= currentPageHifzAyahs.length;
   const toggleHifzMode = useCallback(() => {
     if (hifzEnabled) {
       stopHifzAuto();
@@ -1182,14 +1341,24 @@ function MushafInner() {
       activeVisibleWordCount: 0,
     });
   }, [applyHifzProgress, hifzActiveAyahKey, hifzRevealedAyahCount, stopHifzAuto]);
+  // Play reveals the first word at once, then waits the interval, so it answers even at slow speeds.
   const startHifzAuto = useCallback(() => {
     if (!hifzEnabled) setHifzEnabled(true);
     setHifzAutoRunning(true);
-  }, [hifzEnabled]);
+    stepHifzAuto();
+  }, [hifzEnabled, stepHifzAuto]);
+  const revealNextHifzWord = useCallback(() => {
+    stopHifzAuto();
+    stepHifzAuto(true);
+  }, [stepHifzAuto, stopHifzAuto]);
+  const repeatHifzPage = useCallback(() => {
+    stopHifzAuto();
+    resetHifzProgress();
+  }, [resetHifzProgress, stopHifzAuto]);
+  const goToNextHifzPage = useCallback(() => {
+    if (currentPageRef.current < 604) goToPageRef.current?.(currentPageRef.current + 1);
+  }, []);
   const pageFontSizeLocked = isPageMode && pageScroll === "horizontal";
-  const mobileToolbarIconClass = `rounded-full ${isPhone && isPageMode ? "px-1.5 py-2" : isNarrow ? "px-2 py-2" : "px-2.5 py-2"}`;
-  const desktopToolbarIconClass = `rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`;
-  const toolbarIconColor = isDark ? "#737373" : "#8B8178";
   const mobileBottomNavHeight = 54;
   const mobileBottomNavGap = 6;
   const mobileBottomNavOffset = isPhone
@@ -1200,6 +1369,12 @@ function MushafInner() {
     : isTablet
       ? Math.max(insets.bottom, 16)
       : 0;
+  const [railHeight, setRailHeight] = useState(60);
+  // The player bar sits above the page rail while it shows; the return pill sits above both.
+  const playerBarBottom =
+    railBottomOffset + (showHifzControls || (showBottomSlider && chromeVisible) ? railHeight + 8 : 8);
+  // Mirrors RecitationPlayerBar's own rule: every session except a reciter preview shows the bar.
+  const playerBarVisible = !!audioSession && audioSession.kind !== "preview";
   const pageScrollBottomInset = focusModeActive ? Math.max(insets.bottom, 12) + 96 : isPageMode ? 8 : undefined;
   const floatingRailSurface = {
     backgroundColor: withThemeOpacity(themeSurface, 0.95),
@@ -1234,7 +1409,8 @@ function MushafInner() {
     clearFocusControlsTimer();
     setFocusToastMessage(null);
     setFocusModeActive(true);
-    setFocusModePlaying(true);
+    // Focus mode opens paused with its bar shown; scrolling starts on Play.
+    setFocusModePlaying(false);
     setFocusControlsVisible(true);
     setImmersive(true);
     setChromeVisible(false);
@@ -1321,7 +1497,7 @@ function MushafInner() {
 
   useEffect(() => {
     if (!focusModeActive) return;
-    if (showNavigator || showBookmarks || showSearch || showRecitation || showReadingSettings || showPageViewNavigation || selection || detailWord) {
+    if (showNavigator || showBookmarks || showSearch || showRecitation || showReadingSettings || showHelp || selection || detailWord) {
       pauseFocusAutoScroll();
     }
   }, [
@@ -1330,8 +1506,8 @@ function MushafInner() {
     pauseFocusAutoScroll,
     selection,
     showBookmarks,
+    showHelp,
     showNavigator,
-    showPageViewNavigation,
     showReadingSettings,
     showRecitation,
     showSearch,
@@ -1359,12 +1535,11 @@ function MushafInner() {
     stopHifzAuto();
   }, [currentPage, hifzEnabled, resetHifzProgress, stopHifzAuto]);
 
+  // Verse view has no reveal rail: auto reveal stops, the page's reveals wait for the return.
   useEffect(() => {
     if (isPageMode || !hifzEnabled) return;
     stopHifzAuto();
-    resetHifzProgress();
-    setHifzEnabled(false);
-  }, [hifzEnabled, isPageMode, resetHifzProgress, stopHifzAuto]);
+  }, [hifzEnabled, isPageMode, stopHifzAuto]);
 
   // For page view, derive the topmost ayah from the visible page
   useEffect(() => {
@@ -1373,124 +1548,222 @@ function MushafInner() {
     if (top) setTopAyah(top);
   }, [currentPage, mushafIndex, isPageMode]);
 
-  // Persist last visible position (debounced) so the next visit restores it
+  // Persist the last deliberately read position (debounced). A pending save is flushed at once when
+  // the app goes to the background, the web page hides or the reader unmounts, so leaving within
+  // 600 ms of the last scroll keeps it. An arrival the reader never engaged with is not saved.
   const lastSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Saving waits for the restore attempt, or the initial page 1 would overwrite the saved position.
-  const positionRestoreSettledRef = useRef(false);
+  const pendingSaveRef = useRef<ReaderPosition | null>(null);
+  const flushPendingPosition = useCallback(() => {
+    if (lastSaveTimerRef.current) {
+      clearTimeout(lastSaveTimerRef.current);
+      lastSaveTimerRef.current = null;
+    }
+    const pending = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    if (!pending || !mayPersistPosition(positionSessionRef.current)) return;
+    writeUserSetting(db, "last_mushaf_position", serializePosition(pending)).catch(() => {});
+  }, [db]);
   useEffect(() => {
-    if (loading || !positionRestoreSettledRef.current) return;
+    if (loading) return;
+    const value: ReaderPosition | null = isPageMode
+      ? { mode: "page", page: currentPage }
+      : topAyah
+        ? { mode: "verse", surah: topAyah.surah, ayah: topAyah.ayah }
+        : null;
+    if (!value) return;
+    pendingSaveRef.current = value;
     if (lastSaveTimerRef.current) clearTimeout(lastSaveTimerRef.current);
     lastSaveTimerRef.current = setTimeout(() => {
-      const value = isPageMode
-        ? { mode: "page", page: currentPage }
-        : topAyah
-          ? { mode: "verse", surah: topAyah.surah, ayah: topAyah.ayah }
-          : null;
-      if (!value) return;
-      writeUserSetting(db, "last_mushaf_position", JSON.stringify(value)).catch(() => {});
+      lastSaveTimerRef.current = null;
+      flushPendingPosition();
     }, 600);
-    return () => {
-      if (lastSaveTimerRef.current) {
-        clearTimeout(lastSaveTimerRef.current);
-        lastSaveTimerRef.current = null;
-      }
+    // The top ayah's surah and ayah, not its object identity, decide a save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flushPendingPosition, loading, isPageMode, currentPage, topAyah?.surah, topAyah?.ayah]);
+  const flushPendingPositionRef = useRef(flushPendingPosition);
+  flushPendingPositionRef.current = flushPendingPosition;
+  useEffect(() => {
+    const leave = () => {
+      flushPendingPositionRef.current();
+      dismissReturn();
     };
-  }, [db, loading, isPageMode, currentPage, topAyah?.surah, topAyah?.ayah]);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") leave();
+    });
+    const onPageHide = () => flushPendingPositionRef.current();
+    if (Platform.OS === "web" && typeof window !== "undefined") window.addEventListener("pagehide", onPageHide);
+    return () => {
+      subscription.remove();
+      if (Platform.OS === "web" && typeof window !== "undefined") window.removeEventListener("pagehide", onPageHide);
+      flushPendingPositionRef.current();
+    };
+  }, [dismissReturn]);
 
-  // Restore last position on first mount once items are loaded — skipped if a
-  // pending deep link will scroll us elsewhere (the deep-link handler runs in
-  // its own focus effect).
+  // Restore the saved position once the reader's data is ready, converting it to the current view
+  // (a saved page opens verse view at its first ayah, a saved ayah opens page view at its page). An
+  // explicit target that already arrived wins, and hydration finishing later cannot move the reader.
   const restoredOnceRef = useRef(false);
   useEffect(() => {
     if (restoredOnceRef.current) return;
-    if (loading || !mushafIndex || (!isPageMode && items.length === 0)) return;
+    if (!savedPositionLoaded || loading || !mushafIndex || (!isPageMode && items.length === 0)) return;
     restoredOnceRef.current = true;
-    (async () => {
-      try {
-        const row = await db.getFirstAsync<{ value: string }>(
-          "SELECT value FROM user_settings WHERE key = 'last_mushaf_position'"
-        );
-        if (!row?.value) return;
-        const parsed = JSON.parse(row.value);
-        // Defer to deep-link handler if one is pending — peek without consuming
-        if (deepLinkHandledRef.current || peekPendingDeepLink()) return;
-
-        if (parsed?.mode === "page" && isPageMode && parsed.page > 1) {
-          // Committed through the page prop: PageMushaf applies it once its page data has loaded,
-          // whereas a direct jump before then was silently dropped.
-          if (!deepLinkHandledRef.current && currentPageRef.current === 1) {
-            tapRevealGuardUntilRef.current = Date.now() + 1500;
-            commitCurrentPage(parsed.page);
-          }
-        } else if (parsed?.mode === "verse" && !isPageMode) {
-          const idx = items.findIndex(
-            (it) => it.type === "ayah" && it.surah === parsed.surah && it.ayah === parsed.ayah
-          );
-          if (idx >= 0) {
-            setTimeout(() => {
-              if (deepLinkHandledRef.current) return;
-              scheduleVerseScrollToIndex(idx, false);
-            }, 150);
-          }
-        }
-      } catch (e) {
-        console.warn("[Mushaf] restore last position failed:", e);
-      } finally {
-        positionRestoreSettledRef.current = true;
-      }
-    })();
-  }, [loading, items, mushafIndex, isPageMode, db, scheduleVerseScrollToIndex, commitCurrentPage]);
-
-  // The reader follows a recitation onto the page, or verse, being recited.
-  useEffect(() => {
-    if (!recitation.active || !recitation.currentAyah) return;
-    const { surah, ayah } = recitation.currentAyah;
-    if (isPageMode) {
-      if (!mushafIndex) return;
-      const page = pageForAyah(mushafIndex, surah, ayah);
-      if (page && page !== currentPageRef.current) goToPageRef.current?.(page);
+    const settle = () => dispatchPosition("restore-settled");
+    const saved = savedPositionRef.current;
+    const explicitWins = () =>
+      !mayApplySavedPosition(positionSessionRef.current) || peekPendingDeepLink() !== null || queuedTargetRef.current !== null;
+    const position = saved ? positionForMode(mushafIndex, saved, viewMode) : null;
+    if (!position || explicitWins()) {
+      settle();
       return;
     }
-    const idx = items.findIndex((it) => it.type === "ayah" && it.surah === surah && it.ayah === ayah);
-    if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.2 });
-    // Only a new recited ayah moves the reader.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recitingKey]);
+    if (position.mode === "page") {
+      // Committed through the page prop: PageMushaf applies it once its page data has loaded,
+      // whereas a direct jump before then was silently dropped.
+      if (position.page > 1 && currentPageRef.current === 1) {
+        tapRevealGuardUntilRef.current = Date.now() + 1500;
+        commitCurrentPage(position.page);
+      }
+      settle();
+      return;
+    }
+    const idx = items.findIndex((it) => it.type === "ayah" && it.surah === position.surah && it.ayah === position.ayah);
+    if (idx < 0) {
+      settle();
+      return;
+    }
+    setTimeout(() => {
+      if (explicitWins()) {
+        settle();
+        return;
+      }
+      setTopAyah({ surah: position.surah, ayah: position.ayah });
+      // Saving starts once the restored ayah is in view, so the first rows never overwrite it.
+      void scheduleVerseScrollToIndex(idx, false).finally(settle);
+    }, 150);
+  }, [savedPositionLoaded, loading, items, mushafIndex, isPageMode, viewMode, scheduleVerseScrollToIndex, commitCurrentPage, dispatchPosition]);
 
-  // Web only: ArrowLeft / ArrowRight in page mode → ±1 page (RTL aware)
+  // The reader follows a range recitation onto the page, or verse, being recited, until the reader
+  // scrolls, pages or jumps away; Back to ayah brings it back.
+  const followRecitedAyah = useCallback(
+    ({ surah, ayah }: AyahAudioTarget) => {
+      tapRevealGuardUntilRef.current = Date.now() + 1500;
+      if (isPageMode) {
+        if (!mushafIndex) return;
+        const page = pageForAyah(mushafIndex, surah, ayah);
+        if (page && page !== currentPageRef.current) goToPageRef.current?.(page);
+        return;
+      }
+      const idx = items.findIndex((it) => it.type === "ayah" && it.surah === surah && it.ayah === ayah);
+      if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.2 });
+    },
+    [isPageMode, items, mushafIndex]
+  );
+  const { suspended: followSuspended, suspend: suspendFollow, backToAyah } = useFollowRecitation({
+    followEnabled: audioFollow,
+    rangeActive: recitation.active,
+    recitingAyah: recitation.active ? recitation.currentAyah : null,
+    follow: followRecitedAyah,
+  });
+  suspendFollowRef.current = suspendFollow;
+
+  // C07 keyboard priority (web). Editable fields, composition, focused controls, menus and overlays
+  // come first; focus scrolling owns Space and Escape while it runs. Otherwise PageDown/Space page
+  // forward, PageUp/Shift+Space back, arrows keep their page direction, Ctrl/Cmd+K and "/" open
+  // Search, and "?" opens the shortcuts help. Only a handled key prevents the browser default.
+  const keyboardStateRef = useRef({ readerOverlayOpen, focusModeActive, isPageMode, windowHeight });
+  keyboardStateRef.current = { readerOverlayOpen, focusModeActive, isPageMode, windowHeight };
   useEffect(() => {
-    if (Platform.OS !== "web" || !isPageMode) return;
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const pageBy = (direction: 1 | -1) => {
+      const { isPageMode: pageMode, windowHeight: viewportHeight } = keyboardStateRef.current;
+      markDeliberateMovement();
+      suspendFollowRef.current();
+      if (pageMode) {
+        const next = Math.max(1, Math.min(604, currentPageRef.current + direction));
+        goToPageRef.current?.(next);
+        return;
+      }
+      const offset = Math.max(0, lastScrollYRef.current + direction * viewportHeight * 0.85);
+      flashListRef.current?.scrollToOffset({ offset, animated: true });
+    };
     const handler = (e: KeyboardEvent) => {
-      if (showNavigator || showSearch || showBookmarks || showRecitation || showReadingSettings || showPageViewNavigation) return;
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName?.toLowerCase();
-      // Don't hijack typing inside inputs/textareas/contenteditable
-      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      e.preventDefault();
-      // Arabic reads right-to-left: ArrowRight goes back, ArrowLeft advances.
-      // Under an LTR UI we still want this convention since the Mushaf itself
-      // is always RTL-paginated.
-      const dir = e.key === "ArrowLeft" ? +1 : -1;
-      const next = Math.max(1, Math.min(604, currentPage + dir));
-      goToPageRef.current?.(next);
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+      if (isEditableTarget(e.target)) return;
+      const state = keyboardStateRef.current;
+      // Overlays and menus own their keys (C07): ResponsiveOverlay and DropdownMenu register in the
+      // shared layer stack; a reader sheet flag or any other modal also yields.
+      if (state.readerOverlayOpen || hasOpenOverlay() || anyModalOpen()) return;
+      const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key ?? "").toLowerCase() === "k") {
+        e.preventDefault();
+        handleOpenSearch();
+        return;
+      }
+      if (plain && e.key === "/") {
+        e.preventDefault();
+        handleOpenSearch();
+        return;
+      }
+      if (plain && e.key === "?") {
+        e.preventDefault();
+        handleOpenHelp();
+        return;
+      }
+      if (!plain) return;
+      if (state.focusModeActive && (e.key === " " || e.key === "Escape")) return;
+      if (e.key === " " && isActivatableControl(e.target)) return;
+      if (e.key === "PageDown" || (e.key === " " && !e.shiftKey)) {
+        e.preventDefault();
+        pageBy(1);
+        return;
+      }
+      if (e.key === "PageUp" || (e.key === " " && e.shiftKey)) {
+        e.preventDefault();
+        pageBy(-1);
+        return;
+      }
+      if (state.isPageMode && (e.key === "ArrowLeft" || e.key === "ArrowRight") && !e.shiftKey) {
+        // The Mushaf pages right to left in both UI languages: ArrowLeft advances, ArrowRight goes back.
+        e.preventDefault();
+        pageBy(e.key === "ArrowLeft" ? 1 : -1);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isPageMode, currentPage, showNavigator, showSearch, showBookmarks, showRecitation, showReadingSettings, showPageViewNavigation]);
+  }, [handleOpenHelp, handleOpenSearch, markDeliberateMovement]);
 
-  // Verse-view: track topmost visible ayah via FlashList viewable items
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: MushafItem }> }) => {
-      const firstAyah = viewableItems
-        .map((v) => v.item)
-        .find((it) => it.type === "ayah");
-      if (firstAyah && firstAyah.type === "ayah") {
-        setTopAyah({ surah: firstAyah.surah, ayah: firstAyah.ayah });
-        commitCurrentPage(firstAyah.v2Page);
-      }
-    }
+  // Verse view: the current ayah is the first one at least half visible. An ayah taller than twice
+  // the viewport can never reach that, so the ayah covering the top edge counts when none does.
+  const primaryTopAyahRef = useRef<Extract<MushafItem, { type: "ayah" }> | null>(null);
+  const edgeTopAyahRef = useRef<Extract<MushafItem, { type: "ayah" }> | null>(null);
+  const viewabilityConfigCallbackPairs = useRef(
+    (() => {
+      const firstAyah = (viewableItems: Array<{ item: MushafItem }>) =>
+        (viewableItems.map((v) => v.item).find((it) => it.type === "ayah") as Extract<MushafItem, { type: "ayah" }> | undefined) ??
+        null;
+      const apply = () => {
+        const ayah = primaryTopAyahRef.current ?? edgeTopAyahRef.current;
+        if (!ayah) return;
+        setTopAyah((current) => (current?.surah === ayah.surah && current.ayah === ayah.ayah ? current : { surah: ayah.surah, ayah: ayah.ayah }));
+        commitCurrentPage(ayah.v2Page);
+      };
+      return [
+        {
+          viewabilityConfig: { itemVisiblePercentThreshold: 50 },
+          onViewableItemsChanged: ({ viewableItems }: { viewableItems: Array<{ item: MushafItem }> }) => {
+            primaryTopAyahRef.current = firstAyah(viewableItems);
+            apply();
+          },
+        },
+        {
+          viewabilityConfig: { itemVisiblePercentThreshold: 0 },
+          onViewableItemsChanged: ({ viewableItems }: { viewableItems: Array<{ item: MushafItem }> }) => {
+            edgeTopAyahRef.current = firstAyah(viewableItems);
+            apply();
+          },
+        },
+      ];
+    })()
   ).current;
 
   const initialVerseIndex = useMemo(() => {
@@ -1503,11 +1776,20 @@ function MushafInner() {
   useEffect(() => {
     if (viewMode !== "verse" || pendingVersePageRef.current == null || items.length === 0) return;
     const page = pendingVersePageRef.current;
-    const index = items.findIndex((item) => item.type === "ayah" && item.v2Page === page);
+    const anchor = pendingVerseAnchorRef.current;
+    const anchorIndex = anchor
+      ? items.findIndex((item) => item.type === "ayah" && item.surah === anchor.surah && item.ayah === anchor.ayah)
+      : -1;
+    const index = anchorIndex >= 0 ? anchorIndex : items.findIndex((item) => item.type === "ayah" && item.v2Page === page);
     if (index < 0) return;
     pendingVersePageRef.current = null;
-    scheduleVerseScrollToIndex(index, false);
-  }, [items, scheduleVerseScrollToIndex, viewMode]);
+    pendingVerseAnchorRef.current = null;
+    void scheduleVerseScrollToIndex(index, false);
+    if (anchor && anchorIndex >= 0) {
+      setTopAyah(anchor);
+      startArrival(anchor);
+    }
+  }, [items, scheduleVerseScrollToIndex, startArrival, viewMode]);
 
   // Resolve indicator labels from current top ayah
   const indicator = (() => {
@@ -1527,15 +1809,20 @@ function MushafInner() {
   const dismissFocusToast = useCallback(() => setFocusToastMessage(null), []);
 
   if (loading && !isPageMode) {
+    // Rows shaped like a surah header and two ayahs; the caption stays for screen readers.
     return (
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center">
-        <ActivityIndicator size="large" color="#0d9488" />
-        <Text
-          className="text-warm-400 dark:text-neutral-400 mt-3"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 14 }}
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark" edges={["top"]}>
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={s.loadingQuran}
+          className="w-full self-center gap-5 px-4 pt-10"
+          style={{ maxWidth: 840 }}
         >
-          {s.loadingQuran}
-        </Text>
+          <Skeleton height={148} borderRadius={24} />
+          <Skeleton height={112} borderRadius={16} />
+          <Skeleton height={112} borderRadius={16} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -1543,279 +1830,62 @@ function MushafInner() {
   return (
     <>
       <AyahNavigationRegistrar
-        onNavigateToTarget={navigateToTarget}
+        onNavigateToTarget={requestTarget}
       />
       <SafeAreaView
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
         {...screenDismissHighlightProps}
       >
-        {/* Header chrome — phone gets the new glass top bar, desktop keeps current layout. */}
+        {/* Reader toolbar: six 44px targets below 768px (or whenever the full toolbar does not fit). */}
         <Animated.View
           pointerEvents={chromeVisible ? "auto" : "none"}
           style={[pageHeaderOverlayStyle, headerAnimStyle]}
         >
-          {isPhone || isTablet ? (
-            <View onLayout={onHeaderLayout} className="px-3 pt-2 pb-1" style={HEADER_CONTENT_STYLE}>
-              <View
-                style={{
-                  direction: "ltr",
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: isPhone && isPageMode ? 6 : 8,
-                }}
-              >
-                {isPhone ? (
-                  <ViewModeToggle
-                    isPageMode={isPageMode}
-                    isDark={isDark}
-                    isRTL={isRTL}
-                    label={viewModeLabel}
-                    compact
-                    iconOnly={toolbarToggleIconOnly}
-                    glass
-                    onPress={toggleViewMode}
-                    onPageMenuPress={handleOpenPageViewNavigation}
-                    pageMenuLabel={s.pageViewOptions}
-                  />
-                ) : (
-                  <View />
-                )}
-
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{
-                    flexShrink: 1,
-                    width: isPhone ? Math.max(172, windowWidth - (isPageMode ? 154 : 140)) : undefined,
-                  }}
-                  contentContainerStyle={{ flexGrow: 0 }}
-                  onLayout={(event) => {
-                    toolbarViewportWidthRef.current = event.nativeEvent.layout.width;
-                    checkToolbarOverflow();
-                  }}
-                  onContentSizeChange={(width) => {
-                    toolbarContentWidthRef.current = width;
-                    checkToolbarOverflow();
-                  }}
-                >
-                  <View
-                    className={`rounded-full border border-white/15 ${isPhone && isPageMode ? "p-0.5" : "p-1"}`}
-                    style={{
-                      direction: isRTL ? "rtl" : "ltr",
-                      flexDirection: isRTL ? "row-reverse" : "row",
-                      gap: isPhone && isPageMode ? 1 : 2,
-                      backgroundColor: withThemeOpacity(themeSurface, 0.82),
-                      ...(Platform.OS === "web"
-                        ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
-                        : null),
-                    }}
-                  >
-                    {isTablet && (
-                      <ViewModeToggle
-                        isPageMode={isPageMode}
-                        isDark={isDark}
-                        isRTL={isRTL}
-                        label={viewModeLabel}
-                        compact
-                        glass={false}
-                        onPress={toggleViewMode}
-                        onPageMenuPress={handleOpenPageViewNavigation}
-                        pageMenuLabel={s.pageViewOptions}
-                      />
-                    )}
-                    <Pressable
-                      onPress={handleGoHome}
-                      accessibilityRole="button"
-                      accessibilityLabel={s.tabHome}
-                      className={mobileToolbarIconClass}
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      <Home size={16} color={isDark ? "#737373" : "#8B8178"} />
-                    </Pressable>
-                    <Pressable
-                      onPress={handleOpenBookmarks}
-                      accessibilityRole="button"
-                      className={mobileToolbarIconClass}
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
-                    </Pressable>
-                    {isRecitationEnabled() && (
-                      <Pressable
-                        onPress={handleOpenRecitation}
-                        accessibilityRole="button"
-                        accessibilityLabel={s.recitationToolbar}
-                        className={`${mobileToolbarIconClass} ${showRecitation ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                      >
-                        <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
-                      </Pressable>
-                    )}
-                    {viewMode === "verse" ? (
-                      <Pressable
-                        onPress={() => setVerseHideMode((prev) => !prev)}
-                        className={`${mobileToolbarIconClass} ${verseHideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                      >
-                        {verseHideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        onPress={toggleHifzMode}
-                        accessibilityLabel={s.hifzMode}
-                        className={`${mobileToolbarIconClass} ${hifzEnabled ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                      >
-                        {hifzEnabled ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
-                      </Pressable>
-                    )}
-                    {canUseFocusMode && (
-                      <Pressable
-                        onPress={enterFocusMode}
-                        accessibilityRole="button"
-                        accessibilityLabel={s.enterFocusMode}
-                        className={mobileToolbarIconClass}
-                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                      >
-                        <ScanLine size={16} color={toolbarIconColor} />
-                      </Pressable>
-                    )}
-                    <Pressable
-                      onPress={handleOpenSearch}
-                      className={mobileToolbarIconClass}
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
-                    </Pressable>
-                    <Pressable
-                      onPress={handleOpenReadingSettings}
-                      accessibilityRole="button"
-                      accessibilityLabel={s.readingSettingsButton}
-                      className={`${mobileToolbarIconClass} ${showReadingSettings ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      <SlidersHorizontal size={16} color={showReadingSettings ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
-                    </Pressable>
-                  </View>
-                </ScrollView>
-              </View>
-            </View>
-          ) : (
-            <View
-              onLayout={onHeaderLayout}
-              style={HEADER_CONTENT_STYLE}
-              className={`flex-row items-center justify-between bg-surface dark:bg-surface-dark ${
-                isNarrow ? "px-2 py-2" : "px-4 py-3"
-              }`}
-            >
-              <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
-                <ViewModeToggle
-                  isPageMode={isPageMode}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                  label={viewModeLabel}
-                  compact={isNarrow}
-                  glass={false}
-                  onPress={toggleViewMode}
-                  onPageMenuPress={handleOpenPageViewNavigation}
-                  pageMenuLabel={s.pageViewOptions}
-                />
-                <Pressable
-                  onPress={handleGoHome}
-                  accessibilityRole="button"
-                  accessibilityLabel={s.tabHome}
-                  className={desktopToolbarIconClass}
-                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                >
-                  <Home size={16} color={isDark ? "#737373" : "#8B8178"} />
-                </Pressable>
-                <Pressable
-                  onPress={handleOpenBookmarks}
-                  accessibilityRole="button"
-                  className={desktopToolbarIconClass}
-                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                >
-                  <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
-                </Pressable>
-                {isRecitationEnabled() && (
-                  <Pressable
-                    onPress={handleOpenRecitation}
-                    accessibilityRole="button"
-                    accessibilityLabel={s.recitationToolbar}
-                    className={`${desktopToolbarIconClass} ${
-                      showRecitation
-                        ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                        : ""
-                    }`}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
-                  </Pressable>
-                )}
-                {viewMode === "verse" ? (
-                  <Pressable
-                    onPress={() => setVerseHideMode((prev) => !prev)}
-                    className={`${desktopToolbarIconClass} ${
-                      verseHideMode
-                        ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                        : ""
-                    }`}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    {verseHideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    onPress={toggleHifzMode}
-                    accessibilityLabel={s.hifzMode}
-                    className={`${desktopToolbarIconClass} ${
-                      hifzEnabled
-                        ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                        : ""
-                    }`}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    {hifzEnabled ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
-                  </Pressable>
-                )}
-                {canUseFocusMode && (
-                  <Pressable
-                    onPress={enterFocusMode}
-                    accessibilityRole="button"
-                    accessibilityLabel={s.enterFocusMode}
-                    className={desktopToolbarIconClass}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <ScanLine size={16} color={toolbarIconColor} />
-                  </Pressable>
-                )}
-                <Pressable
-                  onPress={handleOpenSearch}
-                  className={desktopToolbarIconClass}
-                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                >
-                  <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
-                </Pressable>
-                <Pressable
-                  onPress={handleOpenReadingSettings}
-                  accessibilityRole="button"
-                  accessibilityLabel={s.readingSettingsButton}
-                  className={`${desktopToolbarIconClass} ${showReadingSettings ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                >
-                  <SlidersHorizontal size={16} color={showReadingSettings ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
-                </Pressable>
-              </View>
-              <View />
-            </View>
-          )}
+          <View
+            onLayout={onHeaderLayout}
+            style={[
+              HEADER_CONTENT_STYLE,
+              {
+                paddingTop: 4,
+                paddingBottom: 2,
+                backgroundColor: withThemeOpacity(themeSurface, isPageMode && pageScroll === "horizontal" ? 0.92 : 1),
+                ...(Platform.OS === "web" && isPageMode && pageScroll === "horizontal"
+                  ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
+                  : null),
+              },
+            ]}
+          >
+            <ReaderToolbar
+              viewportWidth={windowWidth}
+              isPageMode={isPageMode}
+              onToggleMode={toggleViewMode}
+              onSearch={handleOpenSearch}
+              hideActive={isPageMode ? hifzEnabled : verseHideMode}
+              onToggleHide={isPageMode ? toggleHifzMode : toggleVerseHideMode}
+              recitationAvailable={isRecitationEnabled()}
+              recitationActive={showRecitation}
+              onRecitation={handleOpenRecitation}
+              settingsActive={showReadingSettings}
+              onReadingSettings={handleOpenReadingSettings}
+              onBookmarks={handleOpenBookmarks}
+              onGoTo={() => handleOpenNavigator("surah")}
+              onHome={handleGoHome}
+              focusAvailable={canUseFocusMode}
+              onFocus={enterFocusMode}
+              onHelp={handleOpenHelp}
+            />
+          </View>
         </Animated.View>
 
         {!isPhone && !isPageMode && (
-          <Animated.View pointerEvents="none" style={headerAnimStyle}>
-            <MushafIndicator surahName={indicator.name} juz={indicator.juz} />
+          <Animated.View pointerEvents={chromeVisible ? "box-none" : "none"} style={headerAnimStyle}>
+            <MushafIndicator
+              surahName={indicator.name}
+              juz={indicator.juz}
+              onOpenSurah={() => handleOpenNavigator("surah")}
+              onOpenJuz={() => handleOpenNavigator("juz")}
+            />
           </Animated.View>
         )}
 
@@ -1840,6 +1910,8 @@ function MushafInner() {
                 onScroll={handleScrollChrome}
                 onHorizontalGesture={() => {
                   touchMovedRef.current = true;
+                  markDeliberateMovement();
+                  suspendFollowRef.current();
                 }}
                 pagePaddingTop={isPhone ? 14 : 8}
                 pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
@@ -1855,6 +1927,13 @@ function MushafInner() {
                 onAutoScrollUserPause={pauseFocusAutoScroll}
                 onAutoScrollEnd={handleFocusAutoScrollEnd}
                 hifzVisibility={hifzVisibility}
+                arrivalId={arrival?.id ?? 0}
+                topAyahRef={pageTopAyahRef}
+                keyboardPagingEnabled={!readerOverlayOpen}
+                onUserNavigate={() => {
+                  markDeliberateMovement();
+                  suspendFollowRef.current();
+                }}
               />
             </View>
             <FocusModeControls
@@ -1863,83 +1942,87 @@ function MushafInner() {
               onPlayPause={handleFocusPlayPause}
               onSpeedChange={handleFocusSpeedChange}
               onExit={exitFocusMode}
-              visible={focusModeActive && focusControlsVisible}
+              visible={focusModeActive}
+              collapsed={!focusControlsVisible}
             />
-            {!chromeVisible && !focusModeActive && (
-              <>
-                {/* With the toolbar collapsed the page scrolls to the top edge, so the position strip
-                    gets its own band instead of drawing over the first Quran line. */}
-                <View
-                  pointerEvents="none"
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    backgroundColor: withThemeOpacity(themeSurface, 0.95),
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
+            {!chromeVisible && !focusModeActive && pageScroll === "horizontal" && (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  bottom: 12,
+                  left: currentPage % 2 === 0 ? 12 : undefined,
+                  right: currentPage % 2 === 0 ? undefined : 12,
+                }}
+              >
+                <Text
+                  className="text-warm-500 dark:text-neutral-400"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
                 >
-                  <Text
-                    className="text-warm-500 dark:text-neutral-400"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
-                    numberOfLines={1}
-                  >
-                    {indicator.name ? (isRTL ? `سورة ${indicator.name}` : `Surah ${indicator.name}`) : ""}
-                  </Text>
-                  <Text
-                    className="text-warm-500 dark:text-neutral-400"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
-                    numberOfLines={1}
-                  >
-                    {indicator.juz && indicator.hizb
-                      ? (isRTL
-                        ? `الجزء ${toArabicNumber(indicator.juz)} • الحزب ${toArabicNumber(indicator.hizb)}`
-                        : `Juz ${indicator.juz} • Hizb ${indicator.hizb}`)
-                      : ""}
-                  </Text>
-                </View>
-                {pageScroll === "horizontal" && (
-                  <View
-                    pointerEvents="none"
-                    style={{
-                      position: "absolute",
-                      bottom: 12,
-                      left: currentPage % 2 === 0 ? 12 : undefined,
-                      right: currentPage % 2 === 0 ? undefined : 12,
-                    }}
-                  >
-                    <Text
-                      className="text-warm-500 dark:text-neutral-400"
-                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
-                    >
-                      {isRTL ? toArabicNumber(currentPage) : String(currentPage)}
-                    </Text>
-                  </View>
-                )}
-              </>
+                  {isRTL ? toArabicNumber(currentPage) : String(currentPage)}
+                </Text>
+              </View>
             )}
           </View>
         ) : (
           <View className="flex-1" {...readerTapProps}>
+            {quranLoadFailed && items.length === 0 ? (
+              <QuranLoadError onRetry={() => setQuranLoadAttempt((attempt) => attempt + 1)} />
+            ) : (
             <FlashList
               ref={flashListRef}
               data={items}
               renderItem={renderItem}
               getItemType={getItemType}
               keyExtractor={keyExtractor}
-              extraData={{ fontSize, verseHideMode, highlightedKey: displayedHighlightKey, highlightedWord }}
+              extraData={{ fontSize, verseHideMode, verseReveals, highlightedKey: displayedHighlightKey, highlightedWord }}
               contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
               onScroll={handleScrollChrome}
               scrollEventThrottle={16}
-              onViewableItemsChanged={onViewableItemsChanged}
-              viewabilityConfig={viewabilityConfig}
+              viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs}
               initialScrollIndex={initialVerseIndex}
             />
+            )}
+          </View>
+        )}
+
+        {/* With the controls hidden, a thin band keeps the surah and juz in view, in both views. It has
+            its own band so it never draws over the first Quran line. */}
+        {!chromeVisible && !focusModeActive && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: Platform.OS === "web" ? 0 : insets.top,
+              left: 0,
+              right: 0,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              backgroundColor: withThemeOpacity(themeSurface, 0.95),
+              direction: "ltr",
+              flexDirection: isRTL ? "row-reverse" : "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, writingDirection: isRTL ? "rtl" : "ltr" }}
+              numberOfLines={1}
+            >
+              {indicator.name ? `${s.tabSurah} ${indicator.name}` : ""}
+            </Text>
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, writingDirection: isRTL ? "rtl" : "ltr" }}
+              numberOfLines={1}
+            >
+              {indicator.juz
+                ? isPageMode && indicator.hizb
+                  ? `${s.tabJuz} ${isRTL ? toArabicNumber(indicator.juz) : indicator.juz} • ${s.readerHizb} ${isRTL ? toArabicNumber(indicator.hizb) : indicator.hizb}`
+                  : `${s.tabJuz} ${isRTL ? toArabicNumber(indicator.juz) : indicator.juz}`
+                : ""}
+            </Text>
           </View>
         )}
 
@@ -1947,10 +2030,8 @@ function MushafInner() {
         <GoToNavigator
           visible={showNavigator}
           onClose={() => setShowNavigator(false)}
-          onGoToPage={handleGoToPage}
-          mode={viewMode}
-          currentPage={currentPage}
-          onGoToSurahVerse={handleGoToSurahVerse}
+          onSelectTarget={handleGoToTarget}
+          initialTab={navigatorTab}
         />
 
         {/* Bookmarks sheet */}
@@ -1974,11 +2055,7 @@ function MushafInner() {
           onFontSizeChangeStart={keepChromeVisibleDuringFontChange}
         />
 
-        <PageViewNavigationSheet
-          visible={showPageViewNavigation && isPageMode}
-          anchor={pageViewNavigationAnchor}
-          onClose={handleClosePageViewNavigation}
-        />
+        <ReaderHelpSheet visible={showHelp} onClose={() => setShowHelp(false)} />
 
         {/* Floating word tooltip (portal-based, web only) */}
         <FloatingWordTooltip />
@@ -2002,7 +2079,8 @@ function MushafInner() {
         {/* Bottom page rail / Hifz controls — fades with chrome */}
         {(showBottomSlider || showHifzControls) && (
           <Animated.View
-            pointerEvents={chromeVisible ? "box-none" : "none"}
+            // The reveal rail stays on screen with the chrome hidden, like the player bar.
+            pointerEvents={chromeVisible || showHifzControls ? "box-none" : "none"}
             style={[
               {
                 position: Platform.OS === "web" && (isPhone || isTablet) ? "fixed" as any : "absolute",
@@ -2013,10 +2091,11 @@ function MushafInner() {
                 alignItems: "center",
                 paddingHorizontal: isPhone ? 12 : 16,
               },
-              sliderAnimStyle,
+              showHifzControls ? null : sliderAnimStyle,
             ]}
           >
             <View
+              onLayout={(event) => setRailHeight(Math.round(event.nativeEvent.layout.height))}
               style={[
                 {
                   width: "100%",
@@ -2035,10 +2114,14 @@ function MushafInner() {
                   canRevealNext={canRevealNextHifzAyah}
                   canHidePrevious={canHidePreviousHifzAyah}
                   autoRunning={hifzAutoRunning}
+                  pageComplete={hifzPageComplete}
                   onRevealNext={revealNextHifzAyah}
+                  onRevealNextWord={revealNextHifzWord}
                   onHidePrevious={hidePreviousHifzAyah}
                   onStartAuto={startHifzAuto}
                   onStopAuto={stopHifzAuto}
+                  onRepeatPage={repeatHifzPage}
+                  onNextPage={currentPage < 604 ? goToNextHifzPage : undefined}
                 />
               ) : (
                 <MushafSlider
@@ -2046,6 +2129,8 @@ function MushafInner() {
                   interactive={chromeVisible}
                   onUserActivity={() => setChromeVisible(true)}
                   onCommit={(p) => {
+                    markDeliberateMovement();
+                    suspendFollowRef.current();
                     if (isPageMode) goToPageRef.current?.(p);
                     else {
                       // Verse view: jump to the first ayah on that page
@@ -2060,7 +2145,7 @@ function MushafInner() {
                       }
                     }
                   }}
-                  onExpand={handleOpenNavigator}
+                  onExpand={() => handleOpenNavigator("surah")}
                   index={mushafIndex}
                 />
               )}
@@ -2068,68 +2153,16 @@ function MushafInner() {
           </Animated.View>
         )}
 
-        {/* Recitation player: shown while a recitation runs, even with the chrome hidden. */}
-        {recitation.active && (
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
-              left: 0,
-              right: 0,
-              bottom: railBottomOffset + ((showBottomSlider || showHifzControls) && chromeVisible ? 68 : 8),
-              zIndex: 71,
-              alignItems: "center",
-              paddingHorizontal: isPhone ? 12 : 16,
-            }}
-          >
-            <View
-              accessibilityLiveRegion="polite"
-              style={[
-                {
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                  direction: "ltr",
-                  alignItems: "center",
-                  gap: 10,
-                  borderRadius: 999,
-                  paddingVertical: 6,
-                  paddingHorizontal: 8,
-                },
-                floatingRailSurface,
-              ]}
-            >
-              <Pressable
-                onPress={toggleRecitationPause}
-                accessibilityRole="button"
-                accessibilityLabel={recitation.paused ? s.audioPlay : s.audioPause}
-                hitSlop={6}
-                className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/15 dark:bg-primary-bright/15"
-              >
-                {!recitation.paused ? (
-                  <Pause size={18} color={isDark ? "#5eead4" : "#0d9488"} />
-                ) : (
-                  <Play size={18} color={isDark ? "#5eead4" : "#0d9488"} />
-                )}
-              </Pressable>
-              <Text
-                className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, writingDirection: "ltr", minWidth: 64, textAlign: "center" }}
-              >
-                {recitation.currentAyah
-                  ? `${formatAyahRef(isRTL, recitation.currentAyah.surah, recitation.currentAyah.ayah)}${isRTL ? "، " : " · "}${isRTL ? toArabicNumber(recitation.currentIndex + 1) : recitation.currentIndex + 1}/${isRTL ? toArabicNumber(recitation.totalAyahs) : recitation.totalAyahs}`
-                  : ""}
-              </Text>
-              <Pressable
-                onPress={stopRecitation}
-                accessibilityRole="button"
-                accessibilityLabel={s.recitationStop}
-                hitSlop={6}
-                className="h-10 w-10 items-center justify-center rounded-full"
-              >
-                <Square size={16} color={isDark ? "#d4d4d4" : "#6e5a47"} />
-              </Pressable>
-            </View>
-          </View>
-        )}
+        {/* Recitation player: single ayah or range, shown even with the chrome hidden. */}
+        <RecitationPlayerBar
+          bottom={playerBarBottom}
+          fixed={isPhone || isTablet}
+          horizontalPadding={isPhone ? 12 : 16}
+          surface={floatingRailSurface}
+          onOpenSheet={handleOpenRecitation}
+          showBackToAyah={followSuspended}
+          onBackToAyah={backToAyah}
+        />
 
         {/* One-time weak-spot explanation, above the page rail. */}
         {weakSpotsOnPage && weakSpotNoteSeen === false && chromeVisible && !focusModeActive && !recitation.active && (
@@ -2189,8 +2222,80 @@ function MushafInner() {
           </View>
         )}
 
+        {/* C06 "Back to where I was": one captured position, for five seconds after an explicit jump. */}
+        <AuthReopenSurfaces surface="mushaf" />
+        {returnToken && !focusModeActive && (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
+              left: 0,
+              right: 0,
+              // Above the player bar (and its Back to ayah control) when a recitation shows one.
+              bottom: playerBarBottom + (playerBarVisible ? 60 + (followSuspended ? 52 : 0) : 0),
+              zIndex: 73,
+              alignItems: "center",
+              paddingHorizontal: 16,
+            }}
+          >
+            <Pressable
+              onPress={restoreReturn}
+              accessibilityRole="button"
+              accessibilityLiveRegion="polite"
+              accessibilityLabel={s.readerBackToWhereIWas}
+              className="min-h-[44px] items-center gap-2 rounded-full px-4"
+              style={({ pressed }) => [
+                floatingRailSurface,
+                {
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Undo2 size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              <Text
+                className="text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {s.readerBackToWhereIWas}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {retryTarget && !isPageMode && (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
+              left: 0,
+              right: 0,
+              top: (measuredHeaderH ?? 56) + 8,
+              zIndex: 73,
+              alignItems: "center",
+              paddingHorizontal: 16,
+            }}
+          >
+            <Pressable
+              onPress={() => navigateToTarget(retryTarget, false)}
+              accessibilityRole="button"
+              accessibilityLiveRegion="polite"
+              className="min-h-[44px] justify-center rounded-full px-4"
+              style={floatingRailSurface}
+            >
+              <Text
+                className="text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {interpolate(s.readerRetryJump, { ref: formatAyahRef(isRTL, retryTarget.surah, retryTarget.ayah) })}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Toast notifications */}
-        <Toast message={focusToastMessage} onDismiss={dismissFocusToast} />
+        <Toast message={focusToastMessage} onDismiss={dismissFocusToast} duration={3000} />
       </SafeAreaView>
     </>
   );

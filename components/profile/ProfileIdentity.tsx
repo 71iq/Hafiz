@@ -13,6 +13,8 @@ type ProfileIdentityProps = {
   nameColor?: string;
   handleColor?: string;
   centered?: boolean;
+  /** Optional muted line under the handle, e.g. "Last synced: 5 min ago". */
+  detail?: string;
 };
 
 export function ProfileIdentity({
@@ -27,6 +29,7 @@ export function ProfileIdentity({
   nameColor,
   handleColor,
   centered = false,
+  detail,
 }: ProfileIdentityProps) {
   const handle = username ? `@${username}` : "";
   const textAlign = centered ? "center" : isRTL ? "right" : "left";
@@ -72,6 +75,20 @@ export function ProfileIdentity({
             }}
           >
             {handle}
+          </Text>
+        ) : null}
+        {detail ? (
+          <Text
+            className="mt-0.5"
+            style={{
+              fontFamily: "Manrope_500Medium",
+              fontSize: handleSize,
+              color: isDark ? "#a3a3a3" : "#6e5a47",
+              textAlign,
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {detail}
           </Text>
         ) : null}
       </View>

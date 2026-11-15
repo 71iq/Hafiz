@@ -1,19 +1,21 @@
-import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Check, ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
-import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
+import { OverlayBody, OverlayHeader, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { Switch, SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { ReadingStepper } from "@/components/settings/ReadingStepper";
+import { formatSecondsPerWord, getNextFasterDelay, getNextSlowerDelay } from "@/components/mushaf/HifzControls";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
-import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
-import { useDatabase } from "@/lib/database/provider";
+import { ToggleGroup } from "@/components/ui/ToggleGroup";
+import { isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
 import { toArabicNumber } from "@/lib/arabic";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import {
   FONT_SIZE_STEPS,
+  MAX_HIFZ_AUTO_DELAY_MS,
+  MIN_HIFZ_AUTO_DELAY_MS,
   useSettings,
   type QuranMarkerStyle,
   type ThemeMode,
@@ -43,9 +45,7 @@ export function ReadingSettingsSheet({
   onClose,
   onFontSizeChangeStart,
 }: Props) {
-  const db = useDatabase();
   const s = useStrings();
-  const showNotice = useOperationNotice();
   const { width } = useWindowDimensions();
   const {
     theme,
@@ -59,24 +59,27 @@ export function ReadingSettingsSheet({
     setQuranMarkerStyle,
     markSimilarVerses,
     setMarkSimilarVerses,
+    hifzAutoDelayMs,
+    setHifzAutoDelayMs,
+    hifzAutoAdvancePage,
+    setHifzAutoAdvancePage,
     tafseerSource,
     setTafseerSource,
     isDark,
     isRTL,
     systemTheme,
     themeSurface,
+    effectiveTheme,
   } = useSettings();
-  const [fontPickerVisible, setFontPickerVisible] = useState(false);
   const [markerStylePickerVisible, setMarkerStylePickerVisible] = useState(false);
+  const [tajweedLegendVisible, setTajweedLegendVisible] = useState(false);
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
   const controlColor = isDark ? "#a3a3a3" : "#7C6A58";
-  const accentColor = isDark ? DARK_ACCENT : ACCENT;
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
-  const quranBaseFont = quranFontStyle === "qcf2" ? "qcf2" : "v4";
-  const quranBaseFontLabel = quranBaseFont === "qcf2" ? s.quranFontQcf2 : s.quranFontV4;
-  const tajweedEnabled = quranFontStyle === "v4-tajweed";
+  const baseFont = quranBaseFont(quranFontStyle);
+  const tajweedEnabled = isTajweedStyle(quranFontStyle);
   const markerStyleLabel = markerLabelForValue(quranMarkerStyle, s);
   const currentTafseerSource = AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource);
   const currentTafseerTitle = currentTafseerSource ? stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id) : tafseerSource;
@@ -87,7 +90,7 @@ export function ReadingSettingsSheet({
   const modalHorizontalPadding = compactRows ? 16 : 28;
   const titleFontSize = compactRows ? 21 : 24;
 
-  const fontOptions = useMemo<ChoiceOption<"qcf2" | "v4">[]>(
+  const fontOptions = useMemo<ChoiceOption<QuranBaseFont>[]>(
     () => [
       { value: "qcf2", label: s.quranFontQcf2 },
       { value: "v4", label: s.quranFontV4 },
@@ -105,20 +108,12 @@ export function ReadingSettingsSheet({
   );
 
   const handleBaseFontChange = useCallback(
-    (font: "qcf2" | "v4") => {
-      if (font === "qcf2") {
-        setQuranFontStyle("qcf2");
-        return;
-      }
-      setQuranFontStyle(tajweedEnabled ? "v4-tajweed" : "v4");
-    },
-    [setQuranFontStyle, tajweedEnabled]
+    (font: QuranBaseFont) => setQuranFontStyle(styleForBaseFont(font, quranFontStyle)),
+    [quranFontStyle, setQuranFontStyle]
   );
 
   const handleTajweedToggle = useCallback(
-    (enabled: boolean) => {
-      setQuranFontStyle(enabled ? "v4-tajweed" : quranFontStyle === "qcf2" ? "qcf2" : "v4");
-    },
+    (enabled: boolean) => setQuranFontStyle(styleForTajweed(enabled, quranFontStyle)),
     [quranFontStyle, setQuranFontStyle]
   );
 
@@ -130,18 +125,6 @@ export function ReadingSettingsSheet({
     },
     [fontSizeLocked, onFontSizeChangeStart, setFontSizeIndex]
   );
-
-  const handleTafsirSelectionError = useCallback(
-    (error: unknown) => {
-      console.warn("[ReadingSettingsSheet] Failed to import tafsir source:", error);
-      showNotice(s.tafseerSourceImportFailed);
-    },
-    [s.tafseerSourceImportFailed, showNotice],
-  );
-  const {
-    importingSource: importingTafseerSource,
-    selectSource: handleTafseerSourceSelect,
-  } = useTafsirSourceSelection({ db, onSelected: setTafseerSource, onError: handleTafsirSelectionError });
 
   return (
     <>
@@ -172,25 +155,12 @@ export function ReadingSettingsSheet({
               >
                 {s.readingSettingsTitle}
               </Text>
-              <Text
-                className="mt-1 text-warm-500 dark:text-neutral-400"
-                style={{
-                  fontFamily: "Manrope_400Regular",
-                  fontSize: 13,
-                  lineHeight: 19,
-                  textAlign: horizontalTextAlign,
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {s.readingSettingsSubtitle}
-              </Text>
             </View>
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
               accessibilityLabel={s.genericClose}
-              hitSlop={8}
-              className="h-8 w-8 items-center justify-center rounded-full bg-surface-low/70 dark:bg-surface-dark-low/70"
+              className="h-11 w-11 items-center justify-center rounded-full bg-surface-low/70 dark:bg-surface-dark-low/70"
               style={({ pressed }) => ({
                 opacity: pressed ? 0.72 : 1,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
@@ -218,15 +188,26 @@ export function ReadingSettingsSheet({
 
           <SettingsSectionLabel label={s.sectionReading} isRTL={isRTL} />
           <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
-            <SettingsActionRow
-              title={s.quranFontLabel}
-              subtitle={quranRenderFontStyle !== quranFontStyle ? s.quranFontDarkFallback : undefined}
-              value={quranBaseFontLabel}
-              isRTL={isRTL}
-              onPress={() => setFontPickerVisible(true)}
-              trailing={<Chevron size={17} color={controlColor} />}
-              compact={compactRows}
-            />
+            <View style={{ paddingHorizontal: compactRows ? 14 : 16, paddingVertical: 14, gap: 10 }}>
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {s.quranFontLabel}
+              </Text>
+              <ToggleGroup<QuranBaseFont>
+                value={baseFont}
+                onValueChange={handleBaseFontChange}
+                items={fontOptions}
+                accessibilityLabel={s.quranFontLabel}
+              />
+              <Text
+                className="text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {quranRenderFontStyle !== quranFontStyle ? `${s.quranFontChoiceHint} ${s.quranFontDarkFallback}` : s.quranFontChoiceHint}
+              </Text>
+            </View>
             <Divider />
             <SettingsActionRow
               title={s.fontSizeLabel}
@@ -252,16 +233,31 @@ export function ReadingSettingsSheet({
             <Divider />
             <SettingsActionRow
               title={s.quranFontV4Tajweed}
+              subtitle={s.quranTajweedHint}
               isRTL={isRTL}
               trailing={<Switch accessibilityLabel={s.quranFontV4Tajweed} value={tajweedEnabled} onValueChange={handleTajweedToggle} />}
               compact={compactRows}
             />
+            <Pressable
+              onPress={() => setTajweedLegendVisible(true)}
+              accessibilityRole="button"
+              className="min-h-[44px] justify-center"
+              style={{ paddingHorizontal: compactRows ? 14 : 16, paddingBottom: 8 }}
+            >
+              <Text
+                className="text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {s.tajweedLegendOpen}
+              </Text>
+            </Pressable>
           </View>
 
           <SettingsSectionLabel label={s.readingSettingsAyahDisplay} isRTL={isRTL} />
           <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
             <SettingsActionRow
               title={s.quranMarkerStyleLabel}
+              subtitle={quranRenderFontStyle === "qcf2" ? s.quranMarkerModernOnly : undefined}
               value={markerStyleLabel}
               isRTL={isRTL}
               onPress={() => setMarkerStylePickerVisible(true)}
@@ -287,6 +283,40 @@ export function ReadingSettingsSheet({
             </SwitchRow>
           </View>
 
+          {/* Page reveal mode: the auto reveal pace and whether a revealed page moves on by itself. */}
+          <SettingsSectionLabel label={s.hifzAutoReveal} isRTL={isRTL} />
+          <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
+            <SettingsActionRow
+              title={s.hifzTimeBetweenWords}
+              isRTL={isRTL}
+              compact={compactRows}
+              trailing={
+                <ReadingStepper
+                  variant="sheet"
+                  decrementLabel={s.hifzDecreaseSpeed}
+                  incrementLabel={s.hifzIncreaseSpeed}
+                  value={formatSecondsPerWord(hifzAutoDelayMs, isRTL, s.revealSecondsPerWord)}
+                  onDecrement={() => setHifzAutoDelayMs(getNextSlowerDelay(hifzAutoDelayMs))}
+                  onIncrement={() => setHifzAutoDelayMs(getNextFasterDelay(hifzAutoDelayMs))}
+                  decrementDisabled={hifzAutoDelayMs >= MAX_HIFZ_AUTO_DELAY_MS}
+                  incrementDisabled={hifzAutoDelayMs <= MIN_HIFZ_AUTO_DELAY_MS}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                  compact={compactRows}
+                />
+              }
+            />
+            <Divider />
+            <SwitchRow label={s.hifzAutoNextPage} value={hifzAutoAdvancePage} onValueChange={setHifzAutoAdvancePage}>
+              <SettingsActionRow
+                title={s.hifzAutoNextPage}
+                isRTL={isRTL}
+                trailing={<SwitchTrack value={hifzAutoAdvancePage} />}
+                compact={compactRows}
+              />
+            </SwitchRow>
+          </View>
+
           <SettingsSectionLabel label={s.tafseer} isRTL={isRTL} />
           <View className="overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
             <SettingsActionRow
@@ -294,7 +324,7 @@ export function ReadingSettingsSheet({
               value={currentTafseerTitle}
               isRTL={isRTL}
               onPress={() => setTafseerPickerVisible(true)}
-              trailing={importingTafseerSource ? <ActivityIndicator size="small" color={accentColor} /> : <Chevron size={17} color={controlColor} />}
+              trailing={<Chevron size={17} color={controlColor} />}
               compact={compactRows}
             />
           </View>
@@ -317,17 +347,6 @@ export function ReadingSettingsSheet({
       </ResponsiveOverlay>
 
       <ChoiceDialog
-        visible={fontPickerVisible}
-        title={s.readingSettingsChooseFont}
-        value={quranBaseFont}
-        options={fontOptions}
-        onChange={handleBaseFontChange}
-        onClose={() => setFontPickerVisible(false)}
-        isRTL={isRTL}
-        isDark={isDark}
-        surfaceColor={themeSurface}
-      />
-      <ChoiceDialog
         visible={markerStylePickerVisible}
         title={s.readingSettingsChooseMarkerStyle}
         value={quranMarkerStyle}
@@ -337,12 +356,19 @@ export function ReadingSettingsSheet({
         isRTL={isRTL}
         isDark={isDark}
         surfaceColor={themeSurface}
+        closeLabel={s.genericClose}
+      />
+      <TajweedLegendSheet
+        visible={tajweedLegendVisible}
+        onClose={() => setTajweedLegendVisible(false)}
+        theme={effectiveTheme}
+        isRTL={isRTL}
       />
       <TafsirSourcePicker
         visible={tafseerPickerVisible}
         selectedSource={tafseerSource}
-        importingSource={importingTafseerSource}
-        onSelect={handleTafseerSourceSelect}
+        onSelected={setTafseerSource}
+        logLabel="[ReadingSettingsSheet]"
         onClose={() => setTafseerPickerVisible(false)}
         helperText={s.tafseerDownloadHint}
       />
@@ -513,7 +539,9 @@ function ChoiceDialog<T extends string>({
   isRTL,
   isDark,
   surfaceColor,
+  closeLabel,
 }: {
+  closeLabel: string;
   visible: boolean;
   title: string;
   value: T;
@@ -551,7 +579,9 @@ function ChoiceDialog<T extends string>({
         </Text>
         <Pressable
           onPress={onClose}
-          className="h-10 w-10 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
+          accessibilityRole="button"
+          accessibilityLabel={closeLabel}
+          className="h-11 w-11 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
           style={({ pressed }) => ({
             opacity: pressed ? 0.7 : 1,
             cursor: Platform.OS === "web" ? "pointer" : undefined,
@@ -561,6 +591,7 @@ function ChoiceDialog<T extends string>({
         </Pressable>
       </View>
       <OverlayBody contentContainerClassName="px-4 py-3">
+        <View accessibilityRole="radiogroup" accessibilityLabel={title}>
         {options.map((option) => {
           const active = option.value === value;
           const optionBackgroundColor = active
@@ -575,8 +606,8 @@ function ChoiceDialog<T extends string>({
                 onChange(option.value);
                 onClose();
               }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: active }}
               className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 rounded-2xl px-3 py-4`}
               style={{
                 backgroundColor: optionBackgroundColor,
@@ -613,6 +644,82 @@ function ChoiceDialog<T extends string>({
                 ) : null}
               </View>
             </Pressable>
+          );
+        })}
+        </View>
+      </OverlayBody>
+    </ResponsiveOverlay>
+  );
+}
+
+/** One row per color the Tajweed font draws, in the current theme's render palette. */
+const TAJWEED_LEGEND_RULES = [
+  "ghunnah",
+  "ikhfaa",
+  "idghaam_ghunnah",
+  "iqlab",
+  "ikhfaa_shafawi",
+  "idghaam_shafawi",
+  "idghaam_no_ghunnah",
+  "idghaam_mutamaathilayn",
+  "idghaam_mutaqaaribayn",
+  "idghaam_mutajaanisayn",
+  "hamzat_wasl",
+  "lam_shamsiyyah",
+  "silent",
+  "qalqalah",
+  "madd_2",
+  "madd_246",
+  "madd_6",
+  "madd_munfasil",
+  "madd_muttasil",
+] as const;
+
+function TajweedLegendSheet({
+  visible,
+  onClose,
+  theme,
+  isRTL,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  theme: string;
+  isRTL: boolean;
+}) {
+  const s = useStrings();
+  if (!visible) return null;
+  // Loaded on first open: the rule table builds its palette colors when the module loads.
+  const { getTajweedRule } = require("@/lib/word/tajweed-labels") as typeof import("@/lib/word/tajweed-labels");
+  return (
+    <ResponsiveOverlay open={visible} onClose={onClose} phonePresentation="sheet" desktopPresentation="dialog" maxWidth={480}>
+      <OverlayHeader title={s.tajweedLegendTitle} onClose={onClose} isRTL={isRTL} />
+      <OverlayBody contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20, gap: 4 }}>
+        {TAJWEED_LEGEND_RULES.map((ruleId) => {
+          const rule = getTajweedRule(ruleId, theme);
+          return (
+            <View
+              key={ruleId}
+              className="min-h-[44px] items-center gap-3 py-2"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+            >
+              <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: rule.color }} />
+              <View className="min-w-0 flex-1">
+                <Text
+                  className="text-charcoal dark:text-neutral-100"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                >
+                  {isRTL ? rule.arabic : `${rule.english} · ${rule.arabic}`}
+                </Text>
+                {!isRTL && rule.description ? (
+                  <Text
+                    className="text-warm-500 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_400Regular", fontSize: 12, lineHeight: 17, ...textStartStyle(false) }}
+                  >
+                    {rule.description}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
           );
         })}
       </OverlayBody>

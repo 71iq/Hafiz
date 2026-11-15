@@ -224,6 +224,15 @@ export async function writeSmartDeckFilter(
   await writeUserSetting(db, smartDeckFilterKey(deckId), JSON.stringify(normalized));
 }
 
+/** writeSmartDeckFilter inside the caller's transaction, so the filter commits with the deck's other settings. */
+export async function putSmartDeckFilter(
+  tx: DatabaseExecutor,
+  deckId: SmartDeckId,
+  filter: BuiltInDeckFilter
+): Promise<void> {
+  await putUserSetting(tx, smartDeckFilterKey(deckId), JSON.stringify(normalizeSmartDeckFilter(filter)));
+}
+
 async function readDefaultDeckFilter(db: DatabaseExecutor): Promise<BuiltInDeckFilter> {
   return await readFilterSetting(db, ALL_DECKS_FILTER_KEY)
     ?? await readFilterSetting(db, smartDeckFilterKey(SMART_DECK_IDS.retention))

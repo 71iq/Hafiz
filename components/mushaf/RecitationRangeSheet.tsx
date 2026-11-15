@@ -1,22 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
-import { ChevronLeft, ChevronRight, ListMusic, Minus, Play, Plus, Repeat2, Square, Timer } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, ListMusic, LocateFixed, Minus, Play, Plus, Repeat2, Square, Timer } from "lucide-react-native";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { DisclosureRow, MirroredRow } from "@/components/ui/MirroredRow";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
 import { useAyahAudio, type AyahAudioTarget, type RangeAudioState } from "@/lib/audio/ayah-audio";
+import { audioFailureMessage } from "@/lib/audio/labels";
 import { useDatabase } from "@/lib/database/provider";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recitations";
-import { useSettings } from "@/lib/settings/context";
+import { parseReference } from "@/lib/search/reference";
+import {
+  AUDIO_DELAY_MAX_SECONDS,
+  AUDIO_DELAY_MIN_SECONDS,
+  AUDIO_REPEAT_MAX,
+  AUDIO_REPEAT_MIN,
+  useSettings,
+} from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { errorMessage } from "@/lib/error-message";
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
 type RecitationMode = "single" | "range" | "surah";
+type FieldKey = "single" | "start" | "end";
+type FieldErrors = Partial<Record<FieldKey | "general", string>>;
 
 type Props = {
   visible: boolean;
@@ -29,22 +39,44 @@ type AyahRow = {
   ayah: number;
 };
 
+/** A field-specific validation failure, so its message sits under the field that caused it. */
+class FieldError extends Error {
+  constructor(
+    readonly field: FieldKey | "general",
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
   const db = useDatabase();
   const s = useStrings();
   const { width, height } = useWindowDimensions();
-  const { recitationId, setRecitationId, uiLanguage, isDark, isRTL } = useSettings();
+  const {
+    recitationId,
+    setRecitationId,
+    uiLanguage,
+    isDark,
+    isRTL,
+    audioFollow,
+    setAudioFollow,
+    audioRepeatRange,
+    setAudioRepeatRange,
+    audioRepeatEach,
+    setAudioRepeatEach,
+    audioDelaySeconds,
+    setAudioDelaySeconds,
+  } = useSettings();
   const { playRange, rangeState, stop } = useAyahAudio();
   const [mode, setMode] = useState<RecitationMode>("single");
   const [singleRef, setSingleRef] = useState("1:1");
   const [rangeStartRef, setRangeStartRef] = useState("1:1");
   const [rangeEndRef, setRangeEndRef] = useState("1:7");
-  const [repeatRange, setRepeatRange] = useState(1);
-  const [repeatEachAyah, setRepeatEachAyah] = useState(1);
-  const [delaySeconds, setDelaySeconds] = useState(1);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [starting, setStarting] = useState(false);
   const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
+  const [surahName, setSurahName] = useState<{ surah: number; en: string; ar: string } | null>(null);
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
@@ -52,6 +84,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
   const current = currentAyah ?? { surah: 1, ayah: 1 };
   const reciter = getReciterById(recitationId);
   const reciterLabel = formatReciterLabel(reciter, uiLanguage);
+  const accent = isDark ? "#2dd4bf" : "#0d9488";
 
   useEffect(() => {
     if (!visible) return;
@@ -59,8 +92,24 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
     setSingleRef(ref);
     setRangeStartRef(ref);
     setRangeEndRef(ref);
-    setError(null);
+    setErrors({});
   }, [current.ayah, current.surah, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    db.getFirstAsync<{ name_english: string; name_arabic: string }>(
+      "SELECT name_english, name_arabic FROM surahs WHERE number = ?",
+      [current.surah]
+    )
+      .then((row) => {
+        if (active && row) setSurahName({ surah: current.surah, en: row.name_english, ar: row.name_arabic });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [current.surah, db, visible]);
 
   const modeItems = useMemo(
     () => [
@@ -76,6 +125,14 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
     [isRTL]
   );
 
+  const surahLabel =
+    surahName?.surah === current.surah
+      ? interpolate(s.recitationSurahLabel, {
+          name: uiLanguage === "ar" ? surahName.ar : surahName.en,
+          number: formatCount(current.surah),
+        })
+      : formatCount(current.surah);
+
   const resolveAyahs = useCallback(async (): Promise<AyahAudioTarget[]> => {
     if (mode === "surah") {
       return db.getAllAsync<AyahRow>(
@@ -84,23 +141,24 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
       );
     }
 
+    const startField: FieldKey = mode === "single" ? "single" : "start";
     const start = parseAyahReference(mode === "single" ? singleRef : rangeStartRef);
-    if (!start) throw new Error(s.recitationInvalidReference);
+    if (!start) throw new FieldError(startField, s.recitationInvalidReference);
 
     if (mode === "single") {
       const row = await db.getFirstAsync<AyahRow>(
         "SELECT surah, ayah FROM quran_text WHERE surah = ? AND ayah = ?",
         [start.surah, start.ayah]
       );
-      if (!row) throw new Error(s.recitationInvalidReference);
+      if (!row) throw new FieldError("single", s.recitationInvalidReference);
       return [row];
     }
 
     const end = parseAyahReference(rangeEndRef);
-    if (!end) throw new Error(s.recitationInvalidReference);
+    if (!end) throw new FieldError("end", s.recitationInvalidReference);
     const startKey = start.surah * 1000 + start.ayah;
     const endKey = end.surah * 1000 + end.ayah;
-    if (endKey < startKey) throw new Error(s.recitationInvalidRange);
+    if (endKey < startKey) throw new FieldError("end", s.recitationInvalidRange);
 
     return db.getAllAsync<AyahRow>(
       `SELECT surah, ayah
@@ -114,40 +172,38 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
   const handleStart = useCallback(async () => {
     if (starting) return;
     setStarting(true);
-    setError(null);
+    setErrors({});
     try {
       const ayahs = await resolveAyahs();
-      if (ayahs.length === 0) throw new Error(s.recitationNoAyahs);
+      if (ayahs.length === 0) throw new FieldError("general", s.recitationNoAyahs);
       const result = await playRange({
         ayahs,
         recitationId,
-        repeatRange,
-        repeatEachAyah,
-        delayMs: delaySeconds * 1000,
+        repeatRange: audioRepeatRange,
+        repeatEachAyah: audioRepeatEach,
+        delayMs: audioDelaySeconds * 1000,
       });
       if (!result.ok) {
-        throw new Error(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
+        throw new FieldError(
+          "general",
+          result.failure && result.failure !== "busy" ? audioFailureMessage(result.failure, s) : s.audioPlaybackFailed
+        );
       }
+      // The reader and its player bar take over once a valid recitation starts.
+      onClose();
     } catch (err) {
-      setError(errorMessage(err) ?? s.qfContentUnavailable);
+      const field = err instanceof FieldError ? err.field : "general";
+      const message = err instanceof FieldError ? err.message : s.audioPlaybackFailed;
+      setErrors({ [field]: message });
     } finally {
       setStarting(false);
     }
-  }, [
-    delaySeconds,
-    playRange,
-    recitationId,
-    repeatEachAyah,
-    repeatRange,
-    resolveAyahs,
-    s.qfContentMisconfigured,
-    s.qfContentUnavailable,
-    s.recitationNoAyahs,
-    starting,
-  ]);
+  }, [audioDelaySeconds, audioRepeatEach, audioRepeatRange, onClose, playRange, recitationId, resolveAyahs, s, starting]);
 
   const handlePrimary = rangeState.active ? stop : handleStart;
   const primaryLabel = rangeState.active ? s.recitationStop : s.recitationStart;
+  const clearFieldError = (field: FieldKey) =>
+    setErrors((prev) => (prev[field] || prev.general ? { ...prev, [field]: undefined, general: undefined } : prev));
 
   return (
     <>
@@ -179,7 +235,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
           })}
           leading={
             <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
-              <ListMusic size={19} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              <ListMusic size={19} color={accent} />
             </View>
           }
           trailing={
@@ -214,7 +270,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
             value={mode}
             onValueChange={(value) => {
               setMode(value);
-              setError(null);
+              setErrors({});
             }}
             items={modeItems}
           />
@@ -225,8 +281,12 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
             <LabeledInput
               label={s.recitationSingleReference}
               value={singleRef}
-              onChangeText={setSingleRef}
+              onChangeText={(value) => {
+                setSingleRef(value);
+                clearFieldError("single");
+              }}
               placeholder="1:4"
+              error={errors.single}
               isDark={isDark}
               isRTL={isRTL}
             />
@@ -238,8 +298,12 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
                 <LabeledInput
                   label={s.recitationStartReference}
                   value={rangeStartRef}
-                  onChangeText={setRangeStartRef}
+                  onChangeText={(value) => {
+                    setRangeStartRef(value);
+                    clearFieldError("start");
+                  }}
                   placeholder="1:1"
+                  error={errors.start}
                   isDark={isDark}
                   isRTL={isRTL}
                 />
@@ -248,8 +312,12 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
                 <LabeledInput
                   label={s.recitationEndReference}
                   value={rangeEndRef}
-                  onChangeText={setRangeEndRef}
+                  onChangeText={(value) => {
+                    setRangeEndRef(value);
+                    clearFieldError("end");
+                  }}
                   placeholder="1:7"
+                  error={errors.end}
                   isDark={isDark}
                   isRTL={isRTL}
                 />
@@ -269,7 +337,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
                 className="mt-1 text-charcoal dark:text-neutral-100"
                 style={{ fontFamily: "Manrope_700Bold", fontSize: 18, ...textStartStyle(isRTL)}}
               >
-                {formatCount(current.surah)}
+                {surahLabel}
               </Text>
             </View>
           )}
@@ -277,32 +345,73 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
 
         <View className="mt-4 gap-3">
           <LoopControl
-            icon={<Repeat2 size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />}
+            icon={<Repeat2 size={16} color={accent} />}
             label={s.recitationRepeatRange}
-            value={formatCount(repeatRange)}
-            onDecrease={() => setRepeatRange((value) => Math.max(1, value - 1))}
-            onIncrease={() => setRepeatRange((value) => Math.min(99, value + 1))}
+            value={formatCount(audioRepeatRange)}
+            decreaseLabel={s.recitationDecreaseRepeatRange}
+            increaseLabel={s.recitationIncreaseRepeatRange}
+            canDecrease={audioRepeatRange > AUDIO_REPEAT_MIN}
+            canIncrease={audioRepeatRange < AUDIO_REPEAT_MAX}
+            onDecrease={() => setAudioRepeatRange(audioRepeatRange - 1)}
+            onIncrease={() => setAudioRepeatRange(audioRepeatRange + 1)}
             isDark={isDark}
             isRTL={isRTL}
           />
           <LoopControl
-            icon={<Repeat2 size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />}
+            icon={<Repeat2 size={16} color={accent} />}
             label={s.recitationRepeatEachAyah}
-            value={formatCount(repeatEachAyah)}
-            onDecrease={() => setRepeatEachAyah((value) => Math.max(1, value - 1))}
-            onIncrease={() => setRepeatEachAyah((value) => Math.min(99, value + 1))}
+            value={formatCount(audioRepeatEach)}
+            decreaseLabel={s.recitationDecreaseRepeatEach}
+            increaseLabel={s.recitationIncreaseRepeatEach}
+            canDecrease={audioRepeatEach > AUDIO_REPEAT_MIN}
+            canIncrease={audioRepeatEach < AUDIO_REPEAT_MAX}
+            onDecrease={() => setAudioRepeatEach(audioRepeatEach - 1)}
+            onIncrease={() => setAudioRepeatEach(audioRepeatEach + 1)}
             isDark={isDark}
             isRTL={isRTL}
           />
           <LoopControl
-            icon={<Timer size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />}
+            icon={<Timer size={16} color={accent} />}
             label={s.recitationDelayBetweenAyahs}
-            value={`${formatCount(delaySeconds)}${isRTL ? "ث" : "s"}`}
-            onDecrease={() => setDelaySeconds((value) => Math.max(0, value - 1))}
-            onIncrease={() => setDelaySeconds((value) => Math.min(30, value + 1))}
+            value={`${formatCount(audioDelaySeconds)}${isRTL ? "ث" : "s"}`}
+            decreaseLabel={s.recitationDecreaseDelay}
+            increaseLabel={s.recitationIncreaseDelay}
+            canDecrease={audioDelaySeconds > AUDIO_DELAY_MIN_SECONDS}
+            canIncrease={audioDelaySeconds < AUDIO_DELAY_MAX_SECONDS}
+            onDecrease={() => setAudioDelaySeconds(audioDelaySeconds - 1)}
+            onIncrease={() => setAudioDelaySeconds(audioDelaySeconds + 1)}
             isDark={isDark}
             isRTL={isRTL}
           />
+          {/* The whole row is the switch, so its target is the row, not the 24 px track. */}
+          <SwitchRow
+            label={s.recitationFollow}
+            hint={s.recitationFollowHint}
+            value={audioFollow}
+            onValueChange={setAudioFollow}
+            className="rounded-3xl bg-surface-low p-3 dark:bg-surface-dark-low"
+          >
+            <MirroredRow dir={isRTL ? "rtl" : "ltr"} className="min-h-[36px] items-center gap-3">
+              <View className="h-9 w-9 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
+                <LocateFixed size={16} color={accent} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text
+                  className="text-charcoal dark:text-neutral-100"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, ...textStartStyle(isRTL) }}
+                >
+                  {s.recitationFollow}
+                </Text>
+                <Text
+                  className="mt-0.5 text-warm-500 dark:text-neutral-400"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 17, ...textStartStyle(isRTL) }}
+                >
+                  {s.recitationFollowHint}
+                </Text>
+              </View>
+              <SwitchTrack value={audioFollow} />
+            </MirroredRow>
+          </SwitchRow>
         </View>
 
         {rangeState.active && (
@@ -311,31 +420,41 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
               className="text-primary-accent dark:text-primary-bright"
               style={{ fontFamily: "Manrope_700Bold", fontSize: 13, ...textStartStyle(isRTL)}}
             >
-              {s.recitationPlaying}
+              {rangeState.paused ? s.recitationPaused : s.recitationPlaying}
             </Text>
             <Text
               className="mt-1 text-warm-700 dark:text-neutral-300"
               style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
             >
-              {formatPlaybackLine(rangeState, formatCount)}
+              {formatPlaybackLine(rangeState, formatCount, s.recitationAyahRepeat)}
             </Text>
           </View>
         )}
 
-        {!!error && (
+        {!!errors.general && (
           <Text
+            accessibilityLiveRegion="polite"
             className="mt-4 text-red-600 dark:text-red-400"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, ...textStartStyle(isRTL)}}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL)}}
           >
-            {error}
+            {errors.general}
           </Text>
         )}
+
+        <Text
+          className="mt-4 text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL) }}
+        >
+          {s.recitationNeedsInternet}
+        </Text>
       </OverlayBody>
 
       <OverlayFooter isRTL={isRTL}>
         <Pressable
           onPress={handlePrimary}
           disabled={starting}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: starting, busy: starting }}
           className={`h-12 flex-1 items-center justify-center rounded-full ${rangeState.active ? "bg-surface-high dark:bg-surface-dark-high" : "bg-primary-accent"}`}
           style={({ pressed }) => ({
             opacity: starting ? 0.55 : pressed ? 0.82 : 1,
@@ -375,6 +494,7 @@ function LabeledInput({
   value,
   onChangeText,
   placeholder,
+  error,
   isDark,
   isRTL,
 }: {
@@ -382,6 +502,7 @@ function LabeledInput({
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
+  error?: string;
   isDark: boolean;
   isRTL: boolean;
 }) {
@@ -398,6 +519,8 @@ function LabeledInput({
         value={value}
         onChangeText={onChangeText}
         accessibilityLabel={label}
+        accessibilityHint={error}
+        aria-invalid={error ? true : undefined}
         placeholder={placeholder}
         placeholderTextColor={isDark ? "#737373" : "#b9a085"}
         keyboardType={Platform.OS === "web" ? "default" : "numbers-and-punctuation"}
@@ -409,8 +532,19 @@ function LabeledInput({
           fontSize: 16,
           ...inputTextStartStyle(isRTL),
           writingDirection: "ltr",
+          borderWidth: error ? 1.5 : 0,
+          borderColor: error ? (isDark ? "#f87171" : "#dc2626") : "transparent",
         }}
       />
+      {!!error && (
+        <Text
+          accessibilityLiveRegion="polite"
+          className="px-1 text-red-600 dark:text-red-400"
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, lineHeight: 17, ...textStartStyle(isRTL) }}
+        >
+          {error}
+        </Text>
+      )}
     </View>
   );
 }
@@ -419,6 +553,10 @@ function LoopControl({
   icon,
   label,
   value,
+  decreaseLabel,
+  increaseLabel,
+  canDecrease,
+  canIncrease,
   onDecrease,
   onIncrease,
   isDark,
@@ -427,6 +565,10 @@ function LoopControl({
   icon: ReactNode;
   label: string;
   value: string;
+  decreaseLabel: string;
+  increaseLabel: string;
+  canDecrease: boolean;
+  canIncrease: boolean;
   onDecrease: () => void;
   onIncrease: () => void;
   isDark: boolean;
@@ -452,7 +594,15 @@ function LoopControl({
           dir={isRTL ? "rtl" : "ltr"}
           className="items-center rounded-full bg-surface p-1 dark:bg-surface-dark"
         >
-          <Pressable onPress={onDecrease} className="h-8 w-8 items-center justify-center rounded-full">
+          <Pressable onPress={onDecrease}
+            disabled={!canDecrease}
+            accessibilityRole="button"
+            accessibilityLabel={decreaseLabel}
+            accessibilityState={{ disabled: !canDecrease }}
+            hitSlop={6}
+            className="h-8 w-8 items-center justify-center rounded-full"
+            style={{ opacity: canDecrease ? 1 : 0.35 }}
+          >
             <Minus size={15} color={iconColor} />
           </Pressable>
           <View className="min-w-12 items-center justify-center px-2">
@@ -460,7 +610,15 @@ function LoopControl({
               {value}
             </Text>
           </View>
-          <Pressable onPress={onIncrease} className="h-8 w-8 items-center justify-center rounded-full">
+          <Pressable onPress={onIncrease}
+            disabled={!canIncrease}
+            accessibilityRole="button"
+            accessibilityLabel={increaseLabel}
+            accessibilityState={{ disabled: !canIncrease }}
+            hitSlop={6}
+            className="h-8 w-8 items-center justify-center rounded-full"
+            style={{ opacity: canIncrease ? 1 : 0.35 }}
+          >
             <Plus size={15} color={iconColor} />
           </Pressable>
         </MirroredRow>
@@ -469,18 +627,32 @@ function LoopControl({
   );
 }
 
+/** An exact "surah:ayah" in any digits, within the canonical ayah counts; the shared C06 parser. */
 function parseAyahReference(value: string): AyahAudioTarget | null {
-  const match = value.trim().match(/^(\d{1,3})\s*[:/.-]\s*(\d{1,3})$/);
-  if (!match) return null;
-  const surah = Number(match[1]);
-  const ayah = Number(match[2]);
-  if (!Number.isInteger(surah) || !Number.isInteger(ayah) || surah < 1 || ayah < 1) return null;
-  return { surah, ayah };
+  const parsed = parseReference(value, { context: "goto" });
+  return parsed.kind === "ayah" ? { surah: parsed.surah, ayah: parsed.ayah } : null;
 }
 
-function formatPlaybackLine(rangeState: RangeAudioState, formatCount: (value: number) => string): string {
+function formatPlaybackLine(
+  rangeState: RangeAudioState,
+  formatCount: (value: number) => string,
+  ayahRepeatTemplate: string
+): string {
   const current = rangeState.currentAyah
     ? `${formatCount(rangeState.currentAyah.surah)}:${formatCount(rangeState.currentAyah.ayah)}`
     : "";
-  return `${current} • ${formatCount(rangeState.currentIndex + 1)}/${formatCount(rangeState.totalAyahs)} • ${formatCount(rangeState.repeatRangeIndex)}/${formatCount(rangeState.repeatRange)}`;
+  const parts = [
+    current,
+    `${formatCount(rangeState.currentIndex + 1)}/${formatCount(rangeState.totalAyahs)}`,
+    `${formatCount(rangeState.repeatRangeIndex)}/${formatCount(rangeState.repeatRange)}`,
+  ];
+  if (rangeState.repeatEachAyah > 1) {
+    parts.push(
+      interpolate(ayahRepeatTemplate, {
+        current: formatCount(rangeState.repeatEachAyahIndex),
+        total: formatCount(rangeState.repeatEachAyah),
+      })
+    );
+  }
+  return parts.filter(Boolean).join(" • ");
 }

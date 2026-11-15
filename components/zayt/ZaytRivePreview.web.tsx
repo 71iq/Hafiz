@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View } from "react-native";
 import { Asset } from "expo-asset";
 import { Alignment, Fit, Layout, useRive } from "@rive-app/react-webgl2";
 import type { ZaytRivePreviewProps } from "./types";
+import { ZaytPreviewError, ZaytPreviewLoading } from "./ZaytPreviewStates";
 
 const zaytRiveAsset = require("@/zayt/idle_calm.riv");
 const riveLayout = new Layout({ fit: Fit.Contain, alignment: Alignment.Center });
@@ -10,12 +11,18 @@ const riveLayout = new Layout({ fit: Fit.Contain, alignment: Alignment.Center })
 export function ZaytRivePreview({
   loadingLabel,
   errorLabel,
+  retryLabel,
   isDark,
+  playing,
+  onReady,
   onError,
+  onRetry,
 }: ZaytRivePreviewProps) {
   const [uri, setUri] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [hasError, setHasError] = useState(false);
+  // Reduced motion starts on the first frame instead of autoplaying.
+  const autoplay = useRef(playing).current;
 
   const handleError = useCallback(() => {
     setHasError(true);
@@ -24,15 +31,14 @@ export function ZaytRivePreview({
 
   useEffect(() => {
     let isMounted = true;
-
     Asset.fromModule(zaytRiveAsset)
       .downloadAsync()
       .then((asset) => {
-        if (!isMounted) return;
-        setUri(asset.localUri ?? asset.uri);
+        if (isMounted) setUri(asset.localUri ?? asset.uri);
       })
-      .catch(handleError);
-
+      .catch(() => {
+        if (isMounted) handleError();
+      });
     return () => {
       isMounted = false;
     };
@@ -43,43 +49,33 @@ export function ZaytRivePreview({
       uri && !hasError
         ? {
             src: uri,
-            autoplay: true,
+            autoplay,
             layout: riveLayout,
-            onLoad: () => setIsReady(true),
+            onLoad: () => {
+              setIsReady(true);
+              onReady?.();
+            },
             onLoadError: handleError,
           }
         : null,
-    [handleError, hasError, uri]
+    [autoplay, handleError, hasError, onReady, uri],
   );
 
-  const { RiveComponent } = useRive(riveParams, {
-    shouldResizeCanvasToContainer: true,
-  });
+  const { rive, RiveComponent } = useRive(riveParams, { shouldResizeCanvasToContainer: true });
 
-  if (hasError) {
-    return (
-      <View className="flex-1 items-center justify-center px-6">
-        <Text
-          className="text-center text-warm-500 dark:text-neutral-400"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}
-        >
-          {errorLabel}
-        </Text>
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (!rive || !isReady) return;
+    if (playing) rive.play();
+    else rive.pause();
+  }, [isReady, playing, rive]);
+
+  if (hasError) return <ZaytPreviewError label={errorLabel} retryLabel={retryLabel} isDark={isDark} onRetry={onRetry} />;
 
   return (
     <View className="flex-1">
       {!isReady && (
-        <View className="absolute inset-0 z-10 items-center justify-center gap-3">
-          <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
-          <Text
-            className="text-warm-500 dark:text-neutral-400"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
-          >
-            {loadingLabel}
-          </Text>
+        <View className="absolute inset-0 z-10">
+          <ZaytPreviewLoading label={loadingLabel} isDark={isDark} />
         </View>
       )}
       <RiveComponent style={{ width: "100%", height: "100%" }} />

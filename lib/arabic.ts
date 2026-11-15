@@ -12,6 +12,11 @@ export function formatAyahRef(isRTL: boolean, ...parts: number[]): string {
   return parts.map((part) => (isRTL ? toArabicNumber(part) : String(part))).join(":");
 }
 
+/** Drops tashkeel and tatweel only, as Home search does, so "الرَّحْمَٰن" matches "الرحمن". */
+export function stripArabicDiacritics(text: string): string {
+  return text.replace(ARABIC_DIACRITICS_RE, "");
+}
+
 export function normalizeArabicWord(text: string | null | undefined): string {
   return String(text ?? "")
     .replace(ARABIC_DIACRITICS_RE, "")

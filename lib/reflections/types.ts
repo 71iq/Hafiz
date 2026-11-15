@@ -39,7 +39,12 @@ export type ReflectionComment = {
   user_has_liked?: boolean;
 };
 
-export type ReflectionFeedSort = "newest" | "oldest" | "popular" | "less";
+export type ReflectionFeedSort = "newest" | "popular";
+
+/** The feed offers Newest and Popular only. Any other saved or linked value (old "oldest"/"less") is Newest. */
+export function normalizeFeedSort(value: unknown): ReflectionFeedSort {
+  return value === "popular" ? "popular" : "newest";
+}
 export type ReflectionCommentSort = "popular" | "oldest" | "newest";
 
 export type ReflectionFeedFilter =

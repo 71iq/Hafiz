@@ -17,7 +17,7 @@ function expectSourceContainsAll(relativePath: string, expectedSnippets: string[
 describe("higher-level RTL source contracts", () => {
   it("keeps DropdownMenu placement coordinate-based while menu item rows mirror internally", () => {
     expectSourceContainsAll("components/ui/DropdownMenu.tsx", [
-      "left: menuPosition.left",
+      "left: menuPosition?.left ?? MENU_MARGIN",
       'direction: "ltr"',
       'flexDirection: isRTL ? "row-reverse" : "row"',
       '...textStartStyle(isRTL)',

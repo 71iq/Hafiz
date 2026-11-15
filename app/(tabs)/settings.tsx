@@ -1,11 +1,17 @@
-import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
-import { View, Text, Pressable, ActivityIndicator, Linking, StyleSheet, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking, Platform, StyleSheet, useWindowDimensions } from "react-native";
+import { AccountSyncCard, lastSyncedLabel } from "@/components/settings/AccountSyncCard";
+import { LogoutConfirmDialog } from "@/components/settings/LogoutConfirmDialog";
+import { useIssueReporter } from "@/components/app-update/IssueReporter";
+import { WhatsNewSheet } from "@/components/app-update/WhatsNewSheet";
+import { installedAppVersion } from "@/lib/app-update/build-info";
+import { SyncIndicator, useSyncStatusDetails } from "@/components/ui/SyncIndicator";
+import { subscribeSettingSaveFailed } from "@/lib/settings/save-feedback";
+import { PUBLIC_PAGE_FROM_SETTINGS } from "@/lib/public-pages/content";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { SwitchRow, SwitchTrack } from "@/components/ui/Switch";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { Toast } from "@/components/ui/Toast";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
@@ -25,8 +31,8 @@ import {
   Unlink,
   Info,
   FileText,
-  HeartHandshake,
   ExternalLink,
+  Sparkles,
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react-native";
@@ -36,21 +42,19 @@ import {
   type ThemeMode,
   type UILanguage,
   type PageScroll,
-  type QuranFontStyle,
   type QuranMarkerStyle,
   type ViewMode,
 } from "@/lib/settings/context";
+import { isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
 import { useDatabase } from "@/lib/database/provider";
 import { WirdSettingsSection } from "@/components/habit/WirdSettingsSection";
 import { ReminderSettingsSection } from "@/components/notifications/ReminderSettingsSection";
-import { getLanguageByCode } from "@/lib/translations/languages";
+import { getLanguageByCode, translationDisplayName } from "@/lib/translations/languages";
 import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
-import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
-import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
-import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -66,6 +70,7 @@ import {
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
+import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
@@ -77,9 +82,11 @@ import {
 } from "@/lib/fonts/loader";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import { errorMessage } from "@/lib/error-message";
-import { useAppReleaseRow } from "@/components/app-update/use-app-release-row";
+import { useAppReleaseRows } from "@/components/app-update/use-app-release-row";
 
 type SettingsCategoryId = "general" | "content" | "account" | "about";
+
+// Login and Sign up opened from Account return there; the auth screens own the allowlisted return.
 
 type SettingsCategory = {
   id: SettingsCategoryId;
@@ -126,12 +133,20 @@ export default function SettingsScreen() {
     setQuranMarkerStyle,
     markSimilarVerses,
     setMarkSimilarVerses,
+    hapticsEnabled,
+    setHapticsEnabled,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
-  const appReleaseRow = useAppReleaseRow();
-  const showNotice = useOperationNotice();
+  const appReleaseRows = useAppReleaseRows();
+  const appVersion = installedAppVersion();
+  const syncDetails = useSyncStatusDetails();
   const router = useRouter();
+  // Sign-in from Settings returns to the Account category through the allowlisted return origin (W13).
+  const openAccountAuth = (pathname: "/auth/login" | "/auth/signup") => {
+    captureAuthReturn({ route: "settings-account" });
+    router.push(pathname);
+  };
   const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string }>();
   const configured = isSupabaseConfigured();
   const qfSyncEnabled = isQfSyncEnabled();
@@ -139,7 +154,7 @@ export default function SettingsScreen() {
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
-  const [donorModalVisible, setDonorModalVisible] = useState(false);
+  const [whatsNewVisible, setWhatsNewVisible] = useState(false);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
@@ -150,8 +165,12 @@ export default function SettingsScreen() {
   const currentTafseerTitle = stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id);
   const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
-  const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
+  // Never derive a name from the email; a fallback profile reads "Hafiz user" until the real one loads.
+  const accountName = profile?.display_name || profile?.username || (user ? s.navigationHafizUser : s.authProfile);
+  // The sign-out confirmation names the account as the person signed in with it.
+  const accountIdentity = user?.email || profile?.username || s.authProfile;
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
+  const resolvedThemeLabel = effectiveTheme === "white" ? s.themeWhite : effectiveTheme === "beige" ? s.themeBeige : effectiveTheme === "dark" ? s.themeDark : s.themeAmoled;
   const [quranPreview, setQuranPreview] = useState<QuranPreviewAyah | null>(null);
   const quranPreviewFontReady = useQuranPageFontReady(quranRenderFontStyle, quranPreview?.v2Page);
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
@@ -208,6 +227,9 @@ export default function SettingsScreen() {
   useEffect(() => {
     refreshQfStatus().catch(console.warn);
   }, [refreshQfStatus]);
+
+  // A failed settings write has already reverted to the last saved choice; say so once.
+  useEffect(() => subscribeSettingSaveFailed(() => setToast(s.settingSaveFailed)), [s.settingSaveFailed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -363,12 +385,14 @@ export default function SettingsScreen() {
     }
   }, [captureAccount, db, refreshQfStatus, s.qfFinishConnection, s.qfNeedsReauth, s.qfSyncComplete, s.qfSyncFailed]);
 
-  const openIssueReporter = useCallback(() => {
-    Linking.openURL("https://github.com/71iq/Hafiz/issues").catch((e) => {
-      console.warn("[Settings] Failed to open issue reporter:", e);
-      setToast(s.externalLinkFailed);
-    });
-  }, [s.externalLinkFailed]);
+  const issueReporter = useIssueReporter(setToast);
+  const openPublicPage = useCallback(
+    (page: "about" | "privacy" | "terms" | "credits") => {
+      // The page returns to Settings > About through this captured origin.
+      router.push(`/${page}?from=${PUBLIC_PAGE_FROM_SETTINGS}` as Href);
+    },
+    [router],
+  );
 
   const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
     { value: "white", label: s.themeWhite },
@@ -390,17 +414,6 @@ export default function SettingsScreen() {
       router.setParams({ category });
     },
     [router],
-  );
-
-  const handleTafsirSelectionError = useCallback(
-    (error: unknown) => {
-      console.warn("[Settings] Failed to import tafsir source:", error);
-      showNotice(s.tafseerSourceImportFailed);
-    },
-    [s.tafseerSourceImportFailed, showNotice],
-  );
-  const { importingSource: importingTafseerSource, selectSource: handleTafseerSourceSelect } = useTafsirSourceSelection(
-    { db, onSelected: setTafseerSource, onError: handleTafsirSelectionError },
   );
 
   const categoryPanels = (
@@ -459,6 +472,15 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
+            {theme === "system" ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                className="mt-3 text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {interpolate(s.settingsThemeResolved, { theme: resolvedThemeLabel })}
+              </Text>
+            ) : null}
           </Card>
 
           <SectionLabel>{s.sectionReading}</SectionLabel>
@@ -474,27 +496,56 @@ export default function SettingsScreen() {
                   ]}
                 />
               </SettingsControlRow>
+              <Text
+                className="-mt-2 text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {s.settingsViewModeHint}
+              </Text>
 
               <SettingsControlRow label={s.quranFontLabel} isRTL={isRTL}>
-                <ToggleGroup<QuranFontStyle>
-                  value={quranFontStyle}
-                  onValueChange={setQuranFontStyle}
+                <ToggleGroup<QuranBaseFont>
+                  value={quranBaseFont(quranFontStyle)}
+                  onValueChange={(font) => setQuranFontStyle(styleForBaseFont(font, quranFontStyle))}
+                  accessibilityLabel={s.quranFontLabel}
                   items={[
                     { value: "qcf2", label: s.quranFontQcf2 },
                     { value: "v4", label: s.quranFontV4 },
-                    { value: "v4-tajweed", label: s.quranFontV4Tajweed },
                   ]}
                 />
               </SettingsControlRow>
 
-              {quranRenderFontStyle !== quranFontStyle && (
-                <Text
-                  className="text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL) }}
-                >
-                  {s.quranFontDarkFallback}
-                </Text>
-              )}
+              <Text
+                className="text-warm-400 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {quranRenderFontStyle !== quranFontStyle ? `${s.quranFontChoiceHint} ${s.quranFontDarkFallback}` : s.quranFontChoiceHint}
+              </Text>
+
+              <SwitchRow
+                label={s.quranFontV4Tajweed}
+                hint={s.quranTajweedHint}
+                value={isTajweedStyle(quranFontStyle)}
+                onValueChange={(enabled) => setQuranFontStyle(styleForTajweed(enabled, quranFontStyle))}
+                className="items-center justify-between gap-3"
+                style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row", minHeight: 44 }}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="mb-1 text-charcoal dark:text-neutral-200"
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                  >
+                    {s.quranFontV4Tajweed}
+                  </Text>
+                  <Text
+                    className="text-warm-400 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                  >
+                    {s.quranTajweedHint}
+                  </Text>
+                </View>
+                <SwitchTrack value={isTajweedStyle(quranFontStyle)} />
+              </SwitchRow>
 
               {quranRenderFontStyle !== "qcf2" && (
                 <SettingsControlRow label={s.quranMarkerStyleLabel} isRTL={isRTL}>
@@ -533,8 +584,8 @@ export default function SettingsScreen() {
                   </Text>
                   {fontSizeUsesFittedPageSize && (
                     <Text
-                      className="text-warm-400 dark:text-neutral-500"
-                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
+                      className="text-warm-500 dark:text-neutral-400"
+                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
                     >
                       {s.fontSizeFixedPageView}
                     </Text>
@@ -547,8 +598,9 @@ export default function SettingsScreen() {
                   value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
                   onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
                   onIncrement={() => setFontSizeIndex(fontSizeIndex + 1)}
-                  decrementDisabled={fontSizeIndex === 0}
-                  incrementDisabled={fontSizeIndex === FONT_SIZE_STEPS.length - 1}
+                  // Swipe pages are fitted to the screen, so the stepper has no effect there.
+                  decrementDisabled={fontSizeUsesFittedPageSize || fontSizeIndex === 0}
+                  incrementDisabled={fontSizeUsesFittedPageSize || fontSizeIndex === FONT_SIZE_STEPS.length - 1}
                   isDark={isDark}
                   isRTL={isRTL}
                 />
@@ -637,6 +689,33 @@ export default function SettingsScreen() {
                 </View>
                 <SwitchTrack value={markSimilarVerses} />
               </SwitchRow>
+
+              {Platform.OS !== "web" && (
+                <SwitchRow
+                  label={s.vibrationLabel}
+                  hint={s.vibrationHint}
+                  value={hapticsEnabled}
+                  onValueChange={setHapticsEnabled}
+                  className="items-center justify-between gap-3"
+                  style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row", minHeight: 44 }}
+                >
+                  <View className="min-w-0 flex-1">
+                    <Text
+                      className="mb-1 text-charcoal dark:text-neutral-200"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                    >
+                      {s.vibrationLabel}
+                    </Text>
+                    <Text
+                      className="text-warm-400 dark:text-neutral-400"
+                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                    >
+                      {s.vibrationHint}
+                    </Text>
+                  </View>
+                  <SwitchTrack value={hapticsEnabled} />
+                </SwitchRow>
+              )}
             </View>
           </Card>
 
@@ -656,15 +735,17 @@ export default function SettingsScreen() {
 
       {activeCategory === "content" && (
         <ContentSettingsPanel isRTL={isRTL}>
-          <ContentSettingsTitle isRTL={isRTL}>{s.sectionInlineContent}</ContentSettingsTitle>
+          <ContentSettingsTitle isRTL={isRTL}>{s.readingContentSettingsLabel}</ContentSettingsTitle>
           <View style={{ gap: 34 }}>
-            <ContentSettingsGroup title={s.readingContentSettingsLabel} isRTL={isRTL}>
+            <ContentSettingsGroup isRTL={isRTL}>
               <ContentSettingsRow
                 label={s.translationLanguageLabel}
-                value={currentLang?.nameEnglish ?? "English"}
+                value={currentLang ? translationDisplayName(currentLang, uiLanguage) : translationLanguage}
                 isRTL={isRTL}
                 isDark={isDark}
                 loading={isTranslationLoading}
+                // There is no byte total for a translation, so the row names the phase without a percentage.
+                loadingLabel={Platform.OS === "web" ? s.contentDownloading : s.contentImporting}
                 showDivider
                 onPress={() => setPickerVisible(true)}
               />
@@ -673,7 +754,6 @@ export default function SettingsScreen() {
                 value={currentTafseerTitle}
                 isRTL={isRTL}
                 isDark={isDark}
-                loading={Boolean(importingTafseerSource)}
                 onPress={() => setTafseerPickerVisible(true)}
               />
             </ContentSettingsGroup>
@@ -719,11 +799,14 @@ export default function SettingsScreen() {
                     avatarSize={52}
                     nameSize={16}
                     handleSize={12}
+                    detail={lastSyncedLabel(syncDetails.lastSyncedAt, s, uiLanguage)}
                   />
+                  <SyncIndicator status={syncDetails.status} isDark={isDark} hideSuccess />
                   <View className="h-6 w-6 shrink-0 items-center justify-center">
                     <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
                   </View>
                 </Pressable>
+                <AccountSyncCard />
                 {configured && qfSyncEnabled && (
                   <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">
                     <View className="flex-row items-center gap-3">
@@ -817,7 +900,8 @@ export default function SettingsScreen() {
                 <Pressable
                   onPress={() => setLogoutDialogVisible(true)}
                   disabled={authLoading}
-                  className="flex-row items-center justify-center gap-2 py-3 rounded-full bg-surface dark:bg-surface-dark"
+                  accessibilityRole="button"
+                  className="min-h-11 flex-row items-center justify-center gap-2 py-3 rounded-full bg-surface dark:bg-surface-dark"
                   style={({ pressed }) => ({ opacity: authLoading ? 0.5 : pressed ? 0.7 : 1 })}
                 >
                   <LogOut size={16} color={isDark ? "#ef4444" : "#dc2626"} />
@@ -831,6 +915,12 @@ export default function SettingsScreen() {
               </View>
             ) : (
               <View className="gap-2">
+                <Text
+                  className="mb-2 px-1 text-warm-600 dark:text-neutral-300"
+                  style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 21, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                >
+                  {s.accountGuestIntro}
+                </Text>
                 <SettingsLinkRow
                   icon={User}
                   title={s.settingsProfile}
@@ -839,21 +929,37 @@ export default function SettingsScreen() {
                   isDark={isDark}
                   isRTL={isRTL}
                 />
-                <Button onPress={() => router.push("/auth/login")} disabled={authLoading}>
-                  <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
-                    {s.authLogin}
-                  </Text>
-                </Button>
-                {isEmailAuthFlowsEnabled() && (
-                  <Button variant="outline" onPress={() => router.push("/auth/signup")} disabled={authLoading}>
-                    <Text
-                      className="text-charcoal dark:text-neutral-200"
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                {/* Without an account service there is nothing to sign in to, so the buttons stay hidden. */}
+                {configured ? (
+                  <>
+                    <Button
+                      onPress={() => openAccountAuth("/auth/login")}
+                      disabled={authLoading}
+                      accessibilityState={{ disabled: authLoading, busy: authLoading }}
                     >
-                      {s.authSignup}
-                    </Text>
-                  </Button>
-                )}
+                      {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+                      <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+                        {s.authLogin}
+                      </Text>
+                    </Button>
+                    {isEmailAuthFlowsEnabled() && (
+                      <Button
+                        variant="outline"
+                        onPress={() => openAccountAuth("/auth/signup")}
+                        disabled={authLoading}
+                        accessibilityState={{ disabled: authLoading, busy: authLoading }}
+                      >
+                        {authLoading ? <ActivityIndicator size="small" color={isDark ? "#d4d4d4" : "#2D2D2D"} /> : null}
+                        <Text
+                          className="text-charcoal dark:text-neutral-200"
+                          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                        >
+                          {s.authSignup}
+                        </Text>
+                      </Button>
+                    )}
+                  </>
+                ) : null}
               </View>
             )}
           </Card>
@@ -862,40 +968,39 @@ export default function SettingsScreen() {
 
       {activeCategory === "about" && (
         <>
-          <SectionLabel>{s.settingsAboutSection}</SectionLabel>
+          <SectionLabel>{s.settingsAboutGroupApp}</SectionLabel>
           <Card elevation="low" className="p-2 mb-8">
             <View className="gap-1">
-              {appReleaseRow ? (
+              {appReleaseRows.map((row) => (
                 <SettingsLinkRow
-                  icon={appReleaseRow.icon}
-                  title={appReleaseRow.title}
-                  description={appReleaseRow.description}
-                  onPress={appReleaseRow.onPress}
+                  key={row.key}
+                  icon={row.icon}
+                  title={row.title}
+                  description={row.description}
+                  onPress={row.onPress}
                   isDark={isDark}
                   isRTL={isRTL}
                 />
-              ) : null}
+              ))}
+              <SettingsLinkRow
+                icon={Sparkles}
+                title={s.aboutWhatsNew}
+                description={appVersion ? interpolate(s.aboutWhatsNewDesc, { version: appVersion }) : s.aboutNoReleaseNotes}
+                onPress={() => setWhatsNewVisible(true)}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+            </View>
+          </Card>
+
+          <SectionLabel>{s.settingsAboutGroupHafiz}</SectionLabel>
+          <Card elevation="low" className="p-2 mb-8">
+            <View className="gap-1">
               <SettingsLinkRow
                 icon={Info}
                 title={s.settingsAboutHafiz}
                 description={s.settingsAboutHafizDesc}
-                onPress={() => router.push("/about" as any)}
-                isDark={isDark}
-                isRTL={isRTL}
-              />
-              <SettingsLinkRow
-                icon={FileText}
-                title={s.settingsPrivacyPolicy}
-                description={s.settingsPrivacyPolicyDesc}
-                onPress={() => router.push("/privacy" as any)}
-                isDark={isDark}
-                isRTL={isRTL}
-              />
-              <SettingsLinkRow
-                icon={FileText}
-                title={s.settingsTermsService}
-                description={s.settingsTermsServiceDesc}
-                onPress={() => router.push("/terms" as any)}
+                onPress={() => openPublicPage("about")}
                 isDark={isDark}
                 isRTL={isRTL}
               />
@@ -903,7 +1008,7 @@ export default function SettingsScreen() {
                 icon={FileText}
                 title={s.creditsSection}
                 description={s.settingsCreditsDesc}
-                onPress={() => router.push("/credits" as any)}
+                onPress={() => openPublicPage("credits")}
                 isDark={isDark}
                 isRTL={isRTL}
               />
@@ -911,16 +1016,30 @@ export default function SettingsScreen() {
                 icon={ExternalLink}
                 title={s.settingsReportIssue}
                 description={s.settingsReportIssueDesc}
-                onPress={openIssueReporter}
+                onPress={() => issueReporter.report()}
                 isDark={isDark}
                 isRTL={isRTL}
                 external
               />
+            </View>
+          </Card>
+
+          <SectionLabel>{s.settingsAboutGroupLegal}</SectionLabel>
+          <Card elevation="low" className="p-2 mb-8">
+            <View className="gap-1">
               <SettingsLinkRow
-                icon={HeartHandshake}
-                title={s.settingsBecomeDonor}
-                description={s.settingsBecomeDonorDesc}
-                onPress={() => setDonorModalVisible(true)}
+                icon={FileText}
+                title={s.settingsPrivacyPolicy}
+                description={s.settingsPrivacyPolicyDesc}
+                onPress={() => openPublicPage("privacy")}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+              <SettingsLinkRow
+                icon={FileText}
+                title={s.settingsTermsService}
+                description={s.settingsTermsServiceDesc}
+                onPress={() => openPublicPage("terms")}
                 isDark={isDark}
                 isRTL={isRTL}
               />
@@ -967,68 +1086,23 @@ export default function SettingsScreen() {
 
         <View className="pb-8">{categoryPanels}</View>
       </ScreenScrollView>
-      <ConfirmDialog
+      <LogoutConfirmDialog
         visible={logoutDialogVisible}
-        title={s.authLogout}
-        message={s.authLogoutConfirm}
-        cancelLabel={s.flashcardsCancel}
-        confirmLabel={s.authLogout}
-        destructive
-        confirmLoading={authLoading}
-        isDark={isDark}
-        isRTL={isRTL}
-        onCancel={() => {
-          if (!authLoading) setLogoutDialogVisible(false);
-        }}
+        db={db}
+        accountName={accountIdentity}
+        loading={authLoading}
+        onCancel={() => setLogoutDialogVisible(false)}
         onConfirm={handleLogout}
       />
-      <ResponsiveModal
-        open={donorModalVisible}
-        onClose={() => setDonorModalVisible(false)}
-        maxWidth={420}
-        dir={isRTL ? "rtl" : "ltr"}
-      >
-        <OverlayHeader
-          title={s.settingsBecomeDonor}
-          isRTL={isRTL}
-          onClose={() => setDonorModalVisible(false)}
-          leading={
-            <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
-              <HeartHandshake size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-            </View>
-          }
-        />
-        <OverlayBody scrollEnabled={false}>
-          <View className={isRTL ? "items-end px-5 py-5" : "items-start px-5 py-5"}>
-            <Text
-              className="text-warm-500 dark:text-neutral-400"
-              style={{
-                fontFamily: "Manrope_400Regular",
-                fontSize: 14,
-                lineHeight: 22,
-                ...textStartStyle(isRTL),
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {s.settingsBecomeDonorModalMessage}
-            </Text>
-          </View>
-        </OverlayBody>
-        <View className="border-t border-warm-200 px-5 py-4 dark:border-neutral-800">
-          <Button onPress={() => setDonorModalVisible(false)} className="w-full">
-            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-              {s.genericClose}
-            </Text>
-          </Button>
-        </View>
-      </ResponsiveModal>
+      <WhatsNewSheet open={whatsNewVisible} version={appVersion} onClose={() => setWhatsNewVisible(false)} />
+      {issueReporter.fallback}
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
       <TranslationLanguagePicker visible={pickerVisible} onClose={() => setPickerVisible(false)} />
       <TafsirSourcePicker
         visible={tafseerPickerVisible}
         selectedSource={tafseerSource}
-        importingSource={importingTafseerSource}
-        onSelect={handleTafseerSourceSelect}
+        onSelected={setTafseerSource}
+        logLabel="[Settings]"
         onClose={() => setTafseerPickerVisible(false)}
       />
       <ReciterPicker
@@ -1169,22 +1243,24 @@ function ContentSettingsTitle({ children, isRTL }: { children: string; isRTL: bo
   );
 }
 
-function ContentSettingsGroup({ title, isRTL, children }: { title: string; isRTL: boolean; children: ReactNode }) {
+function ContentSettingsGroup({ title, isRTL, children }: { title?: string; isRTL: boolean; children: ReactNode }) {
   const { isDark, themeColors } = useSettings();
   return (
     <View>
-      <Text
-        className="mb-4 text-charcoal dark:text-neutral-100"
-        style={{
-          fontFamily: "Manrope_700Bold",
-          fontSize: 20,
-          lineHeight: 26,
-          ...textStartStyle(isRTL),
-          writingDirection: isRTL ? "rtl" : "ltr",
-        }}
-      >
-        {title}
-      </Text>
+      {title ? (
+        <Text
+          className="mb-4 text-charcoal dark:text-neutral-100"
+          style={{
+            fontFamily: "Manrope_700Bold",
+            fontSize: 20,
+            lineHeight: 26,
+            ...textStartStyle(isRTL),
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {title}
+        </Text>
+      ) : null}
       <View
         style={{
           backgroundColor: isDark ? themeColors.surfaceLow : themeColors.surfaceBright,
@@ -1206,6 +1282,7 @@ function ContentSettingsRow({
   isRTL,
   isDark,
   loading,
+  loadingLabel,
   showDivider,
   onPress,
 }: {
@@ -1214,6 +1291,7 @@ function ContentSettingsRow({
   isRTL: boolean;
   isDark: boolean;
   loading?: boolean;
+  loadingLabel?: string;
   showDivider?: boolean;
   onPress: () => void;
 }) {
@@ -1281,7 +1359,17 @@ function ContentSettingsRow({
           {value}
         </Text>
         {loading ? (
-          <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+          <View className="items-center gap-2" style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
+            {loadingLabel ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={{ color: valueColor, fontFamily: "Manrope_500Medium", fontSize: 13, writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {loadingLabel}
+              </Text>
+            ) : null}
+            <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+          </View>
         ) : (
           <RowChevron size={21} strokeWidth={2.25} color={chevronColor} />
         )}
@@ -1298,12 +1386,11 @@ function SectionLabel({ children }: { children: string }) {
   const { isRTL } = useSettings();
   return (
     <Text
-      className="text-warm-400 dark:text-neutral-500 mb-3"
+      accessibilityRole="header"
+      className="text-warm-500 dark:text-neutral-400 mb-3"
       style={{
         fontFamily: "Manrope_600SemiBold",
-        fontSize: 14,
-        letterSpacing: 0.6,
-        textTransform: "uppercase",
+        fontSize: 13,
         ...textStartStyle(isRTL),
         writingDirection: isRTL ? "rtl" : "ltr",
       }}
@@ -1348,7 +1435,8 @@ function SettingsLinkRow({
   icon: LucideIcon;
   title: string;
   description: string;
-  onPress: () => void;
+  /** Without onPress the row is information only. */
+  onPress?: () => void;
   isDark: boolean;
   isRTL: boolean;
   external?: boolean;
@@ -1361,7 +1449,9 @@ function SettingsLinkRow({
   return (
     <Pressable
       onPress={onPress}
-      className={`items-center gap-3 rounded-2xl px-3 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+      disabled={!onPress}
+      accessibilityRole={onPress ? (external ? "link" : "button") : "text"}
+      className={`min-h-11 items-center gap-3 rounded-2xl px-3 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
       style={({ pressed }) => ({
         backgroundColor: pressed ? themeColors.surfaceMid : "transparent",
         direction: "ltr",
@@ -1399,9 +1489,11 @@ function SettingsLinkRow({
           {description}
         </Text>
       </View>
-      <View className="h-6 w-6 shrink-0 items-center justify-center">
-        {external ? <ExternalLink size={16} color={chevronColor} /> : <RowChevron size={18} color={chevronColor} />}
-      </View>
+      {onPress ? (
+        <View className="h-6 w-6 shrink-0 items-center justify-center">
+          {external ? <ExternalLink size={16} color={chevronColor} /> : <RowChevron size={18} color={chevronColor} />}
+        </View>
+      ) : null}
     </Pressable>
   );
 }

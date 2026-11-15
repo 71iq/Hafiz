@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BackHandler, Pressable, ScrollView, View } from "react-native";
+import { AccessibilityInfo, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { Minus, Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { MirroredRow } from "@/components/ui/MirroredRow";
@@ -298,6 +298,8 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     initialPlan && presetOf(initialPlan) !== "short_surahs" ? initialPlan.unit : DEFAULT_HIFZ_PLAN.unit,
   );
   const [surahs, setSurahs] = useState<SurahChoice[]>([]);
+  const [surahsState, setSurahsState] = useState<"loading" | "ready" | "error">("loading");
+  const [surahsAttempt, setSurahsAttempt] = useState(0);
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -312,11 +314,29 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     setStepIndex(index);
   };
 
+  // The surah list loads once per attempt; Retry starts a new attempt and a stale one is ignored.
   useEffect(() => {
+    let active = true;
+    setSurahsState("loading");
     db.getAllAsync<SurahChoice>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number")
-      .then(setSurahs)
-      .catch((loadError) => console.warn("[HifzSetup] Surahs failed to load:", loadError));
-  }, [db]);
+      .then((rows) => {
+        if (!active) return;
+        setSurahs(rows);
+        setSurahsState("ready");
+      })
+      .catch((loadError) => {
+        console.warn("[HifzSetup] Surahs failed to load:", loadError);
+        if (active) setSurahsState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [db, surahsAttempt]);
+
+  // Saving is announced once when it starts, beside the busy state on both buttons.
+  useEffect(() => {
+    if (saving) AccessibilityInfo.announceForAccessibility?.(s.setupSavingAnnouncement);
+  }, [saving, s.setupSavingAnnouncement]);
 
   // The optional prayer-times row says whether a location is already saved on this device.
   useEffect(() => {
@@ -343,12 +363,14 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      // The atomic save is in flight: stay on this step until it finishes or fails.
+      if (saving) return true;
       if (stepIndex === 0 && !onCancel) return false;
       back();
       return true;
     });
     return () => subscription.remove();
-  }, [back, onCancel, stepIndex]);
+  }, [back, onCancel, saving, stepIndex]);
 
   const chooseGoal = (next: Goal) => {
     // Tapping the goal already chosen changes nothing, so it does not reset the saved pace.
@@ -360,6 +382,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   };
 
   const save = async () => {
+    if (saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -429,8 +452,13 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   }, [s, step]);
 
   return (
-    <View className="flex-1">
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
+    // The footer stays above the keyboard while the surah search is focused; dragging the list closes it.
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView
+        contentContainerStyle={{ padding: 20, gap: 16 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         <Text dir={dir} variant="caption">
           {interpolate(s.hifzStepOf, { n: formatNumber(stepIndex + 1, language), total: formatNumber(STEPS.length, language) })}
         </Text>
@@ -456,7 +484,19 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
               selectedSurahs={selectedSurahs}
               selectedJuz={selectedJuz}
               onToggleSurah={(surah) => setSelectedSurahs((value) => toggle(value, surah))}
+              onSetSurahs={(numbers, selected) =>
+                setSelectedSurahs((value) => {
+                  const copy = new Set(value);
+                  for (const number of numbers) {
+                    if (selected) copy.add(number);
+                    else copy.delete(number);
+                  }
+                  return copy;
+                })
+              }
               onToggleJuz={(juz) => setSelectedJuz((value) => toggle(value, juz))}
+              loadState={surahsState}
+              onRetryLoad={() => setSurahsAttempt((attempt) => attempt + 1)}
               language={language}
               isDark={isDark}
               s={s}
@@ -631,15 +671,34 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
       </ScrollView>
 
       <View className="px-5 pb-5 pt-2" style={{ gap: 8 }}>
-        <Button label={saving ? s.hifzSaving : stepIndex === STEPS.length - 1 ? s.hifzSaveMemorized : s.hifzContinue} onPress={next} disabled={saving} />
+        <Button
+          label={saving ? s.hifzSaving : stepIndex === STEPS.length - 1 ? s.hifzSaveMemorized : s.hifzContinue}
+          onPress={next}
+          disabled={saving}
+          accessibilityState={{ busy: saving, disabled: saving }}
+          // Long labels wrap and the button grows instead of shrinking the text.
+          className="h-auto min-h-[44px] py-2.5"
+        />
         <MirroredRow dir={dir} className="items-center justify-between">
-          <Pressable accessibilityRole="button" onPress={back} disabled={saving || (stepIndex === 0 && !onCancel)} className="min-h-[44px] justify-center px-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy: saving, disabled: saving || (stepIndex === 0 && !onCancel) }}
+            onPress={back}
+            disabled={saving || (stepIndex === 0 && !onCancel)}
+            className="min-h-[44px] justify-center px-2"
+          >
             <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className={stepIndex === 0 && !onCancel ? "text-transparent" : "text-warm-500 dark:text-neutral-400"}>
               {s.hifzBack}
             </Text>
           </Pressable>
           {step !== "goal" && stepIndex < STEPS.length - 1 ? (
-            <Pressable accessibilityRole="button" onPress={skip} disabled={saving} className="min-h-[44px] justify-center px-2">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: saving }}
+              onPress={skip}
+              disabled={saving}
+              className="min-h-[44px] justify-center px-2"
+            >
               <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-warm-500 dark:text-neutral-400">
                 {s.hifzNotNow}
               </Text>
@@ -647,6 +706,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
           ) : null}
         </MirroredRow>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

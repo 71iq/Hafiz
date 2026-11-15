@@ -2,7 +2,7 @@ import { type Ref } from "react";
 import { TextInput } from "react-native";
 import { Controller, type Control, type FieldPath, type FieldValues } from "react-hook-form";
 import { Input, type InputProps } from "@/components/ui/Input";
-import { Field, FieldMessage } from "@/components/ui/Field";
+import { Field, FieldMessage, Label } from "@/components/ui/Field";
 import { type Direction } from "@/lib/ui/direction";
 
 type FormTextFieldProps<TFieldValues extends FieldValues> = {
@@ -10,6 +10,8 @@ type FormTextFieldProps<TFieldValues extends FieldValues> = {
   name: FieldPath<TFieldValues>;
   label: string;
   error?: string;
+  /** Muted guidance under the field, shown until an error replaces it. */
+  hint?: string;
   dir?: Direction;
   inputRef?: Ref<TextInput>;
   inputProps?: Omit<InputProps, "value" | "onChangeText" | "onBlur" | "dir" | "invalid">;
@@ -20,12 +22,23 @@ export function FormTextField<TFieldValues extends FieldValues>({
   name,
   label,
   error,
+  hint,
   dir,
   inputRef,
   inputProps,
 }: FormTextFieldProps<TFieldValues>) {
   return (
     <Field dir={dir} className="w-full">
+      {/* The visible label repeats the input's accessible name, so assistive technology skips it. */}
+      <Label
+        dir={dir}
+        className="text-sm"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        aria-hidden
+      >
+        {label}
+      </Label>
       <Controller
         control={control}
         name={name}
@@ -43,7 +56,15 @@ export function FormTextField<TFieldValues extends FieldValues>({
           />
         )}
       />
-      {error ? <FieldMessage dir={dir}>{error}</FieldMessage> : null}
+      {error ? (
+        <FieldMessage dir={dir} accessibilityLiveRegion="polite">
+          {error}
+        </FieldMessage>
+      ) : hint ? (
+        <FieldMessage dir={dir} tone="muted">
+          {hint}
+        </FieldMessage>
+      ) : null}
     </Field>
   );
 }

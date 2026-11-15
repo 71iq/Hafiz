@@ -1,26 +1,38 @@
-import { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Platform, Pressable, TextInput, useWindowDimensions, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { isEmailAuthFlowsEnabled, isSocialAuthEnabled } from "@/lib/auth/config";
+import {
+  carryAuthEmail,
+  peekAuthHandoffNotice,
+  readCarriedAuthEmail,
+  takeAuthHandoffNotice,
+} from "@/lib/auth/form-handoff";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
-import { useAppLanguage } from "@/lib/i18n/useStrings";
+import { interpolate, useAppLanguage } from "@/lib/i18n/useStrings";
+import { PERSISTENT_SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
 import {
   AuthFormNotice,
   AuthRouteLink,
   AuthScreenShell,
+  AuthTextLink,
   AuthUnavailableState,
-  useAuthDarkMode,
+  useAuthIconColors,
+  useRevealOnFocus,
 } from "@/components/auth/AuthScreenShell";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { PendingLabel, formatSeconds, useAuthFormError } from "@/components/auth/auth-messages";
+import { EMAIL_RESEND_COOLDOWN_SECONDS, useCooldown } from "@/components/auth/use-cooldown";
+import { useAuthReturn } from "@/components/auth/use-auth-return";
 import { useEmailSubmission } from "@/components/auth/use-email-submission";
 import type { Direction } from "@/lib/ui/direction";
 
@@ -29,10 +41,12 @@ type LoginForm = {
   password: string;
 };
 
+// Login checks only that a password was entered; the server decides whether it is right.
+// Signup and reset keep the account's password rules.
 function createLoginSchema(s: UIStrings) {
   return z.object({
     email: z.string().trim().toLowerCase().email(s.authValidationInvalidEmail),
-    password: z.string().min(6, s.authValidationPasswordMin),
+    password: z.string().min(1, s.authValidationPasswordRequired),
   });
 }
 
@@ -42,52 +56,106 @@ export default function LoginScreen() {
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";
   const s = strings[locale];
   const schema = useMemo(() => createLoginSchema(s), [s]);
-  const { signIn, isLoading, error } = useAuthStore();
+  const { signIn, resendSignupConfirmation, isLoading, sessionEnded } = useAuthStore();
   const { acquire } = useEmailSubmission();
-  const [showError, setShowError] = useState<string | null>(null);
+  const { complete, back, continueOffline } = useAuthReturn();
+  const formError = useAuthFormError(s, locale, "attempts");
+  const resendCooldown = useCooldown();
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const [passwordVisible, setPasswordVisible] = useState(false);
+  // A result from the previous auth screen (a saved password) is shown once.
+  const [handoffNotice] = useState(peekAuthHandoffNotice);
+  useEffect(() => {
+    takeAuthHandoffNotice();
+  }, []);
   const configured = isSupabaseConfigured();
-  const isDark = useAuthDarkMode();
+  const emailFlowsEnabled = isEmailAuthFlowsEnabled();
+  const socialEnabled = isSocialAuthEnabled();
+  const { width } = useWindowDimensions();
+  const colors = useAuthIconColors();
+  const reveal = useRevealOnFocus();
   const passwordRef = useRef<TextInput>(null);
 
   const {
     control,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: readCarriedAuthEmail(), password: "" },
   });
 
+  // The password is hidden again whenever the screen loses focus.
+  useFocusEffect(useCallback(() => () => setPasswordVisible(false), []));
+
+  // Leaving for another auth screen carries only the typed email, in memory.
+  const carryEmail = () => carryAuthEmail(getValues("email") ?? "");
+
   const onSubmit = async (data: LoginForm) => {
+    setPasswordVisible(false);
+    if (formError.blocked) return;
     const lease = acquire();
     if (!lease) return;
     let flow: ReturnType<typeof signIn> | null = null;
     try {
-      setShowError(null);
-      if (!configured) {
-        if (lease.isCurrent()) setShowError(s.authUnavailableSubtitle);
-        return;
-      }
+      formError.clear();
+      setResendState("idle");
+      if (!configured) return;
       flow = signIn(data.email, data.password);
       const result = await flow.result;
       if (!lease.isCurrent() || !flow.isCurrent() || result.status !== "completed" || !result.owner.isCurrent()) return;
-      router.replace("/(tabs)/home");
+      // A verified session for this screen: replace auth history with the captured context or Home.
+      // Restore consent and sync stay with the sync owner; signing in is not synced progress.
+      complete();
     } catch (err: unknown) {
       if (!lease.isCurrent() || (flow && !flow.isCurrent())) return;
-      const message = err instanceof Error ? err.message : String(err);
-      setShowError(message === "Invalid login credentials" ? s.authInvalidCredentials : message);
+      formError.report(err);
     } finally {
       lease.release();
     }
   };
+  const submit = handleSubmit(onSubmit, () => setPasswordVisible(false));
+
+  const resendConfirmation = async () => {
+    if (resendCooldown.active || resendState === "sending") return;
+    const email = getValues("email")?.trim();
+    if (!email) return;
+    setResendState("sending");
+    try {
+      await resendSignupConfirmation(email);
+      setResendState("sent");
+      resendCooldown.start(EMAIL_RESEND_COOLDOWN_SECONDS);
+    } catch (err) {
+      setResendState("idle");
+      formError.report(err);
+    }
+  };
+
+  const serverNotice = formError.message;
+  const resendAction =
+    formError.kind === "email-not-confirmed" && emailFlowsEnabled
+      ? {
+          label: resendCooldown.active
+            ? interpolate(s.authResendIn, { seconds: formatSeconds(resendCooldown.remaining, locale) })
+            : s.authResendConfirmation,
+          onPress: resendConfirmation,
+          disabled: resendCooldown.active,
+          busy: resendState === "sending",
+        }
+      : null;
 
   const form = configured ? (
     <View className="w-full">
-      <AuthFormNotice message={showError || error} dir={dir} />
-      {(!isEmailAuthFlowsEnabled() || !isSocialAuthEnabled()) && (
-        <AuthFormNotice message={s.authTemporarilyLimited} dir={dir} />
-      )}
+      {handoffNotice === "password-updated" ? (
+        <AuthFormNotice message={s.authPasswordUpdated} tone="success" dir={dir} />
+      ) : sessionEnded ? (
+        <AuthFormNotice message={s.authSessionEnded} tone="info" dir={dir} />
+      ) : null}
+      {!emailFlowsEnabled ? <AuthFormNotice message={s.authTemporarilyLimited} tone="info" dir={dir} /> : null}
+      {!socialEnabled ? <AuthFormNotice message={s.authSocialOff} tone="info" dir={dir} /> : null}
+      <AuthFormNotice message={serverNotice} dir={dir} action={resendAction} />
+      {resendState === "sent" ? <AuthFormNotice message={s.authConfirmationResent} tone="success" dir={dir} /> : null}
 
       <FormTextField
         control={control}
@@ -96,14 +164,20 @@ export default function LoginScreen() {
         error={errors.email?.message}
         dir={dir}
         inputProps={{
-          placeholder: s.authEmail,
+          placeholder: s.authEmailPlaceholder,
           keyboardType: "email-address",
           autoCapitalize: "none",
           autoCorrect: false,
+          autoComplete: "email",
+          textContentType: "emailAddress",
+          importantForAutofill: "yes",
+          // Desktop browsers start in Email; phones wait for a tap so the keyboard does not cover the form.
+          autoFocus: Platform.OS === "web" && width >= PERSISTENT_SIDEBAR_BREAKPOINT,
           returnKeyType: "next",
           onSubmitEditing: () => passwordRef.current?.focus(),
+          onFocus: reveal,
           blurOnSubmit: false,
-          startIcon: <Mail size={18} color="#8B8178" />,
+          startIcon: <Mail size={18} color={colors.muted} />,
         }}
       />
 
@@ -117,74 +191,74 @@ export default function LoginScreen() {
         dir={dir}
         inputRef={passwordRef}
         inputProps={{
-          placeholder: s.authPassword,
+          placeholder: s.authPasswordPlaceholder,
           secureTextEntry: !passwordVisible,
+          autoCapitalize: "none",
+          autoCorrect: false,
+          autoComplete: "current-password",
+          textContentType: "password",
+          importantForAutofill: "yes",
           returnKeyType: "done",
-          onSubmitEditing: handleSubmit(onSubmit),
-          startIcon: <Lock size={18} color="#8B8178" />,
+          onSubmitEditing: submit,
+          onFocus: reveal,
+          startIcon: <Lock size={18} color={colors.muted} />,
           endIcon: (
             <Pressable
               onPress={() => setPasswordVisible((current) => !current)}
               accessibilityRole="button"
               accessibilityLabel={passwordVisible ? s.authHidePassword : s.authShowPassword}
-              hitSlop={8}
+              // 20px icon plus 12px on each side reaches the 44px target.
+              hitSlop={12}
             >
-              {passwordVisible ? <EyeOff size={18} color="#8B8178" /> : <Eye size={18} color="#8B8178" />}
+              {passwordVisible ? <EyeOff size={20} color={colors.muted} /> : <Eye size={20} color={colors.muted} />}
             </Pressable>
           ),
         }}
       />
 
-      {isEmailAuthFlowsEnabled() && (
-        <Pressable onPress={() => router.push("/auth/forgot-password" as any)} className="mt-2 self-end" hitSlop={8}>
-          <Text
-            className="text-primary-accent dark:text-primary-bright"
-            style={{
-              color: isDark ? "#14B8A6" : "#0d9488",
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 13,
-              writingDirection: dir,
-            }}
-          >
-            {s.authForgotPassword}
-          </Text>
-        </Pressable>
+      {emailFlowsEnabled ? (
+        <AuthTextLink
+          label={s.authForgotPassword}
+          dir={dir}
+          onPress={() => {
+            carryEmail();
+            router.push("/auth/forgot-password");
+          }}
+        />
+      ) : (
+        <View className="h-3" />
       )}
 
-      <View className="h-7" />
+      <View className="h-4" />
 
-      <Button onPress={handleSubmit(onSubmit)} disabled={isLoading} size="lg" dir={dir}>
-        {isLoading ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
-        ) : (
-          <Text
-            className="text-center text-white"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, writingDirection: dir }}
-          >
-            {s.authLogin}
-          </Text>
-        )}
+      <Button onPress={submit} disabled={isLoading || formError.blocked} size="lg" dir={dir}>
+        <PendingLabel pending={isLoading} label={s.authLogin} pendingLabel={s.authLoggingIn} dir={dir} />
       </Button>
     </View>
   ) : null;
 
   const unavailableContent = !configured ? (
-    <AuthUnavailableState title={s.authUnavailableTitle} subtitle={s.authUnavailableSubtitle} dir={dir} />
+    <AuthUnavailableState
+      title={s.authUnavailableTitle}
+      subtitle={s.authUnavailableSubtitle}
+      dir={dir}
+      continueLabel={s.authContinueOffline}
+      onContinue={continueOffline}
+    />
   ) : undefined;
 
   const footer = configured ? (
     <>
-      <OAuthButtons
-        strings={s}
-        onError={(msg) => setShowError(msg)}
-        onSignedIn={() => router.replace("/(tabs)/home")}
-      />
-      {isEmailAuthFlowsEnabled() && (
+      <OAuthButtons strings={s} onSignedIn={complete} />
+      {emailFlowsEnabled && (
         <AuthRouteLink
           prompt={s.authNoAccount}
           action={s.authSignup}
           dir={dir}
-          onPress={() => router.replace("/auth/signup")}
+          onPress={() => {
+            carryEmail();
+            router.replace("/auth/signup");
+          }}
         />
       )}
     </>
@@ -197,9 +271,9 @@ export default function LoginScreen() {
       subtitle={s.authLoginSubtitle}
       appName={s.appName}
       brandHeadline={s.authBrandHeadline}
-      brandBody={s.authBrandBody}
       backLabel={s.authBack}
-      onBack={() => router.back()}
+      languageLabel={s.authLanguage}
+      onBack={back}
       footer={footer}
       unavailableContent={unavailableContent}
     >

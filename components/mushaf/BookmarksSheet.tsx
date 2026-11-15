@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { View, Text, Pressable, useWindowDimensions } from "react-native";
-import { Trash2, BookmarkX } from "lucide-react-native";
+import { View, Text, Pressable, TextInput, Platform, useWindowDimensions } from "react-native";
+import { Trash2, BookmarkX, Search, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BusyIndicator } from "@/components/ui/BusyIndicator";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useSelection } from "@/lib/selection/context";
-import { removeBookmark } from "@/lib/selection/queries";
+import { fetchAyahOpenings, removeBookmark } from "@/lib/selection/queries";
+import type { BookmarkEntry } from "@/lib/selection/types";
 import { useDatabase } from "@/lib/database/provider";
 import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
 import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
-import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
+import { formatAyahRef } from "@/lib/arabic";
+import { matchesSurahQuery } from "@/lib/search/surah-match";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { textStartStyle } from "@/lib/ui/direction";
+import { inputTextStartStyle, textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -22,10 +25,24 @@ type Props = {
 };
 
 type SurahNames = { db: unknown; byNumber: MushafIndex["surahByNumber"] };
+type BookmarksOrder = "recent" | "quran";
+
+/** The search field appears for more than this many bookmarks, whatever the viewport. */
+export const BOOKMARK_SEARCH_THRESHOLD = 10;
+
+export function shouldShowBookmarkSearch(count: number): boolean {
+  return count > BOOKMARK_SEARCH_THRESHOLD;
+}
+
+/** Recent keeps the stored newest-first order; Quran order sorts by surah, then ayah. */
+export function orderBookmarks<T extends Pick<BookmarkEntry, "surah" | "ayah">>(rows: readonly T[], order: BookmarksOrder): T[] {
+  if (order === "recent") return rows.slice();
+  return rows.slice().sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
+}
 
 export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   const db = useDatabase();
-  const { isDark, isRTL } = useSettings();
+  const { isDark, isRTL, bookmarksOrder = "recent", setBookmarksOrder } = useSettings();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const s = useStrings();
@@ -33,9 +50,14 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   const [surahNames, setSurahNames] = useState<SurahNames | null>(null);
   const [namesFailed, setNamesFailed] = useState(false);
   const [namesAttempt, setNamesAttempt] = useState(0);
-  const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [openings, setOpenings] = useState<Map<string, string>>(new Map());
+  const [query, setQuery] = useState("");
+  const [pendingRemoval, setPendingRemoval] = useState<{ surah: number; ayah: number } | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 640);
+  const showSearch = shouldShowBookmarkSearch(bookmarksList.length);
 
   // Rows come straight from the bookmarks list; only the surah names load, once per database.
   const namesByNumber = surahNames?.db === db ? surahNames.byNumber : null;
@@ -58,46 +80,91 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
     };
   }, [db, needsNames, namesAttempt]);
 
-  const rows = useMemo(
-    () =>
-      namesByNumber
-        ? bookmarksList.map((b) => ({
-            ...b,
-            surahNameArabic: namesByNumber.get(b.surah)?.name_arabic ?? "",
-            surahNameEnglish: namesByNumber.get(b.surah)?.name_english ?? "",
-          }))
-        : [],
-    [bookmarksList, namesByNumber],
+  // Opening words are a convenience: rows render without them and fill in when they arrive.
+  const bookmarkKeys = bookmarksList.map((b) => `${b.surah}:${b.ayah}`).join(",");
+  useEffect(() => {
+    if (!visible || bookmarksList.length === 0) return;
+    let cancelled = false;
+    fetchAyahOpenings(db, bookmarksList)
+      .then((next) => {
+        if (!cancelled) setOpenings(next);
+      })
+      .catch((error) => console.warn("[BookmarksSheet] Failed to load opening words:", error));
+    return () => {
+      cancelled = true;
+    };
+    // The key list stands for the bookmarks themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, visible, bookmarkKeys]);
+
+  useEffect(() => {
+    if (!visible) setQuery("");
+  }, [visible]);
+
+  const surahName = useCallback(
+    (surah: number) => {
+      const meta = namesByNumber?.get(surah);
+      return meta ? (isRTL ? meta.name_arabic : meta.name_english) : "";
+    },
+    [isRTL, namesByNumber],
   );
 
-  const handleRemove = useCallback(
-    async (surah: number, ayah: number) => {
-      const key = `${surah}:${ayah}`;
-      if (removingKey) return;
-      setRemovingKey(key);
-      try {
-        await removeBookmark(db, surah, ayah);
-        await refreshBookmarks();
-        showToast(s.bookmarkRemoved);
-      } catch (e) {
-        console.warn("[BookmarksSheet] Failed to remove bookmark:", e);
-        showToast(s.bookmarkActionFailed);
-      } finally {
-        setRemovingKey(null);
-      }
+  const rows = useMemo(() => {
+    const ordered = orderBookmarks(bookmarksList, bookmarksOrder);
+    const trimmed = showSearch ? query.trim() : "";
+    if (!trimmed) return ordered;
+    return ordered.filter((b) =>
+      matchesSurahQuery(
+        {
+          number: b.surah,
+          name_arabic: namesByNumber?.get(b.surah)?.name_arabic ?? "",
+          name_english: namesByNumber?.get(b.surah)?.name_english ?? "",
+        },
+        trimmed,
+      ),
+    );
+  }, [bookmarksList, bookmarksOrder, namesByNumber, query, showSearch]);
+
+  const itemLabel = useCallback(
+    (surah: number, ayah: number) => {
+      const name = surahName(surah);
+      const ref = formatAyahRef(isRTL, surah, ayah);
+      return name ? `${name} ${ref}` : ref;
     },
-    [db, refreshBookmarks, removingKey, showToast, s.bookmarkRemoved, s.bookmarkActionFailed]
+    [isRTL, surahName],
   );
+
+  const confirmRemove = useCallback(async () => {
+    if (!pendingRemoval || removing) return;
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      await removeBookmark(db, pendingRemoval.surah, pendingRemoval.ayah);
+      await refreshBookmarks();
+      setPendingRemoval(null);
+      showToast(s.bookmarkRemoved);
+    } catch (e) {
+      // The row and the dialog stay, with the error beside the action.
+      console.warn("[BookmarksSheet] Failed to remove bookmark:", e);
+      setRemoveError(s.bookmarkActionFailed);
+    } finally {
+      setRemoving(false);
+    }
+  }, [db, pendingRemoval, refreshBookmarks, removing, showToast, s.bookmarkRemoved, s.bookmarkActionFailed]);
 
   const handleTap = useCallback(
     (surah: number, ayah: number) => {
+      // The reader captures the target (and the return position) before the list closes.
       onNavigate(surah, ayah);
       onClose();
     },
     [onNavigate, onClose]
   );
 
+  const mutedColor = isDark ? "#a3a3a3" : "#7A634D";
+
   return (
+    <>
     <ResponsiveSheet
       open={visible}
       onClose={onClose}
@@ -105,6 +172,55 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
       maxHeight={maxOverlayHeight}
     >
       <OverlayHeader title={s.bookmarksTitle} onClose={onClose} showHandle={isPhone} isRTL={isRTL} />
+      {bookmarksList.length > 1 ? (
+        <View style={{ paddingHorizontal: 20, paddingTop: 10, gap: 10 }}>
+          {showSearch ? (
+            <View
+              className="items-center gap-2.5 bg-surface-low dark:bg-surface-dark-mid rounded-2xl px-4"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", minHeight: 44 }}
+            >
+              <Search size={16} color={mutedColor} />
+              <TextInput
+                accessibilityLabel={s.searchBookmarks}
+                className="flex-1 text-charcoal dark:text-neutral-100"
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 15,
+                  minHeight: 44,
+                  ...inputTextStartStyle(isRTL),
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                  ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null),
+                }}
+                placeholder={s.searchBookmarks}
+                placeholderTextColor={isDark ? "#737373" : "#8B7563"}
+                value={query}
+                onChangeText={setQuery}
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+              {query.length > 0 ? (
+                <Pressable
+                  onPress={() => setQuery("")}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.readerClearSearch}
+                  className="h-11 w-11 items-center justify-center"
+                >
+                  <X size={14} color={mutedColor} />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+          <ToggleGroup<BookmarksOrder>
+            value={bookmarksOrder}
+            onValueChange={(order) => setBookmarksOrder?.(order)}
+            items={[
+              { value: "recent", label: s.bookmarksOrderRecent },
+              { value: "quran", label: s.bookmarksOrderQuran },
+            ]}
+            accessibilityLabel={s.bookmarksOrderLabel}
+          />
+        </View>
+      ) : null}
       <OverlayBody
         contentContainerStyle={{
           paddingHorizontal: 20,
@@ -119,110 +235,153 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
             subtitle={s.emptyBookmarksSubtitle}
             isDark={isDark}
           />
-        ) : !namesByNumber && namesFailed ? (
-          <EmptyState
-            icon={BookmarkX}
-            title={s.bookmarksLoadFailed}
-            actionLabel={s.errorTryAgain}
-            onAction={() => setNamesAttempt((attempt) => attempt + 1)}
-            isDark={isDark}
-          />
-        ) : !namesByNumber ? (
-          <View className="items-center py-10">
-            <BusyIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
-          </View>
         ) : (
-          rows.map((b) => (
-            <Pressable
-              key={`${b.surah}-${b.ayah}`}
-              onPress={() => handleTap(b.surah, b.ayah)}
-              style={({ pressed }) => ({
-                direction: "ltr",
-                flexDirection: isRTL ? "row-reverse" : "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                paddingVertical: 14,
-                paddingHorizontal: 4,
-                borderRadius: 12,
-                backgroundColor: pressed
-                  ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)")
-                  : "transparent",
-              })}
-            >
-              <View
-                style={{
-                  direction: "ltr",
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                  alignItems: "center",
-                  gap: 12,
-                  flex: 1,
-                }}
+          <>
+            {!namesByNumber && namesFailed ? (
+              <EmptyState
+                icon={BookmarkX}
+                title={s.bookmarksLoadFailed}
+                actionLabel={s.errorTryAgain}
+                onAction={() => setNamesAttempt((attempt) => attempt + 1)}
+                isDark={isDark}
+              />
+            ) : null}
+            {rows.length === 0 ? (
+              <Text
+                className="py-8 text-center text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
               >
-                <View
-                  style={{
-                    minWidth: 36,
-                    height: 36,
-                    paddingHorizontal: 8,
-                    borderRadius: 18,
-                    backgroundColor: isDark ? "rgba(253,220,145,0.14)" : "#FFF0C2",
-                    borderColor: isDark ? "rgba(253,220,145,0.22)" : "rgba(154, 98, 0, 0.18)",
-                    borderWidth: 1,
+                {s.bookmarksNoMatches}
+              </Text>
+            ) : null}
+            {rows.map((b) => {
+              const name = surahName(b.surah);
+              const opening = openings.get(`${b.surah}:${b.ayah}`);
+              const label = itemLabel(b.surah, b.ayah);
+              return (
+                <Pressable
+                  key={`${b.surah}-${b.ayah}`}
+                  onPress={() => handleTap(b.surah, b.ayah)}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  style={({ pressed }) => ({
+                    direction: "ltr",
+                    flexDirection: isRTL ? "row-reverse" : "row",
                     alignItems: "center",
-                    justifyContent: "center",
-                  }}
+                    justifyContent: "space-between",
+                    gap: 10,
+                    paddingVertical: 12,
+                    paddingHorizontal: 4,
+                    borderRadius: 12,
+                    backgroundColor: pressed
+                      ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)")
+                      : "transparent",
+                  })}
                 >
-                  <Text
+                  <View
                     style={{
-                      fontFamily: "Manrope_700Bold",
-                      fontSize: 11,
-                      color: isDark ? "#FDDC91" : "#9A6200",
+                      direction: "ltr",
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                      alignItems: "center",
+                      gap: 12,
+                      flex: 1,
+                      minWidth: 0,
                     }}
                   >
-                    {formatAyahRef(isRTL, b.surah, b.ayah)}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontFamily: "Manrope_600SemiBold",
-                      fontSize: 14,
-                      color: isDark ? "#e5e5e5" : "#2D2D2D",
-                      ...textStartStyle(isRTL),
+                    <View
+                      style={{
+                        minWidth: 44,
+                        height: 36,
+                        paddingHorizontal: 8,
+                        borderRadius: 18,
+                        backgroundColor: isDark ? "rgba(253,220,145,0.14)" : "#FFF0C2",
+                        borderColor: isDark ? "rgba(253,220,145,0.22)" : "rgba(154, 98, 0, 0.18)",
+                        borderWidth: 1,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontFamily: "Manrope_700Bold",
+                          fontSize: 11,
+                          color: isDark ? "#FDDC91" : "#7A4E00",
+                        }}
+                      >
+                        {formatAyahRef(isRTL, b.surah, b.ayah)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                      {name ? (
+                        <Text
+                          style={{
+                            fontFamily: "Manrope_600SemiBold",
+                            fontSize: 14,
+                            color: isDark ? "#e5e5e5" : "#2D2D2D",
+                            ...textStartStyle(isRTL),
+                          }}
+                        >
+                          {name}
+                        </Text>
+                      ) : null}
+                      {opening ? (
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            fontSize: 15,
+                            lineHeight: 26,
+                            color: mutedColor,
+                            textAlign: "right",
+                            writingDirection: "rtl",
+                          }}
+                        >
+                          {opening}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Pressable
+                    onPress={(event) => {
+                      event?.stopPropagation?.();
+                      setRemoveError(null);
+                      setPendingRemoval({ surah: b.surah, ayah: b.ayah });
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel={interpolate(s.removeBookmarkFor, { item: label })}
+                    className="h-11 w-11 items-center justify-center rounded-full"
+                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
                   >
-                    {isRTL ? b.surahNameArabic : b.surahNameEnglish}
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: "Manrope_400Regular",
-                      fontSize: 12,
-                      color: isDark ? "#737373" : "#A39B93",
-                      ...textStartStyle(isRTL),
-                    }}
-                  >
-                    {interpolate(s.ayahN, { n: isRTL ? toArabicNumber(b.ayah) : b.ayah })}
-                  </Text>
-                </View>
-              </View>
-              <Pressable
-                onPress={(event) => {
-                  event.stopPropagation?.();
-                  handleRemove(b.surah, b.ayah);
-                }}
-                disabled={removingKey === `${b.surah}:${b.ayah}`}
-                style={({ pressed }) => ({
-                  padding: 8,
-                  opacity: removingKey === `${b.surah}:${b.ayah}` ? 0.45 : pressed ? 0.5 : 1,
-                })}
-                hitSlop={8}
-              >
-                <Trash2 size={16} color={isDark ? "#525252" : "#DFD9D1"} />
-              </Pressable>
-            </Pressable>
-          ))
+                    <Trash2 size={16} color={mutedColor} />
+                  </Pressable>
+                </Pressable>
+              );
+            })}
+          </>
         )}
       </OverlayBody>
     </ResponsiveSheet>
+    <ConfirmDialog
+      visible={pendingRemoval !== null}
+      title={s.removeBookmarkConfirmTitle}
+      message={
+        pendingRemoval
+          ? interpolate(s.removeBookmarkConfirmBody, { item: itemLabel(pendingRemoval.surah, pendingRemoval.ayah) })
+          : ""
+      }
+      cancelLabel={s.readerCancel}
+      confirmLabel={s.removeBookmark}
+      destructive
+      confirmLoading={removing}
+      error={removeError}
+      isDark={isDark}
+      isRTL={isRTL}
+      onCancel={() => {
+        if (removing) return;
+        setPendingRemoval(null);
+        setRemoveError(null);
+      }}
+      onConfirm={confirmRemove}
+    />
+    </>
   );
 }

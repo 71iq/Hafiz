@@ -14,9 +14,11 @@ type Operation = { table: string; kind: "select" | "upsert" | "delete"; data?: u
 const mockOperations: Operation[] = [];
 const mockLocalProgress = jest.fn<Promise<ProfileSurahProgress[]>, [SQLiteDatabase]>();
 const mockRestored = jest.fn<Promise<boolean>, [SQLiteDatabase, string]>();
+const mockPause = jest.fn<Promise<"pending_consent" | "cancelled" | null>, [SQLiteDatabase, string]>();
 let mockRemoteRows: unknown[] = [];
 let mockConfigured = true;
 let mockBeforeSelect: (() => void) | null = null;
+let mockUpsertError: unknown = null;
 
 function mockBuilder(table: string) {
   return {
@@ -34,7 +36,7 @@ function mockBuilder(table: string) {
     },
     upsert: (data: unknown) => {
       mockOperations.push({ table, kind: "upsert", data, filters: [] });
-      return Promise.resolve({ error: null });
+      return Promise.resolve({ error: mockUpsertError });
     },
     delete: () => ({
       eq: (column: string, value: unknown) => {
@@ -65,6 +67,7 @@ jest.mock("@/lib/profile/progress", () => ({
 }));
 jest.mock("@/lib/database/sync", () => ({
   hasCompletedAccountRestore: (db: SQLiteDatabase, id: string) => mockRestored(db, id),
+  readRestorePause: (db: SQLiteDatabase, id: string) => mockPause(db, id),
 }));
 jest.mock("@/lib/auth/oauth", () => ({ startAppOAuth: jest.fn() }));
 jest.mock("@/lib/quran-foundation/config", () => ({ isQfSyncEnabled: () => false, isQfLoginEnabled: () => false }));
@@ -105,8 +108,10 @@ beforeEach(() => {
   mockRemoteRows = [];
   mockConfigured = true;
   mockBeforeSelect = null;
+  mockUpsertError = null;
   mockLocalProgress.mockReset().mockResolvedValue([]);
   mockRestored.mockReset().mockResolvedValue(true);
+  mockPause.mockReset().mockResolvedValue(null);
   signIn(userA);
 });
 
@@ -119,6 +124,17 @@ describe("surah progress repair after sync", () => {
     expect(mockLocalProgress).not.toHaveBeenCalled();
     warn.mockRestore();
   });
+
+  it.each(["pending_consent", "cancelled"] as const)(
+    "reads and writes nothing while sync is paused for restore consent (%s)",
+    async (pause) => {
+      mockPause.mockResolvedValue(pause);
+      await updateProfileStats(db);
+      expect(mockPause).toHaveBeenCalledWith(db, userA.id);
+      expect(mockOperations).toEqual([]);
+      expect(mockLocalProgress).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps the larger count per surah and writes only this account's surah progress", async () => {
     mockRemoteRows = [
@@ -167,5 +183,39 @@ describe("surah progress repair after sync", () => {
     mockConfigured = false;
     await updateProfileStats(db);
     expect(mockOperations).toEqual([]);
+  });
+
+  it("skips an unchanged upload for the same account and session, in memory only", async () => {
+    mockLocalProgress.mockResolvedValue([progress(2, 286, 40)]);
+    await updateProfileStats(db);
+    await updateProfileStats(db);
+    expect(mockOperations.map((operation) => operation.kind)).toEqual(["select", "upsert"]);
+
+    mockLocalProgress.mockResolvedValue([progress(2, 286, 41)]);
+    await updateProfileStats(db);
+    expect(mockOperations.map((operation) => operation.kind)).toEqual(["select", "upsert", "select", "upsert"]);
+  });
+
+  it("records nothing after a failed upload, so the next trigger retries", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    mockLocalProgress.mockResolvedValue([progress(2, 286, 40)]);
+    mockUpsertError = { message: "synthetic upload failure" };
+    await updateProfileStats(db);
+    mockUpsertError = null;
+    await updateProfileStats(db);
+    expect(mockOperations.map((operation) => operation.kind)).toEqual(["select", "upsert", "select", "upsert"]);
+    warn.mockRestore();
+  });
+
+  it("starts the comparison again for another account or a new session", async () => {
+    mockLocalProgress.mockResolvedValue([progress(2, 286, 40)]);
+    await updateProfileStats(db);
+    signIn(userB);
+    await updateProfileStats(db);
+    signIn(userB);
+    await updateProfileStats(db);
+    expect(mockOperations.filter((operation) => operation.kind === "upsert")).toHaveLength(3);
+    expect(mockOperations[1].data).toEqual([expect.objectContaining({ user_id: userA.id })]);
+    expect(mockOperations[3].data).toEqual([expect.objectContaining({ user_id: userB.id })]);
   });
 });

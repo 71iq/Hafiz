@@ -9,7 +9,10 @@ import { strings } from "@/lib/i18n/strings";
 import { flattenStyle } from "../rtl/rtl-test-utils";
 let mockLocale: "en" | "ar" = "en";
 const mockDb = { getAllAsync: async () => [] };
-jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
+jest.mock("expo-router", () => ({
+  router: { push: jest.fn(), navigate: jest.fn() },
+  useNavigation: () => ({ getState: () => ({ type: "tab" }) }),
+}));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDb }));
 jest.mock("@/lib/settings/context", () => ({
   useSettings: () => ({ isDark: false, isRTL: mockLocale === "ar", uiLanguage: mockLocale }),
@@ -141,6 +144,19 @@ function deferred() {
   drain = () => resolve(page());
   return { promise, resolve, reject };
 }
+/**
+ * A comment changes the count in place and only marks the feed stale (no reload that could move the
+ * post); the server count arrives with the next refresh, such as pull to refresh.
+ */
+async function laterRefresh() {
+  expect(fetchReflectionFeed).toHaveBeenCalledTimes(1);
+  expect(
+    client.getQueryState(keys.feed.list({ filter: { type: "all" }, sort: "newest", searchTerm: "" }))?.isInvalidated,
+  ).toBe(true);
+  await act(async () => {
+    void client.refetchQueries({ queryKey: keys.feed.all });
+  });
+}
 function screen() {
   return render(
     <QueryClientProvider client={client}>
@@ -236,6 +252,7 @@ describe.each(["en", "ar"] as const)("feed recovery in %s", (locale) => {
     fireEvent.press(view.getByText("post|3"));
     fireEvent.press(view.getByTestId("confirmed-comment"));
     await waitFor(() => expect(view.getByText("post|4")).toBeTruthy());
+    await laterRefresh();
     pending.resolve(page("post", 4));
     await flush();
     expect(view.getByText("post|4")).toBeTruthy();
@@ -255,6 +272,7 @@ describe.each(["en", "ar"] as const)("feed recovery in %s", (locale) => {
     fireEvent.press(view.getByText("post|3"));
     fireEvent.press(view.getByTestId("confirmed-comment"));
     await waitFor(() => expect(view.getByText("post|4")).toBeTruthy());
+    await laterRefresh();
     pending.resolve(page("post", 3));
     await flush();
     expect(view.getByText("post|3")).toBeTruthy();
@@ -265,23 +283,23 @@ describe.each(["en", "ar"] as const)("feed recovery in %s", (locale) => {
     jest
       .mocked(fetchReflectionFeed)
       .mockResolvedValueOnce(page())
-      .mockImplementation((input) => (input.sort === "oldest" ? Promise.resolve(page()) : pending.promise));
+      .mockImplementation((input) => (input.sort === "popular" ? Promise.resolve(page()) : pending.promise));
     const view = screen();
     await waitFor(() => expect(view.getByText("post|3")).toBeTruthy());
     fireEvent.press(view.getByText("post|3"));
     fireEvent.press(view.getByTestId("confirmed-comment"));
     await waitFor(() => expect(view.getByText("post|4")).toBeTruthy());
     act(() => {
-      client.setQueryData(keys.feed.list({ filter: { type: "all" }, sort: "oldest", searchTerm: "" }), {
+      client.setQueryData(keys.feed.list({ filter: { type: "all" }, sort: "popular", searchTerm: "" }), {
         pages: [page()],
         pageParams: [0],
       });
     });
     fireEvent.press(view.getByLabelText(strings[locale].reflectionFeedSortBy));
-    fireEvent.press(view.getByText(strings[locale].reflectionFeedSortOldest));
+    fireEvent.press(view.getByText(strings[locale].reflectionFeedSortPopular));
     await flush();
     expect(
-      view.getByText(`${strings[locale].reflectionFeedSortBy}: ${strings[locale].reflectionFeedSortOldest}`),
+      view.getByText(`${strings[locale].reflectionFeedSortBy}: ${strings[locale].reflectionFeedSortPopular}`),
     ).toBeTruthy();
     expect(view.getByText("post|3")).toBeTruthy();
     expect(view.queryByText("post|4")).toBeNull();
@@ -294,6 +312,7 @@ describe.each(["en", "ar"] as const)("feed recovery in %s", (locale) => {
     fireEvent.press(view.getByText("post|3"));
     fireEvent.press(view.getByTestId("confirmed-comment"));
     await waitFor(() => expect(view.getByText("post|4")).toBeTruthy());
+    await laterRefresh();
     pending.resolve(page("post", 4));
     await flush();
     await waitFor(() =>

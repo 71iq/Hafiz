@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { AudioLines, BookOpenText } from "lucide-react-native";
+import { AudioLines, BookOpen, BookOpenText, Play, Square } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { AyahDetailModal } from "@/components/mushaf/AyahDetailModal";
 import { useDatabase } from "@/lib/database/provider";
+import { useOptionalAyahAudio } from "@/lib/audio/ayah-audio";
+import { audioFailureMessage } from "@/lib/audio/labels";
+import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
+import { TAFSIR_SOURCES } from "@/lib/tafsir/sources";
+import { strings } from "@/lib/i18n/strings";
 import {
   isQuranPageFontLoaded,
   loadQuranPageFont,
@@ -11,7 +17,7 @@ import {
   quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
 import type {
@@ -22,6 +28,7 @@ import type {
 } from "@/lib/reflection-journey/types";
 import { useSettings } from "@/lib/settings/context";
 import { textStartStyle } from "@/lib/ui/direction";
+import { accentIconColor, errorIconColor, mutedIconColor } from "@/lib/ui/theme-icons";
 
 type Props = {
   block:
@@ -56,12 +63,19 @@ export function JourneyAyahCard({ block }: Props) {
     quranRenderFontStyle: quranFontStyle,
     quranMarkerStyle,
     effectiveTheme,
+    recitationId,
+    themeColors,
   } = useSettings();
+  const openMushaf = useOpenMushaf();
+  const audio = useOptionalAyahAudio();
   const [quranRows, setQuranRows] = useState<QuranRow[]>([]);
   const [textRows, setTextRows] = useState<TextRow[]>([]);
   const [fontsReady, setFontsReady] = useState(block.type !== "ayah_range");
   const [loading, setLoading] = useState(block.type !== "recitation_placeholder");
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [detailTarget, setDetailTarget] = useState<{ surah: number; ayah: number } | null>(null);
+  const [playError, setPlayError] = useState<string | null>(null);
 
   const translationDirection =
     getLanguageByCode(translationLanguage)?.direction === "rtl" ? "rtl" : "ltr";
@@ -90,6 +104,7 @@ export function JourneyAyahCard({ block }: Props) {
 
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     setQuranRows([]);
     setTextRows([]);
 
@@ -159,13 +174,16 @@ export function JourneyAyahCard({ block }: Props) {
 
     loadBlock().catch((error) => {
       console.warn("[JourneyAyahCard] Failed to load block:", error);
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+        setFailed(true);
+      }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [block, db, tafseerSource, translationLanguage]);
+  }, [attempt, block, db, tafseerSource, translationLanguage]);
 
   useEffect(() => {
     if (block.type !== "ayah_range") {
@@ -211,6 +229,97 @@ export function JourneyAyahCard({ block }: Props) {
     );
   }, [block, s.reflectionJourneyRecitationPlaceholder, uiLanguage]);
 
+  const accent = accentIconColor(effectiveTheme);
+  const muted = mutedIconColor(effectiveTheme);
+  // The source is named in its own language and direction: the translation's attribution or name,
+  // and the tafsir's Arabic title.
+  const source = useMemo(() => {
+    if (block.type === "translation") {
+      const language = getLanguageByCode(translationLanguage);
+      return language
+        ? { name: language.attribution ?? language.nameNative, direction: language.direction }
+        : null;
+    }
+    if (block.type === "tafseer") {
+      const id = block.source === "settings" ? tafseerSource : block.source;
+      const config = TAFSIR_SOURCES.find((item) => item.id === id);
+      const name = config ? (strings.ar as Record<string, string>)[config.labelKey] : undefined;
+      return name ? { name, direction: "rtl" as const } : null;
+    }
+    return null;
+  }, [block, tafseerSource, translationLanguage]);
+
+  // Play belongs to this block while the shared range player is on one of its ayahs.
+  const session = audio?.session ?? null;
+  const playingHere =
+    block.type === "recitation_placeholder" &&
+    session?.kind === "range" &&
+    session.target.surah === block.surah &&
+    session.target.ayah >= block.ayahStart &&
+    session.target.ayah <= block.ayahEnd;
+
+  const handlePlay = async () => {
+    if (!audio || block.type !== "recitation_placeholder") return;
+    if (playingHere) {
+      audio.stop();
+      return;
+    }
+    setPlayError(null);
+    const ayahs = [];
+    for (let ayah = block.ayahStart; ayah <= block.ayahEnd; ayah += 1) ayahs.push({ surah: block.surah, ayah });
+    try {
+      const result = await audio.playRange({ ayahs, recitationId });
+      if (!result.ok) {
+        setPlayError(
+          result.failure && result.failure !== "busy" ? audioFailureMessage(result.failure, s) : s.journeyPlayFailed
+        );
+      }
+    } catch (error) {
+      console.warn("[JourneyAyahCard] Failed to play range:", error);
+      setPlayError(s.journeyPlayFailed);
+    }
+  };
+
+  const renderRowHeader = (row: { surah: number; ayah: number }) => (
+    <Text
+      className="text-warm-400 dark:text-neutral-500 mb-2"
+      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+    >
+      {`${row.surah}:${row.ayah}`}
+    </Text>
+  );
+
+  // The book action sits beside the row, not inside it, so the two targets never overlap.
+  const renderRow = (
+    row: { surah: number; ayah: number },
+    key: string,
+    content: ReactNode
+  ) => (
+    <View
+      key={key}
+      className="rounded-3xl bg-surface dark:bg-surface-dark"
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", alignItems: "flex-start" }}
+    >
+      <Pressable
+        onPress={() => setDetailTarget({ surah: row.surah, ayah: row.ayah })}
+        className="rounded-3xl px-4 py-4"
+        style={({ pressed }) => ({ flex: 1, minWidth: 0, transform: [{ scale: pressed ? 0.99 : 1 }] })}
+      >
+        {renderRowHeader(row)}
+        {content}
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={interpolate(s.journeyOpenInMushaf, { ref: `${row.surah}:${row.ayah}` })}
+        onPress={() => openMushaf({ surah: row.surah, ayah: row.ayah })}
+        className="items-center justify-center rounded-full"
+        style={({ pressed }) => ({ width: 44, height: 44, marginTop: 4, opacity: pressed ? 0.7 : 1 })}
+      >
+        <BookOpen size={16} color={accent} />
+      </Pressable>
+    </View>
+  );
+
   return (
     <>
       <Card elevation="low" className="p-5 rounded-3xl">
@@ -235,28 +344,46 @@ export function JourneyAyahCard({ block }: Props) {
           </View>
         ) : null}
 
-        {!loading && block.type === "ayah_range" && (
+        {!loading && failed ? (
+          <View
+            className="rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4 gap-3"
+            accessibilityRole="alert"
+          >
+            <Text
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 13,
+                color: errorIconColor(effectiveTheme),
+                ...textStartStyle(isRTL),
+              }}
+            >
+              {s.journeySectionLoadFailed}
+            </Text>
+            <Button
+              variant="outline"
+              onPress={() => setAttempt((value) => value + 1)}
+              className={`border border-warm-200 dark:border-neutral-700 ${isRTL ? "self-end" : "self-start"}`}
+            >
+              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                {s.reflectionJourneyRetry}
+              </Text>
+            </Button>
+          </View>
+        ) : null}
+
+        {!loading && !failed && block.type === "ayah_range" && (
           <View className="gap-3">
-            {quranRows.map((row) => (
-              <Pressable
-                key={`${row.surah}:${row.ayah}`}
-                onPress={() => setDetailTarget({ surah: row.surah, ayah: row.ayah })}
-                className="rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.99 : 1 }] })}
-              >
-                <Text
-                  className="text-warm-400 dark:text-neutral-500 mb-2"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
-                >
-                  {`${row.surah}:${row.ayah}`}
-                </Text>
-                {!fontsReady ? (
-                  <Text
-                    className="text-warm-500 dark:text-neutral-400"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
-                  >
-                    {s.loading}
-                  </Text>
+            {quranRows.map((row) =>
+              renderRow(
+                row,
+                `${row.surah}:${row.ayah}`,
+                !fontsReady ? (
+                  // One line of Quran text, so the card keeps its height when the glyphs arrive.
+                  <View
+                    testID="journey-quran-line-placeholder"
+                    accessibilityLabel={s.loading}
+                    style={{ height: 54, borderRadius: 12, backgroundColor: themeColors.surfaceHigh }}
+                  />
                 ) : (
                   <View
                     className="items-end"
@@ -297,42 +424,49 @@ export function JourneyAyahCard({ block }: Props) {
                       })}
                     </View>
                   </View>
-                )}
-              </Pressable>
-            ))}
+                )
+              )
+            )}
           </View>
         )}
 
-        {!loading && (block.type === "translation" || block.type === "tafseer") && (
+        {!loading && !failed && (block.type === "translation" || block.type === "tafseer") && (
           <View className="gap-3">
-            {textRows.map((row) => (
-              <Pressable
-                key={`${row.surah}:${row.ayah}:${block.type}`}
-                onPress={() => setDetailTarget({ surah: row.surah, ayah: row.ayah })}
-                className="rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.99 : 1 }] })}
-              >
-                <Text
-                  className="text-warm-400 dark:text-neutral-500 mb-2"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
-                >
-                  {`${row.surah}:${row.ayah}`}
-                </Text>
-                <Text
-                  className="text-charcoal dark:text-neutral-100"
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 15,
-                    lineHeight: 26,
-                    ...textStartStyle(block.type === "tafseer" || translationDirection === "rtl"),
-                    writingDirection:
-                      block.type === "tafseer" ? "rtl" : translationDirection,
-                  }}
-                >
-                  {row.text}
-                </Text>
-              </Pressable>
-            ))}
+            {textRows.map((row) =>
+              renderRow(
+                row,
+                `${row.surah}:${row.ayah}:${block.type}`,
+                <>
+                  <Text
+                    className="text-charcoal dark:text-neutral-100"
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 15,
+                      lineHeight: 26,
+                      ...textStartStyle(block.type === "tafseer" || translationDirection === "rtl"),
+                      writingDirection:
+                        block.type === "tafseer" ? "rtl" : translationDirection,
+                    }}
+                  >
+                    {row.text}
+                  </Text>
+                  {source ? (
+                    <Text
+                      style={{
+                        marginTop: 6,
+                        fontFamily: "Manrope_500Medium",
+                        fontSize: 12,
+                        color: muted,
+                        ...textStartStyle(source.direction === "rtl"),
+                        writingDirection: source.direction,
+                      }}
+                    >
+                      {source.name}
+                    </Text>
+                  ) : null}
+                </>
+              )
+            )}
           </View>
         )}
 
@@ -343,12 +477,6 @@ export function JourneyAyahCard({ block }: Props) {
                 <AudioLines size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
               </View>
               <View className="flex-1">
-                <Text
-                  className="text-charcoal dark:text-neutral-100"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL)}}
-                >
-                  {s.comingSoon}
-                </Text>
                 <Text
                   className="text-warm-400 dark:text-neutral-500"
                   style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
@@ -369,10 +497,46 @@ export function JourneyAyahCard({ block }: Props) {
             >
               {placeholderBody}
             </Text>
+            {audio ? (
+              <Button
+                variant={playingHere ? "outline" : "default"}
+                onPress={() => void handlePlay()}
+                accessibilityLabel={`${playingHere ? s.journeyStop : s.journeyPlay} ${referenceLabel}`}
+                className={`mt-4 ${playingHere ? "border border-warm-200 dark:border-neutral-700 " : ""}${isRTL ? "self-end" : "self-start"}`}
+              >
+                <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                  {playingHere ? (
+                    <Square size={14} color={accent} />
+                  ) : (
+                    <Play size={14} color="#ffffff" />
+                  )}
+                  <Text
+                    className={playingHere ? "text-charcoal dark:text-neutral-100" : "text-white"}
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+                  >
+                    {playingHere ? s.journeyStop : s.journeyPlay}
+                  </Text>
+                </View>
+              </Button>
+            ) : null}
+            {playError ? (
+              <Text
+                accessibilityRole="alert"
+                style={{
+                  marginTop: 8,
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 12,
+                  color: errorIconColor(effectiveTheme),
+                  ...textStartStyle(isRTL),
+                }}
+              >
+                {playError}
+              </Text>
+            ) : null}
           </View>
         )}
 
-        {!loading && block.type !== "recitation_placeholder" && (
+        {!loading && !failed && block.type !== "recitation_placeholder" && (
           <View className={`mt-3 ${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-2`}>
             <BookOpenText size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
             <Text

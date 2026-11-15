@@ -14,6 +14,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { preparePasswordRecovery, finishPasswordRecovery, useAuthStore } from "@/lib/auth/store";
 import { authCommands } from "@/lib/auth/commands";
+import { setAuthHandoffNotice } from "@/lib/auth/form-handoff";
 import type { AuthOwner } from "@/lib/auth/coordinator";
 
 type RecoveryState =
@@ -173,6 +174,8 @@ export function PasswordRecoveryProvider({ children }: { children: ReactNode }) 
         const signout = await finishPasswordRecovery(owner);
         if (isActive(current) && signout.status === "completed" && owner.isCurrent()) {
           setState({ kind: "finished" });
+          // The route is replaced, so Login shows the saved-password notice itself.
+          setAuthHandoffNotice("password-updated");
           router.replace("/auth/login");
         }
       } catch (error: unknown) {

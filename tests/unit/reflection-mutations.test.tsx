@@ -15,20 +15,27 @@ import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import {
   addComment,
   createReflection,
+  deleteReflection,
+  deleteReflectionComment,
   fetchComments,
   reportReflection,
   toggleCommentLike,
   toggleLike,
 } from "@/lib/reflections/api";
+import { resetSentReportsForTests } from "@/components/reflections/use-reflection-actions";
 import type { Reflection, ReflectionComment } from "@/lib/reflections/types";
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 import { reflectionQueryKeys as keys } from "@/lib/reflections/query-keys";
 import { strings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
+import { toArabicNumber } from "@/lib/arabic";
 import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 
 let mockLocale: "en" | "ar" = "en";
+// Comment like counts use the interface's digits (Arabic-Indic in Arabic).
+const commentCount = (value: number) => (mockLocale === "ar" ? toArabicNumber(value) : String(value));
 const firstDb = {} as SQLiteDatabase,
   secondDb = {} as SQLiteDatabase;
 let mockDb = firstDb;
@@ -47,6 +54,8 @@ jest.mock("@/lib/achievements/queries", () => ({ recordAchievementEvent: jest.fn
 jest.mock("@/lib/reflections/api", () => ({
   addComment: jest.fn(),
   createReflection: jest.fn(),
+  deleteReflection: jest.fn(),
+  deleteReflectionComment: jest.fn(),
   fetchComments: jest.fn(),
   reportReflection: jest.fn(),
   toggleCommentLike: jest.fn(),
@@ -74,6 +83,8 @@ jest.mock("@/components/ui/ResponsiveOverlay", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   const { View, Pressable, Text } = jest.requireActual<typeof import("react-native")>("react-native");
   return {
+    // The discard dialog renders through the real modal pieces.
+    ...jest.requireActual("@/components/ui/ResponsiveOverlay"),
     ResponsiveSheet: ({ open, children }: { open: boolean; children: ReactNode }) =>
       open ? <View>{children}</View> : null,
     OverlayBody: ({ children }: { children: ReactNode }) => <View>{children}</View>,
@@ -207,6 +218,12 @@ beforeEach(() => {
   mockDb = firstDb;
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   jest.spyOn(RN, "useWindowDimensions").mockReturnValue({ width: 390, height: 844, scale: 1, fontScale: 1 });
+  // The shared menu opens once its trigger is measured.
+  jest
+    .spyOn(RN.View.prototype, "measureInWindow")
+    .mockImplementation((callback: (x: number, y: number, width: number, height: number) => void) =>
+      callback(300, 100, 32, 32),
+    );
   jest.spyOn(console, "warn").mockImplementation(() => undefined);
   jest.mocked(fetchComments).mockResolvedValue({ data: [comment(), comment("second", 29)], hasMore: false });
   jest.mocked(addComment).mockResolvedValue(comment("new"));
@@ -214,6 +231,9 @@ beforeEach(() => {
   jest.mocked(toggleLike).mockImplementation(async (_u, _p, liked) => !liked);
   jest.mocked(toggleCommentLike).mockImplementation(async (_u, _p, liked) => !liked);
   jest.mocked(reportReflection).mockResolvedValue();
+  jest.mocked(deleteReflection).mockResolvedValue(true);
+  jest.mocked(deleteReflectionComment).mockResolvedValue(true);
+  resetSentReportsForTests();
   jest.mocked(loadMushafIndex).mockResolvedValue(index);
   jest.mocked(recordAchievementEvent).mockResolvedValue();
 });
@@ -261,15 +281,15 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       <ReflectionCard reflection={post()} variant="feed" onLikeToggled={changed} onCommentsPress={jest.fn()} />,
       { wrapper },
     );
-    twice(view.getByText("11"));
+    twice(view.getByText(commentCount(11)));
     expect(toggleLike).toHaveBeenCalledTimes(1);
-    expect(view.getByText("12")).toBeTruthy();
+    expect(view.getByText(commentCount(12))).toBeTruthy();
     pending.reject(new Error("synthetic like rejected"));
     await flush();
-    expect(view.getByText("11")).toBeTruthy();
+    expect(view.getByText(commentCount(11))).toBeTruthy();
     expect(view.getByText(strings[locale].reflectionLikeFailed)).toBeTruthy();
     expect(changed).not.toHaveBeenCalled();
-    fireEvent.press(view.getByText("11"));
+    fireEvent.press(view.getByText(commentCount(11)));
     await flush();
     expect(toggleLike).toHaveBeenCalledTimes(2);
     expect(changed).toHaveBeenCalledTimes(1);
@@ -288,13 +308,13 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       />
     );
     const view = render(screen(11), { wrapper });
-    fireEvent.press(view.getByText("11"));
+    fireEvent.press(view.getByText(commentCount(11)));
     view.rerender(screen(30));
     await flush();
     pending.reject(new Error("synthetic like rejected"));
     await flush();
-    expect(view.getByText("30")).toBeTruthy();
-    expect(view.queryByText("29")).toBeNull();
+    expect(view.getByText(commentCount(30))).toBeTruthy();
+    expect(view.queryByText(commentCount(29))).toBeNull();
     expect(changed).not.toHaveBeenCalled();
   });
   it("admits one comment across duplicate Enter events and keeps it after close/reopen", async () => {
@@ -330,9 +350,9 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
       wrapper,
     });
-    await waitFor(() => expect(view.getByText("17")).toBeTruthy());
-    const pressOne: () => void = button(view.getByText("17")).props.onPress,
-      pressTwo: () => void = button(view.getByText("29")).props.onPress;
+    await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+    const pressOne: () => void = button(view.getByText(commentCount(17))).props.onPress,
+      pressTwo: () => void = button(view.getByText(commentCount(29))).props.onPress;
     act(() => {
       pressOne();
       pressOne();
@@ -342,7 +362,7 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     one.reject(new Error("first like rejected"));
     two.resolve(true);
     await flush();
-    expect(view.getByText("17")).toBeTruthy();
+    expect(view.getByText(commentCount(17))).toBeTruthy();
     expect(view.getByText(strings[locale].reflectionLikeFailed)).toBeTruthy();
     // The like error shows above the input, below the comments, where the person is looking.
     const tree = JSON.stringify(view.toJSON());
@@ -472,15 +492,15 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       <ReflectionCard reflection={post()} variant="feed" onLikeToggled={changed} onCommentsPress={jest.fn()} />,
       { wrapper },
     );
-    fireEvent.press(view.getByText("11"));
+    fireEvent.press(view.getByText(commentCount(11)));
     act(() => activate(2));
     await flush();
-    fireEvent.press(view.getByText("11"));
+    fireEvent.press(view.getByText(commentCount(11)));
     expect(toggleLike).toHaveBeenCalledTimes(2);
     old.reject(new Error("old account error"));
     await flush();
     expect(view.queryByText(strings[locale].reflectionLikeFailed)).toBeNull();
-    expect(button(view.getByText("12")).props.disabled).toBe(true);
+    expect(button(view.getByText(commentCount(12))).props.disabled).toBe(true);
     newer.resolve(true);
     await flush();
     expect(changed).toHaveBeenCalledTimes(1);
@@ -510,7 +530,9 @@ it.each(["account", "ABA", "target", "close", "database", "unmount"] as const)(
     }
     if (retirement === "target") view.rerender(screen(2));
     if (retirement === "close") {
+      // The typed draft asks before closing; Discard completes the close and retires the post.
       fireEvent.press(view.getByTestId("close-sheet"));
+      fireEvent.press(view.getByText(strings.en.discardChangesConfirm));
       view.rerender(screen(1, false));
       view.rerender(screen());
     }
@@ -546,7 +568,10 @@ it("public-post failure retains its draft, enables editing and retries with the 
   expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.editable).toBe(false);
   pending.reject(new Error("synthetic post rejected"));
   await flush();
-  expect(view.getByText("synthetic post rejected")).toBeTruthy();
+  // Server details go to the log; the person sees the plain message with Try again.
+  expect(view.getByText(strings.ar.reflectionPostFailed)).toBeTruthy();
+  expect(view.queryByText("synthetic post rejected")).toBeNull();
+  expect(view.getByText(strings.ar.sharedTryAgain)).toBeTruthy();
   expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.value).toBe(draft);
   expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.editable).toBe(true);
   fireEvent.press(view.getByText(strings.ar.reflectionSubmit));
@@ -630,20 +655,20 @@ it("comment likes restore new canonical query rows after failure and invalidate 
   const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
     wrapper,
   });
-  await waitFor(() => expect(view.getByText("17")).toBeTruthy());
-  fireEvent.press(view.getByText("17"));
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  fireEvent.press(view.getByText(commentCount(17)));
   act(() =>
     client.setQueryData(keys.comments.list({ reflectionId: "post", sort: "oldest", viewerId: user(1).id }), {
       pages: [{ data: [comment("comment", 30)], hasMore: false }],
       pageParams: [0],
     }),
   );
-  await waitFor(() => expect(view.getByText("30")).toBeTruthy());
+  await waitFor(() => expect(view.getByText(commentCount(30))).toBeTruthy());
   pending.reject(new Error("like rejected"));
   await flush();
-  expect(view.getByText("30")).toBeTruthy();
+  expect(view.getByText(commentCount(30))).toBeTruthy();
   expect(client.getQueryState(target)?.isInvalidated).toBe(false);
-  fireEvent.press(view.getByText("30"));
+  fireEvent.press(view.getByText(commentCount(30)));
   await flush();
   expect(client.getQueryState(target)?.isInvalidated).toBe(true);
   expect(client.getQueryState(other)?.isInvalidated).toBe(false);
@@ -715,7 +740,17 @@ it("confirmed unlike updates only the affected ayahs and feed caches", async () 
   expect(client.getQueryState(publicCount)?.isInvalidated).toBe(false);
 });
 
-it("reporting has independent synchronous admission and recovers after rejection", async () => {
+/** Opens the card's shared More options menu and picks an item (the menu runs it on the next frame). */
+async function pickMenuItem(view: ReturnType<typeof render>, label: string, trigger = 0) {
+  fireEvent.press(view.UNSAFE_getAllByType(MoreHorizontal)[trigger]);
+  fireEvent.press(view.getByText(label));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+}
+const ownPost = (id = "post") => ({ ...post(id), user_id: user(1).id });
+
+it("reports after a confirmation, admits one request, keeps the dialog through failure and then shows Reported", async () => {
   mockLocale = "en";
   const pending = deferred<void>(undefined);
   jest.mocked(reportReflection).mockReturnValueOnce(pending.promise);
@@ -723,18 +758,190 @@ it("reporting has independent synchronous admission and recovers after rejection
     <ReflectionCard reflection={post()} variant="feed" onLikeToggled={jest.fn()} onCommentsPress={jest.fn()} />,
     { wrapper },
   );
-  fireEvent.press(view.UNSAFE_getByType(MoreHorizontal));
-  twice(view.getByText(strings.en.reflectionReport));
+  expect(view.queryByText(strings.en.reflectionDeleteAction)).toBeNull();
+  await pickMenuItem(view, strings.en.reflectionReportAction);
+  expect(reportReflection).not.toHaveBeenCalled();
+  expect(view.getByText(strings.en.reflectionReportBody)).toBeTruthy();
+  twice(view.getByText(strings.en.reflectionReportConfirm));
   expect(reportReflection).toHaveBeenCalledTimes(1);
+  expect(reportReflection).toHaveBeenCalledWith(user(1).id, "post");
   pending.reject(new Error("report rejected"));
   await flush();
   expect(view.getByText(strings.en.reflectionReportFailed)).toBeTruthy();
-  fireEvent.press(view.UNSAFE_getByType(MoreHorizontal));
-  fireEvent.press(view.getByText(strings.en.reflectionReport));
+  fireEvent.press(view.getByText(strings.en.sharedTryAgain));
   await flush();
   expect(reportReflection).toHaveBeenCalledTimes(2);
+  expect(view.queryByText(strings.en.reflectionReportBody)).toBeNull();
   fireEvent.press(view.UNSAFE_getByType(MoreHorizontal));
   expect(button(view.getByText(strings.en.reflectionReported)).props.disabled).toBe(true);
+});
+
+it("an owned reflection offers Delete with cascade copy and removes it from caches only after the server confirms", async () => {
+  mockLocale = "en";
+  const pending = deferred(false),
+    gone = jest.fn();
+  jest.mocked(deleteReflection).mockReturnValueOnce(pending.promise);
+  const source = ownPost();
+  const feed = keys.feed.list({ filter: { type: "all" }, sort: "newest", viewerId: user(1).id, searchTerm: "" });
+  const ayah = keys.reflections.firstPage({ surah: 2, ayah: 2, viewerId: user(1).id });
+  const comments = keys.comments.list({ reflectionId: "post", sort: "oldest", viewerId: user(1).id });
+  const count = keys.count({ surah: 2, ayah: 1, viewerId: user(1).id });
+  client.setQueryData(feed, { pages: [{ data: [source, post("other")], hasMore: true }], pageParams: [0] });
+  client.setQueryData(ayah, { data: [source], hasMore: false });
+  client.setQueryData(comments, { pages: [{ data: [comment()], hasMore: false }], pageParams: [0] });
+  client.setQueryData(count, 2);
+  const view = render(
+    <ReflectionCard
+      reflection={source}
+      variant="feed"
+      onLikeToggled={jest.fn()}
+      onCommentsPress={jest.fn()}
+      onGone={gone}
+    />,
+    { wrapper },
+  );
+  expect(view.queryByText(strings.en.reflectionReportAction)).toBeNull();
+  await pickMenuItem(view, strings.en.reflectionDeleteAction);
+  expect(view.getByText(strings.en.reflectionDeleteBody)).toBeTruthy();
+  expect(strings.en.reflectionDeleteBody).toMatch(/comments and likes/);
+  twice(view.getByText(strings.en.reflectionDeleteConfirm));
+  expect(deleteReflection).toHaveBeenCalledTimes(1);
+  expect(deleteReflection).toHaveBeenCalledWith(user(1).id, "post");
+  // Nothing is discarded before the server answers.
+  expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toHaveLength(2);
+  pending.resolve(true);
+  await flush();
+  expect(client.getQueryData<{ pages: { data: Reflection[]; hasMore: boolean }[] }>(feed)?.pages).toEqual([
+    { data: [post("other")], hasMore: true },
+  ]);
+  expect(client.getQueryData<{ data: Reflection[] }>(ayah)?.data).toEqual([]);
+  expect(client.getQueryData(comments)).toBeUndefined();
+  expect(client.getQueryState(count)?.isInvalidated).toBe(true);
+  expect(gone).toHaveBeenCalledWith(source);
+  expect(view.queryByText(strings.en.reflectionDeleteBody)).toBeNull();
+});
+
+it("a false delete result keeps the record, refreshes and never claims deletion", async () => {
+  mockLocale = "en";
+  jest.mocked(deleteReflection).mockResolvedValueOnce(false);
+  const source = ownPost();
+  const feed = keys.feed.list({ filter: { type: "all" }, sort: "newest", viewerId: user(1).id, searchTerm: "" });
+  client.setQueryData(feed, { pages: [{ data: [source], hasMore: false }], pageParams: [0] });
+  const view = render(
+    <ReflectionCard reflection={source} variant="feed" onLikeToggled={jest.fn()} onCommentsPress={jest.fn()} />,
+    { wrapper },
+  );
+  await pickMenuItem(view, strings.en.reflectionDeleteAction);
+  fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
+  await flush();
+  expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toEqual([source]);
+  expect(client.getQueryState(feed)?.isInvalidated).toBe(true);
+  expect(view.queryByText(strings.en.reflectionDeleted)).toBeNull();
+});
+
+it("a failed delete keeps the confirmation, its error and the record, and retries", async () => {
+  mockLocale = "en";
+  jest.mocked(deleteReflection).mockRejectedValueOnce(new Error("synthetic delete failure"));
+  const source = ownPost();
+  const feed = keys.feed.list({ filter: { type: "all" }, sort: "newest", viewerId: user(1).id, searchTerm: "" });
+  client.setQueryData(feed, { pages: [{ data: [source], hasMore: false }], pageParams: [0] });
+  const view = render(
+    <ReflectionCard reflection={source} variant="feed" onLikeToggled={jest.fn()} onCommentsPress={jest.fn()} />,
+    { wrapper },
+  );
+  await pickMenuItem(view, strings.en.reflectionDeleteAction);
+  fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
+  await flush();
+  expect(view.getByText(strings.en.reflectionDeleteFailed)).toBeTruthy();
+  expect(view.getByText(strings.en.reflectionDeleteBody)).toBeTruthy();
+  expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toEqual([source]);
+  fireEvent.press(view.getByText(strings.en.sharedTryAgain));
+  await flush();
+  expect(deleteReflection).toHaveBeenCalledTimes(2);
+  expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toEqual([]);
+});
+
+it("a delete that completes after an account switch changes nothing in the new account's view", async () => {
+  mockLocale = "en";
+  const pending = deferred(false),
+    gone = jest.fn();
+  jest.mocked(deleteReflection).mockReturnValueOnce(pending.promise);
+  const source = ownPost();
+  const otherFeed = keys.feed.list({ filter: { type: "all" }, sort: "newest", viewerId: user(2).id, searchTerm: "" });
+  client.setQueryData(otherFeed, { pages: [{ data: [source], hasMore: false }], pageParams: [0] });
+  const view = render(
+    <ReflectionCard
+      reflection={source}
+      variant="feed"
+      onLikeToggled={jest.fn()}
+      onCommentsPress={jest.fn()}
+      onGone={gone}
+    />,
+    { wrapper },
+  );
+  await pickMenuItem(view, strings.en.reflectionDeleteAction);
+  fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
+  expect(deleteReflection).toHaveBeenCalledWith(user(1).id, "post");
+  act(() => activate(2));
+  pending.resolve(true);
+  await flush();
+  expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(otherFeed)?.pages[0].data).toEqual([source]);
+  expect(client.getQueryState(otherFeed)?.isInvalidated).toBe(false);
+  expect(gone).not.toHaveBeenCalled();
+});
+
+it("an own comment offers Delete through the comment RPC; another's offers Report reflection for the parent", async () => {
+  mockLocale = "en";
+  const removed = jest.fn();
+  jest.mocked(fetchComments).mockResolvedValue({
+    data: [{ ...comment("mine"), user_id: user(1).id }, comment("theirs")],
+    hasMore: false,
+  });
+  const view = render(
+    <CommentsSheet
+      reflectionId="post"
+      reflection={post()}
+      referenceLabel="Al-Baqarah 2:1-2"
+      onClose={jest.fn()}
+      onCommentAdded={jest.fn()}
+      onCommentRemoved={removed}
+    />,
+    { wrapper },
+  );
+  await waitFor(() => expect(view.getByText("Synthetic theirs")).toBeTruthy());
+  // After a confirmed delete the server no longer returns it.
+  jest.mocked(fetchComments).mockResolvedValue({ data: [comment("theirs")], hasMore: false });
+  // Triggers: the card's menu first, then one per comment in order.
+  await pickMenuItem(view, strings.en.reflectionReportAction, 2);
+  expect(view.getByText(interpolate(strings.en.reflectionReportFromCommentBody, { reference: "Al-Baqarah 2:1-2" }))).toBeTruthy();
+  fireEvent.press(view.getByText(strings.en.reflectionReportConfirm));
+  await flush();
+  expect(reportReflection).toHaveBeenCalledWith(user(1).id, "post");
+  await pickMenuItem(view, strings.en.commentDeleteAction, 1);
+  expect(view.getByText(strings.en.commentDeleteBody)).toBeTruthy();
+  fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
+  await flush();
+  expect(deleteReflectionComment).toHaveBeenCalledWith(user(1).id, "mine");
+  expect(removed).toHaveBeenCalledWith("post");
+  await waitFor(() => expect(view.queryAllByText("Synthetic mine")).toHaveLength(0));
+});
+
+it("a false comment delete does not lower the count and the comment list refreshes", async () => {
+  mockLocale = "en";
+  const removed = jest.fn();
+  jest.mocked(deleteReflectionComment).mockResolvedValueOnce(false);
+  jest.mocked(fetchComments).mockResolvedValue({ data: [{ ...comment("mine"), user_id: user(1).id }], hasMore: false });
+  const view = render(
+    <CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} onCommentRemoved={removed} />,
+    { wrapper },
+  );
+  await waitFor(() => expect(view.getByText("Synthetic mine")).toBeTruthy());
+  const calls = jest.mocked(fetchComments).mock.calls.length;
+  await pickMenuItem(view, strings.en.commentDeleteAction, 0);
+  fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
+  await flush();
+  expect(removed).not.toHaveBeenCalled();
+  expect(jest.mocked(fetchComments).mock.calls.length).toBeGreaterThan(calls);
 });
 
 it("an old callback cannot capture a new account before React commits its replacement render", () => {
@@ -758,9 +965,9 @@ it("same-user session replacement removes the prior optimistic comment preview",
   const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
     wrapper,
   });
-  await waitFor(() => expect(view.getByText("17")).toBeTruthy());
-  fireEvent.press(view.getByText("17"));
-  expect(view.getByText("18")).toBeTruthy();
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  fireEvent.press(view.getByText(commentCount(17)));
+  expect(view.getByText(commentCount(18))).toBeTruthy();
   const next = session(1),
     parts = next.access_token.split(".");
   parts[1] = Buffer.from(
@@ -769,8 +976,8 @@ it("same-user session replacement removes the prior optimistic comment preview",
   next.access_token = parts.join(".");
   act(() => useAuthStore.setState({ session: next, user: next.user }));
   await flush();
-  expect(view.getByText("17")).toBeTruthy();
-  expect(view.queryByText("18")).toBeNull();
+  expect(view.getByText(commentCount(17))).toBeTruthy();
+  expect(view.queryByText(commentCount(18))).toBeNull();
   pending.resolve(true);
   await flush();
 });
@@ -783,20 +990,20 @@ it("a confirmed comment like rebases fresh counts before another press", async (
   const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
     wrapper,
   });
-  await waitFor(() => expect(view.getByText("17")).toBeTruthy());
-  fireEvent.press(view.getByText("17"));
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  fireEvent.press(view.getByText(commentCount(17)));
   act(() =>
     client.setQueryData(keys.comments.list({ reflectionId: "post", sort: "oldest", viewerId: user(1).id }), {
       pages: [{ data: [comment("comment", 30)], hasMore: false }],
       pageParams: [0],
     }),
   );
-  await waitFor(() => expect(view.getByText("30")).toBeTruthy());
+  await waitFor(() => expect(view.getByText(commentCount(30))).toBeTruthy());
   jest.mocked(fetchComments).mockReturnValue(refetch.promise);
   pending.resolve(true);
   await flush();
-  expect(view.getByText("31")).toBeTruthy();
-  fireEvent.press(view.getByText("31"));
+  expect(view.getByText(commentCount(31))).toBeTruthy();
+  fireEvent.press(view.getByText(commentCount(31)));
   expect(toggleCommentLike).toHaveBeenLastCalledWith(user(1).id, "comment", true);
   await flush();
   refetch.resolve({ data: [comment("comment", 30)], hasMore: false });
@@ -829,4 +1036,32 @@ it("comment pagination admits one pending page and retains rows through error an
   await waitFor(() => expect(view.getByText("Synthetic next")).toBeTruthy());
   expect(view.getByText("Synthetic comment")).toBeTruthy();
   expect(fetchComments).toHaveBeenLastCalledWith("post", 1, "oldest", user(1).id);
+});
+
+it("asks before closing a typed comment and shows the counter near the limit", async () => {
+  mockLocale = "en";
+  const close = jest.fn();
+  const view = render(<CommentsSheet reflectionId="post" onClose={close} onCommentAdded={jest.fn()} />, { wrapper });
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  const input = view.getByPlaceholderText(strings.en.reflectionAddComment);
+  fireEvent.changeText(input, "x".repeat(1800));
+  expect(view.queryByText("1,800 / 2,000")).toBeNull();
+  fireEvent.changeText(input, "x".repeat(1801));
+  expect(view.getByText("1,801 / 2,000")).toBeTruthy();
+  fireEvent.press(view.getByTestId("close-sheet"));
+  // The mocked header omits titles; the dialog's actions show it asked.
+  expect(view.getByText(strings.en.discardChangesKeepEditing)).toBeTruthy();
+  expect(close).not.toHaveBeenCalled();
+  fireEvent.press(view.getByText(strings.en.discardChangesConfirm));
+  expect(close).toHaveBeenCalledTimes(1);
+});
+
+it("explains a guest's comment like instead of ignoring it when no sign-in path is given", async () => {
+  mockLocale = "en";
+  useAuthStore.setState({ user: null, session: null, profile: null });
+  const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, { wrapper });
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  fireEvent.press(view.getByText(commentCount(17)));
+  expect(view.getByText(strings.en.reflectionFeedAuthRequired)).toBeTruthy();
+  expect(toggleCommentLike).not.toHaveBeenCalled();
 });

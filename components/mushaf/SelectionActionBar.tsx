@@ -1,24 +1,41 @@
-import { useState, useCallback } from "react";
-import { View, Text, Pressable } from "react-native";
-import { formatAyahRef } from "@/lib/arabic";
-import { Copy, BookMarked, Highlighter, PenLine, StickyNote, Trash2 } from "lucide-react-native";
+import { useState, useCallback, useEffect } from "react";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
+import { Copy, BookMarked, Highlighter, PenLine, StickyNote, Trash2, Check } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
-import { Sheet, SheetContent } from "@/components/ui/Sheet";
+import { OverlayBody, OverlayHeader, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { useSelection } from "@/lib/selection/context";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
-import { fetchUthmaniRange, fetchSurahName } from "@/lib/selection/queries";
-import { formatForCopy } from "@/lib/selection/format";
-import { HIGHLIGHT_COLORS } from "@/lib/selection/types";
+import { buildAyahCopyText } from "@/lib/selection/queries";
+import { HIGHLIGHT_COLORS, highlightColorNameKey } from "@/lib/selection/types";
+import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
 import { WriteReflectionSheet } from "@/components/reflections/WriteReflectionSheet";
 import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
+
+type BusyAction = "copy" | "highlight" | "remove-highlight" | "bookmark";
+
+/** "Al-Baqarah 2:255" / "البقرة ٢:٢٥٥", or a range "2:255-257" in the same surah. */
+export function selectionTitle(
+  index: MushafIndex | null,
+  isRTL: boolean,
+  surah: number,
+  ayahStart: number,
+  ayahEnd: number,
+): string {
+  const meta = index?.surahByNumber.get(surah);
+  const name = meta ? (isRTL ? meta.name_arabic : meta.name_english) : "";
+  const start = formatAyahRef(isRTL, surah, ayahStart);
+  const ref = ayahEnd !== ayahStart ? `${start}-${isRTL ? toArabicNumber(ayahEnd) : ayahEnd}` : start;
+  return name ? `${name} ${ref}` : ref;
+}
 
 export function SelectionActionBar() {
   const db = useDatabase();
   const s = useStrings();
-  const { isDark, isRTL, themeColors } = useSettings();
+  const { isDark, isRTL, themeColors, uiLanguage } = useSettings();
   const {
     selection,
     clearSelection,
@@ -32,57 +49,54 @@ export function SelectionActionBar() {
   const [showColors, setShowColors] = useState(false);
   const [showWriteReflection, setShowWriteReflection] = useState(false);
   const [showPrivateNote, setShowPrivateNote] = useState(false);
-  const [actionBusy, setActionBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
+  const [index, setIndex] = useState<MushafIndex | null>(null);
 
   const isOpen = selection !== null;
   const currentHighlight = selection ? getHighlightColor(selection.start.surah, selection.start.ayah) : undefined;
   const currentlyBookmarked = selection ? isBookmarked(selection.start.surah, selection.start.ayah) : false;
+  const actionBusy = busyAction !== null;
+
+  useEffect(() => {
+    if (!selection || index) return;
+    let active = true;
+    loadMushafIndex(db)
+      .then((loaded) => {
+        if (active) setIndex(loaded);
+      })
+      .catch((e) => console.warn("[SelectionActionBar] Failed to load surah names:", e));
+    return () => {
+      active = false;
+    };
+  }, [db, index, selection]);
 
   const handleClose = useCallback(() => {
     setShowColors(false);
     clearSelection();
   }, [clearSelection]);
 
-  const getTextAndMeta = useCallback(async () => {
-    if (!selection) return null;
-    const { start } = selection;
-    const [text, surahName] = await Promise.all([
-      fetchUthmaniRange(db, start.surah, start.ayah, start.ayah),
-      fetchSurahName(db, start.surah),
-    ]);
-    return { text, surahName, surah: start.surah, ayah: start.ayah };
-  }, [db, selection]);
-
   const handleCopy = useCallback(async () => {
-    if (actionBusy) return;
-    setActionBusy(true);
+    if (actionBusy || !selection) return;
+    setBusyAction("copy");
     try {
-      const meta = await getTextAndMeta();
-      if (!meta) return;
-      const formatted = formatForCopy(meta.text, meta.surahName, meta.surah, meta.ayah, meta.ayah);
-      await Clipboard.setStringAsync(formatted);
+      const { start } = selection;
+      const text = await buildAyahCopyText(db, start.surah, start.ayah, start.ayah, uiLanguage);
+      if (!text) throw new Error("Ayah text is unavailable");
+      await Clipboard.setStringAsync(text);
       if (!systemConfirmsCopy()) showToast(s.copied);
       handleClose();
     } catch (e) {
       console.warn("[SelectionActionBar] Failed to copy selection:", e);
       showToast(s.copyFailed);
     } finally {
-      setActionBusy(false);
+      setBusyAction(null);
     }
-  }, [actionBusy, getTextAndMeta, showToast, s.copied, s.copyFailed, handleClose]);
-
-  const handleReflect = useCallback(() => {
-    setShowWriteReflection(true);
-  }, []);
-
-  const handleNote = useCallback(() => {
-    setShowPrivateNote(true);
-  }, []);
+  }, [actionBusy, db, selection, uiLanguage, showToast, s.copied, s.copyFailed, handleClose]);
 
   const handleHighlightColor = useCallback(
     async (color: string) => {
       if (actionBusy) return;
-      setActionBusy(true);
+      setBusyAction("highlight");
       try {
         await addHighlightForSelection(color);
         showToast(s.highlightAdded);
@@ -92,7 +106,7 @@ export function SelectionActionBar() {
         console.warn("[SelectionActionBar] Failed to highlight selection:", e);
         showToast(s.highlightActionFailed);
       } finally {
-        setActionBusy(false);
+        setBusyAction(null);
       }
     },
     [actionBusy, addHighlightForSelection, showToast, s.highlightAdded, s.highlightActionFailed, handleClose]
@@ -100,7 +114,7 @@ export function SelectionActionBar() {
 
   const handleRemoveHighlight = useCallback(async () => {
     if (actionBusy) return;
-    setActionBusy(true);
+    setBusyAction("remove-highlight");
     try {
       await removeHighlightForSelection();
       showToast(s.highlightRemoved);
@@ -110,13 +124,13 @@ export function SelectionActionBar() {
       console.warn("[SelectionActionBar] Failed to remove highlight:", e);
       showToast(s.highlightActionFailed);
     } finally {
-      setActionBusy(false);
+      setBusyAction(null);
     }
   }, [actionBusy, removeHighlightForSelection, showToast, s.highlightRemoved, s.highlightActionFailed, handleClose]);
 
   const handleBookmark = useCallback(async () => {
     if (actionBusy) return;
-    setActionBusy(true);
+    setBusyAction("bookmark");
     try {
       const result = await toggleBookmarkForSelection();
       if (result === "added") showToast(s.bookmarkAdded);
@@ -126,41 +140,39 @@ export function SelectionActionBar() {
       console.warn("[SelectionActionBar] Failed to toggle bookmark:", e);
       showToast(s.bookmarkActionFailed);
     } finally {
-      setActionBusy(false);
+      setBusyAction(null);
     }
   }, [actionBusy, toggleBookmarkForSelection, showToast, s.bookmarkAdded, s.bookmarkRemoved, s.bookmarkActionFailed, handleClose]);
 
   const iconColor = isDark ? "#e5e5e5" : "#2D2D2D";
-  const mutedColor = isDark ? "#737373" : "#A39B93";
+  const mutedColor = isDark ? "#a3a3a3" : "#7A634D";
+  const title = selection
+    ? selectionTitle(index, isRTL, selection.start.surah, selection.start.ayah, selection.end.ayah)
+    : "";
+  const ayahPreview = selection
+    ? `${formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}${selection.start.ayah !== selection.end.ayah ? `-${formatAyahRef(isRTL, selection.end.ayah)}` : ""}`
+    : "";
 
   return (
     <>
-    <Sheet open={isOpen} onClose={handleClose}>
-      <SheetContent>
-        {/* Ayah reference */}
-        {selection && (
-          <Text
-            style={{
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 13,
-              color: mutedColor,
-              textAlign: "center",
-              marginBottom: 16,
-            }}
-          >
-            {formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}
-          </Text>
-        )}
-
-        {/* Action buttons row. Five equal columns with two-line labels fit 360dp phones. The row
-            mirrors by hand, so it pins LTR coordinates; an inherited "rtl" would flip it back. */}
+    <ResponsiveOverlay
+      open={isOpen}
+      onClose={handleClose}
+      phonePresentation="sheet"
+      desktopPresentation="dialog"
+      maxWidth={480}
+    >
+      <OverlayHeader title={title} onClose={handleClose} isRTL={isRTL} />
+      <OverlayBody contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 }}>
+        {/* Five equal columns with two-line labels fit 320px phones. The row mirrors by hand, so it
+            pins LTR coordinates; an inherited "rtl" would flip it back. */}
         <View
           style={{
             direction: "ltr",
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "flex-start",
             gap: 4,
-            marginBottom: showColors ? 16 : 0,
+            marginBottom: showColors ? 12 : 0,
           }}
         >
           <ActionButton
@@ -168,23 +180,24 @@ export function SelectionActionBar() {
             label={s.copy}
             onPress={handleCopy}
             isDark={isDark}
-            disabled={actionBusy}
+            busy={busyAction === "copy"}
+            dimmed={actionBusy && busyAction !== "copy"}
             isRTL={isRTL}
           />
           <ActionButton
             icon={<PenLine size={20} color={iconColor} />}
-            label={s.addReflection}
-            onPress={handleReflect}
+            label={s.shareReflectionAction}
+            onPress={() => setShowWriteReflection(true)}
             isDark={isDark}
-            disabled={actionBusy}
+            dimmed={actionBusy}
             isRTL={isRTL}
           />
           <ActionButton
             icon={<StickyNote size={20} color={iconColor} />}
             label={s.privateNoteAction}
-            onPress={handleNote}
+            onPress={() => setShowPrivateNote(true)}
             isDark={isDark}
-            disabled={actionBusy}
+            dimmed={actionBusy}
             isRTL={isRTL}
           />
           <ActionButton
@@ -193,66 +206,123 @@ export function SelectionActionBar() {
             onPress={() => setShowColors((v) => !v)}
             isDark={isDark}
             active={showColors}
-            disabled={actionBusy}
+            busy={busyAction === "highlight" || busyAction === "remove-highlight"}
+            dimmed={actionBusy && busyAction !== "highlight" && busyAction !== "remove-highlight"}
             isRTL={isRTL}
+            expanded={showColors}
           />
           <ActionButton
-            icon={<BookMarked size={20} color={currentlyBookmarked ? "#FDDC91" : iconColor} />}
+            icon={<BookMarked size={20} color={currentlyBookmarked ? "#B7791F" : iconColor} />}
             label={currentlyBookmarked ? s.removeBookmark : s.bookmark}
             onPress={handleBookmark}
             isDark={isDark}
-            disabled={actionBusy}
+            busy={busyAction === "bookmark"}
+            dimmed={actionBusy && busyAction !== "bookmark"}
             isRTL={isRTL}
           />
         </View>
 
-        {/* Highlight color picker */}
         {showColors && (
-          <View style={{ flexDirection: "row", justifyContent: "center", gap: 16, paddingVertical: 8 }}>
-            {HIGHLIGHT_COLORS.map((color) => (
-              <Pressable
-                key={color}
-                onPress={() => handleHighlightColor(color)}
-                disabled={actionBusy}
-                style={({ pressed }) => ({
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: color,
-                  opacity: actionBusy ? 0.45 : 1,
-                  transform: [{ scale: pressed && !actionBusy ? 0.9 : 1 }],
-                  ...(currentHighlight === color && {
-                    borderWidth: 3,
-                    borderColor: isDark ? "#fff" : "#2D2D2D",
-                  }),
-                })}
-              />
-            ))}
-            {/* Remove highlight button */}
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel={s.highlight}
+            style={{
+              direction: isRTL ? "rtl" : "ltr",
+              flexDirection: "row",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              gap: 4,
+              paddingTop: 4,
+            }}
+          >
+            {HIGHLIGHT_COLORS.map((color) => {
+              const selected = currentHighlight === color;
+              const name = s[highlightColorNameKey(color)];
+              return (
+                <Pressable
+                  key={color}
+                  onPress={() => handleHighlightColor(color)}
+                  disabled={actionBusy}
+                  accessibilityRole="radio"
+                  accessibilityLabel={name}
+                  accessibilityState={{ checked: selected, disabled: actionBusy }}
+                  style={({ pressed }) => ({
+                    width: 60,
+                    minHeight: 64,
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    gap: 4,
+                    paddingTop: 4,
+                    opacity: actionBusy ? 0.45 : pressed ? 0.75 : 1,
+                  })}
+                >
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: color,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderWidth: selected ? 3 : 0,
+                      borderColor: isDark ? "#fff" : "#2D2D2D",
+                    }}
+                  >
+                    {selected ? <Check size={16} color="#2D2D2D" /> : null}
+                  </View>
+                  <Text
+                    numberOfLines={2}
+                    style={{ color: mutedColor, fontFamily: "Manrope_500Medium", fontSize: 11, lineHeight: 14, textAlign: "center" }}
+                  >
+                    {name}
+                  </Text>
+                </Pressable>
+              );
+            })}
             {currentHighlight && (
               <Pressable
                 onPress={handleRemoveHighlight}
                 disabled={actionBusy}
+                accessibilityRole="button"
+                accessibilityLabel={s.readerRemoveHighlight}
                 style={({ pressed }) => ({
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: themeColors.surfaceMid,
+                  width: 60,
+                  minHeight: 64,
                   alignItems: "center",
-                  justifyContent: "center",
-                  opacity: actionBusy ? 0.45 : 1,
-                  transform: [{ scale: pressed && !actionBusy ? 0.9 : 1 }],
+                  gap: 4,
+                  paddingTop: 4,
+                  opacity: actionBusy && busyAction !== "remove-highlight" ? 0.45 : pressed ? 0.75 : 1,
                 })}
               >
-                <Trash2 size={16} color={mutedColor} />
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: themeColors.surfaceMid,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {busyAction === "remove-highlight" ? (
+                    <ActivityIndicator size="small" color={mutedColor} />
+                  ) : (
+                    <Trash2 size={16} color={mutedColor} />
+                  )}
+                </View>
+                <Text
+                  numberOfLines={2}
+                  style={{ color: mutedColor, fontFamily: "Manrope_500Medium", fontSize: 11, lineHeight: 14, textAlign: "center" }}
+                >
+                  {s.readerRemoveHighlight}
+                </Text>
               </Pressable>
             )}
           </View>
         )}
-      </SheetContent>
-    </Sheet>
+      </OverlayBody>
+    </ResponsiveOverlay>
 
-    {/* Write Reflection Sheet */}
     {selection && (
       <WriteReflectionSheet
         open={showWriteReflection}
@@ -263,8 +333,7 @@ export function SelectionActionBar() {
         surah={selection.start.surah}
         ayahStart={selection.start.ayah}
         ayahEnd={selection.end.ayah}
-        ayahPreview={`${formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}${selection.start.ayah !== selection.end.ayah ? `-${formatAyahRef(isRTL, selection.end.ayah)}` : ""}`}
-        onSuccess={() => showToast(s.reflectionPosted)}
+        ayahPreview={ayahPreview}
       />
     )}
     {selection && (
@@ -277,8 +346,7 @@ export function SelectionActionBar() {
         surah={selection.start.surah}
         ayahStart={selection.start.ayah}
         ayahEnd={selection.end.ayah}
-        ayahPreview={`${formatAyahRef(isRTL, selection.start.surah, selection.start.ayah)}${selection.start.ayah !== selection.end.ayah ? `-${formatAyahRef(isRTL, selection.end.ayah)}` : ""}`}
-        onSaved={() => showToast(s.privateNoteSaved)}
+        ayahPreview={ayahPreview}
       />
     )}
     </>
@@ -292,7 +360,9 @@ function ActionButton({
   isDark,
   isRTL,
   active,
-  disabled = false,
+  busy = false,
+  dimmed = false,
+  expanded,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -300,32 +370,41 @@ function ActionButton({
   isDark: boolean;
   isRTL: boolean;
   active?: boolean;
-  disabled?: boolean;
+  /** This action's write is pending: a spinner replaces its icon. */
+  busy?: boolean;
+  /** Another action's write is pending: this one is disabled and dimmed. */
+  dimmed?: boolean;
+  expanded?: boolean;
 }) {
+  const disabled = busy || dimmed;
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled, busy, ...(expanded !== undefined ? { expanded } : null) }}
       style={({ pressed }) => ({
         flex: 1,
         minWidth: 0,
+        minHeight: 64,
         alignItems: "center",
         gap: 6,
         paddingHorizontal: 2,
         paddingVertical: 8,
         borderRadius: 16,
-        opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
+        opacity: dimmed ? 0.45 : pressed ? 0.7 : 1,
         backgroundColor: active
           ? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")
           : "transparent",
       })}
     >
-      {icon}
+      <View style={{ height: 20, justifyContent: "center" }}>
+        {busy ? <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} /> : icon}
+      </View>
       <Text
         style={{
-          color: isDark ? "#a3a3a3" : "#8B8178",
+          color: isDark ? "#a3a3a3" : "#7A634D",
           fontFamily: "Manrope_500Medium",
           fontSize: 11,
           lineHeight: 15,

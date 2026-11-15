@@ -19,7 +19,7 @@ export function ReviewSettingInfoSheet({ visible, info, onClose, isPhone, isRTL 
       maxHeight={isPhone ? "70%" : 360}
       dir={isRTL ? "rtl" : "ltr"}
     >
-      <OverlayHeader title={info?.title ?? ""} onClose={onClose} isRTL={isRTL} showHandle={isPhone} />
+      <OverlayHeader title={info?.title ?? ""} onClose={onClose} isRTL={isRTL} />
       <OverlayBody contentContainerClassName="px-5 py-5" contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}>
         <Text
           className="text-charcoal dark:text-neutral-200"

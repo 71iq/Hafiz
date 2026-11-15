@@ -1,5 +1,12 @@
 import * as fc from "fast-check";
-import { findJuzForAyah, findJuzRangeForAyah, type MushafIndex } from "@/lib/mushaf/position";
+import {
+  estimateAyahLineFraction,
+  findJuzForAyah,
+  findJuzRangeForAyah,
+  juzStartPages,
+  positionForMode,
+  type MushafIndex,
+} from "@/lib/mushaf/position";
 
 type Range = MushafIndex["juzRows"][number];
 const index = (juzRows: Range[]): MushafIndex => ({
@@ -82,5 +89,54 @@ describe("Juz range matching and reader fallback", () => {
       ),
       { seed: 170017, numRuns: 500 },
     );
+  });
+});
+
+describe("reader position helpers on the existing mappings", () => {
+  const pages = new Map([
+    [1, { page: 1, surah_start: 1, ayah_start: 1, surah_end: 1, ayah_end: 7 }],
+    [2, { page: 2, surah_start: 2, ayah_start: 1, surah_end: 2, ayah_end: 5 }],
+    [42, { page: 42, surah_start: 2, ayah_start: 253, surah_end: 2, ayah_end: 256 }],
+  ]);
+  const full: MushafIndex = {
+    juzRows: [
+      { juz: 1, surah: 1, ayah_start: 1, ayah_end: 7 },
+      { juz: 1, surah: 2, ayah_start: 1, ayah_end: 141 },
+      { juz: 2, surah: 2, ayah_start: 142, ayah_end: 252 },
+      { juz: 3, surah: 2, ayah_start: 253, ayah_end: 286 },
+    ],
+    hizbRows: [],
+    surahByNumber: new Map(),
+    pageByNumber: pages,
+  };
+
+  it("marks the first page of each juz for the rail's long ticks", () => {
+    expect(Array.from(juzStartPages(full)).sort((a, b) => a - b)).toEqual([1, 42]);
+  });
+
+  it("converts a saved page to its first ayah in verse view and a saved ayah to its page", () => {
+    expect(positionForMode(full, { mode: "page", page: 42 }, "verse")).toEqual({ mode: "verse", surah: 2, ayah: 253 });
+    expect(positionForMode(full, { mode: "verse", surah: 2, ayah: 255 }, "page")).toEqual({ mode: "page", page: 42 });
+    expect(positionForMode(full, { mode: "page", page: 2 }, "page")).toEqual({ mode: "page", page: 2 });
+    expect(positionForMode(full, { mode: "page", page: 500 }, "verse")).toBeNull();
+  });
+
+  it("places a surah's first ayah at its header line and other ayahs at their own line", () => {
+    const ayahs = [
+      { surah: 1, ayah: 7, glyphCount: 10 },
+      { surah: 2, ayah: 1, glyphCount: 2 },
+      { surah: 2, ayah: 2, glyphCount: 8 },
+    ];
+    const lines = [
+      { line_number: 1, line_type: "ayah", first_word_id: 101, last_word_id: 110, surah_number: null },
+      { line_number: 2, line_type: "surah_name", first_word_id: null, last_word_id: null, surah_number: 2 },
+      { line_number: 3, line_type: "basmallah", first_word_id: null, last_word_id: null, surah_number: 2 },
+      { line_number: 4, line_type: "ayah", first_word_id: 111, last_word_id: 115, surah_number: null },
+      { line_number: 5, line_type: "ayah", first_word_id: 116, last_word_id: 120, surah_number: null },
+    ];
+    expect(estimateAyahLineFraction(ayahs, { surah: 2, ayah: 1 }, lines, 100)).toBeCloseTo(1 / 5);
+    expect(estimateAyahLineFraction(ayahs, { surah: 2, ayah: 2 }, lines, 100)).toBeCloseTo(3 / 5);
+    expect(estimateAyahLineFraction(ayahs, { surah: 2, ayah: 2 })).toBeCloseTo(12 / 20);
+    expect(estimateAyahLineFraction(ayahs, { surah: 9, ayah: 1 }, lines, 100)).toBeNull();
   });
 });

@@ -26,6 +26,9 @@ let mockPathname = "/auth/reset-password";
 let mockParams: Record<string, string> = {};
 const mockBeforeRemove = new Set<() => void>();
 const mockNavigation = {
+  getState: () => ({ index: 0, routes: [{ name: "auth/reset-password" }] }),
+  canGoBack: () => false,
+  goBack: jest.fn(),
   addListener: jest.fn((_name: string, callback: () => void) => {
     mockBeforeRemove.add(callback);
     return () => {
@@ -80,6 +83,8 @@ jest.mock("@/components/auth/AuthScreenShell", () => {
     AuthScreenShell: ({ children }: { children: ReactNode }) => <View>{children}</View>,
     AuthFormNotice: ({ message }: { message: string | null }) => <Text testID="notice">{message}</Text>,
     AuthUnavailableState: () => null,
+    useAuthIconColors: () => ({ muted: "#52525b", accent: "#0d9488", error: "#dc2626", theme: "white" }),
+    useRevealOnFocus: () => () => {},
   };
 });
 jest.mock("@/components/ui/Button", () => {
@@ -287,6 +292,7 @@ it("actual reset route suppresses old error notice after owner switch", async ()
     pending.reject(new Error("old-route-error"));
   });
   expect(screen.queryByText("old-route-error")).toBeNull();
+  expect(screen.queryByText(strings.en.authErrorGeneric)).toBeNull();
   expect(mockSignOut).not.toHaveBeenCalled();
   expect(mockReplace).not.toHaveBeenCalled();
 });
@@ -331,7 +337,8 @@ it("actual reset route retains active errors without signing out", async () => {
   await act(async () => {
     pending.reject(new Error("active-route-error"));
   });
-  expect(screen.getByText("active-route-error")).toBeTruthy();
+  // Provider details stay out of the notice; the localized generic error shows instead.
+  expect(screen.getByText(strings.en.authErrorGeneric)).toBeTruthy();
   expect(mockSignOut).not.toHaveBeenCalled();
   expect(mockReplace).not.toHaveBeenCalled();
 });
@@ -390,7 +397,7 @@ it("retains active signout error notice", async () => {
   await act(async () => {
     signout.reject(new Error("active-signout-error"));
   });
-  expect(screen.getByText("active-signout-error")).toBeTruthy();
+  expect(screen.getByText(strings.en.authErrorGeneric)).toBeTruthy();
   expect(mockReplace).not.toHaveBeenCalled();
 });
 
@@ -486,7 +493,7 @@ it.each(["packet", "rejection"])("web recovery displays current SDK %s failure",
   if (outcome === "packet") mockSetSession.mockResolvedValue({ data: { session: null }, error });
   else mockSetSession.mockRejectedValue(error);
   const screen = render(<ResetPasswordScreen />);
-  await waitFor(() => expect(screen.getByText(error.message)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(strings.en.authErrorGeneric)).toBeTruthy());
   expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(true);
   expect(mockUpdateUser).not.toHaveBeenCalled();
 });
@@ -557,7 +564,7 @@ it("SDK signout error packet keeps the current reset route on its error state", 
   mockUpdateUser.mockResolvedValue({ data: { user: user("a") }, error: null });
   mockSignOutPromise = Promise.resolve({ error });
   const screen = await submit();
-  await waitFor(() => expect(screen.getByText(error.message)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(strings.en.authErrorGeneric)).toBeTruthy());
   expect(mockReplace).not.toHaveBeenCalled();
   expect(useAuthStore.getState().user?.id).toBe(userId("a"));
 });

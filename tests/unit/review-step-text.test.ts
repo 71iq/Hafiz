@@ -1,5 +1,5 @@
 import * as fc from "fast-check";
-import { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
+import { formatStepPreview, formatStepText, parseStepText, validateStepText } from "@/lib/fsrs/review-step-text";
 import type { SchedulerStep } from "@/lib/fsrs/types";
 
 const fallback: SchedulerStep[] = ["10m", "1d"];
@@ -67,5 +67,34 @@ describe("review step-text codec", () => {
       }),
       { seed: 117002, numRuns: 500 },
     );
+  });
+});
+
+describe("strict step-text validation for the settings editor", () => {
+  it.each<[string, SchedulerStep[]]>([
+    ["", []],
+    ["1m, 10m", ["1m", "10m"]],
+    ["1m 10m", ["1m", "10m"]],
+    ["01m, 1.50h", ["1m", "1.5h"]],
+    ["1m, 10m,", ["1m", "10m"]],
+    ["١ دقيقة، ١٠ دقائق", ["1m", "10m"]],
+    ["1 دقيقة 2 ساعات", ["1m", "2h"]],
+    ["دقيقتان ساعتان", ["2m", "2h"]],
+  ])("accepts %j", (input, steps) => {
+    expect(validateStepText(input)).toEqual({ ok: true, steps });
+  });
+
+  it.each(["1m, bad, 2h", "bad", "-1m", ".5h", "2s", "1m 10", "1 2 3"])(
+    "reports %j instead of dropping a token",
+    (input) => {
+      expect(validateStepText(input)).toEqual({ ok: false });
+      // The lenient reader would have saved a subset or the fallback without saying so.
+      expect(parseStepText(input, fallback)).not.toEqual([]);
+    },
+  );
+
+  it("previews what a valid field will save in both locales", () => {
+    expect(formatStepPreview(["1m", "10m", "1h", "2d"], "en")).toBe("1 min, 10 min, 1 hour, 2 days");
+    expect(formatStepPreview(["1m", "10m"], "ar")).toBe("١ دقيقة، ١٠ دقائق");
   });
 });

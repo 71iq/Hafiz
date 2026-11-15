@@ -4,7 +4,8 @@ import NetInfo from "@react-native-community/netinfo";
 import type { Session } from "@supabase/supabase-js";
 import { observeAuthSession } from "@/lib/auth/commands";
 import { emitSyncCompleted } from "@/lib/sync/events";
-import { useSync } from "@/lib/sync/useSync";
+import { RECONNECT_SYNC_DEBOUNCE_MS, useSync } from "@/lib/sync/useSync";
+import { getRestoreConsentView, useRestoreConsent, useSyncRestorePause } from "@/lib/sync/restore-consent";
 
 type Summary = import("@/lib/database/sync").SyncResult;
 type QfResult = import("@/lib/quran-foundation/user-sync").QfSyncResult;
@@ -33,7 +34,18 @@ jest.mock("@/lib/auth/store", () => ({
   ),
 }));
 jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: () => true }));
-jest.mock("@/lib/database/sync", () => ({ fullSync: (...args: unknown[]) => mockFullSync(...args) }));
+const mockPause = jest.fn(async (..._args: unknown[]): Promise<"pending_consent" | "cancelled" | null> => null);
+const mockAccept = jest.fn(async (..._args: unknown[]): Promise<Summary> => HEALTHY);
+const mockCancel = jest.fn(async (..._args: unknown[]) => true);
+const mockClearConsent = jest.fn();
+jest.mock("@/lib/database/sync", () => ({
+  fullSync: (...args: unknown[]) => mockFullSync(...args),
+  readRestorePause: (...args: unknown[]) => mockPause(...args),
+  acceptRestoreConsent: (...args: unknown[]) => mockAccept(...args),
+  cancelRestoreConsent: (...args: unknown[]) => mockCancel(...args),
+  clearRestoreConsentRequests: () => mockClearConsent(),
+  hasCompletedAccountRestore: async () => false,
+}));
 jest.mock("@/lib/database/sync-queue", () => ({ getPendingSyncCount: (...args: unknown[]) => mockCount(...args) }));
 jest.mock("@/lib/fsrs/leaderboard-sync", () => ({ updateProfileStats: (...args: unknown[]) => mockStats(...args) }));
 jest.mock("@/lib/quran-foundation/config", () => ({ isQfSyncEnabled: () => mockQfEnabled }));
@@ -91,6 +103,9 @@ beforeEach(() => {
   mockQfEnabled = true;
   mockSettings = { isLoaded: true, isTranslationLoading: false };
   mockFullSync.mockReset().mockResolvedValue(HEALTHY);
+  mockPause.mockReset().mockResolvedValue(null);
+  mockAccept.mockReset().mockResolvedValue(HEALTHY);
+  mockCancel.mockReset().mockResolvedValue(true);
   mockStats.mockReset().mockResolvedValue();
   mockQfSync.mockReset().mockResolvedValue(QF_HEALTHY);
   mockCount.mockReset().mockResolvedValue(0);
@@ -149,6 +164,8 @@ it("retires a deferred connectivity result and admits the latest account after i
   const response = deferred<Awaited<ReturnType<typeof NetInfo.fetch>>>();
   jest.mocked(NetInfo.fetch).mockReturnValueOnce(response.promise);
   const { result, rerender } = renderHook(() => useSync());
+  // The stored pause is read first; wait until A's run is waiting on connectivity.
+  await waitFor(() => expect(NetInfo.fetch).toHaveBeenCalledTimes(1));
   await act(async () => {
     activate(session(B));
     rerender({});
@@ -189,7 +206,6 @@ it.each(["switch", "signout", "same-ID login", "closed A-B-A"])(
     expect(mockStats).toHaveBeenCalledTimes(transition === "signout" ? 0 : 1);
     expect(mockQfSync).toHaveBeenCalledTimes(transition === "signout" ? 0 : 1);
     expect(jest.mocked(emitSyncCompleted).mock.calls.every(([summary]) => summary.pulled !== 99)).toBe(true);
-    expect(result.current.accountRestoreNotice).toBe(false);
   },
 );
 
@@ -231,7 +247,6 @@ it.each(["stats", "QF"])("stops the old continuation after deferred %s work", as
   expect(mockFullSync).toHaveBeenCalledTimes(2);
   expect(mockQfSync).toHaveBeenCalledTimes(stage === "stats" ? 1 : 2);
   expect(jest.mocked(emitSyncCompleted).mock.calls.every(([summary]) => summary.pulled !== 99)).toBe(true);
-  expect(result.current.accountRestoreNotice).toBe(false);
 });
 
 it("does not let an older pending-count effect overwrite the replacement count", async () => {
@@ -389,7 +404,12 @@ it("admits a fresh connectivity trigger after an idle closed A-B-A without a rer
     activate(original);
     listener(network(true));
   });
-  expect(mockFullSync).toHaveBeenCalledTimes(2);
+  // W02: a reconnect is debounced before it syncs.
+  expect(mockFullSync).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    jest.advanceTimersByTime(RECONNECT_SYNC_DEBOUNCE_MS);
+  });
+  await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(2));
   expect(result.current.status).toBe("synced");
 });
 
@@ -417,7 +437,6 @@ it.each(["same account", "new account", "new database"])(
     expect(mockFullSync).toHaveBeenCalledTimes(2);
     expect(mockStats).toHaveBeenCalledTimes(1);
     expect(mockQfSync).toHaveBeenCalledTimes(1);
-    expect(replacement.result.current.accountRestoreNotice).toBe(false);
     expect(jest.mocked(emitSyncCompleted).mock.calls.every(([summary]) => summary.pulled !== 99)).toBe(true);
   },
 );
@@ -538,7 +557,9 @@ it.each(["synced", "failed"] as const)(
     mockFullSync.mockResolvedValue({ ...HEALTHY, status });
     const { result } = renderHook(() => useSync());
     await waitFor(() => expect(result.current.status).toBe(status === "synced" ? "synced" : "error"));
-    expect(result.current.pendingCount).toBe(7);
+    // Dormant Quran Foundation rows stay stored but are not reported while its gate is off.
+    expect(result.current.pendingCount).toBe(0);
+    expect(mockQfCount).not.toHaveBeenCalled();
     expect(mockQfSync).not.toHaveBeenCalled();
   },
 );
@@ -639,4 +660,226 @@ it("syncs when the app goes to the background", async () => {
     changeListener?.("background");
   });
   await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(2));
+});
+
+describe("W07 restore pause and consent", () => {
+  type ConsentSummary = Extract<Summary, { status: "needs_restore_consent" }>;
+  function consent(token = "token-1"): ConsentSummary {
+    return {
+      status: "needs_restore_consent",
+      pushed: 0,
+      pulled: 0,
+      accountRestored: false,
+      localDataReplaced: false,
+      request: {
+        token,
+        userId: A,
+        accountEmail: null,
+        summary: { categories: [{ key: "bookmarks", count: 1 }], pendingChanges: 0 },
+        preparedAt: Date.now(),
+        expiresAt: Date.now() + 5 * 60_000,
+      },
+    };
+  }
+
+  it("shows a stored pause at an offline cold start without reaching the network", async () => {
+    mockPause.mockResolvedValue("pending_consent");
+    jest.mocked(NetInfo.fetch).mockResolvedValue(network(false));
+    renderHook(() => useSync());
+    await waitFor(() => expect(getRestoreConsentView()).toMatchObject({ userId: A, pause: "pending_consent" }));
+    expect(mockFullSync).not.toHaveBeenCalled();
+  });
+
+  it("stops every automatic trigger and every profile/QF upload while the account is paused", async () => {
+    mockPause.mockResolvedValue("cancelled");
+    const { AppState } = jest.requireActual<typeof import("react-native")>("react-native");
+    let changeListener: ((state: string) => void) | undefined;
+    jest.spyOn(AppState, "addEventListener").mockImplementation(((_type: string, listener: (state: string) => void) => {
+      changeListener = listener;
+      return { remove: () => {} };
+    }) as never);
+    Object.defineProperty(AppState, "currentState", { value: "active", configurable: true });
+    renderHook(() => useSync());
+    await waitFor(() => expect(mockPause).toHaveBeenCalledTimes(1));
+    expect(getRestoreConsentView()).toMatchObject({ userId: A, pause: "cancelled", request: null });
+
+    const calls = jest.mocked(NetInfo.addEventListener).mock.calls;
+    const netListener = calls[calls.length - 1]?.[0];
+    await act(async () => {
+      changeListener?.("active");
+      changeListener?.("background");
+    });
+    await act(async () => {
+      for (const listener of mockQueuedListeners) listener();
+      jest.advanceTimersByTime(20_000);
+    });
+    await act(async () => {
+      netListener?.(network(true));
+      jest.advanceTimersByTime(RECONNECT_SYNC_DEBOUNCE_MS);
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(5 * 60_000);
+    });
+    expect(mockPause.mock.calls.length).toBeGreaterThan(4);
+    expect(mockFullSync).not.toHaveBeenCalled();
+    expect(mockStats).not.toHaveBeenCalled();
+    expect(mockQfSync).not.toHaveBeenCalled();
+    expect(emitSyncCompleted).not.toHaveBeenCalled();
+  });
+
+  it("opens consent without profile, QF or completion work, then accepts with only the token", async () => {
+    mockFullSync.mockResolvedValueOnce(consent());
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(getRestoreConsentView().request?.token).toBe("token-1"));
+    expect(getRestoreConsentView().pause).toBe("pending_consent");
+    expect(mockStats).not.toHaveBeenCalled();
+    expect(mockQfSync).not.toHaveBeenCalled();
+    expect(emitSyncCompleted).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("idle");
+
+    mockAccept.mockResolvedValueOnce({ ...HEALTHY, accountRestored: true, localDataReplaced: true, restoreCompleted: true });
+    const consentHook = renderHook(() => useRestoreConsent(A));
+    await act(async () => {
+      consentHook.result.current.accept();
+    });
+    await waitFor(() => expect(result.current.status).toBe("synced"));
+    expect(mockAccept).toHaveBeenCalledWith(mockDb, "token-1");
+    expect(getRestoreConsentView()).toMatchObject({ request: null, pause: null, busy: null });
+    expect(mockStats).toHaveBeenCalledTimes(1);
+    expect(emitSyncCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("prepares fresh consent after a stale acceptance", async () => {
+    mockFullSync.mockResolvedValueOnce(consent("old"));
+    renderHook(() => useSync());
+    await waitFor(() => expect(getRestoreConsentView().request?.token).toBe("old"));
+    mockAccept.mockResolvedValueOnce({ ...HEALTHY, pushed: 0, status: "restore_consent_stale" });
+    mockFullSync.mockResolvedValueOnce(consent("fresh"));
+    const consentHook = renderHook(() => useRestoreConsent(A));
+    await act(async () => {
+      consentHook.result.current.accept();
+    });
+    await waitFor(() => expect(getRestoreConsentView().request?.token).toBe("fresh"));
+    expect(getRestoreConsentView().issue).toBe("stale");
+    expect(mockFullSync).toHaveBeenLastCalledWith(mockDb, { resume: true });
+    expect(mockStats).not.toHaveBeenCalled();
+  });
+
+  it("cancels into a stored pause, and Resume sync asks for a fresh snapshot", async () => {
+    mockFullSync.mockResolvedValueOnce(consent());
+    renderHook(() => useSync());
+    await waitFor(() => expect(getRestoreConsentView().request).not.toBeNull());
+    const consentHook = renderHook(() => useRestoreConsent(A));
+    await act(async () => {
+      consentHook.result.current.cancel();
+    });
+    await waitFor(() => expect(getRestoreConsentView()).toMatchObject({ request: null, pause: "cancelled" }));
+    expect(mockCancel).toHaveBeenCalledTimes(1);
+
+    const pauseHook = renderHook(() => useSyncRestorePause(A));
+    expect(pauseHook.result.current.paused).toBe(true);
+    mockFullSync.mockResolvedValueOnce(consent("resumed"));
+    await act(async () => {
+      pauseHook.result.current.resume();
+    });
+    await waitFor(() => expect(getRestoreConsentView().request?.token).toBe("resumed"));
+    expect(mockFullSync).toHaveBeenLastCalledWith(mockDb, { resume: true });
+  });
+
+  it("drops a prepared request on an account transition", async () => {
+    mockFullSync.mockResolvedValueOnce(consent());
+    const { rerender } = renderHook(() => useSync());
+    await waitFor(() => expect(getRestoreConsentView().request).not.toBeNull());
+    mockClearConsent.mockClear();
+    await act(async () => {
+      activate(session(B));
+      rerender({});
+    });
+    expect(mockClearConsent).toHaveBeenCalled();
+    expect(getRestoreConsentView()).toMatchObject({ userId: B, request: null, pause: null });
+  });
+
+  it("debounces a reconnect, cancels it on another offline transition and ignores unknown connectivity", async () => {
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(result.current.status).toBe("synced"));
+    const calls = jest.mocked(NetInfo.addEventListener).mock.calls;
+    const listener = calls[calls.length - 1]?.[0];
+    if (!listener) throw new Error("Connectivity listener was not installed");
+    await act(async () => {
+      listener(network(true));
+      jest.advanceTimersByTime(1_000);
+      listener(network(false));
+      jest.advanceTimersByTime(RECONNECT_SYNC_DEBOUNCE_MS);
+    });
+    expect(mockFullSync).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe("offline");
+    await act(async () => {
+      listener({ isConnected: null } as Awaited<ReturnType<typeof NetInfo.fetch>>);
+    });
+    expect(result.current.status).toBe("offline");
+    await act(async () => {
+      listener(network(true));
+      listener(network(true));
+      jest.advanceTimersByTime(RECONNECT_SYNC_DEBOUNCE_MS);
+    });
+    await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("W14 account status details", () => {
+  it("records the last complete sync and names a failure class", async () => {
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(result.current.status).toBe("synced"));
+    expect(result.current.failure).toBeNull();
+    expect(Date.parse(result.current.lastSyncedAt ?? "")).not.toBeNaN();
+    const lastSuccess = result.current.lastSyncedAt;
+
+    mockFullSync.mockResolvedValueOnce({ ...HEALTHY, status: "failed" });
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(result.current.status).toBe("error");
+    expect(result.current.failure).toBe("failed");
+    // A failed run never moves the last successful time.
+    expect(result.current.lastSyncedAt).toBe(lastSuccess);
+
+    mockFullSync.mockResolvedValueOnce({ ...HEALTHY, status: "partial" });
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(result.current.failure).toBe("partial");
+  });
+
+  it("reports offline as its own class", async () => {
+    jest.mocked(NetInfo.fetch).mockResolvedValueOnce(network(false));
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(result.current.failure).toBe("offline"));
+  });
+
+  it("keeps Sync now behind a stored restore pause; only Resume sync continues", async () => {
+    mockPause.mockResolvedValue("cancelled");
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(mockPause).toHaveBeenCalled());
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(mockFullSync).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("idle");
+  });
+
+  it("waits for a run in progress instead of dropping Sync now", async () => {
+    const first = deferred<Summary>();
+    mockFullSync.mockReturnValueOnce(first.promise);
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(1));
+    let manual: Promise<void> | undefined;
+    act(() => {
+      manual = result.current.syncNow();
+    });
+    await act(async () => {
+      first.resolve(HEALTHY);
+      await manual;
+    });
+    expect(mockFullSync).toHaveBeenCalledTimes(2);
+  });
 });

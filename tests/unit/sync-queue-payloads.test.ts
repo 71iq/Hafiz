@@ -6,6 +6,7 @@ import { observeAuthSession } from "@/lib/auth/commands";
 import { createSchema } from "@/lib/database/schema";
 import { fullSync } from "@/lib/database/sync";
 import { enqueueSync, getPendingSyncEntries } from "@/lib/database/sync-queue";
+import { deleteUserWordMeaning, upsertUserWordMeaning } from "@/lib/word/queries";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const OTHER_USER_ID = "00000000-0000-4000-8000-000000000002";
@@ -770,5 +771,101 @@ describe("RF-169 tombstone time", () => {
     await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
 
     expect(remoteWrites).toEqual([]);
+  });
+});
+
+describe("W07 custom meaning edit and deletion", () => {
+  const KEY = { surah: 2, ayah: 255, wordPos: 1 } as const;
+  function seedStoredMeaning() {
+    sql
+      .prepare(
+        "INSERT INTO user_word_meanings (surah,ayah,word_pos,word,meaning,created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+      )
+      .run(2, 255, 1, "synthetic", "synthetic meaning", OLD, OLD);
+  }
+  function storedMeaning() {
+    return sql.prepare("SELECT * FROM user_word_meanings WHERE surah = 2 AND ayah = 255 AND word_pos = 1").get();
+  }
+  function queued() {
+    return sql.prepare("SELECT operation, row_id, data, created_at FROM sync_queue ORDER BY id").all() as {
+      operation: string;
+      row_id: string;
+      data: string;
+      created_at: string;
+    }[];
+  }
+
+  it("keeps created_at when editing and queues the edited row with it", async () => {
+    seedStoredMeaning();
+    await upsertUserWordMeaning(db, { ...KEY, word: null, meaning: "edited meaning" });
+
+    expect(storedMeaning()).toMatchObject({ meaning: "edited meaning", word: "synthetic", created_at: OLD });
+    const [entry] = queued();
+    expect(entry.operation).toBe("UPDATE");
+    expect(JSON.parse(entry.data)).toMatchObject({ meaning: "edited meaning", created_at: OLD });
+  });
+
+  it("removes the key and queues a tombstone whose updated_at, deleted_at and queue time are one fresh time", async () => {
+    seedStoredMeaning();
+
+    await expect(deleteUserWordMeaning(db, { ...KEY, meaning: "synthetic meaning", createdAt: OLD })).resolves.toBe(
+      "deleted",
+    );
+
+    expect(storedMeaning()).toBeUndefined();
+    const [entry] = queued();
+    const data = JSON.parse(entry.data);
+    expect(entry).toMatchObject({ operation: "DELETE", row_id: "2:255:1" });
+    expect(data).toEqual({
+      surah: 2,
+      ayah: 255,
+      word_pos: 1,
+      word: "synthetic",
+      meaning: "synthetic meaning",
+      created_at: OLD,
+      updated_at: data.deleted_at,
+      deleted_at: entry.created_at,
+    });
+    // The stored row's old updated_at is not reused: a device holding that unchanged row must accept it.
+    expect(data.updated_at > OLD).toBe(true);
+
+    mockProbeData = [{ updated_at: OLD }];
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+    expect(remoteWrites).toMatchObject([
+      {
+        table: "user_word_meanings",
+        kind: "upsert",
+        onConflict: "user_id,surah,ayah,word_pos",
+        row: {
+          surah: 2,
+          ayah: 255,
+          word_pos: 1,
+          meaning: "synthetic meaning",
+          updated_at: data.deleted_at,
+          deleted_at: data.deleted_at,
+        },
+      },
+    ]);
+  });
+
+  it("lets a genuinely newer remote edit win over the tombstone", async () => {
+    seedStoredMeaning();
+    await deleteUserWordMeaning(db, { ...KEY, meaning: "synthetic meaning", createdAt: OLD });
+    mockProbeData = [{ updated_at: "2099-01-01T00:00:00.000Z" }];
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+
+    expect(remoteWrites).toEqual([]);
+  });
+
+  it("writes nothing when the row changed since it was shown", async () => {
+    seedStoredMeaning();
+
+    await expect(deleteUserWordMeaning(db, { ...KEY, meaning: "an older meaning", createdAt: OLD })).resolves.toBe(
+      "changed",
+    );
+
+    expect(storedMeaning()).toMatchObject({ meaning: "synthetic meaning" });
+    expect(queued()).toEqual([]);
   });
 });

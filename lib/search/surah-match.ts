@@ -75,3 +75,30 @@ export function matchesSurahQuery(surah: SurahSearchFields, rawQuery: string): b
   const candidates = [surah.name_english, transliteration, withoutArticle(transliteration)];
   return candidates.some((candidate) => candidate && foldLatin(candidate).includes(latinQuery));
 }
+
+function foldArabicSurahName(text: string): string {
+  return normalizeArabicWord(text.replace(/^\s*سورة\s+/u, ""));
+}
+
+/**
+ * Exact alias matching for the shared reference parser (C06): the full English meaning, the
+ * transliteration with or without its article, or the Arabic name with or without "سورة". Returns
+ * every matching surah number so callers can offer choices when a name is ambiguous.
+ */
+export function exactSurahAliasMatches(surahs: readonly SurahSearchFields[], rawQuery: string): number[] {
+  const query = rawQuery.trim().replace(/^(surah|sura|surat)\s+/i, "");
+  if (!query) return [];
+  const arabicQuery = foldArabicSurahName(query);
+  if (arabicQuery && /[\u0600-\u06FF]/.test(query)) {
+    return surahs.filter((surah) => foldArabicSurahName(surah.name_arabic) === arabicQuery).map((surah) => surah.number);
+  }
+  const latinQuery = foldLatin(withoutArticle(query));
+  if (!latinQuery) return [];
+  return surahs
+    .filter((surah) => {
+      const transliteration = surahTransliteration(surah.number) ?? "";
+      const candidates = [surah.name_english, withoutArticle(surah.name_english), transliteration, withoutArticle(transliteration)];
+      return candidates.some((candidate) => candidate && foldLatin(withoutArticle(candidate)) === latinQuery);
+    })
+    .map((surah) => surah.number);
+}

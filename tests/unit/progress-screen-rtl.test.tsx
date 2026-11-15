@@ -1,6 +1,7 @@
 import { textStartStyle } from "@/lib/ui/direction";
+import { peekAuthReturn } from "@/lib/auth/return-origin";
 import React from "react";
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { ScrollView } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import ProgressScreen from "@/app/(tabs)/progress";
@@ -8,18 +9,27 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount } from "@/lib/fsrs/queries";
 import { getAchievementDashboard } from "@/lib/achievements/queries";
 import { getDefaultDeckProgress, getLocalSurahProgress } from "@/lib/profile/progress";
+import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
+import { strings } from "@/lib/i18n/strings";
 import { findAncestorByClassName, flattenStyle, type RtlTestNode } from "../rtl/rtl-test-utils";
 
 const mockDatabase = { name: "isolated-progress-fixture" };
+const mockDismissAccountPromo = jest.fn();
 const mockSettings: {
   isDark: boolean;
   isRTL: boolean;
   uiLanguage: "ar" | "en";
+  effectiveTheme: "white";
+  accountPromoDismissed: boolean;
+  dismissAccountPromo: () => void;
   themeColors: Record<string, string>;
 } = {
   isDark: false,
   isRTL: true,
   uiLanguage: "ar",
+  effectiveTheme: "white",
+  accountPromoDismissed: false,
+  dismissAccountPromo: () => mockDismissAccountPromo(),
   themeColors: {
     surface: "#FFF8F1",
     surfaceLow: "#F9F3EB",
@@ -49,7 +59,8 @@ jest.mock("@react-navigation/native", () => {
 });
 
 jest.mock("expo-router", () => ({
-  router: { push: (...args: unknown[]) => mockRouterPush(...args) },
+  router: { push: (...args: unknown[]) => mockRouterPush(...args), setParams: jest.fn() },
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: (...args: unknown[]) => mockRouterPush(...args) }),
   useNavigation: () => ({ navigate: jest.fn() }),
 }));
@@ -74,8 +85,12 @@ jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: jest.fn(),
 }));
 
+let mockReviewListener: (() => void) | null = null;
 jest.mock("@/lib/fsrs/review-events", () => ({
-  subscribeReviewActivity: () => () => {},
+  subscribeReviewActivity: (listener: () => void) => {
+    mockReviewListener = listener;
+    return () => {};
+  },
 }));
 
 jest.mock("@/lib/sync/events", () => ({
@@ -101,6 +116,12 @@ jest.mock("@/lib/profile/progress", () => ({
   getDefaultDeckProgress: jest.fn(),
   getLocalSurahProgress: jest.fn(),
 }));
+
+jest.mock("@/lib/hifz/progress", () => ({ loadHifzProgress: jest.fn(async () => null) }));
+
+jest.mock("@/lib/reflection-journey/queries", () => ({ getReflectionJourneySummary: jest.fn() }));
+
+jest.mock("@/components/flashcards/DeckCardsSheet", () => ({ DeckCardsSheet: () => null }));
 
 const achievementDashboardFixture = {
   items: [],
@@ -156,6 +177,7 @@ describe("ProgressScreen RTL behavior", () => {
     mockSettings.isRTL = true;
     mockSettings.uiLanguage = "ar";
     mockSettings.isDark = false;
+    mockSettings.accountPromoDismissed = false;
     mockAuthState.user = null;
     mockAuthState.isLoading = false;
     mockAuthState.isInitialized = true;
@@ -167,9 +189,13 @@ describe("ProgressScreen RTL behavior", () => {
       activity: [{ date: "2026-10-15", count: 2 }],
       activeDays: 1,
       totalReviews: 2,
-      averageDailyReviews: 2,
-      longestStreak: 1,
     }));
+    jest.mocked(getReflectionJourneySummary).mockResolvedValue({
+      totalLevels: 5,
+      completedLevels: 2,
+      currentLevelId: "level-3",
+      currentLevelTitle: { en: "Level 3", ar: "المستوى ٣" },
+    });
     jest.mocked(getAchievementDashboard).mockResolvedValue(achievementDashboardFixture);
     jest.mocked(getDefaultDeckProgress).mockResolvedValue([]);
     jest.mocked(getLocalSurahProgress).mockResolvedValue([]);
@@ -190,11 +216,11 @@ describe("ProgressScreen RTL behavior", () => {
     jest.mocked(isSupabaseConfigured).mockReturnValue(true);
     const arabic = renderProgress();
 
-    await waitFor(() => expect(arabic.getByText("سجّل الدخول لمزامنة نتائجك")).toBeTruthy());
+    await waitFor(() => expect(arabic.getByText(strings.ar.progressSignInPrompt)).toBeTruthy());
     await waitFor(() => expect(arabic.getByText("الإنجازات")).toBeTruthy());
 
-    const arabicLabel = arabic.getByText("سجّل الدخول لمزامنة نتائجك");
-    const arabicRow = findAncestorByClassName(arabicLabel, "items-center gap-3");
+    const arabicLabel = arabic.getByText(strings.ar.progressSignInPrompt);
+    const arabicRow = findAncestorByClassName(arabicLabel, "items-start gap-3");
     const arabicButton = arabic.getByRole("button", { name: "تسجيل الدخول" });
     const arabicButtonText = arabic.getByText("تسجيل الدخول");
     const arabicButtonRow = findAncestorByClassName(arabicButtonText, "flex-row items-center gap-2");
@@ -218,21 +244,25 @@ describe("ProgressScreen RTL behavior", () => {
     expect(arabicButtonChildren[1]).toEqual(
       expect.objectContaining({ props: expect.objectContaining({ children: "تسجيل الدخول" }) }),
     );
-    expect(arabicCard.props.className).toContain("mb-6 px-5 py-4");
+    // The shared promotion keeps Progress's light teal card and outline Log In button.
+    expect(arabicCard.props.className).toContain("px-5 py-4");
     expect(arabicCard.props.className).toContain("rounded-4xl overflow-hidden");
-    expect(arabicCard.props.className).toContain("bg-surface-low dark:bg-surface-dark-low");
+    expect(arabicCard.props.className).toContain("bg-primary-accent/10");
     expect(resolvePressableStyle(arabicButton.props.style)).toMatchObject({
-      backgroundColor: "#003638",
+      backgroundColor: "transparent",
+      borderColor: "#0f766e",
+      minHeight: 44,
     });
-    expect(flattenStyle(arabicButtonText.props.style)).toMatchObject({
-      color: "#FDDC91",
-      fontFamily: "Manrope_700Bold",
-      fontSize: 12,
-    });
+    expect(flattenStyle(arabicButtonText.props.style)).toMatchObject({ color: "#0f766e" });
+    // The close control is labeled and keeps its own 44 px target.
+    const arabicDismiss = arabic.getByRole("button", { name: "إغلاق" });
+    expect(arabicDismiss.props.className).toContain("h-11 w-11");
 
     await fireEvent.press(arabicButton);
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
+    // The return to Progress is captured through the allowlisted origin, not a URL parameter.
+    expect(peekAuthReturn()).toEqual({ route: "progress" });
 
     arabic.unmount();
     mockSettings.isRTL = false;
@@ -241,11 +271,11 @@ describe("ProgressScreen RTL behavior", () => {
     mockRouterPush.mockReset();
     const english = renderProgress();
 
-    await waitFor(() => expect(english.getByText("Sign in to sync your results")).toBeTruthy());
+    await waitFor(() => expect(english.getByText(strings.en.progressSignInPrompt)).toBeTruthy());
     await waitFor(() => expect(english.getByText("Achievements")).toBeTruthy());
 
-    const englishLabel = english.getByText("Sign in to sync your results");
-    const englishRow = findAncestorByClassName(englishLabel, "items-center gap-3");
+    const englishLabel = english.getByText(strings.en.progressSignInPrompt);
+    const englishRow = findAncestorByClassName(englishLabel, "items-start gap-3");
     const englishButton = english.getByRole("button", { name: "Log In" });
     const englishButtonText = english.getByText("Log In");
     const englishButtonRow = findAncestorByClassName(englishButtonText, "flex-row items-center gap-2");
@@ -269,21 +299,41 @@ describe("ProgressScreen RTL behavior", () => {
     expect(englishButtonChildren[1]).toEqual(
       expect.objectContaining({ props: expect.objectContaining({ children: "Log In" }) }),
     );
-    expect(englishCard.props.className).toContain("mb-6 px-5 py-4");
+    expect(englishCard.props.className).toContain("px-5 py-4");
     expect(englishCard.props.className).toContain("rounded-4xl overflow-hidden");
-    expect(englishCard.props.className).toContain("bg-surface-low dark:bg-surface-dark-low");
+    expect(englishCard.props.className).toContain("bg-primary-accent/10");
     expect(resolvePressableStyle(englishButton.props.style)).toMatchObject({
-      backgroundColor: "#1B4D4F",
+      backgroundColor: "transparent",
+      borderColor: "#2dd4bf",
+      minHeight: 44,
     });
-    expect(flattenStyle(englishButtonText.props.style)).toMatchObject({
-      color: "#FDDC91",
-      fontFamily: "Manrope_700Bold",
-      fontSize: 12,
-    });
+    expect(flattenStyle(englishButtonText.props.style)).toMatchObject({ color: "#2dd4bf" });
 
+    await fireEvent.press(english.getByRole("button", { name: "Dismiss" }));
+    expect(mockDismissAccountPromo).toHaveBeenCalledTimes(1);
     await fireEvent.press(englishButton);
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
+    // The return to Progress is captured through the allowlisted origin, not a URL parameter.
+    expect(peekAuthReturn()).toEqual({ route: "progress" });
+  });
+
+  it.each([
+    ["the shared dismissal is active", { dismissed: true, reviews: 2 }],
+    ["no review has been completed", { dismissed: false, reviews: 0 }],
+  ])("hides the prompt when %s", async (_case, state) => {
+    jest.mocked(isSupabaseConfigured).mockReturnValue(true);
+    mockSettings.accountPromoDismissed = state.dismissed;
+    jest.mocked(getReviewStats).mockImplementation(async () => ({
+      activity: [],
+      activeDays: 0,
+      totalReviews: state.reviews,
+      averageDailyReviews: 0,
+      longestStreak: 0,
+    }));
+    const view = renderProgress();
+    await waitFor(() => expect(view.getByText("الإنجازات")).toBeTruthy());
+    expect(view.queryByText(strings.ar.progressSignInPrompt)).toBeNull();
   });
 
   it.each([
@@ -320,9 +370,63 @@ describe("ProgressScreen RTL behavior", () => {
 
     await waitFor(() => expect(english.getByText("40%")).toBeTruthy());
     expect(english.getByText("⁦2 / 2⁩")).toBeTruthy();
-    for (const label of ["Total memorized", "Daily average", "Active days", "Total reviews"]) {
+    for (const label of ["Memorized share", "Total memorized", "Current consistency", "Total reviews"]) {
       expect(english.getByText(label)).toBeTruthy();
     }
+    expect(english.queryByText("Average reviews per active day")).toBeNull();
+    fireEvent.press(english.getByText("More stats"));
+    for (const label of ["Longest consistency", "Average reviews per active day", "Steady weeks", "Active days"]) {
+      expect(english.getByText(label)).toBeTruthy();
+    }
+    // Pressing a figure explains what it counts.
+    fireEvent.press(english.getByLabelText("Memorized share: 40%"));
+    expect(english.getByText(`Memorized share: ${strings.en.progressHelpMemorizedShare}`)).toBeTruthy();
+  });
+
+  it("keeps the last figures with a refresh warning when a later load fails", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const view = renderProgress();
+    await waitFor(() => expect(view.getByText("٤٠٪")).toBeTruthy());
+
+    jest.mocked(getTotalAyahCardCount).mockRejectedValueOnce(new Error("synthetic failure"));
+    await act(async () => mockReviewListener?.());
+    await waitFor(() => expect(view.getByText(strings.ar.progressRefreshFailed)).toBeTruthy());
+    expect(view.getByText("٤٠٪")).toBeTruthy();
+    expect(view.queryByText("٠٪")).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(view.getByText(strings.ar.progressRetry));
+    });
+    await waitFor(() => expect(view.queryByText(strings.ar.progressRefreshFailed)).toBeNull());
+  });
+
+  it("shows a load failure with Retry instead of zero figures, then recovers", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.mocked(getReviewStats).mockRejectedValueOnce(new Error("synthetic failure"));
+    const view = renderProgress();
+    await waitFor(() => expect(view.getByText(strings.ar.progressLoadFailed)).toBeTruthy());
+    expect(view.queryByText("٠٪")).toBeNull();
+    await act(async () => {
+      fireEvent.press(view.getByText(strings.ar.progressRetry));
+    });
+    await waitFor(() => expect(view.getByText("٤٠٪")).toBeTruthy());
+    expect(view.queryByText(strings.ar.progressLoadFailed)).toBeNull();
+  });
+
+  it("guides a first review instead of showing zero tiles when there is no history", async () => {
+    jest.mocked(getMemorizedAyahCardCount).mockResolvedValue(0);
+    jest.mocked(getReviewStats).mockImplementation(async () => ({ activity: [], activeDays: 0, totalReviews: 0 }));
+    const view = renderProgress();
+    await waitFor(() => expect(view.getByText(strings.ar.progressEmptyTitle)).toBeTruthy());
+    expect(view.queryByText(strings.ar.progressRetention)).toBeNull();
+    fireEvent.press(view.getByText(strings.ar.progressStartReviewing));
+    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/flashcards/session" });
+  });
+
+  it("shows the Journey row with its completed count under Achievements", async () => {
+    const view = renderProgress();
+    await waitFor(() => expect(view.getByText("٢ / ٥ مكتملة")).toBeTruthy());
+    expect(view.getByText(strings.ar.reflectionJourneyTitle)).toBeTruthy();
   });
 
   it("renders RTL achievement rows with explicit LTR layout direction, mirrored order, and horizontal recent content", async () => {

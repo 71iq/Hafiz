@@ -23,10 +23,20 @@ describe("useAppLanguage on native", () => {
     expect(renderHook(() => useAppLanguage()).result.current).toBe(app);
   });
 
-  it.each([false, true])("uses the device direction until settings load (isRTL=%s)", (deviceRTL) => {
-    jest.replaceProperty(I18nManager, "isRTL", deviceRTL);
+  it.each([
+    { locale: "ar-SA", expected: "ar" },
+    { locale: "en-US", expected: "en" },
+  ] as const)("uses the device language $locale until settings load", ({ locale, expected }) => {
+    const RealDateTimeFormat = Intl.DateTimeFormat;
+    jest.spyOn(Intl, "DateTimeFormat").mockImplementation(((
+      ...args: ConstructorParameters<typeof Intl.DateTimeFormat>
+    ) => {
+      const formatter = new RealDateTimeFormat(...args);
+      const resolved = formatter.resolvedOptions();
+      return { ...formatter, resolvedOptions: () => ({ ...resolved, locale }) } as Intl.DateTimeFormat;
+    }) as unknown as typeof Intl.DateTimeFormat);
     mockSettings.uiLanguage = "en";
     mockSettings.isLoaded = false;
-    expect(renderHook(() => useAppLanguage()).result.current).toBe(deviceRTL ? "ar" : "en");
+    expect(renderHook(() => useAppLanguage()).result.current).toBe(expected);
   });
 });

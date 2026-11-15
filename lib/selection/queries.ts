@@ -2,7 +2,7 @@ import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import type { BookmarkEntry, HighlightEntry } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { enqueueQfSync } from "@/lib/quran-foundation/user-sync";
-import { toArabicNumber } from "@/lib/arabic";
+import { formatQuranCopy, withAyahNumber, type CopyLanguage, type QuranCopyRange } from "./format";
 
 type BookmarkRow = {
   surah: number;
@@ -38,18 +38,11 @@ export type QuranSelectionWordRef = {
   isMarker?: boolean;
 };
 
-type UthmaniSelectionRange = {
-  surah: number;
-  surahName: string;
-  ayahStart: number;
-  ayahEnd: number;
-};
-
 export type UthmaniSelectionText = {
   text: string;
   firstSurah: number;
   firstAyah: number;
-  ranges: UthmaniSelectionRange[];
+  ranges: QuranCopyRange[];
 };
 
 export async function fetchAllBookmarks(db: DatabaseExecutor): Promise<BookmarkEntry[]> {
@@ -191,12 +184,18 @@ export async function addHighlightsForSelectionRefs(
   return ids;
 }
 
-/** Remove an ayah's highlights. The physical delete and its queued deletions commit together. */
+/**
+ * Remove an ayah's whole-ayah highlight. Word-range highlights made from a text selection stay. The
+ * physical delete and its queued deletions commit together.
+ */
 export async function removeHighlightsForAyah(database: AppDatabase, surah: number, ayah: number): Promise<void> {
-  await database.withTransactionAsync((db) => deleteAyahHighlightRows(db, surah, ayah));
+  await database.withTransactionAsync((db) => deleteAyahLevelHighlightRows(db, surah, ayah));
 }
 
-/** Replace an ayah's highlights with one whole-ayah highlight in a single transaction. */
+/**
+ * Replace an ayah's whole-ayah highlight with one in the new color, in a single transaction.
+ * Word-range highlights on the same ayah are unrelated annotations and keep their rows.
+ */
 export async function replaceAyahHighlight(
   database: AppDatabase,
   surah: number,
@@ -205,20 +204,39 @@ export async function replaceAyahHighlight(
 ): Promise<number> {
   let id = 0;
   await database.withTransactionAsync(async (db) => {
-    await deleteAyahHighlightRows(db, surah, ayah);
+    await deleteAyahLevelHighlightRows(db, surah, ayah);
     id = await insertHighlightRow(db, surah, ayah, color);
   });
   return id;
 }
 
-async function deleteAyahHighlightRows(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
+/** Remove exactly these highlight rows (by local id), queueing a deletion for each. */
+export async function removeHighlightsByIds(database: AppDatabase, ids: readonly number[]): Promise<void> {
+  const unique = Array.from(new Set(ids.filter((id) => Number.isInteger(id))));
+  if (unique.length === 0) return;
+  await database.withTransactionAsync(async (db) => {
+    const placeholders = unique.map(() => "?").join(",");
+    const rows = await db.getAllAsync<HighlightRow>(
+      `SELECT * FROM highlights WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+      unique,
+    );
+    await deleteHighlightRows(db, rows);
+  });
+}
+
+async function deleteAyahLevelHighlightRows(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
   const rows = await db.getAllAsync<HighlightRow>(
-    "SELECT * FROM highlights WHERE surah = ? AND ayah = ? AND deleted_at IS NULL",
+    "SELECT * FROM highlights WHERE surah = ? AND ayah = ? AND word_start IS NULL AND word_end IS NULL AND deleted_at IS NULL",
     [surah, ayah]
   );
+  await deleteHighlightRows(db, rows);
+}
+
+async function deleteHighlightRows(db: DatabaseExecutor, rows: readonly HighlightRow[]): Promise<void> {
+  if (rows.length === 0) return;
   const deletedAt = new Date().toISOString();
-  await db.runAsync("DELETE FROM highlights WHERE surah = ? AND ayah = ?", [surah, ayah]);
   for (const row of rows) {
+    await db.runAsync("DELETE FROM highlights WHERE id = ?", [row.id]);
     await enqueueSync(db, "highlights", "DELETE", row.sync_id ?? String(row.id), {
       ...highlightToSyncData(row),
       updated_at: deletedAt,
@@ -257,12 +275,12 @@ export async function fetchUthmaniWordsForSelection(
   }
 
   const textParts: string[] = [];
-  const selectedAyahs: { surah: number; ayah: number; surahName: string }[] = [];
+  const selectedAyahs: { surah: number; ayah: number; surahNameArabic: string; surahNameEnglish: string }[] = [];
 
   for (const ayahRefs of grouped.values()) {
     const first = ayahRefs[0];
-    const row = await db.getFirstAsync<{ text_uthmani: string; name_arabic: string }>(
-      `SELECT qt.text_uthmani, s.name_arabic
+    const row = await db.getFirstAsync<{ text_uthmani: string; name_arabic: string; name_english: string | null }>(
+      `SELECT qt.text_uthmani, s.name_arabic, s.name_english
        FROM quran_text qt
        JOIN surahs s ON s.number = qt.surah
        WHERE qt.surah = ? AND qt.ayah = ?`,
@@ -280,8 +298,13 @@ export async function fetchUthmaniWordsForSelection(
           .filter((word): word is string => !!word);
 
     if (selectedWords.length === 0) continue;
-    textParts.push(`${selectedWords.join(" ")} ${toArabicNumber(first.ayah)}`);
-    selectedAyahs.push({ surah: first.surah, ayah: first.ayah, surahName: row.name_arabic });
+    textParts.push(withAyahNumber(selectedWords.join(" "), first.ayah));
+    selectedAyahs.push({
+      surah: first.surah,
+      ayah: first.ayah,
+      surahNameArabic: row.name_arabic,
+      surahNameEnglish: row.name_english ?? "",
+    });
   }
 
   if (textParts.length === 0 || selectedAyahs.length === 0) return null;
@@ -298,11 +321,72 @@ export async function fetchSurahName(
   db: DatabaseExecutor,
   surah: number,
 ): Promise<string> {
-  const row = await db.getFirstAsync<{ name_arabic: string }>(
-    "SELECT name_arabic FROM surahs WHERE number = ?",
+  return (await fetchSurahNames(db, surah)).arabic;
+}
+
+export async function fetchSurahNames(
+  db: DatabaseExecutor,
+  surah: number,
+): Promise<{ arabic: string; english: string }> {
+  const row = await db.getFirstAsync<{ name_arabic: string; name_english: string | null }>(
+    "SELECT name_arabic, name_english FROM surahs WHERE number = ?",
     [surah]
   );
-  return row?.name_arabic ?? "";
+  return { arabic: row?.name_arabic ?? "", english: row?.name_english ?? "" };
+}
+
+/**
+ * Copy/share text for whole ayahs through the shared format: Unicode `text_uthmani` with each
+ * ayah's number, the reference in the UI language and the canonical link. Null when the text is
+ * missing, so a caller never announces an empty copy as a success.
+ */
+export async function buildAyahCopyText(
+  db: DatabaseExecutor,
+  surah: number,
+  ayahStart: number,
+  ayahEnd: number,
+  language: CopyLanguage,
+): Promise<string | null> {
+  const [rows, names] = await Promise.all([
+    db.getAllAsync<{ ayah: number; text_uthmani: string }>(
+      "SELECT ayah, text_uthmani FROM quran_text WHERE surah = ? AND ayah >= ? AND ayah <= ? ORDER BY ayah",
+      [surah, ayahStart, ayahEnd]
+    ),
+    fetchSurahNames(db, surah),
+  ]);
+  const text = rows
+    .map((row) => withAyahNumber(row.text_uthmani ?? "", row.ayah))
+    .filter(Boolean)
+    .join(" ");
+  if (!text) return null;
+  return formatQuranCopy({
+    text,
+    ranges: [{ surah, surahNameArabic: names.arabic, surahNameEnglish: names.english, ayahStart, ayahEnd }],
+    language,
+  });
+}
+
+/** Opening Unicode words of each ayah, keyed "surah:ayah", for bookmark rows. */
+export async function fetchAyahOpenings(
+  db: DatabaseExecutor,
+  refs: readonly { surah: number; ayah: number }[],
+  wordCount = 6,
+): Promise<Map<string, string>> {
+  const openings = new Map<string, string>();
+  const keys = Array.from(new Set(refs.map((ref) => ref.surah * 1000 + ref.ayah)));
+  for (let start = 0; start < keys.length; start += 400) {
+    const chunk = keys.slice(start, start + 400);
+    const rows = await db.getAllAsync<{ surah: number; ayah: number; text_uthmani: string }>(
+      `SELECT surah, ayah, text_uthmani FROM quran_text WHERE (surah * 1000 + ayah) IN (${chunk.map(() => "?").join(",")})`,
+      chunk
+    );
+    for (const row of rows) {
+      const words = selectableUthmaniWords(row.text_uthmani ?? "", row.surah, row.ayah);
+      const opening = words.slice(0, wordCount).join(" ");
+      openings.set(`${row.surah}:${row.ayah}`, words.length > wordCount ? `${opening} …` : opening);
+    }
+  }
+  return openings;
 }
 
 function selectableUthmaniWords(text: string, surah: number, ayah: number): string[] {
@@ -352,9 +436,9 @@ function selectionRefsToHighlightRanges(
 }
 
 function compactSelectedAyahs(
-  ayahs: { surah: number; ayah: number; surahName: string }[],
-): UthmaniSelectionRange[] {
-  const ranges: UthmaniSelectionRange[] = [];
+  ayahs: { surah: number; ayah: number; surahNameArabic: string; surahNameEnglish: string }[],
+): QuranCopyRange[] {
+  const ranges: QuranCopyRange[] = [];
   for (const item of ayahs) {
     const last = ranges[ranges.length - 1];
     if (last && last.surah === item.surah && last.ayahEnd + 1 === item.ayah) {
@@ -362,7 +446,8 @@ function compactSelectedAyahs(
     } else {
       ranges.push({
         surah: item.surah,
-        surahName: item.surahName,
+        surahNameArabic: item.surahNameArabic,
+        surahNameEnglish: item.surahNameEnglish,
         ayahStart: item.ayah,
         ayahEnd: item.ayah,
       });

@@ -17,6 +17,7 @@ import type { AchievementDashboardItem } from "@/lib/achievements/queries";
 import type { AchievementDefinition } from "@/lib/achievements/catalog";
 import { AchievementProgressBar } from "./AchievementProgressBar";
 import { textStartStyle } from "@/lib/ui/direction";
+import { accentIconColor } from "@/lib/ui/theme-icons";
 
 const ICONS: Record<AchievementDefinition["icon"], LucideIcon> = {
   book: BookOpen,
@@ -31,13 +32,14 @@ const ICONS: Record<AchievementDefinition["icon"], LucideIcon> = {
   trophy: Trophy,
 };
 
-const RARITY_COLOR: Record<AchievementDefinition["rarity"], string> = {
-  common: "#0d9488",
-  uncommon: "#2563eb",
-  rare: "#7c3aed",
-  epic: "#c2410c",
-  legendary: "#b45309",
-};
+// Every unlocked badge uses the one teal accent; rarity is named in a text chip instead of a color code.
+const RARITY_LABEL_KEY = {
+  common: "achievementRarity.common",
+  uncommon: "achievementRarity.uncommon",
+  rare: "achievementRarity.rare",
+  epic: "achievementRarity.epic",
+  legendary: "achievementRarity.legendary",
+} as const satisfies Record<AchievementDefinition["rarity"], string>;
 
 type Props = {
   item: AchievementDashboardItem;
@@ -45,11 +47,12 @@ type Props = {
 };
 
 export function AchievementBadge({ item, compact = false }: Props) {
-  const { isDark, isRTL, themeColors } = useSettings();
+  const { isDark, isRTL, themeColors, effectiveTheme } = useSettings();
   const s = useStrings();
   const Icon = ICONS[item.icon];
   const unlocked = !!item.unlockedAt;
-  const color = RARITY_COLOR[item.rarity];
+  const color = accentIconColor(effectiveTheme);
+  const rarity = s[RARITY_LABEL_KEY[item.rarity]];
   const juzNumber = getJuzNumber(item.id);
   const title = interpolate(stringByKey(s, item.titleKey, item.id), { n: String(juzNumber ?? item.target) });
   const description = interpolate(stringByKey(s, item.descriptionKey), { n: String(juzNumber ?? item.target) });
@@ -88,11 +91,18 @@ export function AchievementBadge({ item, compact = false }: Props) {
           >
             {title}
           </Text>
+          <View
+            className="mt-1 rounded-full bg-surface-high px-2 py-0.5 dark:bg-surface-dark-high"
+            style={{ alignSelf: isRTL ? "flex-end" : "flex-start" }}
+          >
+            <Text className="text-warm-700 dark:text-neutral-300" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}>
+              {rarity}
+            </Text>
+          </View>
           {!compact && (
             <Text
               className="mt-1 text-warm-700 dark:text-neutral-400"
               style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, ...textStartStyle(isRTL)}}
-              numberOfLines={2}
             >
               {description}
             </Text>

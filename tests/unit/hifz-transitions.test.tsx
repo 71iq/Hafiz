@@ -70,7 +70,12 @@ jest.mock("@/lib/selection/context", () => ({
   useSelection: () => mockSelection,
 }));
 jest.mock("@/lib/ui/chrome", () => ({ useChrome: () => mockChrome, useChromeActions: () => mockChrome }));
-jest.mock("@/lib/deep-link", () => ({ consumePendingDeepLink: () => null, peekPendingDeepLink: () => null }));
+jest.mock("@/lib/deep-link", () => ({
+  consumePendingDeepLink: () => null,
+  peekPendingDeepLink: () => null,
+  subscribePendingDeepLink: () => () => undefined,
+}));
+jest.mock("@/lib/auth/store", () => ({ useAuthStore: (select: (state: { user: null }) => unknown) => select({ user: null }) }));
 jest.mock("@/lib/quran-foundation/config", () => ({ isQfContentEnabled: () => false, isRecitationEnabled: () => false }));
 jest.mock("@/lib/audio/ayah-audio", () => ({
   useAyahAudio: () => ({
@@ -119,7 +124,7 @@ jest.mock("@/components/mushaf/FocusModeControls", () => ({ FocusModeControls: (
 jest.mock("@/components/mushaf/WordDetailSheet", () => ({ WordDetailSheet: () => null }));
 jest.mock("@/components/mushaf/RecitationRangeSheet", () => ({ RecitationRangeSheet: () => null }));
 jest.mock("@/components/mushaf/ReadingSettingsSheet", () => ({ ReadingSettingsSheet: () => null }));
-jest.mock("@/components/mushaf/PageViewNavigationSheet", () => ({ PageViewNavigationSheet: () => null }));
+jest.mock("@/components/mushaf/PageViewNavigationSheet", () => ({ PageLayoutMenu: () => null, pageLayoutMenuItems: () => [] }));
 jest.mock("@/components/mushaf/WordTooltip", () => ({ FloatingWordTooltip: () => null }));
 jest.mock("@/components/mushaf/SelectionActionBar", () => ({ SelectionActionBar: () => null }));
 jest.mock("@/components/mushaf/WebSelectionMenu", () => ({ WebSelectionMenu: () => null }));
@@ -199,8 +204,16 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
   async function open(enable = true) {
     const view = render(<MushafScreen />, { wrapper: Wrapper });
     await act(async () => {});
-    if (enable) fireEvent.press(view.getByLabelText(s.hifzMode));
+    if (enable) fireEvent.press(hideToggle(view));
     return view;
+  }
+  // The shared eye toolbar button: verse view names what it does next, page view is the reveal mode.
+  function hideToggle(view: ReturnType<typeof render>) {
+    return (
+      view.queryByLabelText(s.readerHideAyahText) ??
+      view.queryByLabelText(s.readerShowAyahText) ??
+      view.getByLabelText(s.revealPageMode)
+    );
   }
   function press(view: ReturnType<typeof render>, label: string) {
     fireEvent.press(view.getByRole("button", { name: label }));
@@ -214,7 +227,7 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
   it("starts disabled and enables with a blank page", async () => {
     const view = await open(false);
     expect(page().hifzVisibility).toBeNull();
-    fireEvent.press(view.getByLabelText(s.hifzMode));
+    fireEvent.press(hideToggle(view));
     expect(progress()).toEqual(hidden);
     expect(view.getByRole("button", { name: s.hifzHidePreviousAyah })).toBeDisabled();
     expect(view.getByRole("button", { name: s.hifzRevealNextAyah })).toBeEnabled();
@@ -229,12 +242,11 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     press(view, s.hifzRevealNextAyah);
     expect(progress().revealedAyahCount).toBe(2);
   });
-  it("auto reveals one word then manual next completes that ayah and pauses", async () => {
+  it("Play reveals the first word at once, then manual next completes that ayah and pauses", async () => {
     const view = await open();
     press(view, s.hifzContinueAutoReveal);
+    expect(progress()).toEqual({ ...hidden, activeAyahKey: "1:1", activeVisibleWordCount: 1 });
     await tick(999);
-    expect(progress()).toEqual(hidden);
-    await tick(1);
     expect(progress()).toEqual({ ...hidden, activeAyahKey: "1:1", activeVisibleWordCount: 1 });
     press(view, s.hifzRevealNextAyah);
     expect(progress()).toEqual({ ...hidden, revealedAyahCount: 1 });
@@ -246,7 +258,6 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     const view = await open();
     press(view, s.hifzRevealNextAyah);
     press(view, s.hifzContinueAutoReveal);
-    await tick();
     expect(progress()).toEqual({ ...hidden, revealedAyahCount: 1, activeAyahKey: "1:2", activeVisibleWordCount: 1 });
     press(view, s.hifzHidePreviousAyah);
     expect(progress()).toEqual({ ...hidden, revealedAyahCount: 1 });
@@ -258,13 +269,12 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     mockWordCounts = [0, 2];
     const view = await open();
     press(view, s.hifzContinueAutoReveal);
-    await tick();
     expect(progress()).toEqual({ ...hidden, revealedAyahCount: 1 });
     await tick();
     expect(progress()).toEqual({ ...hidden, revealedAyahCount: 1, activeAyahKey: "1:2", activeVisibleWordCount: 1 });
     await tick();
     expect(progress()).toEqual({ ...hidden, revealedAyahCount: 2 });
-    expect(view.getByRole("button", { name: s.hifzContinueAutoReveal })).toBeOnTheScreen();
+    expect(view.getByText(s.revealPageDone)).toBeOnTheScreen();
   });
   it("empty pages keep auto running without progress or navigation", async () => {
     mockWordCounts = [];
@@ -279,18 +289,29 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     mockWordCounts = [1];
     const view = await open();
     press(view, s.hifzContinueAutoReveal);
-    await tick();
     expect(progress()).toEqual({ ...hidden, revealedAyahCount: 1 });
-    expect(view.getByRole("button", { name: s.hifzContinueAutoReveal })).toBeOnTheScreen();
+    // Page end: Play gives way to Page revealed, Repeat and Next page.
+    expect(view.queryByRole("button", { name: s.hifzContinueAutoReveal })).toBeNull();
+    expect(view.getByText(s.revealPageDone)).toBeOnTheScreen();
+    expect(view.getByRole("button", { name: s.revealNextPage })).toBeOnTheScreen();
     await tick(3000);
     expect(mockGoToPage).not.toHaveBeenCalled();
+
+    press(view, s.revealRepeatPage);
+    expect(progress()).toEqual(hidden);
+    expect(view.getByRole("button", { name: s.hifzContinueAutoReveal })).toBeOnTheScreen();
+
+    press(view, s.hifzRevealNextAyah);
+    press(view, s.revealNextPage);
+    await act(async () => {});
+    expect(mockGoToPage).toHaveBeenCalledWith(2);
+    expect(progress()).toEqual(hidden);
   });
   it("automatic page advance preserves the final revealed tick then resets on the next tick", async () => {
     mockSettings.hifzAutoAdvancePage = true;
     mockWordCounts = [1];
     const view = await open();
     press(view, s.hifzContinueAutoReveal);
-    await tick();
     expect(page().currentPage).toBe(1);
     expect(progress().revealedAyahCount).toBe(1);
     expect(mockGoToPage).not.toHaveBeenCalled();
@@ -310,10 +331,10 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
       page().onPageChange(604);
     });
     press(view, s.hifzContinueAutoReveal);
-    await tick();
     expect(progress().revealedAyahCount).toBe(1);
     expect(page().currentPage).toBe(604);
-    expect(view.getByRole("button", { name: s.hifzContinueAutoReveal })).toBeOnTheScreen();
+    expect(view.getByRole("button", { name: s.revealRepeatPage })).toBeOnTheScreen();
+    expect(view.queryByRole("button", { name: s.revealNextPage })).toBeNull();
     await tick(3000);
     expect(mockGoToPage).not.toHaveBeenCalled();
   });
@@ -332,24 +353,34 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
   it("pause and resume retain partial progress", async () => {
     const view = await open();
     press(view, s.hifzContinueAutoReveal);
-    await tick();
     press(view, s.hifzPauseAutoReveal);
     await tick(2000);
     expect(progress().activeVisibleWordCount).toBe(1);
     press(view, s.hifzContinueAutoReveal);
-    await tick();
     expect(progress().activeVisibleWordCount).toBe(2);
   });
   it("disabling Hifz clears progress and timers before re-enabling", async () => {
     const view = await open();
     press(view, s.hifzContinueAutoReveal);
     await tick();
-    fireEvent.press(view.getByLabelText(s.hifzMode));
+    fireEvent.press(hideToggle(view));
     expect(page().hifzVisibility).toBeNull();
     await tick(2000);
-    fireEvent.press(view.getByLabelText(s.hifzMode));
+    fireEvent.press(hideToggle(view));
     expect(progress()).toEqual(hidden);
     expect(view.getByRole("button", { name: s.hifzContinueAutoReveal })).toBeOnTheScreen();
+  });
+  it("next word steps one word by hand without completing or advancing the page", async () => {
+    mockSettings.hifzAutoAdvancePage = true;
+    mockWordCounts = [2];
+    const view = await open();
+    press(view, s.revealNextWord);
+    expect(progress()).toEqual({ ...hidden, activeAyahKey: "1:1", activeVisibleWordCount: 1 });
+    press(view, s.revealNextWord);
+    expect(progress()).toEqual({ ...hidden, revealedAyahCount: 1 });
+    await tick(3000);
+    expect(mockGoToPage).not.toHaveBeenCalled();
+    expect(view.getByText(s.revealPageDone)).toBeOnTheScreen();
   });
   it("unmount clears pending timers", async () => {
     const view = await open();

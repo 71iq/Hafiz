@@ -141,7 +141,11 @@ describe.each(["en", "ar"] as const)("OAuth button ownership on a %s phone", (lo
     });
     await act(async () => flow.reject(new Error("current OAuth failure")));
 
-    expect(view.onError).toHaveBeenCalledWith("current OAuth failure");
+    // The raw provider message stays out; the localized failure names the provider.
+    const failure = view.screenStrings.authProviderFailed.replace("{{provider}}", "Quran Foundation");
+    expect(view.onError).toHaveBeenCalledWith(failure);
+    expect(view.getByText(failure)).toBeTruthy();
+    expect(view.queryByText("current OAuth failure")).toBeNull();
     expect(googleDisabled(view)).toBe(false);
   });
 

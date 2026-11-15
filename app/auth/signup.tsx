@@ -1,16 +1,17 @@
-import { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
-import { Redirect, useRouter } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Pressable, TextInput, View } from "react-native";
+import { Redirect, useFocusEffect, useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Lock, Mail, User, UserRound } from "lucide-react-native";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
+import { carryAuthEmail, readCarriedAuthEmail } from "@/lib/auth/form-handoff";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
-import { useAppLanguage } from "@/lib/i18n/useStrings";
+import { interpolate, useAppLanguage } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
 import {
@@ -18,11 +19,15 @@ import {
   AuthRouteLink,
   AuthScreenShell,
   AuthUnavailableState,
+  useAuthIconColors,
+  useRevealOnFocus,
 } from "@/components/auth/AuthScreenShell";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { PendingLabel, formatSeconds, useAuthFormError } from "@/components/auth/auth-messages";
+import { EMAIL_RESEND_COOLDOWN_SECONDS, useCooldown } from "@/components/auth/use-cooldown";
+import { useAuthReturn } from "@/components/auth/use-auth-return";
 import { useEmailSubmission } from "@/components/auth/use-email-submission";
 import type { Direction } from "@/lib/ui/direction";
-import { errorMessage } from "@/lib/error-message";
 
 type SignupForm = {
   email: string;
@@ -46,6 +51,7 @@ function createSignupSchema(s: UIStrings) {
 }
 
 export default function SignupScreen() {
+  // The limited-service notice on Login explains that sign up is unavailable.
   if (!isEmailAuthFlowsEnabled()) return <Redirect href="/auth/login" />;
   return <SignupFormScreen />;
 }
@@ -56,12 +62,17 @@ function SignupFormScreen() {
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";
   const s = strings[locale];
   const schema = useMemo(() => createSignupSchema(s), [s]);
-  const { signUp, resendSignupConfirmation, isLoading, error } = useAuthStore();
+  const { signUp, resendSignupConfirmation, isLoading } = useAuthStore();
   const { acquire } = useEmailSubmission();
-  const [showError, setShowError] = useState<string | null>(null);
+  const { complete, back, continueOffline } = useAuthReturn();
+  const formError = useAuthFormError(s, locale, "requests");
+  const resendCooldown = useCooldown();
   const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const configured = isSupabaseConfigured();
+  const colors = useAuthIconColors();
+  const reveal = useRevealOnFocus();
 
   const usernameRef = useRef<TextInput>(null);
   const displayNameRef = useRef<TextInput>(null);
@@ -70,57 +81,75 @@ function SignupFormScreen() {
   const {
     control,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm<SignupForm>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "", username: "", displayName: "" },
+    defaultValues: { email: readCarriedAuthEmail(), password: "", username: "", displayName: "" },
   });
 
+  useFocusEffect(useCallback(() => () => setPasswordVisible(false), []));
+
   const onSubmit = async (data: SignupForm) => {
+    setPasswordVisible(false);
+    if (formError.blocked) return;
     const lease = acquire();
     if (!lease) return;
     let flow: ReturnType<typeof signUp> | null = null;
     try {
-      setShowError(null);
-      if (!configured) {
-        if (lease.isCurrent()) setShowError(s.authUnavailableSubtitle);
-        return;
-      }
+      formError.clear();
+      setResendState("idle");
+      if (!configured) return;
       flow = signUp(data.email, data.password, data.username, data.displayName || "");
       const result = await flow.result;
       if (!lease.isCurrent() || !flow.isCurrent() || result.status !== "completed" || !result.owner.isCurrent()) return;
-      if (result.value.status === "alreadyRegistered") {
-        setShowError(s.authSignupAlreadyRegistered);
-        return;
-      }
-      if (result.value.status === "needsEmailConfirmation") {
+      if (result.value.status === "alreadyRegistered" || result.value.status === "needsEmailConfirmation") {
+        // The same neutral result either way, so the form does not reveal who has an account.
         setPendingConfirmationEmail(data.email);
-        setShowError(s.authSignupConfirmEmail);
         return;
       }
-      router.back();
+      // A session exists: replace auth with the captured context or Home. No profile setup step.
+      complete();
     } catch (err: unknown) {
       if (!lease.isCurrent() || (flow && !flow.isCurrent())) return;
-      setShowError(err instanceof Error ? err.message : String(err));
+      formError.report(err);
     } finally {
       lease.release();
     }
   };
+  const submit = handleSubmit(onSubmit, () => setPasswordVisible(false));
 
   const handleResendConfirmation = async () => {
-    if (!pendingConfirmationEmail) return;
+    if (!pendingConfirmationEmail || resendCooldown.active || resendState === "sending") return;
+    setResendState("sending");
     try {
-      setShowError(null);
       await resendSignupConfirmation(pendingConfirmationEmail);
-      setShowError(s.authConfirmationResent);
+      setResendState("sent");
+      resendCooldown.start(EMAIL_RESEND_COOLDOWN_SECONDS);
     } catch (err) {
-      setShowError(errorMessage(err) ?? null);
+      setResendState("idle");
+      formError.report(err);
     }
   };
 
   const form = configured ? (
     <View className="w-full">
-      <AuthFormNotice message={showError || error} dir={dir} />
+      <AuthFormNotice message={formError.message} dir={dir} />
+      {pendingConfirmationEmail ? (
+        <AuthFormNotice
+          message={resendState === "sent" ? s.authConfirmationResent : s.authSignupConfirmEmail}
+          tone="success"
+          dir={dir}
+          action={{
+            label: resendCooldown.active
+              ? interpolate(s.authResendIn, { seconds: formatSeconds(resendCooldown.remaining, locale) })
+              : s.authResendConfirmation,
+            onPress: handleResendConfirmation,
+            disabled: resendCooldown.active,
+            busy: resendState === "sending",
+          }}
+        />
+      ) : null}
 
       <FormTextField
         control={control}
@@ -129,14 +158,18 @@ function SignupFormScreen() {
         error={errors.email?.message}
         dir={dir}
         inputProps={{
-          placeholder: s.authEmail,
+          placeholder: s.authEmailPlaceholder,
           keyboardType: "email-address",
           autoCapitalize: "none",
           autoCorrect: false,
+          autoComplete: "email",
+          textContentType: "emailAddress",
+          importantForAutofill: "yes",
           returnKeyType: "next",
           onSubmitEditing: () => usernameRef.current?.focus(),
+          onFocus: reveal,
           blurOnSubmit: false,
-          startIcon: <Mail size={18} color="#8B8178" />,
+          startIcon: <Mail size={18} color={colors.muted} />,
         }}
       />
 
@@ -147,16 +180,20 @@ function SignupFormScreen() {
         name="username"
         label={s.authUsername}
         error={errors.username?.message}
+        hint={s.authUsernameHint}
         dir={dir}
         inputRef={usernameRef}
         inputProps={{
-          placeholder: s.authUsername,
           autoCapitalize: "none",
           autoCorrect: false,
+          autoComplete: "username-new",
+          textContentType: "username",
+          importantForAutofill: "yes",
           returnKeyType: "next",
           onSubmitEditing: () => displayNameRef.current?.focus(),
+          onFocus: reveal,
           blurOnSubmit: false,
-          startIcon: <UserRound size={18} color="#8B8178" />,
+          startIcon: <UserRound size={18} color={colors.muted} />,
         }}
       />
 
@@ -165,16 +202,19 @@ function SignupFormScreen() {
       <FormTextField
         control={control}
         name="displayName"
-        label={s.authDisplayName}
+        label={s.authDisplayNameOptional}
         error={errors.displayName?.message}
+        hint={s.authDisplayNameHelp}
         dir={dir}
         inputRef={displayNameRef}
         inputProps={{
-          placeholder: s.authDisplayName,
+          autoComplete: "name",
+          textContentType: "nickname",
           returnKeyType: "next",
           onSubmitEditing: () => passwordRef.current?.focus(),
+          onFocus: reveal,
           blurOnSubmit: false,
-          startIcon: <User size={18} color="#8B8178" />,
+          startIcon: <User size={18} color={colors.muted} />,
         }}
       />
 
@@ -185,22 +225,29 @@ function SignupFormScreen() {
         name="password"
         label={s.authPassword}
         error={errors.password?.message}
+        hint={s.authPasswordMinHint}
         dir={dir}
         inputRef={passwordRef}
         inputProps={{
-          placeholder: s.authPassword,
           secureTextEntry: !passwordVisible,
+          autoCapitalize: "none",
+          autoCorrect: false,
+          autoComplete: "new-password",
+          textContentType: "newPassword",
+          passwordRules: "minlength: 6;",
+          importantForAutofill: "yes",
           returnKeyType: "done",
-          onSubmitEditing: handleSubmit(onSubmit),
-          startIcon: <Lock size={18} color="#8B8178" />,
+          onSubmitEditing: submit,
+          onFocus: reveal,
+          startIcon: <Lock size={18} color={colors.muted} />,
           endIcon: (
             <Pressable
               onPress={() => setPasswordVisible((current) => !current)}
               accessibilityRole="button"
               accessibilityLabel={passwordVisible ? s.authHidePassword : s.authShowPassword}
-              hitSlop={8}
+              hitSlop={12}
             >
-              {passwordVisible ? <EyeOff size={18} color="#8B8178" /> : <Eye size={18} color="#8B8178" />}
+              {passwordVisible ? <EyeOff size={20} color={colors.muted} /> : <Eye size={20} color={colors.muted} />}
             </Pressable>
           ),
         }}
@@ -208,66 +255,38 @@ function SignupFormScreen() {
 
       <View className="h-6" />
 
-      <Button
-        onPress={handleSubmit(onSubmit, (formErrors) => {
-          const firstError =
-            formErrors.email?.message ||
-            formErrors.username?.message ||
-            formErrors.displayName?.message ||
-            formErrors.password?.message;
-          setShowError(firstError || s.authSignupValidationError);
-        })}
-        disabled={isLoading}
-        size="lg"
-        dir={dir}
-      >
-        {isLoading ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
-        ) : (
-          <Text
-            className="text-center text-white"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, writingDirection: dir }}
-          >
-            {s.authSignup}
-          </Text>
-        )}
-      </Button>
-
-      {pendingConfirmationEmail ? (
-        <Button
-          variant="outline"
-          onPress={handleResendConfirmation}
-          disabled={isLoading}
-          className="mt-3 border border-surface-high"
+      <Button onPress={submit} disabled={isLoading || formError.blocked} size="lg" dir={dir}>
+        <PendingLabel
+          pending={isLoading && resendState !== "sending"}
+          label={s.authSignup}
+          pendingLabel={s.authCreatingAccount}
           dir={dir}
-        >
-          <Text
-            className="text-center text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, writingDirection: dir }}
-          >
-            {s.authResendConfirmation}
-          </Text>
-        </Button>
-      ) : null}
+        />
+      </Button>
     </View>
   ) : null;
 
   const unavailableContent = !configured ? (
-    <AuthUnavailableState title={s.authUnavailableTitle} subtitle={s.authUnavailableSubtitle} dir={dir} />
+    <AuthUnavailableState
+      title={s.authUnavailableTitle}
+      subtitle={s.authUnavailableSubtitle}
+      dir={dir}
+      continueLabel={s.authContinueOffline}
+      onContinue={continueOffline}
+    />
   ) : undefined;
 
   const footer = configured ? (
     <>
-      <OAuthButtons
-        strings={s}
-        onError={(msg) => setShowError(msg)}
-        onSignedIn={() => router.replace("/(tabs)/home")}
-      />
+      <OAuthButtons strings={s} onSignedIn={complete} />
       <AuthRouteLink
         prompt={s.authHasAccount}
         action={s.authLogin}
         dir={dir}
-        onPress={() => router.replace("/auth/login")}
+        onPress={() => {
+          carryAuthEmail(getValues("email") ?? "");
+          router.replace("/auth/login");
+        }}
       />
     </>
   ) : null;
@@ -279,9 +298,9 @@ function SignupFormScreen() {
       subtitle={s.authSignupSubtitle}
       appName={s.appName}
       brandHeadline={s.authBrandHeadline}
-      brandBody={s.authBrandBody}
       backLabel={s.authBack}
-      onBack={() => router.back()}
+      languageLabel={s.authLanguage}
+      onBack={back}
       footer={footer}
       unavailableContent={unavailableContent}
     >

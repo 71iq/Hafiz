@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { View, Text, Pressable, TextInput, Platform, useWindowDimensions } from "react-native";
-import { X, Search } from "lucide-react-native";
+import { X, Search, CornerDownLeft } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
-import { toArabicNumber } from "@/lib/arabic";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
+import { parseReference } from "@/lib/search/reference";
 import { useSettings } from "@/lib/settings/context";
 import { ResponsiveOverlay, OverlayHeader, OverlayBody } from "@/components/ui/ResponsiveOverlay";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -25,23 +26,24 @@ type JuzInfo = {
   page: number;
 };
 
-type TabKey = "surah" | "juz";
+export type GoToTab = "surah" | "juz";
+
+/** Where Go to sends the reader: an ayah (surah and juz rows, typed references) or a page. */
+export type GoToTarget = { kind: "ayah"; surah: number; ayah: number } | { kind: "page"; page: number };
 
 type Props = {
   visible: boolean;
   onClose: () => void;
-  onGoToPage: (page: number) => void;
-  mode: "verse" | "page";
-  currentPage?: number;
-  onGoToSurahVerse?: (surahNumber: number) => void;
+  /** Called once per choice; the reader closes this sheet before it moves. */
+  onSelectTarget: (target: GoToTarget) => void;
+  initialTab?: GoToTab;
 };
 
 export function GoToNavigator({
   visible,
   onClose,
-  onGoToPage,
-  mode,
-  onGoToSurahVerse,
+  onSelectTarget,
+  initialTab = "surah",
 }: Props) {
   const db = useDatabase();
   const s = useStrings();
@@ -51,28 +53,29 @@ export function GoToNavigator({
   const overlayMaxHeight = isPhone ? "88%" : Math.min(Math.floor(height * 0.88), 820);
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [juzList, setJuzList] = useState<JuzInfo[]>([]);
-  const [surahPageMap, setSurahPageMap] = useState<Map<number, number>>(new Map());
   const [searchText, setSearchText] = useState("");
-  const [tab, setTab] = useState<TabKey>("surah");
+  const [tab, setTab] = useState<GoToTab>(initialTab);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const isArabicUI = isRTL;
+  const digits = (value: number) => (isArabicUI ? toArabicNumber(value) : String(value));
 
   useEffect(() => {
     if (!visible) return;
     setSearchText("");
-    setTab("surah");
+    setTab(initialTab);
+  }, [initialTab, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
     setLoadError(null);
+    let cancelled = false;
 
     async function load() {
       try {
-        const [surahRows, surahPages, juzRows] = await Promise.all([
+        const [surahRows, juzRows] = await Promise.all([
           db.getAllAsync<SurahRow>(
             "SELECT number, name_arabic, name_english FROM surahs ORDER BY number"
-          ),
-          db.getAllAsync<{ page: number; surah: number }>(
-            `SELECT surah, MIN(v2_page) as page
-             FROM quran_text
-             GROUP BY surah
-             ORDER BY surah`
           ),
           db.getAllAsync<{
             juz: number;
@@ -101,10 +104,8 @@ export function GoToNavigator({
           ),
         ]);
 
+        if (cancelled) return;
         setSurahs(surahRows);
-        const map = new Map<number, number>();
-        for (const r of surahPages) map.set(r.surah, r.page);
-        setSurahPageMap(map);
         setJuzList(
           juzRows.map((r) => ({
             juz: r.juz,
@@ -117,43 +118,52 @@ export function GoToNavigator({
         );
       } catch (err) {
         console.error("[GoToNavigator] Failed to load data:", err);
-        setLoadError(s.goToLoadFailed);
+        if (!cancelled) setLoadError(s.goToLoadFailed);
       }
     }
     load();
-  }, [db, visible, s.goToLoadFailed]);
+    return () => {
+      cancelled = true;
+    };
+  }, [db, visible, s.goToLoadFailed, loadAttempt]);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchText(text);
   }, []);
 
-  const handleTabChange = useCallback((newTab: TabKey) => {
+  const handleTabChange = useCallback((newTab: GoToTab) => {
     setTab(newTab);
     setSearchText("");
   }, []);
 
   const handleSelectSurah = (surahNumber: number) => {
-    if (mode === "verse" && onGoToSurahVerse) {
-      onGoToSurahVerse(surahNumber);
-      onClose();
-      return;
-    }
-    const page = surahPageMap.get(surahNumber);
-    if (page) {
-      onGoToPage(page);
-      onClose();
-    }
+    onSelectTarget({ kind: "ayah", surah: surahNumber, ayah: 1 });
   };
 
   const handleSelectJuz = (juz: JuzInfo) => {
-    if (mode === "verse" && onGoToSurahVerse) {
-      onGoToSurahVerse(juz.startSurah);
-      onClose();
-      return;
-    }
-    onGoToPage(juz.page);
-    onClose();
+    onSelectTarget({ kind: "ayah", surah: juz.startSurah, ayah: juz.startAyah });
   };
+
+  // C06: the shared strict parser turns "2:255" / "٢:٢٥٥" or "p 300" / "ص ٣٠٠" into a top row.
+  // Invalid references (2:999, page 700) offer nothing rather than a nearby ayah or page.
+  const reference = useMemo(() => {
+    const parsed = parseReference(searchText, { context: "goto" });
+    if (parsed.kind === "ayah") {
+      return {
+        target: { kind: "ayah", surah: parsed.surah, ayah: parsed.ayah } as GoToTarget,
+        label: interpolate(s.goToAyahRow, { ref: formatAyahRef(isArabicUI, parsed.surah, parsed.ayah) }),
+      };
+    }
+    if (parsed.kind === "page") {
+      return {
+        target: { kind: "page", page: parsed.page } as GoToTarget,
+        label: interpolate(s.goToPageRow, { page: digits(parsed.page) }),
+      };
+    }
+    return null;
+    // digits depends only on the UI locale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isArabicUI, s.goToAyahRow, s.goToPageRow, searchText]);
 
   const filteredSurahs = searchText ? surahs.filter((surah) => matchesSurahQuery(surah, searchText)) : surahs;
 
@@ -172,26 +182,55 @@ export function GoToNavigator({
 
   const searchPlaceholder = tab === "surah" ? s.searchByName : s.searchByJuz;
   const tabItems = [
-    { value: "surah" as TabKey, label: s.tabSurah },
-    { value: "juz" as TabKey, label: s.tabJuz },
+    { value: "surah" as GoToTab, label: s.tabSurah },
+    { value: "juz" as GoToTab, label: s.tabJuz },
   ];
+
+  const renderReferenceRow = () =>
+    reference ? (
+      <Pressable
+        onPress={() => onSelectTarget(reference.target)}
+        accessibilityRole="button"
+        accessibilityLabel={reference.label}
+        className={`mb-2 min-h-[44px] items-center gap-3 rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/10 px-4 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+      >
+        <CornerDownLeft size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
+        <Text
+          className="flex-1 text-primary-accent dark:text-primary-bright"
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+        >
+          {reference.label}
+        </Text>
+      </Pressable>
+    ) : null;
 
   const renderSurahList = () => (
     <>
-      {filteredSurahs.length === 0 && (
-        <Text
-          className="text-warm-400 dark:text-neutral-500 text-center py-8"
-          style={{ fontFamily: "Manrope_400Regular" }}
-        >
-          {s.noSurahsFound}
-        </Text>
+      {renderReferenceRow()}
+      {filteredSurahs.length === 0 && !reference && (
+        <View className="items-center gap-1 py-8">
+          <Text
+            className="text-warm-500 dark:text-neutral-400 text-center"
+            style={{ fontFamily: "Manrope_500Medium" }}
+          >
+            {s.noSurahsFound}
+          </Text>
+          <Text
+            className="text-warm-500 dark:text-neutral-400 text-center"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 13, writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.goToNoSurahsHint}
+          </Text>
+        </View>
       )}
       <View className="gap-1.5">
         {filteredSurahs.map((surah) => (
           <Pressable
             key={surah.number}
             onPress={() => handleSelectSurah(surah.number)}
-            className={`items-center gap-3.5 py-3 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${digits(surah.number)} ${isArabicUI ? surah.name_arabic : surah.name_english}`}
+            className={`min-h-[44px] items-center gap-3.5 py-3 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
             style={({ pressed }) => ({
               backgroundColor: pressed
                 ? isDark
@@ -205,35 +244,26 @@ export function GoToNavigator({
                 className="text-primary-accent dark:text-primary-bright"
                 style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
               >
-                {surah.number}
+                {digits(surah.number)}
               </Text>
             </View>
             <View className="flex-1">
+              {/* Sized by its own text with an explicit family: Android cut the last letter of
+                  content-sized Arabic names measured with the default family ("الكه" for "الكهف"). */}
               <Text
                 className="text-charcoal dark:text-neutral-100"
                 style={{
                   fontFamily: "Manrope_500Medium",
-                  fontSize: 15,
+                  fontSize: isArabicUI ? 18 : 15,
+                  lineHeight: isArabicUI ? 32 : 22,
+                  paddingHorizontal: isArabicUI ? 4 : 0,
                   ...textStartStyle(isRTL),
+                  writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
-                {surah.name_english}
+                {isArabicUI ? surah.name_arabic : surah.name_english}
               </Text>
             </View>
-            {/* Sized by its own text with an explicit family: Android cut the last letter of
-                content-sized Arabic names measured with the default family ("الكه" for "الكهف"). */}
-            <Text
-              className="text-charcoal dark:text-neutral-300"
-              style={{
-                flexShrink: 0,
-                fontFamily: "Manrope_500Medium",
-                fontSize: 20,
-                lineHeight: 38,
-                paddingHorizontal: 10,
-              }}
-            >
-              {surah.name_arabic}
-            </Text>
           </Pressable>
         ))}
       </View>
@@ -242,7 +272,8 @@ export function GoToNavigator({
 
   const renderJuzList = () => (
     <>
-      {filteredJuz.length === 0 && (
+      {renderReferenceRow()}
+      {filteredJuz.length === 0 && !reference && (
         <Text
           className="text-warm-400 dark:text-neutral-500 text-center py-8"
           style={{ fontFamily: "Manrope_400Regular" }}
@@ -255,7 +286,9 @@ export function GoToNavigator({
           <Pressable
             key={juz.juz}
             onPress={() => handleSelectJuz(juz)}
-            className={`items-center gap-3.5 py-3 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${s.tabJuz} ${digits(juz.juz)}`}
+            className={`min-h-[44px] items-center gap-3.5 py-3 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
             style={({ pressed }) => ({
               backgroundColor: pressed
                 ? isDark
@@ -269,7 +302,7 @@ export function GoToNavigator({
                 className="text-primary-accent dark:text-primary-bright"
                 style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
               >
-                {toArabicNumber(juz.juz)}
+                {digits(juz.juz)}
               </Text>
             </View>
             <View className="flex-1">
@@ -281,7 +314,7 @@ export function GoToNavigator({
                   ...textStartStyle(isRTL),
                 }}
               >
-                {isRTL ? `${s.tabJuz} ${toArabicNumber(juz.juz)}` : `Juz ${juz.juz}`}
+                {`${s.tabJuz} ${digits(juz.juz)}`}
               </Text>
               <Text
                 className="text-warm-400 dark:text-neutral-500 mt-0.5"
@@ -291,22 +324,9 @@ export function GoToNavigator({
                   ...textStartStyle(isRTL),
                 }}
               >
-                {juz.surahNameEnglish} {juz.startSurah}:{juz.startAyah}
+                {isArabicUI ? juz.surahNameArabic : juz.surahNameEnglish} {formatAyahRef(isArabicUI, juz.startSurah, juz.startAyah)}
               </Text>
             </View>
-            <Text
-              className="text-charcoal dark:text-neutral-300"
-              style={{
-                fontSize: 20,
-                lineHeight: 38,
-                writingDirection: "rtl",
-                paddingHorizontal: 10,
-                textAlign: "right",
-                overflow: "visible",
-              }}
-            >
-              {juz.surahNameArabic}
-            </Text>
           </Pressable>
         ))}
       </View>
@@ -344,13 +364,21 @@ export function GoToNavigator({
             placeholderTextColor={isDark ? "#525252" : "#b9a085"}
             value={searchText}
             onChangeText={handleSearchChange}
-            returnKeyType="done"
-            keyboardType={tab === "surah" ? "default" : "number-pad"}
+            returnKeyType="go"
+            onSubmitEditing={() => {
+              if (reference) onSelectTarget(reference.target);
+            }}
+            accessibilityLabel={searchPlaceholder}
             autoCorrect={false}
           />
           {searchText.length > 0 && (
-            <Pressable onPress={() => handleSearchChange("")}>
-              <X size={14} color={isDark ? "#525252" : "#DFD9D1"} />
+            <Pressable
+              onPress={() => handleSearchChange("")}
+              accessibilityRole="button"
+              accessibilityLabel={s.readerClearSearch}
+              className="h-11 w-11 items-center justify-center"
+            >
+              <X size={14} color={isDark ? "#a3a3a3" : "#8B7563"} />
             </Pressable>
           )}
         </View>
@@ -362,7 +390,9 @@ export function GoToNavigator({
               <Pressable
                 key={item.value}
                 onPress={() => handleTabChange(item.value)}
-                className={`flex-1 py-2.5 rounded-full items-center ${
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                className={`flex-1 min-h-[44px] justify-center py-2.5 rounded-full items-center ${
                   active ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
                 }`}
                 style={({ pressed }) => ({
@@ -390,17 +420,27 @@ export function GoToNavigator({
       >
         <View className="bg-surface dark:bg-surface-dark">
           {loadError ? (
-            <Text
-              className="py-8 text-center text-red-600 dark:text-red-400"
-              style={{
-                fontFamily: "Manrope_500Medium",
-                fontSize: 13,
-                ...textStartStyle(isRTL),
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {loadError}
-            </Text>
+            <View className="items-center gap-3 py-8">
+              <Text
+                className="text-center text-red-600 dark:text-red-400"
+                style={{
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 13,
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {loadError}
+              </Text>
+              <Pressable
+                onPress={() => setLoadAttempt((attempt) => attempt + 1)}
+                accessibilityRole="button"
+                className="min-h-[44px] justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-5"
+              >
+                <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+                  {s.errorTryAgain}
+                </Text>
+              </Pressable>
+            </View>
           ) : tab === "surah" ? renderSurahList() : renderJuzList()}
         </View>
       </OverlayBody>

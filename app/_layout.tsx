@@ -3,7 +3,9 @@ import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider
 import { bindAuthQueryCache } from "@/lib/query/auth-cache-lifecycle";
 import { bindNativeQueryLifecycle, createAppQueryClient } from "@/lib/query/native-lifecycle";
 import { PasswordRecoveryProvider } from "@/lib/auth/password-recovery";
-import { Stack, usePathname } from "expo-router";
+import { AuthRedirectReturn } from "@/lib/auth/redirect-return";
+import { Stack, usePathname, type ErrorBoundaryProps } from "expo-router";
+import Head from "expo-router/head";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
 import { Platform } from "react-native";
@@ -15,41 +17,77 @@ import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
 import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 import { SettingsProvider } from "@/lib/settings/context";
+import { loadUiBootstrap } from "@/lib/settings/ui-bootstrap";
 import { useReminderResponses, useReminderScheduling } from "@/lib/notifications/use-reminder-scheduling";
 import { useGroupEncouragementChecks } from "@/lib/halaqa/encouragement-notifications";
 import { useBoardBandRefresh } from "@/lib/board/refresh";
 import { useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
+import { ErrorBoundary as ScopedErrorBoundary, RouteErrorFallback } from "@/components/ui/ErrorBoundary";
+import { useStrings } from "@/lib/i18n/useStrings";
+import { strings } from "@/lib/i18n/strings";
+import { documentTitleFor } from "@/lib/navigation/document-title";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { NavigationBarTheme } from "@/components/settings/NavigationBarTheme";
 
 const queryClient = createAppQueryClient();
+const NATIVE_UI_FONT_WAIT_MS = 3000;
 
-export { ErrorBoundary } from "expo-router";
+/**
+ * The Hafiz fallback for a crash above the route providers (instead of the Expo Router default). It
+ * reads the startup language because the settings provider may be the part that failed.
+ */
+export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+  let language: "en" | "ar" = "en";
+  try {
+    language = getStartupLanguage();
+  } catch {}
+  return <RouteErrorFallback strings={strings[language]} onRetry={() => void retry()} />;
+}
+
+/**
+ * Web preloads the three UI faces used on first paint. The URLs are the hashed files the export
+ * already emits for these modules, so nothing is downloaded or replaced.
+ */
+const PRELOADED_UI_FONT_URLS = [
+  UI_FONTS.Manrope_400Regular,
+  UI_FONTS.Manrope_700Bold,
+  UI_FONTS.NotoSerif_700Bold,
+].filter((source): source is string => typeof source === "string");
+
+function WebUiFontPreload() {
+  if (Platform.OS !== "web" || PRELOADED_UI_FONT_URLS.length === 0) return null;
+  return (
+    <Head>
+      {PRELOADED_UI_FONT_URLS.map((href) => (
+        <link key={href} rel="preload" href={href} as="font" type="font/ttf" crossOrigin="anonymous" />
+      ))}
+    </Head>
+  );
+}
 
 SplashScreen.preventAutoHideAsync();
 
+// Native: read the small language/theme startup mirror while UI fonts load, so the first frames use
+// the saved choice. A failed read resolves to null and never blocks data preparation.
+const uiBootstrapReady = Platform.OS === "web" ? Promise.resolve(null) : loadUiBootstrap();
+
 function StableDocumentTitle() {
   const pathname = usePathname();
+  const s = useStrings();
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
 
-    const titles: Record<string, string> = {
-      "/about": "About Hafiz | Hafiz",
-      "/credits": "Credits & Sources | Hafiz",
-      "/privacy": "Privacy Policy | Hafiz",
-      "/profile": "Profile | Hafiz",
-      "/terms": "Terms of Service | Hafiz",
-      "/zayt-preview": "Zayt Preview | Hafiz",
-    };
-
+    const title = documentTitleFor(pathname, s);
     const setTitle = () => {
-      document.title = titles[pathname] ?? "Hafiz";
+      document.title = title;
     };
 
     setTitle();
     requestAnimationFrame(setTitle);
     const timer = setTimeout(setTitle, 0);
     return () => clearTimeout(timer);
-  }, [pathname]);
+  }, [pathname, s]);
 
   return null;
 }
@@ -110,13 +148,19 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
       return;
     }
-    // A failed UI font load must not leave a blank screen: render with system fonts instead.
-    Font.loadAsync(UI_FONTS)
-      .catch(console.error)
-      .finally(() => {
-        setFontsLoaded(true);
-        SplashScreen.hideAsync().catch(() => {});
-      });
+    // A failed UI font load must not leave a blank screen: render with system fonts instead. Stop
+    // waiting after three seconds and let the UI fonts swap in when they arrive.
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      setFontsLoaded(true);
+      SplashScreen.hideAsync().catch(() => {});
+    };
+    const fontsReady = Font.loadAsync(UI_FONTS).catch(console.error);
+    const cap = setTimeout(release, NATIVE_UI_FONT_WAIT_MS);
+    Promise.all([fontsReady, uiBootstrapReady]).finally(release);
+    return () => clearTimeout(cap);
   }, []);
 
   // Initialize auth (restore session) on mount
@@ -128,23 +172,33 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <WebUiFontPreload />
       <PasswordRecoveryProvider>
         <DatabaseProvider>
           {/* The only settings provider: routes share it so opening one never resets language or theme. */}
           <SettingsProvider>
             <DatabaseNoticeBoundary>
               <AudioProviderBoundary>
-                <StableDocumentTitle />
+                {Platform.OS === "web" ? <StableDocumentTitle /> : null}
+                {/* Android system button contrast follows the resolved theme; web and iOS render nothing. */}
+                <NavigationBarTheme />
                 <ReminderLifecycle />
                 <EncouragementChecks />
                 <MinorPhotoCleanup />
-                <Stack screenOptions={{ headerShown: false }}>
+                <AuthRedirectReturn />
+                <Stack
+                  screenOptions={{ headerShown: false }}
+                  // Routes outside the tabs get the Hafiz fallback inside the providers; the tabs
+                  // have their own per-tab boundaries.
+                  screenLayout={({ children, route }) => (
+                    <ScopedErrorBoundary section={`route:${route.name}`}>{children}</ScopedErrorBoundary>
+                  )}
+                >
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="about" />
                   <Stack.Screen name="credits" />
                   <Stack.Screen name="privacy" />
                   <Stack.Screen name="terms" />
-                  <Stack.Screen name="zayt-preview" />
                   <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
                   <Stack.Screen name="open" />
                   <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />

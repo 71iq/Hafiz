@@ -1,6 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { createConnectionOwner } from "@/lib/database/connection-owner";
-import { importTranslation } from "@/lib/translations/import";
+import { importTranslation, TranslationImportCancelled } from "@/lib/translations/import";
 
 type TranslationRow = { surah: number; ayah: number; text: string };
 let mockLoadTranslation: (code: string) => Promise<TranslationRow[] | null>;
@@ -251,5 +251,24 @@ describe("atomic active-translation replacement", () => {
     expect(snapshot()).toEqual({ ...before, target: candidate() });
     expect(commands.filter((source) => source === "COMMIT")).toHaveLength(1);
     await expect(importTranslation(owner.database, "synthetic-language")).rejects.toThrow("no longer active");
+  });
+});
+
+describe("cancelled selection (W14)", () => {
+  it("leaves the active rows untouched when the selection is cancelled before replacement", async () => {
+    const before = snapshot();
+    let current = true;
+    const loading = gate();
+    mockLoadTranslation = async () => {
+      await loading.wait();
+      return candidate();
+    };
+    const importing = importTranslation(owner.database, "synthetic-language", { shouldContinue: () => current });
+    await loading.waitForStart();
+    current = false;
+    loading.release();
+    await expect(importing).rejects.toBeInstanceOf(TranslationImportCancelled);
+    expect(snapshot()).toEqual(before);
+    expect(commands).toEqual([]);
   });
 });

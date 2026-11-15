@@ -16,7 +16,7 @@
       "children": [
         {
           "id": "shell.boot",
-          "title": "Launch: fonts + database preparation, DB failure state",
+          "title": "Launch: fonts + database preparation stages, slow hint, DB failure with Try again",
           "kind": "screen",
           "cases": ["UI-01", "PUBLIC-05"],
           "uses": [],
@@ -25,7 +25,7 @@
         },
         {
           "id": "shell.entry",
-          "title": "Root entry: onboarding vs Home, /flashcards and /search redirects",
+          "title": "Root entry: onboarding vs Home, /flashcards (deck section) and /search?q= redirects",
           "kind": "transition",
           "cases": ["UI-02", "NAV-04"],
           "uses": [],
@@ -52,7 +52,7 @@
         },
         {
           "id": "shell.offline",
-          "title": "Offline banner and reconnect",
+          "title": "Offline banner (immediate or after 3 s unreachable) and reconnect",
           "kind": "widget",
           "cases": ["UI-04"],
           "uses": [],
@@ -61,16 +61,26 @@
         },
         {
           "id": "shell.sync",
-          "title": "Background sync indicator and restore notice",
+          "title": "Background sync status on the profile card",
           "kind": "widget",
           "cases": ["UI-05"],
           "uses": [],
           "native": false,
-          "children": []
+          "children": [
+            {
+              "id": "shell.sync.restore",
+              "title": "Restore consent dialog, Sync paused status and Resume sync",
+              "kind": "widget",
+              "cases": ["UI-14"],
+              "uses": ["shared.confirm"],
+              "native": false,
+              "children": []
+            }
+          ]
         },
         {
           "id": "shell.errorboundary",
-          "title": "Section error fallback with Try Again",
+          "title": "Scoped error fallback per tab, route and overlay: Retry, Home, report a problem",
           "kind": "widget",
           "cases": ["UI-11"],
           "uses": [],
@@ -96,7 +106,7 @@
           "children": [
             {
               "id": "shell.nav.tabs",
-              "title": "Phone tab bar: Home, Mushaf, Leaderboard, Progress, Settings",
+              "title": "Phone tab bar: Home, Mushaf, Progress, Settings",
               "kind": "widget",
               "cases": ["NAV-01"],
               "uses": [],
@@ -105,7 +115,7 @@
             },
             {
               "id": "shell.nav.tablet",
-              "title": "Tablet floating navigation",
+              "title": "Edge navigation panel (768-1023px and Mushaf from 768px): click-only, outside press dismisses",
               "kind": "widget",
               "cases": ["NAV-02"],
               "uses": [],
@@ -114,10 +124,19 @@
             },
             {
               "id": "shell.nav.desktop",
-              "title": "Desktop sidebar (feed, journey, profile links)",
+              "title": "Desktop sidebar: every destination, Search, feed, journey, profile",
               "kind": "widget",
               "cases": ["NAV-03"],
-              "uses": [],
+              "uses": ["home.search"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shell.nav.destinations",
+              "title": "Halaqa, Board and Journey entry rows on Home and Progress",
+              "kind": "widget",
+              "cases": ["NAV-06"],
+              "uses": ["halaqa", "board", "journey"],
               "native": false,
               "children": []
             }
@@ -152,6 +171,15 @@
           "children": []
         },
         {
+          "id": "shared.discard",
+          "title": "Discard changes? confirmation for unsaved editors",
+          "kind": "widget",
+          "cases": ["UI-13"],
+          "uses": ["shared.overlay"],
+          "native": false,
+          "children": []
+        },
+        {
           "id": "shared.menu",
           "title": "Card-actions dropdown menu",
           "kind": "widget",
@@ -166,6 +194,15 @@
           "kind": "widget",
           "cases": ["UI-10"],
           "uses": [],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "shared.accountpromo",
+          "title": "Guest account promotion: one 14-day dismissal for Home and Progress",
+          "kind": "widget",
+          "cases": ["UI-15"],
+          "uses": ["auth.login", "auth.signup"],
           "native": false,
           "children": []
         },
@@ -201,7 +238,7 @@
           "title": "Private note editor",
           "kind": "widget",
           "cases": ["NOTE-02", "NOTE-03"],
-          "uses": ["shared.overlay"],
+          "uses": ["shared.overlay", "shared.discard"],
           "native": false,
           "children": []
         },
@@ -210,22 +247,22 @@
           "title": "Reflection editor (guest prompt, publish, close)",
           "kind": "widget",
           "cases": ["WRITE-01", "WRITE-02", "WRITE-03"],
-          "uses": ["shared.overlay", "auth.login"],
+          "uses": ["shared.overlay", "auth.login", "shared.discard"],
           "native": false,
           "children": []
         },
         {
           "id": "shared.comments",
-          "title": "Comments panel: load, sort, send, like, guest prompt",
+          "title": "Comments panel: load, sort, send, like, delete own, report parent reflection, guest prompt",
           "kind": "widget",
-          "cases": ["COMMENT-01", "COMMENT-02", "COMMENT-03", "COMMENT-04"],
-          "uses": ["shared.overlay", "auth.login"],
+          "cases": ["COMMENT-01", "COMMENT-02", "COMMENT-03", "COMMENT-04", "COMMENT-05"],
+          "uses": ["shared.overlay", "auth.login", "shared.discard"],
           "native": false,
           "children": []
         },
         {
           "id": "shared.ayahdetail",
-          "title": "Ayah detail sheet",
+          "title": "Ayah detail sheet: previous/next, Go to this ayah",
           "kind": "screen",
           "cases": ["AYAH-04", "AYAH-05"],
           "uses": ["shared.overlay"],
@@ -233,7 +270,7 @@
           "children": [
             {
               "id": "shared.ayahdetail.tabs",
-              "title": "Tab switching (Arabic UI drops Translation)",
+              "title": "Tab order and availability: Similar verses, Translation, Tafsir, Notes, Qira'at, Hadith, Reflections",
               "kind": "transition",
               "cases": ["AYAH-06"],
               "uses": [],
@@ -260,7 +297,7 @@
             },
             {
               "id": "shared.ayahdetail.qiraat",
-              "title": "Qiraat tab",
+              "title": "Qira'at tab (shown when the ayah has qira'at)",
               "kind": "widget",
               "cases": ["AYAH-08"],
               "uses": [],
@@ -296,10 +333,10 @@
             },
             {
               "id": "shared.ayahdetail.actions",
-              "title": "Copy, bookmark, audio from detail or verse card",
+              "title": "Copy, Share, bookmark, audio and Report an issue with this ayah",
               "kind": "widget",
               "cases": ["AYAH-10"],
-              "uses": ["shared.toast", "reader.audio.single"],
+              "uses": ["shared.toast", "reader.audio.single", "settings.about.report"],
               "native": false,
               "children": []
             }
@@ -342,7 +379,7 @@
             },
             {
               "id": "shared.worddetail.irab",
-              "title": "I'rab and Tasreef tabs",
+              "title": "Grammar (I'rab) and Morphology (Tasreef) tabs",
               "kind": "widget",
               "cases": ["WORD-07"],
               "uses": [],
@@ -404,7 +441,7 @@
       "title": "Home",
       "kind": "screen",
       "cases": ["HOME-01"],
-      "uses": [],
+      "uses": ["shell.nav.destinations"],
       "native": false,
       "children": [
         {
@@ -472,7 +509,7 @@
         },
         {
           "id": "home.resume",
-          "title": "Reading-position card -> Mushaf",
+          "title": "Continue reading or start card -> Mushaf",
           "kind": "transition",
           "cases": ["HOME-02"],
           "uses": ["reader"],
@@ -481,10 +518,10 @@
         },
         {
           "id": "home.guestbanner",
-          "title": "Guest account banner",
+          "title": "Guest account promotion (shared dismissal)",
           "kind": "widget",
           "cases": ["HOME-03"],
-          "uses": ["auth.login", "auth.signup"],
+          "uses": ["auth.login", "auth.signup", "shared.accountpromo"],
           "native": false,
           "children": []
         },
@@ -543,7 +580,7 @@
             },
             {
               "id": "home.search.result",
-              "title": "Select result -> Mushaf at ayah/word",
+              "title": "Select result or Go to reference -> Mushaf at ayah/word",
               "kind": "transition",
               "cases": ["SEARCH-04"],
               "uses": ["reader.arrival"],
@@ -552,7 +589,7 @@
             },
             {
               "id": "home.search.history",
-              "title": "Recent searches, clear, close reset",
+              "title": "Recent searches: save on submit or result, remove, clear, close reset",
               "kind": "widget",
               "cases": ["SEARCH-05", "SEARCH-06"],
               "uses": [],
@@ -574,7 +611,7 @@
     },
     {
       "id": "openlink",
-      "title": "/open deep link bridge",
+      "title": "/open deep link bridge and invalid-link state",
       "kind": "transition",
       "cases": ["SEARCH-08", "SEARCH-09"],
       "uses": ["reader.arrival"],
@@ -599,6 +636,23 @@
           "children": []
         },
         {
+          "id": "reader.toolbar",
+          "title": "Reader toolbar and More menu: view switch, Search, Hide/Show, Recitation, Settings, Bookmarks, Go to, Home, Focus, Page layout",
+          "kind": "widget",
+          "cases": ["READ-15"],
+          "uses": [
+            "shared.menu",
+            "reader.mode",
+            "reader.pages",
+            "reader.bookmarks",
+            "reader.rail",
+            "reader.focus",
+            "reader.help"
+          ],
+          "native": false,
+          "children": []
+        },
+        {
           "id": "reader.pages",
           "title": "Page view: vertical/horizontal, swipe, drag, wheel, arrow keys",
           "kind": "widget",
@@ -609,7 +663,7 @@
         },
         {
           "id": "reader.rail",
-          "title": "Page rail and Go to (surah/juz)",
+          "title": "Page rail with juz ticks, and Go to (surah/juz, 2:255 and p 300)",
           "kind": "widget",
           "cases": ["READ-06", "READ-07"],
           "uses": [],
@@ -635,6 +689,15 @@
           "children": []
         },
         {
+          "id": "reader.help",
+          "title": "Shortcuts and gestures help sheet (? and More)",
+          "kind": "widget",
+          "cases": ["READ-13"],
+          "uses": ["shared.overlay", "home.search"],
+          "native": false,
+          "children": []
+        },
+        {
           "id": "reader.arrival",
           "title": "Arrive at ayah/word with target highlight",
           "kind": "transition",
@@ -644,8 +707,17 @@
           "children": []
         },
         {
+          "id": "reader.return",
+          "title": "Back to where I was pill after explicit jumps",
+          "kind": "transition",
+          "cases": ["READ-14"],
+          "uses": ["reader.arrival"],
+          "native": false,
+          "children": []
+        },
+        {
           "id": "reader.settings",
-          "title": "Reader settings: theme, font, marker, size",
+          "title": "Reader settings: theme, font (Classic/Modern, Tajweed), marker, size",
           "kind": "widget",
           "cases": ["SET-03", "SET-04", "SET-05", "SET-06"],
           "uses": ["shared.overlay", "shared.tafsirpicker"],
@@ -736,7 +808,7 @@
         },
         {
           "id": "reader.bookmarks",
-          "title": "Bookmarks sheet",
+          "title": "Bookmarks sheet: order, search over ten, named removal",
           "kind": "widget",
           "cases": ["SAVED-01"],
           "uses": ["shared.overlay", "reader.arrival"],
@@ -764,14 +836,14 @@
               "id": "reader.audio.range",
               "title": "Range recitation settings and playback",
               "kind": "widget",
-              "cases": ["AUDIO-02", "AUDIO-03", "AUDIO-04"],
+              "cases": ["AUDIO-02", "AUDIO-03", "AUDIO-04", "AUDIO-06"],
               "uses": ["shared.reciterpicker"],
               "native": false,
               "children": []
             },
             {
               "id": "reader.audio.background",
-              "title": "Pause on native background",
+              "title": "Background playback and return",
               "kind": "transition",
               "cases": ["AUDIO-05"],
               "uses": [],
@@ -795,7 +867,7 @@
           "title": "Built-in deck configuration",
           "kind": "screen",
           "cases": ["DECK-01", "DECK-03", "DECK-04", "DECK-05", "DECK-07"],
-          "uses": ["shared.overlay", "shared.scope"],
+          "uses": ["shared.overlay", "shared.scope", "shared.discard"],
           "native": false,
           "children": []
         },
@@ -804,7 +876,7 @@
           "title": "Vocabulary review settings",
           "kind": "screen",
           "cases": ["DECK-06"],
-          "uses": ["decks.config"],
+          "uses": ["decks.config", "shared.discard"],
           "native": false,
           "children": []
         },
@@ -818,10 +890,10 @@
           "children": [
             {
               "id": "decks.cards.menu",
-              "title": "Card menu: mark, suspend, bury, reset, delete, due date",
+              "title": "Card menu: open in Mushaf, mark, suspend, bury, due date, reset, delete",
               "kind": "widget",
               "cases": ["DECK-10", "DECK-11", "DECK-12"],
-              "uses": ["shared.menu", "shared.confirm"],
+              "uses": ["shared.menu", "shared.confirm", "reader.arrival"],
               "native": false,
               "children": []
             }
@@ -885,10 +957,10 @@
         },
         {
           "id": "review.vocab",
-          "title": "/flashcards/vocab session",
-          "kind": "screen",
+          "title": "/flashcards/vocab redirect to the Vocabulary Review session",
+          "kind": "transition",
           "cases": ["REVIEW-12"],
-          "uses": [],
+          "uses": ["review.session"],
           "native": false,
           "children": []
         }
@@ -1180,7 +1252,7 @@
       "children": [
         {
           "id": "journey.levels",
-          "title": "Level strip / side list and locking",
+          "title": "Level strip / side list, open levels and Next marker",
           "kind": "widget",
           "cases": ["JOURNEY-02"],
           "uses": [],
@@ -1201,7 +1273,7 @@
           "title": "Response draft, complete, edit, next, discard",
           "kind": "widget",
           "cases": ["JOURNEY-04", "JOURNEY-05", "JOURNEY-06", "JOURNEY-07"],
-          "uses": ["shared.toast"],
+          "uses": ["shared.toast", "shared.discard"],
           "native": false,
           "children": []
         }
@@ -1212,12 +1284,12 @@
       "title": "Progress",
       "kind": "screen",
       "cases": ["PROGRESS-01", "PROGRESS-05"],
-      "uses": [],
+      "uses": ["shell.nav.destinations"],
       "native": false,
       "children": [
         {
           "id": "progress.heatmap",
-          "title": "Activity heatmap tooltip",
+          "title": "Activity calendar, day selector and details",
           "kind": "widget",
           "cases": ["PROGRESS-02"],
           "uses": [],
@@ -1226,7 +1298,7 @@
         },
         {
           "id": "progress.surahs",
-          "title": "Surah progress and View all",
+          "title": "Surah progress and View all with search and sort",
           "kind": "widget",
           "cases": ["PROGRESS-03"],
           "uses": ["reader.arrival", "shared.overlay"],
@@ -1244,10 +1316,10 @@
         },
         {
           "id": "progress.guest",
-          "title": "Guest sign-in prompt",
+          "title": "Guest sign-in prompt (shared dismissal)",
           "kind": "widget",
           "cases": ["PROGRESS-06"],
-          "uses": ["auth.login"],
+          "uses": ["auth.login", "shared.accountpromo"],
           "native": false,
           "children": []
         },
@@ -1345,7 +1417,7 @@
         },
         {
           "id": "board.standings",
-          "title": "Cohort standings and points",
+          "title": "Cohort standings, points and scoring info",
           "kind": "widget",
           "cases": ["BOARD-03"],
           "uses": ["wird.sync"],
@@ -1408,7 +1480,7 @@
             },
             {
               "id": "community.feed.like",
-              "title": "Like and report",
+              "title": "Like, delete own reflection, report others' reflections",
               "kind": "widget",
               "cases": ["FEED-07", "FEED-09"],
               "uses": ["shared.toast"],
@@ -1429,7 +1501,7 @@
       "children": [
         {
           "id": "profile.own",
-          "title": "Own profile sheet: overview, guest prompt",
+          "title": "Own profile sheet: overview, figures, guest sign-in",
           "kind": "screen",
           "cases": ["PROFILE-01", "PROFILE-02"],
           "uses": ["shared.overlay", "progress"],
@@ -1437,10 +1509,19 @@
           "children": [
             {
               "id": "profile.own.notes",
-              "title": "Notes tab: preview, view all, open, edit, delete",
+              "title": "Notes tab: preview, search and sort, view all, open, edit, delete",
               "kind": "widget",
               "cases": ["NOTE-05", "NOTE-06", "NOTE-07"],
               "uses": ["shared.noteeditor", "shared.confirm", "reader.arrival"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "profile.own.figures",
+              "title": "Own profile figures: local, paused-sync label",
+              "kind": "widget",
+              "cases": ["PROFILE-09"],
+              "uses": ["progress", "shell.sync.restore"],
               "native": false,
               "children": []
             },
@@ -1449,7 +1530,7 @@
               "title": "Edit profile: name, bio, country, photo, save, draft retention",
               "kind": "widget",
               "cases": ["PROFILE-04", "PROFILE-05", "PROFILE-06", "PROFILE-07", "PROFILE-08"],
-              "uses": [],
+              "uses": ["shared.discard"],
               "native": false,
               "children": []
             }
@@ -1527,6 +1608,15 @@
           "uses": [],
           "native": false,
           "children": []
+        },
+        {
+          "id": "auth.return",
+          "title": "Sign-in return to the screen, editor or comments you left",
+          "kind": "transition",
+          "cases": ["AUTH-10"],
+          "uses": ["auth.login", "auth.signup", "shared.reflectioneditor", "shared.comments"],
+          "native": false,
+          "children": []
         }
       ]
     },
@@ -1540,9 +1630,9 @@
       "children": [
         {
           "id": "settings.general",
-          "title": "General: language, theme, font, marker, size, reading mode",
+          "title": "General: language, theme, font, marker, size, reading mode, vibration",
           "kind": "widget",
-          "cases": ["SET-02", "SET-07"],
+          "cases": ["SET-02", "SET-07", "SET-17"],
           "uses": ["reader.settings"],
           "native": false,
           "children": []
@@ -1576,10 +1666,10 @@
         },
         {
           "id": "settings.account",
-          "title": "Account: profile, logout, login/signup",
+          "title": "Account: profile, sync status and Resume sync, sign-out, login/signup",
           "kind": "widget",
           "cases": ["SET-11"],
-          "uses": ["shared.confirm", "profile.own", "auth.login"],
+          "uses": ["shared.confirm", "profile.own", "auth.login", "shell.sync", "shell.sync.restore"],
           "native": false,
           "children": []
         },
@@ -1594,12 +1684,31 @@
         },
         {
           "id": "settings.about",
-          "title": "About links and donor dialog",
+          "title": "About: version, update, What's new, Report an issue, public page links",
           "kind": "widget",
           "cases": ["SET-15"],
           "uses": ["public"],
           "native": false,
-          "children": []
+          "children": [
+            {
+              "id": "settings.about.whatsnew",
+              "title": "What's new sheet with bundled release notes",
+              "kind": "widget",
+              "cases": ["SET-18"],
+              "uses": ["shared.overlay"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "settings.about.report",
+              "title": "Report an issue: prefilled GitHub form, copy-link fallback",
+              "kind": "widget",
+              "cases": ["SET-19"],
+              "uses": [],
+              "native": false,
+              "children": []
+            }
+          ]
         }
       ]
     },
@@ -1613,7 +1722,7 @@
       "children": [
         {
           "id": "public.zayt",
-          "title": "/zayt-preview",
+          "title": "/dev/zayt mascot preview (development builds only)",
           "kind": "screen",
           "cases": ["PUBLIC-04"],
           "uses": [],

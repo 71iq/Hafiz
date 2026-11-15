@@ -9,6 +9,8 @@ export type Profile = {
   bio: string | null;
   country: string | null;
   created_at: string;
+  /** Client-only: a neutral stand-in shown while the real profile row cannot be read. */
+  is_fallback?: boolean;
 };
 
 export type SignUpResult = {
@@ -23,6 +25,8 @@ export type AuthState = {
   profile: Profile | null;
   isLoading: boolean;
   isInitialized: boolean;
+  /** True only after a confirmed session end (rejected renewal or a sign-out elsewhere). */
+  sessionEnded: boolean;
   error: string | null;
 };
 

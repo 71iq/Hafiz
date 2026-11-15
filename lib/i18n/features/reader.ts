@@ -1,0 +1,196 @@
+/**
+ * W05/W06 deep links, reader position, toolbar, gestures, reveal, focus, bookmarks and audio. Spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity.
+ */
+export const readerStrings = {
+  en: {
+    // /open bridge and invalid links
+    openLinkOpening: "Opening ayah...",
+    openLinkInvalidTitle: "This link doesn't open an ayah",
+    openLinkInvalidBody:
+      "The surah or ayah number in the link is missing or out of range. Your reading position has not changed.",
+    openLinkSearch: "Search",
+
+    // Toolbar
+    readerModeSwitchLabel: "{{current}}. Switch to {{next}}",
+    readerModeShortPage: "Page",
+    readerModeShortVerse: "Verses",
+    readerSearch: "Search",
+    readerHideAyahText: "Hide ayah text",
+    readerShowAyahText: "Show ayah text",
+    readerMore: "More",
+    pageLayoutGroup: "Page layout",
+    readerHizb: "Hizb",
+    indicatorOpenSurah: "Surah {{name}}. Open Go to",
+    indicatorOpenJuz: "{{juz}}. Open Go to",
+
+    // Arrival and return
+    readerBackToWhereIWas: "Back to where I was",
+    readerRetryJump: "Try again: go to {{ref}}",
+    readerQuranLoadFailed: "Could not load the Quran.",
+
+    // Shortcuts and gestures help
+    readerHelpTitle: "Shortcuts and gestures",
+    readerHelpGestures: "Gestures",
+    readerHelpKeyboard: "Keyboard",
+    readerHelpMarkerTap: "Tap an ayah number",
+    readerHelpMarkerTapBody: "Opens the ayah's details: tafsir, translation and notes.",
+    readerHelpMarkerLongPress: "Long-press an ayah number",
+    readerHelpMarkerLongPressBody:
+      "Selects the ayah and shows its actions: copy, highlight, bookmark, note and reflection.",
+    readerHelpWordTap: "Tap a word",
+    readerHelpWordTapWebBody: "Shows the word's meaning. Tap the meaning to open the word details.",
+    readerHelpWordTapNativeBody: "Shows or hides the reading controls.",
+    readerHelpWordLongPress: "Long-press or right-click a word",
+    readerHelpWordLongPressBody: "Opens the word details: meaning, grammar, Tajweed and occurrences.",
+    readerHelpNextPage: "Next page",
+    readerHelpPreviousPage: "Previous page",
+    readerHelpArrows: "Turn pages in page view",
+    readerHelpSearch: "Open Search",
+    readerHelpShortcuts: "Show this list",
+    readerHelpEscape: "Close the open menu or sheet",
+    readerHelpContextMenu: "Open the menu for selected text or a focused ayah number",
+
+    // Ayah markers
+    ayahMarkerLabel: "Ayah {{ref}}",
+    ayahMarkerOpenDetails: "Open ayah details",
+    ayahMarkerSelect: "Select ayah and show actions",
+
+    // Copy and share
+    readerShare: "Share",
+    readerShareAyah: "Share ayah",
+    readerCopyAyah: "Copy ayah",
+    readerShareFailed: "Could not share",
+    shareReflectionAction: "Share reflection",
+    readerRemoveHighlight: "Remove highlight",
+    highlightColorAmber: "Amber",
+    highlightColorGreen: "Green",
+    highlightColorBlue: "Blue",
+    highlightColorPink: "Pink",
+    highlightColorViolet: "Violet",
+    highlightColorRose: "Rose",
+    highlightColorSky: "Sky",
+
+    // Word gloss
+    readerNoWordTranslation: "No translation",
+    wordTooltipOpenDetail: "Open word details",
+
+    // Bookmarks
+    searchBookmarks: "Search bookmarks",
+    readerClearSearch: "Clear search",
+    bookmarksOrderLabel: "Order",
+    bookmarksOrderRecent: "Recent",
+    bookmarksOrderQuran: "Quran order",
+    bookmarksNoMatches: "No bookmarks match",
+    removeBookmarkFor: "Remove bookmark for {{item}}",
+    removeBookmarkConfirmTitle: "Remove bookmark?",
+    removeBookmarkConfirmBody: "{{item}} will be removed from your bookmarks.",
+    readerCancel: "Cancel",
+
+    // Go to and rail
+    goToAyahRow: "Go to {{ref}}",
+    goToPageRow: "Go to page {{page}}",
+    goToNoSurahsHint: "Try a number like 18 or a name like Kahf",
+    railGoToLabel: "Go to, page {{n}}",
+    railJuzN: "Juz {{n}}",
+
+    // Surah information
+    surahInfoOpenNamed: "Open information about Surah {{name}}",
+    surahInfoShownInEnglish: "Shown in English",
+    surahInfoLoadFailed: "Could not load the surah information.",
+    surahInfoSourcePrefix: "Source:",
+
+    // Reading settings
+    tajweedLegendOpen: "What do the colors mean?",
+    tajweedLegendTitle: "Tajweed colors",
+    quranMarkerModernOnly: "Available with the Modern font",
+  },
+  ar: {
+    openLinkOpening: "جارٍ فتح الآية...",
+    openLinkInvalidTitle: "هذا الرابط لا يفتح آية",
+    openLinkInvalidBody: "رقم السورة أو الآية في الرابط مفقود أو خارج النطاق. لم يتغير موضع قراءتك.",
+    openLinkSearch: "البحث",
+
+    readerModeSwitchLabel: "{{current}}. التبديل إلى {{next}}",
+    readerModeShortPage: "الصفحات",
+    readerModeShortVerse: "الآيات",
+    readerSearch: "البحث",
+    readerHideAyahText: "إخفاء نص الآيات",
+    readerShowAyahText: "إظهار نص الآيات",
+    readerMore: "المزيد",
+    pageLayoutGroup: "تخطيط الصفحة",
+    readerHizb: "الحزب",
+    indicatorOpenSurah: "سورة {{name}}. فتح الانتقال",
+    indicatorOpenJuz: "{{juz}}. فتح الانتقال",
+
+    readerBackToWhereIWas: "العودة إلى حيث كنت",
+    readerRetryJump: "حاول مجددًا: الانتقال إلى {{ref}}",
+    readerQuranLoadFailed: "تعذّر تحميل القرآن.",
+
+    readerHelpTitle: "الاختصارات والإيماءات",
+    readerHelpGestures: "الإيماءات",
+    readerHelpKeyboard: "لوحة المفاتيح",
+    readerHelpMarkerTap: "اضغط على رقم الآية",
+    readerHelpMarkerTapBody: "يفتح تفاصيل الآية: التفسير والترجمة والملاحظات.",
+    readerHelpMarkerLongPress: "اضغط مطولًا على رقم الآية",
+    readerHelpMarkerLongPressBody: "يحدد الآية ويعرض إجراءاتها: النسخ والتمييز والإشارة والملاحظة والتأمل.",
+    readerHelpWordTap: "اضغط على كلمة",
+    readerHelpWordTapWebBody: "يعرض معنى الكلمة. اضغط على المعنى لفتح تفاصيل الكلمة.",
+    readerHelpWordTapNativeBody: "يُظهر أدوات القراءة أو يخفيها.",
+    readerHelpWordLongPress: "اضغط مطولًا على كلمة أو انقر بالزر الأيمن",
+    readerHelpWordLongPressBody: "يفتح تفاصيل الكلمة: المعنى والإعراب والتجويد والمواضع.",
+    readerHelpNextPage: "الصفحة التالية",
+    readerHelpPreviousPage: "الصفحة السابقة",
+    readerHelpArrows: "تقليب الصفحات في عرض الصفحات",
+    readerHelpSearch: "فتح البحث",
+    readerHelpShortcuts: "عرض هذه القائمة",
+    readerHelpEscape: "إغلاق القائمة أو النافذة المفتوحة",
+    readerHelpContextMenu: "فتح قائمة النص المحدد أو رقم الآية المحدد",
+
+    ayahMarkerLabel: "الآية {{ref}}",
+    ayahMarkerOpenDetails: "فتح تفاصيل الآية",
+    ayahMarkerSelect: "تحديد الآية وعرض إجراءاتها",
+
+    readerShare: "مشاركة",
+    readerShareAyah: "مشاركة الآية",
+    readerCopyAyah: "نسخ الآية",
+    readerShareFailed: "تعذرت المشاركة",
+    shareReflectionAction: "شارك تأملًا",
+    readerRemoveHighlight: "إزالة التمييز",
+    highlightColorAmber: "كهرماني",
+    highlightColorGreen: "أخضر",
+    highlightColorBlue: "أزرق",
+    highlightColorPink: "وردي",
+    highlightColorViolet: "بنفسجي",
+    highlightColorRose: "أحمر وردي",
+    highlightColorSky: "سماوي",
+
+    readerNoWordTranslation: "لا توجد ترجمة",
+    wordTooltipOpenDetail: "فتح تفاصيل الكلمة",
+
+    searchBookmarks: "بحث في الإشارات",
+    readerClearSearch: "مسح البحث",
+    bookmarksOrderLabel: "الترتيب",
+    bookmarksOrderRecent: "الأحدث",
+    bookmarksOrderQuran: "ترتيب المصحف",
+    bookmarksNoMatches: "لا توجد إشارات مطابقة",
+    removeBookmarkFor: "إزالة الإشارة عن {{item}}",
+    removeBookmarkConfirmTitle: "إزالة الإشارة؟",
+    removeBookmarkConfirmBody: "ستُزال {{item}} من إشاراتك المرجعية.",
+    readerCancel: "إلغاء",
+
+    goToAyahRow: "انتقل إلى {{ref}}",
+    goToPageRow: "انتقل إلى الصفحة {{page}}",
+    goToNoSurahsHint: "جرّب رقمًا مثل ١٨ أو اسمًا مثل الكهف",
+    railGoToLabel: "انتقال، الصفحة {{n}}",
+    railJuzN: "الجزء {{n}}",
+
+    surahInfoOpenNamed: "فتح معلومات سورة {{name}}",
+    surahInfoShownInEnglish: "معروض بالإنجليزية",
+    surahInfoLoadFailed: "تعذر تحميل معلومات السورة.",
+    surahInfoSourcePrefix: "المصدر:",
+
+    tajweedLegendOpen: "ماذا تعني الألوان؟",
+    tajweedLegendTitle: "ألوان التجويد",
+    quranMarkerModernOnly: "متاح مع الخط الحديث",
+  },
+} as const;

@@ -1,7 +1,15 @@
 import { memo, useCallback, useRef } from "react";
 import { Text, Pressable, Platform, View } from "react-native";
-import { useSettings } from "@/lib/settings/context";
+import { useSettings, type ThemePalette } from "@/lib/settings/context";
 import { useWordTap } from "./useWordTap";
+
+/** The line standing in for a hidden word: at least 3:1 against each theme's page. */
+const HIDDEN_WORD_UNDERLINE: Record<ThemePalette, string> = {
+  beige: "#9A8470",
+  white: "#8A8F98",
+  dark: "#6B6B6B",
+  amoled: "#5E5E5E",
+};
 
 type Props = {
   glyph: string;
@@ -15,6 +23,8 @@ type Props = {
   v2Page: number;
   disabled?: boolean;
   highlightColor?: string;
+  /** C07 arrival wash color behind a navigated-to word; it never recolors the glyph. */
+  arrivalWash?: string;
   hidden?: boolean;
   compactLayout?: boolean;
   /** ERR-06: a short bar under a word missed in 3 or more sessions. Never drawn on a hidden word. */
@@ -45,11 +55,12 @@ function WordTokenInner({
   v2Page,
   disabled = false,
   highlightColor,
+  arrivalWash,
   hidden = false,
   compactLayout = false,
   weakSpot = false,
 }: Props) {
-  const { isDark, viewMode, pageScroll } = useSettings();
+  const { isDark, viewMode, pageScroll, effectiveTheme } = useSettings();
   const tokenRef = useRef<View>(null);
   const tap = useWordTap({ surah, ayah, wordPos, v2Page, disabled, hidden });
   const { wordRef, isTooltipSelected, isTouchInput, openDetail } = tap;
@@ -79,8 +90,8 @@ function WordTokenInner({
       : {};
 
   // Highlight background for page view (verse view highlights at container level)
-  let bgColor: string | undefined;
-  if (highlightColor) {
+  let bgColor: string | undefined = arrivalWash;
+  if (!bgColor && highlightColor) {
     bgColor = highlightColor + "20";
   }
 
@@ -117,7 +128,7 @@ function WordTokenInner({
         // invisible below it.
         ...(hidden && {
           borderBottomWidth: Math.max(2, fontSize * 0.08),
-          borderBottomColor: isDark ? "#474747" : "#e8dac5",
+          borderBottomColor: HIDDEN_WORD_UNDERLINE[effectiveTheme],
           paddingBottom: Math.max(1, fontSize * 0.04),
         }),
         ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),

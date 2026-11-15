@@ -4,7 +4,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { authCommands } from "@/lib/auth/commands";
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
 import { getLocalSurahProgress } from "@/lib/profile/progress";
-import { hasCompletedAccountRestore } from "@/lib/database/sync";
+import { hasCompletedAccountRestore, readRestorePause } from "@/lib/database/sync";
 import { errorMessage } from "@/lib/error-message";
 
 /**
@@ -16,6 +16,8 @@ import { errorMessage } from "@/lib/error-message";
  */
 type StatsOwner = {
   userId: string;
+  /** Account and session; the unchanged-upload memory belongs to exactly one. */
+  key: string;
   isCurrent: () => boolean;
 };
 
@@ -27,14 +29,23 @@ function captureStatsOwner(): StatsOwner | null {
   const authOwner = authCommands.captureOwner();
   return {
     userId: user.id,
+    key: JSON.stringify(identity),
     isCurrent: () => authOwner.isCurrent() && useAuthStore.getState().user?.id === user.id,
   };
 }
 
 let statsQueue: { owner: StatsOwner; tail: Promise<void> } | null = null;
 
+/**
+ * The local figures last uploaded successfully for one account/session, in memory only. Repeated
+ * triggers (profile open, review, sync) with unchanged figures skip the upload; a failure records
+ * nothing, so the next trigger retries; another owner starts empty.
+ */
+let lastUploaded: { ownerKey: string; figures: string } | null = null;
+
 function enqueueStats(owner: StatsOwner, work: () => Promise<void>): Promise<void> {
   const queue = statsQueue?.owner.isCurrent() ? statsQueue : { owner, tail: Promise.resolve() };
+  if (queue !== statsQueue && lastUploaded?.ownerKey !== owner.key) lastUploaded = null;
   statsQueue = queue;
   const result = queue.tail.then(async () => {
     if (owner.isCurrent()) await work();
@@ -46,11 +57,15 @@ function enqueueStats(owner: StatsOwner, work: () => Promise<void>): Promise<voi
   return result;
 }
 
+/** Account-derived uploads wait for a completed restore and stay off while sync is paused for consent. */
 async function canWriteAccountDerivedStats(db: DatabaseExecutor, owner: StatsOwner): Promise<boolean> {
-  const restored = await hasCompletedAccountRestore(db, owner.userId);
+  const [restored, pause] = await Promise.all([
+    hasCompletedAccountRestore(db, owner.userId),
+    readRestorePause(db, owner.userId),
+  ]);
   if (!owner.isCurrent()) return false;
   if (!restored) console.warn("[Profile] Skipping surah progress until account data restore completes.");
-  return restored;
+  return restored && pause === null;
 }
 
 /** Repairs this account's server-side surah progress from local cards. Bound to the account that started it. */
@@ -61,10 +76,16 @@ export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
   return enqueueStats(owner, async () => {
     try {
       if (!(await canWriteAccountDerivedStats(db, owner))) return;
-      const [surahProgress, remoteSurahProgress] = await Promise.all([
-        getLocalSurahProgress(db),
-        supabase.from("public_surah_progress").select("surah, total_cards, memorized_cards").eq("user_id", owner.userId),
-      ]);
+      const surahProgress = await getLocalSurahProgress(db);
+      if (!owner.isCurrent()) return;
+      const figures = JSON.stringify(
+        surahProgress.map((row) => [row.surah, row.totalCards, row.memorized]).sort((a, b) => a[0] - b[0]),
+      );
+      if (lastUploaded?.ownerKey === owner.key && lastUploaded.figures === figures) return;
+      const remoteSurahProgress = await supabase
+        .from("public_surah_progress")
+        .select("surah, total_cards, memorized_cards")
+        .eq("user_id", owner.userId);
       if (!owner.isCurrent()) return;
       if (remoteSurahProgress.error) throw remoteSurahProgress.error;
 
@@ -105,8 +126,14 @@ export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
         if (!owner.isCurrent()) return;
         if (deleteError) throw deleteError;
       }
+      lastUploaded = { ownerKey: owner.key, figures };
     } catch (error) {
       if (owner.isCurrent()) console.warn("[Profile] Failed to update surah progress:", errorMessage(error));
     }
   });
+}
+
+/** Test hook: forget the last uploaded figures. */
+export function resetProfileStatsMemoryForTests() {
+  lastUploaded = null;
 }

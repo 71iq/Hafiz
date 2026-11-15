@@ -172,13 +172,17 @@ export async function getRecentUnlocks(
     .map(rowToUnlock);
 }
 
-export async function getLatestUnseenUnlock(db: DatabaseExecutor): Promise<AchievementUnlock | null> {
+/** Unseen unlocks of active achievements, newest first (at most ten), for Home's notice queue. */
+export async function getUnseenUnlocks(db: DatabaseExecutor): Promise<AchievementUnlock[]> {
   const activeIds = new Set(ACHIEVEMENTS.filter((achievement) => achievement.active).map((achievement) => achievement.id));
   const rows = await db.getAllAsync<UnlockRow>(
     "SELECT * FROM achievement_unlocks WHERE seen_at IS NULL ORDER BY unlocked_at DESC LIMIT 10"
   );
-  const row = rows.find((candidate) => activeIds.has(candidate.achievement_id));
-  return row ? rowToUnlock(row) : null;
+  return rows.filter((candidate) => activeIds.has(candidate.achievement_id)).map(rowToUnlock);
+}
+
+export async function getLatestUnseenUnlock(db: DatabaseExecutor): Promise<AchievementUnlock | null> {
+  return (await getUnseenUnlocks(db))[0] ?? null;
 }
 
 export async function markAchievementSeen(
