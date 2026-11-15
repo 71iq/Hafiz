@@ -14,6 +14,7 @@ type Operation = { table: string; kind: "select" | "upsert" | "delete"; data?: u
 const mockOperations: Operation[] = [];
 const mockLocalProgress = jest.fn<Promise<ProfileSurahProgress[]>, [SQLiteDatabase]>();
 const mockRestored = jest.fn<Promise<boolean>, [SQLiteDatabase, string]>();
+const mockPause = jest.fn<Promise<"pending_consent" | "cancelled" | null>, [SQLiteDatabase, string]>();
 let mockRemoteRows: unknown[] = [];
 let mockConfigured = true;
 let mockBeforeSelect: (() => void) | null = null;
@@ -65,6 +66,7 @@ jest.mock("@/lib/profile/progress", () => ({
 }));
 jest.mock("@/lib/database/sync", () => ({
   hasCompletedAccountRestore: (db: SQLiteDatabase, id: string) => mockRestored(db, id),
+  readRestorePause: (db: SQLiteDatabase, id: string) => mockPause(db, id),
 }));
 jest.mock("@/lib/auth/oauth", () => ({ startAppOAuth: jest.fn() }));
 jest.mock("@/lib/quran-foundation/config", () => ({ isQfSyncEnabled: () => false, isQfLoginEnabled: () => false }));
@@ -107,6 +109,7 @@ beforeEach(() => {
   mockBeforeSelect = null;
   mockLocalProgress.mockReset().mockResolvedValue([]);
   mockRestored.mockReset().mockResolvedValue(true);
+  mockPause.mockReset().mockResolvedValue(null);
   signIn(userA);
 });
 
@@ -119,6 +122,17 @@ describe("surah progress repair after sync", () => {
     expect(mockLocalProgress).not.toHaveBeenCalled();
     warn.mockRestore();
   });
+
+  it.each(["pending_consent", "cancelled"] as const)(
+    "reads and writes nothing while sync is paused for restore consent (%s)",
+    async (pause) => {
+      mockPause.mockResolvedValue(pause);
+      await updateProfileStats(db);
+      expect(mockPause).toHaveBeenCalledWith(db, userA.id);
+      expect(mockOperations).toEqual([]);
+      expect(mockLocalProgress).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps the larger count per surah and writes only this account's surah progress", async () => {
     mockRemoteRows = [

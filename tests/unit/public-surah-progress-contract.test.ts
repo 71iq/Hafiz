@@ -52,7 +52,7 @@ describe("public Surah Progress aggregate contract", () => {
 
   it("refreshes public aggregates after normal client sync completes", () => {
     const syncHook = read("lib/sync/useSync.ts");
-    const fullSyncIndex = syncHook.indexOf("const result = await fullSync(db);");
+    const fullSyncIndex = syncHook.indexOf(": await fullSync(db);");
     const updateStatsIndex = syncHook.indexOf("await updateProfileStats(db).catch");
 
     expect(syncHook).toContain('import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";');

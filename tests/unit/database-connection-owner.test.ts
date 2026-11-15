@@ -126,6 +126,40 @@ describe("private SQLite connection owner", () => {
     await owner.close().catch(() => undefined);
   });
 
+  test("W07 restore boundary: an earlier write is seen by the comparison and a later one commits after replacement", async () => {
+    await insert(owner, "local", 1);
+    // Admitted before the replacement transaction: the in-transaction fingerprint must observe it.
+    const earlier = insert(owner, "earlier", 2);
+    const compared = deferred<string>();
+    const resumeReplacement = deferred();
+    let laterWrite: Promise<void> | null = null;
+    const replacement = owner.database.withTransactionAsync(async (tx) => {
+      const seen = await tx.getAllAsync<{ key: string }>("SELECT key FROM records ORDER BY key");
+      compared.resolve(seen.map((row) => row.key).join(","));
+      // A write admitted after the comparison, through the root executor, cannot run inside the gap
+      // between comparison and clear.
+      laterWrite = insert(owner, "later", 3);
+      await resumeReplacement.promise;
+      await tx.runAsync("DELETE FROM records");
+      await tx.runAsync("INSERT INTO records VALUES (?, ?)", "account", 9);
+    });
+    await earlier;
+    expect(await compared.promise).toBe("earlier,local");
+    resumeReplacement.resolve();
+    await replacement;
+    await laterWrite;
+    const commitIndex = harness.events.indexOf("exec:COMMIT");
+    const laterIndex = harness.events.findIndex(
+      (event, index) => index > commitIndex && event === "execute:INSERT INTO records VALUES (?, ?)",
+    );
+    expect(commitIndex).toBeGreaterThan(0);
+    expect(laterIndex).toBeGreaterThan(commitIndex);
+    expect(await rows(owner)).toEqual([
+      { key: "account", value: 9 },
+      { key: "later", value: 3 },
+    ]);
+  });
+
   test("ordinary SQL errors release the FIFO and later SQL succeeds", async () => {
     await expect(owner.database.runAsync("INSERT INTO missing VALUES (1)")).rejects.toThrow();
     await insert(owner, "ok", 7);

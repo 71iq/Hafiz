@@ -4,7 +4,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { authCommands } from "@/lib/auth/commands";
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
 import { getLocalSurahProgress } from "@/lib/profile/progress";
-import { hasCompletedAccountRestore } from "@/lib/database/sync";
+import { hasCompletedAccountRestore, readRestorePause } from "@/lib/database/sync";
 import { errorMessage } from "@/lib/error-message";
 
 /**
@@ -46,11 +46,15 @@ function enqueueStats(owner: StatsOwner, work: () => Promise<void>): Promise<voi
   return result;
 }
 
+/** Account-derived uploads wait for a completed restore and stay off while sync is paused for consent. */
 async function canWriteAccountDerivedStats(db: DatabaseExecutor, owner: StatsOwner): Promise<boolean> {
-  const restored = await hasCompletedAccountRestore(db, owner.userId);
+  const [restored, pause] = await Promise.all([
+    hasCompletedAccountRestore(db, owner.userId),
+    readRestorePause(db, owner.userId),
+  ]);
   if (!owner.isCurrent()) return false;
   if (!restored) console.warn("[Profile] Skipping surah progress until account data restore completes.");
-  return restored;
+  return restored && pause === null;
 }
 
 /** Repairs this account's server-side surah progress from local cards. Bound to the account that started it. */
