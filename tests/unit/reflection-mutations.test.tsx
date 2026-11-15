@@ -25,10 +25,13 @@ import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 import { reflectionQueryKeys as keys } from "@/lib/reflections/query-keys";
 import { strings } from "@/lib/i18n/strings";
+import { toArabicNumber } from "@/lib/arabic";
 import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 
 let mockLocale: "en" | "ar" = "en";
+// Comment like counts use the interface's digits (Arabic-Indic in Arabic).
+const commentCount = (value: number) => (mockLocale === "ar" ? toArabicNumber(value) : String(value));
 const firstDb = {} as SQLiteDatabase,
   secondDb = {} as SQLiteDatabase;
 let mockDb = firstDb;
@@ -74,6 +77,8 @@ jest.mock("@/components/ui/ResponsiveOverlay", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   const { View, Pressable, Text } = jest.requireActual<typeof import("react-native")>("react-native");
   return {
+    // The discard dialog renders through the real modal pieces.
+    ...jest.requireActual("@/components/ui/ResponsiveOverlay"),
     ResponsiveSheet: ({ open, children }: { open: boolean; children: ReactNode }) =>
       open ? <View>{children}</View> : null,
     OverlayBody: ({ children }: { children: ReactNode }) => <View>{children}</View>,
@@ -330,9 +335,9 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
       wrapper,
     });
-    await waitFor(() => expect(view.getByText("17")).toBeTruthy());
-    const pressOne: () => void = button(view.getByText("17")).props.onPress,
-      pressTwo: () => void = button(view.getByText("29")).props.onPress;
+    await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+    const pressOne: () => void = button(view.getByText(commentCount(17))).props.onPress,
+      pressTwo: () => void = button(view.getByText(commentCount(29))).props.onPress;
     act(() => {
       pressOne();
       pressOne();
@@ -342,7 +347,7 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     one.reject(new Error("first like rejected"));
     two.resolve(true);
     await flush();
-    expect(view.getByText("17")).toBeTruthy();
+    expect(view.getByText(commentCount(17))).toBeTruthy();
     expect(view.getByText(strings[locale].reflectionLikeFailed)).toBeTruthy();
     // The like error shows above the input, below the comments, where the person is looking.
     const tree = JSON.stringify(view.toJSON());
@@ -510,7 +515,9 @@ it.each(["account", "ABA", "target", "close", "database", "unmount"] as const)(
     }
     if (retirement === "target") view.rerender(screen(2));
     if (retirement === "close") {
+      // The typed draft asks before closing; Discard completes the close and retires the post.
       fireEvent.press(view.getByTestId("close-sheet"));
+      fireEvent.press(view.getByText(strings.en.discardChangesConfirm));
       view.rerender(screen(1, false));
       view.rerender(screen());
     }
@@ -546,7 +553,10 @@ it("public-post failure retains its draft, enables editing and retries with the 
   expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.editable).toBe(false);
   pending.reject(new Error("synthetic post rejected"));
   await flush();
-  expect(view.getByText("synthetic post rejected")).toBeTruthy();
+  // Server details go to the log; the person sees the plain message with Try again.
+  expect(view.getByText(strings.ar.reflectionPostFailed)).toBeTruthy();
+  expect(view.queryByText("synthetic post rejected")).toBeNull();
+  expect(view.getByText(strings.ar.sharedTryAgain)).toBeTruthy();
   expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.value).toBe(draft);
   expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.editable).toBe(true);
   fireEvent.press(view.getByText(strings.ar.reflectionSubmit));
@@ -630,20 +640,20 @@ it("comment likes restore new canonical query rows after failure and invalidate 
   const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
     wrapper,
   });
-  await waitFor(() => expect(view.getByText("17")).toBeTruthy());
-  fireEvent.press(view.getByText("17"));
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  fireEvent.press(view.getByText(commentCount(17)));
   act(() =>
     client.setQueryData(keys.comments.list({ reflectionId: "post", sort: "oldest", viewerId: user(1).id }), {
       pages: [{ data: [comment("comment", 30)], hasMore: false }],
       pageParams: [0],
     }),
   );
-  await waitFor(() => expect(view.getByText("30")).toBeTruthy());
+  await waitFor(() => expect(view.getByText(commentCount(30))).toBeTruthy());
   pending.reject(new Error("like rejected"));
   await flush();
-  expect(view.getByText("30")).toBeTruthy();
+  expect(view.getByText(commentCount(30))).toBeTruthy();
   expect(client.getQueryState(target)?.isInvalidated).toBe(false);
-  fireEvent.press(view.getByText("30"));
+  fireEvent.press(view.getByText(commentCount(30)));
   await flush();
   expect(client.getQueryState(target)?.isInvalidated).toBe(true);
   expect(client.getQueryState(other)?.isInvalidated).toBe(false);
@@ -758,9 +768,9 @@ it("same-user session replacement removes the prior optimistic comment preview",
   const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
     wrapper,
   });
-  await waitFor(() => expect(view.getByText("17")).toBeTruthy());
-  fireEvent.press(view.getByText("17"));
-  expect(view.getByText("18")).toBeTruthy();
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  fireEvent.press(view.getByText(commentCount(17)));
+  expect(view.getByText(commentCount(18))).toBeTruthy();
   const next = session(1),
     parts = next.access_token.split(".");
   parts[1] = Buffer.from(
@@ -769,8 +779,8 @@ it("same-user session replacement removes the prior optimistic comment preview",
   next.access_token = parts.join(".");
   act(() => useAuthStore.setState({ session: next, user: next.user }));
   await flush();
-  expect(view.getByText("17")).toBeTruthy();
-  expect(view.queryByText("18")).toBeNull();
+  expect(view.getByText(commentCount(17))).toBeTruthy();
+  expect(view.queryByText(commentCount(18))).toBeNull();
   pending.resolve(true);
   await flush();
 });
@@ -783,20 +793,20 @@ it("a confirmed comment like rebases fresh counts before another press", async (
   const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
     wrapper,
   });
-  await waitFor(() => expect(view.getByText("17")).toBeTruthy());
-  fireEvent.press(view.getByText("17"));
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  fireEvent.press(view.getByText(commentCount(17)));
   act(() =>
     client.setQueryData(keys.comments.list({ reflectionId: "post", sort: "oldest", viewerId: user(1).id }), {
       pages: [{ data: [comment("comment", 30)], hasMore: false }],
       pageParams: [0],
     }),
   );
-  await waitFor(() => expect(view.getByText("30")).toBeTruthy());
+  await waitFor(() => expect(view.getByText(commentCount(30))).toBeTruthy());
   jest.mocked(fetchComments).mockReturnValue(refetch.promise);
   pending.resolve(true);
   await flush();
-  expect(view.getByText("31")).toBeTruthy();
-  fireEvent.press(view.getByText("31"));
+  expect(view.getByText(commentCount(31))).toBeTruthy();
+  fireEvent.press(view.getByText(commentCount(31)));
   expect(toggleCommentLike).toHaveBeenLastCalledWith(user(1).id, "comment", true);
   await flush();
   refetch.resolve({ data: [comment("comment", 30)], hasMore: false });
@@ -829,4 +839,32 @@ it("comment pagination admits one pending page and retains rows through error an
   await waitFor(() => expect(view.getByText("Synthetic next")).toBeTruthy());
   expect(view.getByText("Synthetic comment")).toBeTruthy();
   expect(fetchComments).toHaveBeenLastCalledWith("post", 1, "oldest", user(1).id);
+});
+
+it("asks before closing a typed comment and shows the counter near the limit", async () => {
+  mockLocale = "en";
+  const close = jest.fn();
+  const view = render(<CommentsSheet reflectionId="post" onClose={close} onCommentAdded={jest.fn()} />, { wrapper });
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  const input = view.getByPlaceholderText(strings.en.reflectionAddComment);
+  fireEvent.changeText(input, "x".repeat(1800));
+  expect(view.queryByText("1,800 / 2,000")).toBeNull();
+  fireEvent.changeText(input, "x".repeat(1801));
+  expect(view.getByText("1,801 / 2,000")).toBeTruthy();
+  fireEvent.press(view.getByTestId("close-sheet"));
+  // The mocked header omits titles; the dialog's actions show it asked.
+  expect(view.getByText(strings.en.discardChangesKeepEditing)).toBeTruthy();
+  expect(close).not.toHaveBeenCalled();
+  fireEvent.press(view.getByText(strings.en.discardChangesConfirm));
+  expect(close).toHaveBeenCalledTimes(1);
+});
+
+it("explains a guest's comment like instead of ignoring it when no sign-in path is given", async () => {
+  mockLocale = "en";
+  useAuthStore.setState({ user: null, session: null, profile: null });
+  const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, { wrapper });
+  await waitFor(() => expect(view.getByText(commentCount(17))).toBeTruthy());
+  fireEvent.press(view.getByText(commentCount(17)));
+  expect(view.getByText(strings.en.reflectionFeedAuthRequired)).toBeTruthy();
+  expect(toggleCommentLike).not.toHaveBeenCalled();
 });

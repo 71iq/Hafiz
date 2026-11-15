@@ -1,13 +1,26 @@
 import { useCallback, useEffect, useRef } from "react";
 import { AccessibilityInfo, Animated, Platform, Text } from "react-native";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
+import { useSettings, type ThemePalette } from "@/lib/settings/context";
 
 type Props = {
   message: string | null;
   onDismiss: () => void;
   /** Explicit hold time. Omit it to use the shared reading-time rule (C03). */
   duration?: number;
+  /**
+   * Notices are announced politely, once. Pass false only when the control that triggered the
+   * notice already announces the same text, so it is not read twice.
+   */
   announce?: boolean;
+};
+
+/** Inverse-surface pill per theme: dark on the light themes, light on the dark ones (all above 12:1). */
+export const TOAST_INVERSE_COLORS: Record<ThemePalette, { surface: string; text: string }> = {
+  white: { surface: "#27272A", text: "#FFFFFF" },
+  beige: { surface: "#3E342B", text: "#FFF8F1" },
+  dark: { surface: "#F5F5F5", text: "#0A0A0A" },
+  amoled: { surface: "#E5E5E5", text: "#000000" },
 };
 
 const NOTICE_BASE_MS = 2000;
@@ -25,7 +38,9 @@ type Phase = {
   deadline: number;
 };
 
-export function Toast({ message, onDismiss, duration: explicitDuration, announce = false }: Props) {
+export function Toast({ message, onDismiss, duration: explicitDuration, announce = true }: Props) {
+  const { effectiveTheme } = useSettings();
+  const inverse = TOAST_INVERSE_COLORS[effectiveTheme] ?? TOAST_INVERSE_COLORS.white;
   const duration = explicitDuration ?? (message ? noticeDurationMs(message) : NOTICE_BASE_MS);
   const opacity = useRef(new Animated.Value(0)).current;
   const animation = useRef<Animated.CompositeAnimation | null>(null);
@@ -119,8 +134,8 @@ export function Toast({ message, onDismiss, duration: explicitDuration, announce
         accessibilityLiveRegion={announce ? "polite" : undefined}
         aria-live={announce ? "polite" : undefined}
         style={{
-          backgroundColor: "#003638",
-          color: "#fff",
+          backgroundColor: inverse.surface,
+          color: inverse.text,
           fontFamily: "Manrope_600SemiBold",
           fontSize: 13,
           paddingHorizontal: 20,

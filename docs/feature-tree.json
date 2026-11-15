@@ -827,10 +827,10 @@
           "children": [
             {
               "id": "decks.cards.menu",
-              "title": "Card menu: mark, suspend, bury, reset, delete, due date",
+              "title": "Card menu: open in Mushaf, mark, suspend, bury, due date, reset, delete",
               "kind": "widget",
               "cases": ["DECK-10", "DECK-11", "DECK-12"],
-              "uses": ["shared.menu", "shared.confirm"],
+              "uses": ["shared.menu", "shared.confirm", "reader.arrival"],
               "native": false,
               "children": []
             }

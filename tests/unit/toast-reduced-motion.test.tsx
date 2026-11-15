@@ -1,7 +1,7 @@
 import React from "react";
 import { AccessibilityInfo, Animated, StyleSheet } from "react-native";
 import { act, cleanup, render, renderHook } from "@testing-library/react-native";
-import { Toast } from "@/components/ui/Toast";
+import { TOAST_INVERSE_COLORS, Toast } from "@/components/ui/Toast";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
 type MockCompositeAnimation = Animated.CompositeAnimation & {
@@ -111,8 +111,9 @@ it("keeps the existing text, pointer behavior, and styles", () => {
     }),
   );
   expect(StyleSheet.flatten(text.props.style)).toEqual({
-    backgroundColor: "#003638",
-    color: "#fff",
+    // The inverse-surface pill of the active theme (White outside a settings provider).
+    backgroundColor: TOAST_INVERSE_COLORS.white.surface,
+    color: TOAST_INVERSE_COLORS.white.text,
     fontFamily: "Manrope_600SemiBold",
     fontSize: 13,
     paddingHorizontal: 20,

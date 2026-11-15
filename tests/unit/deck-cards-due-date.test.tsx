@@ -57,6 +57,8 @@ const originalWindowDimensions = ReactNative.Dimensions.get("window");
 const originalScreenDimensions = ReactNative.Dimensions.get("screen");
 const NativeModal = ReactNative.Modal;
 
+// Open in Mushaf navigates through the router, which this characterization does not mount.
+jest.mock("@/lib/navigation/open-mushaf", () => ({ useOpenMushaf: () => jest.fn() }));
 jest.mock("@/lib/database/provider", () => ({
   useDatabase: () => mockDatabase,
 }));
@@ -801,7 +803,9 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           expect(enabledButtons).toHaveLength(2);
           for (const button of enabledButtons) expect(button.props.accessibilityState?.disabled).toBe(false);
           expect(view.getByText(firstCard.title)).toBeTruthy();
-          expect(view.getByText(secondCard.title)).toBeTruthy();
+          // The confirmation names the card it acts on, so the title also shows there.
+          expect(within(failedModal).getByText(secondCard.title)).toBeTruthy();
+          expect(view.getAllByText(secondCard.title)).toHaveLength(2);
           expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
           expect(onChanged).not.toHaveBeenCalled();
           expect(onClose).not.toHaveBeenCalled();
@@ -929,7 +933,9 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           expect(enabledButtons).toHaveLength(2);
           for (const button of enabledButtons) expect(button.props.accessibilityState?.disabled).toBe(false);
           expect(view.getByText(firstCard.title)).toBeTruthy();
-          expect(view.getByText(secondCard.title)).toBeTruthy();
+          // The confirmation names the card it acts on, so the title also shows there.
+          expect(within(failedModal).getByText(secondCard.title)).toBeTruthy();
+          expect(view.getAllByText(secondCard.title)).toHaveLength(2);
           expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
           expect(onChanged).not.toHaveBeenCalled();
           expect(onClose).not.toHaveBeenCalled();

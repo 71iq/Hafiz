@@ -224,7 +224,7 @@ describe("review-setting help caller characterization", () => {
         });
 
         if (dismiss === "back") await fireEventAsync(modal, "requestClose");
-        else await fireEventAsync.press(closeControl(modal, dismiss === "header" ? "h-9 w-9" : "absolute inset-0"));
+        else await fireEventAsync.press(closeControl(modal, dismiss === "header" ? "h-11 w-11" : "absolute inset-0"));
         await waitFor(() => expect(view.queryByText(body)).toBeNull());
         expect(view.getByDisplayValue(draft)).toBeTruthy();
         expect(onClose).not.toHaveBeenCalled();

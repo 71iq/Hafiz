@@ -252,6 +252,7 @@ export function WordDetailSheet() {
         onClose={handleClose}
         maxWidth={760}
         maxHeight={maxModalHeight}
+        phoneSheetHeight="max"
         dir="ltr"
       >
         <View ref={keyScopeRef} className="flex-1 min-h-0">

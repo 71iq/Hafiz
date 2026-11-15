@@ -3,11 +3,17 @@ import path from "node:path";
 
 const source = fs.readFileSync(path.join(process.cwd(), "components/ui/ResponsiveOverlay.tsx"), "utf8");
 
+// Rendered sizing is covered by responsive-overlay-contract.test.tsx; this guards the shared rule.
 describe("ResponsiveOverlay phone sheet height contract", () => {
-  it("uses a fixed phone sheet height instead of shrink-wrapping changing content", () => {
-    expect(source).toContain('activePresentation === "sheet"');
+  it("fits phone sheets to their content up to the cap, with a fixed height only on request", () => {
+    expect(source).toContain('phoneSheetHeight = "content"');
     expect(source).toContain("maxHeight: computedMaxHeight");
-    expect(source).toContain('height: activePresentation === "sheet" && isPhone ? computedMaxHeight : undefined');
-    expect(source).toContain("[activePresentation, animation, computedMaxHeight, contentWidth, isPhone, resolvedSurfaceColor]");
+    expect(source).toContain('height: isPhoneSheet && phoneSheetHeight === "max" ? computedMaxHeight : undefined');
+    // Phone sheets still shrink above the keyboard; dialogs and panels stay content-sized.
+    expect(source).toContain("...(isPhoneSheet ? { flexShrink: 1, minHeight: 0 } : null)");
+  });
+
+  it("keeps the 92% phone cap below the status bar", () => {
+    expect(source).toContain("Math.min(height - (isPhone ? insets.top + 8 : 48), isPhone ? height * 0.92 : 720)");
   });
 });

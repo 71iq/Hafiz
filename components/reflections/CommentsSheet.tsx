@@ -1,6 +1,6 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { View, Text, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
 import { ChevronDown, Heart, Send } from "lucide-react-native";
 import { router } from "expo-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,13 +9,15 @@ import { requireSocialOwner } from "@/lib/social/owner";
 import { useAuthStore } from "@/lib/auth/store";
 import { hapticLight } from "@/lib/haptics";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { formatRelativeTime } from "@/lib/i18n/relative-time";
 import { fetchComments, addComment, toggleCommentLike } from "@/lib/reflections/api";
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 import type { Reflection, ReflectionComment, ReflectionCommentSort } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { DiscardChangesDialog, isEditableTextDirty, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
+import { formatNumber } from "@/lib/i18n/count";
 import { Input } from "@/components/ui/Input";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import { ReflectionCard } from "./ReflectionCard";
@@ -35,6 +37,31 @@ type Props = {
   onNavigate?: () => void;
   onCommentAdded: (reflectionId: string) => void;
 };
+
+/** The composer shows its counter from this length. */
+export const COMMENT_COUNTER_THRESHOLD = 1800;
+export const COMMENT_MAX_LENGTH = 2000;
+/** Long comments start clamped to this many lines, with Show more. */
+const COMMENT_CLAMP_LINES = 6;
+const COMMENT_LINE_HEIGHT = 20;
+const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+
+function localizeDigits(value: string, language: string) {
+  return language === "ar" ? value.replace(/[0-9]/g, (digit) => ARABIC_INDIC_DIGITS[Number(digit)]) : value;
+}
+
+/** The full local date and time for a comment, in the interface's language and digits. */
+export function formatCommentDateTime(dateStr: string, language: string): string {
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "";
+  let text: string;
+  try {
+    text = date.toLocaleString(language === "ar" ? "ar" : "en", { dateStyle: "long", timeStyle: "short" });
+  } catch {
+    text = date.toLocaleString();
+  }
+  return localizeDigits(text, language);
+}
 
 function sortComments(comments: ReflectionComment[], sort: ReflectionCommentSort): ReflectionComment[] {
   const sorted = [...comments];
@@ -85,7 +112,7 @@ export function CommentsSheet({
   >({});
   // Each failure shows where the person acted: the first load at the top, loading more beside its
   // button, and posting or liking above the input.
-  const [failure, setFailure] = useState<"load" | "more" | "post" | "privacy" | "like" | null>(null);
+  const [failure, setFailure] = useState<"load" | "more" | "post" | "privacy" | "like" | "auth" | null>(null);
   const error =
     failure === "load" || failure === "more"
       ? s.commentLoadFailed
@@ -95,10 +122,24 @@ export function CommentsSheet({
           ? s.commentPrivacyChanged
           : failure === "like"
             ? s.reflectionLikeFailed
-            : null;
-  const handleClose = useCallback(() => {
+            : failure === "auth"
+              ? s.reflectionFeedAuthRequired
+              : null;
+  // Expanded long comments and the comment whose full date is showing, per reflection.
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [clampedIds, setClampedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [dateRevealId, setDateRevealId] = useState<string | null>(null);
+  const closeNow = useCallback(() => {
     if (retire()) onClose();
   }, [retire, onClose]);
+  // A typed comment asks before any intentional close or switch away from this reflection.
+  const { guard, dialogProps } = useDiscardGuard(isEditableTextDirty(text, ""));
+  const handleClose = useCallback(() => guard(closeNow), [closeNow, guard]);
+  // Without a caller-provided sign-in path, a guest's like tap explains itself instead of doing nothing.
+  const requireAuth = useCallback(() => {
+    if (onAuthRequired) onAuthRequired();
+    else setFailure("auth");
+  }, [onAuthRequired]);
 
   const sortOptions = useMemo<{ value: ReflectionCommentSort; label: string }[]>(
     () => [
@@ -149,6 +190,9 @@ export function CommentsSheet({
     setFailure(null);
     setSortOpen(false);
     setCommentLikeOverrides({});
+    setExpandedIds(new Set());
+    setClampedIds(new Set());
+    setDateRevealId(null);
   }, [reflectionId, user?.id]);
 
   // fetchNextPage reports a failed page through the query's error, not by throwing, so the kind
@@ -217,7 +261,7 @@ export function CommentsSheet({
   const handleCommentLike = useCallback(
     async (comment: ReflectionComment) => {
       if (!user) {
-        onAuthRequired?.();
+        requireAuth();
         return;
       }
       const lease = begin("like:" + comment.id);
@@ -272,20 +316,28 @@ export function CommentsSheet({
         lease.release();
       }
     },
-    [user, begin, loadedComments, localComments, reflectionId, onAuthRequired, queryClient],
+    [user, begin, loadedComments, localComments, reflectionId, requireAuth, queryClient],
   );
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
   // Android keeps this screen and its Modal window mounted under a pushed route, so the sheet
   // has to close before navigating or the next screen opens behind it.
-  const closeForNavigation = useCallback(() => {
-    handleClose();
-    onNavigate?.();
-  }, [handleClose, onNavigate]);
+  // A navigation is an intentional exit, so a typed comment asks first.
+  const closeForNavigation = useCallback(
+    (navigate?: () => void) => {
+      guard(() => {
+        closeNow();
+        onNavigate?.();
+        navigate?.();
+      });
+    },
+    [closeNow, guard, onNavigate],
+  );
   const openProfile = useCallback(
     (commentUserId: string) => {
-      closeForNavigation();
-      router.push(commentUserId === user?.id ? ("/profile" as any) : (`/profile/${commentUserId}` as any));
+      closeForNavigation(() =>
+        router.push(commentUserId === user?.id ? ("/profile" as any) : (`/profile/${commentUserId}` as any)),
+      );
     },
     [closeForNavigation, user?.id],
   );
@@ -293,12 +345,15 @@ export function CommentsSheet({
     () =>
       onReferencePress
         ? (target: Reflection) => {
-            closeForNavigation();
-            onReferencePress(target);
+            closeForNavigation(() => onReferencePress(target));
           }
         : undefined,
     [closeForNavigation, onReferencePress],
   );
+  const retryLoad = useCallback(() => {
+    setFailure(null);
+    void commentsQuery.refetch();
+  }, [commentsQuery]);
 
   return (
     <>
@@ -306,14 +361,14 @@ export function CommentsSheet({
         open={!!reflectionId}
         onClose={handleClose}
         maxWidth={760}
+        // The list scrolls between the header and the pinned composer, so the sheet keeps its height.
+        phoneSheetHeight="max"
         dir={isRTL ? "rtl" : "ltr"}
         avoidKeyboard
       >
         <OverlayHeader
           title={reflection ? s.reflectionPostTitle : s.reflectionComments}
-          subtitle={s.reflections}
           onClose={handleClose}
-          showHandle
           isRTL={isRTL}
         />
         <View className="flex-1 min-h-0">
@@ -325,10 +380,14 @@ export function CommentsSheet({
                 showReference={showReference}
                 referenceLabel={referenceLabel}
                 onReferencePress={handleReferencePress}
-                onNavigate={closeForNavigation}
+                // The card pushes its route right after this call, so it cannot wait for a prompt.
+                onNavigate={() => {
+                  closeNow();
+                  onNavigate?.();
+                }}
                 onCommentsPress={() => {}}
                 onLikeToggled={onLikeToggled ?? (() => {})}
-                onAuthRequired={onAuthRequired}
+                onAuthRequired={requireAuth}
               />
             ) : null}
 
@@ -412,19 +471,22 @@ export function CommentsSheet({
 
             {/* Only the first load fails here; other failures show where the person acted. */}
             {error && failure === "load" ? (
-              <Text
-                accessibilityRole="alert"
-                className="mb-3 text-red-600 dark:text-red-400"
-                style={{
-                  fontFamily: "Manrope_500Medium",
-                  fontSize: 13,
-                  lineHeight: 20,
-                  ...textStartStyle(isRTL),
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {error}
-              </Text>
+              <View className="mb-3 gap-2">
+                <Text
+                  accessibilityRole="alert"
+                  className="text-red-600 dark:text-red-400"
+                  style={{
+                    fontFamily: "Manrope_500Medium",
+                    fontSize: 13,
+                    lineHeight: 20,
+                    ...textStartStyle(isRTL),
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {error}
+                </Text>
+                <RetryButton label={s.sharedTryAgain} onPress={retryLoad} isRTL={isRTL} />
+              </View>
             ) : null}
 
             {commentsQuery.isLoading ? (
@@ -463,22 +525,82 @@ export function CommentsSheet({
                           handleSize={10}
                         />
                       </Pressable>
-                      <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 10, color: mutedColor }}>
-                        {formatRelativeTime(c.created_at, s.justNow, uiLanguage)}
+                      <CommentTime
+                        relative={localizeDigits(formatRelativeTime(c.created_at, s.justNow, uiLanguage), uiLanguage)}
+                        full={formatCommentDateTime(c.created_at, uiLanguage)}
+                        hint={s.commentFullDateHint}
+                        revealed={dateRevealId === c.id}
+                        onReveal={(show) => setDateRevealId((current) => (show ? c.id : current === c.id ? null : current))}
+                        color={mutedColor}
+                      />
+                    </View>
+                    <View>
+                      {/* An unclamped hidden copy tells whether the comment needs Show more. */}
+                      <Text
+                        aria-hidden
+                        accessibilityElementsHidden
+                        importantForAccessibility="no-hide-descendants"
+                        pointerEvents="none"
+                        onLayout={(event) => {
+                          const clamped = event.nativeEvent.layout.height > COMMENT_LINE_HEIGHT * COMMENT_CLAMP_LINES + 2;
+                          setClampedIds((current) => {
+                            if (current.has(c.id) === clamped) return current;
+                            const next = new Set(current);
+                            if (clamped) next.add(c.id);
+                            else next.delete(c.id);
+                            return next;
+                          });
+                        }}
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          opacity: 0,
+                          fontFamily: "Manrope_400Regular",
+                          fontSize: 13,
+                          lineHeight: COMMENT_LINE_HEIGHT,
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                      >
+                        {c.content}
+                      </Text>
+                      <Text
+                        className="text-charcoal dark:text-neutral-300"
+                        numberOfLines={expandedIds.has(c.id) ? undefined : COMMENT_CLAMP_LINES}
+                        style={{
+                          fontFamily: "Manrope_400Regular",
+                          fontSize: 13,
+                          lineHeight: COMMENT_LINE_HEIGHT,
+                          ...textStartStyle(isRTL),
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                      >
+                        {c.content}
                       </Text>
                     </View>
-                    <Text
-                      className="text-charcoal dark:text-neutral-300"
-                      style={{
-                        fontFamily: "Manrope_400Regular",
-                        fontSize: 13,
-                        lineHeight: 20,
-                        ...textStartStyle(isRTL),
-                        writingDirection: isRTL ? "rtl" : "ltr",
-                      }}
-                    >
-                      {c.content}
-                    </Text>
+                    {clampedIds.has(c.id) || expandedIds.has(c.id) ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: expandedIds.has(c.id) }}
+                        onPress={() =>
+                          setExpandedIds((current) => {
+                            const next = new Set(current);
+                            if (next.has(c.id)) next.delete(c.id);
+                            else next.add(c.id);
+                            return next;
+                          })
+                        }
+                        className="min-h-11 justify-center"
+                        style={{ alignSelf: isRTL ? "flex-end" : "flex-start" }}
+                      >
+                        <Text
+                          className="text-primary-accent dark:text-primary-bright"
+                          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                        >
+                          {expandedIds.has(c.id) ? s.sharedShowLess : s.sharedShowMore}
+                        </Text>
+                      </Pressable>
+                    ) : null}
                     <View
                       className={`mt-1.5 items-center ${isRTL ? "flex-row-reverse" : "flex-row"}`}
                       style={{
@@ -505,7 +627,7 @@ export function CommentsSheet({
                         />
                         {(c.likes_count ?? 0) > 0 ? (
                           <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 11, color: mutedColor }}>
-                            {c.likes_count}
+                            {formatNumber(c.likes_count ?? 0, uiLanguage)}
                           </Text>
                         ) : null}
                       </Pressable>
@@ -550,7 +672,7 @@ export function CommentsSheet({
             )}
           </OverlayBody>
 
-          {user && error && (failure === "post" || failure === "privacy" || failure === "like") ? (
+          {error && (failure === "auth" || (user && (failure === "post" || failure === "privacy" || failure === "like"))) ? (
             <Text
               accessibilityRole="alert"
               className="mx-5 mb-2 text-red-600 dark:text-red-400"
@@ -592,7 +714,7 @@ export function CommentsSheet({
                 placeholder={s.reflectionAddComment}
                 placeholderTextColor={mutedColor}
                 multiline={false}
-                maxLength={2000}
+                maxLength={COMMENT_MAX_LENGTH}
                 dir={isRTL ? "rtl" : "ltr"}
                 className="min-h-0 flex-1 bg-transparent px-0 py-0 text-charcoal dark:text-neutral-100"
                 style={{
@@ -622,7 +744,25 @@ export function CommentsSheet({
                 <Send size={18} color={isDark ? "#5eead4" : "#003638"} />
               </Pressable>
             </View>
-          ) : (
+          ) : null}
+          {user && text.length > COMMENT_COUNTER_THRESHOLD ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              className="mx-5 -mt-2 mb-3"
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 12,
+                color: isDark ? "#a3a3a3" : "#6E5A47",
+                ...textStartStyle(isRTL),
+              }}
+            >
+              {interpolate(s.sharedCharacterCount, {
+                n: formatNumber(text.length, uiLanguage),
+                max: formatNumber(COMMENT_MAX_LENGTH, uiLanguage),
+              })}
+            </Text>
+          ) : null}
+          {user ? null : (
             <View className="mx-5 mb-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
               <Text
                 className="text-warm-500 dark:text-neutral-400"
@@ -637,10 +777,7 @@ export function CommentsSheet({
                 {s.reflectionLoginToComment}
               </Text>
               <Pressable
-                onPress={() => {
-                  closeForNavigation();
-                  router.push("/auth/login");
-                }}
+                onPress={() => closeForNavigation(() => router.push("/auth/login"))}
                 accessibilityRole="button"
                 // White on teal-700 in light (5.4:1); dark teal text on the bright accent in dark.
                 className="mt-3 min-h-[44px] justify-center self-start rounded-full bg-primary-muted px-4 py-2 dark:bg-primary-bright"
@@ -654,6 +791,59 @@ export function CommentsSheet({
           )}
         </View>
       </ResponsiveSheet>
+      <DiscardChangesDialog {...dialogProps} title={s.commentDiscardTitle} />
     </>
+  );
+}
+
+function RetryButton({ label, onPress, isRTL }: { label: string; onPress: () => void; isRTL: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      className="min-h-11 justify-center rounded-full bg-surface-high px-5 py-2.5 dark:bg-surface-dark-high"
+      style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, alignSelf: isRTL ? "flex-end" : "flex-start" })}
+    >
+      <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Relative time that reveals the full date and time on long-press, pointer hover or keyboard
+ * focus. Screen readers get the full date as its label.
+ */
+function CommentTime({
+  relative,
+  full,
+  hint,
+  revealed,
+  onReveal,
+  color,
+}: {
+  relative: string;
+  full: string;
+  hint: string;
+  revealed: boolean;
+  onReveal: (show: boolean) => void;
+  color: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="text"
+      accessibilityLabel={full}
+      accessibilityHint={hint}
+      onLongPress={() => onReveal(!revealed)}
+      onHoverIn={() => onReveal(true)}
+      onHoverOut={() => onReveal(false)}
+      onFocus={() => onReveal(true)}
+      onBlur={() => onReveal(false)}
+      focusable={Platform.OS === "web"}
+      hitSlop={8}
+    >
+      <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color }}>{revealed ? full : relative}</Text>
+    </Pressable>
   );
 }

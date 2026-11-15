@@ -65,17 +65,20 @@ export function DiscardChangesDialog({
   visible,
   onKeepEditing,
   onDiscard,
+  title,
 }: {
   visible: boolean;
   onKeepEditing: () => void;
   onDiscard: () => void;
+  /** Names what is discarded, such as "Discard this note?". Defaults to "Discard changes?". */
+  title?: string;
 }) {
   const s = useStrings();
   const { isDark, isRTL } = useSettings();
   return (
     <ConfirmDialog
       visible={visible}
-      title={s.discardChangesTitle}
+      title={title ?? s.discardChangesTitle}
       message={s.discardChangesMessage}
       cancelLabel={s.discardChangesKeepEditing}
       confirmLabel={s.discardChangesConfirm}

@@ -112,6 +112,13 @@ export function useOperationNotice(): (message: string) => void {
   return value.showNotice;
 }
 
+/** Like useOperationNotice, but a no-op outside the provider, for shared editors rendered in isolation. */
+export function useOptionalOperationNotice(): (message: string) => void {
+  return useContext(NoticeContext)?.showNotice ?? ignoreNotice;
+}
+
+function ignoreNotice() {}
+
 export function useInlineOperationNotice(): () => InlineNoticeAttempt {
   const value = useContext(NoticeContext);
   if (!value) throw new Error("useInlineOperationNotice requires OperationNoticeProvider");

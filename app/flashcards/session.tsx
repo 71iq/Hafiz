@@ -77,6 +77,7 @@ import {
 import { Toast } from "@/components/ui/Toast";
 import { getGradeSchedulePreviews, GradingButtons } from "@/components/flashcards/GradingButtons";
 import { formatDays, formatNumber } from "@/lib/i18n/count";
+import { formatAyahRef } from "@/lib/arabic";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -1263,7 +1264,8 @@ function FlashcardSessionScreen() {
         message={confirmCardAction === "delete" ? s.cardDeleteConfirm : s.cardResetConfirm}
         cancelLabel={s.flashcardsCancel}
         confirmLabel={confirmCardAction === "delete" ? s.flashcardsDelete : s.cardResetProgress}
-        destructive={confirmCardAction === "delete"}
+        destructive
+        itemName={currentCard ? `${currentCard.surahName} ${formatAyahRef(isRTL, currentCard.surah, currentCard.ayah)}` : undefined}
         confirmLoading={mutationBusy}
         error={sessionError}
         isDark={isDark}

@@ -1057,7 +1057,8 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(resetStudyCardProgress).not.toHaveBeenCalled();
           expect(hapticMedium).toHaveBeenCalledTimes(1);
 
-          fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsDelete }));
+          // After a failure the confirm action reads Try again (shared.confirm.error).
+          fireEvent.press(within(failedModal).getByRole("button", { name: s.sharedTryAgain }));
           await waitFor(
             () => expect(view.UNSAFE_getAllByType(NativeModal).filter((node) => node.props.visible)).toHaveLength(0),
             // The dialog stays mounted through its real-timer exit animation; allow for a loaded CI host.
@@ -1238,7 +1239,8 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(deleteStudyCard).not.toHaveBeenCalled();
           expect(hapticMedium).toHaveBeenCalledTimes(1);
 
-          fireEvent.press(within(failedModal).getByRole("button", { name: s.cardResetProgress }));
+          // After a failure the confirm action reads Try again (shared.confirm.error).
+          fireEvent.press(within(failedModal).getByRole("button", { name: s.sharedTryAgain }));
           await waitFor(
             () => expect(view.UNSAFE_getAllByType(NativeModal).filter((node) => node.props.visible)).toHaveLength(0),
             // The dialog stays mounted through its real-timer exit animation; allow for a loaded CI host.
