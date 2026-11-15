@@ -60,3 +60,11 @@ export function formatLines(n: number, language: Language): string {
   if (language === "ar") return arabicCount(n, LINES);
   return n === 1 ? "1 line" : `${n.toLocaleString("en")} lines`;
 }
+
+const OCCURRENCES: ArabicForms = { one: "موضع واحد", two: "موضعان", few: "مواضع", many: "موضعًا" };
+
+/** Places a root occurs in the Quran: "موضعان", "١٢ موضعًا" or "3 occurrences". */
+export function formatOccurrences(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, OCCURRENCES);
+  return n === 1 ? "1 occurrence" : `${n.toLocaleString("en")} occurrences`;
+}

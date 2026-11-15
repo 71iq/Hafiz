@@ -1,4 +1,3 @@
-import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { View, Text, Pressable, ActivityIndicator, Linking, Platform, StyleSheet, useWindowDimensions } from "react-native";
 import { Card } from "@/components/ui/Card";
@@ -45,7 +44,6 @@ import { WirdSettingsSection } from "@/components/habit/WirdSettingsSection";
 import { ReminderSettingsSection } from "@/components/notifications/ReminderSettingsSection";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
-import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
@@ -132,7 +130,6 @@ export default function SettingsScreen() {
   const db = useDatabase();
   const s = useStrings();
   const appReleaseRow = useAppReleaseRow();
-  const showNotice = useOperationNotice();
   const router = useRouter();
   const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string }>();
   const configured = isSupabaseConfigured();
@@ -392,17 +389,6 @@ export default function SettingsScreen() {
       router.setParams({ category });
     },
     [router],
-  );
-
-  const handleTafsirSelectionError = useCallback(
-    (error: unknown) => {
-      console.warn("[Settings] Failed to import tafsir source:", error);
-      showNotice(s.tafseerSourceImportFailed);
-    },
-    [s.tafseerSourceImportFailed, showNotice],
-  );
-  const { importingSource: importingTafseerSource, selectSource: handleTafseerSourceSelect } = useTafsirSourceSelection(
-    { db, onSelected: setTafseerSource, onError: handleTafsirSelectionError },
   );
 
   const categoryPanels = (
@@ -725,7 +711,6 @@ export default function SettingsScreen() {
                 value={currentTafseerTitle}
                 isRTL={isRTL}
                 isDark={isDark}
-                loading={Boolean(importingTafseerSource)}
                 onPress={() => setTafseerPickerVisible(true)}
               />
             </ContentSettingsGroup>
@@ -1079,8 +1064,8 @@ export default function SettingsScreen() {
       <TafsirSourcePicker
         visible={tafseerPickerVisible}
         selectedSource={tafseerSource}
-        importingSource={importingTafseerSource}
-        onSelect={handleTafseerSourceSelect}
+        onSelected={setTafseerSource}
+        logLabel="[Settings]"
         onClose={() => setTafseerPickerVisible(false)}
       />
       <ReciterPicker
