@@ -380,6 +380,10 @@ function SidebarProfileCard({
     onNavigate?.();
     router.push("/auth/login" as any);
   };
+  const openSyncDetails = () => {
+    onNavigate?.();
+    router.push({ pathname: "/(tabs)/settings", params: { category: "account" } } as any);
+  };
 
   return (
     <View className="rounded-2xl px-3 py-2" style={{ backgroundColor: cardBg, direction: isRTL ? "rtl" : "ltr" }}>
@@ -414,7 +418,17 @@ function SidebarProfileCard({
             <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, color: nameColor }}>{s.navigationLogIn}</Text>
           </Pressable>
         ) : null}
-        {user ? <SyncIndicator status={syncStatus} isDark={isDark} hideSuccess onPrimary={isPersistent} /> : null}
+        {/* The sync state opens its details (last success, pending changes, guarded retry) in Settings > Account. */}
+        {user && syncStatus !== "idle" && syncStatus !== "synced" ? (
+          <Pressable
+            onPress={openSyncDetails}
+            accessibilityRole="button"
+            accessibilityLabel={s.navigationSyncDetails}
+            className="min-h-11 min-w-11 items-center justify-center"
+          >
+            <SyncIndicator status={syncStatus} isDark={isDark} hideSuccess onPrimary={isPersistent} />
+          </Pressable>
+        ) : null}
       </View>
       {showSessionEnded ? (
         <Text

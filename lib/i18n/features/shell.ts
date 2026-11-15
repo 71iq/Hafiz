@@ -3,6 +3,7 @@
  */
 export const shellStrings = {
   en: {
+    navigationSyncDetails: "Sync details",
     // Startup and database preparation
     databaseRetry: "Try again",
     databaseShowDetails: "Show details",
@@ -44,6 +45,7 @@ export const shellStrings = {
     errorSectionTitle: "This section could not load",
   },
   ar: {
+    navigationSyncDetails: "تفاصيل المزامنة",
     databaseRetry: "حاول مجددًا",
     databaseShowDetails: "عرض التفاصيل",
     databaseHideDetails: "إخفاء التفاصيل",

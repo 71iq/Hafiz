@@ -2437,7 +2437,8 @@ function SessionSummaryView({
           className="text-center text-charcoal dark:text-neutral-100"
           style={{ fontFamily: "NotoSerif_700Bold", fontSize: compact ? 21 : 24, marginBottom: 12 }}
         >
-          {s.sessionNothingToReview}
+          {/* Cards exist but none were due: say so with the next due time. No cards at all: nothing to review. */}
+          {nextReview ? s.sessionNothingWasDue : s.sessionNothingToReview}
         </Text>
         {nextReview ? (
           <Text
