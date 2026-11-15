@@ -6,7 +6,6 @@ export const progressStrings = {
     progressCurrentConsistency: "Current consistency",
     progressMoreStats: "More stats",
     progressFewerStats: "Fewer stats",
-    progressMetricHelpHint: "Shows what this figure counts",
     progressHelpMemorizedShare:
       "The share of your ayah cards you have reviewed at least once. It is not an estimate of recall.",
     progressHelpTotalMemorized: "Ayah cards you have reviewed at least once.",
@@ -51,7 +50,6 @@ export const progressStrings = {
     progressCurrentConsistency: "المواظبة الحالية",
     progressMoreStats: "إحصاءات أخرى",
     progressFewerStats: "إحصاءات أقل",
-    progressMetricHelpHint: "يعرض ما يحسبه هذا الرقم",
     progressHelpMemorizedShare: "نسبة بطاقات الآيات التي راجعتها مرة واحدة على الأقل. ليست تقديرًا لقوة التذكر.",
     progressHelpTotalMemorized: "بطاقات الآيات التي راجعتها مرة واحدة على الأقل.",
     progressHelpCurrentConsistency:
