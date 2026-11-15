@@ -97,13 +97,22 @@ export async function getLocalSurahProgress(db: DatabaseExecutor): Promise<Profi
        WHERE sc.deleted_at IS NULL
          AND sc.id NOT LIKE 'word:%'
          AND sc.deck_id NOT IN (?, ?, ?, ?)
+     ),
+     -- As private.hafiz_public_surah_from_card on the server: a surah is the digits before the first
+     -- colon, from 1 to 114. Page, half, seam, chunk and cloze cards ("page:madani15:582") have none,
+     -- and one such row would fail the whole upload of this account's surah progress.
+     surah_cards AS (
+       SELECT SUBSTR(ayah_key, 1, INSTR(ayah_key, ':') - 1) as surah_text, reps, last_review
+       FROM ayah_cards
+       WHERE INSTR(ayah_key, ':') > 1
      )
      SELECT
-       CAST(SUBSTR(ayah_key, 1, INSTR(ayah_key, ':') - 1) AS INTEGER) as surah,
+       CAST(surah_text AS INTEGER) as surah,
        COUNT(*) as total,
        SUM(CASE WHEN reps > 0 OR last_review IS NOT NULL THEN 1 ELSE 0 END) as memorized
-     FROM ayah_cards
-     WHERE INSTR(ayah_key, ':') > 1
+     FROM surah_cards
+     WHERE surah_text NOT GLOB '*[^0-9]*'
+       AND CAST(surah_text AS INTEGER) BETWEEN 1 AND 114
      GROUP BY surah
      ORDER BY surah`,
     [
