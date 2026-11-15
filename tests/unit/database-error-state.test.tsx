@@ -1,6 +1,6 @@
 import React from "react";
 import { Dimensions, I18nManager } from "react-native";
-import { cleanup, render } from "@testing-library/react-native";
+import { cleanup, fireEvent, render } from "@testing-library/react-native";
 import TabLayout from "@/app/(tabs)/_layout";
 import FlashcardSessionScreenWrapper from "@/app/flashcards/session";
 import VocabSessionScreenWrapper from "@/app/flashcards/vocab";
@@ -9,6 +9,7 @@ import ProfileScreen from "@/app/profile/index";
 import PublicProfileScreen from "@/app/profile/[userId]";
 import { AppNavigation } from "@/components/ui/AppNavigation";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { sanitizeDatabaseErrorDetails } from "@/components/ui/DatabaseErrorState";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { strings } from "@/lib/i18n/strings";
@@ -20,6 +21,7 @@ const mockStatus: ReturnType<typeof useDatabaseStatus> = {
   isReady: false,
   progress: { step: "isolated startup", current: 2, total: 7 },
   error: null,
+  retry: jest.fn(),
 };
 const mockSettings: Pick<ReturnType<typeof useSettings>, "uiLanguage"> = { uiLanguage: "en" };
 const mockDatabaseAccess = jest.fn(() => {
@@ -104,19 +106,25 @@ describe("route database-error presentation", () => {
       const message = "Isolated SQLite failure: تعذر الفتح\nretain literal details";
       mockStatus.error = message;
       const view = render(<Screen />);
+      const s = strings[titleLanguage];
       for (const isReady of [false, true]) {
         mockStatus.isReady = isReady;
         view.rerender(<Screen />);
-        const title = view.getByText(strings[titleLanguage].databaseError);
-        const details = view.getByText(message);
+        const title = view.getByText(s.databaseError);
         expect(view.queryByText(strings[titleLanguage === "ar" ? "en" : "ar"].databaseError)).toBeNull();
-        expect(title.props.className).toBe(profile ? "mb-2 text-red-600" : "text-red-600 mb-4");
-        expect(flattenStyle(title.props.style)).toEqual({ fontFamily: "Manrope_700Bold", fontSize: 18 });
-        expect(details.props.className).toBe(profile ? "text-center text-red-500" : "text-red-500 text-center");
-        expect(flattenStyle(details.props.style)).toEqual({
-          fontFamily: "Manrope_400Regular",
-          fontSize: profile ? 14 : 15,
-        });
+        expect(title.props.className).toContain("text-red-600");
+        expect(flattenStyle(title.props.style)).toEqual(
+          expect.objectContaining({ fontFamily: "Manrope_700Bold", fontSize: 18 }),
+        );
+        // The raw error stays behind Show details until asked for.
+        expect(view.queryByText(message)).toBeNull();
+        fireEvent.press(view.getByText(s.databaseShowDetails));
+        expect(view.getByText(message)).toBeTruthy();
+        fireEvent.press(view.getByText(s.databaseHideDetails));
+        expect(view.queryByText(message)).toBeNull();
+        jest.mocked(mockStatus.retry).mockClear();
+        fireEvent.press(view.getByText(s.databaseRetry));
+        expect(mockStatus.retry).toHaveBeenCalledTimes(1);
         const rootClass = profile
           ? "flex-1 items-center justify-center bg-surface px-6 dark:bg-surface-dark"
           : "flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6";
@@ -124,7 +132,6 @@ describe("route database-error presentation", () => {
         if (!container || Array.isArray(container)) throw new Error("Expected one native startup root");
         expect(container.type).toBe("View");
         expect(container.props.className).toBe(rootClass);
-        expect(container.children).toHaveLength(2);
         expect(view.UNSAFE_queryByType(LoadingScreen)).toBeNull();
         expect(view.UNSAFE_queryByType(SettingsProvider)).toBeNull();
         expect(mockDatabaseAccess).not.toHaveBeenCalled();
@@ -142,4 +149,21 @@ describe("route database-error presentation", () => {
       expect(AppNavigation).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("database error details", () => {
+  it("masks account and device data but keeps the failure text", () => {
+    const raw =
+      "SQLite open failed for person@example.com at /data/user/0/app.hafiz/databases/hafiz.db via https://x.test/a?token=abc";
+    const shown = sanitizeDatabaseErrorDetails(raw);
+    expect(shown).toContain("SQLite open failed");
+    expect(shown).toContain("hafiz.db");
+    expect(shown).not.toContain("person@example.com");
+    expect(shown).not.toContain("/data/user/0");
+    expect(shown).not.toContain("token=abc");
+  });
+
+  it("caps very long details", () => {
+    expect(sanitizeDatabaseErrorDetails("x ".repeat(1000)).length).toBeLessThanOrEqual(603);
+  });
 });

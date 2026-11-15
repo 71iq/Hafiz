@@ -42,6 +42,7 @@ import {
 } from "@/lib/profile/progress";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 import { textStartStyle } from "@/lib/ui/direction";
+import { SecondaryDestinations } from "@/components/ui/SecondaryDestinations";
 
 type HeatmapDay = { date: string; count: number };
 
@@ -273,6 +274,8 @@ export default function ProgressScreen() {
         ) : null}
 
         <DefaultDeckProgressChart items={defaultDeckProgress} isDark={isDark} isRTL={isRTL} s={s} />
+
+        <SecondaryDestinations destinations={["halaqa", "leaderboard", "reflection-journey"]} />
 
         {/* Surah progress */}
         <Text

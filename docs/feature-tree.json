@@ -25,7 +25,7 @@
         },
         {
           "id": "shell.entry",
-          "title": "Root entry: onboarding vs Home, /flashcards and /search redirects",
+          "title": "Root entry: onboarding vs Home, /flashcards and /search?q= redirects",
           "kind": "transition",
           "cases": ["UI-02", "NAV-04"],
           "uses": [],
@@ -61,7 +61,7 @@
         },
         {
           "id": "shell.sync",
-          "title": "Background sync indicator, restore consent and Sync paused status",
+          "title": "Sync state on the profile card, restore consent and Sync paused status",
           "kind": "widget",
           "cases": ["UI-05"],
           "uses": [],
@@ -70,7 +70,7 @@
         },
         {
           "id": "shell.errorboundary",
-          "title": "Section error fallback with Try Again",
+          "title": "Scoped error fallback per tab, route and overlay: Retry, Home, report a problem",
           "kind": "widget",
           "cases": ["UI-11"],
           "uses": [],
@@ -96,7 +96,7 @@
           "children": [
             {
               "id": "shell.nav.tabs",
-              "title": "Phone tab bar: Home, Mushaf, Leaderboard, Progress, Settings",
+              "title": "Phone tab bar: Home, Mushaf, Progress, Settings",
               "kind": "widget",
               "cases": ["NAV-01"],
               "uses": [],
@@ -105,7 +105,7 @@
             },
             {
               "id": "shell.nav.tablet",
-              "title": "Tablet floating navigation",
+              "title": "Edge navigation panel (768-1023px and wide Mushaf): click-only, outside press dismisses",
               "kind": "widget",
               "cases": ["NAV-02"],
               "uses": [],
@@ -114,10 +114,19 @@
             },
             {
               "id": "shell.nav.desktop",
-              "title": "Desktop sidebar (feed, journey, profile links)",
+              "title": "Desktop sidebar: six destinations, Search, feed, journey, profile card",
               "kind": "widget",
               "cases": ["NAV-03"],
-              "uses": [],
+              "uses": ["home.search"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "shell.nav.destinations",
+              "title": "Halaqa, Board and Journey entry rows on Home and Progress",
+              "kind": "widget",
+              "cases": [],
+              "uses": ["halaqa", "board", "journey"],
               "native": false,
               "children": []
             }
@@ -404,7 +413,7 @@
       "title": "Home",
       "kind": "screen",
       "cases": ["HOME-01"],
-      "uses": [],
+      "uses": ["shell.nav.destinations"],
       "native": false,
       "children": [
         {
@@ -1212,7 +1221,7 @@
       "title": "Progress",
       "kind": "screen",
       "cases": ["PROGRESS-01", "PROGRESS-05"],
-      "uses": [],
+      "uses": ["shell.nav.destinations"],
       "native": false,
       "children": [
         {

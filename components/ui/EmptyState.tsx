@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, Pressable } from "react-native";
 import type { LucideIcon } from "lucide-react-native";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
+import { accentIconColor, errorIconColor, mutedIconColor } from "@/lib/ui/theme-icons";
 
 type Props = {
   icon: LucideIcon;
@@ -10,8 +11,11 @@ type Props = {
   actionLabel?: string;
   onAction?: () => void;
   isDark: boolean;
-  /** "success" marks something just done: the icon takes the accent on a tinted disc. */
-  tone?: "neutral" | "success";
+  /**
+   * "success" marks something just done: the icon takes the accent on a tinted disc. "error" colors
+   * the icon with the theme's error token so a failure does not read as an empty list.
+   */
+  tone?: "neutral" | "success" | "error";
   /** "display" sets the title in the serif heading of a session's end, for an end state in a session flow. */
   titleStyle?: "default" | "display";
 };
@@ -22,14 +26,15 @@ type Props = {
  * from the theme tokens, so they follow the active theme, and read at 4.5:1 or more.
  */
 export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction, isDark, tone = "neutral", titleStyle = "default" }: Props) {
-  const { themeColors } = useSettings();
+  const { themeColors, effectiveTheme } = useSettings();
+  // Theme tokens, not fixed hex: the palette prop wins over isDark when the provider knows it.
+  const palette = effectiveTheme ?? (isDark ? "dark" : "beige");
   const success = tone === "success";
-  const accentColor = isDark ? "#2dd4bf" : "#0d9488";
-  const iconColor = success ? accentColor : isDark ? "#525252" : "#DFD9D1";
+  const accentColor = accentIconColor(palette);
+  const iconColor =
+    tone === "error" ? errorIconColor(palette) : success ? accentColor : mutedIconColor(palette);
   const iconBg = success
-    ? isDark
-      ? "rgba(45, 212, 191, 0.15)"
-      : "rgba(13, 148, 136, 0.10)"
+    ? withThemeOpacity(accentColor, isDark ? 0.15 : 0.1)
     : withThemeOpacity(themeColors.surfaceHigh, isDark ? 0.4 : 0.6);
 
   return (
@@ -75,9 +80,9 @@ export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction,
         <Pressable
           onPress={onAction}
           accessibilityRole="button"
+          className="bg-primary-muted dark:bg-primary-bright"
           style={(state) => ({
             marginTop: 20,
-            backgroundColor: accentColor,
             paddingHorizontal: 24,
             minHeight: 44,
             borderRadius: 22,
@@ -86,7 +91,7 @@ export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction,
             transform: [{ scale: state.pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, color: "#FFFFFF" }}>
+          <Text className="text-white dark:text-primary" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
             {actionLabel}
           </Text>
         </Pressable>

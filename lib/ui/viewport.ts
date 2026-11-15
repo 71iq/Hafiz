@@ -11,6 +11,8 @@ export const VIEWPORT_BREAKPOINTS = {
 export const SIDEBAR_BREAKPOINT = VIEWPORT_BREAKPOINTS.sidebar;
 export const PERSISTENT_SIDEBAR_BREAKPOINT = VIEWPORT_BREAKPOINTS.sidebarValidation;
 export const PERSISTENT_SIDEBAR_WIDTH = 248;
+/** The edge navigation trigger's target width (768-1023px and wide Mushaf); content gutters clear it. */
+export const FLOATING_NAV_TRIGGER_SIZE = 44;
 export const DESKTOP_CONTENT_MAX_WIDTH = 1040;
 export const SETTINGS_CONTENT_MAX_WIDTH = 880;
 export const LEADERBOARD_CONTENT_MAX_WIDTH = 900;

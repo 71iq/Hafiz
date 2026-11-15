@@ -20,7 +20,8 @@ export default function NotFoundScreen() {
           title={s.notFoundTitle}
           subtitle={s.notFoundMessage}
           actionLabel={s.notFoundHome}
-          onAction={() => router.replace("/(tabs)/home")}
+          // The root entry sends first-time users to onboarding and everyone else to Home.
+          onAction={() => router.replace("/")}
           isDark={isDark}
         />
       </View>

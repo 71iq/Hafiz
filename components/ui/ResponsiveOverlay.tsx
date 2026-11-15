@@ -1,4 +1,5 @@
 import { OperationNoticeOverlay } from "@/components/ui/OperationNoticeProvider";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useEffect, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import {
   Animated,
@@ -305,7 +306,10 @@ export function ResponsiveOverlay({
           )}
           style={[contentStyle, { direction: dir }]}
         >
-          {children}
+          {/* A crashing sheet shows the fallback inside the sheet; backdrop, Back and Escape still close it. */}
+          <ErrorBoundary section="overlay" variant="section" showHome={false}>
+            {children}
+          </ErrorBoundary>
         </Animated.View>
       </Container>
       <OperationNoticeOverlay overlayId={overlayId} open={open} />
@@ -448,7 +452,10 @@ export function OverlayBody({
       contentContainerClassName={contentContainerClassName}
       stickyHeaderIndices={stickyHeaderIndices}
     >
-      {children}
+      {/* A crash in the body keeps the overlay header and its Close button. */}
+      <ErrorBoundary section="overlay-body" variant="section" showHome={false}>
+        {children}
+      </ErrorBoundary>
       {/* Keeps the last lines above the Android navigation bar without overriding sheet padding. */}
       {insets.bottom > 0 ? <View style={{ height: insets.bottom }} /> : null}
     </ScrollView>

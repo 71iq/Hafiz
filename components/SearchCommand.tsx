@@ -137,9 +137,11 @@ interface SearchCommandProps {
   visible: boolean;
   onClose: () => void;
   onNavigateToAyah?: (surah: number, ayah: number, wordPos?: number) => void;
+  /** Fills the field and searches when Search opens, e.g. from the legacy /search?q= link. */
+  initialQuery?: string;
 }
 
-export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchCommandProps) {
+export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery }: SearchCommandProps) {
   const db = useDatabase();
   const { isDark, isRTL } = useSettings();
   const { width, height } = useWindowDimensions();
@@ -354,6 +356,18 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
     },
     [mode, performSearch, cancelPendingSearch]
   );
+
+  // A query handed over on open runs once for that opening.
+  const appliedInitialQueryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!visible) {
+      appliedInitialQueryRef.current = null;
+      return;
+    }
+    if (!initialQuery || appliedInitialQueryRef.current === initialQuery) return;
+    appliedInitialQueryRef.current = initialQuery;
+    handleQueryChange(initialQuery);
+  }, [visible, initialQuery, handleQueryChange]);
 
   const handleModeChange = useCallback(
     (newMode: "text" | "root") => {
