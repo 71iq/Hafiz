@@ -256,6 +256,10 @@ export function useBoardBandRefresh(): void {
     // settle like activity: their pulled rows are often this device's own changes coming back, and
     // comparing bands after each would rescan the history for nothing.
     const unsubscribeSync = subscribeSyncCompleted((summary) => {
+      // The Board reads its bands from local plan and cards; pulled or restored rows can change them.
+      // The query keys carry this account, so another account's cache is never touched.
+      if (active && (summary.pulled > 0 || summary.restoreCompleted || summary.accountRestored))
+        void queryClient.invalidateQueries({ queryKey: ["boardInputs", userId] });
       if (summary.restoreCompleted || summary.accountRestored) run();
       else settleThenRun();
     });

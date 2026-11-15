@@ -184,3 +184,17 @@ describe("useBoardBandRefresh (8.13)", () => {
     expect(calls("get_profile_privacy")).toHaveLength(1);
   });
 });
+
+describe("Board data after sync (W02 shell.sync.refresh)", () => {
+  it("invalidates only this account's Board inputs when a sync pulls or restores rows", async () => {
+    const { client } = renderProbe();
+    const invalidate = jest.spyOn(client, "invalidateQueries");
+    await act(async () => emitSyncCompleted({ pushed: 3, pulled: 0 }));
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ["boardInputs", USER] });
+    await act(async () => emitSyncCompleted({ pushed: 0, pulled: 2 }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["boardInputs", USER] });
+    invalidate.mockClear();
+    await act(async () => emitSyncCompleted({ pushed: 0, pulled: 0, restoreCompleted: true }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["boardInputs", USER] });
+  });
+});

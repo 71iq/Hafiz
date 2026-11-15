@@ -19,7 +19,7 @@ const ROUTE_TITLE_KEYS: Record<string, UIStringKey> = {
 };
 
 export function documentTitleFor(pathname: string, s: UIStrings): string {
-  if (pathname === "/zayt-preview") return `Zayt Preview | ${s.appName}`;
+  if (pathname === "/dev/zayt") return `Zayt Preview | ${s.appName}`;
   const key = ROUTE_TITLE_KEYS[pathname];
   return key ? interpolate(s.documentTitleFormat, { page: s[key], app: s.appName }) : s.appName;
 }

@@ -1,6 +1,8 @@
 import React from "react";
 import { Linking, Platform } from "react-native";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react-native";
+import { useAppReleaseRows } from "@/components/app-update/use-app-release-row";
+import { resetWebRevision } from "@/lib/app-update/build-info";
 import { AppReleaseCard } from "@/components/app-update/AppReleaseCard";
 import {
   ANDROID_LATEST_APK_URL,
@@ -28,6 +30,7 @@ jest.mock("expo-application", () => ({
     return mockApplication.nativeApplicationVersion;
   },
 }));
+jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { version: "1.0.1" } } }));
 let mockLocale: "en" | "ar" = "en";
 jest.mock("@/lib/i18n/useStrings", () => ({
   ...jest.requireActual("@/lib/i18n/useStrings"),
@@ -120,4 +123,33 @@ it("never checks from the side-by-side QA build", () => {
 
   expect(fetchMock).not.toHaveBeenCalled();
   expect(screen.toJSON()).toBeNull();
+});
+
+describe("Settings > About release rows (W14)", () => {
+  beforeEach(() => resetWebRevision());
+
+  it("shows the exported web version and revision separately from the latest APK", async () => {
+    Platform.OS = "web";
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/__release.json"
+        ? { ok: true, json: async () => ({ commit: "0123456789abcdef0123456789abcdef01234567" }) }
+        : { ok: true, json: async () => release },
+    );
+    const { result } = renderHook(() => useAppReleaseRows());
+    await waitFor(() => expect(result.current[0].description).toBe("Web build 0123456"));
+    expect(result.current.map((row) => row.key)).toEqual(["web-version", "apk"]);
+    expect(result.current[0].title).toBe("Version 1.0.1");
+    // The version line is information, not a button; the APK row opens the download.
+    expect(result.current[0].onPress).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalledWith(ANDROID_RELEASE_MANIFEST_URL, expect.anything());
+  });
+
+  it("shows the installed iOS version without checking for updates", () => {
+    Platform.OS = "ios";
+    const { result } = renderHook(() => useAppReleaseRows());
+    expect(result.current).toHaveLength(1);
+    expect(result.current[0].description).toBe("Version 1.0.2");
+    expect(result.current[0].onPress).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

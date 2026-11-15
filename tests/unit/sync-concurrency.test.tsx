@@ -44,6 +44,7 @@ jest.mock("@/lib/database/sync", () => ({
   acceptRestoreConsent: (...args: unknown[]) => mockAccept(...args),
   cancelRestoreConsent: (...args: unknown[]) => mockCancel(...args),
   clearRestoreConsentRequests: () => mockClearConsent(),
+  hasCompletedAccountRestore: async () => false,
 }));
 jest.mock("@/lib/database/sync-queue", () => ({ getPendingSyncCount: (...args: unknown[]) => mockCount(...args) }));
 jest.mock("@/lib/fsrs/leaderboard-sync", () => ({ updateProfileStats: (...args: unknown[]) => mockStats(...args) }));
@@ -554,7 +555,9 @@ it.each(["synced", "failed"] as const)(
     mockFullSync.mockResolvedValue({ ...HEALTHY, status });
     const { result } = renderHook(() => useSync());
     await waitFor(() => expect(result.current.status).toBe(status === "synced" ? "synced" : "error"));
-    expect(result.current.pendingCount).toBe(7);
+    // Dormant Quran Foundation rows stay stored but are not reported while its gate is off.
+    expect(result.current.pendingCount).toBe(0);
+    expect(mockQfCount).not.toHaveBeenCalled();
     expect(mockQfSync).not.toHaveBeenCalled();
   },
 );
@@ -810,5 +813,63 @@ describe("W07 restore pause and consent", () => {
       jest.advanceTimersByTime(RECONNECT_SYNC_DEBOUNCE_MS);
     });
     await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("W14 account status details", () => {
+  it("records the last complete sync and names a failure class", async () => {
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(result.current.status).toBe("synced"));
+    expect(result.current.failure).toBeNull();
+    expect(Date.parse(result.current.lastSyncedAt ?? "")).not.toBeNaN();
+    const lastSuccess = result.current.lastSyncedAt;
+
+    mockFullSync.mockResolvedValueOnce({ ...HEALTHY, status: "failed" });
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(result.current.status).toBe("error");
+    expect(result.current.failure).toBe("failed");
+    // A failed run never moves the last successful time.
+    expect(result.current.lastSyncedAt).toBe(lastSuccess);
+
+    mockFullSync.mockResolvedValueOnce({ ...HEALTHY, status: "partial" });
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(result.current.failure).toBe("partial");
+  });
+
+  it("reports offline as its own class", async () => {
+    jest.mocked(NetInfo.fetch).mockResolvedValueOnce(network(false));
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(result.current.failure).toBe("offline"));
+  });
+
+  it("keeps Sync now behind a stored restore pause; only Resume sync continues", async () => {
+    mockPause.mockResolvedValue("cancelled");
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(mockPause).toHaveBeenCalled());
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(mockFullSync).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("idle");
+  });
+
+  it("waits for a run in progress instead of dropping Sync now", async () => {
+    const first = deferred<Summary>();
+    mockFullSync.mockReturnValueOnce(first.promise);
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(1));
+    let manual: Promise<void> | undefined;
+    act(() => {
+      manual = result.current.syncNow();
+    });
+    await act(async () => {
+      first.resolve(HEALTHY);
+      await manual;
+    });
+    expect(mockFullSync).toHaveBeenCalledTimes(2);
   });
 });

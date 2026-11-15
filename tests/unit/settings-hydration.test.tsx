@@ -21,7 +21,7 @@ type SettingsFixture = {
 };
 
 const mockSetColorScheme = jest.fn<void, [string]>();
-const mockImportTranslation = jest.fn<Promise<void>, [unknown, string]>(() => Promise.resolve());
+const mockImportTranslation = jest.fn<Promise<void>, [unknown, string, unknown?]>(() => Promise.resolve());
 const mockEnqueueSync = jest.fn<Promise<void>, [unknown, ...unknown[]]>(() => Promise.resolve());
 const mockUseDatabase = jest.fn<SettingsFixture, []>();
 const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -38,6 +38,7 @@ jest.mock("@/lib/database/provider", () => ({
 }));
 
 jest.mock("@/lib/translations/import", () => ({
+  TranslationImportCancelled: class TranslationImportCancelled extends Error {},
   importTranslation: (...args: Parameters<typeof mockImportTranslation>) => mockImportTranslation(...args),
 }));
 
@@ -354,5 +355,76 @@ describe("device-only preferences (C05)", () => {
       await Promise.resolve();
     });
     expect(result.current.theme).toBe("amoled");
+  });
+});
+
+describe("W14 settings write feedback and translation choice", () => {
+  beforeEach(() => {
+    mockIsReady = true;
+    mockImportTranslation.mockReset().mockResolvedValue();
+  });
+
+  it("reverts a failed reader setting to the last value and announces only the key", async () => {
+    const { subscribeSettingSaveFailed } = jest.requireActual("@/lib/settings/save-feedback");
+    const failures: string[] = [];
+    const unsubscribe = subscribeSettingSaveFailed((key: string) => failures.push(key));
+    const fixture = createFixture();
+    const { result } = await renderLoadedSettings(fixture);
+    const setter = result.current.setPageScroll;
+    fixture.runAsync.mockRejectedValueOnce(new Error("disk full"));
+    await act(async () => {
+      result.current.setPageScroll("horizontal");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.pageScroll).toBe("vertical");
+    expect(failures).toEqual(["page_scroll"]);
+    // The setter keeps its identity across value changes.
+    expect(result.current.setPageScroll).toBe(setter);
+    unsubscribe();
+  });
+
+  it("keeps the previous translation when an import fails", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const fixture = createFixture();
+    const { result } = await renderLoadedSettings(fixture);
+    const previous = result.current.translationLanguage;
+    mockImportTranslation.mockRejectedValueOnce(new Error("synthetic import failure"));
+    await act(async () => {
+      await expect(result.current.setTranslationLanguage("fr")).rejects.toThrow("synthetic import failure");
+    });
+    expect(result.current.translationLanguage).toBe(previous);
+    expect(fixture.settings.get("translation_language")).toBe(previous);
+    expect(result.current.isTranslationLoading).toBe(false);
+  });
+
+  it("lets built-in English replace an import still in progress", async () => {
+    const fixture = createFixture();
+    const { result } = await renderLoadedSettings(fixture);
+    let finishImport: () => void = () => {};
+    mockImportTranslation.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishImport = resolve;
+        }),
+    );
+    let importing: Promise<void> | undefined;
+    act(() => {
+      importing = result.current.setTranslationLanguage("fr");
+    });
+    expect(result.current.isTranslationLoading).toBe(true);
+    await act(async () => {
+      await result.current.setTranslationLanguage("en");
+    });
+    expect(result.current.translationLanguage).toBe("en");
+    expect(result.current.isTranslationLoading).toBe(false);
+    await act(async () => {
+      finishImport();
+      await importing;
+    });
+    // The finished import records its rows but cannot take the selection back.
+    expect(result.current.translationLanguage).toBe("en");
+    expect(fixture.settings.get("translation_language")).toBe("en");
+    expect(fixture.settings.get("translation_active_lang")).toBe("fr");
   });
 });

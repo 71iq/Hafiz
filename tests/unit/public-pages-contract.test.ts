@@ -1,6 +1,9 @@
+import fs from "node:fs";
+import path from "node:path";
 import {
   PUBLIC_PAGE_CONTENT,
   PUBLIC_PAGE_LABELS,
+  TABLE_OF_CONTENTS_MIN_SECTIONS,
   type PublicPageContent,
   type PublicPageKey,
   type PublicPageLanguage,
@@ -18,7 +21,8 @@ const minimumSectionCounts: Record<PublicPageKey, number> = {
 
 function allText(content: PublicPageContent): string {
   return [
-    content.eyebrow,
+    content.tabLabel,
+    content.eyebrow ?? "",
     content.title,
     content.description,
     content.lastUpdated ?? "",
@@ -28,15 +32,11 @@ function allText(content: PublicPageContent): string {
       ...(section.bullets ?? []),
       ...(section.links ?? []).flatMap((link) => [link.label, link.href]),
     ]),
-    ...content.actions.flatMap((link) => [link.label, link.href]),
   ].join("\n");
 }
 
 function collectLinks(content: PublicPageContent): PublicPageLink[] {
-  return [
-    ...content.actions,
-    ...content.sections.flatMap((section) => section.links ?? []),
-  ];
+  return content.sections.flatMap((section) => section.links ?? []);
 }
 
 describe("public page content contracts", () => {
@@ -50,7 +50,7 @@ describe("public page content contracts", () => {
     const arabic = PUBLIC_PAGE_CONTENT[pageKey].ar;
 
     expect(arabic.sections).toHaveLength(english.sections.length);
-    expect(arabic.actions).toHaveLength(english.actions.length);
+    expect(Boolean(arabic.eyebrow)).toBe(Boolean(english.eyebrow));
     expect(arabic.lastUpdated ? true : false).toBe(english.lastUpdated ? true : false);
 
     for (let index = 0; index < english.sections.length; index += 1) {
@@ -59,10 +59,9 @@ describe("public page content contracts", () => {
       expect(arSection.body?.length ?? 0).toBe(enSection.body?.length ?? 0);
       expect(arSection.bullets?.length ?? 0).toBe(enSection.bullets?.length ?? 0);
       expect(arSection.links?.length ?? 0).toBe(enSection.links?.length ?? 0);
-      expect(arSection.id ?? null).toBe(enSection.id ?? null);
+      expect(arSection.id).toBe(enSection.id);
+      expect(arSection.links?.map((link) => link.href)).toEqual(enSection.links?.map((link) => link.href));
     }
-
-    expect(arabic.actions.map((link) => link.href)).toEqual(english.actions.map((link) => link.href));
   });
 
   test.each(pageKeys.flatMap((pageKey) => languages.map((language) => [pageKey, language] as const)))(
@@ -70,11 +69,14 @@ describe("public page content contracts", () => {
     (pageKey, language) => {
       const content = PUBLIC_PAGE_CONTENT[pageKey][language];
 
-      expect(content.eyebrow.trim()).toBeTruthy();
+      expect(content.tabLabel.trim()).toBeTruthy();
       expect(content.title.trim()).toBeTruthy();
       expect(content.description.trim()).toBeTruthy();
       expect(content.sections.length).toBeGreaterThanOrEqual(minimumSectionCounts[pageKey]);
-      expect(content.actions.length).toBeGreaterThanOrEqual(2);
+      // Section anchors are unique so the table of contents can link to each one.
+      expect(new Set(content.sections.map((section) => section.id)).size).toBe(content.sections.length);
+      // Unrendered action lists are gone.
+      expect("actions" in content).toBe(false);
 
       for (const section of content.sections) {
         expect(section.title.trim()).toBeTruthy();
@@ -96,7 +98,20 @@ describe("public page content contracts", () => {
 
   it("keeps public shell labels bilingual", () => {
     for (const labels of Object.values(PUBLIC_PAGE_LABELS)) {
-      expect(Object.keys(labels).sort()).toEqual(["back", "external", "home", "language", "linkFailed"]);
+      expect(Object.keys(labels).sort()).toEqual([
+        "back",
+        "backToHafiz",
+        "changeLanguage",
+        "contents",
+        "copied",
+        "copyEmail",
+        "copyFailed",
+        "emailFailed",
+        "external",
+        "home",
+        "language",
+        "linkFailed",
+      ]);
       for (const value of Object.values(labels)) {
         expect(value.trim()).toBeTruthy();
       }
@@ -128,5 +143,48 @@ describe("public page content contracts", () => {
     expect(english).toMatch(/privacy@hafizquran\.app/);
     expect(arabic).toMatch(/support@hafizquran\.app/);
     expect(arabic).toMatch(/privacy@hafizquran\.app/);
+  });
+});
+
+describe("W14 public page decisions", () => {
+  it("drops the eyebrow where it repeats the title and keeps the Arabic Credits tab and heading identical", () => {
+    for (const language of languages) {
+      expect(PUBLIC_PAGE_CONTENT.privacy[language].eyebrow).toBeUndefined();
+      expect(PUBLIC_PAGE_CONTENT.terms[language].eyebrow).toBeUndefined();
+    }
+    expect(PUBLIC_PAGE_CONTENT.credits.en.tabLabel).toBe("Credits");
+    expect(PUBLIC_PAGE_CONTENT.credits.ar.tabLabel).toBe("المصادر والاعتمادات");
+    expect(PUBLIC_PAGE_CONTENT.credits.ar.title).toBe("المصادر والاعتمادات");
+  });
+
+  it("shows the Arabic update date with Arabic-Indic digits", () => {
+    expect(PUBLIC_PAGE_CONTENT.privacy.ar.lastUpdated).toBe("آخر تحديث: ١٦ مايو ٢٠٢٦");
+    expect(PUBLIC_PAGE_CONTENT.terms.ar.lastUpdated).toBe("آخر تحديث: ١٦ مايو ٢٠٢٦");
+  });
+
+  it("gives Privacy and Terms a table of contents", () => {
+    expect(PUBLIC_PAGE_CONTENT.privacy.en.sections.length).toBeGreaterThanOrEqual(TABLE_OF_CONTENTS_MIN_SECTIONS);
+    expect(PUBLIC_PAGE_CONTENT.terms.en.sections.length).toBeGreaterThanOrEqual(TABLE_OF_CONTENTS_MIN_SECTIONS);
+  });
+
+  it("removes the donor placeholder", () => {
+    for (const language of languages) {
+      expect(PUBLIC_PAGE_CONTENT.about[language].sections.some((section) => section.id === "donor")).toBe(false);
+    }
+  });
+
+  it("reproduces every NOTICE.md bundled source line and license on the Credits page", () => {
+    const notice = fs.readFileSync(path.join(process.cwd(), "NOTICE.md"), "utf8");
+    const noticeLines = notice
+      .split("\n")
+      .filter((line) => line.startsWith("- "))
+      .map((line) => line.slice(2).replace(/`/g, ""));
+    const credits = allText(PUBLIC_PAGE_CONTENT.credits.en);
+    expect(noticeLines.length).toBeGreaterThan(0);
+    for (const line of noticeLines) expect(credits).toContain(line);
+    for (const license of ["MIT License", "CC BY 3.0", "CC BY 4.0"]) {
+      expect(credits).toContain(license);
+      expect(allText(PUBLIC_PAGE_CONTENT.credits.ar)).toContain(license);
+    }
   });
 });

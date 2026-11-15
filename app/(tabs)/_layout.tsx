@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { Platform, View } from "react-native";
 import { Tabs } from "expo-router";
 import { House, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked, Users } from "lucide-react-native";
@@ -25,12 +25,16 @@ import { isSearchShortcut, openSearch } from "@/lib/navigation/search-launcher";
  */
 function SyncOwner({ children }: { children: ReactNode }) {
   const { immersive } = useChrome();
-  const { status } = useSync();
+  const { status, pendingCount, failure, lastSyncedAt, syncNow } = useSync();
+  const details = useMemo(
+    () => ({ status, pendingCount, failure, lastSyncedAt, syncNow }),
+    [status, pendingCount, failure, lastSyncedAt, syncNow],
+  );
   const { isRTL } = useSettings();
   const insets = useSafeAreaInsets();
 
   return (
-    <SyncStatusProvider value={status}>
+    <SyncStatusProvider value={details}>
       {children}
       {!immersive ? (
         <View

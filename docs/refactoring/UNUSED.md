@@ -8,12 +8,12 @@ Expo Router discovers files under `app/`, so those routes and layouts are entrie
 
 The installed Metro plugin defaults to a `src/` platform pattern. Hafiz uses root-level `components/` and `lib/`. Four exact entries cover the demonstrated platform resolution paths, without making every component an entry. See [Knip Metro configuration](https://knip.dev/reference/plugins/metro) and [entry configuration](https://knip.dev/overview/configuration).
 
-| Entry                                        | Actual owner                                                                                                     |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `components/zayt/ZaytRivePreview.native.tsx` | `app/zayt-preview.tsx` imports the extensionless preview; Metro chooses native. Imports the Rive native package. |
-| `components/zayt/ZaytRivePreview.web.tsx`    | The same route resolves the web preview. Imports the Rive web package.                                           |
-| `lib/database/native-loaders.web.ts`         | `lib/database/init.ts` imports extensionless native-loaders; web uses these platform stubs.                      |
-| `lib/fonts/qpc-v4-tajweed-fonts.web.ts`      | `lib/fonts/loader.ts` imports the extensionless page-font map; web resolves WOFF2 URLs.                          |
+| Entry                                        | Actual owner                                                                                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `components/zayt/ZaytRivePreview.native.tsx` | `components/zayt/ZaytPreviewScreen.tsx` (development route `app/dev/zayt.tsx`) imports the extensionless preview; Metro chooses native. Imports the Rive native package. |
+| `components/zayt/ZaytRivePreview.web.tsx`    | The same route resolves the web preview. Imports the Rive web package.                                                                                                   |
+| `lib/database/native-loaders.web.ts`         | `lib/database/init.ts` imports extensionless native-loaders; web uses these platform stubs.                                                                              |
+| `lib/fonts/qpc-v4-tajweed-fonts.web.ts`      | `lib/fonts/loader.ts` imports the extensionless page-font map; web resolves WOFF2 URLs.                                                                                  |
 
 Keep the existing exclusions. Each has a specific reason.
 
