@@ -9,8 +9,30 @@ import {
   type WordMeaningArRow,
 } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
-import { addMeaningCard, isMeaningCardSaved } from "@/lib/fsrs/queries";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
+import { addMeaningCard, fetchMeaningCardDue, isMeaningCardSaved } from "@/lib/fsrs/queries";
+import { formatDays } from "@/lib/i18n/count";
+import { useDelayedLoading } from "./use-delayed-loading";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Whether the bundled dataset has this word's meaning; null when that could not be read. */
+async function hasBundledMeaning(
+  db: ReturnType<typeof useDatabase>,
+  surah: number,
+  ayah: number,
+  wordPos: number,
+): Promise<boolean | null> {
+  try {
+    const row = await db.getFirstAsync<{ found: number }>(
+      "SELECT 1 AS found FROM word_meanings_ar WHERE surah = ? AND ayah = ? AND word_pos = ? AND TRIM(COALESCE(meaning, '')) != ''",
+      [surah, ayah, wordPos],
+    );
+    return !!row;
+  } catch {
+    return null;
+  }
+}
 
 type Props = {
   surah: number;
@@ -40,14 +62,24 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const [savedToVocab, setSavedToVocab] = useState(false);
   const [savingToVocab, setSavingToVocab] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  // Read only: shows when the saved word comes up next, without creating or rescheduling a card.
+  const [reviewDue, setReviewDue] = useState<string | null>(null);
+  const [bundled, setBundled] = useState<boolean | null>(null);
+  const [savedCustom, setSavedCustom] = useState(false);
+  const showLoading = useDelayedLoading(loading);
 
   useEffect(() => {
     let cancelled = false;
     setSaveError(false);
     setSavingToVocab(false);
+    setReviewDue(null);
     isMeaningCardSaved(db, surah, ayah, wordPos)
-      .then((saved) => {
-        if (!cancelled) setSavedToVocab(saved);
+      .then(async (saved) => {
+        if (cancelled) return;
+        setSavedToVocab(saved);
+        if (!saved) return;
+        const due = await fetchMeaningCardDue(db, surah, ayah, wordPos);
+        if (!cancelled) setReviewDue(due);
       })
       .catch(() => {
         if (!cancelled) setSavedToVocab(false);
@@ -64,6 +96,9 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
     try {
       await addMeaningCard(db, surah, ayah, wordPos);
       setSavedToVocab(true);
+      fetchMeaningCardDue(db, surah, ayah, wordPos)
+        .then(setReviewDue)
+        .catch(() => undefined);
     } catch (e) {
       console.warn("[MeaningTab] saveToVocab failed:", e);
       setSaveError(true);
@@ -81,7 +116,12 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
     setArMeaning(null);
     setEnData(null);
     setWordArabic(null);
+    setBundled(null);
+    setSavedCustom(false);
     if (isArabicMode) {
+      hasBundledMeaning(db, surah, ayah, wordPos).then((value) => {
+        if (!cancelled) setBundled(value);
+      });
       Promise.all([
         fetchWordMeaningAr(db, surah, ayah, wordPos),
         fetchWordTranslation(db, surah, ayah, wordPos),
@@ -127,6 +167,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         meaning,
       });
       setArMeaning({ surah, ayah, word_pos: wordPos, word: wordArabic, meaning });
+      setSavedCustom(true);
       setCustomMeaningDraft("");
     } catch (e) {
       console.warn("[MeaningTab] saveCustomMeaning failed:", e);
@@ -139,10 +180,21 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   if (loading) {
     return (
       <View className="py-6 items-center">
-        <Text className="text-warm-400 dark:text-neutral-500 text-sm">{s.loading}</Text>
+        {showLoading ? <Text className="text-warm-500 dark:text-neutral-400 text-sm">{s.loading}</Text> : null}
       </View>
     );
   }
+
+  const reviewNote = (() => {
+    if (!savedToVocab || !reviewDue) return null;
+    const dueAt = Date.parse(reviewDue);
+    if (!Number.isFinite(dueAt)) return null;
+    const days = Math.ceil((dueAt - Date.now()) / DAY_MS);
+    return days <= 0
+      ? s.wordMeaningDueNow
+      : interpolate(s.wordMeaningNextReview, { duration: formatDays(days, isArabicMode ? "ar" : "en") });
+  })();
+  const isCustomMeaning = savedCustom || bundled === false;
 
   if (isArabicMode) {
     if (!arMeaning?.meaning) {
@@ -178,11 +230,18 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
               writingDirection: "rtl",
             }}
           />
+          <MutedLine isRTL label={s.wordMeaningPrivate} />
           <CustomMeaningButton
             saving={customMeaningSaving}
             disabled={!customMeaningDraft.trim()}
             onPress={saveCustomMeaning}
-            label={customMeaningSaving ? s.customWordMeaningSaving : s.saveCustomWordMeaning}
+            label={
+              customMeaningSaving
+                ? s.customWordMeaningSaving
+                : customMeaningError
+                  ? s.wordMeaningRetry
+                  : s.saveCustomWordMeaning
+            }
             isRTL={isRTL}
           />
           {customMeaningError && <SaveErrorText isRTL={isRTL} label={s.customWordMeaningFailed} />}
@@ -206,6 +265,11 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         >
           {arMeaning.meaning}
         </Text>
+        {isCustomMeaning ? (
+          <MutedLine isRTL label={s.wordMeaningYours} />
+        ) : bundled ? (
+          <MutedLine isRTL label={s.wordMeaningSource} />
+        ) : null}
         <SaveToVocabButton
           saved={savedToVocab}
           saving={savingToVocab}
@@ -214,6 +278,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
           isRTL={isRTL}
         />
         {saveError && <SaveErrorText isRTL={isRTL} label={s.addToVocabFailed} />}
+        {reviewNote ? <MutedLine isRTL={isRTL} label={reviewNote} /> : null}
       </View>
     );
   }
@@ -221,7 +286,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   if (!enData || (!enData.wordArabic && !enData.translationEn)) {
     return (
       <View className="py-6 items-center">
-        <Text className="text-warm-400 dark:text-neutral-500 text-sm">
+        <Text className="text-warm-500 dark:text-neutral-400 text-sm">
           {s.noMeaningData}
         </Text>
       </View>
@@ -262,6 +327,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         isRTL={isRTL}
       />
       {saveError && <SaveErrorText isRTL={isRTL} label={s.addToVocabFailed} />}
+      {reviewNote ? <MutedLine isRTL={isRTL} label={reviewNote} /> : null}
     </View>
   );
 }
@@ -337,6 +403,17 @@ function SaveToVocabButton({
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+function MutedLine({ isRTL, label }: { isRTL: boolean; label: string }) {
+  return (
+    <Text
+      className={`mt-2 text-warm-500 dark:text-neutral-400 ${isRTL ? "self-end text-right" : "self-start text-left"}`}
+      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, writingDirection: isRTL ? "rtl" : "ltr" }}
+    >
+      {label}
+    </Text>
   );
 }
 

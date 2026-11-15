@@ -6,6 +6,8 @@ import {
   type WordIrabDaasRow,
 } from "@/lib/word/queries";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { useSettings } from "@/lib/settings/context";
+import { useDelayedLoading } from "./use-delayed-loading";
 
 type Props = {
   surah: number;
@@ -17,16 +19,28 @@ type Props = {
 export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
   const db = useDatabase();
   const s = useStrings();
+  const { uiLanguage } = useSettings();
   const [rows, setRows] = useState<WordIrabDaasRow[]>([]);
   const [matchY, setMatchY] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const showLoading = useDelayedLoading(loading);
+
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setMatchY(null);
     fetchWordIrabDaasForAyah(db, surah, ayah)
-      .then(setRows)
-      .finally(() => setLoading(false));
+      .then((next) => {
+        if (!cancelled) setRows(next);
+      })
+      .catch((error) => console.warn("[IrabTab] Failed to load i'rab:", error))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [db, surah, ayah, wordPos]);
 
   useEffect(() => {
@@ -54,7 +68,7 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
   if (loading) {
     return (
       <View className="py-6 items-center">
-        <Text className="text-warm-400 dark:text-neutral-500 text-sm">{s.loading}</Text>
+        {showLoading ? <Text className="text-warm-500 dark:text-neutral-400 text-sm">{s.loading}</Text> : null}
       </View>
     );
   }
@@ -63,7 +77,7 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
     return (
       <View className="py-6 items-center">
         <Text
-          className="text-warm-400 dark:text-neutral-500 text-sm"
+          className="text-warm-500 dark:text-neutral-400 text-sm"
           style={{ writingDirection: "rtl" }}
         >
           {s.noDaasIrab}
@@ -74,6 +88,14 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
 
   return (
     <View className="py-4 px-1">
+      {uiLanguage !== "ar" ? (
+        <Text
+          className="mb-3 text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20, textAlign: "left", writingDirection: "ltr" }}
+        >
+          {s.irabArabicOnly}
+        </Text>
+      ) : null}
       {groupedRows.map(({ row, wordPositions }) => {
         const isMatch = wordPositions.includes(wordPos);
         return (
@@ -82,9 +104,10 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
             onLayout={isMatch ? handleMatchLayout : undefined}
             className={`mb-3 p-3 rounded-2xl ${
               isMatch
-                ? "bg-primary-accent/10 dark:bg-primary-bright/10"
+                ? "border-r-[3px] border-primary-accent bg-primary-accent/10 dark:border-primary-bright dark:bg-primary-bright/10"
                 : "bg-surface-high dark:bg-surface-dark-high"
             }`}
+            // The accent sits where the Arabic analysis starts reading, on the right in both interfaces.
           >
             {row.word && (
               <Text
