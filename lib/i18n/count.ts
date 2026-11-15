@@ -60,3 +60,22 @@ export function formatLines(n: number, language: Language): string {
   if (language === "ar") return arabicCount(n, LINES);
   return n === 1 ? "1 line" : `${n.toLocaleString("en")} lines`;
 }
+
+const SURAHS: ArabicForms = { one: "سورة واحدة", two: "سورتان", few: "سور", many: "سورة" };
+const AYAHS: ArabicForms = { one: "آية واحدة", two: "آيتان", few: "آيات", many: "آية" };
+const CARDS: ArabicForms = { one: "بطاقة واحدة", two: "بطاقتان", few: "بطاقات", many: "بطاقة" };
+
+export function formatSurahs(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, SURAHS);
+  return n === 1 ? "1 surah" : `${n.toLocaleString("en")} surahs`;
+}
+
+export function formatAyahs(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, AYAHS);
+  return n === 1 ? "1 ayah" : `${n.toLocaleString("en")} ayahs`;
+}
+
+export function formatCards(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, CARDS);
+  return n === 1 ? "1 card" : `${n.toLocaleString("en")} cards`;
+}
