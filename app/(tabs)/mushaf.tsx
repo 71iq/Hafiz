@@ -9,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
-import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine, ChevronDown, SlidersHorizontal, Pause, Play, Square } from "lucide-react-native";
+import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine, ChevronDown, SlidersHorizontal } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useWeakSpotMarker, useWeakSpotsLoader } from "@/lib/hifz/use-weak-spots";
 import { writeUserSetting } from "@/lib/database/user-settings";
@@ -27,13 +27,16 @@ import { FocusModeControls } from "@/components/mushaf/FocusModeControls";
 import { HifzControls } from "@/components/mushaf/HifzControls";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
 import { RecitationRangeSheet } from "@/components/mushaf/RecitationRangeSheet";
+import { RecitationPlayerBar } from "@/components/mushaf/RecitationPlayerBar";
+import { keepPageReveals, NO_VERSE_REVEALS, setVerseReveal, type VerseReveals } from "@/components/mushaf/verse-reveals";
 import { ReadingSettingsSheet } from "@/components/mushaf/ReadingSettingsSheet";
 import { PageViewNavigationSheet, type PageViewNavigationAnchor } from "@/components/mushaf/PageViewNavigationSheet";
 import { WEAK_SPOT_DARK, WEAK_SPOT_LIGHT } from "@/components/mushaf/WordToken";
 import { textStartStyle } from "@/lib/ui/direction";
 import type { HifzVisibility } from "@/components/mushaf/MushafPage";
 import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, pageForAyah, type MushafIndex } from "@/lib/mushaf/position";
-import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { useAyahAudio, type AyahAudioTarget } from "@/lib/audio/ayah-audio";
+import { useFollowRecitation } from "@/lib/audio/use-follow-recitation";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
 import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
 import { WebSelectionMenu } from "@/components/mushaf/WebSelectionMenu";
@@ -44,7 +47,7 @@ import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { loadQuranPageFont } from "@/lib/fonts/loader";
 import { scrollToVisibleIndex } from "@/lib/mushaf/scroll-to-visible-index";
-import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
+import { toArabicNumber } from "@/lib/arabic";
 import {
   SIDEBAR_BREAKPOINT,
   VIEWPORT_BREAKPOINTS,
@@ -282,6 +285,7 @@ function MushafInner() {
     hifzAutoAdvancePage,
     focusScrollSpeed,
     setFocusScrollSpeed,
+    audioFollow,
     isDark,
     isRTL,
     themeSurface,
@@ -352,6 +356,8 @@ function MushafInner() {
     setFocusControlsVisible(true);
   }, [clearFocusControlsTimer, focusModeActive]);
 
+  // Set once the follow-recitation owner exists below: the reader's own scrolling or paging suspends it.
+  const suspendFollowRef = useRef<() => void>(() => {});
   const handleScrollChrome = useCallback((e: any) => {
     const y = e?.nativeEvent?.contentOffset?.y;
     if (typeof y !== "number") return;
@@ -361,6 +367,9 @@ function MushafInner() {
     }
     const dy = y - lastScrollYRef.current;
     const now = Date.now();
+    if (Math.abs(dy) > 8 && now - lastUserScrollInputRef.current < USER_SCROLL_INPUT_WINDOW_MS) {
+      suspendFollowRef.current();
+    }
     // A step larger than the screen is a programmatic jump (restoring the saved position, opening
     // a search result), not the reader scrolling, so it must not hide the controls.
     if (now <= tapRevealGuardUntilRef.current || Math.abs(dy) > windowHeight) {
@@ -379,13 +388,15 @@ function MushafInner() {
 
   const toggleChromeFromReaderTap = useCallback(() => {
     if (focusModeActive) {
-      pauseFocusAutoScroll();
+      // A tap on the reader brings back the full controls collapsed to the Pause pill.
+      if (focusModePlaying && !focusControlsVisible) revealFocusControls();
+      else pauseFocusAutoScroll();
       return;
     }
     if (!isPhone && !isTablet) return;
     tapRevealGuardUntilRef.current = Date.now() + 700;
     setChromeVisible((visible) => !visible);
-  }, [focusModeActive, isPhone, isTablet, pauseFocusAutoScroll, setChromeVisible]);
+  }, [focusControlsVisible, focusModeActive, focusModePlaying, isPhone, isTablet, pauseFocusAutoScroll, revealFocusControls, setChromeVisible]);
 
   const keepChromeVisibleDuringFontChange = useCallback(() => {
     if (focusModeActive) return;
@@ -506,6 +517,8 @@ function MushafInner() {
   const [pageViewNavigationAnchor, setPageViewNavigationAnchor] = useState<PageViewNavigationAnchor | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [verseHideMode, setVerseHideMode] = useState(false);
+  // Hide mode: revealed ayahs (key to page) live here so virtualization never re-hides them.
+  const [verseReveals, setVerseReveals] = useState<VerseReveals>(NO_VERSE_REVEALS);
   const [hifzEnabled, setHifzEnabled] = useState(false);
   const [hifzRevealedAyahCount, setHifzRevealedAyahCount] = useState(0);
   const [hifzActiveAyahKey, setHifzActiveAyahKey] = useState<string | null>(null);
@@ -551,7 +564,7 @@ function MushafInner() {
   // Target highlight: "surah:ayah" key from deep links, search, and cross-screen navigation.
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
   // A running recitation highlights the ayah being recited, ahead of an arrival highlight.
-  const { rangeState: recitation, stop: stopRecitation, togglePause: toggleRecitationPause } = useAyahAudio();
+  const { rangeState: recitation } = useAyahAudio();
   const recitingKey =
     recitation.active && recitation.currentAyah ? `${recitation.currentAyah.surah}:${recitation.currentAyah.ayah}` : null;
   const displayedHighlightKey = recitingKey ?? highlightedKey;
@@ -794,11 +807,12 @@ function MushafInner() {
     setHifzAutoRunning(false);
   }, [clearHifzTimer]);
 
+  // Navigation stops auto reveal; the progress resets only if the page actually changes (see the
+  // currentPage effect), so same-page jumps and view switches keep what was revealed.
   const resetHifzForNavigation = useCallback(() => {
     if (!hifzEnabledRef.current) return;
     stopHifzAuto();
-    resetHifzProgress();
-  }, [resetHifzProgress, stopHifzAuto]);
+  }, [stopHifzAuto]);
 
   const handleHifzPageComplete = useCallback(() => {
     const page = currentPageRef.current;
@@ -811,7 +825,9 @@ function MushafInner() {
     stopHifzAuto();
   }, [resetHifzProgress, stopHifzAuto]);
 
-  const stepHifzAuto = useCallback(() => {
+  // One reveal step: the next word, finishing the ayah at its last word. A manual step never
+  // completes or advances the page.
+  const stepHifzAuto = useCallback((manual = false) => {
     if (!hifzEnabledRef.current) {
       stopHifzAuto();
       return;
@@ -828,7 +844,7 @@ function MushafInner() {
 
     if (activeIndex < 0) {
       if (progress.revealedAyahCount >= pageAyahs.length) {
-        handleHifzPageComplete();
+        if (!manual) handleHifzPageComplete();
         return;
       }
       activeIndex = progress.revealedAyahCount;
@@ -838,7 +854,7 @@ function MushafInner() {
 
     const activeAyah = pageAyahs[activeIndex];
     if (!activeAyah || !activeAyahKey) {
-      handleHifzPageComplete();
+      if (!manual) handleHifzPageComplete();
       return;
     }
 
@@ -849,7 +865,7 @@ function MushafInner() {
         activeAyahKey: null,
         activeVisibleWordCount: 0,
       });
-      if (revealedAyahCount >= pageAyahs.length) {
+      if (revealedAyahCount >= pageAyahs.length && !manual) {
         if (!hifzAutoAdvancePageRef.current || currentPageRef.current >= 604) {
           handleHifzPageComplete();
         }
@@ -887,7 +903,7 @@ function MushafInner() {
   useEffect(() => {
     clearHifzTimer();
     if (!hifzAutoRunning) return;
-    hifzAutoTimerRef.current = setInterval(stepHifzAuto, hifzAutoDelayMs);
+    hifzAutoTimerRef.current = setInterval(() => stepHifzAuto(), hifzAutoDelayMs);
     return clearHifzTimer;
   }, [clearHifzTimer, hifzAutoDelayMs, hifzAutoRunning, stepHifzAuto]);
 
@@ -948,6 +964,7 @@ function MushafInner() {
       tapRevealGuardUntilRef.current = Date.now() + 1500;
       pauseFocusAutoScroll();
       resetHifzForNavigation();
+      suspendFollowRef.current();
       void scrollToTarget(target, animated)
         .catch((e) => {
           console.warn("[Mushaf] target navigation failed:", e);
@@ -971,6 +988,19 @@ function MushafInner() {
     }, [isPageMode, loading, items.length, navigateToTarget, settingsLoaded])
   );
 
+  const handleVerseRevealChange = useCallback((surah: number, ayah: number, revealed: boolean, page: number) => {
+    setVerseReveals((prev) => setVerseReveal(prev, surah, ayah, page, revealed));
+  }, []);
+  // Turning hide mode on or off starts from no reveals.
+  const toggleVerseHideMode = useCallback(() => {
+    setVerseHideMode((prev) => !prev);
+    setVerseReveals(NO_VERSE_REVEALS);
+  }, []);
+  // A deliberate scroll or jump to another page keeps only that page's reveals.
+  useEffect(() => {
+    setVerseReveals((prev) => keepPageReveals(prev, currentPage));
+  }, [currentPage]);
+
   const renderItem = useCallback(
     ({ item }: { item: MushafItem }) => {
       if (item.type === "surah-header") {
@@ -993,6 +1023,8 @@ function MushafInner() {
           fontSize={fontSize}
           lineHeight={lineHeight}
           hideMode={verseHideMode}
+          revealed={verseReveals.has(`${item.surah}:${item.ayah}`)}
+          onRevealChange={handleVerseRevealChange}
           highlighted={displayedHighlightKey === `${item.surah}:${item.ayah}`}
           highlightedWordPos={
             highlightedWord?.surah === item.surah && highlightedWord?.ayah === item.ayah
@@ -1002,7 +1034,7 @@ function MushafInner() {
         />
       );
     },
-    [fontSize, lineHeight, verseHideMode, displayedHighlightKey, highlightedWord]
+    [fontSize, lineHeight, verseHideMode, verseReveals, handleVerseRevealChange, displayedHighlightKey, highlightedWord]
   );
 
   const getItemType = useCallback((item: MushafItem) => item.type, []);
@@ -1018,6 +1050,7 @@ function MushafInner() {
   const handleGoToPage = useCallback(
     (page: number) => {
       resetHifzForNavigation();
+      suspendFollowRef.current();
       if (viewMode === "page" && goToPageRef.current) {
         goToPageRef.current(page);
       }
@@ -1028,6 +1061,7 @@ function MushafInner() {
   const handleGoToSurahVerse = useCallback(
     (surahNumber: number) => {
       resetHifzForNavigation();
+      suspendFollowRef.current();
       const index = surahHeaderIndices.get(surahNumber);
       if (index !== undefined && flashListRef.current) {
         flashListRef.current.scrollToIndex({
@@ -1135,6 +1169,13 @@ function MushafInner() {
     (hifzRevealedAyahCount < currentPageHifzAyahs.length || hifzActiveAyahKey !== null);
   const canHidePreviousHifzAyah =
     showHifzControls && (hifzRevealedAyahCount > 0 || hifzActiveAyahKey !== null);
+  // While auto reveal still runs (about to advance a page) Pause stays reachable instead.
+  const hifzPageComplete =
+    showHifzControls &&
+    !hifzAutoRunning &&
+    currentPageHifzAyahs.length > 0 &&
+    hifzActiveAyahKey === null &&
+    hifzRevealedAyahCount >= currentPageHifzAyahs.length;
   const toggleHifzMode = useCallback(() => {
     if (hifzEnabled) {
       stopHifzAuto();
@@ -1182,10 +1223,23 @@ function MushafInner() {
       activeVisibleWordCount: 0,
     });
   }, [applyHifzProgress, hifzActiveAyahKey, hifzRevealedAyahCount, stopHifzAuto]);
+  // Play reveals the first word at once, then waits the interval, so it answers even at slow speeds.
   const startHifzAuto = useCallback(() => {
     if (!hifzEnabled) setHifzEnabled(true);
     setHifzAutoRunning(true);
-  }, [hifzEnabled]);
+    stepHifzAuto();
+  }, [hifzEnabled, stepHifzAuto]);
+  const revealNextHifzWord = useCallback(() => {
+    stopHifzAuto();
+    stepHifzAuto(true);
+  }, [stepHifzAuto, stopHifzAuto]);
+  const repeatHifzPage = useCallback(() => {
+    stopHifzAuto();
+    resetHifzProgress();
+  }, [resetHifzProgress, stopHifzAuto]);
+  const goToNextHifzPage = useCallback(() => {
+    if (currentPageRef.current < 604) goToPageRef.current?.(currentPageRef.current + 1);
+  }, []);
   const pageFontSizeLocked = isPageMode && pageScroll === "horizontal";
   const mobileToolbarIconClass = `rounded-full ${isPhone && isPageMode ? "px-1.5 py-2" : isNarrow ? "px-2 py-2" : "px-2.5 py-2"}`;
   const desktopToolbarIconClass = `rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`;
@@ -1200,6 +1254,7 @@ function MushafInner() {
     : isTablet
       ? Math.max(insets.bottom, 16)
       : 0;
+  const [railHeight, setRailHeight] = useState(60);
   const pageScrollBottomInset = focusModeActive ? Math.max(insets.bottom, 12) + 96 : isPageMode ? 8 : undefined;
   const floatingRailSurface = {
     backgroundColor: withThemeOpacity(themeSurface, 0.95),
@@ -1234,7 +1289,8 @@ function MushafInner() {
     clearFocusControlsTimer();
     setFocusToastMessage(null);
     setFocusModeActive(true);
-    setFocusModePlaying(true);
+    // Focus mode opens paused with its bar shown; scrolling starts on Play.
+    setFocusModePlaying(false);
     setFocusControlsVisible(true);
     setImmersive(true);
     setChromeVisible(false);
@@ -1359,12 +1415,11 @@ function MushafInner() {
     stopHifzAuto();
   }, [currentPage, hifzEnabled, resetHifzProgress, stopHifzAuto]);
 
+  // Verse view has no reveal rail: auto reveal stops, the page's reveals wait for the return.
   useEffect(() => {
     if (isPageMode || !hifzEnabled) return;
     stopHifzAuto();
-    resetHifzProgress();
-    setHifzEnabled(false);
-  }, [hifzEnabled, isPageMode, resetHifzProgress, stopHifzAuto]);
+  }, [hifzEnabled, isPageMode, stopHifzAuto]);
 
   // For page view, derive the topmost ayah from the visible page
   useEffect(() => {
@@ -1441,21 +1496,29 @@ function MushafInner() {
     })();
   }, [loading, items, mushafIndex, isPageMode, db, scheduleVerseScrollToIndex, commitCurrentPage]);
 
-  // The reader follows a recitation onto the page, or verse, being recited.
-  useEffect(() => {
-    if (!recitation.active || !recitation.currentAyah) return;
-    const { surah, ayah } = recitation.currentAyah;
-    if (isPageMode) {
-      if (!mushafIndex) return;
-      const page = pageForAyah(mushafIndex, surah, ayah);
-      if (page && page !== currentPageRef.current) goToPageRef.current?.(page);
-      return;
-    }
-    const idx = items.findIndex((it) => it.type === "ayah" && it.surah === surah && it.ayah === ayah);
-    if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.2 });
-    // Only a new recited ayah moves the reader.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recitingKey]);
+  // The reader follows a range recitation onto the page, or verse, being recited, until the reader
+  // scrolls, pages or jumps away; Back to ayah brings it back.
+  const followRecitedAyah = useCallback(
+    ({ surah, ayah }: AyahAudioTarget) => {
+      tapRevealGuardUntilRef.current = Date.now() + 1500;
+      if (isPageMode) {
+        if (!mushafIndex) return;
+        const page = pageForAyah(mushafIndex, surah, ayah);
+        if (page && page !== currentPageRef.current) goToPageRef.current?.(page);
+        return;
+      }
+      const idx = items.findIndex((it) => it.type === "ayah" && it.surah === surah && it.ayah === ayah);
+      if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.2 });
+    },
+    [isPageMode, items, mushafIndex]
+  );
+  const { suspended: followSuspended, suspend: suspendFollow, backToAyah } = useFollowRecitation({
+    followEnabled: audioFollow,
+    rangeActive: recitation.active,
+    recitingAyah: recitation.active ? recitation.currentAyah : null,
+    follow: followRecitedAyah,
+  });
+  suspendFollowRef.current = suspendFollow;
 
   // Web only: ArrowLeft / ArrowRight in page mode → ±1 page (RTL aware)
   useEffect(() => {
@@ -1473,6 +1536,7 @@ function MushafInner() {
       // is always RTL-paginated.
       const dir = e.key === "ArrowLeft" ? +1 : -1;
       const next = Math.max(1, Math.min(604, currentPage + dir));
+      suspendFollowRef.current();
       goToPageRef.current?.(next);
     };
     window.addEventListener("keydown", handler);
@@ -1655,7 +1719,10 @@ function MushafInner() {
                     )}
                     {viewMode === "verse" ? (
                       <Pressable
-                        onPress={() => setVerseHideMode((prev) => !prev)}
+                        onPress={toggleVerseHideMode}
+                        accessibilityRole="button"
+                        accessibilityLabel={verseHideMode ? s.revealShowAyahs : s.revealHideAyahs}
+                        accessibilityState={{ selected: verseHideMode }}
                         className={`${mobileToolbarIconClass} ${verseHideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
                         style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                       >
@@ -1664,7 +1731,9 @@ function MushafInner() {
                     ) : (
                       <Pressable
                         onPress={toggleHifzMode}
-                        accessibilityLabel={s.hifzMode}
+                        accessibilityRole="button"
+                        accessibilityLabel={s.revealPageMode}
+                        accessibilityState={{ selected: hifzEnabled }}
                         className={`${mobileToolbarIconClass} ${hifzEnabled ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
                         style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                       >
@@ -1756,7 +1825,10 @@ function MushafInner() {
                 )}
                 {viewMode === "verse" ? (
                   <Pressable
-                    onPress={() => setVerseHideMode((prev) => !prev)}
+                    onPress={toggleVerseHideMode}
+                    accessibilityRole="button"
+                    accessibilityLabel={verseHideMode ? s.revealShowAyahs : s.revealHideAyahs}
+                    accessibilityState={{ selected: verseHideMode }}
                     className={`${desktopToolbarIconClass} ${
                       verseHideMode
                         ? "bg-primary-accent/15 dark:bg-primary-bright/15"
@@ -1769,7 +1841,9 @@ function MushafInner() {
                 ) : (
                   <Pressable
                     onPress={toggleHifzMode}
-                    accessibilityLabel={s.hifzMode}
+                    accessibilityRole="button"
+                    accessibilityLabel={s.revealPageMode}
+                    accessibilityState={{ selected: hifzEnabled }}
                     className={`${desktopToolbarIconClass} ${
                       hifzEnabled
                         ? "bg-primary-accent/15 dark:bg-primary-bright/15"
@@ -1840,6 +1914,7 @@ function MushafInner() {
                 onScroll={handleScrollChrome}
                 onHorizontalGesture={() => {
                   touchMovedRef.current = true;
+                  suspendFollowRef.current();
                 }}
                 pagePaddingTop={isPhone ? 14 : 8}
                 pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
@@ -1863,7 +1938,8 @@ function MushafInner() {
               onPlayPause={handleFocusPlayPause}
               onSpeedChange={handleFocusSpeedChange}
               onExit={exitFocusMode}
-              visible={focusModeActive && focusControlsVisible}
+              visible={focusModeActive}
+              collapsed={!focusControlsVisible}
             />
             {!chromeVisible && !focusModeActive && (
               <>
@@ -1932,7 +2008,7 @@ function MushafInner() {
               renderItem={renderItem}
               getItemType={getItemType}
               keyExtractor={keyExtractor}
-              extraData={{ fontSize, verseHideMode, highlightedKey: displayedHighlightKey, highlightedWord }}
+              extraData={{ fontSize, verseHideMode, verseReveals, highlightedKey: displayedHighlightKey, highlightedWord }}
               contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
               onScroll={handleScrollChrome}
               scrollEventThrottle={16}
@@ -2002,7 +2078,8 @@ function MushafInner() {
         {/* Bottom page rail / Hifz controls — fades with chrome */}
         {(showBottomSlider || showHifzControls) && (
           <Animated.View
-            pointerEvents={chromeVisible ? "box-none" : "none"}
+            // The reveal rail stays on screen with the chrome hidden, like the player bar.
+            pointerEvents={chromeVisible || showHifzControls ? "box-none" : "none"}
             style={[
               {
                 position: Platform.OS === "web" && (isPhone || isTablet) ? "fixed" as any : "absolute",
@@ -2013,10 +2090,11 @@ function MushafInner() {
                 alignItems: "center",
                 paddingHorizontal: isPhone ? 12 : 16,
               },
-              sliderAnimStyle,
+              showHifzControls ? null : sliderAnimStyle,
             ]}
           >
             <View
+              onLayout={(event) => setRailHeight(Math.round(event.nativeEvent.layout.height))}
               style={[
                 {
                   width: "100%",
@@ -2035,10 +2113,14 @@ function MushafInner() {
                   canRevealNext={canRevealNextHifzAyah}
                   canHidePrevious={canHidePreviousHifzAyah}
                   autoRunning={hifzAutoRunning}
+                  pageComplete={hifzPageComplete}
                   onRevealNext={revealNextHifzAyah}
+                  onRevealNextWord={revealNextHifzWord}
                   onHidePrevious={hidePreviousHifzAyah}
                   onStartAuto={startHifzAuto}
                   onStopAuto={stopHifzAuto}
+                  onRepeatPage={repeatHifzPage}
+                  onNextPage={currentPage < 604 ? goToNextHifzPage : undefined}
                 />
               ) : (
                 <MushafSlider
@@ -2046,6 +2128,7 @@ function MushafInner() {
                   interactive={chromeVisible}
                   onUserActivity={() => setChromeVisible(true)}
                   onCommit={(p) => {
+                    suspendFollowRef.current();
                     if (isPageMode) goToPageRef.current?.(p);
                     else {
                       // Verse view: jump to the first ayah on that page
@@ -2068,68 +2151,16 @@ function MushafInner() {
           </Animated.View>
         )}
 
-        {/* Recitation player: shown while a recitation runs, even with the chrome hidden. */}
-        {recitation.active && (
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
-              left: 0,
-              right: 0,
-              bottom: railBottomOffset + ((showBottomSlider || showHifzControls) && chromeVisible ? 68 : 8),
-              zIndex: 71,
-              alignItems: "center",
-              paddingHorizontal: isPhone ? 12 : 16,
-            }}
-          >
-            <View
-              accessibilityLiveRegion="polite"
-              style={[
-                {
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                  direction: "ltr",
-                  alignItems: "center",
-                  gap: 10,
-                  borderRadius: 999,
-                  paddingVertical: 6,
-                  paddingHorizontal: 8,
-                },
-                floatingRailSurface,
-              ]}
-            >
-              <Pressable
-                onPress={toggleRecitationPause}
-                accessibilityRole="button"
-                accessibilityLabel={recitation.paused ? s.audioPlay : s.audioPause}
-                hitSlop={6}
-                className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/15 dark:bg-primary-bright/15"
-              >
-                {!recitation.paused ? (
-                  <Pause size={18} color={isDark ? "#5eead4" : "#0d9488"} />
-                ) : (
-                  <Play size={18} color={isDark ? "#5eead4" : "#0d9488"} />
-                )}
-              </Pressable>
-              <Text
-                className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, writingDirection: "ltr", minWidth: 64, textAlign: "center" }}
-              >
-                {recitation.currentAyah
-                  ? `${formatAyahRef(isRTL, recitation.currentAyah.surah, recitation.currentAyah.ayah)}${isRTL ? "، " : " · "}${isRTL ? toArabicNumber(recitation.currentIndex + 1) : recitation.currentIndex + 1}/${isRTL ? toArabicNumber(recitation.totalAyahs) : recitation.totalAyahs}`
-                  : ""}
-              </Text>
-              <Pressable
-                onPress={stopRecitation}
-                accessibilityRole="button"
-                accessibilityLabel={s.recitationStop}
-                hitSlop={6}
-                className="h-10 w-10 items-center justify-center rounded-full"
-              >
-                <Square size={16} color={isDark ? "#d4d4d4" : "#6e5a47"} />
-              </Pressable>
-            </View>
-          </View>
-        )}
+        {/* Recitation player: single ayah or range, shown even with the chrome hidden. */}
+        <RecitationPlayerBar
+          bottom={railBottomOffset + (showHifzControls || (showBottomSlider && chromeVisible) ? railHeight + 8 : 8)}
+          fixed={isPhone || isTablet}
+          horizontalPadding={isPhone ? 12 : 16}
+          surface={floatingRailSurface}
+          onOpenSheet={handleOpenRecitation}
+          showBackToAyah={followSuspended}
+          onBackToAyah={backToAyah}
+        />
 
         {/* One-time weak-spot explanation, above the page rail. */}
         {weakSpotsOnPage && weakSpotNoteSeen === false && chromeVisible && !focusModeActive && !recitation.active && (
@@ -2190,7 +2221,7 @@ function MushafInner() {
         )}
 
         {/* Toast notifications */}
-        <Toast message={focusToastMessage} onDismiss={dismissFocusToast} />
+        <Toast message={focusToastMessage} onDismiss={dismissFocusToast} duration={3000} />
       </SafeAreaView>
     </>
   );

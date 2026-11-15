@@ -57,6 +57,7 @@ import {
   surahNameFontName,
   surahNameGlyph,
 } from "@/lib/fonts/loader";
+import { FOCUS_BASE_SECONDS_PER_PAGE } from "./FocusModeControls";
 
 type PageRow = {
   page: number;
@@ -229,7 +230,6 @@ const HORIZONTAL_PAN_DIRECTION_RATIO = 0.8;
 const HORIZONTAL_FLICK_MIN_DISTANCE = 12;
 const HORIZONTAL_FLICK_VELOCITY = 0.26;
 const HORIZONTAL_EASING = Easing.out(Easing.cubic);
-const FOCUS_BASE_SECONDS_PER_PAGE = 90;
 
 function PageSeparator({
   page,
