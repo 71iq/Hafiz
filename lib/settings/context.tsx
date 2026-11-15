@@ -614,13 +614,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           if (!valid && saved[key] != null) warnInvalidSetting(key);
         };
 
-        const savedFontSize = saved.font_size_index;
-        if (savedFontSize !== null) {
-          const idx = parseInt(savedFontSize, 10);
-          if (idx >= 0 && idx < FONT_SIZE_STEPS.length) {
-            setFontSizeIndexState(idx);
-          }
-        }
+        const savedFontSize = decodeBoundedInt(saved.font_size_index, 0, FONT_SIZE_STEPS.length - 1);
+        invalidIfSet("font_size_index", savedFontSize !== null);
+        if (savedFontSize !== null) setFontSizeIndexState(savedFontSize);
 
         const savedTheme = saved.theme;
         const normalizedTheme = normalizeThemeMode(savedTheme);
@@ -632,40 +628,49 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
 
         const savedViewMode = saved.view_mode;
+        invalidIfSet("view_mode", savedViewMode === "verse" || savedViewMode === "page");
         if (savedViewMode === "verse" || savedViewMode === "page") {
           setViewModeState(savedViewMode);
         }
 
         const savedQuranFontStyle = normalizeQuranFontStyle(saved.quran_font_style);
+        invalidIfSet("quran_font_style", savedQuranFontStyle !== null);
         if (savedQuranFontStyle) {
           setQuranFontStyleState(savedQuranFontStyle);
         }
 
         const savedQuranMarkerStyle = normalizeQuranMarkerStyle(saved.quran_marker_style);
+        invalidIfSet("quran_marker_style", savedQuranMarkerStyle !== null);
         if (savedQuranMarkerStyle) {
           setQuranMarkerStyleState(savedQuranMarkerStyle);
         }
 
         const savedShowAyahMarkers = saved.show_ayah_markers;
+        invalidIfSet("show_ayah_markers", decodeBoolean(savedShowAyahMarkers) !== null);
         if (savedShowAyahMarkers === "true") setShowAyahMarkersState(true);
         if (savedShowAyahMarkers === "false") setShowAyahMarkersState(false);
 
         const savedMarkSimilarVerses = saved.mark_similar_verses;
+        invalidIfSet("mark_similar_verses", decodeBoolean(savedMarkSimilarVerses) !== null);
         if (savedMarkSimilarVerses === "true") setMarkSimilarVersesState(true);
         if (savedMarkSimilarVerses === "false") setMarkSimilarVersesState(false);
 
         const savedPageScroll = saved.page_scroll;
+        invalidIfSet("page_scroll", savedPageScroll === "vertical" || savedPageScroll === "horizontal");
         if (savedPageScroll === "vertical" || savedPageScroll === "horizontal") {
           setPageScrollState(savedPageScroll);
         }
 
         const savedShowTranslation = saved.show_translation;
+        invalidIfSet("show_translation", decodeBoolean(savedShowTranslation) !== null);
         if (savedShowTranslation === "true") setShowTranslationState(true);
 
         const savedShowTafseer = saved.show_tafseer;
+        invalidIfSet("show_tafseer", decodeBoolean(savedShowTafseer) !== null);
         if (savedShowTafseer === "true") setShowTafseerState(true);
 
         const savedTafseerSource = saved.tafseer_source;
+        invalidIfSet("tafseer_source", isAvailableTafsirSourceId(savedTafseerSource));
         if (isAvailableTafsirSourceId(savedTafseerSource)) {
           setTafseerSourceState(savedTafseerSource);
         }
