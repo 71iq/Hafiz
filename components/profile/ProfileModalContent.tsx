@@ -20,7 +20,7 @@ import { getRecentUnlocks } from "@/lib/achievements/queries";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabase } from "@/lib/database/provider";
-import { getReviewStats } from "@/lib/fsrs/queries";
+import { loadStudyMetrics } from "@/lib/progress/metrics";
 import { loadHabitOverview } from "@/lib/habit/queries";
 import { longestStreak, toDayMap } from "@/lib/habit/streak";
 import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
@@ -35,6 +35,7 @@ import { useOptionalOperationNotice } from "@/components/ui/OperationNoticeProvi
 import { fetchProfilePrivacy, fetchProfileSummary, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { requireSocialOwner } from "@/lib/social/owner";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { socialFailureOf } from "@/lib/social/remote";
 import {
   getDefaultDeckProgress,
@@ -67,6 +68,7 @@ type ReviewSnapshot = {
   activity: { date: string; count: number }[];
   activeDays: number;
   totalReviews: number;
+  memorizedAyahCards: number;
 };
 
 type ProfileTab = "overview" | "notes";
@@ -177,7 +179,12 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const { user, session, profile, isLoading: authLoading, updateProfile } = useAuthStore();
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [localStats, setLocalStats] = useState<ProfileStatsSnapshot | null>(null);
-  const [localReview, setLocalReview] = useState<ReviewSnapshot>({ activity: [], activeDays: 0, totalReviews: 0 });
+  const [localReview, setLocalReview] = useState<ReviewSnapshot>({
+    activity: [],
+    activeDays: 0,
+    totalReviews: 0,
+    memorizedAyahCards: 0,
+  });
   const [defaultDeckProgress, setDefaultDeckProgress] = useState<DefaultDeckProgressItem[]>([]);
   const [localSurahProgress, setLocalSurahProgress] = useState<ProfileSurahProgress[]>([]);
   const [editOpen, setEditOpen] = useState(false);
@@ -365,11 +372,11 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const surahProgress = showsLocalFigures ? localSurahProgress : [];
   const surahSummary = summarizeSurahProgress(surahProgress);
   const sharedSummary = profileSummaryQuery.data ?? null;
-  // The four profile figures share Progress's definitions: memorized cards from surah progress, the
-  // habit streak Home and Progress show, and review-log active days and totals.
+  // The four profile figures share Progress's definitions (lib/progress/metrics.ts): memorized ayah
+  // cards, the habit streak Home and Progress show, and review-log active days and totals.
   const stats: { label: string; value: number | string }[] = showsLocalFigures
     ? [
-        { label: s.progressTotalMemorized, value: surahSummary.memorized },
+        { label: s.progressTotalMemorized, value: review.memorizedAyahCards },
         { label: s.profileCurrentConsistency, value: localStatsSnapshot.currentStreak },
         { label: s.heatmapActiveDays, value: review.activeDays },
         { label: s.heatmapTotalReviews, value: review.totalReviews },
@@ -402,10 +409,11 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const loadLocalOverview = useCallback(async () => {
     if (!showsLocalFigures) return;
     // The wird streak is the same one Home and Progress show (lib/habit), not a count of review days.
-    const [habit, cardsReviewedRow, reviewStats] = await Promise.all([
+    // Total memorized, active days and total reviews come from the shared Progress definitions.
+    const [habit, cardsReviewedRow, metrics] = await Promise.all([
       loadHabitOverview(db),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
-      getReviewStats(db),
+      loadStudyMetrics(db),
     ]);
     setLocalStats({
       currentStreak: habit.streak.length,
@@ -413,9 +421,10 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       cardsReviewed: cardsReviewedRow?.count ?? 0,
     });
     setLocalReview({
-      activity: reviewStats.activity,
-      activeDays: reviewStats.activeDays,
-      totalReviews: reviewStats.totalReviews,
+      activity: metrics.activity,
+      activeDays: metrics.activeDays,
+      totalReviews: metrics.totalReviews,
+      memorizedAyahCards: metrics.memorizedAyahCards,
     });
 
     const [defaultDecks, surahs] = await Promise.all([
@@ -1570,10 +1579,13 @@ function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: 
   return (
     <View className="gap-4">
       <EmptyState icon={UserRound} title={s.profileSignedOutTitle} subtitle={s.profileSignedOutSubtitle} isDark={isDark} />
+      {/* Accounts not configured on this build: no entry point that would only reach the unavailable card. */}
+      {isSupabaseConfigured() ? (
       <View className="gap-2">
         <Button
           onPress={() => {
             onClose();
+            captureAuthReturn({ route: "profile" });
             router.push("/auth/login" as any);
           }}
         >
@@ -1586,6 +1598,7 @@ function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: 
             variant="outline"
             onPress={() => {
               onClose();
+              captureAuthReturn({ route: "profile" });
               router.push("/auth/signup" as any);
             }}
           >
@@ -1598,6 +1611,7 @@ function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: 
           </Button>
         )}
       </View>
+      ) : null}
     </View>
   );
 }

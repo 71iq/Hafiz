@@ -20,6 +20,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { requireSocialOwner } from "@/lib/social/owner";
 import { router } from "expo-router";
+import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useReflectionMutationScope } from "./use-mutation-scope";
 import { findJuzForAyah, loadMushafIndex } from "@/lib/mushaf/position";
@@ -195,10 +196,12 @@ export function WriteReflectionSheet({
   const handleClose = useCallback(() => guard(closeNow), [closeNow, guard]);
 
   const handleLogin = useCallback(() => {
+    // The return target holds only the ayah range; the guest's text is not carried into the account.
+    captureAuthReturn({ route: "reflection-editor", params: { surah, ayahStart, ayahEnd } });
     closeNow();
     onNavigate?.();
     router.push("/auth/login");
-  }, [closeNow, onNavigate]);
+  }, [ayahEnd, ayahStart, closeNow, onNavigate, surah]);
 
   const privateNoteSaved = useCallback(() => {
     // The note was the chosen destination: the reflection draft is done, and nothing was posted.

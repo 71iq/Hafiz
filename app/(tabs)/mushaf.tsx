@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
+import { AuthReopenSurfaces } from "@/components/auth/AuthReopenSurfaces";
 import { View, Text, Pressable, Platform, useWindowDimensions, BackHandler, AppState } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
@@ -2222,6 +2223,7 @@ function MushafInner() {
         )}
 
         {/* C06 "Back to where I was": one captured position, for five seconds after an explicit jump. */}
+        <AuthReopenSurfaces surface="mushaf" />
         {returnToken && !focusModeActive && (
           <View
             pointerEvents="box-none"

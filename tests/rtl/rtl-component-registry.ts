@@ -77,6 +77,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Shared guest promotion row, actions and close control mirror; covered by the ProgressScreen and Home fixtures.",
   ),
   entry(
+    "components/auth/AuthReopenSurfaces.tsx",
+    "direction-neutral",
+    "source",
+    "Renders the reflection editor or comments sheets, which own their own mirroring.",
+  ),
+  entry(
     "components/auth/AuthScreenShell.tsx",
     "app-shell",
     "rntl",
@@ -556,6 +562,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Author/action rows mirror; reflection text can use natural direction.",
   ),
   entry(
+    "components/reflections/ReflectionTime.tsx",
+    "feedback",
+    "rntl",
+    "Relative time with the full localized date on hover or long-press; follows the UI direction.",
+  ),
+  entry(
     "components/reflections/ReflectionsSection.tsx",
     "card",
     "source",
@@ -615,6 +627,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "card",
     "rntl",
     "Board intention card; toggle rows mirror and copy aligns to the reading side (tests/unit/board-screen.test.tsx).",
+  ),
+  entry(
+    "components/social/BoardScoringSheet.tsx",
+    "overlay",
+    "rntl",
+    "Read-only scoring rules sheet; headings and paragraphs follow the UI direction.",
   ),
   entry(
     "components/social/BoardStandings.tsx",

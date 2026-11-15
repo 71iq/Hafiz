@@ -166,6 +166,19 @@ export function deriveAuthReturnFromStack(state: RouteStackState | undefined): A
 type Pending = { target: AuthReturnTarget; capturedAt: number };
 let pending: Pending | null = null;
 let reopen: AuthReopenRequest | null = null;
+const reopenListeners = new Set<() => void>();
+
+/** Notified when a sign-in return sets a surface to reopen, so a mounted destination can open it. */
+export function subscribeAuthReopen(listener: () => void): () => void {
+  reopenListeners.add(listener);
+  return () => {
+    reopenListeners.delete(listener);
+  };
+}
+
+function notifyReopen() {
+  if (reopen) reopenListeners.forEach((listener) => listener());
+}
 let redirectRestored = false;
 let awaitingRedirect = false;
 
@@ -360,6 +373,7 @@ export function resolveAuthReturn(target: AuthReturnTarget): AuthReturnNavigatio
 export function completeAuthReturn(state: RootStackState): AuthReturnTarget {
   const target = consumeAuthReturn();
   reopen = reopenFor(target);
+  notifyReopen();
   navigateTo(state, target);
   return target;
 }
@@ -382,6 +396,7 @@ export function leaveAuthWithoutSession(state: RootStackState): AuthReturnTarget
 export function completeRedirectReturn(): AuthReturnTarget {
   const target = consumeAuthReturn();
   reopen = reopenFor(target);
+  notifyReopen();
   const navigation = resolveAuthReturn(target);
   if (navigation.kind === "tabs") {
     if (navigation.deepLink) setPendingDeepLink(navigation.deepLink);

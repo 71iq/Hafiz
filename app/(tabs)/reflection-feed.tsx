@@ -1,4 +1,5 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
+import { AuthReopenSurfaces } from "@/components/auth/AuthReopenSurfaces";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -629,6 +630,7 @@ export default function ReflectionFeedScreen() {
       />
 
       <Toast message={toast} onDismiss={() => setToast(null)} />
+      <AuthReopenSurfaces surface="feed" />
     </SafeAreaView>
   );
 }

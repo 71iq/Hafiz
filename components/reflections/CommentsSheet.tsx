@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } fr
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { ChevronDown, Flag, Heart, Send, Trash2 } from "lucide-react-native";
 import { router } from "expo-router";
+import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { requireSocialOwner } from "@/lib/social/owner";
@@ -819,7 +820,18 @@ export function CommentsSheet({
                 {s.reflectionLoginToComment}
               </Text>
               <Pressable
-                onPress={() => closeForNavigation(() => router.push("/auth/login"))}
+                onPress={() =>
+                  closeForNavigation(() => {
+                    // Only the reflection reference returns after sign-in; no comment or like is replayed.
+                    if (reflectionId) {
+                      captureAuthReturn({
+                        route: "comments",
+                        params: { reflectionId, surah: reflection?.surah, ayah: reflection?.ayah_start },
+                      });
+                    }
+                    router.push("/auth/login");
+                  })
+                }
                 accessibilityRole="button"
                 // White on teal-700 in light (5.4:1); dark teal text on the bright accent in dark.
                 className="mt-3 min-h-[44px] justify-center self-start rounded-full bg-primary-muted px-4 py-2 dark:bg-primary-bright"
