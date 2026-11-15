@@ -3,6 +3,7 @@
  */
 export const detailStrings = {
   en: {
+    ayahDetailReportIssue: "Report an issue with this ayah",
     detailRetry: "Retry",
     ayahDetailGoToAyah: "Go to this ayah",
     ayahDetailShare: "Share",
@@ -46,6 +47,7 @@ export const detailStrings = {
     occurrencesLoadMoreFailed: "Could not load more",
   },
   ar: {
+    ayahDetailReportIssue: "الإبلاغ عن مشكلة في هذه الآية",
     detailRetry: "حاول مجددًا",
     ayahDetailGoToAyah: "انتقل إلى هذه الآية",
     ayahDetailShare: "مشاركة",

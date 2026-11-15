@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ActivityIndicator, Platform, Pressable, ScrollView, Share, Text, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { ArrowRight, ArrowLeft, BookOpenText, Bookmark, ChevronLeft, ChevronRight, Copy, Pause, Play, Share2 } from "lucide-react-native";
+import { ArrowRight, ArrowLeft, BookOpenText, Bookmark, ChevronLeft, ChevronRight, Copy, Flag, Pause, Play, Share2 } from "lucide-react-native";
+import { useIssueReporter } from "@/components/app-update/IssueReporter";
 import { formatAyahRef } from "@/lib/arabic";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
@@ -122,6 +123,8 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     isLoaded: settingsLoaded,
   } = useSettings();
   const { isBookmarked, showToast, refreshBookmarks } = useSelection();
+  // W14: a deliberate report carries only public context: the canonical reference and active tab/source.
+  const issueReporter = useIssueReporter(showToast);
   const { getAyahState, toggleAyah } = useAyahAudio();
   const { navigateToAyah, hasReaderNavigation } = useWordInteraction();
   const [ayahRow, setAyahRow] = useState<Loaded<AyahRow | null> | null>(null);
@@ -638,6 +641,28 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                   {isRTL ? <ArrowLeft size={16} color={accentColor} /> : <ArrowRight size={16} color={accentColor} />}
                 </Pressable>
               ) : null}
+
+              {activeTarget ? (
+                <Pressable
+                  onPress={() =>
+                    issueReporter.report({
+                      surah: activeTarget.surah,
+                      ayah: activeTarget.ayah,
+                      tab: shownTab,
+                      source: shownTab === "tafsir" ? preferredSource : null,
+                    })
+                  }
+                  accessibilityRole="link"
+                  className="mt-2 min-h-11 items-center gap-2 self-start"
+                  style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", alignSelf: isRTL ? "flex-end" : "flex-start" }}
+                >
+                  <Flag size={14} color={iconColor} />
+                  <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
+                    {s.ayahDetailReportIssue}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {issueReporter.fallback}
             </View>
 
             {/* Pinned once the ayah scrolls away, so a long tafsir can switch tabs without scrolling back. */}
