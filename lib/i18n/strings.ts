@@ -15,6 +15,8 @@ import { reflectionsStrings } from "@/lib/i18n/features/reflections";
 import { profileNotesStrings } from "@/lib/i18n/features/profile-notes";
 import { authStrings } from "@/lib/i18n/features/auth";
 import { settingsPublicStrings } from "@/lib/i18n/features/settings-public";
+import { audioStrings } from "@/lib/i18n/features/audio";
+import { detailStrings } from "@/lib/i18n/features/detail";
 
 export const strings = {
   en: {
@@ -1012,6 +1014,8 @@ export const strings = {
     ...profileNotesStrings.en,
     ...authStrings.en,
     ...settingsPublicStrings.en,
+    ...audioStrings.en,
+    ...detailStrings.en,
   },
   ar: {
     appName: "حافظ",
@@ -1983,6 +1987,8 @@ export const strings = {
     ...profileNotesStrings.ar,
     ...authStrings.ar,
     ...settingsPublicStrings.ar,
+    ...audioStrings.ar,
+    ...detailStrings.ar,
   },
 } as const;
 

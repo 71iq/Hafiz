@@ -5,7 +5,7 @@ import { TranslationLanguagePicker } from "@/components/settings/TranslationLang
 import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import { ResponsiveSheet, OverlayHeader } from "@/components/ui/ResponsiveOverlay";
 import { DisclosureRow } from "@/components/ui/MirroredRow";
-import { Toast } from "@/components/ui/Toast";
+import { Toast, noticeDurationMs } from "@/components/ui/Toast";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { TRANSLATION_LANGUAGES } from "@/lib/translations/languages";
 import { strings } from "@/lib/i18n/strings";
@@ -178,7 +178,8 @@ describe.each(["en", "ar"] as const)("%s translation selection lifetime", (langu
     if (when === "after") await fail(result);
     expect(view.getByText(message)).toBeTruthy();
     expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
-    act(() => jest.advanceTimersByTime(1999));
+    const hold = noticeDurationMs(message);
+    act(() => jest.advanceTimersByTime(hold - 1));
     expect(view.getByText(message)).toBeTruthy();
     act(() => jest.advanceTimersByTime(201));
     expect(view.queryByText(message)).toBeNull();

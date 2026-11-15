@@ -624,6 +624,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "rntl",
     "Startup error typography, locale owner and readiness precedence are covered through all six real routes.",
   ),
+  entry("components/ui/DiscardChangesDialog.tsx", "overlay", "rntl", "Reuses ConfirmDialog; title and actions mirror."),
   entry(
     "components/ui/DropdownMenu.tsx",
     "picker-menu",

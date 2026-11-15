@@ -117,13 +117,17 @@ it("keeps the existing text, pointer behavior, and styles", () => {
     fontSize: 13,
     paddingHorizontal: 20,
     paddingVertical: 10,
+    marginHorizontal: 16,
+    maxWidth: 560,
+    textAlign: "center",
     borderRadius: 999,
     overflow: "hidden",
   });
 });
 
 it.each([
-  [undefined, 2000],
+  // One word: 2000 + 60ms per word (C03).
+  [undefined, 2060],
   [3500, 3500],
 ] as const)("uses the %s hold and a separate 200ms dismissal tail", (duration, hold) => {
   const onDismiss = jest.fn();
