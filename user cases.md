@@ -69,12 +69,12 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 
 ## Memorization and focus
 
-- HIFZ-01. In verse view, hide verses and tap a hidden ayah to reveal it. Turn hiding off and on to reset revealed ayahs.
-- HIFZ-02. In page view, enable Hifz. Hide words and replace the page rail with memorization controls. Reveal the next ayah or hide the previous/partially revealed ayah. Boundary controls disable when no action remains.
-- HIFZ-03. Start automatic word revelation, adjust its speed, then stop it. Manual reveal/hide stops automatic progress.
-- HIFZ-04. Finish automatic revelation on a page. Stop there, or advance when the saved auto-advance preference permits it. Stop at page 604. Manual navigation resets revelation; switching to verse view disables page Hifz.
-- FOCUS-01. Enter focus mode from vertical page view while Hifz is off. Hide normal navigation and start automatic scrolling. Pause/resume, adjust speed, show the focus controls, or exit to normal reading.
-- FOCUS-02. Touch, scroll, navigate, open ayah actions/word detail, or open a reading panel during focus mode. Pause automatic movement. Reaching the end pauses with feedback; incompatible reading settings exit focus mode.
+- HIFZ-01. In verse view, hide ayahs and tap a hidden ayah's placeholder, sized like the ayah, to reveal it. Re-hide it only with its Hide this ayah action. Reveals survive scrolling within the current page and same-page jumps; scrolling or jumping to another page keeps only that page's reveals. Turning hiding off clears every reveal. Nothing here changes Hifz records.
+- HIFZ-02. In page view, turn on page reveal mode. Hide words and replace the page rail with memorization controls that stay visible when the toolbar hides. Reveal the next word or the next ayah, or hide the last revealed ayah. Boundary controls disable when no action remains.
+- HIFZ-03. Start automatic word revelation: the first word appears at once, then one word per interval shown in seconds. Adjust the interval from the rail or the Auto reveal section of reading settings, then stop it. Manual reveal/hide stops automatic progress.
+- HIFZ-04. Reveal a whole page. See Page revealed with Repeat and Next page (no Next page on 604), or advance automatically when the saved auto-advance preference permits it. Moving to another page resets revelation; same-page jumps and view switches keep it.
+- FOCUS-01. Enter focus mode from vertical page view while Hifz is off. Hide normal navigation with scrolling paused until Play. While playing, the screen stays on and idle controls shrink to one Pause pill after 2.5 seconds. Pause/resume (Space on web), adjust speed with its time per page, show the focus controls, or exit (Escape on web) to normal reading.
+- FOCUS-02. Scroll, navigate, open ayah actions/word detail, or open a reading panel during focus mode. Pause automatic movement and show Paused. Reaching the end pauses with a three-second notice; incompatible reading settings exit focus mode.
 
 ## Ayah actions and details
 
@@ -107,11 +107,12 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 
 ## Recitation
 
-- AUDIO-01. With Quran Foundation content enabled, play a single ayah from verse view or detail. Pause/resume it, or select another ayah to replace playback. Single-ayah playback cancels a playing range. Loading blocks repeated playback requests.
+- AUDIO-01. Play a single ayah from verse view or detail. The player bar shows the surah and ayah, reciter and loading, playing, paused or failed state, with pause/resume, stop and the recitation sheet. Select another ayah to replace playback. Single-ayah playback cancels a playing range. Loading blocks repeated requests and gives up after 15 seconds with Retry; a late answer never starts. Offline, an unavailable recitation and a playback failure read differently; recitation needs an internet connection.
 - AUDIO-02. Open recitation settings. Start with the visible ayah, choose one ayah, an inclusive start/end range, or the current surah, then select a reciter through the shared reciter picker.
-- AUDIO-03. Set whole-range repeats, repeats per ayah, and delay. Start playback, watch the active ayah and progress/repeat counters, then stop or let it finish. Closing the settings sheet leaves playback running.
-- AUDIO-04. Submit a malformed reference, nonexistent single-ayah reference, reversed/empty range, or failed playback request. Keep the recitation sheet open with feedback. Unavailable or misconfigured audio also reports failure.
-- AUDIO-05. Background the native app during playback. Pause audio. Returning makes audio available without automatically issuing a new play command.
+- AUDIO-03. Set whole-range repeats, repeats per ayah, and delay; they are kept on this device. Start playback: the sheet closes and the player bar shows the surah, ayah and progress, dimmed with Paused while paused. Reopen the sheet from the bar to see repeat counters, then stop or let it finish.
+- AUDIO-04. Submit a malformed reference (Arabic-Indic digits are accepted), nonexistent single-ayah reference, reversed/empty range, or failed playback request. Keep the recitation sheet open with the message under the field that caused it. Unavailable audio also reports failure.
+- AUDIO-05. Background the native app or lock the screen during playback. Recitation keeps playing with lock-screen controls titled with the surah name and ayah, the reciter and Hafiz. Pausing there, or a platform pause such as unplugged headphones where the platform supports it, shows as paused on return; returning restores the actual player state and current ayah without a new play command.
+- AUDIO-06. With Follow recitation on (the default), a range recitation keeps its current ayah in view. Scroll, page or jump away: following stops for that recitation without stopping audio and one Back to ayah control appears. Use it to recenter and follow again. Turn Follow recitation off in the recitation sheet to stop following; single ayahs are never followed.
 
 ## Deck setup and card management
 
@@ -279,7 +280,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - SET-07. In General, choose verse/page reading and vertical/horizontal page movement. Save both choices for subsequent reading. The reader's mode controls use the same preferences.
 - SET-08. Open translation selection from Content. Choose a language, wait for any import, then close with that selection active. Failure leaves an error and falls back to English. Other choices disable during selection.
 - SET-09. Open tafsir selection from Content, reader settings, or ayah detail. Choose an available source and close, or download/import another source with progress. A download leaves the picker open; failure retains the previous source and reports the error.
-- SET-10. With recitation content enabled, open the reciter picker from Content or recitation settings. Load available reciters with a bundled fallback, select one, close the picker, and retain that preferred reciter.
+- SET-10. Open the reciter picker from Content or recitation settings. See reciters sorted by name in the app language, from a weekly-refreshed device copy over the bundled list, and search them. Preview a reciter (Al-Fatihah 1, up to ten seconds, unavailable while a recitation plays) without changing the saved one. Select one, close the picker, and retain that preferred reciter.
 - SET-11. Open Account. A signed-in user can open their profile or choose Logout. Confirm logout to become a guest, or cancel to retain the session. Guests can open their profile, Login, or enabled Signup.
 - SET-12. With account service and Quran Foundation sync enabled, connect/reconnect through external authorization. Return through `/auth/qf-callback` to Settings with a connected state or provider/missing-parameter/completion error.
 - SET-13. After a successful connection, run the initial sync. Show connected, linked-without-sync, disconnected, or reauthentication-needed status with its result message. Connection callbacks clear their temporary URL parameters.

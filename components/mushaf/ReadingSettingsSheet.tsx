@@ -5,6 +5,7 @@ import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { Switch, SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { ReadingStepper } from "@/components/settings/ReadingStepper";
+import { formatSecondsPerWord, getNextFasterDelay, getNextSlowerDelay } from "@/components/mushaf/HifzControls";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
@@ -13,6 +14,8 @@ import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import {
   FONT_SIZE_STEPS,
+  MAX_HIFZ_AUTO_DELAY_MS,
+  MIN_HIFZ_AUTO_DELAY_MS,
   useSettings,
   type QuranMarkerStyle,
   type ThemeMode,
@@ -56,6 +59,10 @@ export function ReadingSettingsSheet({
     setQuranMarkerStyle,
     markSimilarVerses,
     setMarkSimilarVerses,
+    hifzAutoDelayMs,
+    setHifzAutoDelayMs,
+    hifzAutoAdvancePage,
+    setHifzAutoAdvancePage,
     tafseerSource,
     setTafseerSource,
     isDark,
@@ -268,6 +275,40 @@ export function ReadingSettingsSheet({
                 subtitle={s.hifzSimilarMarkSettingHint}
                 isRTL={isRTL}
                 trailing={<SwitchTrack value={markSimilarVerses} />}
+                compact={compactRows}
+              />
+            </SwitchRow>
+          </View>
+
+          {/* Page reveal mode: the auto reveal pace and whether a revealed page moves on by itself. */}
+          <SettingsSectionLabel label={s.hifzAutoReveal} isRTL={isRTL} />
+          <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
+            <SettingsActionRow
+              title={s.hifzTimeBetweenWords}
+              isRTL={isRTL}
+              compact={compactRows}
+              trailing={
+                <ReadingStepper
+                  variant="sheet"
+                  decrementLabel={s.hifzDecreaseSpeed}
+                  incrementLabel={s.hifzIncreaseSpeed}
+                  value={formatSecondsPerWord(hifzAutoDelayMs, isRTL, s.revealSecondsPerWord)}
+                  onDecrement={() => setHifzAutoDelayMs(getNextSlowerDelay(hifzAutoDelayMs))}
+                  onIncrement={() => setHifzAutoDelayMs(getNextFasterDelay(hifzAutoDelayMs))}
+                  decrementDisabled={hifzAutoDelayMs >= MAX_HIFZ_AUTO_DELAY_MS}
+                  incrementDisabled={hifzAutoDelayMs <= MIN_HIFZ_AUTO_DELAY_MS}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                  compact={compactRows}
+                />
+              }
+            />
+            <Divider />
+            <SwitchRow label={s.hifzAutoNextPage} value={hifzAutoAdvancePage} onValueChange={setHifzAutoAdvancePage}>
+              <SettingsActionRow
+                title={s.hifzAutoNextPage}
+                isRTL={isRTL}
+                trailing={<SwitchTrack value={hifzAutoAdvancePage} />}
                 compact={compactRows}
               />
             </SwitchRow>

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ActivityIndicator, Platform, Pressable, ScrollView, Share, Text, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { useNetInfo } from "@react-native-community/netinfo";
 import { ArrowRight, ArrowLeft, BookOpenText, Bookmark, ChevronLeft, ChevronRight, Copy, Pause, Play, Share2 } from "lucide-react-native";
 import { formatAyahRef } from "@/lib/arabic";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
@@ -23,6 +22,7 @@ import {
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { audioFailureMessage } from "@/lib/audio/labels";
 import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { useDatabase } from "@/lib/database/provider";
 import { setPendingDeepLink } from "@/lib/deep-link";
@@ -105,8 +105,6 @@ function canShareText() {
 export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "tafsir" }: Props) {
   const db = useDatabase();
   const s = useStrings();
-  const netInfo = useNetInfo();
-  const offline = netInfo.isConnected === false || netInfo.isInternetReachable === false;
   const { width, height } = useWindowDimensions();
   const {
     translationLanguage,
@@ -424,8 +422,10 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   const handleAudioPress = useCallback(async () => {
     if (!activeTarget) return;
     const result = await toggleAyah(activeTarget.surah, activeTarget.ayah, recitationId);
-    if (!result.ok) showToast(offline ? s.ayahDetailAudioOffline : s.ayahDetailAudioFailed);
-  }, [activeTarget, offline, recitationId, toggleAyah, showToast, s.ayahDetailAudioOffline, s.ayahDetailAudioFailed]);
+    if (!result.ok && result.failure && result.failure !== "busy") {
+      showToast(audioFailureMessage(result.failure, s));
+    }
+  }, [activeTarget, recitationId, toggleAyah, showToast, s]);
 
   const handleNavigateAyah = useCallback((direction: "previous" | "next") => {
     const nextTarget = adjacentAyahs[direction];

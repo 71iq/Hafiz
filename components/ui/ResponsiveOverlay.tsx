@@ -115,6 +115,11 @@ function isTopOverlay(id: string) {
   return overlayStack[overlayStack.length - 1] === id;
 }
 
+/** True while any overlay is open, so reader-level keys (focus Space/Escape) leave it the keys. */
+export function hasOpenOverlay() {
+  return overlayStack.length > 0;
+}
+
 export function ResponsiveOverlay({
   open,
   onClose,

@@ -1,7 +1,15 @@
 import { memo, useCallback, useRef } from "react";
 import { Text, Pressable, Platform, View } from "react-native";
-import { useSettings } from "@/lib/settings/context";
+import { useSettings, type ThemePalette } from "@/lib/settings/context";
 import { useWordTap } from "./useWordTap";
+
+/** The line standing in for a hidden word: at least 3:1 against each theme's page. */
+const HIDDEN_WORD_UNDERLINE: Record<ThemePalette, string> = {
+  beige: "#9A8470",
+  white: "#8A8F98",
+  dark: "#6B6B6B",
+  amoled: "#5E5E5E",
+};
 
 type Props = {
   glyph: string;
@@ -49,7 +57,7 @@ function WordTokenInner({
   compactLayout = false,
   weakSpot = false,
 }: Props) {
-  const { isDark, viewMode, pageScroll } = useSettings();
+  const { isDark, viewMode, pageScroll, effectiveTheme } = useSettings();
   const tokenRef = useRef<View>(null);
   const tap = useWordTap({ surah, ayah, wordPos, v2Page, disabled, hidden });
   const { wordRef, isTooltipSelected, isTouchInput, openDetail } = tap;
@@ -117,7 +125,7 @@ function WordTokenInner({
         // invisible below it.
         ...(hidden && {
           borderBottomWidth: Math.max(2, fontSize * 0.08),
-          borderBottomColor: isDark ? "#474747" : "#e8dac5",
+          borderBottomColor: HIDDEN_WORD_UNDERLINE[effectiveTheme],
           paddingBottom: Math.max(1, fontSize * 0.04),
         }),
         ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),

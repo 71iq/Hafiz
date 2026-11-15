@@ -764,14 +764,14 @@
               "id": "reader.audio.range",
               "title": "Range recitation settings and playback",
               "kind": "widget",
-              "cases": ["AUDIO-02", "AUDIO-03", "AUDIO-04"],
+              "cases": ["AUDIO-02", "AUDIO-03", "AUDIO-04", "AUDIO-06"],
               "uses": ["shared.reciterpicker"],
               "native": false,
               "children": []
             },
             {
               "id": "reader.audio.background",
-              "title": "Pause on native background",
+              "title": "Background playback and return",
               "kind": "transition",
               "cases": ["AUDIO-05"],
               "uses": [],

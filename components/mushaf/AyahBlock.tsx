@@ -21,6 +21,7 @@ import { SimilarVerseButton } from "./SimilarVerseMarker";
 import {
   BookOpenText,
   Bookmark,
+  EyeOff,
   NotebookPen,
   Pause,
   Play,
@@ -36,6 +37,7 @@ import {
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { audioFailureMessage } from "@/lib/audio/labels";
 import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
 import { textStartStyle } from "@/lib/ui/direction";
@@ -69,6 +71,9 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   hideMode?: boolean;
+  /** Hide mode only: the reader keeps revealed ayahs, so recycling a block never re-hides one. */
+  revealed?: boolean;
+  onRevealChange?: (surah: number, ayah: number, revealed: boolean, v2Page: number) => void;
   highlighted?: boolean;
   highlightedWordPos?: number | null;
 };
@@ -81,6 +86,8 @@ function AyahBlockInner({
   fontSize,
   lineHeight,
   hideMode = false,
+  revealed = false,
+  onRevealChange,
   highlighted = false,
   highlightedWordPos = null,
 }: Props) {
@@ -106,9 +113,8 @@ function AyahBlockInner({
   const { getAyahState, toggleAyah } = useAyahAudio();
 
   const fontVisible = useQuranPageFontReady(quranFontStyle, v2Page);
-  // FlashList reuses a block for another ayah; recycling state resets with the ayah, so a revealed
-  // verse in hide mode (or an open detail sheet) does not carry over to the verse that reuses it.
-  const [revealed, setRevealed] = useRecyclingState(false, [surah, ayah, hideMode]);
+  // FlashList reuses a block for another ayah; recycling state resets with the ayah, so an open
+  // detail sheet does not carry over to the verse that reuses it.
   const [detailOpen, setDetailOpen] = useRecyclingState(false, [surah, ayah]);
   const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("hadith");
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
@@ -143,8 +149,11 @@ function AyahBlockInner({
   }, []);
 
   const handleReveal = useCallback(() => {
-    if (hideMode) setRevealed((prev) => !prev);
-  }, [hideMode]);
+    if (hideMode) onRevealChange?.(surah, ayah, true, v2Page);
+  }, [ayah, hideMode, onRevealChange, surah, v2Page]);
+  const handleHide = useCallback(() => {
+    onRevealChange?.(surah, ayah, false, v2Page);
+  }, [ayah, onRevealChange, surah, v2Page]);
 
   const isBlurred = hideMode && !revealed;
   const fontFamily = quranPageFontName(quranFontStyle, v2Page);
@@ -158,6 +167,15 @@ function AyahBlockInner({
   const bookmarked = isBookmarked(surah, ayah);
   const highlightColor = getHighlightColor(surah, ayah);
   const qcf2LineHeight = Math.ceil(lineHeight + Math.max(6, fontSize * 0.16));
+  // The hidden placeholder takes about the height the ayah's words will need, so revealing it does
+  // not shift the list. Words wrap like the rendered row: roughly 1.7em per page-font word.
+  const hiddenAyahHeight = useMemo(() => {
+    const textWidth = Math.max(120, Math.min(width - 24, 840) - 38);
+    const rowGap = Math.max(4, fontSize * 0.12);
+    const perLine = Math.max(1, Math.floor(textWidth / (fontSize * 1.7 + 2)));
+    const lines = Math.max(1, Math.ceil((wordTokens.words.length + 1) / perLine));
+    return lines * qcf2LineHeight + (lines - 1) * rowGap;
+  }, [fontSize, qcf2LineHeight, width, wordTokens.words.length]);
 
   const handleBookmark = useCallback(async () => {
     if (bookmarkBusy) return;
@@ -203,10 +221,10 @@ function AyahBlockInner({
 
   const handleAudioPress = useCallback(async () => {
     const result = await toggleAyah(surah, ayah, recitationId);
-    if (!result.ok) {
-      showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
+    if (!result.ok && result.failure && result.failure !== "busy") {
+      showToast(audioFailureMessage(result.failure, s));
     }
-  }, [ayah, recitationId, showToast, s.qfContentMisconfigured, s.qfContentUnavailable, surah, toggleAyah]);
+  }, [ayah, recitationId, showToast, s, surah, toggleAyah]);
 
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
   const audioState = getAyahState(surah, ayah, recitationId);
@@ -318,10 +336,16 @@ function AyahBlockInner({
 
       {/* Arabic text (QCF2) — interactive word tokens */}
       {isBlurred ? (
-        <Pressable onPress={handleReveal} className="pt-4">
+        <Pressable
+          onPress={handleReveal}
+          accessibilityRole="button"
+          accessibilityLabel={`${s.tapToReveal}, ${formatAyahRef(isRTL, surah, ayah)}`}
+          {...readerControlProps}
+          className={isPhone ? "pt-3 pb-1" : "pt-5 pb-1"}
+        >
           <View
             className="rounded-2xl bg-surface-mid dark:bg-surface-dark-mid items-center justify-center"
-            style={{ height: lineHeight + 16 }}
+            style={{ height: hiddenAyahHeight }}
           >
             <Text
               className="text-warm-400 dark:text-neutral-500"
@@ -339,7 +363,7 @@ function AyahBlockInner({
           className={isPhone ? "pt-3 pb-1" : "pt-5 pb-1"}
           style={{ direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
         >
-          {Platform.OS === "android" && !hideMode ? (
+          {Platform.OS === "android" ? (
             // Android clips each separate Text to its own box, which cut page-font word glyphs that draw
             // outside their advance. One Text per ayah with nested word spans draws every word fully.
             <AyahWordText
@@ -371,7 +395,7 @@ function AyahBlockInner({
               wordHighlightColor={(wordPos) =>
                 highlightedWordPos === wordPos ? "#0d9488" : getWordHighlightColor(surah, ayah, wordPos)
               }
-              wordWeakSpot={(wordPos) => !hideMode && isWeakSpot(surah, ayah, wordPos)}
+              wordWeakSpot={(wordPos) => isWeakSpot(surah, ayah, wordPos)}
             />
           ) : (
             <View
@@ -408,13 +432,12 @@ function AyahBlockInner({
                     ayah={ayah}
                     wordPos={wordPos}
                     v2Page={v2Page}
-                    disabled={hideMode}
                     highlightColor={
                       highlightedWordPos === wordPos
                         ? "#0d9488"
                         : getWordHighlightColor(surah, ayah, wordPos)
                     }
-                    weakSpot={!hideMode && isWeakSpot(surah, ayah, wordPos)}
+                    weakSpot={isWeakSpot(surah, ayah, wordPos)}
                   />
                 );
               })}
@@ -430,7 +453,7 @@ function AyahBlockInner({
                           hafizAyah: String(ayah),
                           hafizWordPos: "0",
                           hafizAyahMarker: "true",
-                          hafizQuranHidden: hideMode ? "true" : "false",
+                          hafizQuranHidden: "false",
                         },
                       } as any)
                     : {})}
@@ -442,7 +465,7 @@ function AyahBlockInner({
                     lineHeight: qcf2LineHeight,
                     paddingHorizontal: 2,
                     writingDirection: "rtl",
-                    ...(Platform.OS === "web" ? ({ userSelect: hideMode ? "none" : "text" } as any) : null),
+                    ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                   }}
                 >
                   {wordTokens.marker}
@@ -450,6 +473,24 @@ function AyahBlockInner({
               )}
             </View>
           )}
+        </View>
+      )}
+
+      {hideMode && revealed && (
+        <View className={isRTL ? "items-end pt-1" : "items-start pt-1"}>
+          <Pressable
+            onPress={handleHide}
+            accessibilityRole="button"
+            accessibilityLabel={`${s.revealHideThisAyah}, ${formatAyahRef(isRTL, surah, ayah)}`}
+            {...readerControlProps}
+            className="min-h-[44px] items-center justify-center gap-1.5 rounded-full px-3"
+            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+          >
+            <EyeOff size={15} color={iconColor} />
+            <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+              {s.revealHideThisAyah}
+            </Text>
+          </Pressable>
         </View>
       )}
 
