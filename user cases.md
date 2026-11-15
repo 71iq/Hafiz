@@ -97,7 +97,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - WORD-03. In word detail, browse previous/next words and view their reference and frequency, plus root/lemma metadata in Arabic UI. Switch Meaning, I'rab, Tajweed, Tasreef, and Occurrences tabs. Boundary arrows disable; closing resets the initial tab.
 - WORD-04. Open the current word's ayah detail above the word sheet. Meaning starts Translation where available, otherwise Tafsir. Other word tabs start Tafsir. Close ayah detail to return to the word sheet.
 - WORD-05. Read the word translation/transliteration or Arabic meaning. Add its meaning to vocabulary, then show saving/saved feedback or a retryable failure.
-- WORD-06. When Arabic meaning is absent, enter a custom meaning and save it locally. The saved meaning gains the normal vocabulary action. Empty text cannot save; a failure retains the editor and error.
+- WORD-06. When Arabic meaning is absent, enter a custom meaning and save it locally. The saved meaning gains the normal vocabulary action. Empty text cannot save; a failure retains the editor and error. Your own meaning offers Edit and a confirmed Delete; a bundled meaning offers neither.
 - WORD-07. Read I'rab with the selected word highlighted and scrolled into view, or read Tasreef morphology. Loading/missing-data states replace unavailable content.
 - WORD-08. Expand or collapse individual Tajweed rules in the selected UI language. Show the no-rules state when none applies.
 - WORD-09. Select a root occurrence. Close word detail and move Mushaf to that ayah/word with a highlight. Missing roots or occurrences show an empty state.

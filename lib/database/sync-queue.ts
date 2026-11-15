@@ -9,12 +9,14 @@ export async function enqueueSync(
   tableName: string,
   operation: "INSERT" | "UPDATE" | "DELETE",
   rowId: string,
-  data: Record<string, any>
+  data: Record<string, any>,
+  /** The queue time. A deletion passes its own deletion time so the entry and payload agree. */
+  queuedAt: string = new Date().toISOString()
 ): Promise<void> {
   await db.runAsync(
     `INSERT INTO sync_queue (table_name, operation, row_id, data, status, created_at)
      VALUES (?, ?, ?, ?, 'pending', ?)`,
-    [tableName, operation, rowId, JSON.stringify(data), new Date().toISOString()]
+    [tableName, operation, rowId, JSON.stringify(data), queuedAt]
   );
   emitSyncQueued();
 }
