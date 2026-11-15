@@ -520,6 +520,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Chart layout does not silently reverse chronology.",
   ),
   entry(
+    "components/progress/ProgressStats.tsx",
+    "progress-chart",
+    "source",
+    "Stat tiles wrap from the reading start and the More stats toggle aligns to the start edge.",
+  ),
+  entry(
     "components/progress/SurahProgressList.tsx",
     "progress-chart",
     "source",

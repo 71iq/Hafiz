@@ -87,3 +87,11 @@ export function formatCards(n: number, language: Language): string {
   if (language === "ar") return arabicCount(n, CARDS);
   return n === 1 ? "1 card" : `${n.toLocaleString("en")} cards`;
 }
+
+const REVIEWS: ArabicForms = { one: "مراجعة واحدة", two: "مراجعتان", few: "مراجعات", many: "مراجعة" };
+
+/** Reviews on a day or in total, including zero: "0 reviews", "1 review", "٠ مراجعة", "مراجعتان". */
+export function formatReviews(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, REVIEWS);
+  return n === 1 ? "1 review" : `${n.toLocaleString("en")} reviews`;
+}

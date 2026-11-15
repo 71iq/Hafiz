@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from "react";
-import { View, Text, Pressable, useWindowDimensions } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, Pressable, Platform, useWindowDimensions } from "react-native";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textEndStyle, textStartStyle } from "@/lib/ui/direction";
-import { toArabicNumber } from "@/lib/arabic";
-import { formatNumber } from "@/lib/i18n/count";
+import { formatNumber, formatReviews } from "@/lib/i18n/count";
 import type { DayStatus } from "@/lib/habit/types";
 
 type DayData = { date: string; count: number };
@@ -80,10 +80,19 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
 const BASE_CELL_SIZE = 13;
 /** Month and weekday labels share one readable tone at 10 px: about 7:1 in dark and 6:1 in light. */
 const LABEL_COLOR = (isDark: boolean) => (isDark ? "#a3a3a3" : "#6E5A47");
+/** The theme's gold token for today's ring: gold on the dark themes, gold-dark on the light ones. */
+const TODAY_RING = (isDark: boolean) => (isDark ? "#FDDC91" : "#785F22");
 /** Space between the weekday labels and the grid. */
 const DAY_LABEL_GAP = 6;
 const TOTAL_WEEKS = 13;
 const SUMMARY_BREAKPOINT = 560;
+/** Intensity steps: 0, 1-10, 11-25 and 26 or more reviews. */
+const INTENSITY_STEPS = [
+  { sample: 0, from: 0, to: 0 },
+  { sample: 5, from: 1, to: 10 },
+  { sample: 18, from: 11, to: 25 },
+  { sample: 28, from: 26, to: null },
+] as const;
 
 function getColor(count: number, isDark: boolean, emptyColor: string): string {
   if (count === 0) return emptyColor;
@@ -92,29 +101,42 @@ function getColor(count: number, isDark: boolean, emptyColor: string): string {
   return isDark ? "#2dd4bf" : "#0d9488";
 }
 
-function getMonthLabel(date: Date, isArabic: boolean): string {
-  const months = isArabic
-    ? ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
-    : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return months[date.getMonth()];
+const MONTHS = {
+  en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
+};
+const WEEKDAYS = {
+  en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  ar: ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"],
+};
+
+/** English abbreviates to three letters; Arabic day and month names have no customary short form. */
+function shortName(name: string, language: "en" | "ar"): string {
+  return language === "en" ? name.slice(0, 3) : name;
 }
 
-/** Mon, Wed and Fri are labelled on whichever rows they fall; they are never on adjacent rows. */
-function getDayLabel(dayOfWeek: number, isArabic: boolean): string | null {
-  if (dayOfWeek === 1) return isArabic ? "الاثنين" : "Mon";
-  if (dayOfWeek === 3) return isArabic ? "الأربعاء" : "Wed";
-  if (dayOfWeek === 5) return isArabic ? "الجمعة" : "Fri";
-  return null;
-}
-
-/** The tooltip date in the interface's digits: Arabic uses Arabic-Indic digits throughout. */
-function formatTooltipDate(dateKey: string, isArabic: boolean): string {
+function parseDateKey(dateKey: string): Date {
   const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(isArabic ? "ar-u-nu-arab" : "en", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return new Date(year, month - 1, day);
+}
+
+/** "Tue, 3 Nov" or "الثلاثاء ٣ نوفمبر", in the interface's digits. */
+export function formatHeatmapDayShort(dateKey: string, language: "en" | "ar"): string {
+  const date = parseDateKey(dateKey);
+  const weekday = shortName(WEEKDAYS[language][date.getDay()], language);
+  const month = shortName(MONTHS[language][date.getMonth()], language);
+  const day = formatNumber(date.getDate(), language);
+  return language === "en" ? `${weekday}, ${day} ${month}` : `${weekday} ${day} ${month}`;
+}
+
+/** "Tuesday, 3 November 2026" or "الثلاثاء ٣ نوفمبر ٢٠٢٦" for accessible names. */
+export function formatHeatmapDayFull(dateKey: string, language: "en" | "ar"): string {
+  const date = parseDateKey(dateKey);
+  const weekday = WEEKDAYS[language][date.getDay()];
+  const month = MONTHS[language][date.getMonth()];
+  const day = formatNumber(date.getDate(), language);
+  const year = language === "ar" ? formatNumber(date.getFullYear(), "ar") : String(date.getFullYear());
+  return language === "en" ? `${weekday}, ${day} ${month} ${year}` : `${weekday} ${day} ${month} ${year}`;
 }
 
 function formatDateKey(date: Date): string {
@@ -123,6 +145,14 @@ function formatDateKey(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+function addDaysToKey(dateKey: string, days: number): string {
+  const date = parseDateKey(dateKey);
+  date.setDate(date.getDate() + days);
+  return formatDateKey(date);
+}
+
+type FocusableCell = { focus?: () => void };
 
 export function ActivityHeatmap({
   data,
@@ -137,10 +167,11 @@ export function ActivityHeatmap({
   weekStart = 0,
 }: Props) {
   const { themeColors } = useSettings();
-  const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [measuredLabelWidth, setMeasuredLabelWidth] = useState(0);
   const { width } = useWindowDimensions();
   const isArabic = !!isRTL;
+  const language = isArabic ? "ar" : "en";
   const layoutWidth = containerWidth || width;
   const showSummary = showSummaryStats && layoutWidth >= SUMMARY_BREAKPOINT;
   const isSidebarWidth = width >= SIDEBAR_BREAKPOINT;
@@ -161,9 +192,10 @@ export function ActivityHeatmap({
         : showSummary
           ? 15
           : BASE_CELL_SIZE;
-  // The Arabic day names are about 26 px at 10 px; their column sits close to the grid, with the 6 px
-  // gap the labels keep from it (DAY_LABEL_GAP) inside the width.
-  const DAY_LABEL_WIDTH = isArabic ? (showSummary ? 50 : 44) : (showSummary ? 40 : 34);
+  // The weekday column reserves the widest measured label plus its gap from the grid, with an
+  // estimate until the labels have been measured.
+  const estimatedLabelWidth = isArabic ? (showSummary ? 50 : 44) : (showSummary ? 40 : 34);
+  const DAY_LABEL_WIDTH = Math.max(estimatedLabelWidth, measuredLabelWidth ? measuredLabelWidth + DAY_LABEL_GAP : 0);
   const reservedSummaryWidth = showSummary ? (isSidebarWidth ? 200 : 150) : 0;
   const reservedSummaryGap = showSummary ? (isSidebarWidth ? 32 : 20) : 0;
   const availableWidth = Math.max(220, layoutWidth);
@@ -182,6 +214,7 @@ export function ActivityHeatmap({
   startRaw.setDate(startRaw.getDate() - (TOTAL_WEEKS - 1) * 7);
   // Back up to the week start, so each column is one of the user's weeks and today sits in the last.
   startRaw.setDate(startRaw.getDate() - ((startRaw.getDay() - weekStart + 7) % 7));
+  const firstKey = formatDateKey(startRaw);
 
   const weeks: { date: Date; dateStr: string; count: number }[][] = [];
   const cursor = new Date(startRaw);
@@ -202,27 +235,67 @@ export function ActivityHeatmap({
   }
   const renderedWeeks = isRTL ? [...weeks].reverse() : weeks;
 
+  // One selected day drives the cells' roving focus and the labeled day selector below the grid.
+  const [selectedDate, setSelectedDate] = useState(todayKey);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const selected = selectedDate < firstKey || selectedDate > todayKey ? todayKey : selectedDate;
+  const cellRefs = useRef(new Map<string, FocusableCell | null>());
+  const focusAfterMove = useRef(false);
+
+  // Keyboard moves hand focus to the newly selected cell (roving focus).
+  useEffect(() => {
+    if (!focusAfterMove.current) return;
+    focusAfterMove.current = false;
+    cellRefs.current.get(selected)?.focus?.();
+  }, [selected]);
+
+  const clampKey = (key: string) => (key < firstKey ? firstKey : key > todayKey ? todayKey : key);
+  const moveSelection = (days: number) => setSelectedDate(clampKey(addDaysToKey(selected, days)));
+
+  const onGridKeyDown = (event: { key: string; preventDefault?: () => void }) => {
+    // Columns are weeks running toward the reading end: right in English, left in Arabic.
+    const later = isRTL ? "ArrowLeft" : "ArrowRight";
+    const earlier = isRTL ? "ArrowRight" : "ArrowLeft";
+    let next: string | null = null;
+    if (event.key === "ArrowUp") next = addDaysToKey(selected, -1);
+    else if (event.key === "ArrowDown") next = addDaysToKey(selected, 1);
+    else if (event.key === later) next = addDaysToKey(selected, 7);
+    else if (event.key === earlier) next = addDaysToKey(selected, -7);
+    else if (event.key === "Home") next = firstKey;
+    else if (event.key === "End") next = todayKey;
+    else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault?.();
+      setDetailsOpen((open) => !open);
+      return;
+    }
+    if (next === null) return;
+    event.preventDefault?.();
+    focusAfterMove.current = true;
+    setSelectedDate(clampKey(next));
+  };
+
   // Month labels at each month's first week in reading order: from the left in English, from the
   // right in Arabic, where the weeks run right to left and the oldest week is on the right.
-  const monthLabels: { label: string; weekIndex: number }[] = [];
+  const monthLabels: { label: string; full: string; weekIndex: number }[] = [];
   let lastMonth = -1;
   for (let step = 0; step < renderedWeeks.length; step++) {
     const w = isRTL ? renderedWeeks.length - 1 - step : step;
     const firstDay = renderedWeeks[w][0];
     const month = firstDay.date.getMonth();
     if (month !== lastMonth) {
-      monthLabels.push({ label: getMonthLabel(firstDay.date, isArabic), weekIndex: w });
+      const full = MONTHS[language][month];
+      monthLabels.push({ label: shortName(full, language), full, weekIndex: w });
       lastMonth = month;
     }
   }
 
   const spacedMonthLabels = useMemo(() => {
     // `offset` is from the reading start: the left edge in English, the right edge in Arabic.
-    const result: { label: string; offset: number }[] = [];
+    const result: { label: string; full: string; offset: number }[] = [];
     const candidates = monthLabels
       .map((m) => {
         const fromStart = isRTL ? renderedWeeks.length - 1 - m.weekIndex : m.weekIndex;
-        return { label: m.label, offset: fromStart * (CELL_SIZE + CELL_GAP) };
+        return { label: m.label, full: m.full, offset: fromStart * (CELL_SIZE + CELL_GAP) };
       })
       .sort((a, b) => a.offset - b.offset);
     // A label needs its own width before the next: Arabic month names run about 35 px at this size.
@@ -237,16 +310,40 @@ export function ActivityHeatmap({
       result.push(candidate);
     }
     return result;
-  }, [monthLabels, CELL_SIZE, isRTL, isArabic, renderedWeeks.length]);
+  }, [monthLabels, CELL_SIZE, CELL_GAP, isRTL, isArabic, renderedWeeks.length]);
   const heatmapWidth = TOTAL_WEEKS * CELL_SIZE + (TOTAL_WEEKS - 1) * CELL_GAP;
   const contentWidth = heatmapWidth + DAY_LABEL_WIDTH;
   const reviewActiveDays = activeDays ?? data.filter((d) => d.count > 0).length;
   const reviewTotal = totalReviews ?? data.reduce((sum, d) => sum + d.count, 0);
-  const formatCount = (value: number) => value > 0 ? formatNumber(value, isArabic ? "ar" : "en") : "—";
+  const formatCount = (value: number) => value > 0 ? formatNumber(value, language) : "—";
   const summaryItems = [
     { value: reviewActiveDays, label: s.heatmapActiveDays },
     { value: reviewTotal, label: s.heatmapTotalReviews },
   ];
+  const labelColor = LABEL_COLOR(isDark);
+  const strongText = isDark ? "#e5e5e5" : "#2D2D2D";
+  const rowDirection = { direction: "ltr" as const, flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const) };
+
+  const dayDescription = (dateKey: string) => {
+    const count = countMap.get(dateKey) ?? 0;
+    const status = dayStatuses?.get(dateKey);
+    return [
+      `${formatHeatmapDayFull(dateKey, language)}: ${formatReviews(count, language)}`,
+      status ? statusLabel(status, s) : null,
+      dateKey === todayKey ? s.heatmapToday : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  };
+  const selectedCount = countMap.get(selected) ?? 0;
+  const selectedStatus = dayStatuses?.get(selected);
+  const selectorLabel = `${formatHeatmapDayShort(selected, language)}: ${formatReviews(selectedCount, language)}`;
+  const PreviousIcon = isRTL ? ChevronRight : ChevronLeft;
+  const NextIcon = isRTL ? ChevronLeft : ChevronRight;
+  const weekdayKeys = Array.from({ length: 7 }, (_, i) => (weekStart + i) % 7);
+  // Mon, Wed and Fri are labelled on whichever rows they fall; they are never on adjacent rows.
+  const labelledDays = new Set([1, 3, 5]);
+  const webKeyProps = Platform.OS === "web" ? ({ onKeyDown: onGridKeyDown } as object) : {};
 
   return (
     <View
@@ -256,6 +353,21 @@ export function ActivityHeatmap({
       }}
       style={{ direction: "ltr", alignItems: showSummary ? "stretch" : "center", width: "100%" }}
     >
+      {/* Measures the weekday labels so their column never clips a long name. */}
+      <View style={{ position: "absolute", opacity: 0, pointerEvents: "none", flexDirection: "row" }} aria-hidden>
+        {[1, 3, 5].map((day) => (
+          <Text
+            key={day}
+            onLayout={(event) => {
+              const measured = Math.ceil(event.nativeEvent.layout.width);
+              setMeasuredLabelWidth((current) => (measured > current ? measured : current));
+            }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 10 }}
+          >
+            {shortName(WEEKDAYS[language][day], language)}
+          </Text>
+        ))}
+      </View>
       <View
         style={{
           flexDirection: showSummary ? (isRTL ? "row-reverse" : "row") : "column",
@@ -280,10 +392,11 @@ export function ActivityHeatmap({
           {spacedMonthLabels.map((m, i) => (
             <Text
               key={i}
+              accessibilityLabel={m.full}
               style={{
                 fontFamily: "Manrope_500Medium",
                 fontSize: 10,
-                color: LABEL_COLOR(isDark),
+                color: labelColor,
                 position: "absolute",
                 ...(isRTL ? { right: m.offset } : { left: m.offset }),
                 ...textStartStyle(isRTL),
@@ -301,8 +414,8 @@ export function ActivityHeatmap({
         <View style={{ flexDirection: isRTL ? "row-reverse" : "row", width: contentWidth, direction: "ltr" }}>
           {/* Day labels */}
           <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start", alignItems: isRTL ? "flex-start" : "flex-end" }}>
-            {Array.from({ length: 7 }, (_, i) => {
-              const label = getDayLabel((weekStart + i) % 7, isArabic);
+            {weekdayKeys.map((day, i) => {
+              const full = WEEKDAYS[language][day];
               return (
                 <View
                   key={i}
@@ -312,13 +425,15 @@ export function ActivityHeatmap({
                     justifyContent: "center",
                   }}
                 >
-                  {label && (
+                  {labelledDays.has(day) && (
                     <Text
+                      accessibilityLabel={full}
+                      numberOfLines={1}
                       style={{
                         // The rows follow the chosen week start, so these labels must be easy to read.
                         fontFamily: "Manrope_500Medium",
                         fontSize: 10,
-                        color: LABEL_COLOR(isDark),
+                        color: labelColor,
                         // Toward the grid: the end of the label column. The grid row is laid out
                         // left to right in both languages, so the gap is a physical side.
                         ...textEndStyle(isRTL),
@@ -327,7 +442,7 @@ export function ActivityHeatmap({
                         width: DAY_LABEL_WIDTH,
                       }}
                     >
-                      {label}
+                      {shortName(full, language)}
                     </Text>
                   )}
                 </View>
@@ -335,8 +450,13 @@ export function ActivityHeatmap({
             })}
           </View>
 
-          {/* Week columns */}
-          <View style={{ flexDirection: "row", gap: CELL_GAP, width: heatmapWidth }}>
+          {/* Week columns. The tiny cells are a visual overview without enlarged hit areas; the day
+              selector below gives every day a full-size control. */}
+          <View
+            accessibilityLabel={s.heatmapCalendarLabel}
+            style={{ flexDirection: "row", gap: CELL_GAP, width: heatmapWidth }}
+            {...webKeyProps}
+          >
             {renderedWeeks.map((week, wi) => (
               <View key={wi} style={{ gap: CELL_GAP }}>
                 {week.map((day) => {
@@ -344,13 +464,28 @@ export function ActivityHeatmap({
                     return <View key={day.dateStr} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
                   }
                   const isToday = day.dateStr === todayKey;
+                  const isSelected = day.dateStr === selected;
                   const status = dayStatuses?.get(day.dateStr);
                   const statusStyle = status ? statusCellStyle(status, day.count, isDark) : null;
+                  const ringColor = isToday ? TODAY_RING(isDark) : isSelected ? strongText : null;
                   return (
                     <Pressable
                       key={day.dateStr}
-                      onPress={() => setTooltip(tooltip?.date === day.dateStr ? null : { date: day.dateStr, count: day.count })}
-                      accessibilityLabel={status ? `${day.dateStr}: ${statusLabel(status, s)}` : undefined}
+                      ref={(node) => {
+                        cellRefs.current.set(day.dateStr, node as unknown as FocusableCell | null);
+                      }}
+                      testID={`heatmap-day-${day.dateStr}`}
+                      focusable={isSelected}
+                      onPress={() => {
+                        if (isSelected) setDetailsOpen((open) => !open);
+                        else {
+                          setSelectedDate(day.dateStr);
+                          setDetailsOpen(true);
+                        }
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={dayDescription(day.dateStr)}
+                      accessibilityState={{ selected: isSelected }}
                       style={{
                         width: CELL_SIZE,
                         height: CELL_SIZE,
@@ -361,8 +496,10 @@ export function ActivityHeatmap({
                         borderStyle: statusStyle?.borderStyle ?? "solid",
                       }}
                     >
-                      {/* Today: a ring outside the cell with a 1 px gap, so the cell keeps its own status border. */}
-                      {isToday ? (
+                      {/* Today keeps a 2 px gold ring, dashed while another day is selected; the selected
+                          day has a solid text-colored ring. Rings sit outside the cell with a 1 px gap,
+                          so the cell keeps its own status border. */}
+                      {ringColor ? (
                         <View
                           style={{
                             pointerEvents: "none",
@@ -370,7 +507,8 @@ export function ActivityHeatmap({
                             inset: -3 - (statusStyle?.borderWidth ?? 0),
                             borderRadius: 5,
                             borderWidth: 2,
-                            borderColor: isDark ? "#ffffff" : "#2D2D2D",
+                            borderColor: ringColor,
+                            borderStyle: isToday && !isSelected ? "dashed" : "solid",
                           }}
                         />
                       ) : null}
@@ -382,30 +520,121 @@ export function ActivityHeatmap({
           </View>
         </View>
 
-        {/* Tooltip */}
-        {tooltip && (
-          <View
-            className="rounded-xl px-3 py-2 mt-3"
-            style={{ backgroundColor: themeColors.surfaceMid, alignSelf: "center" }}
+        {/* Day selector: previous/next and a details action, each a 44 px target, for touch and readers. */}
+        <View className="mt-3 items-center gap-1" style={{ ...rowDirection, width: contentWidth }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={s.heatmapPreviousDay}
+            disabled={selected <= firstKey}
+            onPress={() => moveSelection(-1)}
+            style={({ pressed }) => ({
+              width: 44,
+              height: 44,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 22,
+              opacity: selected <= firstKey ? 0.4 : pressed ? 0.7 : 1,
+            })}
           >
-            <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#d4d4d4" : "#6e5a47" }}>
-              {isArabic ? toArabicNumber(tooltip.count) : tooltip.count} {s.heatmapReviews} — {formatTooltipDate(tooltip.date, isArabic)}
-              {dayStatuses?.get(tooltip.date) ? ` — ${statusLabel(dayStatuses.get(tooltip.date)!, s)}` : ""}
+            <PreviousIcon size={18} color={strongText} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${dayDescription(selected)}. ${detailsOpen ? s.heatmapHideDetails : s.heatmapDayDetails}`}
+            accessibilityState={{ expanded: detailsOpen }}
+            onPress={() => setDetailsOpen((open) => !open)}
+            className="rounded-full px-3"
+            style={({ pressed }) => ({
+              flex: 1,
+              minHeight: 44,
+              justifyContent: "center",
+              backgroundColor: themeColors.surfaceMid,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text
+              style={{
+                fontFamily: "Manrope_600SemiBold",
+                fontSize: 12,
+                color: strongText,
+                textAlign: "center",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {selected === todayKey ? `${s.heatmapToday} · ${selectorLabel}` : selectorLabel}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={s.heatmapNextDay}
+            disabled={selected >= todayKey}
+            onPress={() => moveSelection(1)}
+            style={({ pressed }) => ({
+              width: 44,
+              height: 44,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 22,
+              opacity: selected >= todayKey ? 0.4 : pressed ? 0.7 : 1,
+            })}
+          >
+            <NextIcon size={18} color={strongText} />
+          </Pressable>
+        </View>
+
+        {detailsOpen && (
+          <View
+            accessibilityLiveRegion="polite"
+            className="rounded-xl px-3 py-2 mt-2"
+            style={{ backgroundColor: themeColors.surfaceMid, alignSelf: "stretch" }}
+          >
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, color: strongText, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}>
+              {formatHeatmapDayFull(selected, language)}
+            </Text>
+            <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: labelColor, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}>
+              {[
+                formatReviews(selectedCount, language),
+                selectedStatus ? statusLabel(selectedStatus, s) : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </Text>
           </View>
         )}
 
-        {/* Legend */}
+        {/* Legend: Less, the four intensity steps with their ranges, More; then wird statuses. */}
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "center",
             marginTop: 12,
             marginLeft: isRTL ? 0 : DAY_LABEL_WIDTH,
             marginRight: isRTL ? DAY_LABEL_WIDTH : 0,
             width: heatmapWidth,
+            gap: 8,
           }}
         >
+          <View style={{ ...rowDirection, flexWrap: "wrap", alignItems: "center", gap: 6, rowGap: 4 }}>
+            <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 10, color: labelColor }}>{s.heatmapLess}</Text>
+            {INTENSITY_STEPS.map((step) => (
+              <View key={step.from} style={{ ...rowDirection, alignItems: "center", gap: 3 }}>
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 2,
+                    backgroundColor: getColor(step.sample, isDark, themeColors.surfaceHigh),
+                  }}
+                />
+                <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 10, color: labelColor, writingDirection: "ltr" }}>
+                  {step.to === null
+                    ? `${formatNumber(step.from, language)}+`
+                    : step.from === step.to
+                      ? formatNumber(step.from, language)
+                      : `${formatNumber(step.from, language)}–${formatNumber(step.to, language)}`}
+                </Text>
+              </View>
+            ))}
+            <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 10, color: labelColor }}>{s.heatmapMore}</Text>
+          </View>
           {dayStatuses ? (
             // flex: 1 bounds the legend to the grid width, so it wraps instead of clipping its last items.
             <View style={{ flex: 1, minWidth: 0, flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 6 }}>
@@ -431,21 +660,7 @@ export function ActivityHeatmap({
                 );
               })}
             </View>
-          ) : (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            {[0, 1, 2, 3].map((l) => (
-              <View
-                key={l}
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 2,
-                  backgroundColor: getColor(l === 0 ? 0 : l === 1 ? 5 : l === 2 ? 18 : 28, isDark, themeColors.surfaceHigh),
-                }}
-              />
-            ))}
-          </View>
-          )}
+          ) : null}
         </View>
       </View>
       {showSummary && (

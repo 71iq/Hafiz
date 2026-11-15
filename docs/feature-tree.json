@@ -1189,7 +1189,7 @@
       "children": [
         {
           "id": "journey.levels",
-          "title": "Level strip / side list and locking",
+          "title": "Level strip / side list, open levels and Next marker",
           "kind": "widget",
           "cases": ["JOURNEY-02"],
           "uses": [],
@@ -1226,7 +1226,7 @@
       "children": [
         {
           "id": "progress.heatmap",
-          "title": "Activity heatmap tooltip",
+          "title": "Activity calendar, day selector and details",
           "kind": "widget",
           "cases": ["PROGRESS-02"],
           "uses": [],
@@ -1235,7 +1235,7 @@
         },
         {
           "id": "progress.surahs",
-          "title": "Surah progress and View all",
+          "title": "Surah progress and View all with search and sort",
           "kind": "widget",
           "cases": ["PROGRESS-03"],
           "uses": ["reader.arrival", "shared.overlay"],

@@ -1,8 +1,10 @@
-import { Text, View } from "react-native";
-import { BarChart3 } from "lucide-react-native";
+import { Pressable, Text, View } from "react-native";
+import { BarChart3, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { useSettings } from "@/lib/settings/context";
 import { formatNumber } from "@/lib/i18n/count";
+import { interpolate } from "@/lib/i18n/useStrings";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 import type { UIStrings } from "@/lib/i18n/strings";
 import type { DefaultDeckProgressItem, DefaultDeckProgressKey } from "@/lib/profile/progress";
 import { textStartStyle } from "@/lib/ui/direction";
@@ -22,7 +24,8 @@ type DefaultDeckProgressStrings = Pick<
   | "flashcardsNewCards"
   | "progressDefaultDecksEmpty"
   | "deckCardsFilterDue"
->;
+> &
+  Partial<Pick<UIStrings, "progressOpenDeckCards">>;
 
 type Props = {
   items: DefaultDeckProgressItem[];
@@ -30,6 +33,8 @@ type Props = {
   isRTL: boolean;
   s: DefaultDeckProgressStrings;
   className?: string;
+  /** Opens a deck's card list. Without it the rows are read-only, as on a profile. */
+  onOpenDeck?: (item: DefaultDeckProgressItem, title: string) => void;
 };
 
 export function DefaultDeckProgressChart({
@@ -38,6 +43,7 @@ export function DefaultDeckProgressChart({
   isRTL,
   s,
   className = "p-5 mb-6",
+  onOpenDeck,
 }: Props) {
   const titles: Record<DefaultDeckProgressKey, string> = {
     retention: s.smartDeckRetentionTitle,
@@ -79,14 +85,6 @@ export function DefaultDeckProgressChart({
           </Text>
         </View>
       </View>
-      <View
-        className={`mt-4 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
-        style={{ ...rowFlexStyle, flexWrap: "wrap" }}
-      >
-        <DeckLegendDot label={s.progressDeckStarted} color={isDark ? "#2dd4bf" : "#0d9488"} isRTL={isRTL} />
-        <DeckLegendDot label={s.flashcardsNewCards} color={isDark ? "#525252" : "#E5DDD4"} isRTL={isRTL} />
-      </View>
-
       {totalCards > 0 ? (
         <View className="mt-5 gap-4">
           {items.map((item) => (
@@ -96,6 +94,7 @@ export function DefaultDeckProgressChart({
               item={item}
               isRTL={isRTL}
               s={s}
+              onPress={onOpenDeck ? () => onOpenDeck(item, titles[item.key]) : undefined}
             />
           ))}
         </View>
@@ -116,21 +115,24 @@ function DefaultDeckProgressRow({
   item,
   isRTL,
   s,
+  onPress,
 }: {
   title: string;
   item: DefaultDeckProgressItem;
   isRTL: boolean;
   s: DefaultDeckProgressStrings;
+  onPress?: () => void;
 }) {
-  const { themeColors, uiLanguage } = useSettings();
+  const { themeColors, uiLanguage, effectiveTheme } = useSettings();
+  const Chevron = isRTL ? ChevronLeft : ChevronRight;
   const startedPct = item.total > 0 ? Math.round((item.startedCount / item.total) * 100) : 0;
   const barWidth = `${startedPct}%` as `${number}%`;
   const rowFlexStyle = {
     direction: "ltr" as const,
     flexDirection: isRTL ? "row-reverse" as const : "row" as const,
   };
-  return (
-    <View>
+  const content = (
+    <View style={{ flex: 1, minWidth: 0 }}>
       <View className={`mb-2 flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
         <Text
           className="min-w-0 flex-1 text-charcoal dark:text-neutral-200"
@@ -172,6 +174,20 @@ function DefaultDeckProgressRow({
       </View>
     </View>
   );
+  if (!onPress) return content;
+  // Each row opens its deck's card list; the chevron points toward the reading end.
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={s.progressOpenDeckCards ? interpolate(s.progressOpenDeckCards, { deck: title }) : title}
+      onPress={onPress}
+      className={`flex-row items-center gap-2 rounded-2xl ${isRTL ? "flex-row-reverse" : ""}`}
+      style={({ pressed }) => ({ ...rowFlexStyle, minHeight: 44, opacity: pressed ? 0.75 : 1 })}
+    >
+      {content}
+      <Chevron size={18} color={mutedIconColor(effectiveTheme)} />
+    </Pressable>
+  );
 }
 
 function DeckMetric({
@@ -202,32 +218,6 @@ function DeckMetric({
       <Text
         className="text-warm-500 dark:text-neutral-400"
         style={{ fontFamily: "Manrope_500Medium", fontSize: 10, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function DeckLegendDot({
-  label,
-  color,
-  isRTL,
-}: {
-  label: string;
-  color: string;
-  isRTL: boolean;
-}) {
-  const rowFlexStyle = {
-    direction: "ltr" as const,
-    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
-  };
-  return (
-    <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
-      <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-      <Text
-        className="text-warm-500 dark:text-neutral-400"
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
       >
         {label}
       </Text>

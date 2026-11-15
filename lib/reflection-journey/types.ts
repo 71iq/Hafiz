@@ -77,7 +77,11 @@ export type ReflectionJourneyEntry = {
   completedAt: string | null;
 };
 
-type ReflectionJourneyLevelStatus = "locked" | "available" | "draft" | "completed";
+/**
+ * Every level is open in its suggested order. "available" means no saved entry yet; it has no badge.
+ * Completion records stay independent: finishing a later level never completes an earlier one.
+ */
+export type ReflectionJourneyLevelStatus = "available" | "draft" | "completed";
 
 export type ReflectionJourneyLevel = {
   id: string;
@@ -93,7 +97,6 @@ export type ReflectionJourneyLevel = {
 export type ReflectionJourneyLevelListItem = ReflectionJourneyLevel & {
   status: ReflectionJourneyLevelStatus;
   entry: ReflectionJourneyEntry | null;
-  isLocked: boolean;
 };
 
 export type ReflectionJourneyLevelDetail = ReflectionJourneyLevelListItem;
