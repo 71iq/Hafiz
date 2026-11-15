@@ -15,16 +15,22 @@ import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
 import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 import { SettingsProvider } from "@/lib/settings/context";
+import { loadUiBootstrap } from "@/lib/settings/ui-bootstrap";
 import { useReminderResponses, useReminderScheduling } from "@/lib/notifications/use-reminder-scheduling";
 import { useGroupEncouragementChecks } from "@/lib/halaqa/encouragement-notifications";
 import { useBoardBandRefresh } from "@/lib/board/refresh";
 import { useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
 
 const queryClient = createAppQueryClient();
+const NATIVE_UI_FONT_WAIT_MS = 3000;
 
 export { ErrorBoundary } from "expo-router";
 
 SplashScreen.preventAutoHideAsync();
+
+// Native: read the small language/theme startup mirror while UI fonts load, so the first frames use
+// the saved choice. A failed read resolves to null and never blocks data preparation.
+const uiBootstrapReady = Platform.OS === "web" ? Promise.resolve(null) : loadUiBootstrap();
 
 function StableDocumentTitle() {
   const pathname = usePathname();
@@ -110,13 +116,19 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
       return;
     }
-    // A failed UI font load must not leave a blank screen: render with system fonts instead.
-    Font.loadAsync(UI_FONTS)
-      .catch(console.error)
-      .finally(() => {
-        setFontsLoaded(true);
-        SplashScreen.hideAsync().catch(() => {});
-      });
+    // A failed UI font load must not leave a blank screen: render with system fonts instead. Stop
+    // waiting after three seconds and let the UI fonts swap in when they arrive.
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      setFontsLoaded(true);
+      SplashScreen.hideAsync().catch(() => {});
+    };
+    const fontsReady = Font.loadAsync(UI_FONTS).catch(console.error);
+    const cap = setTimeout(release, NATIVE_UI_FONT_WAIT_MS);
+    Promise.all([fontsReady, uiBootstrapReady]).finally(release);
+    return () => clearTimeout(cap);
   }, []);
 
   // Initialize auth (restore session) on mount

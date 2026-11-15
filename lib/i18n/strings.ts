@@ -2,6 +2,19 @@ import { habitStrings } from "@/lib/i18n/features/habit";
 import { hifzStrings } from "@/lib/i18n/features/hifz";
 import { notificationsStrings } from "@/lib/i18n/features/notifications";
 import { socialStrings } from "@/lib/i18n/features/social";
+import { foundationStrings } from "@/lib/i18n/features/foundation";
+import { shellStrings } from "@/lib/i18n/features/shell";
+import { sharedStrings } from "@/lib/i18n/features/shared";
+import { homeSearchStrings } from "@/lib/i18n/features/home-search";
+import { readerStrings } from "@/lib/i18n/features/reader";
+import { syncRestoreStrings } from "@/lib/i18n/features/sync-restore";
+import { decksStrings } from "@/lib/i18n/features/decks";
+import { journeyStrings } from "@/lib/i18n/features/journey";
+import { progressStrings } from "@/lib/i18n/features/progress";
+import { reflectionsStrings } from "@/lib/i18n/features/reflections";
+import { profileNotesStrings } from "@/lib/i18n/features/profile-notes";
+import { authStrings } from "@/lib/i18n/features/auth";
+import { settingsPublicStrings } from "@/lib/i18n/features/settings-public";
 
 export const strings = {
   en: {
@@ -986,6 +999,19 @@ export const strings = {
     ...notificationsStrings.en,
     ...socialStrings.en,
     ...hifzStrings.en,
+    ...foundationStrings.en,
+    ...shellStrings.en,
+    ...sharedStrings.en,
+    ...homeSearchStrings.en,
+    ...readerStrings.en,
+    ...syncRestoreStrings.en,
+    ...decksStrings.en,
+    ...journeyStrings.en,
+    ...progressStrings.en,
+    ...reflectionsStrings.en,
+    ...profileNotesStrings.en,
+    ...authStrings.en,
+    ...settingsPublicStrings.en,
   },
   ar: {
     appName: "حافظ",
@@ -1944,6 +1970,19 @@ export const strings = {
     ...notificationsStrings.ar,
     ...socialStrings.ar,
     ...hifzStrings.ar,
+    ...foundationStrings.ar,
+    ...shellStrings.ar,
+    ...sharedStrings.ar,
+    ...homeSearchStrings.ar,
+    ...readerStrings.ar,
+    ...syncRestoreStrings.ar,
+    ...decksStrings.ar,
+    ...journeyStrings.ar,
+    ...progressStrings.ar,
+    ...reflectionsStrings.ar,
+    ...profileNotesStrings.ar,
+    ...authStrings.ar,
+    ...settingsPublicStrings.ar,
   },
 } as const;
 

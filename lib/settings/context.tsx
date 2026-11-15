@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Platform, useColorScheme as useSystemColorScheme, useWindowDimensions, View } from "react-native";
 import { useColorScheme as useNativeWindColorScheme, vars } from "nativewind";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
@@ -11,6 +11,9 @@ import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-founda
 import { DirectionProvider } from "@/lib/ui/direction";
 import type { QuranMarkerStyle as QuranMarkerStylePreference } from "@/lib/fonts/loader";
 import { DEFAULT_TAFSIR_SOURCE, isAvailableTafsirSourceId, type TafsirSourceId } from "@/lib/tafsir/sources";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { setHapticsEnabled } from "@/lib/haptics";
+import { getResolvedUiBootstrap, writeUiBootstrap } from "@/lib/settings/ui-bootstrap";
 
 // Desktop / large-viewport scale. Also the canonical length (10 levels) used
 // by UI controls like the font size picker.
@@ -23,8 +26,8 @@ export const FONT_SIZE_STEPS_MOBILE = [14, 17, 20, 23, 26, 29, 32, 35, 38, 41] a
 export const FONT_SIZE_LINE_HEIGHTS_MOBILE = [32, 38, 44, 50, 56, 62, 68, 74, 80, 86] as const;
 
 export const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 20px (verse view)
-// Web viewports narrower than the shared sidebar breakpoint use the mobile
-// scale; native is always mobile.
+// Viewports narrower than the shared sidebar breakpoint use the mobile scale. Wider web viewports and
+// native tablets (768px and above) use the desktop reader scale with the same saved index.
 
 export const DEFAULT_DAILY_REVIEW_LIMIT = 20;
 export const MIN_DAILY_REVIEW_LIMIT = 10;
@@ -37,6 +40,51 @@ export const DEFAULT_HIFZ_AUTO_DELAY_MS = 500;
 export const MIN_HIFZ_AUTO_DELAY_MS = 250;
 export const MAX_HIFZ_AUTO_DELAY_MS = 5000;
 export const HIFZ_AUTO_DELAY_STEP_MS = 250;
+
+// Device-only preferences (C05). These names stay outside every syncable key and prefix.
+export const DEVICE_SETTING_KEYS = {
+  accountPromoDismissedAt: "device_account_promo_dismissed_at",
+  bookmarksOrder: "device_bookmarks_order",
+  audioFollow: "device_audio_follow",
+  audioRepeatRange: "device_audio_repeat_range",
+  audioRepeatEach: "device_audio_repeat_each",
+  audioDelaySeconds: "device_audio_delay_seconds",
+  hapticsEnabled: "device_haptics_enabled",
+} as const;
+export const AUDIO_REPEAT_MIN = 1;
+export const AUDIO_REPEAT_MAX = 99;
+export const AUDIO_DELAY_MIN_SECONDS = 0;
+export const AUDIO_DELAY_MAX_SECONDS = 30;
+export const DEFAULT_AUDIO_REPEAT = 1;
+export const DEFAULT_AUDIO_DELAY_SECONDS = 1;
+export const ACCOUNT_PROMO_DISMISS_MS = 14 * 24 * 60 * 60 * 1000;
+export type BookmarksOrder = "recent" | "quran";
+
+/** Strict integer decode: rejects signs, fractions, blanks and out-of-range values. */
+export function decodeBoundedInt(raw: string | null | undefined, min: number, max: number): number | null {
+  if (raw == null || !/^\d+$/.test(raw)) return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value >= min && value <= max ? value : null;
+}
+
+export function decodeBoolean(raw: string | null | undefined): boolean | null {
+  return raw === "true" ? true : raw === "false" ? false : null;
+}
+
+export function decodeBookmarksOrder(raw: string | null | undefined): BookmarksOrder | null {
+  return raw === "recent" || raw === "quran" ? raw : null;
+}
+
+/**
+ * The account promotion stays hidden for 14 days after a dismissal. Invalid or future timestamps do
+ * not hide it indefinitely.
+ */
+export function isAccountPromoDismissed(raw: string | null | undefined, now = Date.now()): boolean {
+  if (!raw) return false;
+  const dismissedAt = Date.parse(raw);
+  if (!Number.isFinite(dismissedAt) || dismissedAt > now) return false;
+  return now - dismissedAt < ACCOUNT_PROMO_DISMISS_MS;
+}
 
 export type ThemePalette = "beige" | "dark" | "white" | "amoled";
 export type ThemeMode = ThemePalette | "system";
@@ -187,6 +235,22 @@ type SettingsContextType = {
   setHifzAutoDelayMs: (delayMs: number) => void;
   hifzAutoAdvancePage: boolean;
   setHifzAutoAdvancePage: (enabled: boolean) => void;
+  /** Device-only: Home and Progress share one account-promotion dismissal (C05). */
+  accountPromoDismissed: boolean;
+  dismissAccountPromo: () => void;
+  bookmarksOrder: BookmarksOrder;
+  setBookmarksOrder: (order: BookmarksOrder) => void;
+  /** Device-only Follow recitation preference. Temporary suspension is the audio owner's state. */
+  audioFollow: boolean;
+  setAudioFollow: (follow: boolean) => void;
+  audioRepeatRange: number;
+  setAudioRepeatRange: (count: number) => void;
+  audioRepeatEach: number;
+  setAudioRepeatEach: (count: number) => void;
+  audioDelaySeconds: number;
+  setAudioDelaySeconds: (seconds: number) => void;
+  hapticsEnabled: boolean;
+  setHapticsEnabled: (enabled: boolean) => void;
   isRTL: boolean;
   isDark: boolean;
   isLoaded: boolean;
@@ -237,6 +301,20 @@ const SettingsContext = createContext<SettingsContextType>({
   setHifzAutoDelayMs: () => {},
   hifzAutoAdvancePage: false,
   setHifzAutoAdvancePage: () => {},
+  accountPromoDismissed: false,
+  dismissAccountPromo: () => {},
+  bookmarksOrder: "recent",
+  setBookmarksOrder: () => {},
+  audioFollow: true,
+  setAudioFollow: () => {},
+  audioRepeatRange: DEFAULT_AUDIO_REPEAT,
+  setAudioRepeatRange: () => {},
+  audioRepeatEach: DEFAULT_AUDIO_REPEAT,
+  setAudioRepeatEach: () => {},
+  audioDelaySeconds: DEFAULT_AUDIO_DELAY_SECONDS,
+  setAudioDelaySeconds: () => {},
+  hapticsEnabled: true,
+  setHapticsEnabled: () => {},
   isRTL: false,
   isDark: false,
   isLoaded: false,
@@ -380,9 +458,11 @@ function normalizeQuranMarkerStyle(value: string | null | undefined): QuranMarke
 }
 
 function readCachedUiLanguage(): UILanguage {
-  if (Platform.OS !== "web" || typeof window === "undefined") return "en";
-  const cached = window.localStorage.getItem(UI_LANGUAGE_CACHE_KEY);
-  return cached === "ar" ? "ar" : "en";
+  try {
+    return getStartupLanguage();
+  } catch {
+    return "en";
+  }
 }
 
 function cacheUiLanguage(lang: UILanguage) {
@@ -392,8 +472,18 @@ function cacheUiLanguage(lang: UILanguage) {
 }
 
 function readCachedThemeMode(): ThemeMode {
-  if (Platform.OS !== "web" || typeof window === "undefined") return "system";
-  return normalizeThemeMode(window.localStorage.getItem(THEME_CACHE_KEY)) ?? "system";
+  if (Platform.OS !== "web") return getResolvedUiBootstrap()?.theme ?? "system";
+  if (typeof window === "undefined") return "system";
+  try {
+    return normalizeThemeMode(window.localStorage.getItem(THEME_CACHE_KEY)) ?? "system";
+  } catch {
+    return "system";
+  }
+}
+
+function warnInvalidSetting(key: string) {
+  // Log only the key: saved values can be personal.
+  if (typeof __DEV__ !== "undefined" && __DEV__) console.warn(`[Settings] Ignoring invalid saved value for ${key}`);
 }
 
 function cacheThemeMode(theme: ThemeMode) {
@@ -454,7 +544,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { setColorScheme } = useNativeWindColorScheme();
   const systemScheme = useSystemColorScheme();
   const { width } = useWindowDimensions();
-  const isCompact = Platform.OS !== "web" || width < SIDEBAR_BREAKPOINT;
+  const isCompact = width < SIDEBAR_BREAKPOINT;
   const activeSteps = isCompact ? FONT_SIZE_STEPS_MOBILE : FONT_SIZE_STEPS;
   const activeLineHeights = isCompact ? FONT_SIZE_LINE_HEIGHTS_MOBILE : FONT_SIZE_LINE_HEIGHTS;
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
@@ -477,7 +567,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [focusScrollSpeed, setFocusScrollSpeedState] = useState(FOCUS_SCROLL_SPEED_DEFAULT);
   const [hifzAutoDelayMs, setHifzAutoDelayMsState] = useState(DEFAULT_HIFZ_AUTO_DELAY_MS);
   const [hifzAutoAdvancePage, setHifzAutoAdvancePageState] = useState(false);
+  const [accountPromoDismissedAt, setAccountPromoDismissedAt] = useState<string | null>(null);
+  const [bookmarksOrder, setBookmarksOrderState] = useState<BookmarksOrder>("recent");
+  const [audioFollow, setAudioFollowState] = useState(true);
+  const [audioRepeatRange, setAudioRepeatRangeState] = useState(DEFAULT_AUDIO_REPEAT);
+  const [audioRepeatEach, setAudioRepeatEachState] = useState(DEFAULT_AUDIO_REPEAT);
+  const [audioDelaySeconds, setAudioDelaySecondsState] = useState(DEFAULT_AUDIO_DELAY_SECONDS);
+  const [hapticsEnabled, setHapticsEnabledState] = useState(true);
   const [loadedDb, setLoadedDb] = useState<AppDatabase | null>(null);
+  // Per-key write generations: a failed write reverts only if no newer choice was made since (C03).
+  const writeGenerations = useRef(new Map<string, number>());
+  const committedLanguage = useRef<UILanguage>(uiLanguage);
+  const committedTheme = useRef<ThemeMode>(theme);
   const isLoaded = db !== null && loadedDb === db;
 
   // Load settings from SQLite once each database connection is ready
@@ -506,8 +607,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           "hifz_auto_advance_page",
           "translation_language",
           "translation_active_lang",
+          ...Object.values(DEVICE_SETTING_KEYS),
         ]);
         if (cancelled) return;
+        const invalidIfSet = (key: string, valid: boolean) => {
+          if (!valid && saved[key] != null) warnInvalidSetting(key);
+        };
 
         const savedFontSize = saved.font_size_index;
         if (savedFontSize !== null) {
@@ -519,9 +624,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         const savedTheme = saved.theme;
         const normalizedTheme = normalizeThemeMode(savedTheme);
+        invalidIfSet("theme", normalizedTheme !== null);
         if (normalizedTheme) {
           setThemeState(normalizedTheme);
           cacheThemeMode(normalizedTheme);
+          committedTheme.current = normalizedTheme;
         }
 
         const savedViewMode = saved.view_mode;
@@ -569,10 +676,51 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
 
         const savedUiLang = saved.ui_language;
+        invalidIfSet("ui_language", savedUiLang === "en" || savedUiLang === "ar");
         if (savedUiLang === "en" || savedUiLang === "ar") {
           setUiLanguageState(savedUiLang);
           cacheUiLanguage(savedUiLang);
+          committedLanguage.current = savedUiLang;
+          // Reconcile the native startup mirror with SQLite, which stays authoritative.
+          const mirror = getResolvedUiBootstrap();
+          const nextTheme = normalizedTheme ?? committedTheme.current;
+          if (Platform.OS !== "web" && (mirror?.language !== savedUiLang || mirror?.theme !== nextTheme)) {
+            void writeUiBootstrap(savedUiLang, nextTheme);
+          }
         }
+
+        const promoDismissedAt = saved[DEVICE_SETTING_KEYS.accountPromoDismissedAt];
+        setAccountPromoDismissedAt(promoDismissedAt);
+        const savedBookmarksOrder = decodeBookmarksOrder(saved[DEVICE_SETTING_KEYS.bookmarksOrder]);
+        invalidIfSet(DEVICE_SETTING_KEYS.bookmarksOrder, savedBookmarksOrder !== null);
+        if (savedBookmarksOrder) setBookmarksOrderState(savedBookmarksOrder);
+        const savedFollow = decodeBoolean(saved[DEVICE_SETTING_KEYS.audioFollow]);
+        invalidIfSet(DEVICE_SETTING_KEYS.audioFollow, savedFollow !== null);
+        if (savedFollow !== null) setAudioFollowState(savedFollow);
+        const savedRepeatRange = decodeBoundedInt(
+          saved[DEVICE_SETTING_KEYS.audioRepeatRange],
+          AUDIO_REPEAT_MIN,
+          AUDIO_REPEAT_MAX,
+        );
+        invalidIfSet(DEVICE_SETTING_KEYS.audioRepeatRange, savedRepeatRange !== null);
+        if (savedRepeatRange !== null) setAudioRepeatRangeState(savedRepeatRange);
+        const savedRepeatEach = decodeBoundedInt(
+          saved[DEVICE_SETTING_KEYS.audioRepeatEach],
+          AUDIO_REPEAT_MIN,
+          AUDIO_REPEAT_MAX,
+        );
+        invalidIfSet(DEVICE_SETTING_KEYS.audioRepeatEach, savedRepeatEach !== null);
+        if (savedRepeatEach !== null) setAudioRepeatEachState(savedRepeatEach);
+        const savedDelay = decodeBoundedInt(
+          saved[DEVICE_SETTING_KEYS.audioDelaySeconds],
+          AUDIO_DELAY_MIN_SECONDS,
+          AUDIO_DELAY_MAX_SECONDS,
+        );
+        invalidIfSet(DEVICE_SETTING_KEYS.audioDelaySeconds, savedDelay !== null);
+        if (savedDelay !== null) setAudioDelaySecondsState(savedDelay);
+        const savedHaptics = decodeBoolean(saved[DEVICE_SETTING_KEYS.hapticsEnabled]);
+        invalidIfSet(DEVICE_SETTING_KEYS.hapticsEnabled, savedHaptics !== null);
+        if (savedHaptics !== null) setHapticsEnabledState(savedHaptics);
 
         const savedLimit = saved.daily_review_limit;
         if (savedLimit !== null) {
@@ -655,6 +803,34 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     applyWebThemePalette(effectiveTheme);
   }, [effectiveTheme]);
 
+  useEffect(() => {
+    setHapticsEnabled(hapticsEnabled);
+  }, [hapticsEnabled]);
+
+  /**
+   * Saves one setting. The caller has already applied the optimistic value; if the write fails and
+   * no newer write for the same key has started, onFailure restores the last committed value.
+   */
+  const persist = useCallback(
+    (key: string, value: string, onFailure?: () => void, onSuccess?: () => void) => {
+      const generation = (writeGenerations.current.get(key) ?? 0) + 1;
+      writeGenerations.current.set(key, generation);
+      // Before the database is ready (public pages, startup) keep the in-memory choice and web cache
+      // instead of reverting a deliberate change.
+      if (!db) return;
+      writeSetting(db, key, value).then(
+        () => {
+          if (writeGenerations.current.get(key) === generation) onSuccess?.();
+        },
+        () => {
+          console.warn(`[Settings] Failed to save ${key}`);
+          if (writeGenerations.current.get(key) === generation) onFailure?.();
+        },
+      );
+    },
+    [db],
+  );
+
   const setFontSizeIndex = useCallback(
     (index: number) => {
       if (index < 0 || index >= FONT_SIZE_STEPS.length) return;
@@ -668,9 +844,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (newTheme: ThemeMode) => {
       setThemeState(newTheme);
       cacheThemeMode(newTheme);
-      writeSetting(db, "theme", newTheme).catch(console.warn);
+      persist(
+        "theme",
+        newTheme,
+        () => {
+          setThemeState(committedTheme.current);
+          cacheThemeMode(committedTheme.current);
+        },
+        () => {
+          committedTheme.current = newTheme;
+          void writeUiBootstrap(committedLanguage.current, newTheme);
+        },
+      );
     },
-    [db],
+    [persist],
   );
 
   const setViewMode = useCallback(
@@ -824,10 +1011,87 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (lang: UILanguage) => {
       setUiLanguageState(lang);
       cacheUiLanguage(lang);
-      writeSetting(db, "ui_language", lang).catch(console.warn);
+      persist(
+        "ui_language",
+        lang,
+        () => {
+          setUiLanguageState(committedLanguage.current);
+          cacheUiLanguage(committedLanguage.current);
+        },
+        () => {
+          committedLanguage.current = lang;
+          void writeUiBootstrap(lang, committedTheme.current);
+        },
+      );
     },
-    [db],
+    [persist],
   );
+
+  const dismissAccountPromo = useCallback(() => {
+    const previous = accountPromoDismissedAt;
+    const now = new Date().toISOString();
+    setAccountPromoDismissedAt(now);
+    persist(DEVICE_SETTING_KEYS.accountPromoDismissedAt, now, () => setAccountPromoDismissedAt(previous));
+  }, [accountPromoDismissedAt, persist]);
+
+  const setBookmarksOrder = useCallback(
+    (order: BookmarksOrder) => {
+      const previous = bookmarksOrder;
+      setBookmarksOrderState(order);
+      persist(DEVICE_SETTING_KEYS.bookmarksOrder, order, () => setBookmarksOrderState(previous));
+    },
+    [bookmarksOrder, persist],
+  );
+
+  const setAudioFollow = useCallback(
+    (follow: boolean) => {
+      const previous = audioFollow;
+      setAudioFollowState(follow);
+      persist(DEVICE_SETTING_KEYS.audioFollow, String(follow), () => setAudioFollowState(previous));
+    },
+    [audioFollow, persist],
+  );
+
+  const setAudioRepeatRange = useCallback(
+    (count: number) => {
+      if (!Number.isInteger(count) || count < AUDIO_REPEAT_MIN || count > AUDIO_REPEAT_MAX) return;
+      const previous = audioRepeatRange;
+      setAudioRepeatRangeState(count);
+      persist(DEVICE_SETTING_KEYS.audioRepeatRange, String(count), () => setAudioRepeatRangeState(previous));
+    },
+    [audioRepeatRange, persist],
+  );
+
+  const setAudioRepeatEach = useCallback(
+    (count: number) => {
+      if (!Number.isInteger(count) || count < AUDIO_REPEAT_MIN || count > AUDIO_REPEAT_MAX) return;
+      const previous = audioRepeatEach;
+      setAudioRepeatEachState(count);
+      persist(DEVICE_SETTING_KEYS.audioRepeatEach, String(count), () => setAudioRepeatEachState(previous));
+    },
+    [audioRepeatEach, persist],
+  );
+
+  const setAudioDelaySeconds = useCallback(
+    (seconds: number) => {
+      if (!Number.isInteger(seconds) || seconds < AUDIO_DELAY_MIN_SECONDS || seconds > AUDIO_DELAY_MAX_SECONDS) return;
+      const previous = audioDelaySeconds;
+      setAudioDelaySecondsState(seconds);
+      persist(DEVICE_SETTING_KEYS.audioDelaySeconds, String(seconds), () => setAudioDelaySecondsState(previous));
+    },
+    [audioDelaySeconds, persist],
+  );
+
+  const setHapticsPreference = useCallback(
+    (enabled: boolean) => {
+      const previous = hapticsEnabled;
+      setHapticsEnabledState(enabled);
+      persist(DEVICE_SETTING_KEYS.hapticsEnabled, String(enabled), () => setHapticsEnabledState(previous));
+    },
+    [hapticsEnabled, persist],
+  );
+
+  const accountPromoDismissed = isAccountPromoDismissed(accountPromoDismissedAt);
 
   const isRTL = uiLanguage === "ar";
   const quranRenderFontStyle: QuranFontStyle =
@@ -880,6 +1144,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setHifzAutoDelayMs,
         hifzAutoAdvancePage,
         setHifzAutoAdvancePage,
+        accountPromoDismissed,
+        dismissAccountPromo,
+        bookmarksOrder,
+        setBookmarksOrder,
+        audioFollow,
+        setAudioFollow,
+        audioRepeatRange,
+        setAudioRepeatRange,
+        audioRepeatEach,
+        setAudioRepeatEach,
+        audioDelaySeconds,
+        setAudioDelaySeconds,
+        hapticsEnabled,
+        setHapticsEnabled: setHapticsPreference,
         isRTL,
         isDark,
         isLoaded,

@@ -7,6 +7,8 @@ import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverla
 import { Switch, SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
+import { ToggleGroup } from "@/components/ui/ToggleGroup";
+import { isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
 import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
 import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
@@ -66,7 +68,6 @@ export function ReadingSettingsSheet({
     systemTheme,
     themeSurface,
   } = useSettings();
-  const [fontPickerVisible, setFontPickerVisible] = useState(false);
   const [markerStylePickerVisible, setMarkerStylePickerVisible] = useState(false);
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
@@ -74,9 +75,8 @@ export function ReadingSettingsSheet({
   const accentColor = isDark ? DARK_ACCENT : ACCENT;
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
-  const quranBaseFont = quranFontStyle === "qcf2" ? "qcf2" : "v4";
-  const quranBaseFontLabel = quranBaseFont === "qcf2" ? s.quranFontQcf2 : s.quranFontV4;
-  const tajweedEnabled = quranFontStyle === "v4-tajweed";
+  const baseFont = quranBaseFont(quranFontStyle);
+  const tajweedEnabled = isTajweedStyle(quranFontStyle);
   const markerStyleLabel = markerLabelForValue(quranMarkerStyle, s);
   const currentTafseerSource = AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource);
   const currentTafseerTitle = currentTafseerSource ? stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id) : tafseerSource;
@@ -87,7 +87,7 @@ export function ReadingSettingsSheet({
   const modalHorizontalPadding = compactRows ? 16 : 28;
   const titleFontSize = compactRows ? 21 : 24;
 
-  const fontOptions = useMemo<ChoiceOption<"qcf2" | "v4">[]>(
+  const fontOptions = useMemo<ChoiceOption<QuranBaseFont>[]>(
     () => [
       { value: "qcf2", label: s.quranFontQcf2 },
       { value: "v4", label: s.quranFontV4 },
@@ -105,20 +105,12 @@ export function ReadingSettingsSheet({
   );
 
   const handleBaseFontChange = useCallback(
-    (font: "qcf2" | "v4") => {
-      if (font === "qcf2") {
-        setQuranFontStyle("qcf2");
-        return;
-      }
-      setQuranFontStyle(tajweedEnabled ? "v4-tajweed" : "v4");
-    },
-    [setQuranFontStyle, tajweedEnabled]
+    (font: QuranBaseFont) => setQuranFontStyle(styleForBaseFont(font, quranFontStyle)),
+    [quranFontStyle, setQuranFontStyle]
   );
 
   const handleTajweedToggle = useCallback(
-    (enabled: boolean) => {
-      setQuranFontStyle(enabled ? "v4-tajweed" : quranFontStyle === "qcf2" ? "qcf2" : "v4");
-    },
+    (enabled: boolean) => setQuranFontStyle(styleForTajweed(enabled, quranFontStyle)),
     [quranFontStyle, setQuranFontStyle]
   );
 
@@ -218,15 +210,26 @@ export function ReadingSettingsSheet({
 
           <SettingsSectionLabel label={s.sectionReading} isRTL={isRTL} />
           <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
-            <SettingsActionRow
-              title={s.quranFontLabel}
-              subtitle={quranRenderFontStyle !== quranFontStyle ? s.quranFontDarkFallback : undefined}
-              value={quranBaseFontLabel}
-              isRTL={isRTL}
-              onPress={() => setFontPickerVisible(true)}
-              trailing={<Chevron size={17} color={controlColor} />}
-              compact={compactRows}
-            />
+            <View style={{ paddingHorizontal: compactRows ? 14 : 16, paddingVertical: 14, gap: 10 }}>
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {s.quranFontLabel}
+              </Text>
+              <ToggleGroup<QuranBaseFont>
+                value={baseFont}
+                onValueChange={handleBaseFontChange}
+                items={fontOptions}
+                accessibilityLabel={s.quranFontLabel}
+              />
+              <Text
+                className="text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {quranRenderFontStyle !== quranFontStyle ? `${s.quranFontChoiceHint} ${s.quranFontDarkFallback}` : s.quranFontChoiceHint}
+              </Text>
+            </View>
             <Divider />
             <SettingsActionRow
               title={s.fontSizeLabel}
@@ -252,6 +255,7 @@ export function ReadingSettingsSheet({
             <Divider />
             <SettingsActionRow
               title={s.quranFontV4Tajweed}
+              subtitle={s.quranTajweedHint}
               isRTL={isRTL}
               trailing={<Switch accessibilityLabel={s.quranFontV4Tajweed} value={tajweedEnabled} onValueChange={handleTajweedToggle} />}
               compact={compactRows}
@@ -316,17 +320,6 @@ export function ReadingSettingsSheet({
         </OverlayBody>
       </ResponsiveOverlay>
 
-      <ChoiceDialog
-        visible={fontPickerVisible}
-        title={s.readingSettingsChooseFont}
-        value={quranBaseFont}
-        options={fontOptions}
-        onChange={handleBaseFontChange}
-        onClose={() => setFontPickerVisible(false)}
-        isRTL={isRTL}
-        isDark={isDark}
-        surfaceColor={themeSurface}
-      />
       <ChoiceDialog
         visible={markerStylePickerVisible}
         title={s.readingSettingsChooseMarkerStyle}

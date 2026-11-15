@@ -37,12 +37,12 @@ afterEach(async () => {
   jest.useRealTimers();
 });
 
-it("shows a normal notice for the existing full duration", () => {
+it("shows a short notice for 2000ms plus 60ms per word", () => {
   const view = render(tree());
   act(() => showNotice("Synthetic failure"));
   expect(view.getByText("Synthetic failure")).toBeTruthy();
-  expect(view.getByRole("alert").props.accessibilityLiveRegion).toBe("polite");
-  act(() => jest.advanceTimersByTime(1999));
+  expect(view.getByText("Synthetic failure").props.accessibilityLiveRegion).toBe("polite");
+  act(() => jest.advanceTimersByTime(2119));
   expect(view.getByText("Synthetic failure")).toBeTruthy();
   act(() => jest.advanceTimersByTime(201));
   expect(view.queryByText("Synthetic failure")).toBeNull();
@@ -57,7 +57,7 @@ it("holds an unavailable notice and starts its full duration after recovery", ()
   view.rerender(tree(true));
   expect(showNotice).toBe(stableReporter);
   expect(view.getByText("تعذر تحميل مصدر التفسير")).toBeTruthy();
-  act(() => jest.advanceTimersByTime(1999));
+  act(() => jest.advanceTimersByTime(2239));
   expect(view.getByText("تعذر تحميل مصدر التفسير")).toBeTruthy();
   act(() => jest.advanceTimersByTime(201));
   expect(view.queryByText("تعذر تحميل مصدر التفسير")).toBeNull();
@@ -72,7 +72,7 @@ it("preserves a notice when readiness disappears after reporting", () => {
   expect(view.queryByText("Synthetic retirement failure")).toBeNull();
   view.rerender(tree());
   expect(view.getByText("Synthetic retirement failure")).toBeTruthy();
-  act(() => jest.advanceTimersByTime(1999));
+  act(() => jest.advanceTimersByTime(2179));
   expect(view.getByText("Synthetic retirement failure")).toBeTruthy();
   act(() => jest.advanceTimersByTime(201));
   expect(view.queryByText("Synthetic retirement failure")).toBeNull();
@@ -86,10 +86,26 @@ it("gives an identical later failure a fresh duration and rejects a stale dismis
   act(() => jest.advanceTimersByTime(1500));
   act(() => showNotice("Repeated failure"));
   act(() => oldDismiss());
-  act(() => jest.advanceTimersByTime(1999));
+  act(() => jest.advanceTimersByTime(2119));
   expect(view.getByText("Repeated failure")).toBeTruthy();
   act(() => jest.advanceTimersByTime(201));
   expect(view.queryByText("Repeated failure")).toBeNull();
+});
+
+it("caps a long notice at 6000ms", () => {
+  const view = render(tree());
+  const long = Array.from({ length: 80 }, (_, index) => `word${index}`).join(" ");
+  act(() => showNotice(long));
+  act(() => jest.advanceTimersByTime(5999));
+  expect(view.getByText(long)).toBeTruthy();
+  act(() => jest.advanceTimersByTime(201));
+  expect(view.queryByText(long)).toBeNull();
+});
+
+it("keeps an explicit duration such as the 3000ms focus-end notice", () => {
+  const view = render(<Toast message="Focus ended" duration={3000} onDismiss={() => {}} />);
+  act(() => jest.advanceTimersByTime(2999));
+  expect(view.getByText("Focus ended")).toBeTruthy();
 });
 
 it("uses only the newest open modal window, then the previous window and root", () => {
@@ -124,7 +140,7 @@ it("cancels active notice timers when the owner unmounts", () => {
   const schedule = jest.spyOn(globalThis, "setTimeout");
   const cancel = jest.spyOn(globalThis, "clearTimeout");
   act(() => showNotice("Unmounted owner"));
-  const index = schedule.mock.calls.findIndex((call) => call[1] === 2000);
+  const index = schedule.mock.calls.findIndex((call) => call[1] === 2120);
   if (index < 0) throw new Error("Missing notice display timer");
   const timer = schedule.mock.results[index];
   if (timer.type !== "return") throw new Error("Notice timer was not scheduled");
@@ -172,7 +188,8 @@ it("promotes an earlier inline failure once without restarting on late reports",
   expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
   act(() => jest.advanceTimersByTime(1500));
   act(() => expect(attempt.report("Retained inline failure")).toBe("retained"));
-  act(() => jest.advanceTimersByTime(700));
+  // Three words hold for 2180ms plus the 200ms fade; the late report did not restart the timer.
+  act(() => jest.advanceTimersByTime(880));
   expect(view.queryByText("Retained inline failure")).toBeNull();
 });
 

@@ -83,6 +83,18 @@ describe("route database-error presentation", () => {
       const contextLanguage: Language = language === "ar" ? "en" : "ar";
       mockSettings.uiLanguage = contextLanguage;
       jest.replaceProperty(I18nManager, "isRTL", language === "ar");
+      // The startup owner reads the device locale on native.
+      const RealDateTimeFormat = Intl.DateTimeFormat;
+      jest.spyOn(Intl, "DateTimeFormat").mockImplementation(((
+        ...args: ConstructorParameters<typeof Intl.DateTimeFormat>
+      ) => {
+        const formatter = new RealDateTimeFormat(...args);
+        const resolved = formatter.resolvedOptions();
+        return {
+          ...formatter,
+          resolvedOptions: () => ({ ...resolved, locale: language === "ar" ? "ar-SA" : "en-US" }),
+        } as Intl.DateTimeFormat;
+      }) as unknown as typeof Intl.DateTimeFormat);
       const width = language === "ar" ? 390 : 1280;
       Dimensions.set({
         window: { width, height: 844, scale: 1, fontScale: 1 },

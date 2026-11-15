@@ -1,25 +1,23 @@
 import { I18nManager, Platform } from "react-native";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { resetUiBootstrapForTests } from "@/lib/settings/ui-bootstrap";
+
+function mockDeviceLocale(locale: string | undefined) {
+  const RealDateTimeFormat = Intl.DateTimeFormat;
+  jest.spyOn(Intl, "DateTimeFormat").mockImplementation(((...args: ConstructorParameters<typeof Intl.DateTimeFormat>) => {
+    const formatter = new RealDateTimeFormat(...args);
+    const resolved = formatter.resolvedOptions();
+    return { ...formatter, resolvedOptions: () => ({ ...resolved, locale: locale as string }) } as Intl.DateTimeFormat;
+  }) as unknown as typeof Intl.DateTimeFormat);
+}
 
 describe("getStartupLanguage", () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   const getItem = jest.fn<string | null, [string]>();
 
-  beforeEach(() => {
-    jest.replaceProperty(Platform, "OS", "web");
-    jest.replaceProperty(I18nManager, "isRTL", false);
-    getItem.mockReset().mockReturnValue(null);
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: {
-        localStorage: { getItem },
-        navigator: { language: "ar-SA" },
-      },
-    });
-  });
-
   afterEach(() => {
     jest.restoreAllMocks();
+    resetUiBootstrapForTests();
     if (originalWindow) {
       Object.defineProperty(globalThis, "window", originalWindow);
     } else {
@@ -27,63 +25,72 @@ describe("getStartupLanguage", () => {
     }
   });
 
-  describe.each([false, true])("with isRTL=%s", (isRTL) => {
+  describe("on web", () => {
     beforeEach(() => {
-      jest.replaceProperty(I18nManager, "isRTL", isRTL);
+      jest.replaceProperty(Platform, "OS", "web");
+      getItem.mockReset().mockReturnValue(null);
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: { localStorage: { getItem }, navigator: { language: "ar-SA" } },
+      });
     });
 
-    it.each(["en", "ar"])("uses cached %s regardless of direction", (cached) => {
+    it.each(["en", "ar"])("uses cached %s before the browser language", (cached) => {
       getItem.mockReturnValue(cached);
-
       expect(getStartupLanguage()).toBe(cached);
       expect(getItem).toHaveBeenCalledWith("hafiz_ui_language");
     });
 
-    it.each([null, "", "fr", "AR", "ar-SA"])(
-      "falls back to direction for cache %s, ignoring browser language",
-      (cached) => {
-        getItem.mockReturnValue(cached);
+    it.each([null, "", "fr", "AR", "ar-SA"])("uses the browser language for invalid cache %s", (cached) => {
+      getItem.mockReturnValue(cached);
+      expect(getStartupLanguage()).toBe("ar");
+    });
 
-        expect(getStartupLanguage()).toBe(isRTL ? "ar" : "en");
-      }
-    );
+    it.each(["en-US", "fr-FR", "he-IL", "arn-CL"])("chooses English for browser language %s", (language) => {
+      (window as unknown as { navigator: { language: string } }).navigator.language = language;
+      expect(getStartupLanguage()).toBe("en");
+    });
 
-    it("falls back to direction without a window", () => {
-      Reflect.deleteProperty(globalThis, "window");
+    it("propagates storage read errors", () => {
+      const error = new Error("Storage read failed");
+      getItem.mockImplementation(() => {
+        throw error;
+      });
+      expect(getStartupLanguage).toThrow(error);
+    });
+  });
 
-      expect(getStartupLanguage()).toBe(isRTL ? "ar" : "en");
+  describe.each(["android", "ios"] satisfies (typeof Platform.OS)[])("on %s", (platform) => {
+    beforeEach(() => {
+      jest.replaceProperty(Platform, "OS", platform);
+      jest.replaceProperty(I18nManager, "isRTL", false);
+      resetUiBootstrapForTests();
+    });
+
+    it.each(["en", "ar"] as const)("uses the startup mirror language %s before the device locale", (language) => {
+      mockDeviceLocale(language === "ar" ? "en-US" : "ar-EG");
+      resetUiBootstrapForTests({ version: 1, language, theme: "system" });
+      expect(getStartupLanguage()).toBe(language);
+    });
+
+    it.each([
+      ["ar-EG", "ar"],
+      ["ar", "ar"],
+      ["en-GB", "en"],
+      ["fa-IR", "en"],
+      ["he-IL", "en"],
+    ] as const)("maps device locale %s to %s without a mirror", (locale, expected) => {
+      mockDeviceLocale(locale);
+      resetUiBootstrapForTests(null);
+      expect(getStartupLanguage()).toBe(expected);
+    });
+
+    it("never reads browser storage", () => {
+      getItem.mockReset().mockReturnValue("ar");
+      Object.defineProperty(globalThis, "window", { configurable: true, value: { localStorage: { getItem } } });
+      mockDeviceLocale("en-US");
+      expect(getStartupLanguage()).toBe("en");
       expect(getItem).not.toHaveBeenCalled();
     });
-
-    it.each(["android", "ios"] satisfies (typeof Platform.OS)[])(
-      "uses direction on %s without reading browser storage",
-      (platform) => {
-        jest.replaceProperty(Platform, "OS", platform);
-        getItem.mockReturnValue(isRTL ? "en" : "ar");
-
-        expect(getStartupLanguage()).toBe(isRTL ? "ar" : "en");
-        expect(getItem).not.toHaveBeenCalled();
-      }
-    );
-  });
-
-  it("propagates storage read errors", () => {
-    const error = new Error("Storage read failed");
-    getItem.mockImplementation(() => {
-      throw error;
-    });
-
-    expect(getStartupLanguage).toThrow(error);
-  });
-
-  it("propagates errors accessing localStorage", () => {
-    const error = new Error("Storage access denied");
-    Object.defineProperty(window, "localStorage", {
-      get() {
-        throw error;
-      },
-    });
-
-    expect(getStartupLanguage).toThrow(error);
   });
 });

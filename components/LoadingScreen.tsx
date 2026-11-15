@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { Platform, View, Text, Image, I18nManager } from "react-native";
+import { Platform, View, Text, Image } from "react-native";
 import type { ImportProgress } from "@/lib/database/init";
 import { Progress } from "@/components/ui/Progress";
 import { strings } from "@/lib/i18n/strings";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { useUiBootstrap } from "@/lib/settings/ui-bootstrap";
 
 const logoSource = require("@/assets/images/logo.png");
-const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
-
-function getStartupLanguage(): "en" | "ar" {
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    const cached = window.localStorage.getItem(UI_LANGUAGE_CACHE_KEY);
-    if (cached === "en" || cached === "ar") return cached;
-    if (window.navigator.language.toLowerCase().startsWith("ar")) return "ar";
+function safeStartupLanguage(): "en" | "ar" {
+  try {
+    return getStartupLanguage();
+  } catch {
+    return "en";
   }
-  return I18nManager.isRTL ? "ar" : "en";
 }
 
 type Props = {
@@ -21,9 +20,13 @@ type Props = {
 };
 
 export function LoadingScreen({ progress }: Props) {
-  const [uiLanguage, setUiLanguage] = useState<"en" | "ar" | null>(() =>
-    Platform.OS === "web" ? null : getStartupLanguage()
+  // Web reads its cached language on the first client frame. Native waits for the startup mirror and
+  // shows the logo and progress without language text until it resolves.
+  const bootstrap = useUiBootstrap();
+  const [webLanguage, setWebLanguage] = useState<"en" | "ar" | null>(() =>
+    Platform.OS === "web" && typeof window !== "undefined" ? safeStartupLanguage() : null
   );
+  const uiLanguage = Platform.OS === "web" ? webLanguage : bootstrap.resolved ? safeStartupLanguage() : null;
   const s = uiLanguage ? strings[uiLanguage] : null;
   const rawPct = progress ? (progress.current / progress.total) * 100 : 0;
   const percentage = Math.max(0, Math.min(100, Math.round(rawPct)));
@@ -43,8 +46,8 @@ export function LoadingScreen({ progress }: Props) {
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
-    setUiLanguage(getStartupLanguage());
-    const onStorage = () => setUiLanguage(getStartupLanguage());
+    setWebLanguage(safeStartupLanguage());
+    const onStorage = () => setWebLanguage(safeStartupLanguage());
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);

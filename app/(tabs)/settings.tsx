@@ -1,6 +1,6 @@
 import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
-import { View, Text, Pressable, ActivityIndicator, Linking, StyleSheet, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking, Platform, StyleSheet, useWindowDimensions } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
@@ -36,10 +36,10 @@ import {
   type ThemeMode,
   type UILanguage,
   type PageScroll,
-  type QuranFontStyle,
   type QuranMarkerStyle,
   type ViewMode,
 } from "@/lib/settings/context";
+import { isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
 import { useDatabase } from "@/lib/database/provider";
 import { WirdSettingsSection } from "@/components/habit/WirdSettingsSection";
 import { ReminderSettingsSection } from "@/components/notifications/ReminderSettingsSection";
@@ -126,6 +126,8 @@ export default function SettingsScreen() {
     setQuranMarkerStyle,
     markSimilarVerses,
     setMarkSimilarVerses,
+    hapticsEnabled,
+    setHapticsEnabled,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
@@ -476,25 +478,48 @@ export default function SettingsScreen() {
               </SettingsControlRow>
 
               <SettingsControlRow label={s.quranFontLabel} isRTL={isRTL}>
-                <ToggleGroup<QuranFontStyle>
-                  value={quranFontStyle}
-                  onValueChange={setQuranFontStyle}
+                <ToggleGroup<QuranBaseFont>
+                  value={quranBaseFont(quranFontStyle)}
+                  onValueChange={(font) => setQuranFontStyle(styleForBaseFont(font, quranFontStyle))}
+                  accessibilityLabel={s.quranFontLabel}
                   items={[
                     { value: "qcf2", label: s.quranFontQcf2 },
                     { value: "v4", label: s.quranFontV4 },
-                    { value: "v4-tajweed", label: s.quranFontV4Tajweed },
                   ]}
                 />
               </SettingsControlRow>
 
-              {quranRenderFontStyle !== quranFontStyle && (
-                <Text
-                  className="text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL) }}
-                >
-                  {s.quranFontDarkFallback}
-                </Text>
-              )}
+              <Text
+                className="text-warm-400 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {quranRenderFontStyle !== quranFontStyle ? `${s.quranFontChoiceHint} ${s.quranFontDarkFallback}` : s.quranFontChoiceHint}
+              </Text>
+
+              <SwitchRow
+                label={s.quranFontV4Tajweed}
+                hint={s.quranTajweedHint}
+                value={isTajweedStyle(quranFontStyle)}
+                onValueChange={(enabled) => setQuranFontStyle(styleForTajweed(enabled, quranFontStyle))}
+                className="items-center justify-between gap-3"
+                style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row", minHeight: 44 }}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="mb-1 text-charcoal dark:text-neutral-200"
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                  >
+                    {s.quranFontV4Tajweed}
+                  </Text>
+                  <Text
+                    className="text-warm-400 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                  >
+                    {s.quranTajweedHint}
+                  </Text>
+                </View>
+                <SwitchTrack value={isTajweedStyle(quranFontStyle)} />
+              </SwitchRow>
 
               {quranRenderFontStyle !== "qcf2" && (
                 <SettingsControlRow label={s.quranMarkerStyleLabel} isRTL={isRTL}>
@@ -637,6 +662,33 @@ export default function SettingsScreen() {
                 </View>
                 <SwitchTrack value={markSimilarVerses} />
               </SwitchRow>
+
+              {Platform.OS !== "web" && (
+                <SwitchRow
+                  label={s.vibrationLabel}
+                  hint={s.vibrationHint}
+                  value={hapticsEnabled}
+                  onValueChange={setHapticsEnabled}
+                  className="items-center justify-between gap-3"
+                  style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row", minHeight: 44 }}
+                >
+                  <View className="min-w-0 flex-1">
+                    <Text
+                      className="mb-1 text-charcoal dark:text-neutral-200"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                    >
+                      {s.vibrationLabel}
+                    </Text>
+                    <Text
+                      className="text-warm-400 dark:text-neutral-400"
+                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                    >
+                      {s.vibrationHint}
+                    </Text>
+                  </View>
+                  <SwitchTrack value={hapticsEnabled} />
+                </SwitchRow>
+              )}
             </View>
           </Card>
 
