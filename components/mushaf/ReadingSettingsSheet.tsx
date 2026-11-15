@@ -1,6 +1,5 @@
-import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Check, ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
@@ -9,8 +8,6 @@ import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
-import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
-import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -45,9 +42,7 @@ export function ReadingSettingsSheet({
   onClose,
   onFontSizeChangeStart,
 }: Props) {
-  const db = useDatabase();
   const s = useStrings();
-  const showNotice = useOperationNotice();
   const { width } = useWindowDimensions();
   const {
     theme,
@@ -72,7 +67,6 @@ export function ReadingSettingsSheet({
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
   const controlColor = isDark ? "#a3a3a3" : "#7C6A58";
-  const accentColor = isDark ? DARK_ACCENT : ACCENT;
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
   const baseFont = quranBaseFont(quranFontStyle);
@@ -122,18 +116,6 @@ export function ReadingSettingsSheet({
     },
     [fontSizeLocked, onFontSizeChangeStart, setFontSizeIndex]
   );
-
-  const handleTafsirSelectionError = useCallback(
-    (error: unknown) => {
-      console.warn("[ReadingSettingsSheet] Failed to import tafsir source:", error);
-      showNotice(s.tafseerSourceImportFailed);
-    },
-    [s.tafseerSourceImportFailed, showNotice],
-  );
-  const {
-    importingSource: importingTafseerSource,
-    selectSource: handleTafseerSourceSelect,
-  } = useTafsirSourceSelection({ db, onSelected: setTafseerSource, onError: handleTafsirSelectionError });
 
   return (
     <>
@@ -298,7 +280,7 @@ export function ReadingSettingsSheet({
               value={currentTafseerTitle}
               isRTL={isRTL}
               onPress={() => setTafseerPickerVisible(true)}
-              trailing={importingTafseerSource ? <ActivityIndicator size="small" color={accentColor} /> : <Chevron size={17} color={controlColor} />}
+              trailing={<Chevron size={17} color={controlColor} />}
               compact={compactRows}
             />
           </View>
@@ -334,8 +316,8 @@ export function ReadingSettingsSheet({
       <TafsirSourcePicker
         visible={tafseerPickerVisible}
         selectedSource={tafseerSource}
-        importingSource={importingTafseerSource}
-        onSelect={handleTafseerSourceSelect}
+        onSelected={setTafseerSource}
+        logLabel="[ReadingSettingsSheet]"
         onClose={() => setTafseerPickerVisible(false)}
         helperText={s.tafseerDownloadHint}
       />

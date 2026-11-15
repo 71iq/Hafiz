@@ -21,6 +21,7 @@ jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: () => true, supabase:
 jest.mock("@/lib/reflections/api", () => ({ fetchReflections: jest.fn(), fetchReflectionCount: async () => 1 }));
 jest.mock("@/components/reflections/WriteReflectionSheet", () => ({ WriteReflectionSheet: () => null }));
 jest.mock("@/components/ui/Skeleton", () => ({ ReflectionsSkeleton: () => null }));
+jest.mock("@/components/ui/OperationNoticeProvider", () => ({ useOperationNotice: () => jest.fn() }));
 jest.mock("@/components/ui/EmptyState", () => ({ EmptyState: () => null }));
 jest.mock("@/components/reflections/CommentsSheet", () => {
   const React = jest.requireActual<typeof import("react")>("react");

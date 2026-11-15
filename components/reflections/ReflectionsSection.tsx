@@ -6,6 +6,8 @@ import { router, type Href } from "expo-router";
 import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useQuery } from "@tanstack/react-query";
+import { useNetInfo } from "@react-native-community/netinfo";
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { formatAyahRef } from "@/lib/arabic";
@@ -42,6 +44,9 @@ function ReflectionsSectionContent({
 }: Props & { user: ReturnType<typeof useAuthStore.getState>["user"] }) {
   const { isDark, isRTL, themeColors } = useSettings();
   const s = useStrings();
+  const showNotice = useOperationNotice();
+  const netInfo = useNetInfo();
+  const offline = netInfo.isConnected === false || netInfo.isInternetReachable === false;
   const { begin, pending } = useReflectionMutationScope(JSON.stringify([surah, ayah]), user?.id);
   const firstPageGeneration = useRef(0);
   const [expanded, setExpanded] = useState(initiallyExpanded);
@@ -194,12 +199,34 @@ function ReflectionsSectionContent({
       {/* Expanded content */}
       {expanded && (
         <View className="pb-3 pt-3">
+          <Text
+            className="mb-3 text-warm-500 dark:text-neutral-400"
+            style={{
+              fontFamily: "Manrope_500Medium",
+              fontSize: 12,
+              lineHeight: 18,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {s.reflectionsDisclaimer}
+          </Text>
+          {reflectionsError && allReflections.length > 0 ? (
+            // A failed refresh keeps the last page on screen and says it may be out of date.
+            <Text
+              accessibilityLiveRegion="polite"
+              className="mb-2 text-red-600 dark:text-red-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            >
+              {offline ? s.reflectionsOffline : s.reflectionsRefreshFailed}
+            </Text>
+          ) : null}
           {isLoading ? (
             <ReflectionsSkeleton isDark={isDark} />
-          ) : reflectionsError ? (
+          ) : reflectionsError && allReflections.length === 0 ? (
             <EmptyState
               icon={MessageSquare}
-              title={s.reflectionLoadFailed}
+              title={offline ? s.reflectionsOffline : s.reflectionLoadFailed}
               actionLabel={s.errorTryAgain}
               onAction={() => refetchReflections()}
               isDark={isDark}
@@ -213,10 +240,8 @@ function ReflectionsSectionContent({
                 reflection={r}
                 onLikeToggled={handleLikeToggled}
                 onCommentsPress={setCommentsReflectionId}
-                onAuthRequired={() => {
-                  onNavigate?.();
-                  router.push("/auth/login");
-                }}
+                // Guests stay in the sheet and get the feed's polite sign-in notice.
+                onAuthRequired={() => showNotice(s.reflectionFeedAuthRequired)}
                 onNavigate={onNavigate}
               />
             ))
@@ -256,11 +281,12 @@ function ReflectionsSectionContent({
               onNavigate?.();
               router.push("/reflection-feed" as Href);
             }}
-            className="items-center py-2.5"
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            accessibilityRole="link"
+            className="items-center justify-center py-2.5"
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, minHeight: 44 })}
           >
             <Text
-              className="text-warm-500 dark:text-neutral-400"
+              className="text-warm-600 dark:text-neutral-300"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
             >
               {s.reflectionFeedSeeAll}
@@ -268,16 +294,24 @@ function ReflectionsSectionContent({
           </Pressable>
 
           <Pressable
-            onPress={() => setWriteOpen(true)}
-            className="flex-row items-center justify-center gap-2 rounded-full py-3.5 mt-1"
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.7 : 1,
-              backgroundColor: isDark ? "#0D4B4D" : "#003638",
-            })}
+            onPress={() => {
+              if (user) {
+                setWriteOpen(true);
+                return;
+              }
+              onNavigate?.();
+              router.push("/auth/login");
+            }}
+            accessibilityRole="button"
+            className="flex-row items-center justify-center gap-2 rounded-full bg-primary-muted py-3.5 mt-1 dark:bg-primary-bright"
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, minHeight: 44 })}
           >
-            <PenLine size={15} color="#FDDC91" />
-            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#FDDC91" }}>
-              {s.reflectionWrite}
+            <PenLine size={15} color={isDark ? "#0A0A0A" : "#FFFFFF"} />
+            <Text
+              className="text-white dark:text-neutral-950"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+            >
+              {user ? s.reflectionWrite : s.reflectionSignInToWrite}
             </Text>
           </Pressable>
         </View>

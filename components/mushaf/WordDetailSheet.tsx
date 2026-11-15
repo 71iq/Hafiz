@@ -1,12 +1,17 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { View, Text, Pressable, ScrollView, Platform, useWindowDimensions } from "react-native";
-import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
+import * as Clipboard from "expo-clipboard";
+import { formatAyahRef } from "@/lib/arabic";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useWordInteraction, type WordRef } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
+import { formatNumber } from "@/lib/i18n/count";
 import { useDatabase } from "@/lib/database/provider";
+import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { quranPageFontName, quranPageFontPaletteStyle } from "@/lib/fonts/loader";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
@@ -16,7 +21,15 @@ import { TasreefTab } from "./word-tabs/TasreefTab";
 import { TajweedTab } from "./word-tabs/TajweedTab";
 import { OccurrencesTab } from "./word-tabs/OccurrencesTab";
 import { AyahDetailModal } from "./AyahDetailModal";
-import { fetchWordQcf2Glyph, fetchWordRoot, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
+import { DetailTabRow } from "./DetailTabRow";
+import { useDetailArrowKeys } from "./use-detail-arrow-keys";
+import {
+  fetchWordMeaningAr,
+  fetchWordQcf2Glyph,
+  fetchWordRoot,
+  fetchWordText,
+  fetchWordTranslation,
+} from "@/lib/word/queries";
 import { textStartStyle } from "@/lib/ui/direction";
 
 type TabKey = "meaning" | "irab" | "tajweed" | "tasreef" | "occurrences";
@@ -29,14 +42,31 @@ type WordHeaderMeta = {
   lemma: string | null;
   rootCount: number | null;
   translationEn: string | null;
+  meaningAr: string | null;
+  surahNameArabic: string | null;
+  surahNameEnglish: string | null;
+};
+
+const EMPTY_META: WordHeaderMeta = {
+  wordText: null,
+  qcf2Glyph: null,
+  root: null,
+  lemma: null,
+  rootCount: null,
+  translationEn: null,
+  meaningAr: null,
+  surahNameArabic: null,
+  surahNameEnglish: null,
 };
 
 export function WordDetailSheet() {
   const { detailWord, openDetail, closeDetail } = useWordInteraction();
-  const { effectiveTheme, isDark, isRTL, uiLanguage } = useSettings();
+  const { effectiveTheme, isDark, isRTL, uiLanguage, themeSurface } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
   const db = useDatabase();
+  const showNotice = useOperationNotice();
+  const reduceMotion = useReducedMotionPreference();
 
   const [activeTab, setActiveTab] = useState<TabKey>("meaning");
   const [ayahModalOpen, setAyahModalOpen] = useState(false);
@@ -48,17 +78,17 @@ export function WordDetailSheet() {
   // those themes show the header word in the classic font there.
   const headerFontStyle = Platform.OS !== "web" && isDark ? "qcf2" : WORD_HEADER_FONT_STYLE;
   const wordHeaderFontReady = useQuranPageFontReady(headerFontStyle, detailWord?.v2Page);
-  const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>({
-    wordText: null,
-    qcf2Glyph: null,
-    root: null,
-    lemma: null,
-    rootCount: null,
-    translationEn: null,
-  });
+  const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>(EMPTY_META);
   const contentScrollRef = useRef<ScrollView>(null);
+  const keyScopeRef = useRef<View>(null);
 
-  const localNumber = (value: number) => (isRTL ? toArabicNumber(value) : String(value));
+  // Every close path (close button, Back, Escape, backdrop, an occurrence or ayah jump that closes
+  // the sheet from the reader) leaves no word open, so the next word always starts on Meaning.
+  if (!detailWord && (activeTab !== "meaning" || ayahModalOpen)) {
+    setActiveTab("meaning");
+    setAyahModalOpen(false);
+  }
+
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxModalHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
   const headerFontFamily = detailWord ? quranPageFontName(headerFontStyle, detailWord.v2Page) : undefined;
@@ -90,17 +120,29 @@ export function WordDetailSheet() {
     openDetail(targetWord);
   }, [adjacentWords, openDetail]);
 
+  useDetailArrowKeys(keyScopeRef, {
+    enabled: !!detailWord && !ayahModalOpen,
+    isRTL,
+    onPrevious: () => handleNavigateWord("previous"),
+    onNext: () => handleNavigateWord("next"),
+  });
+
   useEffect(() => {
     if (!detailWord) return;
     let cancelled = false;
-    setHeaderMeta({ wordText: null, qcf2Glyph: null, root: null, lemma: null, rootCount: null, translationEn: null });
+    setHeaderMeta(EMPTY_META);
     Promise.all([
       fetchWordText(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
       fetchWordQcf2Glyph(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
       fetchWordRoot(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
       fetchWordTranslation(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
+      fetchWordMeaningAr(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
+      db.getFirstAsync<{ name_arabic: string; name_english: string }>(
+        "SELECT name_arabic, name_english FROM surahs WHERE number = ?",
+        [detailWord.surah]
+      ),
     ])
-      .then(async ([wordText, qcf2Glyph, rootMeta, wordTranslation]) => {
+      .then(async ([wordText, qcf2Glyph, rootMeta, wordTranslation, meaningAr, surahRow]) => {
         if (cancelled) return;
         let rootCount: number | null = null;
         if (rootMeta?.root) {
@@ -118,12 +160,13 @@ export function WordDetailSheet() {
           lemma: rootMeta?.lemma ?? null,
           rootCount,
           translationEn: wordTranslation?.translation_en ?? null,
+          meaningAr: meaningAr?.meaning?.trim().split(/\r?\n/)[0]?.trim() || null,
+          surahNameArabic: surahRow?.name_arabic ?? null,
+          surahNameEnglish: surahRow?.name_english ?? null,
         });
       })
       .catch(() => {
-        if (!cancelled) {
-          setHeaderMeta({ wordText: null, qcf2Glyph: null, root: null, lemma: null, rootCount: null, translationEn: null });
-        }
+        if (!cancelled) setHeaderMeta(EMPTY_META);
       });
     return () => {
       cancelled = true;
@@ -178,15 +221,29 @@ export function WordDetailSheet() {
     return () => cancelAnimationFrame(frame);
   }, [activeTab, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
 
+  // Copies the Unicode Uthmani word, never the page-font glyph code points shown above.
+  const copyWord = useCallback(async () => {
+    const text = headerMeta.wordText?.trim();
+    if (!text) return;
+    try {
+      await Clipboard.setStringAsync(text);
+      if (!systemConfirmsCopy()) showNotice(s.wordCopied);
+    } catch (error) {
+      console.warn("[WordDetailSheet] Failed to copy word:", error);
+      showNotice(s.copyFailed);
+    }
+  }, [headerMeta.wordText, showNotice, s.wordCopied, s.copyFailed]);
+
   if (!detailWord) return null;
 
   const { surah, ayah, wordPos } = detailWord;
   const isArabicMode = uiLanguage === "ar";
-  const panelIconColor = isDark ? "#a3a3a3" : effectiveTheme === "white" ? "#71717A" : "#8B8178";
-  const surahLabel = isArabicMode ? "السورة" : "Surah";
-  const ayahLabel = isArabicMode ? "الآية" : "Ayah";
-  const wordLabel = isArabicMode ? "الكلمة" : "Word";
-  const showRootLemma = isArabicMode;
+  const panelIconColor = isDark ? "#a3a3a3" : effectiveTheme === "white" ? "#71717A" : "#7A634D";
+  const accentColor = isDark ? "#2dd4bf" : "#0f766e";
+  const surahName = isArabicMode ? headerMeta.surahNameArabic : headerMeta.surahNameEnglish;
+  const reference = formatAyahRef(isRTL, surah, ayah, wordPos);
+  const referenceLabel = surahName ? `${surahName} ${reference}` : reference;
+  const gloss = isArabicMode ? headerMeta.meaningAr : headerMeta.translationEn;
 
   return (
     <>
@@ -197,148 +254,148 @@ export function WordDetailSheet() {
         maxHeight={maxModalHeight}
         dir="ltr"
       >
-        <OverlayHeader
-          isRTL={isRTL}
-          onClose={handleClose}
-          showHandle={isPhone}
-          actions={
-            <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
-              <PanelNavIcon
-                icon={isRTL ? <ChevronRight size={16} color={panelIconColor} /> : <ChevronLeft size={16} color={panelIconColor} />}
-                onPress={() => handleNavigateWord("previous")}
-                disabled={!adjacentWords.previous}
-                accessibilityLabel={s.previousWord}
-              />
-              <PanelNavIcon
-                icon={isRTL ? <ChevronLeft size={16} color={panelIconColor} /> : <ChevronRight size={16} color={panelIconColor} />}
-                onPress={() => handleNavigateWord("next")}
-                disabled={!adjacentWords.next}
-                accessibilityLabel={s.nextWord}
-              />
-            </View>
-          }
-          leading={
-            <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-              <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5">
-                <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
-                  {formatAyahRef(isRTL, surah, ayah, wordPos)}
-                </Text>
+        <View ref={keyScopeRef} className="flex-1 min-h-0">
+          <OverlayHeader
+            isRTL={isRTL}
+            onClose={handleClose}
+            showHandle={isPhone}
+            actions={
+              <View className={isRTL ? "flex-row-reverse items-center gap-1" : "flex-row items-center gap-1"}>
+                <PanelNavIcon
+                  icon={isRTL ? <ChevronRight size={18} color={panelIconColor} /> : <ChevronLeft size={18} color={panelIconColor} />}
+                  onPress={() => handleNavigateWord("previous")}
+                  disabled={!adjacentWords.previous}
+                  accessibilityLabel={s.previousWord}
+                />
+                <PanelNavIcon
+                  icon={isRTL ? <ChevronLeft size={18} color={panelIconColor} /> : <ChevronRight size={18} color={panelIconColor} />}
+                  onPress={() => handleNavigateWord("next")}
+                  disabled={!adjacentWords.next}
+                  accessibilityLabel={s.nextWord}
+                />
               </View>
-              <Pressable
-                onPress={() => setAyahModalOpen(true)}
-                className="flex-row items-center gap-1.5 rounded-full bg-surface-low dark:bg-surface-dark-low px-3 py-1.5"
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-              >
-                <BookOpen size={13} color={isDark ? "#a3a3a3" : "#003638"} />
-                <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-                  {s.viewFullAyah}
-                </Text>
-              </Pressable>
-            </View>
-          }
-        />
-
-        <View className="flex-1 min-h-0">
-          <View className={`px-4 py-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
-            {/* Glyphs mounted before their page font exists render and measure in the system font. */}
-            {wordHeaderFontReady ? (
-              <Text
-                className="text-charcoal dark:text-neutral-100"
-                style={{
-                  fontFamily: headerFontFamily,
-                  ...headerFontPaletteStyle,
-                  fontSize: 38,
-                  lineHeight: 58,
-                  writingDirection: "ltr",
-                }}
-              >
-                {headerMeta.qcf2Glyph?.trim() || headerMeta.wordText?.trim() || "—"}
-              </Text>
-            ) : (
-              <View style={{ height: 58 }} />
-            )}
-            {!isArabicMode && !!headerMeta.translationEn && (
-              <Text
-                className="mt-1 text-warm-500 dark:text-neutral-400"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL) }}
-              >
-                {headerMeta.translationEn}
-              </Text>
-            )}
-
-            <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-              {showRootLemma && (
-                <>
-                  <MetaPill label={s.rootLabel ?? "Root"} value={headerMeta.root ?? "—"} />
-                  <MetaPill label={s.lemmaLabel ?? "Lemma"} value={headerMeta.lemma ?? "—"} />
-                </>
-              )}
-              <MetaPill label={s.wordTabOccurrences} value={headerMeta.rootCount == null ? "—" : localNumber(headerMeta.rootCount)} />
-            </View>
-
-            <View className={`mt-2 flex-row gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-              <QuickStat label={surahLabel} value={localNumber(surah)} />
-              <QuickStat label={ayahLabel} value={localNumber(ayah)} />
-              <QuickStat label={wordLabel} value={localNumber(wordPos)} />
-            </View>
-          </View>
-
-          <View className="h-14 justify-center bg-surface-low dark:bg-surface-dark-low">
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              // Direction alone mirrors the tab row and starts its scroll at the right in Arabic. The
-              // sheet is already "rtl" there, so row-reverse ran the tabs left to right and a
-              // scroll-to-end on every tab change was needed to bring the first tab into view.
-              contentContainerStyle={{
-                minWidth: "100%",
-                paddingHorizontal: 16,
-                gap: 6,
-                paddingVertical: 6,
-                alignItems: "center",
-                justifyContent: "flex-start",
-                direction: isRTL ? "rtl" : "ltr",
-                flexDirection: "row",
-              }}
-            >
-              {tabs.map((tab) => {
-                const isActive = activeTab === tab.key;
-                return (
-                  <Pressable
-                    key={tab.key}
-                    onPress={() => setActiveTab(tab.key)}
-                    className={`rounded-full px-4 py-2.5 ${isActive ? "bg-primary-soft" : "bg-transparent"}`}
-                    style={({ pressed }) => ({
-                      alignSelf: "center",
-                      transform: [{ scale: pressed ? 0.98 : 1 }],
-                    })}
+            }
+            leading={
+              <View className={`flex-wrap items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5">
+                  <Text
+                    className="text-primary-muted dark:text-primary-bright"
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, writingDirection: isRTL ? "rtl" : "ltr" }}
                   >
-                    <Text
-                      className={isActive ? "text-gold" : "text-warm-400 dark:text-neutral-500"}
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-                    >
-                      {tab.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
+                    {referenceLabel}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setAyahModalOpen(true)}
+                  accessibilityRole="button"
+                  className={`items-center gap-1.5 rounded-full bg-surface-low dark:bg-surface-dark-low px-3 ${
+                    isRTL ? "flex-row-reverse" : "flex-row"
+                  }`}
+                  style={({ pressed }) => ({
+                    minHeight: 44,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    cursor: Platform.OS === "web" ? "pointer" : undefined,
+                  })}
+                >
+                  <BookOpen size={14} color={accentColor} />
+                  <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                    {s.viewFullAyah}
+                  </Text>
+                </Pressable>
+              </View>
+            }
+          />
 
-          <OverlayBody scrollRef={contentScrollRef} contentContainerClassName="px-5">
-            {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-            {activeTab === "irab" && (
-              <IrabTab
-                surah={surah}
-                ayah={ayah}
-                wordPos={wordPos}
-                onScrollToMatch={(y) => contentScrollRef.current?.scrollTo({ y, animated: true })}
+          <View className="flex-1 min-h-0">
+            <View className={`px-4 py-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
+              {/* Glyphs mounted before their page font exists render and measure in the system font. */}
+              {wordHeaderFontReady ? (
+                <Pressable
+                  onLongPress={copyWord}
+                  delayLongPress={450}
+                  accessibilityRole="text"
+                  accessibilityLabel={headerMeta.wordText ?? undefined}
+                  accessibilityHint={s.copy}
+                >
+                  <Text
+                    className="text-charcoal dark:text-neutral-100"
+                    style={{
+                      fontFamily: headerFontFamily,
+                      ...headerFontPaletteStyle,
+                      fontSize: 38,
+                      lineHeight: 58,
+                      writingDirection: "ltr",
+                    }}
+                  >
+                    {headerMeta.qcf2Glyph?.trim() || headerMeta.wordText?.trim() || "—"}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={{ height: 58 }} />
+              )}
+              {!!gloss && (
+                <Text
+                  className="mt-1 text-warm-600 dark:text-neutral-300"
+                  style={{
+                    fontFamily: "Manrope_500Medium",
+                    fontSize: 14,
+                    lineHeight: 22,
+                    // The gloss follows its own language, English in English and Arabic in Arabic.
+                    writingDirection: isArabicMode ? "rtl" : "ltr",
+                    ...textStartStyle(isRTL),
+                  }}
+                >
+                  {gloss}
+                </Text>
+              )}
+
+              <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+                {headerMeta.root ? (
+                  <MetaPill
+                    label={s.rootLabel}
+                    value={headerMeta.root}
+                    onPress={() => setActiveTab("occurrences")}
+                    accessibilityLabel={interpolate(s.wordRootOpenOccurrences, { root: headerMeta.root })}
+                  />
+                ) : null}
+                {isArabicMode && headerMeta.lemma ? <MetaPill label={s.lemmaLabel} value={headerMeta.lemma} /> : null}
+                {headerMeta.rootCount != null && headerMeta.rootCount > 0 ? (
+                  <MetaPill
+                    label={s.wordTabOccurrences}
+                    value={formatNumber(headerMeta.rootCount, uiLanguage)}
+                    onPress={() => setActiveTab("occurrences")}
+                  />
+                ) : null}
+              </View>
+            </View>
+
+            <View className="px-4 pb-2">
+              <DetailTabRow
+                tabs={tabs}
+                activeKey={activeTab}
+                onChange={setActiveTab}
+                isRTL={isRTL}
+                backgroundColor={themeSurface}
               />
-            )}
-            {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-            {activeTab === "tasreef" && <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-            {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-          </OverlayBody>
+            </View>
+
+            <OverlayBody scrollRef={contentScrollRef} contentContainerClassName="px-5">
+              {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {activeTab === "irab" && (
+                <IrabTab
+                  surah={surah}
+                  ayah={ayah}
+                  wordPos={wordPos}
+                  onScrollToMatch={(y) => contentScrollRef.current?.scrollTo({ y, animated: !reduceMotion })}
+                />
+              )}
+              {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {activeTab === "tasreef" && (
+                <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} onRootPress={() => setActiveTab("occurrences")} />
+              )}
+              {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+            </OverlayBody>
+          </View>
         </View>
       </ResponsiveSheet>
       <AyahDetailModal
@@ -351,29 +408,41 @@ export function WordDetailSheet() {
   );
 }
 
-function MetaPill({ label, value }: { label: string; value: string }) {
-  return (
+function MetaPill({
+  label,
+  value,
+  onPress,
+  accessibilityLabel,
+}: {
+  label: string;
+  value: string;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+}) {
+  const content = (
     <View className="flex-row items-center gap-1 rounded-full bg-surface-low dark:bg-surface-dark px-3 py-1.5">
-      <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
+      <Text className="text-warm-600 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
         {label}
       </Text>
-      <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
+      <Text
+        className={onPress ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+      >
         {value}
       </Text>
     </View>
   );
-}
-
-function QuickStat({ label, value }: { label: string; value: string }) {
+  if (!onPress) return content;
   return (
-    <View className="min-w-[68px] flex-1 rounded-2xl bg-surface-low dark:bg-surface-dark px-3 py-2">
-      <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 10 }}>
-        {label}
-      </Text>
-      <Text className="mt-0.5 text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}>
-        {value}
-      </Text>
-    </View>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? `${label} ${value}`}
+      className="justify-center"
+      style={{ minHeight: 44, cursor: Platform.OS === "web" ? "pointer" : undefined }}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -394,9 +463,9 @@ function PanelNavIcon({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      hitSlop={8}
-      className="h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
-      style={{ opacity: disabled ? 0.45 : 1 }}
+      accessibilityState={{ disabled }}
+      className="h-11 w-11 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
+      style={{ opacity: disabled ? 0.45 : 1, cursor: Platform.OS === "web" ? (disabled ? "auto" : "pointer") : undefined }}
     >
       {icon}
     </Pressable>

@@ -296,6 +296,20 @@ export async function isMeaningCardSaved(
   return (row?.c ?? 0) > 0;
 }
 
+/** The saved meaning card's due time, or null when the word is not in word review. Read only. */
+export async function fetchMeaningCardDue(
+  db: DatabaseExecutor,
+  surah: number,
+  ayah: number,
+  wordPos: number
+): Promise<string | null> {
+  const row = await db.getFirstAsync<{ due: string }>(
+    "SELECT due FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
+    [meaningCardId(surah, ayah, wordPos), MEANINGS_DECK_ID]
+  );
+  return row?.due ?? null;
+}
+
 export async function addMeaningCard(
   db: AppDatabase,
   surah: number,

@@ -64,6 +64,8 @@ type OverlayBodyProps = {
   className?: string;
   contentContainerClassName?: string;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
+  /** Direct children that stay pinned to the top while the body scrolls. */
+  stickyHeaderIndices?: number[];
 };
 
 type OverlayFooterProps = {
@@ -410,6 +412,7 @@ export function OverlayBody({
   className,
   contentContainerClassName,
   contentContainerStyle,
+  stickyHeaderIndices,
 }: OverlayBodyProps) {
   const insets = useSafeAreaInsets();
   if (!scrollEnabled) {
@@ -438,6 +441,7 @@ export function OverlayBody({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={contentContainerStyle}
       contentContainerClassName={contentContainerClassName}
+      stickyHeaderIndices={stickyHeaderIndices}
     >
       {children}
       {/* Keeps the last lines above the Android navigation bar without overriding sheet padding. */}

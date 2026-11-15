@@ -17,7 +17,9 @@ it("renders every supplied block literally in order without reparsing or adding 
   const tree = view.toJSON();
   if (!Array.isArray(tree)) throw new Error("Expected sibling rows without a native wrapper");
   expect(tree.map((row) => row.type)).toEqual(["View", "View", "View"]);
-  expect(tree.map((row) => row.props.className)).toEqual(["mb-4", "mb-4", "mb-4"]);
+  // 12px and a hairline between readings, nothing after the last one.
+  const separated = "mb-3 pb-3 border-b border-warm-200 dark:border-neutral-800";
+  expect(tree.map((row) => row.props.className)).toEqual([separated, separated, "mb-1"]);
   expect(tree.map((row) => row.children?.length)).toEqual([2, 1, 1]);
   const heading = view.getByText("عنوان تجريبي");
   expect(flattenStyle(heading.props.style)).toEqual({ writingDirection: "rtl", textAlign: "right", fontWeight: "700" });

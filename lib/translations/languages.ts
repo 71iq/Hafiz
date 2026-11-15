@@ -3,14 +3,22 @@ export type TranslationLanguage = {
   nameEnglish: string;
   nameNative: string;
   direction: "ltr" | "rtl";
+  /** Whose translation this is, shown under the text when the bundled source names it. */
+  attribution?: string;
 };
 
 export const DEFAULT_LANGUAGE = "en";
 export const DEFAULT_TRANSLATION_LANGUAGE = "en-bridges";
 
 export const TRANSLATION_LANGUAGES: TranslationLanguage[] = [
-  { code: "en", nameEnglish: "English", nameNative: "English", direction: "ltr" },
-  { code: "en-bridges", nameEnglish: "English (Bridges)", nameNative: "English (Bridges)", direction: "ltr" },
+  { code: "en", nameEnglish: "English", nameNative: "English", direction: "ltr", attribution: "Saheeh International" },
+  {
+    code: "en-bridges",
+    nameEnglish: "English (Bridges)",
+    nameNative: "English (Bridges)",
+    direction: "ltr",
+    attribution: "Bridges translation, Fadel Soliman",
+  },
   { code: "id", nameEnglish: "Indonesian", nameNative: "Bahasa Indonesia", direction: "ltr" },
   { code: "bn", nameEnglish: "Bengali", nameNative: "বাংলা", direction: "ltr" },
   { code: "ur", nameEnglish: "Urdu", nameNative: "اردو", direction: "rtl" },

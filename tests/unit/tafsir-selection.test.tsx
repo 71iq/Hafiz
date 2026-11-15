@@ -1,5 +1,4 @@
-import { Toast } from "@/components/ui/Toast";
-import { OperationNoticeOverlay, OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
+import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import React, { type ComponentProps } from "react";
 import { Dimensions, I18nManager } from "react-native";
 import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
@@ -15,16 +14,18 @@ import { stringByKey } from "@/lib/i18n/useStrings";
 import type { useSettings } from "@/lib/settings/context";
 import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
 
-let mockNoticeReady = true;
-
 type PickerProps = ComponentProps<typeof TafsirSourcePicker>;
 let mockPickerProps: PickerProps | undefined;
-const mockSelectionResults: Promise<boolean>[] = [];
+let mockNetInfo: { isConnected: boolean | null; isInternetReachable: boolean | null } = {
+  isConnected: true,
+  isInternetReachable: true,
+};
 const mockRemoteAccess = jest.fn<never, unknown[]>(() => {
   throw new Error("Remote service forbidden in local selection fixture");
 });
 const mockDatabase = {
   getFirstAsync: jest.fn(async () => null),
+  // Qurtubi is complete on this device; Al-Razi needs a download.
   getAllAsync: jest.fn(async () => [{ source: "qurtubi", count: 6234 }]),
   runAsync: jest.fn(() => {
     throw new Error("Database writes forbidden in selection fixture");
@@ -40,9 +41,14 @@ const mockSettings: Partial<ReturnType<typeof useSettings>> = {
 const mockRouter = { push: mockRemoteAccess, setParams: mockRemoteAccess };
 const originalWindow = Dimensions.get("window");
 const originalScreen = Dimensions.get("screen");
-const sourceA: TafsirSourceId = "qurtubi";
-const sourceB: TafsirSourceId = "zilal";
+const download: TafsirSourceId = "razi";
+const installed: TafsirSourceId = "qurtubi";
 
+jest.mock("@react-native-community/netinfo", () => ({
+  useNetInfo: () => mockNetInfo,
+  fetch: async () => mockNetInfo,
+  addEventListener: () => () => undefined,
+}));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDatabase }));
 jest.mock("@/lib/database/init", () => ({ ensureTafsirSourceImported: jest.fn() }));
 jest.mock("@/lib/settings/context", () => {
@@ -58,14 +64,7 @@ jest.mock("@/components/settings/TafsirSourcePicker", () => {
     ...actual,
     TafsirSourcePicker: (props: PickerProps) => {
       mockPickerProps = props;
-      return React.createElement(actual.TafsirSourcePicker, {
-        ...props,
-        onSelect: (sourceId: TafsirSourceId) => {
-          const result = props.onSelect(sourceId);
-          mockSelectionResults.push(result);
-          return result;
-        },
-      });
+      return React.createElement(actual.TafsirSourcePicker, props);
     },
   };
 });
@@ -138,7 +137,7 @@ function Wrapper({ children }: React.PropsWithChildren) {
         insets: { top: 0, left: 0, bottom: 0, right: 0 },
       }}
     >
-      <OperationNoticeProvider ready={mockNoticeReady}>
+      <OperationNoticeProvider ready>
         <DirectionProvider dir={mockSettings.isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
       </OperationNoticeProvider>
     </SafeAreaProvider>
@@ -156,14 +155,19 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
   let warn: jest.SpyInstance;
   let errors: jest.SpyInstance;
   let expectedWarnings: number;
-  const prefix =
-    owner === "settings"
-      ? "[Settings] Failed to import tafsir source:"
-      : "[ReadingSettingsSheet] Failed to import tafsir source:";
+  const s = strings[language];
+  const prefix = owner === "settings" ? "[Settings]" : "[ReadingSettingsSheet]";
   function label(sourceId: TafsirSourceId) {
     const source = AVAILABLE_TAFSIR_SOURCES.find((value) => value.id === sourceId);
     if (!source) throw new Error("Missing source fixture");
-    return stringByKey(strings[language], source.labelKey, source.id);
+    return stringByKey(s, source.labelKey, source.id);
+  }
+  function row(view: ReturnType<typeof render>, sourceId: TafsirSourceId) {
+    const found = view
+      .UNSAFE_getAllByType(DisclosureRow)
+      .find((item) => String(item.props.accessibilityLabel).startsWith(label(sourceId)));
+    if (!found) throw new Error("Missing row for " + sourceId);
+    return found;
   }
   async function open() {
     const view = render(
@@ -171,28 +175,15 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
       { wrapper: Wrapper },
     );
     await act(async () => {});
-    fireEvent.press(view.getByText(strings[language].tafseerSourceLabel));
+    fireEvent.press(view.getByText(s.tafseerSourceLabel));
     await act(async () => {});
     expect(picker().visible).toBe(true);
     return view;
   }
-  function begin(view: ReturnType<typeof render>) {
-    fireEvent.press(view.getByText(label(sourceA)));
-    const result = mockSelectionResults.at(-1);
-    if (!result) throw new Error("No selection result");
-    return result;
-  }
-  function expectBusy(view: ReturnType<typeof render>, busy: boolean) {
-    const rows = view.UNSAFE_getAllByType(DisclosureRow);
-    expect(rows).toHaveLength(AVAILABLE_TAFSIR_SOURCES.length);
-    expect(rows.every((row) => row.props.disabled === busy)).toBe(true);
-    expect(picker().importingSource).toBe(busy ? sourceA : null);
-  }
   beforeEach(() => {
-    mockNoticeReady = true;
     jest.clearAllMocks();
     mockPickerProps = undefined;
-    mockSelectionResults.length = 0;
+    mockNetInfo = { isConnected: true, isInternetReachable: true };
     expectedWarnings = 0;
     Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar", tafseerSource: "muyassar" });
     mockSetSource.mockReset().mockImplementation((source) => {
@@ -208,8 +199,10 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
     warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
     errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
   });
-  afterEach(() => {
+  afterEach(async () => {
     try {
+      // Settle any import a test left running so it cannot leak into the next one.
+      await act(async () => pending.resolve());
       cleanup();
       expect(mockRemoteAccess).not.toHaveBeenCalled();
       expect(mockDatabase.runAsync).not.toHaveBeenCalled();
@@ -220,230 +213,110 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
       Dimensions.set({ window: originalWindow, screen: originalScreen });
     }
   });
-  it("imports before selecting, disables real rows and closes after success", async () => {
+
+  it("splits installed and downloadable sources and offers a plain Download", async () => {
     const view = await open();
-    const result = begin(view);
-    expectBusy(view, true);
+    expect(view.getByText(s.tafsirPickerOnDevice)).toBeTruthy();
+    expect(view.getByText(s.tafsirPickerAvailable)).toBeTruthy();
+    expect(view.getByText(s.tafseerDownloadHint)).toBeTruthy();
+    expect(row(view, download).props.accessibilityLabel).toBe(`${label(download)}, ${s.tafseerDownloadAction}`);
+    expect(row(view, installed).props.accessibilityLabel).toBe(`${label(installed)}, ${s.tafseerDownloaded}`);
+    expect(view.queryByText(/MB/)).toBeNull();
+  });
+
+  it("downloads before selecting, keeps installed rows usable and closes after success", async () => {
+    const view = await open();
+    fireEvent.press(row(view, download));
+    expect(ensureTafsirSourceImported).toHaveBeenCalledWith(mockDatabase, download);
     expect(mockSetSource).not.toHaveBeenCalled();
-    expect(ensureTafsirSourceImported).toHaveBeenCalledWith(mockDatabase, sourceA);
-    await act(async () => {
-      pending.resolve();
-      await result;
-    });
-    await expect(result).resolves.toBe(true);
-    expect(mockSetSource).toHaveBeenCalledWith(sourceA);
-    expect(picker().importingSource).toBeNull();
-    expect(picker().selectedSource).toBe(sourceA);
+    expect(row(view, download).props.disabled).toBe(true);
+    expect(row(view, installed).props.disabled).toBe(false);
+    expect(row(view, "tahrir-tanwir").props.disabled).toBe(true);
+    await act(async () => pending.resolve());
+    expect(mockSetSource).toHaveBeenCalledWith(download);
     expect(picker().visible).toBe(false);
-  }, 10000);
-  it("reports import failure without selecting or closing", async () => {
+  });
+
+  it("shows a failed download inline with Retry and keeps the sheet open", async () => {
     const view = await open();
-    const result = begin(view);
-    const error = new Error("Synthetic import failure");
+    fireEvent.press(row(view, download));
     expectedWarnings = 1;
-    await act(async () => {
-      pending.reject(error);
-      await result;
-    });
-    await expect(result).resolves.toBe(false);
+    const error = new Error("Synthetic import failure");
+    await act(async () => pending.reject(error));
+    expect(warn).toHaveBeenCalledWith(`${prefix} Failed to import tafsir source:`, error);
     expect(mockSetSource).not.toHaveBeenCalled();
-    expectBusy(view, false);
     expect(picker().visible).toBe(true);
-    expect(warn).toHaveBeenCalledWith(prefix, error);
-    expect(view.getByText(strings[language].tafseerSourceImportFailed, { includeHiddenElements: true })).toBeTruthy();
-    const retry = deferred();
-    jest.mocked(ensureTafsirSourceImported).mockReturnValue(retry.promise);
-    const retried = begin(view);
-    expectBusy(view, true);
+    expect(view.getByText(s.tafsirDownloadFailed)).toBeTruthy();
+    pending = deferred();
+    jest.mocked(ensureTafsirSourceImported).mockReturnValue(pending.promise);
+    fireEvent.press(view.getByText(s.detailRetry));
     expect(ensureTafsirSourceImported).toHaveBeenCalledTimes(2);
-    await act(async () => {
-      retry.resolve();
-      await retried;
-    });
-    await expect(retried).resolves.toBe(true);
-    expect(mockSetSource).toHaveBeenCalledWith(sourceA);
+    await act(async () => pending.resolve());
+    expect(mockSetSource).toHaveBeenCalledWith(download);
+    expect(picker().visible).toBe(false);
   });
-  it("rejects a selection after the busy render and disables other real rows", async () => {
+
+  it("explains an offline failure truthfully", async () => {
+    mockNetInfo = { isConnected: false, isInternetReachable: false };
     const view = await open();
-    const result = begin(view);
-    expectBusy(view, true);
-    fireEvent.press(view.getByText(label(sourceB)));
-    let blocked: boolean | undefined;
-    await act(async () => {
-      blocked = await picker().onSelect(sourceB);
-    });
-    expect(blocked).toBe(false);
-    expect(ensureTafsirSourceImported).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      pending.resolve();
-      await result;
-    });
-    await expect(result).resolves.toBe(true);
+    fireEvent.press(row(view, download));
+    expectedWarnings = 1;
+    await act(async () => pending.reject(new Error("Synthetic offline failure")));
+    expect(view.getByText(s.tafsirDownloadOffline)).toBeTruthy();
+    expect(view.queryByText(s.tafsirDownloadFailed)).toBeNull();
   });
-  it("reports a synchronous settings callback failure and clears busy state", async () => {
+
+  it("does not select a download that finishes after the picker closed", async () => {
+    const view = await open();
+    fireEvent.press(row(view, download));
+    act(() => picker().onClose());
+    expect(picker().visible).toBe(false);
+    await act(async () => pending.resolve());
+    expect(mockSetSource).not.toHaveBeenCalled();
+    expect(view.queryByText(s.tafsirDownloadFailed)).toBeNull();
+  });
+
+  it("lets a newer installed choice win over a late download", async () => {
+    const view = await open();
+    fireEvent.press(row(view, download));
+    fireEvent.press(row(view, installed));
+    await act(async () => {});
+    expect(mockSetSource).toHaveBeenCalledWith(installed);
+    expect(picker().visible).toBe(false);
+    await act(async () => pending.resolve());
+    expect(mockSetSource).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not select after the owner unmounts mid-download", async () => {
+    const view = await open();
+    fireEvent.press(row(view, download));
+    view.unmount();
+    await act(async () => pending.resolve());
+    expect(mockSetSource).not.toHaveBeenCalled();
+  });
+
+  it("reports a synchronous settings failure on the row without closing", async () => {
     const view = await open();
     const error = new Error("Synthetic settings callback failure");
     expectedWarnings = 1;
     mockSetSource.mockImplementationOnce(() => {
       throw error;
     });
-    const result = begin(view);
-    await act(async () => {
-      pending.resolve();
-      await result;
-    });
-    await expect(result).resolves.toBe(false);
-    expect(mockSetSource).toHaveBeenCalledWith(sourceA);
-    expect(picker().selectedSource).toBe("muyassar");
+    fireEvent.press(row(view, installed));
+    await act(async () => {});
+    expect(warn).toHaveBeenCalledWith(`${prefix} Failed to import tafsir source:`, error);
     expect(picker().visible).toBe(true);
-    expectBusy(view, false);
-    expect(warn).toHaveBeenCalledWith(prefix, error);
-    const retry = deferred();
-    jest.mocked(ensureTafsirSourceImported).mockReturnValue(retry.promise);
-    const retried = begin(view);
-    expectBusy(view, true);
-    await act(async () => {
-      retry.resolve();
-      await retried;
-    });
-    await expect(retried).resolves.toBe(true);
+    expect(view.getByText(s.tafseerSourceImportFailed)).toBeTruthy();
+    fireEvent.press(view.getByText(s.detailRetry));
+    await act(async () => {});
     expect(mockSetSource).toHaveBeenCalledTimes(2);
-  });
-  it("keeps a pending import active after the picker closes", async () => {
-    const view = await open();
-    const result = begin(view);
-    act(() => picker().onClose());
     expect(picker().visible).toBe(false);
-    expect(picker().importingSource).toBe(sourceA);
-    await act(async () => {
-      pending.resolve();
-      await result;
-    });
-    await expect(result).resolves.toBe(true);
-    expect(mockSetSource).toHaveBeenCalledWith(sourceA);
-    expect(picker().visible).toBe(false);
-    expect(picker().importingSource).toBeNull();
-  });
-  it("hands one failure notice from the real picker to its sheet and root", async () => {
-    const view = await open();
-    const result = begin(view);
-    expectedWarnings = 1;
-    jest.useFakeTimers();
-    try {
-      await act(async () => {
-        pending.reject(new Error("Synthetic nested picker failure"));
-        await result;
-      });
-      const activeSlots = () =>
-        view.UNSAFE_queryAllByType(OperationNoticeOverlay).filter((slot) => slot.findAllByType(Toast).length > 0);
-      expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
-      expect(activeSlots()).toHaveLength(1);
-      const pickerId: unknown = activeSlots()[0].props.overlayId;
-      act(() => picker().onClose());
-      expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
-      expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
-      if (owner === "reading") {
-        expect(activeSlots()).toHaveLength(1);
-        expect(activeSlots()[0].props.overlayId).not.toBe(pickerId);
-      } else {
-        expect(activeSlots()).toHaveLength(0);
-      }
-      view.rerender(<></>);
-      expect(activeSlots()).toHaveLength(0);
-      expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
-      expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
-    } finally {
-      view.unmount();
-      jest.useRealTimers();
-    }
-  });
-  it("retains a deferred failure after the owner disappears and readiness recovers", async () => {
-    const view = await open();
-    const result = begin(view);
-    expectedWarnings = 1;
-    jest.useFakeTimers();
-    try {
-      mockNoticeReady = false;
-      view.rerender(<></>);
-      await act(async () => {
-        pending.reject(new Error("Synthetic retired SQLite failure"));
-        await result;
-      });
-      await expect(result).resolves.toBe(false);
-      expect(mockSetSource).not.toHaveBeenCalled();
-      act(() => jest.advanceTimersByTime(5000));
-      expect(view.queryByText(strings[language].tafseerSourceImportFailed)).toBeNull();
-      mockNoticeReady = true;
-      view.rerender(<></>);
-      expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
-    } finally {
-      view.unmount();
-      jest.useRealTimers();
-    }
-  });
-  it("preserves selection completion after the owner unmounts", async () => {
-    const view = await open();
-    const result = begin(view);
-    view.unmount();
-    await act(async () => {
-      pending.resolve();
-      await result;
-    });
-    await expect(result).resolves.toBe(true);
-    expect(mockSetSource).toHaveBeenCalledWith(sourceA);
-  });
-  it("blocks same-render and stale callbacks until the first import settles", async () => {
-    const view = await open();
-    const other = deferred();
-    jest.mocked(ensureTafsirSourceImported).mockImplementation((database, source) => {
-      expect(database).toBe(mockDatabase);
-      if (source === sourceA) return pending.promise;
-      if (source === sourceB) return other.promise;
-      throw new Error("Unexpected concurrent source fixture");
-    });
-    const staleSelect = picker().onSelect;
-    let first: Promise<boolean> | undefined;
-    let second: Promise<boolean> | undefined;
-    try {
-      await act(async () => {
-        first = staleSelect(sourceA);
-        second = staleSelect(sourceB);
-      });
-      expect(ensureTafsirSourceImported).toHaveBeenCalledTimes(1);
-      await expect(second).resolves.toBe(false);
-      expectBusy(view, true);
-      let blocked: boolean | undefined;
-      await act(async () => {
-        blocked = await staleSelect(sourceB);
-      });
-      expect(blocked).toBe(false);
-      expect(ensureTafsirSourceImported).toHaveBeenCalledTimes(1);
-      expectBusy(view, true);
-      await act(async () => {
-        pending.resolve();
-        await first;
-      });
-      await expect(first).resolves.toBe(true);
-      expect(mockSetSource).toHaveBeenCalledTimes(1);
-      expect(mockSetSource).toHaveBeenCalledWith(sourceA);
-      expect(picker().importingSource).toBeNull();
-    } finally {
-      await act(async () => {
-        pending.resolve();
-        other.resolve();
-        await Promise.all([first, second]);
-      });
-    }
   });
 
   it("closes the already selected included source without another import", async () => {
     const view = await open();
-    const index = AVAILABLE_TAFSIR_SOURCES.findIndex((source) => source.id === "muyassar");
-    const row = view.UNSAFE_getAllByType(DisclosureRow)[index];
-    if (!row) throw new Error("Missing selected source row");
-    fireEvent.press(row);
+    fireEvent.press(row(view, "muyassar"));
     expect(picker().visible).toBe(false);
-    expect(mockSelectionResults).toHaveLength(0);
     expect(ensureTafsirSourceImported).not.toHaveBeenCalled();
     expect(mockSetSource).not.toHaveBeenCalled();
   });

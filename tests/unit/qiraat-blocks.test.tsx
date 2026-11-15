@@ -1,7 +1,7 @@
 import React from "react";
 import { Dimensions, I18nManager } from "react-native";
-import { act, cleanup, render } from "@testing-library/react-native";
-import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
+import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
+import { QiraatTab, formatQiraatCovers } from "@/components/mushaf/word-tabs/QiraatTab";
 import { fetchQiraat } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
 import { strings } from "@/lib/i18n/strings";
@@ -23,6 +23,10 @@ jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   return { ...actual, useSettings: () => mockSettings };
 });
+
+const isBlockRow = (className: unknown) =>
+  typeof className === "string" && /^(mb-1$|mb-3 pb-3 border-b)/.test(className);
+const coversRange = (language: Language) => (language === "ar" ? "يشمل الآيات ٢:٣-٢:٤" : "Covers ayahs 2:3-2:4");
 
 function deferred() {
   let complete: ((value: QiraatResult) => void) | undefined;
@@ -62,7 +66,8 @@ describe.each(locales)("Qiraat content in $language at $width", ({ language, wid
   it.each([true, false])("preserves literal block rows with showHeader=%s", async (showHeader) => {
     jest.mocked(fetchQiraat).mockResolvedValue({ ...row, text: showHeader ? row.text : `قرئ: ${firstBody}` });
     const view = render(<QiraatTab surah={2} ayah={3} showHeader={showHeader} />);
-    expect(view.getByText(strings[language].loading)).toBeTruthy();
+    // The read is local, so no "Loading..." flashes before it settles.
+    expect(view.queryByText(strings[language].loading)).toBeNull();
     const first = await view.findByText(firstBody, { normalizer: (value) => value });
     const title = view.queryByText(heading);
     expect(Boolean(title)).toBe(showHeader);
@@ -80,19 +85,19 @@ describe.each(locales)("Qiraat content in $language at $width", ({ language, wid
       expect(flattenStyle(body.props.style)).toEqual({ writingDirection: "rtl", textAlign: "right" });
     }
     if (title) expect(title.props.className).toBe("text-lg text-primary-accent dark:text-primary-bright mb-1.5");
-    const header = view.queryByText(strings[language].qiraatHeader);
-    expect(Boolean(header)).toBe(showHeader);
-    expect(view.getByText(`${strings[language].qiraatCoversAyahs}: ٢:٣، ٢:٤`)).toBeTruthy();
+    // The source is a heading with showHeader, otherwise a muted footnote at the end of the panel.
+    expect(view.getByText(strings[language].qiraatHeader)).toBeTruthy();
+    expect(view.getByText(coversRange(language))).toBeTruthy();
     const tree = view.toJSON();
     if (!tree || Array.isArray(tree)) throw new Error("Expected original single Qiraat root");
     expect(tree.type).toBe("View");
     expect(tree.props.className).toBe("py-4 px-1");
-    const rows = tree.children?.filter((child) => typeof child !== "string" && child.props.className === "mb-4");
+    const rows = tree.children?.filter((child) => typeof child !== "string" && isBlockRow(child.props.className));
     expect(rows).toHaveLength(1);
     expect(rows?.map((child) => (typeof child === "string" ? null : child.children?.length))).toEqual([
       showHeader ? 2 : 1,
     ]);
-    expect(tree.children).toHaveLength(showHeader ? 3 : 2);
+    expect(tree.children).toHaveLength(3);
     expect(fetchQiraat).toHaveBeenCalledTimes(1);
     expect(fetchQiraat).toHaveBeenCalledWith(mockDatabase, 2, 3);
   });
@@ -101,7 +106,7 @@ describe.each(locales)("Qiraat content in $language at $width", ({ language, wid
     jest.mocked(fetchQiraat).mockResolvedValue(result);
     const view = render(<QiraatTab surah={2} ayah={3} />);
     const empty = await view.findByText(strings[language].noQiraatData);
-    expect(flattenStyle(empty.props.style)).toEqual({ writingDirection: "rtl" });
+    expect(flattenStyle(empty.props.style)).toEqual({ writingDirection: language === "ar" ? "rtl" : "ltr" });
     expect(view.queryByText(strings[language].qiraatHeader)).toBeNull();
     expect(view.queryByText(heading)).toBeNull();
   });
@@ -118,10 +123,10 @@ describe.each(locales)("Qiraat content in $language at $width", ({ language, wid
     expect(view.getAllByText(heading)).toHaveLength(1);
     const tree = view.toJSON();
     if (!tree || Array.isArray(tree)) throw new Error("Expected original Qiraat root");
-    const rows = tree.children?.filter((child) => typeof child !== "string" && child.props.className === "mb-4");
+    const rows = tree.children?.filter((child) => typeof child !== "string" && isBlockRow(child.props.className));
     expect(rows).toHaveLength(2);
     expect(rows?.map((child) => (typeof child === "string" ? null : child.children?.length))).toEqual([2, 1]);
-    expect(view.getByText(`${strings[language].qiraatCoversAyahs}: ٢:٣، ٢:٤`)).toBeTruthy();
+    expect(view.getByText(coversRange(language))).toBeTruthy();
   });
 
   it("ignores an old result after changing the selected ayah", async () => {
@@ -139,5 +144,49 @@ describe.each(locales)("Qiraat content in $language at $width", ({ language, wid
     expect(view.queryByText("محتوى قديم")).toBeNull();
     expect(view.getByText("محتوى جديد")).toBeTruthy();
     expect(fetchQiraat).toHaveBeenNthCalledWith(2, mockDatabase, 2, 4);
+  });
+});
+
+describe("Qiraat failure and covered ayahs", () => {
+  afterEach(() => {
+    cleanup();
+    jest.restoreAllMocks();
+  });
+
+  it("shows a failed read as an error with Retry, not as missing data", async () => {
+    mockSettings.uiLanguage = "en";
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest
+      .mocked(fetchQiraat)
+      .mockReset()
+      .mockRejectedValueOnce(new Error("synthetic read failure"))
+      .mockResolvedValueOnce({ text: "قرئ: محتوى بعد المحاولة", ayah_group: null });
+    const view = render(<QiraatTab surah={2} ayah={3} />);
+    expect(await view.findByText(strings.en.qiraatLoadFailed)).toBeTruthy();
+    expect(view.queryByText(strings.en.noQiraatData)).toBeNull();
+    fireEvent.press(view.getByText(strings.en.detailRetry));
+    expect(await view.findByText("محتوى بعد المحاولة")).toBeTruthy();
+  });
+
+  it("lists separated ayahs with the interface's digits and separator", () => {
+    const labels = { list: "Covers ayahs", range: "Covers ayahs {{from}}-{{to}}" };
+    const group = [
+      { surah: 2, ayah: 5 },
+      { surah: 2, ayah: 9 },
+    ];
+    expect(formatQiraatCovers(group, false, labels)).toBe("Covers ayahs: 2:5, 2:9");
+    expect(formatQiraatCovers(group, true, { list: "يشمل الآيات", range: "" })).toBe("يشمل الآيات: ٢:٥، ٢:٩");
+    expect(
+      formatQiraatCovers(
+        [
+          { surah: 2, ayah: 5 },
+          { surah: 2, ayah: 6 },
+          { surah: 2, ayah: 7 },
+        ],
+        false,
+        labels,
+      ),
+    ).toBe("Covers ayahs 2:5-2:7");
+    expect(formatQiraatCovers([{ surah: 2, ayah: 5 }], false, labels)).toBeNull();
   });
 });
