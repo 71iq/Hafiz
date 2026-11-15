@@ -1585,10 +1585,10 @@
         },
         {
           "id": "settings.account",
-          "title": "Account: profile, logout, login/signup",
+          "title": "Account: profile, sync status, logout, login/signup",
           "kind": "widget",
           "cases": ["SET-11"],
-          "uses": ["shared.confirm", "profile.own", "auth.login"],
+          "uses": ["shared.confirm", "profile.own", "auth.login", "shell.sync"],
           "native": false,
           "children": []
         },
@@ -1622,7 +1622,7 @@
       "children": [
         {
           "id": "public.zayt",
-          "title": "/zayt-preview",
+          "title": "/dev/zayt mascot preview (development builds only)",
           "kind": "screen",
           "cases": ["PUBLIC-04"],
           "uses": [],
