@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, Platform } from "react-native";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
-import { useWordInteraction, type TooltipPosition } from "@/lib/word/context";
+import { useWordInteraction, type TooltipPosition, type WordRef } from "@/lib/word/context";
 import { fetchWordTranslation, fetchWordMeaningAr } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { textStartStyle } from "@/lib/ui/direction";
+import { inverseSurfaceColors } from "@/lib/ui/inverse-surface";
 
 const TOOLTIP_HEIGHT = 36;
 const ARROW_SIZE = 6;
@@ -16,6 +17,14 @@ const MAX_TOOLTIP_WIDTH = 320;
 const DISMISS_DRAG_DISTANCE = 8;
 const WORD_TOKEN_SELECTOR = "[data-hafiz-quran-token='word']";
 const TOOLTIP_SELECTOR = "[data-hafiz-word-tooltip='true']";
+
+/** The rendered word token, so focus can return to it after the gloss or detail sheet closes. */
+function wordElement(word: Pick<WordRef, "surah" | "ayah" | "wordPos">): HTMLElement | null {
+  if (Platform.OS !== "web" || typeof document === "undefined") return null;
+  return document.querySelector<HTMLElement>(
+    `[data-hafiz-quran-token="word"][data-hafiz-surah="${word.surah}"][data-hafiz-ayah="${word.ayah}"][data-hafiz-word-pos="${word.wordPos}"]`,
+  );
+}
 
 function closestMatches(target: EventTarget | null, selector: string) {
   if (!target || typeof Element === "undefined" || !(target instanceof Element)) {
@@ -28,6 +37,8 @@ function TooltipPopup({
   position,
   translation,
   isRTL,
+  isDark,
+  openLabel,
   onPress,
   onHoverIn,
   onHoverOut,
@@ -35,12 +46,16 @@ function TooltipPopup({
   position: TooltipPosition;
   translation: string | null;
   isRTL: boolean;
+  isDark: boolean;
+  openLabel: string;
   onPress: () => void;
   onHoverIn?: () => void;
   onHoverOut?: () => void;
 }) {
   const [tooltipWidth, setTooltipWidth] = useState(0);
+  const [tooltipHeight, setTooltipHeight] = useState(TOOLTIP_HEIGHT);
   const TooltipChevron = isRTL ? ChevronLeft : ChevronRight;
+  const colors = inverseSurfaceColors(isDark);
 
   const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 400;
   const maxTooltipWidth = Math.min(MAX_TOOLTIP_WIDTH, viewportWidth - SIDE_MARGIN * 2);
@@ -50,11 +65,14 @@ function TooltipPopup({
     tooltipWidth > 0
       ? Math.max(SIDE_MARGIN, Math.min(centerX - tooltipWidth / 2, viewportWidth - tooltipWidth - SIDE_MARGIN))
       : centerX;
-  const top = position.y - TOOLTIP_HEIGHT - ARROW_SIZE - GAP;
+  // A two-line meaning makes the pill taller; it still ends just above the word.
+  const top = position.y - tooltipHeight - ARROW_SIZE - GAP;
 
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={translation ? `${translation}. ${openLabel}` : openLabel}
       {...(Platform.OS === "web" ? ({ dataSet: { hafizWordTooltip: "true" } } as any) : null)}
       // @ts-ignore — position:'fixed' is valid CSS/RN-Web but not in RN types
       style={{
@@ -67,14 +85,17 @@ function TooltipPopup({
         cursor: "pointer",
         maxWidth: maxTooltipWidth,
       }}
-      onLayout={(e) => setTooltipWidth(e.nativeEvent.layout.width)}
+      onLayout={(e) => {
+        setTooltipWidth(e.nativeEvent.layout.width);
+        setTooltipHeight(Math.max(TOOLTIP_HEIGHT, e.nativeEvent.layout.height - ARROW_SIZE));
+      }}
       {...(onHoverIn && { onHoverIn })}
       {...(onHoverOut && { onHoverOut })}
     >
       <View
         style={{
-          backgroundColor: "#003638", // primary deep teal
-          borderRadius: 20, // pill shape
+          backgroundColor: colors.background,
+          borderRadius: 18,
           paddingHorizontal: 14,
           paddingVertical: 8,
           direction: "ltr",
@@ -83,7 +104,7 @@ function TooltipPopup({
           gap: 5,
           maxWidth: maxTooltipWidth,
           // Ambient teal-tinted shadow
-          shadowColor: "#003638",
+          shadowColor: "#000",
           shadowOpacity: 0.04,
           shadowRadius: 32,
           shadowOffset: { width: 0, height: 4 },
@@ -92,22 +113,21 @@ function TooltipPopup({
       >
         <Text
           style={{
-            color: "#fff",
+            color: colors.text,
             fontSize: 13,
+            lineHeight: 18,
             fontFamily: "Manrope_500Medium",
             maxWidth: maxTextWidth,
-            overflow: "hidden",
-            // @ts-ignore — whiteSpace is valid CSS on web
-            whiteSpace: "nowrap",
+            flexShrink: 1,
             ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
-          numberOfLines={1}
+          numberOfLines={2}
           ellipsizeMode="tail"
         >
           {translation ?? "…"}
         </Text>
-        <TooltipChevron size={12} color="rgba(255,255,255,0.6)" />
+        <TooltipChevron size={12} color={colors.muted} />
       </View>
       {/* Down-pointing caret */}
       <View
@@ -120,7 +140,7 @@ function TooltipPopup({
           borderTopWidth: ARROW_SIZE,
           borderLeftColor: "transparent",
           borderRightColor: "transparent",
-          borderTopColor: "#003638",
+          borderTopColor: colors.background,
         }}
       />
     </Pressable>
@@ -131,7 +151,7 @@ export function FloatingWordTooltip() {
   const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltip, clearTooltipDelayed } =
     useWordInteraction();
   const db = useDatabase();
-  const { isRTL, uiLanguage } = useSettings();
+  const { isRTL, isDark, uiLanguage } = useSettings();
   const s = useStrings();
   const [translation, setTranslation] = useState<string | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -151,9 +171,34 @@ export function FloatingWordTooltip() {
         })
         .catch(() => setTranslation(s.noWordMeaningFallback));
     } else {
-      fetchWordTranslation(db, surah, ayah, wordPos).then((row) => setTranslation(row?.translation_en ?? "—"));
+      fetchWordTranslation(db, surah, ayah, wordPos)
+        .then((row) => setTranslation(row?.translation_en?.trim() ? row.translation_en : s.readerNoWordTranslation))
+        .catch(() => setTranslation(s.readerNoWordTranslation));
     }
-  }, [db, s.noWordMeaningFallback, tooltipWord?.surah, tooltipWord?.ayah, tooltipWord?.wordPos, uiLanguage]);
+  }, [
+    db,
+    s.noWordMeaningFallback,
+    s.readerNoWordTranslation,
+    tooltipWord?.surah,
+    tooltipWord?.ayah,
+    tooltipWord?.wordPos,
+    uiLanguage,
+  ]);
+
+  // Escape closes the gloss (the topmost reader surface) and returns focus to its word.
+  useEffect(() => {
+    if (!tooltipWord || Platform.OS !== "web" || typeof window === "undefined") return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const word = tooltipWord;
+      clearTooltip();
+      requestAnimationFrame(() => wordElement(word)?.focus?.());
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [clearTooltip, tooltipWord]);
 
   useEffect(() => {
     if (!tooltipWord || Platform.OS !== "web" || typeof document === "undefined") return;
@@ -218,7 +263,13 @@ export function FloatingWordTooltip() {
       position={tooltipPosition}
       translation={translation}
       isRTL={isRTL}
-      onPress={() => openDetail(tooltipWord)}
+      isDark={isDark}
+      openLabel={s.wordTooltipOpenDetail}
+      onPress={() => {
+        // Focus moves to the word first, so the detail sheet restores focus to it when it closes.
+        wordElement(tooltipWord)?.focus?.();
+        openDetail(tooltipWord);
+      }}
       onHoverIn={cancelTooltipClear}
       onHoverOut={clearTooltipDelayed}
     />,

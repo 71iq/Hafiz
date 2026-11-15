@@ -30,6 +30,7 @@ import {
   mushafLineWidthScale,
   pageWordLineNumbers,
   splitGlyphs,
+  type AyahMarkerLabels,
   type HifzVisibility,
   type PageLineLayout,
   type PageWordsData,
@@ -45,8 +46,10 @@ import {
   getRenderedLineCount,
   buildLayoutOffsets,
 } from "@/lib/mushaf/page-layout";
-import { findJuzRangeForAyah } from "@/lib/mushaf/position";
+import { estimateAyahLineFraction, findJuzRangeForAyah } from "@/lib/mushaf/position";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
+import { QuranLoadError } from "./QuranLoadError";
 import { JuzNameText } from "./JuzNameText";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -122,15 +125,6 @@ type WebDragState = {
   lastTime: number;
   vx: number;
 };
-
-const QURAN_SELECTION_TARGET_SELECTOR = "[data-hafiz-quran-token]";
-
-function isQuranSelectionTarget(target: EventTarget | null | undefined): boolean {
-  if (Platform.OS !== "web" || typeof Element === "undefined" || !(target instanceof Element)) {
-    return false;
-  }
-  return Boolean(target.closest(QURAN_SELECTION_TARGET_SELECTOR));
-}
 
 function hasActiveBrowserSelection(): boolean {
   if (Platform.OS !== "web" || typeof window === "undefined") return false;
@@ -215,6 +209,14 @@ type Props = {
   onAutoScrollUserPause?: () => void;
   onAutoScrollEnd?: () => void;
   hifzVisibility?: HifzVisibility | null;
+  /** Changes with every arrival, so a repeated jump to the same ayah is placed and announced again. */
+  arrivalId?: number;
+  /** Filled with a reader for the ayah at the top of the viewport (the view-switch anchor). */
+  topAyahRef?: React.MutableRefObject<(() => { surah: number; ayah: number } | null) | null>;
+  /** Arrow-key paging is off while an overlay or menu owns the keyboard. */
+  keyboardPagingEnabled?: boolean;
+  /** Reports the reader's own keyboard page turn, which counts as deliberate movement. */
+  onUserNavigate?: () => void;
 };
 
 // Fixed heights for getItemLayout calculation
@@ -230,6 +232,10 @@ const HORIZONTAL_FLICK_MIN_DISTANCE = 12;
 const HORIZONTAL_FLICK_VELOCITY = 0.26;
 const HORIZONTAL_EASING = Easing.out(Easing.cubic);
 const FOCUS_BASE_SECONDS_PER_PAGE = 90;
+const PAGE_PILL_MS = 1500;
+const PAGE_PILL_FADE_MS = 150;
+/** Arrivals place the target this far down the viewport, matching verse view. */
+const ARRIVAL_VIEWPORT_FRACTION = 0.25;
 
 function PageSeparator({
   page,
@@ -335,10 +341,19 @@ export function PageMushaf({
   onAutoScrollUserPause,
   onAutoScrollEnd,
   hifzVisibility = null,
+  arrivalId = 0,
+  topAyahRef,
+  keyboardPagingEnabled = true,
+  onUserNavigate,
 }: Props) {
+  const reduceMotion = useReducedMotionPreference();
   const db = useDatabase();
   const { fontSize, fontSizeIndex, lineHeight, pageScroll, isRTL, uiLanguage, quranRenderFontStyle: quranFontStyle } = useSettings();
   const s = useStrings();
+  const markerLabels = useMemo<AyahMarkerLabels>(
+    () => ({ label: s.ayahMarkerLabel, openDetails: s.ayahMarkerOpenDetails, select: s.ayahMarkerSelect }),
+    [s.ayahMarkerLabel, s.ayahMarkerOpenDetails, s.ayahMarkerSelect],
+  );
   const { width, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
@@ -385,6 +400,8 @@ export function PageMushaf({
   const [juzRangeRows, setJuzRangeRows] = useState<JuzRangeRow[]>([]);
   const [pageMetaMap, setPageMetaMap] = useState<Map<number, { surahNumber: number | null; surahName: string | null; juz: number | null }>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const initialPage = clampPage(requestedPage);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [detailAyah, setDetailAyah] = useState<{ surah: number; ayah: number } | null>(null);
@@ -414,6 +431,7 @@ export function PageMushaf({
   const autoScrollEndedRef = useRef(false);
   const [webDragging, setWebDragging] = useState(false);
   const [showPageIndicator, setShowPageIndicator] = useState(false);
+  const pageIndicatorOpacity = useRef(new RNAnimated.Value(0)).current;
   const currentPageLabel = isRTL ? toArabicNumber(currentPage) : String(currentPage);
   const totalPageLabel = isRTL ? toArabicNumber(604) : "604";
   const verticalAutoScrollEnabled = autoScrollActive && !horizontal;
@@ -514,13 +532,15 @@ export function PageMushaf({
         setLayoutInfo(buildLayoutOffsets(data, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom, verticalLineHeightMultiplier));
       } catch (err) {
         console.error("[PageMushaf] Failed to load data:", err);
+        setLoadFailed(true);
       } finally {
         setLoading(false);
       }
     }
 
+    setLoadFailed(false);
     loadData();
-  }, [db]);
+  }, [db, loadAttempt]);
 
   useEffect(() => {
     if (pageRows.length === 0 || surahMap.size === 0) return;
@@ -604,24 +624,50 @@ export function PageMushaf({
     [onPageChange, pageData.length]
   );
 
+  // The page pill shows for 1500 ms after a page change, and on every arrival in swipe view so a jump
+  // is noticed even onto a similar-looking page. It fades over 150 ms, instantly with reduced motion.
+  const flashPageIndicator = useCallback(() => {
+    if (pageIndicatorTimerRef.current) clearTimeout(pageIndicatorTimerRef.current);
+    setShowPageIndicator(true);
+    if (reduceMotion) pageIndicatorOpacity.setValue(1);
+    else RNAnimated.timing(pageIndicatorOpacity, { toValue: 1, duration: PAGE_PILL_FADE_MS, useNativeDriver: true }).start();
+    pageIndicatorTimerRef.current = setTimeout(() => {
+      pageIndicatorTimerRef.current = null;
+      if (reduceMotion) {
+        pageIndicatorOpacity.setValue(0);
+        setShowPageIndicator(false);
+        return;
+      }
+      RNAnimated.timing(pageIndicatorOpacity, { toValue: 0, duration: PAGE_PILL_FADE_MS, useNativeDriver: true }).start(
+        ({ finished }) => {
+          if (finished) setShowPageIndicator(false);
+        },
+      );
+    }, PAGE_PILL_MS);
+  }, [pageIndicatorOpacity, reduceMotion]);
+
   useEffect(() => {
     if (!pageIndicatorMountedRef.current) {
       pageIndicatorMountedRef.current = true;
       return;
     }
-    if (pageIndicatorTimerRef.current) clearTimeout(pageIndicatorTimerRef.current);
-    setShowPageIndicator(true);
-    pageIndicatorTimerRef.current = setTimeout(() => {
-      setShowPageIndicator(false);
-      pageIndicatorTimerRef.current = null;
-    }, 900);
-    return () => {
-      if (pageIndicatorTimerRef.current) {
-        clearTimeout(pageIndicatorTimerRef.current);
-        pageIndicatorTimerRef.current = null;
-      }
-    };
+    flashPageIndicator();
+    // Only a page change shows the pill here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
+
+  useEffect(() => {
+    if (horizontal && arrivalId > 0 && highlightedAyahKey) flashPageIndicator();
+    // Each arrival shows the pill once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrivalId]);
+
+  useEffect(
+    () => () => {
+      if (pageIndicatorTimerRef.current) clearTimeout(pageIndicatorTimerRef.current);
+    },
+    [],
+  );
 
   const jumpToPage = useCallback(
     (page: number, animated = false) => {
@@ -666,9 +712,9 @@ export function PageMushaf({
     }
   }, [jumpToPage, pageData.length, requestedPage]);
 
-  // A jump lands on the page's top, but at larger font sizes a page is taller than the screen and a
-  // target ayah lower on it (2:255 on page 42) stayed out of view. Bring the highlighted ayah near the
-  // top, estimating its height on the page from the glyphs before it.
+  // An arrival places its target ayah (or, for a surah's first ayah, the surah header) about 25% from
+  // the top of the viewport, as verse view does, instead of leaving the page top in view. The
+  // position on the page comes from the page's line layout.
   useEffect(() => {
     if (horizontal || !highlightedAyahKey || !layoutInfo || pageData.length === 0) return;
     const index = pageData.findIndex((item) =>
@@ -678,15 +724,22 @@ export function PageMushaf({
     const pageStart = layoutInfo.offsets[index];
     const pageHeight = layoutInfo.heights[index];
     if (typeof pageStart !== "number" || typeof pageHeight !== "number") return;
-    if (pageHeight <= effectiveContainerHeight) return;
-    const glyphCounts = pageData[index].ayahs.map((ayah) => ayah.textQcf2.split(/\s+/).filter(Boolean).length);
-    const total = glyphCounts.reduce((sum, count) => sum + count, 0);
-    const targetIndex = pageData[index].ayahs.findIndex((ayah) => `${ayah.surah}:${ayah.ayah}` === highlightedAyahKey);
-    const before = glyphCounts.slice(0, targetIndex).reduce((sum, count) => sum + count, 0);
-    if (total <= 0 || before <= 0) return;
+    const [targetSurah, targetAyah] = highlightedAyahKey.split(":").map(Number);
+    const fraction = estimateAyahLineFraction(
+      pageData[index].ayahs.map((ayah) => ({
+        surah: ayah.surah,
+        ayah: ayah.ayah,
+        glyphCount: ayah.textQcf2.split(/\s+/).filter(Boolean).length,
+      })),
+      { surah: targetSurah, ayah: targetAyah },
+      pageData[index].lineLayout,
+      pageData[index].globalWordOffset,
+    );
+    if (fraction === null) return;
     const contentHeight = pageHeight - pagePaddingTop - pagePaddingBottom - SEPARATOR_HEIGHT;
-    const targetY = pageStart + pagePaddingTop + (before / total) * contentHeight;
-    const offset = Math.max(pageStart, targetY - effectiveContainerHeight * 0.25);
+    const targetY = pageStart + pagePaddingTop + fraction * contentHeight;
+    const offset = Math.max(pageStart, targetY - effectiveContainerHeight * ARRIVAL_VIEWPORT_FRACTION);
+    if (Math.abs(offset - pageStart) < 2 && fraction === 0) return;
     // On a cold start the list is still applying its initial page, so the offset stays pending and is
     // retried until a scroll event confirms it, as for a font size change.
     const frame = requestAnimationFrame(() => {
@@ -701,9 +754,39 @@ export function PageMushaf({
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };
-    // Only a new target scrolls; later layout or size changes keep the reader's own position.
+    // Only a new arrival scrolls; later layout or size changes keep the reader's own position.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightedAyahKey, horizontal, pageData.length > 0, layoutInfo !== null]);
+  }, [highlightedAyahKey, arrivalId, horizontal, pageData.length > 0, layoutInfo !== null]);
+
+  // The view-switch anchor: the ayah at the top of the viewport in vertical view, or the page's first
+  // ayah in swipe view.
+  useEffect(() => {
+    if (!topAyahRef) return;
+    topAyahRef.current = () => {
+      const pageIndex = currentPageRef.current - 1;
+      const page = pageData[pageIndex];
+      if (!page || page.ayahs.length === 0) return null;
+      const first = { surah: page.ayahs[0].surah, ayah: page.ayahs[0].ayah };
+      if (horizontal || !layoutInfo) return first;
+      const pageStart = layoutInfo.offsets[pageIndex];
+      const pageHeight = layoutInfo.heights[pageIndex];
+      if (typeof pageStart !== "number" || typeof pageHeight !== "number" || pageHeight <= 0) return first;
+      const contentHeight = Math.max(1, pageHeight - pagePaddingTop - pagePaddingBottom - SEPARATOR_HEIGHT);
+      const fraction = (verticalOffsetRef.current - pageStart - pagePaddingTop) / contentHeight;
+      if (fraction <= 0) return first;
+      const glyphs = page.ayahs.map((ayah) => ayah.textQcf2.split(/\s+/).filter(Boolean).length);
+      const total = glyphs.reduce((sum, count) => sum + count, 0);
+      let seen = 0;
+      for (let i = 0; i < page.ayahs.length; i += 1) {
+        seen += glyphs[i];
+        if (total > 0 && seen / total > fraction) return { surah: page.ayahs[i].surah, ayah: page.ayahs[i].ayah };
+      }
+      return { surah: page.ayahs[page.ayahs.length - 1].surah, ayah: page.ayahs[page.ayahs.length - 1].ayah };
+    };
+    return () => {
+      topAyahRef.current = null;
+    };
+  }, [horizontal, layoutInfo, pageData, pagePaddingBottom, pagePaddingTop, topAyahRef]);
 
   // Neighbouring page fonts load ahead in both modes, so a page scrolled into view is not a spinner.
   useEffect(() => {
@@ -717,12 +800,14 @@ export function PageMushaf({
   }, [currentPage, pageData.length, quranFontStyle]);
 
   useEffect(() => {
-    if (Platform.OS !== "web") return;
+    if (Platform.OS !== "web" || !keyboardPagingEnabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) return;
+      if (typeof document !== "undefined" && document.querySelector('[aria-modal="true"]')) return;
 
       const current = currentPageRef.current;
       let next: number | null = null;
@@ -733,12 +818,13 @@ export function PageMushaf({
 
       event.preventDefault();
       pauseAutoScrollForUser();
+      onUserNavigate?.();
       jumpToPage(Math.max(1, Math.min(pageData.length, next)), true);
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [horizontal, jumpToPage, pageData.length, pauseAutoScrollForUser]);
+  }, [horizontal, jumpToPage, keyboardPagingEnabled, onUserNavigate, pageData.length, pauseAutoScrollForUser]);
 
   const handleScrollToIndexFailed = useCallback(
     ({ index }: { index: number }) => {
@@ -830,6 +916,15 @@ export function PageMushaf({
         resetHorizontalDrag();
         return;
       }
+      // Reduced motion swaps the page instantly instead of sliding it across.
+      if (reduceMotion) {
+        dragX.stopAnimation();
+        horizontalDragOffsetRef.current = 0;
+        dragX.setValue(0);
+        horizontalAnimatingRef.current = false;
+        updateCurrentPage(nextPage);
+        return;
+      }
       horizontalAnimatingRef.current = true;
       const targetX = direction === 1 ? pageWidth : -pageWidth;
       const remainingDistance = Math.abs(targetX - horizontalDragOffsetRef.current);
@@ -856,7 +951,7 @@ export function PageMushaf({
         });
       });
     },
-    [dragX, pageData.length, pageWidth, resetHorizontalDrag, updateCurrentPage]
+    [dragX, pageData.length, pageWidth, reduceMotion, resetHorizontalDrag, updateCurrentPage]
   );
 
   const finishHorizontalGesture = useCallback(
@@ -937,7 +1032,7 @@ export function PageMushaf({
   );
 
   const handleHorizontalPointerDown = useCallback(
-    (event: { target?: EventTarget | null; nativeEvent?: { button?: number; clientX?: number; clientY?: number; pointerType?: string; target?: EventTarget | null } }) => {
+    (event: { nativeEvent?: { button?: number; clientX?: number; clientY?: number; pointerType?: string } }) => {
       const nativeEvent = event.nativeEvent;
       if (
         Platform.OS !== "web" ||
@@ -948,8 +1043,9 @@ export function PageMushaf({
         return;
       }
       const pointerType = nativeEvent.pointerType;
-      const target = event.target ?? nativeEvent.target;
-      if (hasActiveBrowserSelection() || (pointerType === "mouse" && isQuranSelectionTarget(target))) {
+      // Mouse drags select text on web; only touch and pen drags turn pages. Wheel, keyboard and
+      // the edge buttons still page with a mouse.
+      if (pointerType === "mouse" || hasActiveBrowserSelection()) {
         return;
       }
       const x = nativeEvent.clientX ?? 0;
@@ -1250,6 +1346,7 @@ export function PageMushaf({
             lineSlotHeight={verticalLineSlotHeight}
             allowLineWrap={verticalAllowsLineWrap}
             hifzVisibility={hifzVisibility}
+            markerLabels={markerLabels}
           />
           {index < pageData.length - 1 && (
             <PageSeparator
@@ -1285,6 +1382,7 @@ export function PageMushaf({
       verticalLineSlotHeight,
       hifzVisibility,
       verticalAllowsLineWrap,
+      markerLabels,
     ]
   );
 
@@ -1311,6 +1409,17 @@ export function PageMushaf({
         onWheel: handleHorizontalWheel,
       } as Record<string, unknown>)
     : horizontalPanResponder.panHandlers;
+
+  if (!loading && loadFailed && pageData.length === 0) {
+    return (
+      <QuranLoadError
+        onRetry={() => {
+          setLoading(true);
+          setLoadAttempt((attempt) => attempt + 1);
+        }}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -1377,6 +1486,7 @@ export function PageMushaf({
                     allowLineWrap={false}
                     showLoadingIndicator={false}
                     hifzVisibility={hifzVisibility}
+                    markerLabels={markerLabels}
                   />
                 </View>
               </View>
@@ -1414,13 +1524,17 @@ export function PageMushaf({
       <AyahDetailModal target={detailAyah} onClose={() => setDetailAyah(null)} initialTab={detailTab} />
 
       {showPageIndicator && (
-        <View className="absolute bottom-3 left-0 right-0 items-center pointer-events-none">
+        <RNAnimated.View
+          pointerEvents="none"
+          className="absolute bottom-3 left-0 right-0 items-center"
+          style={{ opacity: pageIndicatorOpacity }}
+        >
           <View className="bg-warm-800/80 dark:bg-neutral-800/90 rounded-full px-4 py-1.5">
-            <Text className="text-white text-xs font-semibold">
+            <Text accessibilityLiveRegion="polite" className="text-white text-xs font-semibold">
               {interpolate(s.pageXOfY, { page: currentPageLabel, total: totalPageLabel })}
             </Text>
           </View>
-        </View>
+        </RNAnimated.View>
       )}
     </View>
   );
