@@ -1,52 +1,45 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
-import { Check } from "lucide-react-native";
+import { Check, Search } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DiscardChangesDialog, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
 import { ReviewSettingInfoSheet } from "@/components/flashcards/ReviewSettingInfoSheet";
+import { InlineMessage, LoadErrorRow, SchedulerOptionsPanel } from "@/components/flashcards/DeckReviewSettingsSheet";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
-import { normalizeDateDigits } from "@/lib/date";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
+import { formatAyahs, formatNumber } from "@/lib/i18n/count";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { SchedulerOptionsPanel } from "@/components/flashcards/DeckReviewSettingsSheet";
+import { matchesSurahQuery, surahTransliteration } from "@/lib/search/surah-match";
 import {
-  clampDailyReviewLimit,
-  clampNewCardsLimit,
-  clampRequestRetention,
-  clampMaximumInterval,
-} from "@/lib/fsrs/review-settings-draft";
-import { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
+  formatAyahSpan,
+  juzScopeRanges,
+  summarizeScopeRanges,
+  validateRangeText,
+  type JuzMapRow,
+  type RangeText,
+  type ScopeRange,
+  type ScopeSurah,
+} from "@/lib/fsrs/deck-scope";
 import {
-  DEFAULT_DECK_ENABLE_FUZZ,
-  DEFAULT_DECK_ENABLE_SHORT_TERM,
-  DEFAULT_DECK_DAILY_REVIEW_LIMIT,
-  DEFAULT_DECK_LEARNING_STEPS,
-  DEFAULT_DECK_MAXIMUM_INTERVAL,
-  DEFAULT_DECK_NEW_CARD_LIMIT,
-  DEFAULT_DECK_RELEARNING_STEPS,
-  DEFAULT_DECK_REQUEST_RETENTION,
-  DEFAULT_ENABLED_MODES,
-  DEFAULT_NEW_CARD_SORT_ORDER,
-  DEFAULT_NEW_REVIEW_ORDER,
-  DEFAULT_REVIEW_SORT_ORDER,
-  DEFAULT_WORD_TEST_MODES,
-  type DeckReviewSettings,
-  type NewCardSortOrder,
-  type NewReviewOrder,
-  type ReviewSortOrder,
-  type SurahAyahRange,
-} from "@/lib/fsrs/types";
-import { readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
+  applySchedulerDraftPatch,
+  isSchedulerDraftChanged,
+  schedulerDraftFromSettings,
+  schedulerFieldsFromDraft,
+  type SchedulerDraft,
+} from "@/lib/fsrs/scheduler-draft";
+import type { DeckReviewSettings } from "@/lib/fsrs/types";
+import { putDeckReviewSettings, readDeckReviewSettings } from "@/lib/fsrs/queries";
 import {
   materializeSmartDeckCards,
+  putSmartDeckFilter,
   readSmartDeckFilter,
   SMART_DECK_IDS,
   type BuiltInDeckFilter,
   type SmartDeckId,
-  writeSmartDeckFilter,
 } from "@/lib/fsrs/smart-decks";
 import { textStartStyle, textEndStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
@@ -54,83 +47,91 @@ type Props = {
   visible: boolean;
   deckId: SmartDeckId | null;
   onClose: () => void;
-  onSaved: () => void;
+  /** Called after an explicit, committed save with the notice that names the deck. */
+  onSaved: (notice: string) => void;
 };
 
 type FilterType = BuiltInDeckFilter["type"];
 type SettingInfo = { title: string; body: string };
-type SurahRow = { number: number; name_arabic: string; name_english: string; ayah_count: number };
-type RangeInputValue = { from: string; to: string };
+type Language = "en" | "ar";
+type Baseline = { filter: BuiltInDeckFilter; settings: DeckReviewSettings };
+
+const JUZ_NUMBERS = Array.from({ length: 30 }, (_, i) => i + 1);
+
+/** The surah name a summary or row title shows: Arabic in Arabic, the transliteration in English. */
+function scopeName(surah: ScopeSurah, language: Language): string {
+  return language === "ar" ? surah.name_arabic : (surahTransliteration(surah.number) ?? surah.name_english);
+}
+
+/** Two filters select the same cards when their sorted numbers and partial ranges match. */
+function filterKey(filter: BuiltInDeckFilter): string {
+  if (filter.type === "juz") return `juz:${[...filter.juzNumbers].sort((a, b) => a - b).join(",")}`;
+  if (filter.type === "surah") {
+    const ranges = [...(filter.ranges ?? [])]
+      .sort((a, b) => a.surah - b.surah)
+      .map((range) => `${range.surah}:${range.ayahStart}-${range.ayahEnd}`);
+    return `surah:${[...filter.surahs].sort((a, b) => a - b).join(",")}|${ranges.join(",")}`;
+  }
+  return "all";
+}
 
 export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Props) {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL } = useSettings();
+  const language: Language = isRTL ? "ar" : "en";
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const compact = width >= SIDEBAR_BREAKPOINT;
+  const [baseline, setBaseline] = useState<Baseline | null>(null);
+  const [draft, setDraft] = useState<SchedulerDraft | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
-  const [selectedSurahRanges, setSelectedSurahRanges] = useState<Record<number, RangeInputValue>>({});
-  const [surahs, setSurahs] = useState<SurahRow[]>([]);
-  const [dailyLimit, setDailyLimit] = useState(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
-  const [newCardsLimit, setNewCardsLimit] = useState(DEFAULT_DECK_NEW_CARD_LIMIT);
-  const [requestRetention, setRequestRetention] = useState(DEFAULT_DECK_REQUEST_RETENTION);
-  const [maximumInterval, setMaximumInterval] = useState(DEFAULT_DECK_MAXIMUM_INTERVAL);
-  const [enableFuzz, setEnableFuzz] = useState(DEFAULT_DECK_ENABLE_FUZZ);
-  const [enableShortTerm, setEnableShortTerm] = useState(DEFAULT_DECK_ENABLE_SHORT_TERM);
-  const [learningStepsText, setLearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_LEARNING_STEPS, isRTL));
-  const [relearningStepsText, setRelearningStepsText] = useState(() =>
-    formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL),
-  );
-  const [newReviewOrder, setNewReviewOrder] = useState<NewReviewOrder>(DEFAULT_NEW_REVIEW_ORDER);
-  const [reviewSortOrder, setReviewSortOrder] = useState<ReviewSortOrder>(DEFAULT_REVIEW_SORT_ORDER);
-  const [newCardSortOrder, setNewCardSortOrder] = useState<NewCardSortOrder>(DEFAULT_NEW_CARD_SORT_ORDER);
-  const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
+  const [selectedSurahRanges, setSelectedSurahRanges] = useState<Record<number, RangeText>>({});
+  const [surahs, setSurahs] = useState<ScopeSurah[]>([]);
+  const [juzMap, setJuzMap] = useState<JuzMapRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeInfo, setActiveInfo] = useState<SettingInfo | null>(null);
   const [surahSelectorOpen, setSurahSelectorOpen] = useState(false);
-  const [rangeTarget, setRangeTarget] = useState<SurahRow | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [rangeTarget, setRangeTarget] = useState<ScopeSurah | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     if (!visible || !deckId) return;
     let cancelled = false;
+    setLoadError(null);
+    setSaveError(null);
     Promise.all([
-      db.getAllAsync<SurahRow>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number"),
+      db.getAllAsync<ScopeSurah>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number"),
+      db.getAllAsync<JuzMapRow>("SELECT juz, surah, ayah_start, ayah_end FROM juz_map ORDER BY juz, surah, ayah_start"),
       readSmartDeckFilter(db, deckId),
       readDeckReviewSettings(db, deckId),
     ])
-      .then(([rows, filter, settings]) => {
+      .then(([rows, juzRows, filter, settings]) => {
         if (cancelled) return;
-        setError(null);
         setSurahs(rows);
+        setJuzMap(juzRows);
         setFilterType(filter.type);
         setSelectedSurahs(new Set(filter.type === "surah" ? filter.surahs : []));
         setSelectedJuz(new Set(filter.type === "juz" ? filter.juzNumbers : []));
         setSelectedSurahRanges(filter.type === "surah" ? initialRangeState(rows, filter.surahs, filter.ranges) : {});
-        setDailyLimit(settings.dailyReviewLimit);
-        setNewCardsLimit(settings.newCardsLimit);
-        setRequestRetention(settings.requestRetention);
-        setMaximumInterval(settings.maximumInterval);
-        setEnableFuzz(settings.enableFuzz);
-        setEnableShortTerm(settings.enableShortTerm);
-        setLearningStepsText(formatStepText(settings.learningSteps, isRTL));
-        setRelearningStepsText(formatStepText(settings.relearningSteps, isRTL));
-        setNewReviewOrder(settings.newReviewOrder);
-        setReviewSortOrder(settings.reviewSortOrder);
-        setNewCardSortOrder(settings.newCardSortOrder);
-        setReviewSettings(settings);
+        setDraft(schedulerDraftFromSettings(settings, isRTL));
+        setBaseline({ filter, settings });
       })
       .catch((e) => {
         console.warn("[SmartDeckFilterSheet] Failed to load filter:", e);
-        if (!cancelled) setError(s.genericActionFailed);
+        if (cancelled) return;
+        setBaseline(null);
+        setDraft(null);
+        setLoadError(s.genericActionFailed);
       });
     return () => {
       cancelled = true;
     };
-  }, [db, visible, deckId, isRTL]);
+  }, [db, visible, deckId, isRTL, loadAttempt]);
 
   useEffect(() => {
     if (!visible) {
@@ -140,48 +141,108 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     }
   }, [visible]);
 
-  const openSettingInfo = useCallback((title: string, body: string) => {
-    setActiveInfo({ title, body });
+  const surahByNumber = useMemo(() => new Map(surahs.map((row) => [row.number, row])), [surahs]);
+  const sortedSelection = useMemo(() => [...selectedSurahs].sort((a, b) => a - b), [selectedSurahs]);
+
+  /** Selected surahs whose typed range is not valid, in Quran order. */
+  const invalidSurahs = useMemo(
+    () =>
+      sortedSelection.filter((number) => {
+        const surah = surahByNumber.get(number);
+        if (!surah) return true;
+        const range = selectedSurahRanges[number] ?? { from: "1", to: String(surah.ayah_count) };
+        return !validateRangeText(range, surah.ayah_count).ok;
+      }),
+    [selectedSurahRanges, sortedSelection, surahByNumber],
+  );
+
+  /** The exact ranges a valid surah selection covers. */
+  const surahRanges = useMemo<ScopeRange[]>(
+    () =>
+      sortedSelection.flatMap((number) => {
+        const surah = surahByNumber.get(number);
+        if (!surah) return [];
+        const result = validateRangeText(selectedSurahRanges[number] ?? { from: "1", to: String(surah.ayah_count) }, surah.ayah_count);
+        return result.ok ? [{ surah: number, ayahStart: result.ayahStart, ayahEnd: result.ayahEnd }] : [];
+      }),
+    [selectedSurahRanges, sortedSelection, surahByNumber],
+  );
+
+  const scopeFilter = useMemo<BuiltInDeckFilter | null>(() => {
+    if (filterType === "all") return { type: "all" };
+    if (filterType === "juz") return selectedJuz.size > 0 ? { type: "juz", juzNumbers: [...selectedJuz] } : null;
+    if (sortedSelection.length === 0 || invalidSurahs.length > 0) return null;
+    const partial = surahRanges.some((range) => {
+      const surah = surahByNumber.get(range.surah);
+      return !!surah && (range.ayahStart !== 1 || range.ayahEnd !== surah.ayah_count);
+    });
+    return { type: "surah", surahs: sortedSelection, ...(partial ? { ranges: surahRanges } : {}) };
+  }, [filterType, invalidSurahs.length, selectedJuz, sortedSelection, surahByNumber, surahRanges]);
+
+  const firstInvalid = invalidSurahs.length > 0 ? surahByNumber.get(invalidSurahs[0]) ?? null : null;
+  const scopeError =
+    filterType === "surah"
+      ? sortedSelection.length === 0
+        ? s.deckScopeSelectSurah
+        : firstInvalid
+          ? interpolate(s.deckScopeCheckRange, { surah: scopeName(firstInvalid, language) })
+          : null
+      : filterType === "juz" && selectedJuz.size === 0
+        ? s.deckScopeSelectJuz
+        : null;
+
+  const fields = draft ? schedulerFieldsFromDraft(draft) : null;
+  const dirty =
+    !!baseline &&
+    !!draft &&
+    (!scopeFilter || filterKey(scopeFilter) !== filterKey(baseline.filter) || isSchedulerDraftChanged(draft, baseline.settings));
+  const canSave = !!deckId && !!baseline && !!fields && !!scopeFilter && dirty && !saving;
+  const { guard, dialogProps } = useDiscardGuard(dirty);
+  const requestClose = useCallback(() => {
+    if (!saving) guard(onClose);
+  }, [guard, onClose, saving]);
+
+  const updateDraft = useCallback((patch: Partial<SchedulerDraft>) => {
+    setSaveError(null);
+    setDraft((prev) => (prev ? applySchedulerDraftPatch(prev, patch) : prev));
   }, []);
 
-  const toggleSurah = useCallback(
-    (n: number) => {
-      setError(null);
+  const setSurahSelected = useCallback(
+    (numbers: number[], selected: boolean) => {
+      setSaveError(null);
       setSelectedSurahs((prev) => {
         const next = new Set(prev);
-        const willSelect = !next.has(n);
-        if (willSelect) next.add(n);
-        else next.delete(n);
-        setSelectedSurahRanges((prevRanges) => {
-          const nextRanges = { ...prevRanges };
-          if (willSelect) {
-            const ayahCount = surahs.find((row) => row.number === n)?.ayah_count ?? 1;
-            nextRanges[n] = nextRanges[n] ?? { from: "1", to: String(ayahCount) };
-          } else {
-            delete nextRanges[n];
-          }
-          return nextRanges;
-        });
+        for (const n of numbers) {
+          if (selected) next.add(n);
+          else next.delete(n);
+        }
+        return next;
+      });
+      setSelectedSurahRanges((prev) => {
+        const next = { ...prev };
+        for (const n of numbers) {
+          if (selected) next[n] = next[n] ?? { from: "1", to: String(surahByNumber.get(n)?.ayah_count ?? 1) };
+          else delete next[n];
+        }
         return next;
       });
     },
-    [surahs],
+    [surahByNumber],
   );
 
   const updateSurahRange = useCallback(
-    (surah: number, field: keyof RangeInputValue, value: string) => {
-      setError(null);
+    (surah: number, field: keyof RangeText, value: string) => {
+      setSaveError(null);
       setSelectedSurahRanges((prev) => {
-        const ayahCount = surahs.find((row) => row.number === surah)?.ayah_count ?? 1;
-        const current = prev[surah] ?? { from: "1", to: String(ayahCount) };
+        const current = prev[surah] ?? { from: "1", to: String(surahByNumber.get(surah)?.ayah_count ?? 1) };
         return { ...prev, [surah]: { ...current, [field]: value } };
       });
     },
-    [surahs],
+    [surahByNumber],
   );
 
   const toggleJuz = useCallback((n: number) => {
-    setError(null);
+    setSaveError(null);
     setSelectedJuz((prev) => {
       const next = new Set(prev);
       if (next.has(n)) next.delete(n);
@@ -190,121 +251,60 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     });
   }, []);
 
-  const setNextDailyLimit = useCallback((value: number) => {
-    setError(null);
-    setDailyLimit(clampDailyReviewLimit(value));
-  }, []);
-
-  const setNextNewCardsLimit = useCallback((value: number) => {
-    setError(null);
-    setNewCardsLimit(clampNewCardsLimit(value));
-  }, []);
-
-  const setNextRetention = useCallback((value: number) => {
-    setError(null);
-    setRequestRetention(clampRequestRetention(value));
-  }, []);
-
-  const setNextMaximumInterval = useCallback((value: number) => {
-    setError(null);
-    setMaximumInterval(clampMaximumInterval(value));
-  }, []);
-
-  const getSurahFilter = (): BuiltInDeckFilter | null => {
-    if (selectedSurahs.size === 0) return null;
-    const selected = [...selectedSurahs].sort((a, b) => a - b);
-    const ranges: SurahAyahRange[] = [];
-    let hasPartialRange = false;
-    for (const surahNumber of selected) {
-      const surah = surahs.find((row) => row.number === surahNumber);
-      if (!surah) return null;
-      const range = selectedSurahRanges[surahNumber] ?? { from: "1", to: String(surah.ayah_count) };
-      const ayahStart = Number(normalizeDateDigits(range.from.trim()));
-      const ayahEnd = Number(normalizeDateDigits(range.to.trim()));
-      if (![ayahStart, ayahEnd].every(Number.isInteger)) return null;
-      if (ayahStart < 1 || ayahEnd > surah.ayah_count || ayahEnd < ayahStart) return null;
-      if (ayahStart !== 1 || ayahEnd !== surah.ayah_count) hasPartialRange = true;
-      ranges.push({ surah: surahNumber, ayahStart, ayahEnd });
-    }
-    return { type: "surah", surahs: selected, ...(hasPartialRange ? { ranges } : {}) };
-  };
-
-  const canSave = () => {
-    if (!deckId) return false;
-    if (filterType === "surah") return getSurahFilter() !== null;
-    if (filterType === "juz") return selectedJuz.size > 0;
-    return true;
-  };
-
-  const selectedSurahPreview = useMemo(() => {
-    const selected = [...selectedSurahs].sort((a, b) => a - b);
-    if (selected.length === 0) return s.deckNoSurahsSelected;
-    return selected
-      .slice(0, 4)
-      .map((number) => {
-        const surah = surahs.find((row) => row.number === number);
-        if (!surah) return String(number);
-        return isRTL ? surah.name_arabic : surah.name_english;
-      })
-      .join(isRTL ? "، " : ", ");
-  }, [isRTL, s.deckNoSurahsSelected, selectedSurahs, surahs]);
+  const title = deckId ? getSmartDeckTitle(deckId, s) : s.smartDeckFilterTitle;
 
   const handleSave = async () => {
-    if (!deckId || saving) return;
-    setError(null);
-    if (!canSave()) {
-      setError(filterType === "surah" && selectedSurahs.size > 0 ? s.deckRangeInvalid : s.deckSelectionRequired);
-      return;
-    }
+    if (!deckId || !baseline || !fields || !scopeFilter || saving) return;
+    setSaveError(null);
     setSaving(true);
     try {
-      let filter: BuiltInDeckFilter = { type: "all" };
-      if (filterType === "surah") filter = getSurahFilter()!;
-      if (filterType === "juz") filter = { type: "juz", juzNumbers: [...selectedJuz] };
-      await writeSmartDeckFilter(db, deckId, filter);
-      await writeDeckReviewSettings(db, deckId, {
-        ...(reviewSettings ?? {}),
-        dailyReviewLimit: dailyLimit,
-        newCardsLimit,
-        requestRetention,
-        maximumInterval,
-        enableFuzz,
-        enableShortTerm,
-        learningSteps: parseStepText(learningStepsText, DEFAULT_DECK_LEARNING_STEPS),
-        relearningSteps: parseStepText(relearningStepsText, DEFAULT_DECK_RELEARNING_STEPS),
-        newReviewOrder,
-        reviewSortOrder,
-        newCardSortOrder,
-        testModes: reviewSettings?.testModes ?? DEFAULT_ENABLED_MODES,
-        wordTestModes: reviewSettings?.wordTestModes ?? DEFAULT_WORD_TEST_MODES,
+      const settings = { ...baseline.settings, ...fields };
+      // The scope and the scheduler options commit together or not at all.
+      await db.withTransactionAsync(async (tx) => {
+        await putSmartDeckFilter(tx, deckId, scopeFilter);
+        await putDeckReviewSettings(tx, deckId, settings);
       });
-      await materializeSmartDeckCards(db, deckId, dailyLimit, newCardsLimit);
-      onSaved();
-      onClose();
     } catch (e) {
       console.warn("[SmartDeckFilterSheet] Failed to save filter:", e);
-      setError(s.deckFilterSaveFailed);
-    } finally {
+      setSaveError(s.deckFilterSaveFailed);
       setSaving(false);
+      return;
     }
+    // The settings are saved. Today's cards are built again when the queue loads, so a failure here
+    // must not present the committed save as failed.
+    try {
+      await materializeSmartDeckCards(db, deckId, fields.dailyReviewLimit, fields.newCardsLimit);
+    } catch (e) {
+      console.warn("[SmartDeckFilterSheet] Saved settings; preparing today's cards failed:", e);
+    }
+    setSaving(false);
+    onSaved(interpolate(s.deckSettingsSavedNamed, { deck: title }));
+    onClose();
   };
 
-  const title = deckId ? getSmartDeckTitle(deckId, s) : s.smartDeckFilterTitle;
   const tabs: { value: FilterType; label: string }[] = [
-    { value: "all", label: s.smartDeckFilterAll },
-    { value: "surah", label: s.flashcardsScopeBysurah },
-    { value: "juz", label: s.flashcardsScopeByjuz },
+    { value: "all", label: s.deckScopeAll },
+    { value: "surah", label: s.deckScopeBySurah },
+    { value: "juz", label: s.deckScopeByJuz },
   ];
+  const surahSummary = summarizeScopeRanges(surahRanges, surahs, language);
+  const juzSummary = summarizeScopeRanges(juzScopeRanges(juzMap, selectedJuz), surahs, language);
+  const summaryNames = (summary: typeof surahSummary) =>
+    summary.moreCount > 0
+      ? `${summary.names}${language === "ar" ? "، " : ", "}${interpolate(s.deckScopeMore, { n: formatNumber(summary.moreCount, language) })}`
+      : summary.names;
+  const selectedLabel = interpolate(s.deckSurahsSelectedCount, { n: formatNumber(selectedSurahs.size, language) });
 
   return (
     <>
-      <ResponsiveSheet open={visible} onClose={onClose} maxWidth={760} maxHeight={720} dir={isRTL ? "rtl" : "ltr"}>
-        <OverlayHeader title={title} onClose={onClose} isRTL={isRTL} showHandle={isPhone} />
+      <ResponsiveSheet open={visible} onClose={requestClose} maxWidth={760} maxHeight={720} dir={isRTL ? "rtl" : "ltr"}>
+        <OverlayHeader title={title} subtitle={s.smartDeckFilterTitle} onClose={requestClose} isRTL={isRTL} />
 
         <View className="mb-4 mt-2">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            accessibilityRole="tablist"
             contentContainerStyle={{
               gap: 8,
               alignItems: "center",
@@ -315,34 +315,43 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
             }}
             style={{ maxHeight: 52 }}
           >
-            {tabs.map((tab) => (
-              <Pressable
-                key={tab.value}
-                onPress={() => {
-                  setError(null);
-                  setFilterType(tab.value);
-                }}
-                className={`h-11 rounded-full px-5 items-center justify-center ${
-                  filterType === tab.value ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
-                }`}
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontFamily: filterType === tab.value ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                    fontSize: 13,
-                    color: filterType === tab.value ? "#fff" : isDark ? "#a3a3a3" : "#6e5a47",
+            {tabs.map((tab) => {
+              const selected = filterType === tab.value;
+              return (
+                <Pressable
+                  key={tab.value}
+                  onPress={() => {
+                    setSaveError(null);
+                    setFilterType(tab.value);
                   }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  className={`h-11 rounded-full px-5 items-center justify-center ${
+                    selected ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
+                  }`}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontFamily: selected ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                      fontSize: 13,
+                      color: selected ? "#fff" : isDark ? "#a3a3a3" : "#6e5a47",
+                    }}
+                  >
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </View>
 
         <OverlayBody contentContainerClassName="px-5 pb-8" contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}>
+          {loadError ? (
+            <LoadErrorRow message={loadError} onRetry={() => setLoadAttempt((n) => n + 1)} isRTL={isRTL} />
+          ) : null}
+
           {filterType === "all" && (
             <Card elevation="low" className="p-5">
               <Text
@@ -360,11 +369,10 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
           )}
 
           {filterType === "surah" && (
-            <SurahFilterSummary
-              selectedCount={selectedSurahs.size}
-              selectedPreview={selectedSurahPreview}
-              selectedLabel={interpolate(s.deckSurahsSelectedCount, { n: String(selectedSurahs.size) })}
-              noSelectionLabel={s.deckNoSurahsSelected}
+            <ScopeSummaryCard
+              heading={selectedSurahs.size > 0 ? surahSummary.size : s.deckNoSurahsSelected}
+              names={selectedSurahs.size > 0 ? summaryNames(surahSummary) : null}
+              error={baseline ? scopeError : null}
               actionLabel={selectedSurahs.size > 0 ? s.deckChangeSurahs : s.flashcardsSelectSurahs}
               isRTL={isRTL}
               onPress={() => setSurahSelectorOpen(true)}
@@ -372,71 +380,55 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
           )}
 
           {filterType === "juz" && (
-            <View
-              className="flex-wrap gap-3"
-              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-                <NumberChip
-                  key={n}
-                  number={n}
-                  selected={selectedJuz.has(n)}
-                  onToggle={() => toggleJuz(n)}
-                  isDark={isDark}
-                />
-              ))}
+            <View className="gap-3">
+              <SelectAllClearRow
+                onSelectAll={() => setSelectedJuz(new Set(JUZ_NUMBERS))}
+                onClear={() => setSelectedJuz(new Set())}
+                isRTL={isRTL}
+                s={s}
+              />
+              <View className="flex-wrap gap-3" style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
+                {JUZ_NUMBERS.map((n) => (
+                  <NumberChip
+                    key={n}
+                    label={formatNumber(n, language)}
+                    accessibilityLabel={interpolate(s.deckScopeJuzLabel, { n: formatNumber(n, language) })}
+                    selected={selectedJuz.has(n)}
+                    onToggle={() => toggleJuz(n)}
+                    isDark={isDark}
+                  />
+                ))}
+              </View>
+              {selectedJuz.size > 0 ? (
+                <ScopeSummaryCard heading={juzSummary.size} names={summaryNames(juzSummary)} isRTL={isRTL} />
+              ) : baseline && scopeError ? (
+                <InlineMessage text={scopeError} isRTL={isRTL} tone="error" />
+              ) : null}
             </View>
           )}
 
-          <View className="mt-6">
-            <SchedulerOptionsPanel
-              dailyLimit={dailyLimit}
-              newCardsLimit={newCardsLimit}
-              requestRetention={requestRetention}
-              maximumInterval={maximumInterval}
-              enableFuzz={enableFuzz}
-              enableShortTerm={enableShortTerm}
-              learningStepsText={learningStepsText}
-              relearningStepsText={relearningStepsText}
-              newReviewOrder={newReviewOrder}
-              reviewSortOrder={reviewSortOrder}
-              newCardSortOrder={newCardSortOrder}
-              onDailyLimitChange={setNextDailyLimit}
-              onNewCardsLimitChange={setNextNewCardsLimit}
-              onRequestRetentionChange={setNextRetention}
-              onMaximumIntervalChange={setNextMaximumInterval}
-              onEnableFuzzChange={setEnableFuzz}
-              onEnableShortTermChange={setEnableShortTerm}
-              onLearningStepsTextChange={setLearningStepsText}
-              onRelearningStepsTextChange={setRelearningStepsText}
-              onNewReviewOrderChange={setNewReviewOrder}
-              onReviewSortOrderChange={setReviewSortOrder}
-              onNewCardSortOrderChange={setNewCardSortOrder}
-              onInfoPress={openSettingInfo}
-              compact={compact}
-              isDark={isDark}
-              isRTL={isRTL}
-            />
-          </View>
+          {draft ? (
+            <View className="mt-6">
+              <SchedulerOptionsPanel
+                draft={draft}
+                onChange={updateDraft}
+                onInfoPress={(infoTitle, body) => setActiveInfo({ title: infoTitle, body })}
+                compact={compact}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+            </View>
+          ) : null}
         </OverlayBody>
 
         <OverlayFooter isRTL={isRTL}>
           <View className="w-full gap-3">
-            {error && (
-              <Text
-                className="text-red-600 dark:text-red-400"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL)}}
-              >
-                {error}
-              </Text>
-            )}
-            <Button onPress={handleSave} disabled={saving || !canSave()} className="w-full">
+            {saveError ? <InlineMessage text={saveError} isRTL={isRTL} tone="error" /> : null}
+            <Button onPress={handleSave} disabled={!canSave} className="w-full">
               {saving ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-                  {s.smartDeckApplyFilter}
-                </Text>
+                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.deckSettingsSave}</Text>
               )}
             </Button>
           </View>
@@ -448,17 +440,16 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         surahs={surahs}
         selectedSurahs={selectedSurahs}
         selectedSurahRanges={selectedSurahRanges}
-        selectedLabel={interpolate(s.deckSurahsSelectedCount, { n: String(selectedSurahs.size) })}
-        title={s.flashcardsSelectSurahs}
-        doneLabel={s.deckAyahRangeDone}
-        rangeActionLabel={s.deckSpecifyAyahRange}
+        invalidSurahs={invalidSurahs}
+        selectedLabel={selectedLabel}
+        isPhone={isPhone}
         isDark={isDark}
         isRTL={isRTL}
-        isPhone={isPhone}
-        onToggleSurah={toggleSurah}
+        language={language}
+        s={s}
+        onSetSelected={setSurahSelected}
         onRangePress={setRangeTarget}
         onClose={() => setSurahSelectorOpen(false)}
-        ayahLabel={s.ayahs}
       />
 
       <ReviewSettingInfoSheet
@@ -472,84 +463,101 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       <SurahRangeEditor
         visible={visible && rangeTarget !== null}
         surah={rangeTarget}
-        range={
-          rangeTarget
-            ? (selectedSurahRanges[rangeTarget.number] ?? { from: "1", to: String(rangeTarget.ayah_count) })
-            : null
-        }
+        range={rangeTarget ? (selectedSurahRanges[rangeTarget.number] ?? { from: "1", to: String(rangeTarget.ayah_count) }) : null}
         rangeLabels={{
           from: `${s.flashcardsFrom} ${s.reflectionAyahLabel}`,
           to: `${s.flashcardsTo} ${s.reflectionAyahLabel}`,
         }}
-        title={s.deckSpecifyAyahRange}
-        doneLabel={s.deckAyahRangeDone}
+        language={language}
         isDark={isDark}
         isRTL={isRTL}
+        s={s}
         onChange={(field, value) => {
           if (rangeTarget) updateSurahRange(rangeTarget.number, field, value);
         }}
         onClose={() => setRangeTarget(null)}
       />
+      <DiscardChangesDialog {...dialogProps} />
     </>
   );
 }
 
-function SurahFilterSummary({
-  selectedCount,
-  selectedPreview,
-  selectedLabel,
-  noSelectionLabel,
+function ScopeSummaryCard({
+  heading,
+  names,
+  error,
   actionLabel,
   isRTL,
   onPress,
 }: {
-  selectedCount: number;
-  selectedPreview: string;
-  selectedLabel: string;
-  noSelectionLabel: string;
-  actionLabel: string;
+  heading: string;
+  names: string | null;
+  error?: string | null;
+  actionLabel?: string;
   isRTL: boolean;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   return (
     <Card elevation="low" className="p-4">
-      <View className={`items-center gap-4 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={{ direction: "ltr" }}>
-        <View className="flex-1 gap-1" style={{ minWidth: 0 }}>
+      <View className={`items-center gap-4 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={{ direction: "ltr", flexWrap: "wrap" }}>
+        <View className="flex-1 gap-1" style={{ minWidth: 180 }}>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            numberOfLines={1}
-            style={{
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 15,
-              ...textStartStyle(isRTL),
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           >
-            {selectedCount > 0 ? selectedLabel : noSelectionLabel}
+            {heading}
           </Text>
-          {selectedCount > 0 ? (
+          {names ? (
             <Text
               className="text-warm-500 dark:text-neutral-400"
-              numberOfLines={2}
-              style={{
-                fontFamily: "Manrope_400Regular",
-                fontSize: 13,
-                lineHeight: 20,
-                ...textStartStyle(isRTL),
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 20, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
             >
-              {selectedPreview}
+              {names}
             </Text>
           ) : null}
+          {error ? <InlineMessage text={error} isRTL={isRTL} tone="error" /> : null}
         </View>
-        <Button onPress={onPress} size="sm" className="shrink-0 px-5">
-          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-            {actionLabel}
-          </Text>
-        </Button>
+        {onPress && actionLabel ? (
+          <Button onPress={onPress} size="sm" className="shrink-0 px-5">
+            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+              {actionLabel}
+            </Text>
+          </Button>
+        ) : null}
       </View>
     </Card>
+  );
+}
+
+function SelectAllClearRow({
+  onSelectAll,
+  onClear,
+  isRTL,
+  s,
+}: {
+  onSelectAll: () => void;
+  onClear: () => void;
+  isRTL: boolean;
+  s: UIStrings;
+}) {
+  const link = (label: string, onPress: () => void) => (
+    <Pressable
+      key={label}
+      onPress={onPress}
+      accessibilityRole="button"
+      className="min-h-11 justify-center rounded-full px-3"
+      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+    >
+      <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+  return (
+    <View className="gap-1" style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
+      {link(s.deckScopeSelectAll, onSelectAll)}
+      {link(s.deckScopeClear, onClear)}
+    </View>
   );
 }
 
@@ -558,66 +566,116 @@ function SurahSelectorSheet({
   surahs,
   selectedSurahs,
   selectedSurahRanges,
+  invalidSurahs,
   selectedLabel,
-  title,
-  doneLabel,
-  rangeActionLabel,
+  isPhone,
   isDark,
   isRTL,
-  isPhone,
-  onToggleSurah,
+  language,
+  s,
+  onSetSelected,
   onRangePress,
   onClose,
-  ayahLabel,
 }: {
   visible: boolean;
-  surahs: SurahRow[];
+  surahs: ScopeSurah[];
   selectedSurahs: Set<number>;
-  selectedSurahRanges: Record<number, RangeInputValue>;
+  selectedSurahRanges: Record<number, RangeText>;
+  invalidSurahs: number[];
   selectedLabel: string;
-  title: string;
-  doneLabel: string;
-  rangeActionLabel: string;
+  isPhone: boolean;
   isDark: boolean;
   isRTL: boolean;
-  isPhone: boolean;
-  onToggleSurah: (surah: number) => void;
-  onRangePress: (surah: SurahRow) => void;
+  language: Language;
+  s: UIStrings;
+  onSetSelected: (surahs: number[], selected: boolean) => void;
+  onRangePress: (surah: ScopeSurah) => void;
   onClose: () => void;
-  ayahLabel: string;
 }) {
+  const [query, setQuery] = useState("");
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledRef = useRef(false);
+  const visibleSurahs = useMemo(() => surahs.filter((surah) => matchesSurahQuery(surah, query)), [query, surahs]);
+  const firstInvalid = invalidSurahs[0] ?? null;
+
+  useEffect(() => {
+    if (!visible) {
+      setQuery("");
+      scrolledRef.current = false;
+    }
+  }, [visible]);
+
   return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={640}
-      maxHeight={isPhone ? "86%" : 680}
-      dir={isRTL ? "rtl" : "ltr"}
-    >
-      <OverlayHeader title={title} subtitle={selectedLabel} onClose={onClose} isRTL={isRTL} showHandle={isPhone} />
+    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={640} maxHeight={isPhone ? "86%" : 680} dir={isRTL ? "rtl" : "ltr"}>
+      <OverlayHeader title={s.flashcardsSelectSurahs} subtitle={selectedLabel} onClose={onClose} isRTL={isRTL} />
+      <View className="gap-2 px-5 pb-2">
+        <View
+          className="items-center gap-2 rounded-2xl bg-surface-low px-4 dark:bg-surface-dark-low"
+          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+        >
+          <Search size={17} color={isDark ? "#737373" : "#8B8178"} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            accessibilityLabel={s.deckScopeSearchSurahs}
+            placeholder={s.deckScopeSearchSurahs}
+            placeholderTextColor={isDark ? "#737373" : "#8B8178"}
+            autoCorrect={false}
+            className="min-h-11 flex-1 py-2 text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, ...inputTextStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+          />
+        </View>
+        <SelectAllClearRow
+          onSelectAll={() => onSetSelected(visibleSurahs.map((surah) => surah.number), true)}
+          onClear={() => onSetSelected([...selectedSurahs], false)}
+          isRTL={isRTL}
+          s={s}
+        />
+      </View>
       <OverlayBody
+        scrollRef={scrollRef}
         contentContainerClassName="px-5 py-4"
         contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr", gap: 8 }}
       >
-        {surahs.map((surah) => (
-          <SurahFilterItem
-            key={surah.number}
-            surah={surah}
-            selected={selectedSurahs.has(surah.number)}
-            onToggle={() => onToggleSurah(surah.number)}
-            isDark={isDark}
-            isRTL={isRTL}
-            ayahCountLabel={interpolate("{{n}} {{label}}", { n: surah.ayah_count, label: ayahLabel })}
-            range={selectedSurahRanges[surah.number] ?? { from: "1", to: String(surah.ayah_count) }}
-            rangeActionLabel={rangeActionLabel}
-            onRangePress={() => onRangePress(surah)}
-          />
-        ))}
+        {visibleSurahs.length === 0 ? (
+          <Text
+            className="py-6 text-center text-warm-500 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 14, writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.deckScopeNoSurahMatch}
+          </Text>
+        ) : (
+          visibleSurahs.map((surah) => (
+            <SurahFilterItem
+              key={surah.number}
+              surah={surah}
+              selected={selectedSurahs.has(surah.number)}
+              invalid={invalidSurahs.includes(surah.number)}
+              onToggle={() => onSetSelected([surah.number], !selectedSurahs.has(surah.number))}
+              isDark={isDark}
+              isRTL={isRTL}
+              language={language}
+              s={s}
+              range={selectedSurahRanges[surah.number] ?? { from: "1", to: String(surah.ayah_count) }}
+              onRangePress={() => onRangePress(surah)}
+              // Opening with an invalid range scrolls to its row once, so the highlighted row is in view.
+              onLayoutY={
+                surah.number === firstInvalid
+                  ? (y) => {
+                      if (scrolledRef.current) return;
+                      scrolledRef.current = true;
+                      scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: false });
+                    }
+                  : undefined
+              }
+            />
+          ))
+        )}
       </OverlayBody>
       <OverlayFooter isRTL={isRTL}>
         <Button onPress={onClose} className="w-full">
           <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
-            {doneLabel}
+            {s.deckAyahRangeDone}
           </Text>
         </Button>
       </OverlayFooter>
@@ -636,35 +694,51 @@ function getSmartDeckTitle(deckId: SmartDeckId, s: UIStrings): string {
 function SurahFilterItem({
   surah,
   selected,
+  invalid,
   onToggle,
   isDark,
   isRTL,
-  ayahCountLabel,
+  language,
+  s,
   range,
-  rangeActionLabel,
   onRangePress,
+  onLayoutY,
 }: {
-  surah: SurahRow;
+  surah: ScopeSurah;
   selected: boolean;
+  invalid: boolean;
   onToggle: () => void;
   isDark: boolean;
   isRTL: boolean;
-  ayahCountLabel: string;
-  range: RangeInputValue;
-  rangeActionLabel: string;
+  language: Language;
+  s: UIStrings;
+  range: RangeText;
   onRangePress: () => void;
+  onLayoutY?: (y: number) => void;
 }) {
-  const rangeSummary = `${range.from}-${range.to}`;
+  const parsed = validateRangeText(range, surah.ayah_count);
+  const rangeLabel = !parsed.ok
+    ? interpolate(s.deckScopeAyahRange, { range: `${range.from}-${range.to}` })
+    : parsed.ayahStart === 1 && parsed.ayahEnd === surah.ayah_count
+      ? s.deckScopeFullSurah
+      : interpolate(s.deckScopeAyahRange, { range: formatAyahSpan(parsed.ayahStart, parsed.ayahEnd, language) });
+  // Arabic UI titles the row in Arabic with the transliteration as its hint; English the reverse.
+  const title = language === "ar" ? surah.name_arabic : surah.name_english;
+  const hint = language === "ar" ? (surahTransliteration(surah.number) ?? surah.name_english) : surah.name_arabic;
 
   return (
     <View
+      onLayout={onLayoutY ? (event) => onLayoutY(event.nativeEvent.layout.y) : undefined}
       className={`min-h-[68px] justify-center rounded-2xl px-4 py-3 ${
         selected ? "bg-primary-accent/10 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"
-      }`}
+      } ${invalid ? "border-2 border-red-600 dark:border-red-400" : ""}`}
       style={{ direction: "ltr" }}
     >
       <Pressable
         onPress={onToggle}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: selected }}
+        accessibilityLabel={`${title}, ${formatAyahs(surah.ayah_count, language)}`}
         className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
         style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
       >
@@ -676,35 +750,35 @@ function SurahFilterItem({
           {selected ? (
             <Check size={14} color="#fff" />
           ) : (
-            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: isDark ? "#737373" : "#b9a085" }}>
-              {surah.number}
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: isDark ? "#a3a3a3" : "#8B8178" }}>
+              {formatNumber(surah.number, language)}
             </Text>
           )}
         </View>
         <View className="flex-1" style={{ minWidth: 0 }}>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 14, ...textStartStyle(isRTL)}}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: language === "ar" ? 16 : 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           >
-            {surah.name_english}
+            {title}
           </Text>
           <Text
             className="text-warm-400 dark:text-neutral-500"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, ...textStartStyle(isRTL)}}
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, ...textStartStyle(isRTL) }}
           >
-            {ayahCountLabel}
+            {formatAyahs(surah.ayah_count, language)}
           </Text>
         </View>
         <Text
           className="text-charcoal dark:text-neutral-300"
           style={{
             fontFamily: "Manrope_400Regular",
-            fontSize: 16,
-            writingDirection: "rtl",
+            fontSize: language === "ar" ? 13 : 16,
+            writingDirection: language === "ar" ? "ltr" : "rtl",
             ...textEndStyle(isRTL),
           }}
         >
-          {surah.name_arabic}
+          {hint}
         </Text>
         {selected && (
           <Pressable
@@ -713,28 +787,16 @@ function SurahFilterItem({
               onRangePress();
             }}
             accessibilityRole="button"
-            accessibilityLabel={rangeActionLabel}
-            className="min-h-9 justify-center rounded-full bg-surface-high px-3 dark:bg-surface-dark-high"
+            accessibilityLabel={`${s.deckSpecifyAyahRange}: ${rangeLabel}`}
+            className="min-h-11 justify-center rounded-full bg-surface-high px-3 dark:bg-surface-dark-high"
             style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
           >
             <Text
-              className="text-primary-accent dark:text-primary-bright"
+              className={invalid ? "text-red-600 dark:text-red-400" : "text-primary-accent dark:text-primary-bright"}
               numberOfLines={1}
-              style={{
-                fontFamily: "Manrope_600SemiBold",
-                fontSize: 12,
-                textAlign: "center",
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: "center", writingDirection: isRTL ? "rtl" : "ltr" }}
             >
-              {rangeActionLabel}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500"
-              numberOfLines={1}
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 10, textAlign: "center" }}
-            >
-              {rangeSummary}
+              {rangeLabel}
             </Text>
           </Pressable>
         )}
@@ -748,51 +810,76 @@ function SurahRangeEditor({
   surah,
   range,
   rangeLabels,
-  title,
-  doneLabel,
+  language,
   isDark,
   isRTL,
+  s,
   onChange,
   onClose,
 }: {
   visible: boolean;
-  surah: SurahRow | null;
-  range: RangeInputValue | null;
+  surah: ScopeSurah | null;
+  range: RangeText | null;
   rangeLabels: { from: string; to: string };
-  title: string;
-  doneLabel: string;
+  language: Language;
   isDark: boolean;
   isRTL: boolean;
-  onChange: (field: keyof RangeInputValue, value: string) => void;
+  s: UIStrings;
+  onChange: (field: keyof RangeText, value: string) => void;
   onClose: () => void;
 }) {
+  const result = surah && range ? validateRangeText(range, surah.ayah_count) : null;
+  const count = surah ? formatNumber(surah.ayah_count, language) : "";
+  const error =
+    result && !result.ok
+      ? result.reason === "order"
+        ? s.deckScopeRangeOrder
+        : interpolate(s.deckScopeRangeOutside, { n: count })
+      : null;
+  const placeholder = surah ? `${formatNumber(1, language)}-${count}` : "";
   return (
-    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={420} maxHeight={320} dir={isRTL ? "rtl" : "ltr"}>
-      <OverlayHeader title={title} subtitle={isRTL ? surah?.name_arabic : surah?.name_english} onClose={onClose} isRTL={isRTL} showHandle />
+    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={420} maxHeight={380} dir={isRTL ? "rtl" : "ltr"}>
+      <OverlayHeader
+        title={s.deckSpecifyAyahRange}
+        subtitle={surah ? (language === "ar" ? surah.name_arabic : surah.name_english) : undefined}
+        onClose={onClose}
+        isRTL={isRTL}
+      />
       <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
         {range ? (
-          <View className="gap-3" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
-            <RangeInput
-              label={rangeLabels.from}
-              value={range.from}
-              onChangeText={(value) => onChange("from", value)}
-              isDark={isDark}
-              isRTL={isRTL}
-            />
-            <RangeInput
-              label={rangeLabels.to}
-              value={range.to}
-              onChangeText={(value) => onChange("to", value)}
-              isDark={isDark}
-              isRTL={isRTL}
-            />
+          <View className="gap-2">
+            <View className="gap-3" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+              <RangeInput
+                label={rangeLabels.from}
+                value={range.from}
+                placeholder={placeholder}
+                invalid={!!error}
+                onChangeText={(value) => onChange("from", value)}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+              <RangeInput
+                label={rangeLabels.to}
+                value={range.to}
+                placeholder={placeholder}
+                invalid={!!error}
+                onChangeText={(value) => onChange("to", value)}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+            </View>
+            {error ? (
+              <InlineMessage text={error} isRTL={isRTL} tone="error" />
+            ) : (
+              <InlineMessage text={interpolate(s.deckScopeRangeHelper, { n: count })} isRTL={isRTL} tone="hint" />
+            )}
           </View>
         ) : null}
       </OverlayBody>
       <OverlayFooter isRTL={isRTL}>
-        <Button onPress={onClose} className="w-full">
+        <Button onPress={onClose} disabled={!!error} className="w-full">
           <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
-            {doneLabel}
+            {s.deckAyahRangeDone}
           </Text>
         </Button>
       </OverlayFooter>
@@ -800,23 +887,13 @@ function SurahRangeEditor({
   );
 }
 
-function initialRangeState(
-  rows: SurahRow[],
-  surahs: number[],
-  ranges?: SurahAyahRange[],
-): Record<number, RangeInputValue> {
+function initialRangeState(rows: ScopeSurah[], surahs: number[], ranges?: ScopeRange[]): Record<number, RangeText> {
   const rangeBySurah = new Map((ranges ?? []).map((range) => [range.surah, range]));
   return Object.fromEntries(
     surahs.map((surahNumber) => {
       const surah = rows.find((row) => row.number === surahNumber);
       const range = rangeBySurah.get(surahNumber);
-      return [
-        surahNumber,
-        {
-          from: String(range?.ayahStart ?? 1),
-          to: String(range?.ayahEnd ?? surah?.ayah_count ?? 1),
-        },
-      ];
+      return [surahNumber, { from: String(range?.ayahStart ?? 1), to: String(range?.ayahEnd ?? surah?.ayah_count ?? 1) }];
     }),
   );
 }
@@ -824,12 +901,16 @@ function initialRangeState(
 function RangeInput({
   label,
   value,
+  placeholder,
+  invalid,
   onChangeText,
   isDark,
   isRTL,
 }: {
   label: string;
   value: string;
+  placeholder: string;
+  invalid: boolean;
   onChangeText: (text: string) => void;
   isDark: boolean;
   isRTL: boolean;
@@ -840,27 +921,27 @@ function RangeInput({
         value={value}
         onChangeText={onChangeText}
         accessibilityLabel={label}
-        placeholder={label}
+        placeholder={placeholder}
         keyboardType="number-pad"
-        className="bg-surface-high dark:bg-surface-dark-high rounded-xl px-4 py-3 text-charcoal dark:text-neutral-200"
-        style={{
-          fontFamily: "Manrope_500Medium",
-          fontSize: 15,
-          ...inputTextStartStyle(isRTL),
-        }}
-        placeholderTextColor={isDark ? "#525252" : "#DFD9D1"}
+        className={`bg-surface-high dark:bg-surface-dark-high rounded-xl px-4 py-3 text-charcoal dark:text-neutral-200 ${
+          invalid ? "border border-red-600 dark:border-red-400" : ""
+        }`}
+        style={{ fontFamily: "Manrope_500Medium", fontSize: 15, ...inputTextStartStyle(isRTL) }}
+        placeholderTextColor={isDark ? "#737373" : "#8B8178"}
       />
     </View>
   );
 }
 
 function NumberChip({
-  number,
+  label,
+  accessibilityLabel,
   selected,
   onToggle,
   isDark,
 }: {
-  number: number;
+  label: string;
+  accessibilityLabel: string;
   selected: boolean;
   onToggle: () => void;
   isDark: boolean;
@@ -868,6 +949,9 @@ function NumberChip({
   return (
     <Pressable
       onPress={onToggle}
+      accessibilityRole="checkbox"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked: selected }}
       className={`w-14 h-14 rounded-2xl items-center justify-center ${
         selected ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
       }`}
@@ -880,7 +964,7 @@ function NumberChip({
           color: selected ? "#fff" : isDark ? "#a3a3a3" : "#6e5a47",
         }}
       >
-        {number}
+        {label}
       </Text>
     </Pressable>
   );

@@ -87,7 +87,6 @@ type SmartDeckDisplay = {
 type DeckReviewSettingsTarget = {
   id: string;
   title: string;
-  mode: "ayah" | "word";
 };
 
 type DeckCardsTarget = {
@@ -812,7 +811,7 @@ export default function HomeScreen() {
               stats={vocabStats}
               onStartReview={() => handleStartReview(MEANINGS_DECK_ID)}
               onConfigure={() =>
-                setReviewSettingsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle, mode: "word" })
+                setReviewSettingsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })
               }
               onShowCards={() => setDeckCardsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })}
               isDark={isDark}
@@ -837,17 +836,19 @@ export default function HomeScreen() {
         visible={!!filterDeckId}
         deckId={filterDeckId}
         onClose={() => setFilterDeckId(null)}
-        onSaved={loadData}
+        onSaved={(notice) => {
+          setToast(notice);
+          loadData();
+        }}
       />
 
       <DeckReviewSettingsSheet
         visible={!!reviewSettingsTarget}
         deckId={reviewSettingsTarget?.id ?? null}
         deckTitle={reviewSettingsTarget?.title ?? ""}
-        mode={reviewSettingsTarget?.mode ?? "ayah"}
         onClose={() => setReviewSettingsTarget(null)}
-        onSaved={() => {
-          setToast(s.deckReviewSettingsSaved);
+        onSaved={(notice) => {
+          setToast(notice);
           loadData();
         }}
       />
@@ -1183,37 +1184,53 @@ function DeckStats({
         ]
       : []),
   ];
+  // Today's remaining cards come from the same queue counts, so the daily limit is visible before starting.
+  const leftToday = showReviewStats && total > 0
+    ? interpolate(s.deckLeftToday, { n: isRTL ? toArabicNumber(newCount + dueCount) : String(newCount + dueCount) })
+    : null;
   return (
-    <View
-      accessible
-      accessibilityLabel={stats.map((stat) => `${stat.value} ${stat.label}`).join(", ")}
-      className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
-      style={{ direction: "ltr" }}
-    >
-      {stats.map((stat, index) => (
-        <View key={stat.label} className={`items-center ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={{ gap: 12 }}>
-          {index === 1 ? <View style={{ width: 1, height: 28, backgroundColor: themeColors.surfaceDim }} /> : null}
-          <View className="items-center min-w-[32px]">
-            <Text
-              className={stat.color ? "text-center" : "text-charcoal dark:text-neutral-100 text-center"}
-              style={{
-                fontFamily: "Manrope_700Bold",
-                fontSize: 14,
-                fontVariant: ["tabular-nums"],
-                ...(stat.color ? { color: stat.color } : null),
-              }}
-            >
-              {isRTL ? toArabicNumber(stat.value) : stat.value}
-            </Text>
-            <Text
-              className="text-warm-500 dark:text-neutral-400 text-center"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 10, marginTop: 1 }}
-            >
-              {stat.label}
-            </Text>
+    <View className={isRTL ? "items-end" : "items-start"} style={{ gap: 2 }}>
+      <View
+        accessible
+        accessibilityLabel={[...stats.map((stat) => `${stat.value} ${stat.label}`), ...(leftToday ? [leftToday] : [])].join(", ")}
+        className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+        style={{ direction: "ltr" }}
+      >
+        {stats.map((stat, index) => (
+          <View key={stat.label} className={`items-center ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={{ gap: 12 }}>
+            {index === 1 ? <View style={{ width: 1, height: 28, backgroundColor: themeColors.surfaceDim }} /> : null}
+            <View className="items-center min-w-[32px]">
+              <Text
+                className={stat.color ? "text-center" : "text-charcoal dark:text-neutral-100 text-center"}
+                style={{
+                  fontFamily: "Manrope_700Bold",
+                  fontSize: 14,
+                  fontVariant: ["tabular-nums"],
+                  ...(stat.color ? { color: stat.color } : null),
+                }}
+              >
+                {isRTL ? toArabicNumber(stat.value) : stat.value}
+              </Text>
+              <Text
+                className="text-warm-500 dark:text-neutral-400 text-center"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 10, marginTop: 1 }}
+              >
+                {stat.label}
+              </Text>
+            </View>
           </View>
-        </View>
-      ))}
+        ))}
+      </View>
+      {leftToday ? (
+        <Text
+          importantForAccessibility="no"
+          accessibilityElementsHidden
+          className="text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 11, writingDirection: isRTL ? "rtl" : "ltr" }}
+        >
+          {leftToday}
+        </Text>
+      ) : null}
     </View>
   );
 }

@@ -8,6 +8,7 @@ import { ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { useSettings } from "@/lib/settings/context";
 import { strings, type UIStrings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { Rating, State } from "@/lib/fsrs/scheduler";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
@@ -31,6 +32,7 @@ import {
   setStudyCardMarked,
   setStudyCardSuspended,
   putCardRow,
+  publishReviewLogged,
 } from "@/lib/fsrs/queries";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { hapticMedium } from "@/lib/haptics";
@@ -50,7 +52,13 @@ import { expectTextAlignStart, expectWritingDirection, flattenStyle } from "../r
  * button is a button too, so it is left out here.
  */
 function dialogButtons(modal: Parameters<typeof within>[0]) {
-  const close = new Set([strings.en.genericClose, strings.ar.genericClose]);
+  // The answer editor's Use default link is part of the field, not one of the dialog's actions.
+  const close = new Set([
+    strings.en.genericClose,
+    strings.ar.genericClose,
+    strings.en.cardAnswerUseDefault,
+    strings.ar.cardAnswerUseDefault,
+  ]);
   return within(modal)
     .getAllByRole("button")
     .filter((button) => !close.has(button.props.accessibilityLabel));
@@ -658,8 +666,9 @@ function confirmCardActionLabel(s: UIStrings, action: ConfirmCardAction): string
   return action === "delete" ? s.cardDelete : s.cardResetProgress;
 }
 
+/** The dialog is found by its body: its title names the card ("Delete Al-Baqara 2:255?"). */
 function confirmCardActionTitle(s: UIStrings, action: ConfirmCardAction): string {
-  return action === "delete" ? s.cardDeleteTitle : s.cardResetTitle;
+  return action === "delete" ? s.cardDeleteConfirm : s.cardResetConfirm;
 }
 
 async function openConfirmCardAction(
@@ -781,14 +790,14 @@ describe("Flashcard session due-date editor characterization", () => {
 
     const editorSheet = view
       .UNSAFE_getAllByType(ResponsiveSheet)
-      .find((node) => node.props.maxWidth === 420 && node.props.maxHeight === 360);
+      .find((node) => node.props.maxWidth === 420 && node.props.maxHeight === 400);
     if (!editorSheet) throw new Error("The session due-date editor sheet was not rendered");
-    expect(editorSheet.props).toMatchObject({ maxWidth: 420, maxHeight: 360, avoidKeyboard: true });
+    expect(editorSheet.props).toMatchObject({ maxWidth: 420, maxHeight: 400, avoidKeyboard: true });
     const renderedEditorSheet = view
       .UNSAFE_getAllByType(ReactNative.Animated.View)
-      .find((node) => flattenStyle(node.props.style).maxHeight === 360);
+      .find((node) => flattenStyle(node.props.style).maxHeight === 400);
     if (!renderedEditorSheet) throw new Error("The rendered session due-date sheet was not found");
-    expect(flattenStyle(renderedEditorSheet.props.style)).toMatchObject({ width: 390, maxHeight: 360 });
+    expect(flattenStyle(renderedEditorSheet.props.style)).toMatchObject({ width: 390, maxHeight: 400 });
     expect(view.UNSAFE_getAllByType(ReactNative.KeyboardAvoidingView)).not.toHaveLength(0);
 
     fireEvent.changeText(input, "not-a-date");
@@ -1029,17 +1038,17 @@ describe("Flashcard session due-date editor characterization", () => {
           const modal = await openConfirmCardAction(view, s, phase, "delete");
           expect(within(modal).getByText(s.cardDeleteConfirm)).toBeTruthy();
           fireEvent.press(within(modal).getByRole("button", { name: s.flashcardsDelete }));
-          await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardDeleteTitle)));
-          const busyModal = getVisibleModalByText(view, s.cardDeleteTitle);
+          await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardDeleteConfirm)));
+          const busyModal = getVisibleModalByText(view, s.cardDeleteConfirm);
           fireEvent(busyModal, "requestClose");
-          expect(within(getVisibleModalByText(view, s.cardDeleteTitle)).getByText(s.cardDeleteConfirm)).toBeTruthy();
+          expect(within(getVisibleModalByText(view, s.cardDeleteConfirm)).getByText(s.cardDeleteConfirm)).toBeTruthy();
 
           deferred.reject(failure);
           await act(async () => {
             await deferred.promise.catch(() => undefined);
           });
 
-          const failedModal = getVisibleModalByText(view, s.cardDeleteTitle);
+          const failedModal = getVisibleModalByText(view, s.cardDeleteConfirm);
           expect(within(failedModal).getByText(s.cardActionFailed)).toBeTruthy();
           expectExactlyTwoEnabledDialogButtons(failedModal);
           expect(view.getByText(firstCue)).toBeTruthy();
@@ -1209,17 +1218,17 @@ describe("Flashcard session due-date editor characterization", () => {
           const modal = await openConfirmCardAction(view, s, phase, "reset");
           expect(within(modal).getByText(s.cardResetConfirm)).toBeTruthy();
           fireEvent.press(within(modal).getByRole("button", { name: s.cardResetProgress }));
-          await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardResetTitle)));
-          const busyModal = getVisibleModalByText(view, s.cardResetTitle);
+          await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardResetConfirm)));
+          const busyModal = getVisibleModalByText(view, s.cardResetConfirm);
           fireEvent(busyModal, "requestClose");
-          expect(within(getVisibleModalByText(view, s.cardResetTitle)).getByText(s.cardResetConfirm)).toBeTruthy();
+          expect(within(getVisibleModalByText(view, s.cardResetConfirm)).getByText(s.cardResetConfirm)).toBeTruthy();
 
           deferred.reject(failure);
           await act(async () => {
             await deferred.promise.catch(() => undefined);
           });
 
-          const failedModal = getVisibleModalByText(view, s.cardResetTitle);
+          const failedModal = getVisibleModalByText(view, s.cardResetConfirm);
           expect(within(failedModal).getByText(s.cardActionFailed)).toBeTruthy();
           expectExactlyTwoEnabledDialogButtons(failedModal);
           expect(view.getByText(firstCue)).toBeTruthy();
@@ -1289,23 +1298,23 @@ describe("Flashcard session due-date editor characterization", () => {
       try {
         const modal = await openConfirmCardAction(view, s, "front", "delete");
         fireEvent.press(within(modal).getByRole("button", { name: s.flashcardsDelete }));
-        await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardDeleteTitle)));
+        await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardDeleteConfirm)));
         deferred.reject(failure);
         await act(async () => {
           await deferred.promise.catch(() => undefined);
         });
-        const failedModal = getVisibleModalByText(view, s.cardDeleteTitle);
+        const failedModal = getVisibleModalByText(view, s.cardDeleteConfirm);
         expect(within(failedModal).getByText(s.cardActionFailed)).toBeTruthy();
         expectExactlyTwoEnabledDialogButtons(failedModal);
         fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
-        await waitFor(() => expect(findVisibleModalByText(view, s.cardDeleteTitle)).toBeNull());
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardDeleteConfirm)).toBeNull());
 
         const reopenedModal = await openConfirmCardAction(view, s, "front", "delete");
         expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
         expect(deleteStudyCard).toHaveBeenCalledTimes(1);
         expect(resetStudyCardProgress).not.toHaveBeenCalled();
         fireEvent.press(within(reopenedModal).getByRole("button", { name: s.flashcardsCancel }));
-        await waitFor(() => expect(findVisibleModalByText(view, s.cardDeleteTitle)).toBeNull());
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardDeleteConfirm)).toBeNull());
         expectNoUnrelatedCardActionCalls();
       } finally {
         deferred.reject(failure);
@@ -1338,23 +1347,23 @@ describe("Flashcard session due-date editor characterization", () => {
       try {
         const modal = await openConfirmCardAction(view, s, "front", "reset");
         fireEvent.press(within(modal).getByRole("button", { name: s.cardResetProgress }));
-        await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardResetTitle)));
+        await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardResetConfirm)));
         deferred.reject(failure);
         await act(async () => {
           await deferred.promise.catch(() => undefined);
         });
-        const failedModal = getVisibleModalByText(view, s.cardResetTitle);
+        const failedModal = getVisibleModalByText(view, s.cardResetConfirm);
         expect(within(failedModal).getByText(s.cardActionFailed)).toBeTruthy();
         expectExactlyTwoEnabledDialogButtons(failedModal);
         fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
-        await waitFor(() => expect(findVisibleModalByText(view, s.cardResetTitle)).toBeNull());
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardResetConfirm)).toBeNull());
 
         const reopenedModal = await openConfirmCardAction(view, s, "front", "reset");
         expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
         expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
         expect(deleteStudyCard).not.toHaveBeenCalled();
         fireEvent.press(within(reopenedModal).getByRole("button", { name: s.flashcardsCancel }));
-        await waitFor(() => expect(findVisibleModalByText(view, s.cardResetTitle)).toBeNull());
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardResetConfirm)).toBeNull());
         expectNoUnrelatedCardActionCalls();
       } finally {
         deferred.reject(failure);
@@ -1532,6 +1541,8 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(input.props.value).toBe("  Canceled answer  ");
         expectExactlyTwoEnabledDialogButtons(failedModal);
         fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+        // A failed save keeps the edit, so Cancel asks before discarding it.
+        fireEvent.press(await waitFor(() => view.getByRole("button", { name: s.discardChangesConfirm })));
         await waitFor(() => expect(writeUserSetting).toHaveBeenCalledTimes(1));
         await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
         expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
@@ -1607,6 +1618,8 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(input.props.value).toBe("   ");
         expectExactlyTwoEnabledDialogButtons(failedModal);
         fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+        // Clearing a saved answer is an edit: Cancel asks before discarding it.
+        fireEvent.press(await waitFor(() => view.getByRole("button", { name: s.discardChangesConfirm })));
         await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
         expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
 
@@ -1667,8 +1680,9 @@ describe("Flashcard session due-date editor characterization", () => {
             await deferred.promise.catch(() => undefined);
           });
 
-          expect(view.queryByText(s.cardActionsTitle)).toBeNull();
-          expect(view.getByText(s.cardActionFailed)).toBeTruthy();
+          // The sheet stays open, with the error above its rows, for a retry from the same place.
+          expect(view.getByText(s.cardActionsTitle)).toBeTruthy();
+          expect(within(getVisibleModalByText(view, s.cardActionsTitle)).getByText(s.cardActionFailed)).toBeTruthy();
           expect(view.getByText(firstCue)).toBeTruthy();
           expect(view.queryByText(secondCue)).toBeNull();
           if (phase === "front") {
@@ -1682,10 +1696,9 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(hapticMedium).toHaveBeenCalledTimes(1);
           expect(loadReviewQueue).toHaveBeenCalledTimes(1);
 
-          fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
-          await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
           fireEvent.press(view.getByRole("button", { name: directCardActionLabel(s, action) }));
-          await waitFor(() => expect(view.queryByText(s.cardActionsTitle)).toBeNull());
+          // The sheet closes once the retried action is saved, then plays its exit.
+          await waitFor(() => expect(view.queryByText(s.cardActionsTitle)).toBeNull(), { timeout: 4000 });
           await waitFor(() =>
             expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(
               false,
@@ -1729,6 +1742,8 @@ describe("Flashcard session due-date editor characterization", () => {
         warnSpy.mockRestore();
       }
     },
+    // Each case saves, fails, retries and waits for the sheet's exit.
+    15000,
   );
 
   describe("review-session persistence orchestration", () => {
@@ -1997,7 +2012,7 @@ describe("Flashcard session due-date editor characterization", () => {
     it("leaves at once before any grade, and asks once after one (SES-02)", async () => {
       const view = renderSession();
       await reveal(view);
-      fireEvent.press(view.getByLabelText(s.genericClose));
+      fireEvent.press(view.getByLabelText(s.sessionEndReview));
       expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
     });
 
@@ -2006,16 +2021,144 @@ describe("Flashcard session due-date editor characterization", () => {
       await reveal(view);
       fireEvent.press(getTextButton(view, s.flashcardsEasy));
       await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
-      fireEvent.press(view.getByLabelText(s.genericClose));
+      fireEvent.press(view.getByLabelText(s.sessionEndReview));
       await waitFor(() => expect(view.getByText(s.habitExitTitle)).toBeTruthy());
       fireEvent.press(getTextButton(view, s.habitExitStay));
       await waitFor(() => expect(view.queryByText(s.habitExitTitle)).toBeNull());
       expect(mockRouterReplace).not.toHaveBeenCalled();
-      fireEvent.press(view.getByLabelText(s.genericClose));
+      fireEvent.press(view.getByLabelText(s.sessionEndReview));
       await waitFor(() => expect(view.getByText(s.habitExitLeave)).toBeTruthy());
       fireEvent.press(getTextButton(view, s.habitExitLeave));
       expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
       expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
+
+    it("uses the same end-review path for Android Back as for the labeled X", async () => {
+      jest.replaceProperty(ReactNative.Platform, "OS", "android");
+      const back: { onBack: (() => boolean | null | undefined) | null } = { onBack: null };
+      jest.spyOn(ReactNative.BackHandler, "addEventListener").mockImplementation((_event, handler) => {
+        back.onBack = handler;
+        return { remove: () => undefined };
+      });
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+      await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+      let handled: boolean | null | undefined;
+      act(() => {
+        handled = back.onBack?.();
+      });
+      expect(handled).toBe(true);
+      // After a saved grade, Back asks first, exactly like X.
+      await waitFor(() => expect(view.getByText(s.habitExitTitle)).toBeTruthy());
+      // With a dialog open, Back belongs to the dialog.
+      expect(back.onBack?.()).toBe(false);
+      fireEvent.press(getTextButton(view, s.habitExitLeave));
+      expect(endReviewSession).toHaveBeenCalledWith(mockDatabase, { session: fixtureSession });
+      expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
+
+    describe("keyboard on web", () => {
+      let onKeyDown: ((event: Partial<KeyboardEvent>) => void) | null = null;
+      let platform: { replaceValue: (value: typeof ReactNative.Platform.OS) => unknown } | null = null;
+      const originalDocument = (globalThis as { document?: unknown }).document;
+      const win = globalThis as unknown as { addEventListener?: unknown; removeEventListener?: unknown };
+      const originalWindowListeners = { add: win.addEventListener, remove: win.removeEventListener };
+
+      beforeEach(() => {
+        onKeyDown = null;
+        // Web overlays listen on window for Escape; the session listens on document.
+        win.addEventListener = () => undefined;
+        win.removeEventListener = () => undefined;
+        platform = jest.replaceProperty(ReactNative.Platform, "OS", "web");
+        (globalThis as { document?: unknown }).document = {
+          addEventListener: (_type: string, handler: (event: Partial<KeyboardEvent>) => void) => {
+            onKeyDown = handler;
+          },
+          removeEventListener: () => undefined,
+          body: { style: {} },
+          documentElement: { style: {}, clientWidth: 390 },
+        };
+      });
+
+      afterEach(() => {
+        (globalThis as { document?: unknown }).document = originalDocument;
+        win.addEventListener = originalWindowListeners.add;
+        win.removeEventListener = originalWindowListeners.remove;
+      });
+
+      function press(key: string, extra: Partial<KeyboardEvent> = {}) {
+        const preventDefault = jest.fn();
+        act(() => onKeyDown?.({ key, repeat: false, isComposing: false, keyCode: 0, target: null, preventDefault, ...extra }));
+        return preventDefault;
+      }
+
+      it("reveals with Space and grades 1 to 4 by meaning in RTL, ignoring repeats, typing and composition", async () => {
+        configureSettings("ar", false);
+        const ar = strings.ar;
+        jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard, secondCard]));
+        const view = renderSession();
+        await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+        // Grades are not eligible before the answer is shown.
+        press("4");
+        expect(putStudyLogRow).not.toHaveBeenCalled();
+        expect(press(" ", { repeat: true })).not.toHaveBeenCalled();
+        expect(press(" ", { target: { closest: (selector: string) => (selector.includes("input") ? {} : null) } as never })).not.toHaveBeenCalled();
+        expect(press(" ")).toHaveBeenCalled();
+        await waitFor(() => expect(view.getByText(ar.flashcardsEasy)).toBeTruthy());
+        press("1", { isComposing: true });
+        expect(putStudyLogRow).not.toHaveBeenCalled();
+        // "٢" is Hard whatever the mirrored visual order of the buttons.
+        press("٢");
+        await waitFor(() => expect(putStudyLogRow).toHaveBeenCalledTimes(1));
+        expect(jest.mocked(putStudyLogRow).mock.calls[0][1].rating).toBe(Rating.Hard);
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+      });
+
+      it("leaves keys to an open sheet", async () => {
+        const view = renderSession();
+        await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+        // The key listener is registered; the sheet itself renders through the native overlay path here.
+        platform?.replaceValue("ios");
+        fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
+        await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+        expect(press(" ")).not.toHaveBeenCalled();
+        expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+      });
+    });
+
+    it("retries a failed grade with the same rating and appends exactly one review log", async () => {
+      const failure = new Error("synthetic grade failure");
+      const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard, secondCard]));
+      // The first attempt fails inside the transaction, so nothing of it is committed.
+      jest.mocked(putStudyLogRow).mockRejectedValueOnce(failure);
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsGood));
+      await waitFor(() => expect(view.getByText(s.flashcardsReviewSaveFailed)).toBeTruthy());
+      // A failure is not completion: the same card stays, with Try again.
+      expect(view.getByText(firstCue)).toBeTruthy();
+      expect(view.queryByText(s.flashcardsSummaryTitle)).toBeNull();
+      expect(recordSessionProgress).not.toHaveBeenCalled();
+      fireEvent.press(getTextButton(view, s.decksTryAgain));
+      await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+      expect(putStudyLogRow).toHaveBeenCalledTimes(2);
+      expect(jest.mocked(putStudyLogRow).mock.calls.map((call) => call[1].rating)).toEqual([Rating.Good, Rating.Good]);
+      // One committed attempt: session progress and the review listener ran once.
+      expect(recordSessionProgress).toHaveBeenCalledTimes(1);
+      expect(publishReviewLogged).toHaveBeenCalledTimes(1);
+      expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
+      warning.mockRestore();
+    });
+
+    it("says there is nothing to review, with the next due time, instead of a zero summary", async () => {
+      jest.mocked(loadReviewQueue).mockResolvedValue([]);
+      jest.mocked(getNextEligibleReviewDate).mockResolvedValue(new Date(2026, 10, 19, 9, 0, 0).toISOString());
+      const view = renderSession();
+      await waitFor(() => expect(view.getByText(s.sessionNothingToReview)).toBeTruthy());
+      expect(view.getByText(interpolate(s.sessionNextDue, { when: "Thursday, 19 November" }))).toBeTruthy();
+      expect(view.queryByText(s.flashcardsSummaryReviewed)).toBeNull();
     });
 
     describe("leaving while a grade is unresolved", () => {
@@ -2031,7 +2174,7 @@ describe("Flashcard session due-date editor characterization", () => {
       });
 
       function closeButton(view: ReturnType<typeof render>): RenderedNode {
-        return view.getByRole("button", { name: s.genericClose });
+        return view.getByRole("button", { name: s.sessionEndReview });
       }
 
       /** Grade the first card with its card write held open, so the grade stays unresolved. */
@@ -2221,7 +2364,7 @@ describe("Flashcard session due-date editor characterization", () => {
       const failure = new Error("synthetic card action failure");
 
       function closeButton(view: ReturnType<typeof render>): RenderedNode {
-        return view.getByRole("button", { name: s.genericClose });
+        return view.getByRole("button", { name: s.sessionEndReview });
       }
 
       function menuButton(view: ReturnType<typeof render>): RenderedNode {
@@ -2387,7 +2530,7 @@ describe("Flashcard session due-date editor characterization", () => {
         fireEvent.press(getTextButton(view, s.flashcardsEasy));
         await waitFor(() => expect(getNextEligibleReviewDate).toHaveBeenCalledTimes(1));
         // The grade is saved, so Close asks, and Leave waits for the summary being prepared.
-        fireEvent.press(view.getByRole("button", { name: s.genericClose }));
+        fireEvent.press(view.getByRole("button", { name: s.sessionEndReview }));
         await waitFor(() => expect(view.getByText(s.habitExitLeave)).toBeTruthy());
         fireEvent.press(getTextButton(view, s.habitExitLeave));
         expect(mockRouterReplace).not.toHaveBeenCalled();
@@ -2531,16 +2674,22 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(mockRouterReplace).not.toHaveBeenCalled();
     });
 
-    it("shows a failed queue load as an empty summary with an error and no review side effects", async () => {
+    it("shows a failed queue load as an error with Try again, never a completed session", async () => {
       const failure = new Error("synthetic queue failure");
       const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-      jest.mocked(loadReviewQueue).mockRejectedValueOnce(failure);
+      jest.mocked(loadReviewQueue).mockRejectedValue(failure);
       const view = renderSession();
-      await waitFor(() => expect(view.getByText(s.genericActionFailed)).toBeTruthy());
-      expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy();
+      await waitFor(() => expect(view.getByText(s.sessionLoadFailed)).toBeTruthy());
+      const failedLoads = jest.mocked(loadReviewQueue).mock.calls.length;
+      jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
+      expect(view.queryByText(s.flashcardsSummaryTitle)).toBeNull();
+      expect(view.queryByText(s.sessionNothingToReview)).toBeNull();
       expect(warning).toHaveBeenCalledWith("[FlashcardSession] Failed to load session:", failure);
       expect(putCardRow).not.toHaveBeenCalled();
       expect(putStudyLogRow).not.toHaveBeenCalled();
+      fireEvent.press(getTextButton(view, s.decksTryAgain));
+      await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+      expect(loadReviewQueue).toHaveBeenCalledTimes(failedLoads + 1);
       expect(endReviewSession).not.toHaveBeenCalled();
     });
   });

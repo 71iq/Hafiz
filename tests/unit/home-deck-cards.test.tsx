@@ -294,7 +294,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
       visible: true,
       deckId: MEANINGS_DECK_ID,
       deckTitle: s.vocabDeckTitle,
-      mode: "word",
     });
     expect(filter().visible).toBe(false);
     expect(mockRouterPush).not.toHaveBeenCalled();
@@ -310,7 +309,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(cards().deckId).toBe(MEANINGS_DECK_ID);
     act(() => cards().onClose());
     fireEvent.press(vocabControl, {});
-    expect(review().mode).toBe("word");
+    expect(review().deckId).toBe(MEANINGS_DECK_ID);
     act(() => review().onClose());
     expect(mockRouterPush).not.toHaveBeenCalled();
     fireEvent.press(startTarget(view, s.smartDeckRetentionTitle));
@@ -429,7 +428,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
     });
 
     await act(async () => {
-      review().onSaved();
+      review().onSaved("saved");
     });
 
     await waitFor(() => expect(view.getByText(s.homeLoadFailed)).toBeTruthy());
@@ -464,13 +463,13 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
         return { ...olderSmart };
       });
       await act(async () => {
-        review().onSaved();
+        review().onSaved("saved");
       });
       jest
         .mocked(getDeckTodayStats)
         .mockImplementation(async (_db, id) => ({ ...(id === MEANINGS_DECK_ID ? vocabStats : newerSmart) }));
       await act(async () => {
-        review().onSaved();
+        review().onSaved("saved");
       });
       await waitFor(() =>
         expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(newerSmart.total))).toBeTruthy(),

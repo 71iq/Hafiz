@@ -17,6 +17,7 @@ import {
 import type { DeckCardListItem, StudyCardRow } from "@/lib/fsrs/types";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { strings, type UIStrings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
 import { State } from "@/lib/fsrs/scheduler";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { expectTextAlignStart, expectWritingDirection, flattenStyle } from "../rtl/rtl-test-utils";
@@ -329,12 +330,12 @@ describe("DeckCardsSheet due-date editor characterization", () => {
 
     const editorSheet = view.UNSAFE_getAllByType(ResponsiveSheet).find((node) => node.props.maxWidth === 420);
     if (!editorSheet) throw new Error("The due-date editor sheet was not rendered");
-    expect(editorSheet.props).toMatchObject({ maxWidth: 420, maxHeight: 360, avoidKeyboard: true });
+    expect(editorSheet.props).toMatchObject({ maxWidth: 420, maxHeight: 400, avoidKeyboard: true });
     const renderedEditorSheet = view
       .UNSAFE_getAllByType(ReactNative.Animated.View)
-      .find((node) => flattenStyle(node.props.style).maxHeight === 360);
+      .find((node) => flattenStyle(node.props.style).maxHeight === 400);
     if (!renderedEditorSheet) throw new Error("The rendered due-date editor sheet was not found");
-    expect(flattenStyle(renderedEditorSheet.props.style)).toMatchObject({ width: 390, maxHeight: 360 });
+    expect(flattenStyle(renderedEditorSheet.props.style)).toMatchObject({ width: 390, maxHeight: 400 });
     expect(view.UNSAFE_getAllByType(ReactNative.KeyboardAvoidingView)).not.toHaveLength(0);
 
     fireEvent.changeText(input, "not-a-date");
@@ -803,9 +804,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           expect(enabledButtons).toHaveLength(2);
           for (const button of enabledButtons) expect(button.props.accessibilityState?.disabled).toBe(false);
           expect(view.getByText(firstCard.title)).toBeTruthy();
-          // The confirmation names the card it acts on, so the title also shows there.
-          expect(within(failedModal).getByText(secondCard.title)).toBeTruthy();
-          expect(view.getAllByText(secondCard.title)).toHaveLength(2);
+          expect(view.getByText(secondCard.title)).toBeTruthy();
           expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
           expect(onChanged).not.toHaveBeenCalled();
           expect(onClose).not.toHaveBeenCalled();
@@ -933,9 +932,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           expect(enabledButtons).toHaveLength(2);
           for (const button of enabledButtons) expect(button.props.accessibilityState?.disabled).toBe(false);
           expect(view.getByText(firstCard.title)).toBeTruthy();
-          // The confirmation names the card it acts on, so the title also shows there.
-          expect(within(failedModal).getByText(secondCard.title)).toBeTruthy();
-          expect(view.getAllByText(secondCard.title)).toHaveLength(2);
+          expect(view.getByText(secondCard.title)).toBeTruthy();
           expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
           expect(onChanged).not.toHaveBeenCalled();
           expect(onClose).not.toHaveBeenCalled();
@@ -997,4 +994,124 @@ describe("DeckCardsSheet due-date editor characterization", () => {
       }
     },
   );
+});
+
+describe("DeckCardsSheet list states, search and actions", () => {
+  beforeEach(() => {
+    configureSettings("en", false);
+    jest.resetAllMocks();
+    jest.mocked(performance.now).mockImplementation(Date.now);
+    mockMeasureInWindow.mockImplementation((callback) => callback(24, 120, 32, 32));
+    jest.spyOn(ReactNative.View.prototype, "measureInWindow").mockImplementation((callback) => {
+      mockMeasureInWindow(callback);
+    });
+    ReactNative.Dimensions.set({
+      window: { width: 1024, height: 844, scale: 1, fontScale: 1 },
+      screen: { width: 1024, height: 844, scale: 1, fontScale: 1 },
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    ReactNative.Dimensions.set({ window: originalWindowDimensions, screen: originalScreenDimensions });
+    jest.restoreAllMocks();
+  });
+
+  const s = strings.en;
+
+  it("searches with Home's normalization: tashkeel and case do not matter", async () => {
+    const rahman = { ...makeCard("55:1", "55:1", localDateWithOffset(0)), searchText: "55:1 الرَّحْمَٰنُ Ar-Rahman" };
+    jest.mocked(getDeckCardsForList).mockResolvedValue([rahman, secondCard]);
+    const view = renderDeckWithCallbacks(jest.fn(), jest.fn());
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+    expect(view.getByText(s.cardDueToday)).toBeTruthy();
+    expect(view.getByText(interpolate(s.deckCardsSubtitle, { deck: "Memorization", cards: "2 cards" }))).toBeTruthy();
+    fireEvent.changeText(view.getByLabelText(s.deckCardsSearchPlaceholder), "الرحمن");
+    expect(view.queryByText(secondCard.title)).toBeNull();
+    expect(view.getByText("55:1")).toBeTruthy();
+    fireEvent.changeText(view.getByLabelText(s.deckCardsSearchPlaceholder), "AR-RAHMAN");
+    expect(view.getByText("55:1")).toBeTruthy();
+    expect(view.getByText(interpolate(s.deckCardsShowing, { shown: "1", total: "1" }))).toBeTruthy();
+    fireEvent.changeText(view.getByLabelText(s.deckCardsSearchPlaceholder), "nothing like this");
+    expect(view.getByText(s.deckCardsNoMatch)).toBeTruthy();
+  });
+
+  it("says an empty deck has no cards yet", async () => {
+    jest.mocked(getDeckCardsForList).mockResolvedValueOnce([]);
+    const empty = renderDeckWithCallbacks(jest.fn(), jest.fn());
+    await waitFor(() => expect(empty.getByText(s.deckCardsNoCardsYet)).toBeTruthy());
+    expect(empty.queryByText(s.deckCardsNoMatch)).toBeNull();
+  });
+
+  it("shows a load error with Try again instead of an empty deck", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest
+      .mocked(getDeckCardsForList)
+      .mockRejectedValueOnce(new Error("synthetic load failure"))
+      .mockResolvedValueOnce(deckCards);
+    const view = renderDeckWithCallbacks(jest.fn(), jest.fn());
+    await waitFor(() => expect(view.getByText(s.deckCardsLoadFailed)).toBeTruthy());
+    expect(view.queryByText(s.deckCardsNoCardsYet)).toBeNull();
+    fireEvent.press(view.getByRole("button", { name: s.decksTryAgain }));
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+  });
+
+  it("orders the menu and hides Delete for generated cards", async () => {
+    jest.mocked(getDeckCardsForList).mockResolvedValue([{ ...firstCard, isVirtual: true }, secondCard]);
+    const view = renderDeckWithCallbacks(jest.fn(), jest.fn());
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+    fireEvent.press(view.getAllByRole("button", { name: s.cardActionsTitle })[0]);
+    await waitFor(() => expect(view.getByRole("menuitem", { name: s.cardMark })).toBeTruthy());
+    expect(view.getAllByRole("menuitem").map((item) => item.props.accessibilityLabel)).toEqual([
+      s.cardMark,
+      s.cardSuspend,
+      s.cardBury,
+      s.cardSetDueDate,
+      s.cardResetProgress,
+    ]);
+  });
+
+  it("names the card in the delete confirmation", async () => {
+    jest.mocked(getDeckCardsForList).mockResolvedValue(deckCards);
+    const second = renderDeckWithCallbacks(jest.fn(), jest.fn());
+    await waitFor(() => expect(second.getByText(secondCard.title)).toBeTruthy());
+    await openSecondCardConfirmation(second, s, "delete");
+    expect(
+      second.getByText(interpolate(s.cardDeleteNamed, { card: `Subtitle for Second card Second card` })),
+    ).toBeTruthy();
+  });
+
+  it("marks a failed row and retries the same action from its Try again link", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.mocked(getDeckCardsForList).mockResolvedValue(deckCards);
+    jest
+      .mocked(setStudyCardMarked)
+      .mockRejectedValueOnce(new Error("synthetic mark failure"))
+      .mockResolvedValueOnce({} as StudyCardRow);
+    const onChanged = jest.fn();
+    const view = renderDeckWithCallbacks(jest.fn(), onChanged);
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+    await openSecondCardMenu(view, s);
+    fireEvent.press(view.getByRole("menuitem", { name: s.cardMark }));
+    await waitFor(() => expect(view.getByText(s.cardActionFailed)).toBeTruthy());
+    fireEvent.press(view.getByRole("button", { name: s.decksTryAgain }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(setStudyCardMarked).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(setStudyCardMarked).mock.calls[1].slice(1, 4)).toEqual(["deck-1", "card-2", true]);
+    expect(view.queryByText(s.cardActionFailed)).toBeNull();
+  });
+
+  it("previews the typed due date in words and dims Save while it is invalid", async () => {
+    jest.mocked(getDeckCardsForList).mockResolvedValue(deckCards);
+    const view = renderDeckWithCallbacks(jest.fn(), jest.fn());
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+    const input = await openSecondCardEditor(view, s);
+    fireEvent.changeText(input, "2099-11-19");
+    expect(view.getByText("Thursday, 19 November 2099")).toBeTruthy();
+    fireEvent.changeText(input, "2099-13-40");
+    expect(view.queryByText(s.cardDueDateInvalid)).toBeNull();
+    expect(getTextButton(view, s.cardSaveDueDate).props.className).toContain("opacity-50");
+    fireEvent(input, "blur");
+    expect(view.getByText(s.cardDueDateInvalid)).toBeTruthy();
+  });
 });

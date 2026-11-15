@@ -3,7 +3,6 @@ import { Dimensions, I18nManager } from "react-native";
 import { cleanup, fireEvent, render } from "@testing-library/react-native";
 import TabLayout from "@/app/(tabs)/_layout";
 import FlashcardSessionScreenWrapper from "@/app/flashcards/session";
-import VocabSessionScreenWrapper from "@/app/flashcards/vocab";
 import OnboardingScreen from "@/app/onboarding";
 import ProfileScreen from "@/app/profile/index";
 import PublicProfileScreen from "@/app/profile/[userId]";
@@ -58,7 +57,6 @@ jest.mock("expo-router", () => ({
 const routes = [
   { name: "tabs", Screen: TabLayout, titleOwner: "context", profile: false },
   { name: "session", Screen: FlashcardSessionScreenWrapper, titleOwner: "context", profile: false },
-  { name: "vocab", Screen: VocabSessionScreenWrapper, titleOwner: "startup", profile: false },
   { name: "onboarding", Screen: OnboardingScreen, titleOwner: "context", profile: false },
   { name: "profile", Screen: ProfileScreen, titleOwner: "startup", profile: true },
   { name: "public profile", Screen: PublicProfileScreen, titleOwner: "startup", profile: true },

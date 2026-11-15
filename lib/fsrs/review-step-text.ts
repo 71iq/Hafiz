@@ -73,3 +73,61 @@ export function parseStepText(value: string, fallback: readonly SchedulerStep[])
     .filter((step): step is SchedulerStep => step !== null);
   return spaceSeparated.length > 0 ? spaceSeparated : [...fallback];
 }
+
+export type StepTextResult = { ok: true; steps: SchedulerStep[] } | { ok: false };
+
+/**
+ * Strict reading of a steps field for the settings editor: every token must be a step, so a typo is
+ * reported instead of being dropped (parseStepText above keeps its lenient reading for old callers).
+ * Steps are separated by commas, or by spaces; a number may stand apart from its unit ("1 دقيقة").
+ * An empty field is valid and means no steps.
+ */
+export function validateStepText(value: string): StepTextResult {
+  if (value.trim().length === 0) return { ok: true, steps: [] };
+  const result = readStrictSteps(value);
+  // "01m" saves as "1m": the number is kept as a value, not as typed.
+  return result
+    ? { ok: true, steps: result.map((step) => `${parseFloat(step)}${step.slice(-1)}` as SchedulerStep) }
+    : { ok: false };
+}
+
+function readStrictSteps(value: string): SchedulerStep[] | null {
+  const steps: SchedulerStep[] = [];
+  for (const chunk of value.split(/[,،]/)) {
+    const trimmed = chunk.trim();
+    if (!trimmed) continue;
+    const whole = parseStepToken(trimmed);
+    if (whole) {
+      steps.push(whole);
+      continue;
+    }
+    const words = trimmed.split(/\s+/);
+    for (let i = 0; i < words.length; i += 1) {
+      const single = parseStepToken(words[i]);
+      if (single) {
+        steps.push(single);
+        continue;
+      }
+      const paired = i + 1 < words.length ? parseStepToken(`${words[i]} ${words[i + 1]}`) : null;
+      if (!paired) return null;
+      steps.push(paired);
+      i += 1;
+    }
+  }
+  return steps;
+}
+
+function formatEnglishStep(step: SchedulerStep): string {
+  const match = step.match(STEP_TEXT_RE);
+  if (!match) return step;
+  const value = Number(match[1]);
+  if (match[2] === "m") return `${match[1]} min`;
+  if (match[2] === "h") return `${match[1]} ${value === 1 ? "hour" : "hours"}`;
+  return `${match[1]} ${value === 1 ? "day" : "days"}`;
+}
+
+/** The steps a valid field will save, spelled out for the "Will use" preview under it. */
+export function formatStepPreview(steps: readonly SchedulerStep[], language: "en" | "ar"): string {
+  if (language === "ar") return steps.map(formatArabicStep).join("، ");
+  return steps.map(formatEnglishStep).join(", ");
+}

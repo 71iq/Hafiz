@@ -1,3 +1,4 @@
+import { normalizeDateDigits } from "@/lib/date";
 import {
   MAX_DECK_MAXIMUM_INTERVAL,
   MAX_DECK_REQUEST_RETENTION,
@@ -22,4 +23,23 @@ export function clampRequestRetention(value: number): number {
 
 export function clampMaximumInterval(value: number): number {
   return Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value));
+}
+
+export type LimitTextResult = { ok: true; value: number } | { ok: false };
+
+/**
+ * A typed daily limit: a whole number in Western or Arabic-Indic digits, at least `min`, with no
+ * upper cap beyond what the stepper already allows. Signs, fractions and other characters are
+ * rejected rather than clamped.
+ */
+export function validateLimitText(text: string, min: number): LimitTextResult {
+  const normalized = normalizeDateDigits(text.trim());
+  if (!/^\d+$/.test(normalized)) return { ok: false };
+  const value = Number(normalized);
+  if (!Number.isSafeInteger(value) || value < min) return { ok: false };
+  return { ok: true, value };
+}
+
+export function validateDailyReviewLimitText(text: string): LimitTextResult {
+  return validateLimitText(text, MIN_DECK_DAILY_REVIEW_LIMIT);
 }

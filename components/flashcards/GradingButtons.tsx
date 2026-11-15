@@ -31,6 +31,7 @@ export function GradingButtons({
   proposed = null,
   maxRating = Rating.Easy,
   dir = "ltr",
+  mirrorInRTL = false,
 }: {
   onGrade: (rating: Grade) => void;
   previews: Record<number, string>;
@@ -39,8 +40,13 @@ export function GradingButtons({
   disabled?: boolean;
   proposed?: Grade | null;
   maxRating?: Grade;
-  /** Direction of the caption; the grade row itself always runs Again to Easy from the left. */
+  /** Direction of the caption. */
   dir?: "ltr" | "rtl";
+  /**
+   * Run the row Again to Easy from the start of the reading direction, so Arabic reads it from the
+   * right. Only the visual order moves: each button keeps its grade, and keys 1 to 4 keep theirs.
+   */
+  mirrorInRTL?: boolean;
 }) {
   const labels: Record<number, string> = {
     [Rating.Again]: s.flashcardsAgain,
@@ -73,7 +79,10 @@ export function GradingButtons({
           ))}
         </View>
       ) : null}
-      <View className="flex-row" style={{ direction: "ltr", gap: ringSpace > 0 ? 6 : 12 }}>
+      <View
+        className="flex-row"
+        style={{ direction: "ltr", flexDirection: mirrorInRTL && dir === "rtl" ? "row-reverse" : "row", gap: ringSpace > 0 ? 6 : 12 }}
+      >
         {GRADE_BUTTONS.map(({ rating, bgLight, bgDark }) => {
           const isCapped = rating > maxRating;
           const suggested = proposed === rating;
@@ -99,22 +108,18 @@ export function GradingButtons({
                   className="items-center justify-center px-1.5 py-2.5"
                   style={{ backgroundColor: isCapped ? undefined : isDark ? bgDark : bgLight, minHeight: 58 }}
                 >
+                  {/* Long labels wrap and the button grows instead of shrinking the type. */}
                   <Text
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.82}
                     className={isCapped ? "text-warm-500 dark:text-neutral-500" : undefined}
-                    style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: isCapped ? undefined : "#fff" }}
+                    style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: "center", color: isCapped ? undefined : "#fff" }}
                   >
                     {labels[rating]}
                   </Text>
                   {/* A capped grade cannot be chosen, so it shows no next-review interval. */}
                   {previews[rating] && !isCapped ? (
                     <Text
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
                       style={{
+                        textAlign: "center",
                         // Solid white at 11 px reads at 4.5:1 or more on every fill.
                         color: "#fff",
                         fontFamily: "Manrope_600SemiBold",
