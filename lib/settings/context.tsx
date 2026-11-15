@@ -1,11 +1,20 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { Platform, useColorScheme as useSystemColorScheme, useWindowDimensions, View } from "react-native";
 import { useColorScheme as useNativeWindColorScheme, vars } from "nativewind";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { DEFAULT_LANGUAGE, DEFAULT_TRANSLATION_LANGUAGE } from "@/lib/translations/languages";
-import { importTranslation } from "@/lib/translations/import";
+import { importTranslation, TranslationImportCancelled } from "@/lib/translations/import";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-foundation/recitations";
 import { DirectionProvider } from "@/lib/ui/direction";
@@ -14,6 +23,7 @@ import { DEFAULT_TAFSIR_SOURCE, isAvailableTafsirSourceId, type TafsirSourceId }
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { setHapticsEnabled } from "@/lib/haptics";
 import { getResolvedUiBootstrap, writeUiBootstrap } from "@/lib/settings/ui-bootstrap";
+import { emitSettingSaveFailed } from "@/lib/settings/save-feedback";
 
 // Desktop / large-viewport scale. Also the canonical length (10 levels) used
 // by UI controls like the font size picker.
@@ -219,7 +229,12 @@ type SettingsContextType = {
   showTafseer: boolean;
   setShowTafseer: (show: boolean) => void;
   translationLanguage: string;
-  setTranslationLanguage: (code: string) => Promise<void>;
+  /**
+   * Select a translation. Built-in English applies at once; another language is imported first. The
+   * previous choice stays selected if the import fails. `isCurrent` lets the picker cancel before the
+   * import replaces the active rows; a newer selection always wins over an older import.
+   */
+  setTranslationLanguage: (code: string, options?: { isCurrent?: () => boolean }) => Promise<void>;
   isTranslationLoading: boolean;
   tafseerSource: TafseerSource;
   setTafseerSource: (source: TafseerSource) => void;
@@ -816,6 +831,30 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
    * Saves one setting. The caller has already applied the optimistic value; if the write fails and
    * no newer write for the same key has started, onFailure restores the last committed value.
    */
+  // The values a failed write reverts to. Setters read them here so their identity stays stable.
+  const latestValues = useRef({
+    fontSizeIndex,
+    viewMode,
+    quranFontStyle,
+    quranMarkerStyle,
+    markSimilarVerses,
+    pageScroll,
+    tafseerSource,
+    recitationId,
+  });
+  useLayoutEffect(() => {
+    latestValues.current = {
+      fontSizeIndex,
+      viewMode,
+      quranFontStyle,
+      quranMarkerStyle,
+      markSimilarVerses,
+      pageScroll,
+      tafseerSource,
+      recitationId,
+    };
+  });
+
   const persist = useCallback(
     (key: string, value: string, onFailure?: () => void, onSuccess?: () => void) => {
       const generation = (writeGenerations.current.get(key) ?? 0) + 1;
@@ -829,7 +868,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         },
         () => {
           console.warn(`[Settings] Failed to save ${key}`);
-          if (writeGenerations.current.get(key) === generation) onFailure?.();
+          if (writeGenerations.current.get(key) !== generation) return;
+          onFailure?.();
+          emitSettingSaveFailed(key);
         },
       );
     },
@@ -839,10 +880,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setFontSizeIndex = useCallback(
     (index: number) => {
       if (index < 0 || index >= FONT_SIZE_STEPS.length) return;
+      const previous = latestValues.current.fontSizeIndex;
       setFontSizeIndexState(index);
-      writeSetting(db, "font_size_index", String(index)).catch(console.warn);
+      persist("font_size_index", String(index), () => setFontSizeIndexState(previous));
     },
-    [db],
+    [persist],
   );
 
   const setTheme = useCallback(
@@ -867,26 +909,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const setViewMode = useCallback(
     (mode: ViewMode) => {
+      const previous = latestValues.current.viewMode;
       setViewModeState(mode);
-      writeSetting(db, "view_mode", mode).catch(console.warn);
+      persist("view_mode", mode, () => setViewModeState(previous));
     },
-    [db],
+    [persist],
   );
 
   const setQuranFontStyle = useCallback(
     (style: QuranFontStyle) => {
+      const previous = latestValues.current.quranFontStyle;
       setQuranFontStyleState(style);
-      writeSetting(db, "quran_font_style", style).catch(console.warn);
+      persist("quran_font_style", style, () => setQuranFontStyleState(previous));
     },
-    [db],
+    [persist],
   );
 
   const setQuranMarkerStyle = useCallback(
     (style: QuranMarkerStyle) => {
+      const previous = latestValues.current.quranMarkerStyle;
       setQuranMarkerStyleState(style);
-      writeSetting(db, "quran_marker_style", style).catch(console.warn);
+      persist("quran_marker_style", style, () => setQuranMarkerStyleState(previous));
     },
-    [db],
+    [persist],
   );
 
   const setShowAyahMarkers = useCallback(
@@ -899,18 +944,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const setMarkSimilarVerses = useCallback(
     (mark: boolean) => {
+      const previous = latestValues.current.markSimilarVerses;
       setMarkSimilarVersesState(mark);
-      writeSetting(db, "mark_similar_verses", String(mark)).catch(console.warn);
+      persist("mark_similar_verses", String(mark), () => setMarkSimilarVersesState(previous));
     },
-    [db],
+    [persist],
   );
 
   const setPageScroll = useCallback(
     (scroll: PageScroll) => {
+      const previous = latestValues.current.pageScroll;
       setPageScrollState(scroll);
-      writeSetting(db, "page_scroll", scroll).catch(console.warn);
+      persist("page_scroll", scroll, () => setPageScrollState(previous));
     },
-    [db],
+    [persist],
   );
 
   const setShowTranslation = useCallback(
@@ -929,30 +976,37 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db],
   );
 
+  const translationRequest = useRef(0);
   const setTranslationLanguage = useCallback(
-    async (code: string) => {
+    async (code: string, options: { isCurrent?: () => boolean } = {}) => {
       if (code === translationLanguage) return;
       if (!db) throw new Error("Database not initialized");
+      const request = ++translationRequest.current;
       if (code === DEFAULT_LANGUAGE) {
+        // English reads its own bundled table, so it never waits for an import in progress.
+        setIsTranslationLoading(false);
         setTranslationLanguageState(code);
         await writeSetting(db, "translation_language", code);
         return;
       }
-      if (code !== DEFAULT_LANGUAGE) {
-        setIsTranslationLoading(true);
-        try {
-          await importTranslation(db, code);
-          await writeSetting(db, "translation_active_lang", code);
-          setTranslationLanguageState(code);
-          await writeSetting(db, "translation_language", code);
-        } catch (e) {
-          console.warn("[Settings] Failed to import translation:", e);
-          setTranslationLanguageState(DEFAULT_LANGUAGE);
-          writeSetting(db, "translation_language", DEFAULT_LANGUAGE).catch(console.warn);
-          throw e;
-        } finally {
-          setIsTranslationLoading(false);
-        }
+      const isLatest = () => translationRequest.current === request;
+      setIsTranslationLoading(true);
+      try {
+        await importTranslation(db, code, {
+          shouldContinue: () => isLatest() && (options.isCurrent?.() ?? true),
+        });
+        // The rows are committed now, so record them even if a newer choice was made meanwhile.
+        await writeSetting(db, "translation_active_lang", code);
+        if (!isLatest()) return;
+        setTranslationLanguageState(code);
+        await writeSetting(db, "translation_language", code);
+      } catch (e) {
+        // The previous translation stays selected. A failed or cancelled import rolled back or never
+        // started its transaction, so the active rows still belong to the previous choice.
+        if (!(e instanceof TranslationImportCancelled)) console.warn("[Settings] Failed to import translation:", e);
+        throw e;
+      } finally {
+        if (isLatest()) setIsTranslationLoading(false);
       }
     },
     [db, translationLanguage],
@@ -960,19 +1014,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const setTafseerSource = useCallback(
     (source: TafseerSource) => {
+      const previous = latestValues.current.tafseerSource;
       setTafseerSourceState(source);
-      writeSetting(db, "tafseer_source", source).catch(console.warn);
+      persist("tafseer_source", source, () => setTafseerSourceState(previous));
     },
-    [db],
+    [persist],
   );
 
   const setRecitationId = useCallback(
     (id: number) => {
       const next = normalizeRecitationId(id);
+      const previous = latestValues.current.recitationId;
       setRecitationIdState(next);
-      writeSetting(db, "recitation_id", String(next)).catch(console.warn);
+      persist("recitation_id", String(next), () => setRecitationIdState(previous));
     },
-    [db],
+    [persist],
   );
 
   const setDailyReviewLimit = useCallback(

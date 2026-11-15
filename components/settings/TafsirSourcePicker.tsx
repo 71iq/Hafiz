@@ -164,7 +164,7 @@ export function TafsirSourcePicker({
           disabled={disabled}
           accessibilityRole="button"
           accessibilityState={{ selected: isSelected, busy: isImporting, disabled }}
-          accessibilityLabel={`${title}, ${statusText}`}
+          accessibilityLabel={isIncluded ? `${title}, ${s.tafsirOfflineTag}, ${statusText}` : `${title}, ${statusText}`}
           className={`items-center justify-between gap-3 rounded-2xl px-3 py-3.5 ${
             isSelected ? "bg-primary-soft/10 dark:bg-primary-bright/10" : ""
           }`}
@@ -186,17 +186,28 @@ export function TafsirSourcePicker({
             )
           }
         >
-          <Text
-            className={isSelected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-300"}
-            style={{
-              fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
-              fontSize: 15,
-              ...textStartStyle(isRTL),
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {title}
-          </Text>
+          <View className="items-center gap-2" style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row", flexWrap: "wrap" }}>
+            <Text
+              className={isSelected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-300"}
+              style={{
+                fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                fontSize: 15,
+                ...textStartStyle(isRTL),
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {title}
+            </Text>
+            {isIncluded ? (
+              // Bundled sources work without a connection.
+              <Text
+                className="rounded-full bg-primary-accent/10 px-2 py-0.5 text-primary-accent dark:bg-primary-bright/15 dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+              >
+                {s.tafsirOfflineTag}
+              </Text>
+            ) : null}
+          </View>
           <Text
             className="mt-0.5 text-warm-500 dark:text-neutral-400"
             style={{

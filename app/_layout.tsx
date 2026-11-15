@@ -26,6 +26,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { strings } from "@/lib/i18n/strings";
 import { documentTitleFor } from "@/lib/navigation/document-title";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { NavigationBarTheme } from "@/components/settings/NavigationBarTheme";
 
 const queryClient = createAppQueryClient();
 const NATIVE_UI_FONT_WAIT_MS = 3000;
@@ -178,6 +179,8 @@ export default function RootLayout() {
             <DatabaseNoticeBoundary>
               <AudioProviderBoundary>
                 {Platform.OS === "web" ? <StableDocumentTitle /> : null}
+                {/* Android system button contrast follows the resolved theme; web and iOS render nothing. */}
+                <NavigationBarTheme />
                 <ReminderLifecycle />
                 <EncouragementChecks />
                 <MinorPhotoCleanup />
@@ -194,7 +197,6 @@ export default function RootLayout() {
                   <Stack.Screen name="credits" />
                   <Stack.Screen name="privacy" />
                   <Stack.Screen name="terms" />
-                  <Stack.Screen name="zayt-preview" />
                   <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
                   <Stack.Screen name="open" />
                   <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />

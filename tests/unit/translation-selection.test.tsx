@@ -10,7 +10,7 @@ import { DirectionProvider } from "@/lib/ui/direction";
 import { TRANSLATION_LANGUAGES } from "@/lib/translations/languages";
 import { strings } from "@/lib/i18n/strings";
 
-const mockSelect = jest.fn<Promise<void>, [string]>();
+const mockSelect = jest.fn<Promise<void>, [string, { isCurrent?: () => boolean }?]>();
 const mockSettings = {
   translationLanguage: "en-bridges",
   setTranslationLanguage: mockSelect,
@@ -51,9 +51,21 @@ function tree({ ready = true, mounted = true, visible = true } = {}) {
     </SafeAreaProvider>
   );
 }
+// Rows render as "On this device" (English and the active translation), then "Available".
+function renderedOrder() {
+  const onDevice = (code: string) => code === "en" || code === mockSettings.translationLanguage;
+  return [
+    ...TRANSLATION_LANGUAGES.filter((language) => onDevice(language.code)),
+    ...TRANSLATION_LANGUAGES.filter((language) => !onDevice(language.code)),
+  ].map((language) => language.code);
+}
+function row(view: ReturnType<typeof render>, code: string) {
+  const match = view.UNSAFE_getAllByType(DisclosureRow)[renderedOrder().indexOf(code)];
+  if (!match) throw new Error(`Missing row ${code}`);
+  return match;
+}
 function action(view: ReturnType<typeof render>, code = "id") {
-  const index = TRANSLATION_LANGUAGES.findIndex((language) => language.code === code);
-  const callback: unknown = view.UNSAFE_getAllByType(DisclosureRow)[index].props.onPress;
+  const callback: unknown = row(view, code).props.onPress;
   if (typeof callback !== "function") throw new Error("Missing actual selection");
   return () => {
     const result = Promise.resolve(callback());
@@ -70,8 +82,14 @@ function begin(view: ReturnType<typeof render>, code = "id") {
   if (!result) throw new Error("Missing selection result");
   return result;
 }
+// Built-in English stays usable while another language imports; every other row follows busy.
 function busy(view: ReturnType<typeof render>, expected: boolean) {
-  expect(view.UNSAFE_getAllByType(DisclosureRow).every((row) => row.props.disabled === expected)).toBe(true);
+  const rows = view.UNSAFE_getAllByType(DisclosureRow);
+  const order = renderedOrder();
+  expect(
+    rows.filter((_, index) => order[index] !== "en").every((candidate) => candidate.props.disabled === expected),
+  ).toBe(true);
+  expect(row(view, "en").props.disabled).toBe(false);
 }
 function dismiss(view: ReturnType<typeof render>, kind: "header" | "sheet") {
   const callback: unknown =
@@ -230,7 +248,7 @@ describe.each(["en", "ar"] as const)("%s translation selection lifetime", (langu
       void second();
     });
     expect(mockSelect).toHaveBeenCalledTimes(1);
-    expect(mockSelect).toHaveBeenCalledWith("id");
+    expect(mockSelect).toHaveBeenCalledWith("id", expect.objectContaining({ isCurrent: expect.any(Function) }));
     await act(async () => {
       pending.resolve();
       await result;
@@ -301,7 +319,7 @@ describe.each(["en", "ar"] as const)("%s translation selection lifetime", (langu
       await current;
     });
     expect(mockSelect).toHaveBeenCalledTimes(1);
-    expect(mockSelect).toHaveBeenCalledWith("fr");
+    expect(mockSelect).toHaveBeenCalledWith("fr", expect.objectContaining({ isCurrent: expect.any(Function) }));
     expect(close).toHaveBeenCalledTimes(2);
     busy(view, false);
   });
