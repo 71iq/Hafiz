@@ -62,7 +62,11 @@ async function readPendingCount(db: Parameters<typeof getPendingSyncCount>[0]): 
   return accountCount + qfCount;
 }
 
-type SyncView = { start: () => Promise<void> };
+type SyncView = {
+  start: () => Promise<void>;
+  /** The database and account this view syncs, as of its latest render. */
+  holds: (db: unknown, userId: string) => boolean;
+};
 // The optional status overlay can remount while its database work is still pending.
 let physicalSyncRun: symbol | null = null;
 let physicalSyncSettled: Promise<void> = Promise.resolve();
@@ -120,7 +124,7 @@ export function useSync() {
   );
   const mounted = useRef(false);
   const lifecycle = useRef(0);
-  const viewOwner = useRef<SyncView>({ start: async () => {} });
+  const viewOwner = useRef<SyncView>({ start: async () => {}, holds: () => false });
   const sequence = useRef(0);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const context = useRef({ db, userId, identityKey, isLoaded, isTranslationLoading });
@@ -231,19 +235,40 @@ export function useSync() {
         }
         setStatus("syncing");
         setFailure(null);
+        // The rows a run moved are in the database whatever becomes of the view that started it, so
+        // they are announced as soon as the result is known, before follow-up work can outlast the
+        // view: an account restore that finished as the app navigated after sign-in otherwise left
+        // Home on the empty plan it read first, since the next run moves nothing and announces
+        // nothing. A retired run announces only while the same session holds the data and a mounted
+        // view still syncs that database. A finished restore is announced even when it moved no rows:
+        // the local data now belongs to this account, and screens and the board refresh wait for it.
+        const announce = (moved: SyncResult) => {
+          if (!isOrdinaryResult(moved)) return;
+          if (!(moved.pushed > 0 || moved.pulled > 0 || moved.accountRestored || moved.restoreCompleted)) return;
+          const holder = latestSyncView();
+          if (isCurrent() || (isAuthCurrent() && holder !== undefined && holder.holds(db, userId))) {
+            emitSyncCompleted(moved);
+          }
+        };
         let result =
           mode.kind === "accept"
             ? await acceptRestoreConsent(db, mode.token)
             : mode.kind === "resume"
               ? await fullSync(db, { resume: true })
               : await fullSync(db);
-        if (!isCurrent()) return;
+        if (!isCurrent()) {
+          announce(result);
+          return;
+        }
         let issue: RestoreConsentIssue = null;
         if (result.status === "restore_consent_stale") {
           // Local data changed after the prompt was prepared: prepare fresh counts and a fresh token.
           issue = "stale";
           result = await fullSync(db, { resume: true });
-          if (!isCurrent()) return;
+          if (!isCurrent()) {
+            announce(result);
+            return;
+          }
         }
         if (result.status === "restore_consent_invalid") {
           updateRestoreConsent(userId, { busy: null, issue: "expired" });
@@ -261,6 +286,8 @@ export function useSync() {
           return;
         }
         if (!isOrdinaryResult(result)) return;
+        announce(result);
+        if (!isCurrent()) return;
         // The account restore is complete for this owner, so any pause and request are over.
         const consent = getRestoreConsentView();
         if (consent.request || consent.pause || consent.busy || consent.issue) {
@@ -273,11 +300,6 @@ export function useSync() {
               error instanceof Error ? error.message : String(error),
             );
         });
-        if (!isCurrent()) return;
-        // A finished account restore is announced even when it moved no rows: the local data now
-        // belongs to this account, and screens and the board refresh wait for it.
-        if (result.pushed > 0 || result.pulled > 0 || result.accountRestored || result.restoreCompleted)
-          emitSyncCompleted(result);
         if (!isCurrent()) return;
         const qfResult = isQfSyncEnabled() ? await fullQfUserSync(db) : null;
         if (!isCurrent()) return;
@@ -368,6 +390,8 @@ export function useSync() {
   useLayoutEffect(() => {
     context.current = { db, userId, identityKey, isLoaded, isTranslationLoading };
     viewOwner.current.start = doSync;
+    viewOwner.current.holds = (heldDb, heldUserId) =>
+      context.current.db === heldDb && context.current.userId === heldUserId;
   }, [db, userId, identityKey, isLoaded, isTranslationLoading, doSync]);
 
   useLayoutEffect(

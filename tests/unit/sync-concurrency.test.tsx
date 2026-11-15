@@ -437,7 +437,10 @@ it.each(["same account", "new account", "new database"])(
     expect(mockFullSync).toHaveBeenCalledTimes(2);
     expect(mockStats).toHaveBeenCalledTimes(1);
     expect(mockQfSync).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(emitSyncCompleted).mock.calls.every(([summary]) => summary.pulled !== 99)).toBe(true);
+    // The retired run's rows are announced only while the replacement syncs the same database for the
+    // same session; its follow-up work (stats, QF) still runs once, from the replacement.
+    const announced = jest.mocked(emitSyncCompleted).mock.calls.some(([summary]) => summary.pulled === 99);
+    expect(announced).toBe(replacementKind === "same account");
   },
 );
 
@@ -882,4 +885,39 @@ describe("W14 account status details", () => {
     });
     expect(mockFullSync).toHaveBeenCalledTimes(2);
   });
+});
+
+it("announces what a run moved when its view is replaced but the same session owns the data", async () => {
+  // Found on an Android phone: the account restore after sign-in finished as the app navigated, its run
+  // was retired with the view, and Home kept the empty plan it read first until the app restarted.
+  const restored: Summary = { status: "synced", pushed: 0, pulled: 71, accountRestored: true, localDataReplaced: false, restoreCompleted: true };
+  const response = deferred<Summary>();
+  mockFullSync.mockReturnValueOnce(response.promise);
+  renderHook(() => useSync());
+  await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(1));
+  // A newer view takes over while the restore is still running.
+  const second = renderHook(() => useSync());
+  await act(async () => {
+    response.resolve(restored);
+  });
+  await waitFor(() => expect(second.result.current.status).toBe("synced"));
+  expect(jest.mocked(emitSyncCompleted).mock.calls.some(([summary]) => summary.pulled === 71)).toBe(true);
+});
+
+it("announces a restore before profile stats, so a view replaced during the stats keeps it", async () => {
+  // Review finding: the restore finished while its view was current, the view was replaced during
+  // the profile stats upload, and the run returned there without announcing.
+  const restored: Summary = { status: "synced", pushed: 0, pulled: 71, accountRestored: true, localDataReplaced: false, restoreCompleted: true };
+  const stats = deferred<void>();
+  mockFullSync.mockResolvedValueOnce(restored);
+  mockStats.mockReturnValueOnce(stats.promise);
+  const first = renderHook(() => useSync());
+  await waitFor(() => expect(mockStats).toHaveBeenCalledTimes(1));
+  first.unmount();
+  const second = renderHook(() => useSync());
+  await act(async () => {
+    stats.resolve();
+  });
+  await waitFor(() => expect(second.result.current.status).toBe("synced"));
+  expect(jest.mocked(emitSyncCompleted).mock.calls.some(([summary]) => summary.pulled === 71)).toBe(true);
 });
