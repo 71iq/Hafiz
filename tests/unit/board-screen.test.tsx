@@ -437,7 +437,7 @@ describe("Board tab", () => {
     const screen = renderScreen();
 
     const mine = await screen.findByLabelText(
-      interpolate(strings.en.boardPointsA11y, { name: `Amina (${strings.en.boardYou})`, rank: "2", points: "6", streak: "4 days" }),
+      interpolate(strings.en.boardPointsA11y, { name: `Amina (${strings.en.boardYou})`, rank: "2", points: "6 points", streak: "4 days" }),
     );
     expect(mine).toBeTruthy();
     expect(screen.getByText("Little Star")).toBeTruthy();
@@ -448,6 +448,28 @@ describe("Board tab", () => {
     expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
   });
 
+  it("explains the weekly scoring in an info view without excuses or a global ranking", async () => {
+    signIn(USER);
+    boardState = ready;
+    const screen = renderScreen();
+    fireEvent.press(await screen.findByRole("button", { name: strings.en.boardScoringOpen }));
+    expect(await screen.findByText(strings.en.boardRules)).toBeTruthy();
+    expect(screen.getByText(strings.en.boardScoringEligibility)).toBeTruthy();
+    // Reading the rules calls nothing new: no join, no other ranking.
+    expect(mockRpc.mock.calls.map(([fn]) => fn).filter((fn) => fn !== "get_board")).toEqual([]);
+  });
+
+  it("keeps local study reassurance beside a Board read failure and shows no standings", async () => {
+    signIn(USER);
+    mockRpc.mockImplementation(async (fn) => {
+      if (fn === "get_board") return { data: null, error: { code: "XX000", message: "synthetic failure" } };
+      throw new Error(`Unexpected RPC ${fn}`);
+    });
+    const screen = renderScreen();
+    expect(await screen.findByText(new RegExp(strings.en.boardLocalReassurance))).toBeTruthy();
+    expect(screen.queryByText("Little Star")).toBeNull();
+  });
+
   it("mirrors standing rows in Arabic and uses Arabic digits", async () => {
     mockSettings.isRTL = true;
     mockSettings.uiLanguage = "ar";
@@ -456,7 +478,7 @@ describe("Board tab", () => {
     const screen = renderScreen();
 
     const row = await screen.findByLabelText(
-      interpolate(strings.ar.boardPointsA11y, { name: "Little Star", rank: "١", points: "٩", streak: "١٢ يومًا" }),
+      interpolate(strings.ar.boardPointsA11y, { name: "Little Star", rank: "١", points: "٩ نقاط", streak: "١٢ يومًا" }),
     );
     expect(flattenStyle(row.props.style)).toMatchObject({ direction: "ltr", flexDirection: "row-reverse" });
     // STR-28: an Arabic reader's week starts on Saturday unless they chose another day.
