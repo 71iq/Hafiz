@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
-import { View } from "react-native";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { useDatabase } from "@/lib/database/provider";
 
 export default function IndexRedirect() {
@@ -26,6 +26,7 @@ export default function IndexRedirect() {
 
   if (checked) return null;
 
-  // Brief blank screen while checking
-  return <View style={{ flex: 1 }} />;
+  // The logo stays during the onboarding lookup, without the preparation bar, until Home or
+  // onboarding appears.
+  return <LoadingScreen progress={null} showProgress={false} />;
 }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { openDatabaseAsync } from "expo-sqlite";
 import { importBundledDatabase } from "./bundled-database";
@@ -14,6 +14,12 @@ type DatabaseContextType = {
   isReady: boolean;
   progress: ImportProgress | null;
   error: string | null;
+  /**
+   * Runs preparation again after a failure. It reuses the same idempotent startup path: schema
+   * creation and migrations are additive, an interrupted content import clears only bundled content
+   * tables, and user tables are never reset. A connection whose close is uncertain stays failed.
+   */
+  retry: () => void;
 };
 
 const DatabaseContext = createContext<DatabaseContextType>({
@@ -21,6 +27,7 @@ const DatabaseContext = createContext<DatabaseContextType>({
   isReady: false,
   progress: null,
   error: null,
+  retry: () => {},
 });
 
 const quranDbAsset = require("../../assets/data/quran.db");
@@ -62,6 +69,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const retryRef = useRef<() => void>(() => {});
+  const retry = useCallback(() => retryRef.current(), []);
 
   useEffect(() => {
     const uniqueId = () =>
@@ -493,8 +502,14 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     const lifecycleWindow = isWeb && typeof window !== "undefined" ? window : null;
     lifecycleWindow?.addEventListener("pagehide", handlePageHide);
     lifecycleWindow?.addEventListener("pageshow", handlePageShow);
+    retryRef.current = () => {
+      // Only a settled failure retries; a running attempt or a live connection is left alone.
+      if (cancelled || hidden || currentDb || attempt) return;
+      void runInit();
+    };
     void runInit();
     return () => {
+      retryRef.current = () => {};
       lifecycleWindow?.removeEventListener("pagehide", handlePageHide);
       lifecycleWindow?.removeEventListener("pageshow", handlePageShow);
       hidden = true;
@@ -506,7 +521,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return <DatabaseContext.Provider value={{ db, isReady, progress, error }}>{children}</DatabaseContext.Provider>;
+  const value = useMemo(() => ({ db, isReady, progress, error, retry }), [db, isReady, progress, error, retry]);
+  return <DatabaseContext.Provider value={value}>{children}</DatabaseContext.Provider>;
 }
 
 export function useDatabase() {

@@ -1,9 +1,15 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
-import { View, StyleSheet } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import { AlertTriangle } from "lucide-react-native";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useStrings } from "@/lib/i18n/useStrings";
+import type { UIStrings } from "@/lib/i18n/strings";
 import { useSettings } from "@/lib/settings/context";
-import { AlertTriangle } from "lucide-react-native";
+import { errorIconColor } from "@/lib/ui/theme-icons";
+
+// The support contact published on the About and Terms pages.
+export const SUPPORT_CONTACT_URL = "mailto:support@hafizquran.app";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,18 +21,22 @@ interface ErrorBoundaryProps {
   fallback?: ReactNode;
   /** Section name used for logging context (e.g. "Mushaf", "Flashcards"). */
   section?: string;
+  /**
+   * "screen" fills its route with Retry, Go to Home and the support link. "section" is a smaller
+   * inline card for a boundary around one part of a screen or sheet, so the surrounding controls
+   * (including a sheet's close button) keep working.
+   */
+  variant?: "screen" | "section";
+  /** Strings for a boundary outside the settings provider (the root route fallback). */
+  strings?: UIStrings;
+  /** Shows the Go to Home action. Off where Home is not reachable or not meaningful. */
+  showHome?: boolean;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
 }
-
-// ---------------------------------------------------------------------------
-// Styles — StyleSheet because class components cannot use hooks (NativeWind).
-// Follows "The Serene Path" design tokens: warm neutrals, teal accent, no
-// borders, pill shapes, tonal layering, Manrope font family.
-// ---------------------------------------------------------------------------
 
 const viewStyles = StyleSheet.create({
   container: {
@@ -37,7 +47,6 @@ const viewStyles = StyleSheet.create({
     paddingVertical: 48,
   },
 });
-
 
 // ---------------------------------------------------------------------------
 // ErrorBoundary (class component — React requirement for error boundaries)
@@ -62,6 +71,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.setState({ hasError: false, error: null });
   };
 
+  private handleHome = () => {
+    this.setState({ hasError: false, error: null });
+    // The root entry decides between onboarding and Home.
+    router.replace("/");
+  };
+
   render() {
     if (!this.state.hasError) {
       return this.props.children;
@@ -72,25 +87,116 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return this.props.fallback;
     }
 
-    return <ErrorFallback onReset={this.handleReset} />;
+    return (
+      <ErrorFallback
+        onReset={this.handleReset}
+        onHome={this.props.showHome === false ? undefined : this.handleHome}
+        variant={this.props.variant ?? "screen"}
+        strings={this.props.strings}
+      />
+    );
   }
+}
+
+/** The route fallback outside the providers reads the startup strings it is given. */
+export function RouteErrorFallback({
+  strings,
+  onRetry,
+}: {
+  strings: UIStrings;
+  onRetry: () => void;
+}) {
+  return <ErrorFallback onReset={onRetry} onHome={() => router.replace("/")} variant="screen" strings={strings} />;
 }
 
 // The fallback reads strings and theme through hooks, so it follows the app language and dark themes;
 // the class body drew fixed English text in a fixed dark colour.
-function ErrorFallback({ onReset }: { onReset: () => void }) {
-  const s = useStrings();
-  const { isDark } = useSettings();
+function ErrorFallback({
+  onReset,
+  onHome,
+  variant,
+  strings: providedStrings,
+}: {
+  onReset: () => void;
+  onHome?: () => void;
+  variant: "screen" | "section";
+  strings?: UIStrings;
+}) {
+  const contextStrings = useStrings();
+  const s = providedStrings ?? contextStrings;
+  const { isDark, effectiveTheme } = useSettings();
+  const palette = effectiveTheme ?? (isDark ? "dark" : "beige");
+  const openSupport = () => {
+    Linking.openURL(SUPPORT_CONTACT_URL).catch(() => {});
+  };
+  const supportLink = (
+    <Pressable
+      onPress={openSupport}
+      accessibilityRole="link"
+      className="mt-2 min-h-11 items-center justify-center px-3"
+    >
+      <Text
+        className="text-center text-warm-700 underline dark:text-neutral-300"
+        style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}
+      >
+        {s.errorReportProblem}
+      </Text>
+    </Pressable>
+  );
+
+  if (variant === "section") {
+    return (
+      <View
+        accessibilityRole="alert"
+        className="m-4 items-center rounded-3xl bg-surface-low px-5 py-5 dark:bg-surface-dark-low"
+      >
+        <AlertTriangle size={22} color={errorIconColor(palette)} strokeWidth={1.75} />
+        <Text
+          className="mt-2 text-center text-charcoal dark:text-neutral-200"
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, lineHeight: 22 }}
+        >
+          {s.errorSectionTitle}
+        </Text>
+        <Pressable
+          onPress={onReset}
+          accessibilityRole="button"
+          className="mt-3 min-h-11 items-center justify-center rounded-full bg-primary-muted px-5 dark:bg-primary-bright"
+        >
+          <Text className="text-white dark:text-primary" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+            {s.errorTryAgain}
+          </Text>
+        </Pressable>
+        {supportLink}
+      </View>
+    );
+  }
+
   return (
     <View className="bg-surface dark:bg-surface-dark" style={viewStyles.container}>
       <EmptyState
         icon={AlertTriangle}
+        tone="error"
         title={s.errorTitle}
         subtitle={s.errorSubtitle}
         actionLabel={s.errorTryAgain}
         onAction={onReset}
         isDark={isDark}
       />
+      {onHome ? (
+        <Pressable
+          onPress={onHome}
+          accessibilityRole="button"
+          className="-mt-8 min-h-11 items-center justify-center rounded-full bg-surface-high px-6 dark:bg-surface-dark-high"
+        >
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+          >
+            {s.errorGoHome}
+          </Text>
+        </Pressable>
+      ) : null}
+      {supportLink}
     </View>
   );
 }

@@ -458,11 +458,11 @@ export const strings = {
     // TranslationLanguagePicker
     translationLanguagePickerTitle: "Translation Language",
     // LoadingScreen
-    preparingDatabase: "Preparing database...",
+    preparingDatabase: "Preparing local data...",
     appSubtitle: "Memorize Through Reflection",
     notFoundTitle: "Page not found",
     profileNotFound: "This profile does not exist.",
-    notFoundMessage: "This screen does not exist.",
+    notFoundMessage: "This page doesn't exist. It may have moved.",
     notFoundHome: "Go to home",
     qaReadyTitle: "QA readiness",
     qaReadySubtitle: "Wait for readiness before starting screenshot capture.",
@@ -950,7 +950,7 @@ export const strings = {
     reflectionFeedViewAyah: "View ayah",
     reflectionFeedRetry: "Retry",
     // Error
-    databaseError: "Database Error",
+    databaseError: "Hafiz could not prepare its local data.",
     genericActionFailed: "Something went wrong. Try again.",
     settingSaveFailed: "Could not save setting",
     translationLoadFailed: "Could not load this translation. English remains available.",
@@ -986,7 +986,7 @@ export const strings = {
     onboardingCreating: "Saving...",
     onboardingSaveFailed: "Could not finish setup",
     // Offline
-    offlineBanner: "You're offline — study features work, community features will sync when connected",
+    offlineBanner: "Offline. Your study is saved on this device.",
     // Empty states
     emptyBookmarksSubtitle: "Tap the bookmark icon on any ayah to save it here",
     emptyDecksSubtitle: "Use the retention deck to review ayahs with spaced repetition",
@@ -1404,11 +1404,11 @@ export const strings = {
     surahProgressEmptyDesc: "أنشئ مجموعة لبدء تتبع تقدمك في الحفظ",
     comingSoon: "قريبًا",
     translationLanguagePickerTitle: "لغة الترجمة",
-    preparingDatabase: "جارٍ تهيئة قاعدة البيانات...",
+    preparingDatabase: "جارٍ تجهيز البيانات المحلية...",
     appSubtitle: "احفظ بالتدبر",
     notFoundTitle: "الصفحة غير موجودة",
     profileNotFound: "هذا الملف الشخصي غير موجود.",
-    notFoundMessage: "هذه الصفحة غير موجودة.",
+    notFoundMessage: "هذه الصفحة غير موجودة، ربما نُقلت.",
     notFoundHome: "العودة إلى الرئيسية",
     qaReadyTitle: "جاهزية الاختبار",
     qaReadySubtitle: "انتظر ظهور الجاهزية قبل بدء التقاط اللقطات.",
@@ -1923,7 +1923,7 @@ export const strings = {
     reflectionFeedAuthRequired: "سجل الدخول للإعجاب أو التعليق على التأملات.",
     reflectionFeedViewAyah: "عرض الآية",
     reflectionFeedRetry: "إعادة المحاولة",
-    databaseError: "خطأ في قاعدة البيانات",
+    databaseError: "تعذر على حافظ تجهيز بياناته المحلية.",
     genericActionFailed: "حدث خطأ. حاول مجددًا.",
     settingSaveFailed: "تعذر حفظ الإعداد",
     translationLoadFailed: "تعذر تحميل هذه الترجمة. تبقى الإنجليزية متاحة.",
@@ -1959,7 +1959,7 @@ export const strings = {
     onboardingCreating: "جارٍ الحفظ...",
     onboardingSaveFailed: "تعذر إكمال الإعداد",
     // Offline
-    offlineBanner: "أنت غير متصل — ميزات الدراسة تعمل، الميزات الاجتماعية ستتم مزامنتها عند الاتصال",
+    offlineBanner: "غير متصل. دراستك محفوظة على هذا الجهاز.",
     // Empty states
     emptyBookmarksSubtitle: "اضغط على أيقونة الإشارة على أي آية لحفظها هنا",
     emptyDecksSubtitle: "استخدم مجموعة التثبيت لمراجعة الآيات بالتكرار المتباعد",

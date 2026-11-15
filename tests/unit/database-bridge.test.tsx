@@ -344,6 +344,30 @@ describe("database bridge message boundary", () => {
     ).not.toBeNull();
   });
 
+  it("retries a failed preparation through the same idempotent path without resetting user data", async () => {
+    const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
+    mockInitializeDatabase.mockRejectedValueOnce(new Error("isolated import failure"));
+    const view = render(
+      <DatabaseProvider>
+        <StatusProbe onStatus={(status) => statuses.push(status)} />
+      </DatabaseProvider>,
+    );
+    await waitFor(() => expect(statuses.at(-1)?.error).toBe("isolated import failure"));
+    expect(mockInitializeDatabase).toHaveBeenCalledTimes(1);
+    // Retry is a no-op while preparation is idle with a live connection, so only failures rerun.
+    await act(async () => statuses.at(-1)?.retry());
+    await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
+    expect(statuses.at(-1)?.error).toBeNull();
+    expect(mockInitializeDatabase).toHaveBeenCalledTimes(2);
+    const userTableResets = hostDb.execAsync.mock.calls.filter(([sql]: [string]) =>
+      /DROP|DELETE FROM user_/i.test(sql),
+    );
+    expect(userTableResets).toEqual([]);
+    await act(async () => statuses.at(-1)?.retry());
+    expect(mockInitializeDatabase).toHaveBeenCalledTimes(2);
+    view.unmount();
+  });
+
   it("dispatches valid host operations and keeps a matching proxy reply owner", async () => {
     const hostStatuses: ReturnType<typeof useDatabaseStatus>[] = [];
     const proxyStatuses: ReturnType<typeof useDatabaseStatus>[] = [];
