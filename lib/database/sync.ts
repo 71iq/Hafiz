@@ -652,7 +652,7 @@ const ONBOARDING_SETTING = "onboarding_completed";
 
 /**
  * Whether replacing local data with a nonempty account snapshot needs the owner's consent: any
- * replaced study row, any syncable setting, or any unsent queued change. Completed onboarding alone
+ * replaced study row, any syncable setting, or any sync_queue row (the replacement clears the queue). Completed onboarding alone
  * does not count, because the restore keeps it. Derived/internal settings and qf_sync_queue alone
  * never prompt, though they are still replaced and still part of the exact fingerprint.
  */
@@ -687,8 +687,7 @@ async function requiresRestoreConsent(db: DatabaseExecutor): Promise<boolean> {
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM recitation_errors"),
       db.getFirstAsync<{ count: number }>(
         `SELECT COUNT(*) as count FROM sync_queue
-         WHERE status IN ('pending', 'failed')
-           AND NOT (table_name = 'user_settings' AND row_id = '${ONBOARDING_SETTING}')`,
+         WHERE NOT (table_name = 'user_settings' AND row_id = '${ONBOARDING_SETTING}')`,
       ),
     ]);
 
