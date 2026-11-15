@@ -17,6 +17,7 @@ import type { AchievementDashboardItem } from "@/lib/achievements/queries";
 import type { AchievementDefinition } from "@/lib/achievements/catalog";
 import { AchievementProgressBar } from "./AchievementProgressBar";
 import { textStartStyle } from "@/lib/ui/direction";
+import { accentIconColor } from "@/lib/ui/theme-icons";
 
 const ICONS: Record<AchievementDefinition["icon"], LucideIcon> = {
   book: BookOpen,
@@ -31,13 +32,6 @@ const ICONS: Record<AchievementDefinition["icon"], LucideIcon> = {
   trophy: Trophy,
 };
 
-const RARITY_COLOR: Record<AchievementDefinition["rarity"], string> = {
-  common: "#0d9488",
-  uncommon: "#2563eb",
-  rare: "#7c3aed",
-  epic: "#c2410c",
-  legendary: "#b45309",
-};
 
 type Props = {
   item: AchievementDashboardItem;
@@ -45,11 +39,13 @@ type Props = {
 };
 
 export function AchievementBadge({ item, compact = false }: Props) {
-  const { isDark, isRTL, themeColors } = useSettings();
+  const { isDark, isRTL, themeColors, effectiveTheme } = useSettings();
   const s = useStrings();
   const Icon = ICONS[item.icon];
   const unlocked = !!item.unlockedAt;
-  const color = RARITY_COLOR[item.rarity];
+  // One teal accent for every unlocked badge; rarity is named in text rather than told by color.
+  const color = accentIconColor(effectiveTheme);
+  const rarity = stringByKey(s, `achievementRarity.${item.rarity}`, item.rarity);
   const juzNumber = getJuzNumber(item.id);
   const title = interpolate(stringByKey(s, item.titleKey, item.id), { n: String(juzNumber ?? item.target) });
   const description = interpolate(stringByKey(s, item.descriptionKey), { n: String(juzNumber ?? item.target) });
@@ -88,11 +84,16 @@ export function AchievementBadge({ item, compact = false }: Props) {
           >
             {title}
           </Text>
+          <Text
+            className="mt-0.5 text-warm-700 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, ...textStartStyle(isRTL)}}
+          >
+            {rarity}
+          </Text>
           {!compact && (
             <Text
               className="mt-1 text-warm-700 dark:text-neutral-400"
               style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, ...textStartStyle(isRTL)}}
-              numberOfLines={2}
             >
               {description}
             </Text>

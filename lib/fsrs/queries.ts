@@ -1,4 +1,4 @@
-import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
+import { buildLocalReviewCounts } from "@/lib/fsrs/review-activity";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { createEmptyCard, State, type Card } from "./scheduler";
@@ -68,12 +68,15 @@ import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID } from "@/lib/hifz/units";
 
 type ReviewActivityDay = { date: string; count: number };
 
-type ReviewStats = {
+/**
+ * Raw review facts by local calendar day. Derived figures (memorized share, average per active day,
+ * consistency) are defined once in lib/progress/metrics.ts; consistency comes from lib/habit, never
+ * from review-day counts.
+ */
+export type ReviewStats = {
   activity: ReviewActivityDay[];
   activeDays: number;
   totalReviews: number;
-  averageDailyReviews: number;
-  longestStreak: number;
 };
 
 const SMART_CARD_SQL = `deck_id IN (${Object.values(SMART_DECK_IDS).map((id) => `'${id}'`).join(", ")})`;
@@ -1452,11 +1455,5 @@ export async function getReviewStats(db: DatabaseExecutor, activityDays = 90): P
   const totalReviews = [...counts.values()].reduce((sum, count) => sum + count, 0);
   const activeDays = dateKeys.length;
 
-  return {
-    activity,
-    activeDays,
-    totalReviews,
-    averageDailyReviews: activeDays > 0 ? Math.round(totalReviews / activeDays) : 0,
-    longestStreak: calculateLongestStreak(dateKeys),
-  };
+  return { activity, activeDays, totalReviews };
 }

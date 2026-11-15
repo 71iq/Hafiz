@@ -197,12 +197,12 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 
 ## Progress and achievements
 
-- PROGRESS-01. Open Progress or own profile Overview. View available local study totals, wird, activity, default-deck progress, surah progress, and achievements. Refresh relevant figures after saved review activity or pulled sync records.
-- PROGRESS-02. Press an activity-heatmap day. Show its date, review count, and wird status (done, made up, earned back, excused, paused, or grace). Excused days are visible only to the user. Press the same day to hide the tooltip, or another day to replace it.
-- PROGRESS-03. Browse own surah progress and select a surah to open Mushaf at ayah 1. From Progress, use View all to open the full surah list, then select or dismiss it.
-- PROGRESS-04. Open View all achievements from Progress. Browse grouped unlocked badges and locked progress, then dismiss. Individual charts, statistics, and badges remain read-only.
-- PROGRESS-05. View empty study history. Show zero/empty progress or dedicated empty text. Some failed local queries also fall back to empty values; no general progress Retry control appears.
-- PROGRESS-06. As a guest with account sync configured, use Progress's sign-in prompt to open Login while keeping local progress available.
+- PROGRESS-01. Open Progress or own profile Overview. On Progress, view activity and four figures first (Memorized share, Total memorized, Current consistency, Total reviews), with Longest consistency, Average reviews per active day, Steady weeks and Active days under More stats; press a figure to see what it counts. Consistency follows the wird rules. Then view default-deck progress (each deck opens its card list), Halaqa and Board, surah progress, achievements, the Reflection Journey row with its completed count, and the hadith. Refresh after saved review activity, pulled sync records, a return to the app or a new day.
+- PROGRESS-02. Inspect any activity-calendar day by pressing it, by arrow keys on the calendar, or with the day selector's previous, next and details controls. Show its localized date, review count including zero, and wird status (done, made up, earned back, excused, paused, or grace). Excused days are visible only to the user. Weeks start on the chosen week start; Less and More frame the intensity legend, and today has a gold ring.
+- PROGRESS-03. Browse own surah progress and select a surah to open Mushaf at ayah 1. From Progress, use View all to open the full surah list, search it by name or number, sort it by surah order or most or least memorized, then select or dismiss it. With no tracked surahs, set up a plan.
+- PROGRESS-04. Open View all achievements from Progress. Browse grouped badges with descriptions, rarity names and locked progress; the 30 juz completion badges share one row that expands. Then dismiss. Badges remain read-only.
+- PROGRESS-05. View empty study history and see Your progress will appear after your first review with Start reviewing. A failed first load shows Could not load your progress with Retry; a failed refresh keeps the last figures with Could not refresh and Retry.
+- PROGRESS-06. As a guest with account sync configured, see that progress is saved on this device and use the prompt's outline Log In button to open Login for optional sync, while keeping local progress available.
 
 ## Community feed and reflections
 

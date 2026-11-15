@@ -32,9 +32,12 @@ const DESTINATIONS: Record<
 export function SecondaryDestinations({
   destinations,
   className,
+  details,
 }: {
   destinations: readonly SecondaryDestination[];
   className?: string;
+  /** Replaces a row's hint line, such as Journey's "2 / 5 completed" on Progress. */
+  details?: Partial<Record<SecondaryDestination, string>>;
 }) {
   const s = useStrings();
   const { isRTL, effectiveTheme } = useSettings();
@@ -53,7 +56,7 @@ export function SecondaryDestinations({
             onPress={() => router.navigate(item.href)}
             accessibilityRole="button"
             accessibilityLabel={s[item.label]}
-            accessibilityHint={s[item.hint]}
+            accessibilityHint={details?.[name] ?? s[item.hint]}
             className={`min-h-14 flex-row items-center gap-3 px-4 py-3 ${
               index > 0 ? "border-t border-black/5 dark:border-white/5" : ""
             }`}
@@ -81,7 +84,7 @@ export function SecondaryDestinations({
                 className="text-warm-700 dark:text-neutral-400"
                 style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 19, ...textStartStyle(isRTL) }}
               >
-                {s[item.hint]}
+                {details?.[name] ?? s[item.hint]}
               </Text>
             </View>
             <Chevron size={18} color={muted} />

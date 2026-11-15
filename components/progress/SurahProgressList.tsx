@@ -1,14 +1,16 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { ScrollView, View, Text, Pressable } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { BookOpen, ChevronDown } from "lucide-react-native";
+import { Input } from "@/components/ui/Input";
+import { ToggleGroup } from "@/components/ui/ToggleGroup";
+import { BookOpen, ChevronLeft, ChevronRight, Search } from "lucide-react-native";
 import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
-import { toArabicNumber } from "@/lib/arabic";
+import { normalizeArabicWord, toArabicNumber } from "@/lib/arabic";
 
 type SurahProgress = {
   surah: number;
@@ -26,6 +28,8 @@ type Props = {
   previewLimit?: number;
   onItemPress?: () => void;
   onViewAll?: () => void;
+  /** Offered from the empty state: progress appears after study under the current plan. */
+  onSetUpPlan?: () => void;
   readOnly?: boolean;
   s: UIStrings;
 };
@@ -38,6 +42,7 @@ export function SurahProgressList({
   previewLimit,
   onItemPress,
   onViewAll,
+  onSetUpPlan,
   readOnly = false,
   s,
 }: Props) {
@@ -55,6 +60,8 @@ export function SurahProgressList({
           icon={BookOpen}
           title={s.surahProgressEmpty}
           subtitle={s.surahProgressEmptyDesc}
+          actionLabel={onSetUpPlan ? s.surahSetUpPlan : undefined}
+          onAction={onSetUpPlan}
           isDark={isDark}
         />
       </Card>
@@ -222,7 +229,12 @@ export function SurahProgressList({
                 >
                   {s.surahProgressViewAll}
                 </Text>
-                <ChevronDown size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                {/* Points toward the reading end: right in English, left in Arabic. */}
+                {isRTL ? (
+                  <ChevronLeft size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                ) : (
+                  <ChevronRight size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                )}
               </View>
             </Card>
           </Pressable>
@@ -241,6 +253,83 @@ export function SurahProgressList({
       }}
     >
       {data.map((item) => renderItem(item))}
+    </View>
+  );
+}
+
+type SurahSort = "order" | "most" | "least";
+
+function memorizedShare(item: SurahProgress): number {
+  return item.totalCards > 0 ? item.memorized / item.totalCards : 0;
+}
+
+/**
+ * The full surah list behind View all: a search field (name in either language or surah number) and
+ * a sort toggle. Searching and sorting never change progress data.
+ */
+export function SurahProgressBrowser({
+  data,
+  isDark,
+  isRTL,
+  isCompact,
+  onItemPress,
+  s,
+}: Pick<Props, "data" | "isDark" | "isRTL" | "isCompact" | "onItemPress" | "s">) {
+  const { effectiveTheme } = useSettings();
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SurahSort>("order");
+  const visible = useMemo(() => {
+    const raw = query.trim();
+    const digits = raw.replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660));
+    const latin = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const arabic = normalizeArabicWord(raw);
+    const matches = (item: SurahProgress) => {
+      if (!raw) return true;
+      if (/^\d+$/.test(digits)) return String(item.surah) === digits;
+      if (latin && item.nameEnglish.toLowerCase().replace(/[^a-z0-9]/g, "").includes(latin)) return true;
+      return !!arabic && normalizeArabicWord(item.nameArabic).includes(arabic);
+    };
+    const filtered = data.filter(matches);
+    if (sort === "order") return [...filtered].sort((a, b) => a.surah - b.surah);
+    const direction = sort === "most" ? -1 : 1;
+    return [...filtered].sort(
+      (a, b) => direction * (memorizedShare(a) - memorizedShare(b)) || direction * (a.memorized - b.memorized) || a.surah - b.surah
+    );
+  }, [data, query, sort]);
+
+  return (
+    <View className="gap-3">
+      <Input
+        value={query}
+        onChangeText={setQuery}
+        placeholder={s.surahSearchPlaceholder}
+        accessibilityLabel={s.surahSearchPlaceholder}
+        placeholderTextColor={mutedIconColor(effectiveTheme)}
+        startIcon={<Search size={16} color={mutedIconColor(effectiveTheme)} />}
+        returnKeyType="search"
+        autoCorrect={false}
+      />
+      <ToggleGroup
+        accessibilityLabel={s.surahSortLabel}
+        value={sort}
+        onValueChange={setSort}
+        itemClassName="min-h-11"
+        items={[
+          { value: "order", label: s.surahSortOrder },
+          { value: "most", label: s.surahSortMost },
+          { value: "least", label: s.surahSortLeast },
+        ]}
+      />
+      {visible.length === 0 ? (
+        <Text
+          className="py-6 text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: "center" }}
+        >
+          {s.surahNoMatches}
+        </Text>
+      ) : (
+        <SurahProgressList data={visible} isDark={isDark} isRTL={isRTL} isCompact={isCompact} onItemPress={onItemPress} s={s} />
+      )}
     </View>
   );
 }
