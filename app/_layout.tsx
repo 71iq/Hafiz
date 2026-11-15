@@ -3,6 +3,7 @@ import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider
 import { bindAuthQueryCache } from "@/lib/query/auth-cache-lifecycle";
 import { bindNativeQueryLifecycle, createAppQueryClient } from "@/lib/query/native-lifecycle";
 import { PasswordRecoveryProvider } from "@/lib/auth/password-recovery";
+import { AuthRedirectReturn } from "@/lib/auth/redirect-return";
 import { Stack, usePathname, type ErrorBoundaryProps } from "expo-router";
 import Head from "expo-router/head";
 import * as SplashScreen from "expo-splash-screen";
@@ -181,6 +182,7 @@ export default function RootLayout() {
                 <ReminderLifecycle />
                 <EncouragementChecks />
                 <MinorPhotoCleanup />
+                <AuthRedirectReturn />
                 <Stack
                   screenOptions={{ headerShown: false }}
                   // Routes outside the tabs get the Hafiz fallback inside the providers; the tabs
