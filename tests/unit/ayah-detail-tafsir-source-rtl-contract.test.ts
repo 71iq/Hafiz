@@ -5,8 +5,8 @@ const source = fs.readFileSync(path.join(process.cwd(), "components/mushaf/AyahD
 
 describe("AyahDetailModal tafsir source row RTL contract", () => {
   it("mirrors the source copy and Sources button as one row in RTL", () => {
-    const rowStart = source.indexOf('activeTab === "tafsir"');
-    const pickerStart = source.indexOf("{tafsirRows === null", rowStart);
+    const rowStart = source.indexOf('shownTab === "tafsir"');
+    const pickerStart = source.indexOf("{tafsirFailed ?", rowStart);
     const rowSource = source.slice(rowStart, pickerStart);
 
     expect(rowStart).toBeGreaterThan(-1);

@@ -25,6 +25,8 @@ type WordInteractionContextType = {
   clearTooltipDelayed: () => void;
   cancelTooltipClear: () => void;
   navigateToAyah: (surah: number, ayah: number, wordPos?: number) => void;
+  /** True inside the reader, where navigateToAyah moves the open Mushaf. */
+  hasReaderNavigation: boolean;
   setNavigateToAyah: (fn: (surah: number, ayah: number, wordPos?: number) => void) => void;
 };
 
@@ -39,6 +41,7 @@ const WordInteractionContext = createContext<WordInteractionContextType>({
   clearTooltipDelayed: () => {},
   cancelTooltipClear: () => {},
   navigateToAyah: () => {},
+  hasReaderNavigation: false,
   setNavigateToAyah: () => {},
 });
 
@@ -130,6 +133,7 @@ export function WordInteractionProvider({ children }: { children: React.ReactNod
       clearTooltipDelayed,
       cancelTooltipClear,
       navigateToAyah,
+      hasReaderNavigation: true,
       setNavigateToAyah,
     }),
     [
