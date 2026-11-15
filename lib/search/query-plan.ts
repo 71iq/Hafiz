@@ -26,12 +26,16 @@ export function planSearchQuery(raw: string, surahs: readonly SurahSearchFields[
   const runSearch =
     parsed.kind === "text" || ((parsed.kind === "surah" || parsed.kind === "surah-choices") && !numeric);
   const length = stripSearchDiacritics(raw.trim()).length;
-  return { reference, runSearch: runSearch && length >= MIN_SEARCH_CHARS, tooShort: !reference && length > 0 && length < MIN_SEARCH_CHARS };
+  return {
+    reference,
+    runSearch: runSearch && length >= MIN_SEARCH_CHARS,
+    tooShort: !reference && length > 0 && length < MIN_SEARCH_CHARS,
+  };
 }
 
 /** A single Arabic word without spaces, which a root search could expand. */
 export function isSingleArabicWord(raw: string): boolean {
-  return /^[ء-يٱ-ۓ]+$/.test(stripSearchDiacritics(raw.trim()));
+  return /^[\u0621-\u064A\u0671-\u06D3]+$/.test(stripSearchDiacritics(raw.trim()));
 }
 
 /** Root letters spaced for reading: "كتب" becomes "ك ت ب". */

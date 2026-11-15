@@ -34,7 +34,10 @@ export function AccountPromoCard({ title, message, actions, onDismiss, className
         </View>
         <View className="min-w-0 flex-1" style={{ gap: 2 }}>
           {title ? (
-            <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textDirection }}>
+            <Text
+              className="text-charcoal dark:text-neutral-200"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textDirection }}
+            >
               {title}
             </Text>
           ) : null}
@@ -63,7 +66,11 @@ export function AccountPromoCard({ title, message, actions, onDismiss, className
                 style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
               >
                 <Text
-                  className={action.primary ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}
+                  className={
+                    action.primary
+                      ? "text-primary-muted dark:text-primary-bright"
+                      : "text-charcoal dark:text-neutral-200"
+                  }
                   style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
                 >
                   {action.label}

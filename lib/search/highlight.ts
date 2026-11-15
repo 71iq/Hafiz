@@ -7,7 +7,7 @@
 export type HighlightSegment = { text: string; highlight: boolean };
 export type MatchRange = readonly [start: number, end: number];
 
-const ARABIC_DIACRITIC = /[ً-ٰٟۖ-ۜ۟-۪ۤۧۨ-ۭـ]/;
+const ARABIC_DIACRITIC = /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/;
 const ARABIC_DIACRITICS = new RegExp(ARABIC_DIACRITIC.source, "g");
 
 /** The diacritics (and tatweel) Search ignores. */

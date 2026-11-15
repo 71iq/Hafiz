@@ -481,7 +481,7 @@
         },
         {
           "id": "home.resume",
-          "title": "Reading-position card -> Mushaf",
+          "title": "Continue reading or start card -> Mushaf",
           "kind": "transition",
           "cases": ["HOME-02"],
           "uses": ["reader"],
@@ -490,7 +490,7 @@
         },
         {
           "id": "home.guestbanner",
-          "title": "Guest account banner",
+          "title": "Guest account promotion (shared dismissal)",
           "kind": "widget",
           "cases": ["HOME-03"],
           "uses": ["auth.login", "auth.signup"],
@@ -552,7 +552,7 @@
             },
             {
               "id": "home.search.result",
-              "title": "Select result -> Mushaf at ayah/word",
+              "title": "Select result or Go to reference -> Mushaf at ayah/word",
               "kind": "transition",
               "cases": ["SEARCH-04"],
               "uses": ["reader.arrival"],
@@ -561,7 +561,7 @@
             },
             {
               "id": "home.search.history",
-              "title": "Recent searches, clear, close reset",
+              "title": "Recent searches: save on submit or result, remove, clear, close reset",
               "kind": "widget",
               "cases": ["SEARCH-05", "SEARCH-06"],
               "uses": [],
@@ -1253,7 +1253,7 @@
         },
         {
           "id": "progress.guest",
-          "title": "Guest sign-in prompt",
+          "title": "Guest sign-in prompt (shared dismissal)",
           "kind": "widget",
           "cases": ["PROGRESS-06"],
           "uses": ["auth.login"],
