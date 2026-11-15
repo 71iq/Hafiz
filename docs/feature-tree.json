@@ -885,10 +885,10 @@
         },
         {
           "id": "review.vocab",
-          "title": "/flashcards/vocab session",
-          "kind": "screen",
+          "title": "/flashcards/vocab redirect to the Vocabulary Review session",
+          "kind": "transition",
           "cases": ["REVIEW-12"],
-          "uses": [],
+          "uses": ["review.session"],
           "native": false,
           "children": []
         }

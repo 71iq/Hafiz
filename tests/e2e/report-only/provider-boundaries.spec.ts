@@ -12,7 +12,6 @@ const providerBoundaryRoutes = [
   "app/auth/qf-callback.tsx",
   "app/+not-found.tsx",
   "app/qa-ready.tsx",
-  "app/flashcards/vocab.tsx",
   "app/profile/[userId].tsx",
 ];
 

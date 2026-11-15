@@ -141,7 +141,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - REVIEW-09. Set a valid due date of today or later for the current card. Save and remove it from this session, then advance or finish. Invalid input stays in the editor.
 - REVIEW-10. Press X during an active session. With no grade saved yet, return to Home. After a grade, confirm leaving first; Stay returns to the card. Already saved grades and card changes remain.
 - REVIEW-11. Finish the queue. Read reviewed/new/review/relearning totals, duration, and next review, then the wird cards (WIRD-08). Choose Done, or "I'll be back tomorrow" during the first week, to return Home.
-- REVIEW-12. Open `/flashcards/vocab` directly. Load due vocabulary cards, or all vocabulary cards when none is due. Reveal, rate, and advance to its summary. Back/X exits immediately; Delete removes the current card without confirmation. Save/delete errors retain the card, while initial load failure falls through to its summary.
+- REVIEW-12. Open `/flashcards/vocab` directly, for example from an old link. The route immediately replaces itself with the main review session for the Vocabulary Review deck, before anything is loaded, so that deck's settings, grades, card actions and states apply (REVIEW-01 to REVIEW-11). Back from the session does not return to the old URL. Older saved-word rows are left unchanged.
 
 ## Wird days and streak
 
