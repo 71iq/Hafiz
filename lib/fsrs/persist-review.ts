@@ -148,6 +148,12 @@ export async function persistReviewTransition({
     saved = { result: { wird, resolvedInboxItems, transition: resolved }, log: entry };
   });
   if (!saved) throw new Error("The review transaction ended without saving the grade.");
-  publishReviewLogged(db, saved.log);
+  // The grade is committed. A listener failing now must not report it unsaved: a retry of the same
+  // grade would then append a second log.
+  try {
+    publishReviewLogged(db, saved.log);
+  } catch (error) {
+    console.warn("[persistReviewTransition] A review listener failed after the grade was saved:", error);
+  }
   return saved.result;
 }
