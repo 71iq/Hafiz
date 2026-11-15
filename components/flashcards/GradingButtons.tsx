@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { Rating, State, type Grade } from "@/lib/fsrs/scheduler";
 import { DEFAULT_DECK_LEARNING_STEPS, DEFAULT_DECK_RELEARNING_STEPS, type DeckReviewSettings, type StudyCardRow } from "@/lib/fsrs/types";
@@ -87,11 +87,18 @@ export function GradingButtons({
           const isCapped = rating > maxRating;
           const suggested = proposed === rating;
           return (
-            <View
-              key={rating}
-              className="flex-1"
-              style={{ padding: ringSpace, borderRadius: 16 + ringSpace, backgroundColor: suggested ? ringColor : "transparent" }}
-            >
+            <View key={rating} className="flex-1" style={{ padding: ringSpace, borderRadius: 16 + ringSpace }}>
+              {ringSpace > 0 ? (
+                // Android drops a view's rounding when its background arrives after mount, so a ring
+                // moving to another grade was drawn square. Each ring exists from mount and only fades.
+                <View
+                  pointerEvents="none"
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { borderRadius: 16 + ringSpace, backgroundColor: ringColor, opacity: suggested ? 1 : 0 },
+                  ]}
+                />
+              ) : null}
               <Pressable
                 onPress={() => onGrade(rating)}
                 disabled={disabled || isCapped}
