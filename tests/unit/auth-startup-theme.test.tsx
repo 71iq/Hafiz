@@ -25,6 +25,10 @@ type TestDocument = {
   documentElement: object;
 };
 
+// Google's published dark and light button outlines.
+const GOOGLE_DARK_BORDER = "#8E918F";
+const GOOGLE_LIGHT_BORDER = "#747775";
+
 let mockColorScheme: "light" | "dark" = "light";
 
 jest.mock("nativewind", () => ({
@@ -127,7 +131,7 @@ describe("auth startup theme resolution", () => {
     getItem.mockReturnValue(cachedTheme);
     installWindow({ localStorage: { getItem } });
 
-    expectBothConsumersToResolve(true, "#E5E7EB");
+    expectBothConsumersToResolve(true, GOOGLE_DARK_BORDER);
     expect(getItem).toHaveBeenCalledWith("hafiz_theme");
   });
 
@@ -141,7 +145,7 @@ describe("auth startup theme resolution", () => {
     getItem.mockReturnValue(cachedTheme);
     installWindow({ localStorage: { getItem } });
 
-    expectBothConsumersToResolve(false, "#DFD9D1");
+    expectBothConsumersToResolve(false, GOOGLE_LIGHT_BORDER);
     expect(getItem).toHaveBeenCalledWith("hafiz_theme");
   });
 
@@ -154,7 +158,7 @@ describe("auth startup theme resolution", () => {
     getItem.mockReturnValue("system");
     installWindow({ localStorage: { getItem }, matchMedia });
 
-    expectBothConsumersToResolve(matches, matches ? "#E5E7EB" : "#DFD9D1");
+    expectBothConsumersToResolve(matches, matches ? GOOGLE_DARK_BORDER : GOOGLE_LIGHT_BORDER);
     expect(matchMedia).toHaveBeenCalledTimes(2);
   });
 
@@ -167,7 +171,10 @@ describe("auth startup theme resolution", () => {
       installDocument();
       installWindow({ localStorage: { getItem }, getComputedStyle });
 
-      expectBothConsumersToResolve(nativeScheme === "dark", nativeScheme === "dark" ? "#E5E7EB" : "#DFD9D1");
+      expectBothConsumersToResolve(
+        nativeScheme === "dark",
+        nativeScheme === "dark" ? GOOGLE_DARK_BORDER : GOOGLE_LIGHT_BORDER,
+      );
       expect(getComputedStyle).not.toHaveBeenCalled();
     },
   );
@@ -190,7 +197,7 @@ describe("auth startup theme resolution", () => {
       const documentElement = installDocument();
       installWindow({ localStorage: { getItem }, getComputedStyle });
 
-      expectBothConsumersToResolve(false, "#E5E7EB");
+      expectBothConsumersToResolve(false, GOOGLE_DARK_BORDER);
       expect(getComputedStyle).toHaveBeenCalledWith(documentElement);
     },
   );
@@ -204,7 +211,10 @@ describe("auth startup theme resolution", () => {
       const documentElement = installDocument();
       installWindow({ localStorage: { getItem }, getComputedStyle });
 
-      expectBothConsumersToResolve(nativeScheme === "dark", nativeScheme === "dark" ? "#E5E7EB" : "#DFD9D1");
+      expectBothConsumersToResolve(
+        nativeScheme === "dark",
+        nativeScheme === "dark" ? GOOGLE_DARK_BORDER : GOOGLE_LIGHT_BORDER,
+      );
       expect(getComputedStyle).toHaveBeenCalledWith(documentElement);
     },
   );
@@ -215,7 +225,10 @@ describe("auth startup theme resolution", () => {
     installWindow({ localStorage: { getItem } });
     Reflect.deleteProperty(globalThis, "document");
 
-    expectBothConsumersToResolve(nativeScheme === "dark", nativeScheme === "dark" ? "#E5E7EB" : "#DFD9D1");
+    expectBothConsumersToResolve(
+      nativeScheme === "dark",
+      nativeScheme === "dark" ? GOOGLE_DARK_BORDER : GOOGLE_LIGHT_BORDER,
+    );
   });
 
   it.each([
@@ -229,7 +242,10 @@ describe("auth startup theme resolution", () => {
     getItem.mockReturnValue("dark");
     installWindow({ localStorage: { getItem } });
 
-    expectBothConsumersToResolve(nativeScheme === "dark", nativeScheme === "dark" ? "#E5E7EB" : "#DFD9D1");
+    expectBothConsumersToResolve(
+      nativeScheme === "dark",
+      nativeScheme === "dark" ? GOOGLE_DARK_BORDER : GOOGLE_LIGHT_BORDER,
+    );
     expect(getItem).not.toHaveBeenCalled();
   });
 
@@ -239,7 +255,10 @@ describe("auth startup theme resolution", () => {
     installWindow({ localStorage: { getItem } });
     Reflect.deleteProperty(globalThis, "window");
 
-    expectBothConsumersToResolve(nativeScheme === "dark", nativeScheme === "dark" ? "#E5E7EB" : "#DFD9D1");
+    expectBothConsumersToResolve(
+      nativeScheme === "dark",
+      nativeScheme === "dark" ? GOOGLE_DARK_BORDER : GOOGLE_LIGHT_BORDER,
+    );
     expect(getItem).not.toHaveBeenCalled();
   });
 
@@ -249,7 +268,7 @@ describe("auth startup theme resolution", () => {
     getItem.mockReturnValue(isDark ? "beige" : "dark");
     installWindow({ localStorage: { getItem }, getComputedStyle });
 
-    const expectedBorderColor = isDark ? "#E5E7EB" : "#DFD9D1";
+    const expectedBorderColor = isDark ? GOOGLE_DARK_BORDER : GOOGLE_LIGHT_BORDER;
     expect(renderGoogleButton(isDark).borderColor).toBe(expectedBorderColor);
     expect(getItem).not.toHaveBeenCalled();
     expect(getComputedStyle).not.toHaveBeenCalled();

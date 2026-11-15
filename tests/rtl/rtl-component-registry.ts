@@ -68,7 +68,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/auth/AuthScreenShell.tsx",
     "app-shell",
     "rntl",
-    "Auth chrome mirrors; logo and decorative artwork do not mirror.",
+    "Auth chrome mirrors; the logo and the English | العربية toggle keep their order.",
   ),
   entry(
     "components/auth/OAuthButtons.tsx",

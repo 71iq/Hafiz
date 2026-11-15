@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, TextInput, View } from "react-native";
 import { Redirect, useRouter, useNavigation } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,9 +12,18 @@ import { usePasswordRecovery } from "@/lib/auth/password-recovery";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { useAppLanguage } from "@/lib/i18n/useStrings";
+import { classifyAuthError } from "@/lib/auth/errors";
 import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
-import { AuthFormNotice, AuthScreenShell, AuthUnavailableState } from "@/components/auth/AuthScreenShell";
+import {
+  AuthFormNotice,
+  AuthScreenShell,
+  AuthUnavailableState,
+  useAuthIconColors,
+  useRevealOnFocus,
+} from "@/components/auth/AuthScreenShell";
+import { PendingLabel } from "@/components/auth/auth-messages";
+import { useAuthReturn } from "@/components/auth/use-auth-return";
 import type { Direction } from "@/lib/ui/direction";
 
 type ResetPasswordForm = {
@@ -34,12 +43,20 @@ function createResetPasswordSchema(s: UIStrings) {
     });
 }
 
+// Provider messages stay out of the notice; each known failure has localized copy.
 function passwordResetErrorMessage(error: unknown, strings: UIStrings): string {
-  if (typeof error === "object" && error !== null) {
-    if ("code" in error && error.code === "auth_storage_lock_unavailable") return strings.authResetBrowserUnsupported;
-    if ("message" in error && typeof error.message === "string") return error.message;
+  switch (classifyAuthError(error).kind) {
+    case "browser-unsupported":
+      return strings.authResetBrowserUnsupported;
+    case "rate-limited":
+      return strings.authErrorRequestsLimited;
+    case "offline":
+      return strings.authErrorOffline;
+    case "weak-password":
+      return strings.authErrorWeakPassword;
+    default:
+      return strings.authErrorGeneric;
   }
-  return String(error);
 }
 
 export default function ResetPasswordScreen() {
@@ -66,20 +83,32 @@ function ResetPasswordFormScreen() {
     attach();
     return navigation.addListener("beforeRemove", leave);
   }, [navigation, attach, leave]);
+  const { back, continueOffline } = useAuthReturn({ ownsReturn: false });
+  const colors = useAuthIconColors();
+  const reveal = useRevealOnFocus();
   const ready = recovery.state.kind === "ready";
+  const checking = recovery.state.kind === "idle" || recovery.state.kind === "preparing";
   const passwordBusy = ["saving", "signing-out", "finished"].includes(recovery.state.kind);
   const success = recovery.state.kind === "signing-out" || recovery.state.kind === "finished";
+  const invalid = recovery.state.kind === "invalid";
   const message =
     recovery.state.kind === "failed"
       ? passwordResetErrorMessage(recovery.state.error, s)
       : recovery.state.kind === "ready" && recovery.state.error
         ? passwordResetErrorMessage(recovery.state.error, s)
-        : recovery.state.kind === "invalid"
+        : invalid
           ? s.authResetLinkInvalid
           : success
             ? s.authPasswordUpdated
-            : null;
-  const messageType = success ? "success" : "error";
+            : checking
+              ? s.authResetChecking
+              : null;
+  const messageType = success ? "success" : checking ? "info" : "error";
+  // An expired or invalid link offers a new one instead of a dead end.
+  const requestNewLink =
+    invalid || recovery.state.kind === "failed"
+      ? { label: s.authResetRequestNew, onPress: () => router.replace("/auth/forgot-password") }
+      : null;
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const configured = isSupabaseConfigured();
@@ -95,11 +124,19 @@ function ResetPasswordFormScreen() {
   });
 
   const onSubmit = async (data: ResetPasswordForm) => {
+    setPasswordVisible(false);
+    setConfirmPasswordVisible(false);
     await recovery.submit(data.password);
   };
 
   const unavailableContent = !configured ? (
-    <AuthUnavailableState title={s.authUnavailableTitle} subtitle={s.authUnavailableSubtitle} dir={dir} />
+    <AuthUnavailableState
+      title={s.authUnavailableTitle}
+      subtitle={s.authUnavailableSubtitle}
+      dir={dir}
+      continueLabel={s.authContinueOffline}
+      onContinue={continueOffline}
+    />
   ) : undefined;
 
   return (
@@ -109,35 +146,42 @@ function ResetPasswordFormScreen() {
       subtitle={configured ? s.authResetPasswordSubtitle : s.authUnavailableSubtitle}
       appName={s.appName}
       brandHeadline={s.authBrandHeadline}
-      brandBody={s.authBrandBody}
       backLabel={s.authBack}
-      onBack={() => router.back()}
+      languageLabel={s.authLanguage}
+      onBack={back}
       unavailableContent={unavailableContent}
     >
       <View className="w-full">
-        <AuthFormNotice message={message} tone={messageType} dir={dir} />
+        <AuthFormNotice message={message} tone={messageType} dir={dir} action={requestNewLink} />
 
         <FormTextField
           control={control}
           name="password"
           label={s.authNewPassword}
           error={errors.password?.message}
+          hint={s.authPasswordMinHint}
           dir={dir}
           inputProps={{
-            placeholder: s.authNewPassword,
             secureTextEntry: !passwordVisible,
+            autoCapitalize: "none",
+            autoCorrect: false,
+            autoComplete: "new-password",
+            textContentType: "newPassword",
+            passwordRules: "minlength: 6;",
+            importantForAutofill: "yes",
             returnKeyType: "next",
             onSubmitEditing: () => confirmPasswordRef.current?.focus(),
+            onFocus: reveal,
             blurOnSubmit: false,
-            startIcon: <Lock size={18} color="#8B8178" />,
+            startIcon: <Lock size={18} color={colors.muted} />,
             endIcon: (
               <Pressable
                 onPress={() => setPasswordVisible((current) => !current)}
                 accessibilityRole="button"
                 accessibilityLabel={passwordVisible ? s.authHidePassword : s.authShowPassword}
-                hitSlop={8}
+                hitSlop={12}
               >
-                {passwordVisible ? <EyeOff size={18} color="#8B8178" /> : <Eye size={18} color="#8B8178" />}
+                {passwordVisible ? <EyeOff size={20} color={colors.muted} /> : <Eye size={20} color={colors.muted} />}
               </Pressable>
             ),
           }}
@@ -153,19 +197,28 @@ function ResetPasswordFormScreen() {
           dir={dir}
           inputRef={confirmPasswordRef}
           inputProps={{
-            placeholder: s.authConfirmPassword,
             secureTextEntry: !confirmPasswordVisible,
+            autoCapitalize: "none",
+            autoCorrect: false,
+            autoComplete: "new-password",
+            textContentType: "newPassword",
+            importantForAutofill: "yes",
             returnKeyType: "done",
             onSubmitEditing: handleSubmit(onSubmit),
-            startIcon: <Lock size={18} color="#8B8178" />,
+            onFocus: reveal,
+            startIcon: <Lock size={18} color={colors.muted} />,
             endIcon: (
               <Pressable
                 onPress={() => setConfirmPasswordVisible((current) => !current)}
                 accessibilityRole="button"
                 accessibilityLabel={confirmPasswordVisible ? s.authHidePassword : s.authShowPassword}
-                hitSlop={8}
+                hitSlop={12}
               >
-                {confirmPasswordVisible ? <EyeOff size={18} color="#8B8178" /> : <Eye size={18} color="#8B8178" />}
+                {confirmPasswordVisible ? (
+                  <EyeOff size={20} color={colors.muted} />
+                ) : (
+                  <Eye size={20} color={colors.muted} />
+                )}
               </Pressable>
             ),
           }}
@@ -174,16 +227,12 @@ function ResetPasswordFormScreen() {
         <View className="h-7" />
 
         <Button onPress={handleSubmit(onSubmit)} disabled={isLoading || passwordBusy || !ready} size="lg" dir={dir}>
-          {isLoading || passwordBusy ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text
-              className="text-center text-white"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 16, writingDirection: dir }}
-            >
-              {s.authUpdatePassword}
-            </Text>
-          )}
+          <PendingLabel
+            pending={isLoading || passwordBusy}
+            label={s.authUpdatePassword}
+            pendingLabel={s.authSaving}
+            dir={dir}
+          />
         </Button>
       </View>
     </AuthScreenShell>

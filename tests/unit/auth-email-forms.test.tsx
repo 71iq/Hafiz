@@ -3,24 +3,51 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
 import type { Control } from "react-hook-form";
 import LoginScreen from "@/app/auth/login";
 import SignupScreen from "@/app/auth/signup";
+import ForgotPasswordScreen from "@/app/auth/forgot-password";
 import type { AuthActionHandle, SignUpResult } from "@/lib/auth/types";
 import type { AuthCommandResult, AuthOwner } from "@/lib/auth/coordinator";
 import { strings } from "@/lib/i18n/strings";
+import { clearAuthHandoff } from "@/lib/auth/form-handoff";
 let mockLocale: "en" | "ar" = "en",
   mockConfigured = true,
   mockEmailEnabled = true,
   mockLoading = false;
-const mockRouter = { replace: jest.fn(), back: jest.fn(), push: jest.fn() };
+const mockRouter = {
+  replace: jest.fn(),
+  back: jest.fn(),
+  push: jest.fn(),
+  dismissTo: jest.fn(),
+  canGoBack: () => true,
+};
+// The auth screen sits on top of a cold stack, so a verified session replaces it.
+const mockNavigation = {
+  getState: () => ({ index: 0, routes: [{ name: "auth/login" }] }),
+  canGoBack: () => false,
+  goBack: jest.fn(),
+  addListener: jest.fn(() => () => {}),
+};
 const mockSignIn = jest.fn<AuthActionHandle<void>, [string, string]>();
 const mockSignUp = jest.fn<AuthActionHandle<SignUpResult>, [string, string, string, string]>();
 const mockResend = jest.fn<Promise<void>, [string]>();
-jest.mock("expo-router", () => ({ useRouter: () => mockRouter, Redirect: () => null }));
+const mockSendReset = jest.fn<Promise<void>, [string]>();
+jest.mock("expo-router", () => ({
+  useRouter: () => mockRouter,
+  useNavigation: () => mockNavigation,
+  useFocusEffect: () => {},
+  // Read lazily: the module factory runs before the test's constants are initialized.
+  get router() {
+    return mockRouter;
+  },
+  Redirect: () => null,
+}));
 jest.mock("@/lib/auth/store", () => ({
   useAuthStore: () => ({
     signIn: mockSignIn,
     signUp: mockSignUp,
     resendSignupConfirmation: mockResend,
+    sendPasswordReset: mockSendReset,
     isLoading: mockLoading,
+    sessionEnded: false,
     error: null,
   }),
 }));
@@ -66,6 +93,13 @@ jest.mock("@/components/auth/AuthScreenShell", () => {
       </Pressable>
     ),
     AuthUnavailableState: () => <Text>Unconfigured fixture</Text>,
+    AuthTextLink: ({ onPress, label }: { onPress: () => void; label: string }) => (
+      <Pressable onPress={onPress}>
+        <Text>{label}</Text>
+      </Pressable>
+    ),
+    useAuthIconColors: () => ({ muted: "#52525b", accent: "#0d9488", error: "#dc2626", theme: "white" }),
+    useRevealOnFocus: () => () => {},
   };
 });
 jest.mock("@/components/ui/Button", () => {
@@ -82,32 +116,38 @@ jest.mock("@/components/ui/Button", () => {
 jest.mock("@/components/ui/FormTextField", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   const { Controller } = jest.requireActual<typeof import("react-hook-form")>("react-hook-form");
-  const { TextInput } = jest.requireActual<typeof import("react-native")>("react-native");
+  const { Text, TextInput } = jest.requireActual<typeof import("react-native")>("react-native");
   return {
     FormTextField: ({
       control,
       name,
       label,
+      error,
       inputProps,
     }: {
       control: Control<{ email: string; password: string; username: string; displayName: string }>;
       name: "email" | "password" | "username" | "displayName";
       label: string;
+      error?: string;
       inputProps: React.ComponentProps<typeof TextInput>;
     }) => (
-      <Controller
-        control={control}
-        name={name}
-        render={({ field }) => (
-          <TextInput
-            {...inputProps}
-            accessibilityLabel={label}
-            value={field.value}
-            onChangeText={field.onChange}
-            onBlur={field.onBlur}
-          />
-        )}
-      />
+      <>
+        <Controller
+          control={control}
+          name={name}
+          render={({ field }) => (
+            <TextInput
+              {...inputProps}
+              accessibilityLabel={label}
+              value={field.value}
+              onChangeText={field.onChange}
+              onBlur={field.onBlur}
+            />
+          )}
+        />
+        {/* Field errors render under their field, as in the real component. */}
+        {error ? <Text testID={`${name}-error`}>{error}</Text> : null}
+      </>
     ),
   };
 });
@@ -144,7 +184,7 @@ function form(mode: Mode, strict = false) {
   fireEvent.changeText(view.getByLabelText(s.authPassword), "valid-password-42");
   if (mode === "signup") {
     fireEvent.changeText(view.getByLabelText(s.authUsername), " synthetic_user ");
-    fireEvent.changeText(view.getByLabelText(s.authDisplayName), " Synthetic Name ");
+    fireEvent.changeText(view.getByLabelText(s.authDisplayNameOptional), " Synthetic Name ");
   }
   return view;
 }
@@ -161,6 +201,7 @@ async function flush() {
 }
 beforeEach(() => {
   jest.clearAllMocks();
+  clearAuthHandoff();
   mockSignIn.mockReset();
   mockSignUp.mockReset();
   mockLocale = "en";
@@ -203,8 +244,8 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
         signup.complete({ status: "signedIn" });
       }
       await flush();
-      if (mode === "login") expect(mockRouter.replace).toHaveBeenCalledWith("/(tabs)/home");
-      else expect(mockRouter.back).toHaveBeenCalledTimes(1);
+      expect(mockRouter.replace).toHaveBeenCalledWith("/(tabs)/home");
+      expect(mockRouter.back).not.toHaveBeenCalled();
     },
   );
   it.each<Mode>(["login", "signup"])("%s ignores superseded results and retired errors", async (mode) => {
@@ -283,10 +324,11 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
     });
 
     it.each([
-      ["alreadyRegistered", strings[locale].authSignupAlreadyRegistered, false],
+      // Registered and new emails get the same neutral result, so the form reveals no account.
+      ["alreadyRegistered", strings[locale].authSignupConfirmEmail, false],
       ["needsEmailConfirmation", strings[locale].authSignupConfirmEmail, false],
       ["signedIn", null, true],
-    ] as const)("handles signup %s only for its current result", async (status, message, navigatesBack) => {
+    ] as const)("handles signup %s only for its current result", async (status, message, leavesAuth) => {
       const signup = pending<SignUpResult>();
       mockSignUp.mockReturnValue(signup.handle);
       const view = form("signup");
@@ -295,7 +337,7 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
       signup.complete({ status });
       await flush();
       if (message) expect(view.getByText(message)).toBeTruthy();
-      expect(mockRouter.back).toHaveBeenCalledTimes(navigatesBack ? 1 : 0);
+      expect(mockRouter.replace).toHaveBeenCalledTimes(leavesAuth ? 1 : 0);
     });
 
     it.each<Mode>(["login", "signup"])("does not continue after %s settles following unmount", async (mode) => {
@@ -320,7 +362,9 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
       fireEvent.press(invalid.getByTestId("email-submit"));
       await flush();
       expect(mockSignUp).not.toHaveBeenCalled();
-      expect(invalid.getByText(strings[locale].authValidationInvalidEmail)).toBeTruthy();
+      // The error shows only under its field, not repeated in the form banner.
+      expect(invalid.getByTestId("email-error").props.children).toBe(strings[locale].authValidationInvalidEmail);
+      expect(invalid.getAllByText(strings[locale].authValidationInvalidEmail)).toHaveLength(1);
     });
 
     it("hides email controls when auth is unconfigured", () => {
@@ -384,6 +428,105 @@ it.each<Mode>(["login", "signup"])(
     if (mode === "login") newLogin.complete();
     else newSignup.complete({ status: "signedIn" });
     await flush();
-    expect(mode === "login" ? mockRouter.replace : mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).toHaveBeenCalledTimes(1);
   },
 );
+
+describe("login and carried email", () => {
+  const routerArgs = () =>
+    [...mockRouter.push.mock.calls, ...mockRouter.replace.mock.calls, ...mockRouter.dismissTo.mock.calls].map((call) =>
+      JSON.stringify(call),
+    );
+
+  it("checks only that a password was entered, not the signup length rule", async () => {
+    mockSignIn.mockReturnValue(pending<void>().handle);
+    const view = form("login");
+    fireEvent.changeText(view.getByLabelText(strings.en.authPassword), "abc");
+    fireEvent.press(view.getByTestId("email-submit"));
+    await flush();
+    expect(mockSignIn).toHaveBeenCalledWith("qa@example.invalid", "abc");
+  });
+
+  it("requires a password", async () => {
+    const view = form("login");
+    fireEvent.changeText(view.getByLabelText(strings.en.authPassword), "");
+    fireEvent.press(view.getByTestId("email-submit"));
+    await flush();
+    expect(mockSignIn).not.toHaveBeenCalled();
+    expect(view.getByTestId("password-error").props.children).toBe(strings.en.authValidationPasswordRequired);
+  });
+
+  it("carries the typed email to Forgot password and Sign up in memory, never in a URL", async () => {
+    const login = form("login");
+    fireEvent.press(login.getByText(strings.en.authForgotPassword));
+    expect(mockRouter.push).toHaveBeenCalledWith("/auth/forgot-password");
+    login.unmount();
+
+    const signupFromLogin = render(<LoginScreen />);
+    expect(signupFromLogin.getByLabelText(strings.en.authEmail).props.value).toBe("QA@Example.Invalid");
+    fireEvent.press(signupFromLogin.getByText(strings.en.authSignup));
+    expect(mockRouter.replace).toHaveBeenCalledWith("/auth/signup");
+    signupFromLogin.unmount();
+
+    const signup = render(<SignupScreen />);
+    expect(signup.getByLabelText(strings.en.authEmail).props.value).toBe("QA@Example.Invalid");
+    // No navigation argument carries the email or any part of it.
+    for (const args of routerArgs()) {
+      expect(args).not.toContain("@");
+      expect(args.toLowerCase()).not.toContain("example");
+    }
+  });
+
+  it("never shows a raw provider message and offers resend for an unconfirmed email", async () => {
+    const failed = pending<void>();
+    mockSignIn.mockReturnValue(failed.handle);
+    const view = form("login");
+    fireEvent.press(view.getByTestId("email-submit"));
+    await flush();
+    failed.reject(Object.assign(new Error("Email not confirmed"), { code: "email_not_confirmed" }));
+    await flush();
+    expect(view.getByText(strings.en.authErrorEmailNotConfirmed)).toBeTruthy();
+    expect(view.queryByText("Email not confirmed")).toBeNull();
+  });
+
+  it("maps an unknown failure to the generic localized error", async () => {
+    const failed = pending<void>();
+    mockSignIn.mockReturnValue(failed.handle);
+    const view = form("login");
+    fireEvent.press(view.getByTestId("email-submit"));
+    await flush();
+    failed.reject(new Error("relation profiles does not exist"));
+    await flush();
+    expect(view.getByText(strings.en.authErrorGeneric)).toBeTruthy();
+    expect(view.queryByText("relation profiles does not exist")).toBeNull();
+  });
+});
+
+describe("forgot password", () => {
+  it("shows a neutral sent panel and blocks another send for 60 seconds", async () => {
+    jest.useFakeTimers();
+    try {
+      mockSendReset.mockResolvedValue();
+      const view = render(<ForgotPasswordScreen />);
+      fireEvent.changeText(view.getByLabelText(strings.en.authEmail), "qa@example.invalid");
+      await act(async () => {
+        fireEvent.press(view.getByTestId("email-submit"));
+      });
+      await flush();
+      expect(mockSendReset).toHaveBeenCalledWith("qa@example.invalid");
+      // Neutral: the same words whether or not the address has an account.
+      expect(view.getByText(new RegExp("^If qa@example\\.invalid has a Hafiz account"))).toBeTruthy();
+      fireEvent.press(view.getByText("Send again in 60 s"));
+      expect(mockSendReset).toHaveBeenCalledTimes(1);
+      act(() => {
+        jest.advanceTimersByTime(60_000);
+      });
+      fireEvent.press(view.getByText(strings.en.authSendAgain));
+      await flush();
+      expect(mockSendReset).toHaveBeenCalledTimes(2);
+      expect(mockRouter.push).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
