@@ -31,6 +31,7 @@ import {
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { audioFailureMessage } from "@/lib/audio/labels";
 import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
@@ -328,10 +329,10 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   const handleAudioPress = useCallback(async () => {
     if (!activeTarget) return;
     const result = await toggleAyah(activeTarget.surah, activeTarget.ayah, recitationId);
-    if (!result.ok) {
-      showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
+    if (!result.ok && result.failure && result.failure !== "busy") {
+      showToast(audioFailureMessage(result.failure, s));
     }
-  }, [activeTarget?.surah, activeTarget?.ayah, recitationId, toggleAyah, showToast, s.qfContentMisconfigured, s.qfContentUnavailable]);
+  }, [activeTarget?.surah, activeTarget?.ayah, recitationId, toggleAyah, showToast, s]);
 
   const handleNavigateAyah = useCallback((direction: "previous" | "next") => {
     const nextTarget = adjacentAyahs[direction];

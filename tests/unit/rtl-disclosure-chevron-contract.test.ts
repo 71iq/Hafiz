@@ -25,18 +25,17 @@ describe("RTL disclosure chevron contract", () => {
       'trailing={',
     ]);
 
+    // Reciter rows show name, style and the selected check (no ID badge or chevron), with a separate
+    // 44px preview button, mirrored by hand so the RTL reader root does not flip them back.
     expectContains("components/settings/ReciterPicker.tsx", [
-      'import { ActivityIndicator, Pressable, Text, View } from "react-native";',
-      "const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;",
       "<Pressable",
-      'className={`w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}',
       'direction: "ltr",',
       'flexDirection: isRTL ? "row-reverse" : "row",',
       'width: "100%",',
-      'className="h-10 w-10 shrink-0 items-center justify-center rounded-2xl"',
-      'className={`min-w-0 flex-1 gap-1 ${isRTL ? "items-end" : "items-start"}`}',
-      'className="h-9 w-9 shrink-0 items-center justify-center rounded-full"',
+      'className={`min-w-0 flex-1 gap-0.5 ${isRTL ? "items-end" : "items-start"}`}',
+      'className="mx-1 h-11 w-11 shrink-0 items-center justify-center rounded-full"',
     ]);
+    expect(read("components/settings/ReciterPicker.tsx")).not.toContain("toArabicNumber(reciter.id)");
   });
 
   it("mirrors picker and settings disclosure rows without relying on ambient RTL direction", () => {

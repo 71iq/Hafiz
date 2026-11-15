@@ -36,6 +36,7 @@ import {
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { audioFailureMessage } from "@/lib/audio/labels";
 import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
 import { textStartStyle } from "@/lib/ui/direction";
@@ -203,10 +204,10 @@ function AyahBlockInner({
 
   const handleAudioPress = useCallback(async () => {
     const result = await toggleAyah(surah, ayah, recitationId);
-    if (!result.ok) {
-      showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
+    if (!result.ok && result.failure && result.failure !== "busy") {
+      showToast(audioFailureMessage(result.failure, s));
     }
-  }, [ayah, recitationId, showToast, s.qfContentMisconfigured, s.qfContentUnavailable, surah, toggleAyah]);
+  }, [ayah, recitationId, showToast, s, surah, toggleAyah]);
 
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
   const audioState = getAyahState(surah, ayah, recitationId);
