@@ -1043,7 +1043,10 @@ describe("DeckCardsSheet list states, search and actions", () => {
 
   it("shows a load error with Try again instead of an empty deck", async () => {
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    jest.mocked(getDeckCardsForList).mockRejectedValueOnce(new Error("synthetic load failure")).mockResolvedValueOnce(deckCards);
+    jest
+      .mocked(getDeckCardsForList)
+      .mockRejectedValueOnce(new Error("synthetic load failure"))
+      .mockResolvedValueOnce(deckCards);
     const view = renderDeckWithCallbacks(jest.fn(), jest.fn());
     await waitFor(() => expect(view.getByText(s.deckCardsLoadFailed)).toBeTruthy());
     expect(view.queryByText(s.deckCardsNoCardsYet)).toBeNull();
@@ -1071,13 +1074,18 @@ describe("DeckCardsSheet list states, search and actions", () => {
     const second = renderDeckWithCallbacks(jest.fn(), jest.fn());
     await waitFor(() => expect(second.getByText(secondCard.title)).toBeTruthy());
     await openSecondCardConfirmation(second, s, "delete");
-    expect(second.getByText(interpolate(s.cardDeleteNamed, { card: `Subtitle for Second card Second card` }))).toBeTruthy();
+    expect(
+      second.getByText(interpolate(s.cardDeleteNamed, { card: `Subtitle for Second card Second card` })),
+    ).toBeTruthy();
   });
 
   it("marks a failed row and retries the same action from its Try again link", async () => {
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
     jest.mocked(getDeckCardsForList).mockResolvedValue(deckCards);
-    jest.mocked(setStudyCardMarked).mockRejectedValueOnce(new Error("synthetic mark failure")).mockResolvedValueOnce({} as StudyCardRow);
+    jest
+      .mocked(setStudyCardMarked)
+      .mockRejectedValueOnce(new Error("synthetic mark failure"))
+      .mockResolvedValueOnce({} as StudyCardRow);
     const onChanged = jest.fn();
     const view = renderDeckWithCallbacks(jest.fn(), onChanged);
     await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());

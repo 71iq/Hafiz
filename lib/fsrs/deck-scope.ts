@@ -20,7 +20,8 @@ export function validateRangeText(range: RangeText, ayahCount: number): RangeTex
   if (!/^\d+$/.test(from) || !/^\d+$/.test(to)) return { ok: false, reason: "invalid" };
   const ayahStart = Number(from);
   const ayahEnd = Number(to);
-  if (ayahStart < 1 || ayahEnd < 1 || ayahStart > ayahCount || ayahEnd > ayahCount) return { ok: false, reason: "invalid" };
+  if (ayahStart < 1 || ayahEnd < 1 || ayahStart > ayahCount || ayahEnd > ayahCount)
+    return { ok: false, reason: "invalid" };
   if (ayahStart > ayahEnd) return { ok: false, reason: "order" };
   return { ok: true, ayahStart, ayahEnd };
 }

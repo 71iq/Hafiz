@@ -1949,7 +1949,8 @@ function TestModeAnswer({
         <View>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 24, textAlign: "left", writingDirection: "ltr" }}
+            // English translation stays LTR in either interface language.
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 24, ...textStartStyle(false), writingDirection: "ltr" }}
           >
             {card.translation}
           </Text>

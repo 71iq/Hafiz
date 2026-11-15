@@ -377,7 +377,9 @@ describe("review-setting help caller characterization", () => {
           expect(putSmartDeckFilter).toHaveBeenCalledWith(mockTx, "default-retention", { type: "all" });
           expect(putDeckReviewSettings).toHaveBeenCalledWith(mockTx, "default-retention", expected);
           expect(materializeSmartDeckCards).toHaveBeenCalledWith(mockDatabase, "default-retention", 750, 0);
-          expect(saved).toHaveBeenCalledWith(interpolate(s.deckSettingsSavedNamed, { deck: s.smartDeckRetentionTitle }));
+          expect(saved).toHaveBeenCalledWith(
+            interpolate(s.deckSettingsSavedNamed, { deck: s.smartDeckRetentionTitle }),
+          );
           expect(writeDeckReviewSettings).not.toHaveBeenCalled();
         } else {
           expect(writeDeckReviewSettings).toHaveBeenCalledWith(mockDatabase, "isolated-review-help", expected);
@@ -446,27 +448,30 @@ describe("review-setting help caller characterization", () => {
       },
     );
 
-    it.each(["deck", "smart"] as const)("%s asks before closing a dirty draft and closes a clean one at once", async (kind) => {
-      const s = strings.en;
-      const close = jest.fn();
-      const view = render(editor(kind, 390, "en", close, jest.fn()));
-      await loaded(view);
-      const header = view.UNSAFE_getAllByType(OverlayHeader)[0];
-      act(() => header.props.onClose());
-      expect(close).toHaveBeenCalledTimes(1);
-      fireEvent.changeText(view.getByLabelText(s.flashcardsDailyLimit), "40");
-      act(() => header.props.onClose());
-      expect(close).toHaveBeenCalledTimes(1);
-      await waitFor(() => expect(view.getByText(s.discardChangesTitle)).toBeTruthy());
-      fireEvent.press(view.getByText(s.discardChangesKeepEditing));
-      await waitFor(() => expect(view.queryByText(s.discardChangesTitle)).toBeNull());
-      expect(view.getByLabelText(s.flashcardsDailyLimit).props.value).toBe("40");
-      act(() => header.props.onClose());
-      fireEvent.press(await waitFor(() => view.getByText(s.discardChangesConfirm)));
-      expect(close).toHaveBeenCalledTimes(2);
-      expect(writeDeckReviewSettings).not.toHaveBeenCalled();
-      expect(putDeckReviewSettings).not.toHaveBeenCalled();
-    });
+    it.each(["deck", "smart"] as const)(
+      "%s asks before closing a dirty draft and closes a clean one at once",
+      async (kind) => {
+        const s = strings.en;
+        const close = jest.fn();
+        const view = render(editor(kind, 390, "en", close, jest.fn()));
+        await loaded(view);
+        const header = view.UNSAFE_getAllByType(OverlayHeader)[0];
+        act(() => header.props.onClose());
+        expect(close).toHaveBeenCalledTimes(1);
+        fireEvent.changeText(view.getByLabelText(s.flashcardsDailyLimit), "40");
+        act(() => header.props.onClose());
+        expect(close).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(view.getByText(s.discardChangesTitle)).toBeTruthy());
+        fireEvent.press(view.getByText(s.discardChangesKeepEditing));
+        await waitFor(() => expect(view.queryByText(s.discardChangesTitle)).toBeNull());
+        expect(view.getByLabelText(s.flashcardsDailyLimit).props.value).toBe("40");
+        act(() => header.props.onClose());
+        fireEvent.press(await waitFor(() => view.getByText(s.discardChangesConfirm)));
+        expect(close).toHaveBeenCalledTimes(2);
+        expect(writeDeckReviewSettings).not.toHaveBeenCalled();
+        expect(putDeckReviewSettings).not.toHaveBeenCalled();
+      },
+    );
 
     function toggle(view: ReturnType<typeof render>, label: string) {
       let node = view.getByText(label).parent;

@@ -86,7 +86,9 @@ export function validateStepText(value: string): StepTextResult {
   if (value.trim().length === 0) return { ok: true, steps: [] };
   const result = readStrictSteps(value);
   // "01m" saves as "1m": the number is kept as a value, not as typed.
-  return result ? { ok: true, steps: result.map((step) => `${parseFloat(step)}${step.slice(-1)}` as SchedulerStep) } : { ok: false };
+  return result
+    ? { ok: true, steps: result.map((step) => `${parseFloat(step)}${step.slice(-1)}` as SchedulerStep) }
+    : { ok: false };
 }
 
 function readStrictSteps(value: string): SchedulerStep[] | null {

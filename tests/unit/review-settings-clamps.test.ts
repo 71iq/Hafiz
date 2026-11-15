@@ -5,7 +5,11 @@ import {
   clampMaximumInterval,
   validateDailyReviewLimitText,
 } from "@/lib/fsrs/review-settings-draft";
-import { isSchedulerDraftChanged, schedulerDraftFromSettings, schedulerFieldsFromDraft } from "@/lib/fsrs/scheduler-draft";
+import {
+  isSchedulerDraftChanged,
+  schedulerDraftFromSettings,
+  schedulerFieldsFromDraft,
+} from "@/lib/fsrs/scheduler-draft";
 import type { DeckReviewSettings } from "@/lib/fsrs/types";
 
 describe("review settings numeric drafts", () => {
@@ -119,7 +123,16 @@ describe("scheduler draft dirtiness and serialization", () => {
   } as const satisfies DeckReviewSettings;
 
   it("is clean when only formatting differs and dirty for an invalid or changed field", () => {
-    const draft = schedulerDraftFromSettings({ ...base, learningSteps: [...base.learningSteps], relearningSteps: [...base.relearningSteps], testModes: [...base.testModes], wordTestModes: [...base.wordTestModes] }, false);
+    const draft = schedulerDraftFromSettings(
+      {
+        ...base,
+        learningSteps: [...base.learningSteps],
+        relearningSteps: [...base.relearningSteps],
+        testModes: [...base.testModes],
+        wordTestModes: [...base.wordTestModes],
+      },
+      false,
+    );
     expect(isSchedulerDraftChanged(draft, base)).toBe(false);
     expect(isSchedulerDraftChanged({ ...draft, learningStepsText: "1m 10m" }, base)).toBe(false);
     expect(isSchedulerDraftChanged({ ...draft, learningStepsText: "1m bad" }, base)).toBe(true);
