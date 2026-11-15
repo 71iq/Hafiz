@@ -1,10 +1,12 @@
+import { useEffect, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Input, type InputProps } from "@/components/ui/Input";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
-import { formatLocalDateInput } from "@/lib/date";
+import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
+import { formatLongCardDate } from "@/lib/fsrs/card-dates";
 import { toArabicNumber } from "@/lib/arabic";
 import { textStartStyle } from "@/lib/ui/direction";
 
@@ -41,13 +43,25 @@ export function DueDateSheet({
   autoCapitalize,
   autoCorrect,
 }: DueDateSheetProps) {
+  // A typing error waits until the field loses focus; a pressed Save still reports it at once.
+  const [touched, setTouched] = useState(false);
+  useEffect(() => {
+    if (!visible) setTouched(false);
+  }, [visible]);
+  const parsed = parseDueDateInput(value);
+  const fieldError = parsed.ok ? null : parsed.reason === "past" ? s.cardDueDatePast : s.cardDueDateInvalid;
+  const message = error ?? (touched ? fieldError : null);
+  const preview = parsed.ok ? formatLongCardDate(parsed.date, isRTL ? "ar" : "en") : null;
   return (
-    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={420} maxHeight={360} avoidKeyboard>
-      <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} showHandle />
+    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={420} maxHeight={400} avoidKeyboard>
+      <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} />
       <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
         <Input
           value={value}
           onChangeText={onChange}
+          onBlur={() => setTouched(true)}
+          accessibilityLabel={s.cardSetDueDate}
+          accessibilityHint={preview ?? undefined}
           placeholder={s.cardDueDatePlaceholder}
           placeholderTextColor={isDark ? "#737373" : "#b9a085"}
           autoCapitalize={autoCapitalize}
@@ -62,6 +76,14 @@ export function DueDateSheet({
             writingDirection: "ltr",
           }}
         />
+        {preview ? (
+          <Text
+            className="mt-2 text-warm-600 dark:text-neutral-300"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {preview}
+          </Text>
+        ) : null}
         {/* Quick choices fill the field, so a common date needs no typing. */}
         <View className="mt-3 flex-row flex-wrap gap-2" style={{ direction: isRTL ? "rtl" : "ltr" }}>
           {quickDueDates(s, isRTL).map((choice) => {
@@ -85,8 +107,10 @@ export function DueDateSheet({
             );
           })}
         </View>
-        {error ? (
+        {message ? (
           <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
             className="mt-3 text-red-600 dark:text-red-400"
             style={{
               fontFamily: "Manrope_500Medium",
@@ -95,7 +119,7 @@ export function DueDateSheet({
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
-            {error}
+            {message}
           </Text>
         ) : null}
       </OverlayBody>
@@ -108,7 +132,8 @@ export function DueDateSheet({
             {s.flashcardsCancel}
           </Text>
         </Button>
-        <Button onPress={onSave} disabled={busy} className="flex-1">
+        {/* Dimmed while the date is not valid; a press then shows why instead of saving. */}
+        <Button onPress={onSave} disabled={busy} className={`flex-1 ${parsed.ok ? "" : "opacity-50"}`}>
           <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
             {s.cardSaveDueDate}
           </Text>

@@ -781,14 +781,14 @@ describe("Flashcard session due-date editor characterization", () => {
 
     const editorSheet = view
       .UNSAFE_getAllByType(ResponsiveSheet)
-      .find((node) => node.props.maxWidth === 420 && node.props.maxHeight === 360);
+      .find((node) => node.props.maxWidth === 420 && node.props.maxHeight === 400);
     if (!editorSheet) throw new Error("The session due-date editor sheet was not rendered");
-    expect(editorSheet.props).toMatchObject({ maxWidth: 420, maxHeight: 360, avoidKeyboard: true });
+    expect(editorSheet.props).toMatchObject({ maxWidth: 420, maxHeight: 400, avoidKeyboard: true });
     const renderedEditorSheet = view
       .UNSAFE_getAllByType(ReactNative.Animated.View)
-      .find((node) => flattenStyle(node.props.style).maxHeight === 360);
+      .find((node) => flattenStyle(node.props.style).maxHeight === 400);
     if (!renderedEditorSheet) throw new Error("The rendered session due-date sheet was not found");
-    expect(flattenStyle(renderedEditorSheet.props.style)).toMatchObject({ width: 390, maxHeight: 360 });
+    expect(flattenStyle(renderedEditorSheet.props.style)).toMatchObject({ width: 390, maxHeight: 400 });
     expect(view.UNSAFE_getAllByType(ReactNative.KeyboardAvoidingView)).not.toHaveLength(0);
 
     fireEvent.changeText(input, "not-a-date");
