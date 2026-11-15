@@ -20,6 +20,7 @@ const ROUTE_TITLE_KEYS: Record<string, UIStringKey> = {
 
 export function documentTitleFor(pathname: string, s: UIStrings): string {
   if (pathname === "/dev/zayt") return `Zayt Preview | ${s.appName}`;
-  const key = ROUTE_TITLE_KEYS[pathname];
+  // Every profile, own or another person's, reads "Profile | Hafiz" ("الملف الشخصي | حافظ").
+  const key = ROUTE_TITLE_KEYS[pathname] ?? (pathname.startsWith("/profile/") ? "authProfile" : undefined);
   return key ? interpolate(s.documentTitleFormat, { page: s[key], app: s.appName }) : s.appName;
 }

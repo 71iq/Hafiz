@@ -225,7 +225,7 @@
         },
         {
           "id": "shared.comments",
-          "title": "Comments panel: load, sort, send, like, guest prompt",
+          "title": "Comments panel: load, sort, send, like, own delete, report parent, guest prompt",
           "kind": "widget",
           "cases": ["COMMENT-01", "COMMENT-02", "COMMENT-03", "COMMENT-04"],
           "uses": ["shared.overlay", "auth.login"],
@@ -1354,7 +1354,7 @@
         },
         {
           "id": "board.standings",
-          "title": "Cohort standings and points",
+          "title": "Cohort standings, points and scoring info",
           "kind": "widget",
           "cases": ["BOARD-03"],
           "uses": ["wird.sync"],
@@ -1417,7 +1417,7 @@
             },
             {
               "id": "community.feed.like",
-              "title": "Like and report",
+              "title": "Like, report and author delete",
               "kind": "widget",
               "cases": ["FEED-07", "FEED-09"],
               "uses": ["shared.toast"],
@@ -1446,7 +1446,7 @@
           "children": [
             {
               "id": "profile.own.notes",
-              "title": "Notes tab: preview, view all, open, edit, delete",
+              "title": "Notes tab: preview, search and sort, view all, open, edit, delete",
               "kind": "widget",
               "cases": ["NOTE-05", "NOTE-06", "NOTE-07"],
               "uses": ["shared.noteeditor", "shared.confirm", "reader.arrival"],

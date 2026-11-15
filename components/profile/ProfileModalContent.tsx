@@ -26,19 +26,17 @@ import { longestStreak, toDayMap } from "@/lib/habit/streak";
 import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { useStrings } from "@/lib/i18n/useStrings";
-import {
-  fetchPublicAchievementUnlocks,
-  fetchPublicProfile,
-  fetchPublicSurahProgress,
-  type PublicProfile,
-} from "@/lib/leaderboard/api";
-import { uploadProfileAvatar } from "@/lib/profile/avatar";
+import { fetchPublicAchievementUnlocks, fetchPublicProfile, type PublicProfile } from "@/lib/leaderboard/api";
+import { uploadProfileAvatar, validateAvatarAsset, type AvatarProblem } from "@/lib/profile/avatar";
+import { neutralProfileName } from "@/lib/profile/identity";
+import { useSyncRestorePause } from "@/lib/sync/restore-consent";
+import { DiscardChangesDialog, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
+import { useOptionalOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { fetchProfilePrivacy, fetchProfileSummary, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { requireSocialOwner } from "@/lib/social/owner";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { socialFailureOf } from "@/lib/social/remote";
 import {
-  attachSurahNames,
   getDefaultDeckProgress,
   getLocalSurahProgress,
   summarizeSurahProgress,
@@ -78,6 +76,9 @@ const PROFILE_COUNTRY_MAX_LENGTH = 80;
 const EDIT_PROFILE_MODAL_MAX_WIDTH = 780;
 const EDIT_PROFILE_AVATAR_SIZE = 118;
 const EDIT_PROFILE_AVATAR_SIZE_PHONE = 88;
+/** The profile shows the most recent badges; View all opens the full list. */
+const PROFILE_BADGE_PREVIEW_LIMIT = 12;
+const PROFILE_SURAH_PREVIEW_LIMIT = 8;
 
 const COUNTRY_REGION_CODES = [
   "AF", "AX", "AL", "DZ", "AS", "AD", "AO", "AI", "AQ", "AG", "AR", "AM", "AW", "AU", "AT", "AZ", "BS", "BH",
@@ -166,15 +167,6 @@ function getLocalizedCountryValue(value: string, language: UILanguage): string {
   return findCountryOptionByValue(value, options)?.label ?? value;
 }
 
-function chooseRicherSurahProgress(local: ProfileSurahProgress[], remote: ProfileSurahProgress[]): ProfileSurahProgress[] {
-  if (remote.length === 0) return local;
-  const localSummary = summarizeSurahProgress(local);
-  const remoteSummary = summarizeSurahProgress(remote);
-  if (remoteSummary.memorized > localSummary.memorized) return remote;
-  if (remoteSummary.memorized === localSummary.memorized && remoteSummary.totalCards > localSummary.totalCards) return remote;
-  return local;
-}
-
 export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -196,11 +188,19 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const [avatarDraft, setAvatarDraft] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [avatarRemovalDraft, setAvatarRemovalDraft] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [profileStatus, setProfileStatus] = useState<"saved" | "saveFailed" | "photoFailed" | "permissionDenied" | null>(null);
+  const [profileStatus, setProfileStatus] = useState<
+    "saveFailed" | "photoFailed" | "permissionDenied" | `photo-${AvatarProblem}` | null
+  >(null);
+  const showNotice = useOptionalOperationNotice();
 
   const requestedUserId = userId || user?.id || "";
   const isOwnProfile = !!user && (!userId || userId === user.id);
   const isSignedOutOwnProfile = !user && !userId;
+  // The owner (or a guest on their own device) sees this device's figures; others see shared ones.
+  const showsLocalFigures = isOwnProfile || isSignedOutOwnProfile;
+  // W07: while a restore waits for consent, local figures are this device's, not synced progress.
+  const restorePause = useSyncRestorePause(isOwnProfile ? (user?.id ?? null) : null);
+  const awaitingSync = isOwnProfile && restorePause.pause !== null;
   // A link to a malformed id named no account; every public query for it was rejected by the server.
   const hasValidRequestedUserId = isAccountId(requestedUserId);
   const identity = getAuthSessionIdentity(session);
@@ -274,9 +274,9 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   });
 
   const ownBadgesQuery = useQuery({
-    queryKey: ["currentUserPublicAchievementUnlocks", user?.id],
+    queryKey: ["currentUserPublicAchievementUnlocks", user?.id ?? "signed-out"],
     queryFn: () => getRecentUnlocks(db, 100),
-    enabled: isOwnProfile,
+    enabled: showsLocalFigures,
     staleTime: 1000 * 60,
   });
 
@@ -299,14 +299,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     staleTime: 1000 * 60,
   });
   const photosOff = ownPrivacyQuery.data?.isMinor === true;
-
-  // The server copy of surah progress is readable only by its owner; it fills in other devices' cards.
-  const publicSurahProgressQuery = useQuery({
-    queryKey: ["publicSurahProgress", requestedUserId],
-    queryFn: async () => attachSurahNames(db, await fetchPublicSurahProgress(requestedUserId)),
-    enabled: hasValidRequestedUserId && isOwnProfile,
-    staleTime: 1000 * 60 * 2,
-  });
 
   const close = useCallback(() => {
     if (!editScope.origin.isCurrent() || !editScope.owner.isCurrent()) return;
@@ -332,11 +324,13 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
         }
       : null
     : publicProfile;
+  // A username made from the account's email prefix is never shown as the owner's identity.
+  const ownNeutral = isOwnProfile && neutralProfileName(visibleProfile, user?.email ?? null);
   const displayName =
     visibleProfile?.display_name ||
-    visibleProfile?.username ||
-    (isSignedOutOwnProfile ? s.authProfile : s.genericAnonymous);
-  const username = visibleProfile?.username ?? null;
+    (ownNeutral ? s.authProfile : visibleProfile?.username) ||
+    (isSignedOutOwnProfile || isOwnProfile ? s.authProfile : s.genericAnonymous);
+  const username = ownNeutral ? null : (visibleProfile?.username ?? null);
   const avatarUrl = visibleProfile?.avatar_url ?? null;
   const bio = visibleProfile?.bio?.trim() ?? "";
   const country = visibleProfile?.country?.trim() ?? "";
@@ -365,21 +359,18 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     : isDark ? "#0f766e" : "#0d9488";
   const localStatsSnapshot = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0 };
   // Activity and progress are private (SOC-01): the owner sees this device's history, others see only
-  // the streak and juz completions the person chose to share.
+  // the streak and juz completions the person chose to share. Figures come from this device's
+  // records for the current owner; they are never combined with server totals (no max(local, server)).
   const review = localReview;
-  const remoteSurahProgress = publicSurahProgressQuery.data ?? [];
-  const surahProgress = isOwnProfile ? chooseRicherSurahProgress(localSurahProgress, remoteSurahProgress) : [];
+  const surahProgress = showsLocalFigures ? localSurahProgress : [];
   const surahSummary = summarizeSurahProgress(surahProgress);
-  const averageDailyReviews = review.activeDays > 0 ? Math.round(review.totalReviews / review.activeDays) : 0;
   const sharedSummary = profileSummaryQuery.data ?? null;
-  const stats: { label: string; value: number | string }[] = isOwnProfile
+  // The four profile figures share Progress's definitions: memorized cards from surah progress, the
+  // habit streak Home and Progress show, and review-log active days and totals.
+  const stats: { label: string; value: number | string }[] = showsLocalFigures
     ? [
-        { label: s.progressRetention, value: `${surahSummary.retentionPct}%` },
         { label: s.progressTotalMemorized, value: surahSummary.memorized },
-        { label: s.wirdCurrent, value: localStatsSnapshot.currentStreak },
-        { label: s.wirdLongest, value: localStatsSnapshot.longestStreak },
-        { label: s.progressAvgDaily, value: averageDailyReviews },
-        { label: s.flashcardsSummaryReviewed, value: localStatsSnapshot.cardsReviewed },
+        { label: s.profileCurrentConsistency, value: localStatsSnapshot.currentStreak },
         { label: s.heatmapActiveDays, value: review.activeDays },
         { label: s.heatmapTotalReviews, value: review.totalReviews },
       ]
@@ -390,22 +381,26 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           : []),
       ];
   const publicBadges = isOwnProfile ? ownBadgesQuery.data ?? [] : publicBadgesQuery.data ?? [];
-  const loadingPublic = !isOwnProfile && !isSignedOutOwnProfile && publicProfileQuery.isLoading;
+  const loadingPublic = !isOwnProfile && !isSignedOutOwnProfile && hasValidRequestedUserId && publicProfileQuery.isLoading;
   const publicProfileMissing =
     !isOwnProfile && (!hasValidRequestedUserId || (publicProfileQuery.isSuccess && publicProfileQuery.data === null));
   const statusMessage =
-    profileStatus === "saved"
-      ? s.profileSaved
-      : profileStatus === "permissionDenied"
-        ? s.profilePhotoPermissionDenied
-        : profileStatus === "photoFailed"
-          ? s.profilePhotoFailed
-          : profileStatus === "saveFailed"
-            ? s.profileSaveFailed
-            : "";
+    profileStatus === "permissionDenied"
+      ? s.profilePhotoPermissionDenied
+      : profileStatus === "photoFailed"
+        ? s.profilePhotoFailed
+        : profileStatus === "saveFailed"
+          ? s.profileSaveFailed
+          : profileStatus === "photo-type"
+            ? s.profilePhotoInvalidType
+            : profileStatus === "photo-size"
+              ? s.profilePhotoTooLarge
+              : profileStatus === "photo-unreadable"
+                ? s.profilePhotoUnreadable
+                : "";
 
   const loadLocalOverview = useCallback(async () => {
-    if (!user) return;
+    if (!showsLocalFigures) return;
     // The wird streak is the same one Home and Progress show (lib/habit), not a count of review days.
     const [habit, cardsReviewedRow, reviewStats] = await Promise.all([
       loadHabitOverview(db),
@@ -435,7 +430,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     ]);
     setDefaultDeckProgress(defaultDecks);
     setLocalSurahProgress(surahs);
-  }, [db, user]);
+  }, [db, showsLocalFigures]);
 
   const invalidateProfileSurfaces = useCallback((isCurrent: () => boolean) => {
     const keys = [["publicProfile"], reflectionQueryKeys.feed.all, reflectionQueryKeys.reflections.all,
@@ -446,20 +441,20 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     }
   }, [queryClient]);
 
+  // updateProfileStats keeps its central restore/pause/owner guard and skips unchanged uploads.
   useEffect(() => {
-    if (!isOwnProfile) return;
+    if (!showsLocalFigures) return;
     loadLocalOverview().catch(console.warn);
-    updateProfileStats(db).catch(console.warn);
-  }, [db, isOwnProfile, loadLocalOverview]);
+    if (isOwnProfile) updateProfileStats(db).catch(console.warn);
+  }, [db, isOwnProfile, showsLocalFigures, loadLocalOverview]);
 
   useEffect(() => {
-    if (!isOwnProfile) return;
+    if (!showsLocalFigures) return;
     return subscribeReviewActivity(() => {
       loadLocalOverview().catch(console.warn);
-      updateProfileStats(db).catch(console.warn);
-      queryClient.invalidateQueries({ queryKey: ["publicSurahProgress", user?.id] });
+      if (isOwnProfile) updateProfileStats(db).catch(console.warn);
     });
-  }, [db, isOwnProfile, loadLocalOverview, queryClient, user?.id]);
+  }, [db, isOwnProfile, showsLocalFigures, loadLocalOverview]);
 
   useEffect(() => {
     if (!isOwnProfile) return;
@@ -494,7 +489,11 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       if (!isCurrentSave()) return;
       invalidateProfileSurfaces(isCurrentSave);
       if (!isCurrentSave()) return;
-      setProfileStatus("saved");
+      // Saved: the editor closes and a notice confirms it. The draft stays until this point.
+      editScope.busy = false;
+      setProfileSaving(false);
+      closeEdit();
+      showNotice(s.profileSaved);
     } catch (e) {
       if (!isCurrentSave()) return;
       console.warn("[Profile] Failed to update profile:", e);
@@ -511,7 +510,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
         }
       }
     }
-  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioValue, countryDirty, countryValue, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user, editScope, isCurrentEdit]);
+  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioValue, countryDirty, countryValue, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user, editScope, isCurrentEdit, closeEdit, showNotice, s.profileSaved]);
 
   const handlePickAvatar = useCallback(async () => {
     if (!isCurrentEdit() || editScope.busy || editScope.picking) return;
@@ -532,6 +531,12 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       if (!isCurrentPicker()) return;
       const asset = result.canceled ? null : result.assets[0];
       if (!asset) return;
+      // Checked before any upload; a rejected image leaves the previous draft as it was.
+      const problem = validateAvatarAsset(asset);
+      if (problem) {
+        setProfileStatus(`photo-${problem}`);
+        return;
+      }
       setAvatarDraft(asset);
       setAvatarRemovalDraft(false);
     } finally {
@@ -552,6 +557,12 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     setAvatarDraft(null);
     setAvatarRemovalDraft(!!profile?.avatar_url);
   }, [avatarDraft, profile?.avatar_url, editScope, isCurrentEdit]);
+
+  // Closing the editor with changes asks first; an account change still clears it directly.
+  const { guard: guardEditClose, dialogProps: discardDialogProps } = useDiscardGuard(profileDirty && !profileSaving);
+  const requestCloseEdit = useCallback(() => guardEditClose(closeEdit), [guardEditClose, closeEdit]);
+  const [badgesOpen, setBadgesOpen] = useState(false);
+  const [surahsOpen, setSurahsOpen] = useState(false);
 
   const tabs = useMemo(
     () => isOwnProfile ? [
@@ -582,10 +593,16 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
         dir={isRTL ? "rtl" : "ltr"}
       >
         <OverlayHeader
-          title={displayName}
-          subtitle={username ? `@${username}` : undefined}
+          title={loadingPublic ? undefined : displayName}
+          subtitle={!loadingPublic && username ? `@${username}` : undefined}
           leading={
-            visibleProfile ? (
+            loadingPublic ? (
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                className="h-12 w-12 rounded-full bg-surface-high dark:bg-surface-dark-high"
+              />
+            ) : visibleProfile ? (
               <ProfileAvatar avatarUrl={avatarUrl} name={displayName} size={56} isDark={isDark} />
             ) : (
               <View className="h-12 w-12 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
@@ -601,18 +618,41 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
         <OverlayBody contentContainerClassName="px-5 py-5">
           {isSignedOutOwnProfile ? (
-            <SignedOutProfile isDark={isDark} isRTL={isRTL} onClose={close} />
+            <View className="gap-6">
+              <SignedOutProfile isDark={isDark} isRTL={isRTL} onClose={close} />
+              {/* A guest's own activity on this device stays useful offline, below the sign-in prompt. */}
+              <ProfileOverview
+                bio=""
+                country=""
+                stats={stats}
+                review={review}
+                defaultDeckProgress={defaultDeckProgress}
+                surahProgress={surahProgress}
+                publicBadges={publicBadges}
+                numberLocale={numberLocale}
+                isOwnProfile
+                localTitle={s.profileGuestActivityTitle}
+                sharedSummaryLoading={false}
+                onViewAllBadges={() => setBadgesOpen(true)}
+                onViewAllSurahs={() => setSurahsOpen(true)}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+            </View>
           ) : loadingPublic ? (
-            <View className="items-center justify-center py-12">
-              <ActivityIndicator color={isDark ? "#5eead4" : "#003638"} />
+            <View accessible accessibilityLabel={s.profileLoadingLabel} className="gap-3 py-6">
+              <View className="h-5 w-48 rounded-full bg-surface-high dark:bg-surface-dark-high" />
+              <View className="h-4 w-32 rounded-full bg-surface-high dark:bg-surface-dark-high" />
             </View>
           ) : !visibleProfile ? (
             <EmptyState
               icon={UserRound}
-              title={s.authProfile}
-              subtitle={publicProfileMissing ? s.profileNotFound : s.errorSubtitle}
-              actionLabel={isOwnProfile || publicProfileMissing ? undefined : s.errorTryAgain}
-              onAction={isOwnProfile || publicProfileMissing ? undefined : () => void publicProfileQuery.refetch()}
+              title={publicProfileMissing ? s.profileNotFound : isOwnProfile ? s.authProfile : s.profileLoadFailed}
+              subtitle={publicProfileMissing || isOwnProfile ? undefined : s.errorSubtitle}
+              actionLabel={publicProfileMissing ? s.genericClose : isOwnProfile ? undefined : s.errorTryAgain}
+              onAction={
+                publicProfileMissing ? close : isOwnProfile ? undefined : () => void publicProfileQuery.refetch()
+              }
               isDark={isDark}
             />
           ) : (
@@ -661,7 +701,10 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                   publicBadges={publicBadges}
                   numberLocale={numberLocale}
                   isOwnProfile={isOwnProfile}
+                  awaitingSync={awaitingSync}
                   sharedSummaryLoading={profileSummaryQuery.isLoading}
+                  onViewAllBadges={() => setBadgesOpen(true)}
+                  onViewAllSurahs={() => setSurahsOpen(true)}
                   isDark={isDark}
                   isRTL={isRTL}
                 />
@@ -673,7 +716,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
       <ResponsiveModal
         open={editOpen}
-        onClose={closeEdit}
+        onClose={requestCloseEdit}
         maxWidth={EDIT_PROFILE_MODAL_MAX_WIDTH}
         maxHeight={maxOverlayHeight}
         surfaceColor={isDark ? themeColors.surfaceLow : themeColors.surfaceBright}
@@ -719,7 +762,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
             </Text>
           </View>
           <Pressable
-            onPress={closeEdit}
+            onPress={requestCloseEdit}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={s.genericClose}
@@ -755,6 +798,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 className="min-w-0 flex-1"
                 style={{ alignItems: isRTL ? "flex-end" : "flex-start", gap: 12, width: isPhone ? "100%" : undefined }}
               >
+                <ProfileEditFieldLabel label={s.authDisplayName} isRTL={isRTL} />
                 <Input
                   value={displayNameDraft}
                   onChangeText={(value) => {
@@ -766,12 +810,12 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                   accessibilityLabel={s.authDisplayName}
                   maxLength={60}
                   dir={isRTL ? "rtl" : "ltr"}
-                  className="min-h-10 rounded-none bg-transparent px-0 py-0"
+                  // A visible border so the name reads as an editable field.
+                  className="min-h-12 rounded-2xl border border-warm-300 bg-surface-bright px-4 py-2 dark:border-neutral-700 dark:bg-surface-dark"
                   style={{
                     fontFamily: "Manrope_700Bold",
-                    fontSize: isPhone ? 22 : 24,
-                    height: 40,
-                    lineHeight: 30,
+                    fontSize: isPhone ? 20 : 22,
+                    lineHeight: 28,
                     minWidth: isPhone ? 260 : 320,
                   }}
                 />
@@ -878,6 +922,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 searchPlaceholder={s.profileCountrySearchPlaceholder}
                 emptyLabel={s.profileCountryNoResults}
                 clearLabel={s.profileCountryClear}
+                sheetTitle={s.profileCountryListTitle}
                 language={uiLanguage}
                 isDark={isDark}
                 isRTL={isRTL}
@@ -887,7 +932,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
             {statusMessage ? (
               <Text
-                className={profileStatus === "saved" ? "text-primary-accent dark:text-primary-bright" : "text-red-600 dark:text-red-400"}
+                accessibilityRole="alert"
+                className="text-red-600 dark:text-red-400"
                 style={{
                   fontFamily: "Manrope_500Medium",
                   fontSize: 13,
@@ -924,7 +970,27 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           </Button>
         </View>
       </ResponsiveModal>
+      <DiscardChangesDialog {...discardDialogProps} />
 
+      <ResponsiveModal open={badgesOpen} onClose={() => setBadgesOpen(false)} maxWidth={720} maxHeight={maxOverlayHeight} dir={isRTL ? "rtl" : "ltr"}>
+        <OverlayHeader title={s.publicBadges} onClose={() => setBadgesOpen(false)} isRTL={isRTL} />
+        <OverlayBody contentContainerClassName="px-5 py-5">
+          <PublicBadgesGrid unlocks={publicBadges} />
+        </OverlayBody>
+      </ResponsiveModal>
+
+      <ResponsiveModal open={surahsOpen} onClose={() => setSurahsOpen(false)} maxWidth={720} maxHeight={maxOverlayHeight} dir={isRTL ? "rtl" : "ltr"}>
+        <OverlayHeader title={s.progressSurahProgress} onClose={() => setSurahsOpen(false)} isRTL={isRTL} />
+        <OverlayBody contentContainerClassName="px-5 py-5">
+          <SurahProgressList
+            data={surahProgress}
+            isDark={isDark}
+            isRTL={isRTL}
+            onItemPress={() => setSurahsOpen(false)}
+            s={s}
+          />
+        </OverlayBody>
+      </ResponsiveModal>
     </>
   );
 }
@@ -1000,6 +1066,7 @@ function CountryCommandSelect({
   searchPlaceholder,
   emptyLabel,
   clearLabel,
+  sheetTitle,
   language,
   isDark,
   isRTL,
@@ -1011,6 +1078,7 @@ function CountryCommandSelect({
   searchPlaceholder: string;
   emptyLabel: string;
   clearLabel: string;
+  sheetTitle: string;
   language: UILanguage;
   isDark: boolean;
   isRTL: boolean;
@@ -1018,6 +1086,9 @@ function CountryCommandSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const { width } = useWindowDimensions();
+  // On phones the list opens in a sheet that avoids the keyboard, so results stay visible.
+  const inSheet = width < SIDEBAR_BREAKPOINT;
   const options = useMemo(() => buildCountryOptions(language), [language]);
   const selectedOption = useMemo(() => findCountryOptionByValue(value, options), [options, value]);
   const selectedLabel = selectedOption?.label ?? value.trim();
@@ -1084,7 +1155,89 @@ function CountryCommandSelect({
         </View>
       </Pressable>
 
-      {open ? (
+      {open && inSheet ? (
+        <ResponsiveSheet
+          open
+          onClose={() => setOpen(false)}
+          maxWidth={560}
+          phoneSheetHeight="max"
+          avoidKeyboard
+          dir={isRTL ? "rtl" : "ltr"}
+        >
+          <OverlayHeader title={sheetTitle} onClose={() => setOpen(false)} isRTL={isRTL} />
+          <View className="flex-1 min-h-0">
+          <View className="border-b border-warm-200 px-3 py-2 dark:border-neutral-800">
+            <Input
+              value={query}
+              onChangeText={setQuery}
+              placeholder={searchPlaceholder}
+              maxLength={PROFILE_COUNTRY_MAX_LENGTH}
+              dir={isRTL ? "rtl" : "ltr"}
+              startIcon={<Search size={16} color={iconColor} />}
+              className="min-h-9 bg-transparent px-0 py-0"
+              containerClassName="bg-surface-low dark:bg-surface-dark-low"
+              style={{ height: 36, lineHeight: 20 }}
+            />
+          </View>
+          <ScrollView
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={inSheet ? { flex: 1 } : { maxHeight: 260 }}
+            contentContainerClassName="py-1"
+          >
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option) => {
+                const selected = selectedOption?.code === option.code;
+                return (
+                  <Pressable
+                    key={option.code}
+                    onPress={() => {
+                      onChange(option.storageName);
+                      setOpen(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    className={cn(
+                      "mx-1 min-h-11 rounded-xl px-3 py-2",
+                      selected ? "bg-primary-accent/10 dark:bg-primary-bright/15" : "bg-transparent"
+                    )}
+                  >
+                    <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={rowFlexStyle}>
+                      <Text
+                        className="min-w-0 flex-1 text-charcoal dark:text-neutral-100"
+                        numberOfLines={1}
+                        style={{
+                          fontFamily: selected ? "Manrope_700Bold" : "Manrope_500Medium",
+                          fontSize: 14,
+                          ...textStartStyle(isRTL),
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                      {selected ? <Check size={16} color={activeColor} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })
+            ) : (
+              <Text
+                className="px-4 py-6 text-warm-500 dark:text-neutral-500"
+                style={{
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 13,
+                  textAlign: "center",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {emptyLabel}
+              </Text>
+            )}
+          </ScrollView>
+          </View>
+        </ResponsiveSheet>
+      ) : open ? (
         <View className="mt-2 overflow-hidden rounded-2xl border border-warm-200 bg-surface-high dark:border-neutral-800 dark:bg-surface-dark-high">
           <View className="border-b border-warm-200 px-3 py-2 dark:border-neutral-800">
             <Input
@@ -1103,7 +1256,7 @@ function CountryCommandSelect({
             nestedScrollEnabled
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            style={{ maxHeight: 260 }}
+            style={inSheet ? { flex: 1 } : { maxHeight: 260 }}
             contentContainerClassName="py-1"
           >
             {filteredOptions.length > 0 ? (
@@ -1171,7 +1324,11 @@ function ProfileOverview({
   publicBadges,
   numberLocale,
   isOwnProfile,
+  awaitingSync = false,
+  localTitle,
   sharedSummaryLoading,
+  onViewAllBadges,
+  onViewAllSurahs,
   isDark,
   isRTL,
 }: {
@@ -1184,7 +1341,13 @@ function ProfileOverview({
   publicBadges: any[];
   numberLocale: string;
   isOwnProfile: boolean;
+  /** W07: sync is paused for restore consent, so figures are labeled as this device's. */
+  awaitingSync?: boolean;
+  /** Replaces the activity heading, such as "On this device" for a guest. */
+  localTitle?: string;
   sharedSummaryLoading: boolean;
+  onViewAllBadges: () => void;
+  onViewAllSurahs: () => void;
   isDark: boolean;
   isRTL: boolean;
 }) {
@@ -1202,47 +1365,31 @@ function ProfileOverview({
 
   return (
     <View className="gap-5">
-      {country ? (
-        <Card elevation="low" className="p-5">
-          <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={inlineRowFlexStyle}>
-            <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
-              <MapPin size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text
-                className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 15, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
-              >
-                {s.profileCountryTitle}
-              </Text>
+      {/* Country and bio sit with the identity at the top rather than in cards of their own. */}
+      {country || bio ? (
+        <View className="gap-2">
+          {country ? (
+            <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={inlineRowFlexStyle}>
+              <MapPin size={15} color={isDark ? "#2dd4bf" : "#0d9488"} accessibilityLabel={s.profileCountryTitle} />
               <Text
                 selectable
-                className="mt-0.5 text-warm-700 dark:text-neutral-300"
-                style={{ fontFamily: "Manrope_400Regular", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                className="min-w-0 flex-1 text-warm-700 dark:text-neutral-300"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
               >
                 {country}
               </Text>
             </View>
-          </View>
-        </Card>
-      ) : null}
-
-      {bio ? (
-        <Card elevation="low" className="p-5">
-          <Text
-            className="mb-2 text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
-          >
-            {s.profileBioTitle}
-          </Text>
-          <Text
-            selectable
-            className="text-warm-700 dark:text-neutral-300"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
-          >
-            {bio}
-          </Text>
-        </Card>
+          ) : null}
+          {bio ? (
+            <Text
+              selectable
+              className="text-charcoal dark:text-neutral-200"
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+            >
+              {bio}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
 
       {!isOwnProfile ? (
@@ -1268,13 +1415,30 @@ function ProfileOverview({
         </Card>
       ) : null}
 
+      {/* W07: while sync waits for restore consent these are this device's figures, said plainly. */}
+      {awaitingSync ? (
+        <View className="gap-1 rounded-2xl bg-surface-high px-4 py-3 dark:bg-surface-dark-high">
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 13, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.profileStatsAwaitingSync}
+          </Text>
+          <Text
+            className="text-warm-700 dark:text-neutral-300"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 19, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.profileStatsAwaitingSyncBody}
+          </Text>
+        </View>
+      ) : null}
       {isOwnProfile ? (
       <Card elevation="low" className="p-5">
         <Text
           className="mb-4 text-charcoal dark:text-neutral-100"
           style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
         >
-          {s.progressActivity}
+          {localTitle ?? s.progressActivity}
         </Text>
         <View
           className="gap-5"
@@ -1323,7 +1487,15 @@ function ProfileOverview({
           >
             {s.progressSurahProgress}
           </Text>
-          <SurahProgressList data={surahProgress} isDark={isDark} isRTL={isRTL} previewLimit={8} readOnly={false} s={s} />
+          <SurahProgressList
+            data={surahProgress}
+            isDark={isDark}
+            isRTL={isRTL}
+            previewLimit={PROFILE_SURAH_PREVIEW_LIMIT}
+            onViewAll={onViewAllSurahs}
+            readOnly={false}
+            s={s}
+          />
         </View>
       ) : null}
 
@@ -1334,7 +1506,19 @@ function ProfileOverview({
         >
           {s.publicBadges}
         </Text>
-        <PublicBadgesGrid unlocks={publicBadges} />
+        <PublicBadgesGrid unlocks={publicBadges.slice(0, PROFILE_BADGE_PREVIEW_LIMIT)} />
+        {publicBadges.length > PROFILE_BADGE_PREVIEW_LIMIT ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onViewAllBadges}
+            className="mt-3 min-h-11 justify-center"
+            style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1, alignSelf: isRTL ? "flex-end" : "flex-start" })}
+          >
+            <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+              {s.profileBadgesViewAll}
+            </Text>
+          </Pressable>
+        ) : null}
       </Card>
     </View>
   );

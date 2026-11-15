@@ -1,14 +1,16 @@
+import { useState } from "react";
 import { Pressable, View } from "react-native";
-import { CalendarCheck2, LogOut, Users } from "lucide-react-native";
+import { CalendarCheck2, Info, LogOut, Users } from "lucide-react-native";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Card } from "@/components/ui/Card";
 import { Text } from "@/components/ui/Text";
 import type { BoardStanding, BoardView } from "@/lib/board/api";
-import { formatDays } from "@/lib/i18n/count";
+import { formatDays, formatPoints } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { formatSocialDate, socialNumber } from "@/lib/social/text";
+import { BoardScoringSheet } from "./BoardScoringSheet";
 import { socialRowStyle, useSocialAccent } from "./SocialControls";
 
 type Language = "en" | "ar";
@@ -31,6 +33,7 @@ export function BoardStandings({
   const { isRTL, uiLanguage } = useSettings();
   const language: Language = uiLanguage === "ar" ? "ar" : "en";
   const { accent, muted } = useSocialAccent();
+  const [scoringOpen, setScoringOpen] = useState(false);
 
   return (
     <View className="gap-4">
@@ -66,7 +69,18 @@ export function BoardStandings({
         </View>
       )}
 
-      <Text variant="caption">{s.boardRules}</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => setScoringOpen(true)}
+        className="min-h-11 items-center gap-2 self-start px-1"
+        style={socialRowStyle(isRTL)}
+      >
+        <Info size={16} color={accent} />
+        <Text variant="label-lg" className="text-primary-accent dark:text-primary-bright">
+          {s.boardScoringOpen}
+        </Text>
+      </Pressable>
+      <BoardScoringSheet open={scoringOpen} onClose={() => setScoringOpen(false)} />
 
       <Pressable
         accessibilityRole="button"
@@ -91,7 +105,7 @@ function StandingRow({ standing, language, s }: { standing: BoardStanding; langu
   const label = interpolate(s.boardPointsA11y, {
     name: standing.isMe ? `${standing.name} (${s.boardYou})` : standing.name,
     rank: socialNumber(standing.rank, language),
-    points: socialNumber(standing.points, language),
+    points: formatPoints(standing.points, language),
     streak: formatDays(standing.streak, language),
   });
   return (

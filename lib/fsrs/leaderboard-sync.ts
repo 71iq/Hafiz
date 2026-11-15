@@ -16,6 +16,8 @@ import { errorMessage } from "@/lib/error-message";
  */
 type StatsOwner = {
   userId: string;
+  /** Account and session; the unchanged-upload memory belongs to exactly one. */
+  key: string;
   isCurrent: () => boolean;
 };
 
@@ -27,14 +29,23 @@ function captureStatsOwner(): StatsOwner | null {
   const authOwner = authCommands.captureOwner();
   return {
     userId: user.id,
+    key: JSON.stringify(identity),
     isCurrent: () => authOwner.isCurrent() && useAuthStore.getState().user?.id === user.id,
   };
 }
 
 let statsQueue: { owner: StatsOwner; tail: Promise<void> } | null = null;
 
+/**
+ * The local figures last uploaded successfully for one account/session, in memory only. Repeated
+ * triggers (profile open, review, sync) with unchanged figures skip the upload; a failure records
+ * nothing, so the next trigger retries; another owner starts empty.
+ */
+let lastUploaded: { ownerKey: string; figures: string } | null = null;
+
 function enqueueStats(owner: StatsOwner, work: () => Promise<void>): Promise<void> {
   const queue = statsQueue?.owner.isCurrent() ? statsQueue : { owner, tail: Promise.resolve() };
+  if (queue !== statsQueue && lastUploaded?.ownerKey !== owner.key) lastUploaded = null;
   statsQueue = queue;
   const result = queue.tail.then(async () => {
     if (owner.isCurrent()) await work();
@@ -65,10 +76,16 @@ export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
   return enqueueStats(owner, async () => {
     try {
       if (!(await canWriteAccountDerivedStats(db, owner))) return;
-      const [surahProgress, remoteSurahProgress] = await Promise.all([
-        getLocalSurahProgress(db),
-        supabase.from("public_surah_progress").select("surah, total_cards, memorized_cards").eq("user_id", owner.userId),
-      ]);
+      const surahProgress = await getLocalSurahProgress(db);
+      if (!owner.isCurrent()) return;
+      const figures = JSON.stringify(
+        surahProgress.map((row) => [row.surah, row.totalCards, row.memorized]).sort((a, b) => a[0] - b[0]),
+      );
+      if (lastUploaded?.ownerKey === owner.key && lastUploaded.figures === figures) return;
+      const remoteSurahProgress = await supabase
+        .from("public_surah_progress")
+        .select("surah, total_cards, memorized_cards")
+        .eq("user_id", owner.userId);
       if (!owner.isCurrent()) return;
       if (remoteSurahProgress.error) throw remoteSurahProgress.error;
 
@@ -109,8 +126,14 @@ export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
         if (!owner.isCurrent()) return;
         if (deleteError) throw deleteError;
       }
+      lastUploaded = { ownerKey: owner.key, figures };
     } catch (error) {
       if (owner.isCurrent()) console.warn("[Profile] Failed to update surah progress:", errorMessage(error));
     }
   });
+}
+
+/** Test hook: forget the last uploaded figures. */
+export function resetProfileStatsMemoryForTests() {
+  lastUploaded = null;
 }

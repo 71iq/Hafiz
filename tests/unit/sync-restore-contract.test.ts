@@ -109,11 +109,12 @@ describe("account sync restore contract", () => {
     expect(updateProfileStats).toContain("Math.max(row.memorized, existing?.memorized_cards ?? 0)");
   });
 
-  it("uses the owner's server surah progress only on their own profile", () => {
+  it("shows the owner's local surah progress on their profile, never a max with the server copy (W12)", () => {
     const source = read("components/profile/ProfileModalContent.tsx");
 
-    expect(source).toContain("chooseRicherSurahProgress(localSurahProgress, remoteSurahProgress)");
-    expect(source).toContain("enabled: hasValidRequestedUserId && isOwnProfile,");
+    expect(source).toContain("const surahProgress = showsLocalFigures ? localSurahProgress : [];");
+    expect(source).not.toContain("chooseRicherSurahProgress");
+    expect(source).not.toContain("fetchPublicSurahProgress");
   });
 });
 

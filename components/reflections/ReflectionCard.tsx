@@ -4,15 +4,22 @@ import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useReflectionMutationScope, type ReflectionMutationLease } from "./use-mutation-scope";
 import { View, Text, Pressable } from "react-native";
 import { router } from "expo-router";
-import { Heart, MessageCircle, MoreHorizontal, Flag } from "lucide-react-native";
+import { Heart, MessageCircle, Flag, Trash2 } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { hapticLight } from "@/lib/haptics";
-import { toggleLike, reportReflection } from "@/lib/reflections/api";
+import { toggleLike } from "@/lib/reflections/api";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { formatRelativeTime } from "@/lib/i18n/relative-time";
+import { formatCompactCount } from "@/lib/reflections/format";
 import type { Reflection } from "@/lib/reflections/types";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMenu";
+import { formatCommentDateTime, formatLocalRelativeTime, ReflectionTime } from "./ReflectionTime";
+import { useDeleteReflection, useReportReflection } from "./use-reflection-actions";
+
+/** Feed cards clamp long reflections to this many lines; Read more opens the full post. */
+export const REFLECTION_CLAMP_LINES = 8;
 
 type Props = {
   reflection: Reflection;
@@ -26,6 +33,10 @@ type Props = {
   onAuthRequired?: () => void;
   /** Called before the card navigates away, so the sheet that shows it can close first. */
   onNavigate?: () => void;
+  /** Clamp long content and offer Read more (which calls onPress). The full-post view leaves this off. */
+  clamp?: boolean;
+  /** After the author's delete settled (deleted, or no longer available), so a detail view can close. */
+  onGone?: (reflection: Reflection) => void;
 };
 
 export function ReflectionCard({
@@ -39,6 +50,8 @@ export function ReflectionCard({
   onReferencePress,
   onAuthRequired,
   onNavigate,
+  clamp = false,
+  onGone,
 }: Props) {
   const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
@@ -56,11 +69,13 @@ export function ReflectionCard({
     liked: boolean;
     count: number;
   } | null>(null);
-  const [showMenu, setShowMenu] = useState(false);
-  const [reported, setReported] = useState(false);
-  const [failure, setFailure] = useState<"like" | "report" | null>(null);
-  const likeBusy = pending.has("like"),
-    reportBusy = pending.has("report");
+  const [failure, setFailure] = useState<"like" | "auth" | null>(null);
+  const [timeRevealed, setTimeRevealed] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const likeBusy = pending.has("like");
+  const report = useReportReflection(reflection);
+  const removal = useDeleteReflection(reflection, onGone);
+  const isOwn = !!user && reflection.user_id === user.id;
   const canonicalLiked = reflection.user_has_liked ?? false;
   const activePreview =
     preview?.lease.isCurrent() && preview.baseLiked === canonicalLiked && preview.baseCount === reflection.likes_count
@@ -68,19 +83,20 @@ export function ReflectionCard({
       : null;
   const liked = activePreview?.liked ?? canonicalLiked;
   const likesCount = activePreview?.count ?? reflection.likes_count;
-  const error = failure === "like" ? s.reflectionLikeFailed : failure === "report" ? s.reflectionReportFailed : null;
+  const error = failure === "like" ? s.reflectionLikeFailed : failure === "auth" ? s.reflectionFeedAuthRequired : null;
   const authorName = reflection.profiles?.display_name || reflection.profiles?.username || s.genericAnonymous;
 
   useLayoutEffect(() => {
     setPreview(null);
-    setReported(false);
     setFailure(null);
-    setShowMenu(false);
+    setTimeRevealed(false);
   }, [reflection.id, user?.id]);
 
   const handleLike = useCallback(async () => {
     if (!user) {
-      onAuthRequired?.();
+      // The surface stays open and explains itself; no like is replayed after signing in.
+      if (onAuthRequired) onAuthRequired();
+      else setFailure("auth");
       return;
     }
     const lease = begin("like");
@@ -125,51 +141,74 @@ export function ReflectionCard({
     }
   }, [user, begin, liked, canonicalLiked, likesCount, reflection, onLikeToggled, onAuthRequired, queryClient]);
 
-  const handleReport = useCallback(async () => {
-    if (!user || reported) return;
-    const lease = begin("report");
-    if (!lease) return;
-    setShowMenu(false);
-    setFailure(null);
-    try {
-      await reportReflection(user.id, reflection.id);
-      if (lease.isCurrent()) setReported(true);
-    } catch {
-      if (lease.isCurrent()) setFailure("report");
-    } finally {
-      lease.release();
-    }
-  }, [user, reported, begin, reflection.id]);
-
   const mutedColor = isDark ? "#737373" : "#A39B93";
   const heartColor = liked ? "#ef4444" : mutedColor;
-  const contentAlign = isRTL ? "right" : "left";
+  const contentAlign = isRTL ? ("right" as const) : ("left" as const);
   const rowClassName = isRTL ? "flex-row-reverse" : "flex-row";
   const rowFlexStyle = {
     direction: "ltr" as const,
     flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const),
   };
-  const menuSide = isRTL ? { left: 12 } : { right: 12 };
   const isFeed = variant === "feed";
   const openProfile = useCallback(() => {
     onNavigate?.();
     router.push(reflection.user_id === user?.id ? ("/profile" as any) : (`/profile/${reflection.user_id}` as any));
   }, [onNavigate, reflection.user_id, user?.id]);
+  const contentStyle = {
+    fontFamily: "Manrope_400Regular",
+    fontSize: isFeed ? 15 : 14,
+    lineHeight: isFeed ? 25 : 23,
+    textAlign: contentAlign,
+    writingDirection: isRTL ? ("rtl" as const) : ("ltr" as const),
+  };
+  const canClamp = clamp && !!onPress;
   const contentText = (
-    <Text
-      className="text-charcoal dark:text-neutral-200"
-      style={{
-        fontFamily: "Manrope_400Regular",
-        fontSize: isFeed ? 15 : 14,
-        lineHeight: isFeed ? 25 : 23,
-        marginBottom: isFeed ? 14 : 12,
-        textAlign: contentAlign,
-        writingDirection: isRTL ? "rtl" : "ltr",
-      }}
-    >
-      {reflection.content}
-    </Text>
+    <View style={{ marginBottom: canClamp && clamped ? 4 : isFeed ? 14 : 12 }}>
+      {canClamp ? (
+        // An unclamped hidden copy tells whether the reflection needs Read more.
+        <Text
+          aria-hidden
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          pointerEvents="none"
+          onLayout={(event) => {
+            const next = event.nativeEvent.layout.height > contentStyle.lineHeight * REFLECTION_CLAMP_LINES + 2;
+            setClamped((current) => (current === next ? current : next));
+          }}
+          style={{ ...contentStyle, position: "absolute", left: 0, right: 0, opacity: 0 }}
+        >
+          {reflection.content}
+        </Text>
+      ) : null}
+      <Text
+        className="text-charcoal dark:text-neutral-200"
+        numberOfLines={canClamp ? REFLECTION_CLAMP_LINES : undefined}
+        style={contentStyle}
+      >
+        {reflection.content}
+      </Text>
+    </View>
   );
+  const menuItems: DropdownMenuItem[] = isOwn
+    ? [
+        {
+          key: "delete",
+          label: s.reflectionDeleteAction,
+          destructive: true,
+          icon: (color) => <Trash2 size={16} color={color} />,
+          onPress: removal.request,
+          disabled: removal.pending,
+        },
+      ]
+    : [
+        {
+          key: "report",
+          label: report.reported ? s.reflectionReported : s.reflectionReportAction,
+          icon: (color) => <Flag size={16} color={color} />,
+          onPress: report.request,
+          disabled: report.reported || report.pending,
+        },
+      ];
 
   return (
     <>
@@ -207,65 +246,26 @@ export function ReflectionCard({
                 handleSize={10}
               />
             </Pressable>
-            <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color: mutedColor }}>
-              {formatRelativeTime(reflection.created_at, s.justNow, uiLanguage)}
-            </Text>
+            <ReflectionTime
+              relative={formatLocalRelativeTime(reflection.created_at, s.justNow, uiLanguage)}
+              full={formatCommentDateTime(reflection.created_at, uiLanguage)}
+              hint={s.commentFullDateHint}
+              revealed={timeRevealed}
+              onReveal={setTimeRevealed}
+              color={mutedColor}
+            />
           </View>
 
-          {user && (
-            <Pressable
-              onPress={() => setShowMenu((v) => !v)}
-              hitSlop={8}
-              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, padding: 4 })}
-            >
-              <MoreHorizontal size={16} color={mutedColor} />
-            </Pressable>
-          )}
+          {user ? (
+            <DropdownMenu items={menuItems} triggerLabel={s.reflectionMoreOptions} align="end" isRTL={isRTL} />
+          ) : null}
         </View>
-
-        {showMenu && (
-          <View
-            style={{
-              position: "absolute",
-              top: 40,
-              ...menuSide,
-              zIndex: 10,
-              borderRadius: 12,
-              padding: 4,
-              backgroundColor: themeColors.surfaceBright,
-              shadowColor: "#003638",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.08,
-              shadowRadius: 16,
-              elevation: 4,
-            }}
-          >
-            <Pressable
-              onPress={handleReport}
-              disabled={reported || reportBusy}
-              className={`${rowClassName} items-center gap-2 px-3 py-2`}
-              style={({ pressed }) => ({
-                ...rowFlexStyle,
-                opacity: pressed || reported || reportBusy ? 0.6 : 1,
-              })}
-            >
-              <Flag size={14} color={reported ? mutedColor : "#ef4444"} />
-              <Text
-                style={{
-                  fontFamily: "Manrope_500Medium",
-                  fontSize: 13,
-                  color: reported ? mutedColor : isDark ? "#e5e5e5" : "#2D2D2D",
-                }}
-              >
-                {reported ? s.reflectionReported : s.reflectionReport}
-              </Text>
-            </Pressable>
-          </View>
-        )}
 
         {showReference && referenceLabel ? (
           <Pressable
             onPress={() => onReferencePress?.(reflection)}
+            accessibilityRole="link"
+            hitSlop={8}
             className={`mb-2 self-start rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5 ${isRTL ? "self-end" : "self-start"}`}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
@@ -289,6 +289,21 @@ export function ReflectionCard({
         ) : (
           contentText
         )}
+        {canClamp && clamped ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onPress?.(reflection.id)}
+            className="mb-2 min-h-11 justify-center"
+            style={{ alignSelf: isRTL ? "flex-end" : "flex-start" }}
+          >
+            <Text
+              className="text-primary-accent dark:text-primary-bright"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+            >
+              {s.reflectionReadMore}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <View
           className={`${rowClassName} items-center gap-2`}
@@ -309,7 +324,9 @@ export function ReflectionCard({
           >
             <Heart size={15} color={heartColor} fill={liked ? "#ef4444" : "none"} />
             {(isFeed || likesCount > 0) && (
-              <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: mutedColor }}>{likesCount}</Text>
+              <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: mutedColor }}>
+                {formatCompactCount(likesCount, uiLanguage)}
+              </Text>
             )}
           </Pressable>
 
@@ -325,7 +342,7 @@ export function ReflectionCard({
             <MessageCircle size={15} color={mutedColor} />
             {(isFeed || reflection.comments_count > 0) && (
               <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: mutedColor }}>
-                {reflection.comments_count}
+                {formatCompactCount(reflection.comments_count, uiLanguage)}
               </Text>
             )}
           </Pressable>
@@ -345,6 +362,36 @@ export function ReflectionCard({
           </Text>
         ) : null}
       </View>
+      <ConfirmDialog
+        visible={removal.open}
+        title={s.reflectionDeleteTitle}
+        message={s.reflectionDeleteBody}
+        cancelLabel={s.reflectionCancel}
+        confirmLabel={s.reflectionDeleteConfirm}
+        pendingLabel={s.reflectionDeleting}
+        destructive
+        confirmLoading={removal.pending}
+        error={removal.error}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={removal.cancel}
+        onConfirm={() => void removal.confirm()}
+      />
+      <ConfirmDialog
+        visible={report.open}
+        title={s.reflectionReportTitle}
+        message={s.reflectionReportBody}
+        cancelLabel={s.reflectionCancel}
+        confirmLabel={s.reflectionReportConfirm}
+        pendingLabel={s.reflectionReporting}
+        tone="info"
+        confirmLoading={report.pending}
+        error={report.error}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={report.cancel}
+        onConfirm={() => void report.confirm()}
+      />
     </>
   );
 }

@@ -94,7 +94,20 @@ jest.mock("@/lib/profile/privacy", () => ({
   },
 }));
 jest.mock("@/lib/profile/avatar", () => ({
+  ...jest.requireActual("@/lib/profile/avatar"),
   uploadProfileAvatar: (id: string, asset: unknown) => mockUpload(id, asset),
+}));
+// A successful save closes the editor and confirms it through the shared notice.
+const mockNotice = jest.fn();
+jest.mock("@/components/ui/OperationNoticeProvider", () => ({ useOptionalOperationNotice: () => mockNotice }));
+let mockRestorePause: "pending_consent" | "cancelled" | null = null;
+jest.mock("@/lib/sync/restore-consent", () => ({
+  useSyncRestorePause: (userId: string | null) => ({
+    paused: userId !== null && mockRestorePause !== null,
+    pause: userId !== null ? mockRestorePause : null,
+    resuming: false,
+    resume: () => undefined,
+  }),
 }));
 jest.mock("@/lib/profile/progress", () => ({
   attachSurahNames: async () => [],
@@ -121,16 +134,32 @@ jest.mock("@/components/ui/Input", () => ({
   },
 }));
 jest.mock("@/components/ui/ResponsiveOverlay", () => {
-  const { View } = jest.requireActual("react-native");
+  const { View, Pressable, Text } = jest.requireActual("react-native");
   return {
     ResponsiveSheet: ({ children, onClose }: { children: ReactNode; onClose: () => void }) => {
       mockRootClose = onClose;
       return <View>{children}</View>;
     },
-    ResponsiveModal: ({ children, open, onClose }: { children: ReactNode; open: boolean; onClose: () => void }) => {
-      mockCloseEdit = onClose;
+    // The edit dialog is the modal that avoids the keyboard; the discard prompt and lists are others.
+    ResponsiveModal: ({
+      children,
+      open,
+      onClose,
+      avoidKeyboard,
+    }: {
+      children: ReactNode;
+      open: boolean;
+      onClose: () => void;
+      avoidKeyboard?: boolean;
+    }) => {
+      if (avoidKeyboard) mockCloseEdit = onClose;
       return open ? <View>{children}</View> : null;
     },
+    OverlayFooter: ({ children }: { children: ReactNode }) => <View>{children}</View>,
+    OverlayFooterLabel: ({ children }: { children: ReactNode }) => <Text>{children}</Text>,
+    OverlayButton: ({ children, onPress }: { children: ReactNode; onPress: () => void }) => (
+      <Pressable onPress={onPress}>{children}</Pressable>
+    ),
     OverlayBody: ({ children }: { children: ReactNode }) => <View>{children}</View>,
     OverlayHeader: ({ actions }: { actions: ReactNode }) => <View>{actions}</View>,
   };
@@ -199,6 +228,8 @@ async function flush() {
   });
 }
 beforeEach(() => {
+  mockNotice.mockReset();
+  mockRestorePause = null;
   mockQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   activate(session("a"), profile("a"));
   mockAuthStore.setState({ isLoading: false, error: null, isInitialized: true });
@@ -240,7 +271,7 @@ it("saves a current trimmed profile and updates its real Query cache", async () 
   const screen = await open();
   change(screen, "  Changed A  ");
   fireEvent.press(screen.getByTestId("save"));
-  await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+  await waitFor(() => expect(mockNotice).toHaveBeenCalledWith(strings.en.profileSaved));
   expect(mockWrite).toHaveBeenCalledWith({ display_name: "Changed A" });
   expect(mockQueryClient.getQueryData(["publicProfile", uid("a")])).toEqual(profile("a", "Changed A"));
 });
@@ -262,7 +293,7 @@ it.each(["success", "error", "rejection"])("ignores late profile %s after accoun
   });
   expect(mockAuthStore.getState().profile?.id).toBe(uid("b"));
   expect(mockQueryClient.getQueryData(["publicProfile", uid("a")])).toBeUndefined();
-  expect(screen.queryByText(strings.en.profileSaved)).toBeNull();
+  expect(mockNotice).not.toHaveBeenCalledWith(strings.en.profileSaved);
   expect(screen.queryByText(strings.en.profileSaveFailed)).toBeNull();
 });
 it("guards duplicate same-stack submit callbacks", async () => {
@@ -301,7 +332,7 @@ it("does not mutate the current edit after old avatar upload finishes", async ()
   await act(async () => activate(session("b"), profile("b")));
   await act(async () => upload.resolve("https://synthetic.example.invalid/old-a.png"));
   expect(mockWrite).not.toHaveBeenCalled();
-  expect(screen.queryByText(strings.en.profileSaved)).toBeNull();
+  expect(mockNotice).not.toHaveBeenCalledWith(strings.en.profileSaved);
 });
 it("suppresses picker permission continuation after account replacement", async () => {
   const permission = deferred<{ granted: boolean }>();
@@ -422,9 +453,9 @@ it("late upload cleanup cannot release a reopened editor's busy state", async ()
   await waitFor(() => expect(mockWrite).toHaveBeenCalledTimes(1));
   await act(async () => upload.resolve("https://synthetic.example.invalid/old.png"));
   expect(screen.getByTestId("save").props.accessibilityState.disabled).toBe(true);
-  expect(screen.queryByText(strings.en.profileSaved)).toBeNull();
+  expect(mockNotice).not.toHaveBeenCalledWith(strings.en.profileSaved);
   await act(async () => write.resolve({ data: profile("a", "New edit"), error: null }));
-  await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+  await waitFor(() => expect(mockNotice).toHaveBeenCalledWith(strings.en.profileSaved));
 });
 it("a newer explicit intent without a store notification cancels the stale edit at completion", async () => {
   const upload = deferred<string>();
@@ -476,7 +507,7 @@ it("stops save invalidations if its real Query cache subscriber replaces the acc
   await flush();
   expect(mockAuthStore.getState().user?.id).toBe(uid("b"));
   expect(invalidate).not.toHaveBeenCalled();
-  expect(screen.queryByText(strings.en.profileSaved)).toBeNull();
+  expect(mockNotice).not.toHaveBeenCalledWith(strings.en.profileSaved);
   unsubscribe();
 });
 it("stops later invalidations if the first invalidation replaces the account", async () => {
@@ -492,7 +523,7 @@ it("stops later invalidations if the first invalidation replaces the account", a
   fireEvent.press(screen.getByTestId("save"));
   await flush();
   expect(invalidate).toHaveBeenCalledTimes(1);
-  expect(screen.queryByText(strings.en.profileSaved)).toBeNull();
+  expect(mockNotice).not.toHaveBeenCalledWith(strings.en.profileSaved);
 });
 
 it("allows the visible obsolete editor to close before a pending upload settles", async () => {
@@ -520,7 +551,7 @@ it("uploads the current chosen avatar and saves its URL once", async () => {
   fireEvent.press(screen.getByText(strings.en.profileChangePhoto));
   await flush();
   fireEvent.press(screen.getByTestId("save"));
-  await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+  await waitFor(() => expect(mockNotice).toHaveBeenCalledWith(strings.en.profileSaved));
   expect(mockUpload).toHaveBeenCalledWith(uid("a"), asset);
   expect(mockUpload).toHaveBeenCalledTimes(1);
   expect(mockWrite).toHaveBeenCalledWith({ avatar_url: url });
@@ -532,7 +563,7 @@ it("removes the current existing avatar with an explicit null patch", async () =
   const screen = await open();
   fireEvent.press(screen.getByText(strings.en.profileRemovePhoto));
   fireEvent.press(screen.getByTestId("save"));
-  await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+  await waitFor(() => expect(mockNotice).toHaveBeenCalledWith(strings.en.profileSaved));
   expect(mockUpload).not.toHaveBeenCalled();
   expect(mockWrite).toHaveBeenCalledWith({ avatar_url: null });
 });
@@ -549,7 +580,7 @@ it("retains the current avatar draft and allows retry after upload rejection", a
   expect(mockWrite).not.toHaveBeenCalled();
   expect(screen.getByTestId("save").props.accessibilityState.disabled).toBe(false);
   fireEvent.press(screen.getByTestId("save"));
-  await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+  await waitFor(() => expect(mockNotice).toHaveBeenCalledWith(strings.en.profileSaved));
   expect(mockUpload).toHaveBeenCalledTimes(2);
   expect(mockWrite).toHaveBeenCalledTimes(1);
 });
@@ -633,7 +664,7 @@ it.each(["name", "remove-avatar"])(
       mockAuthStore.setState({ profile: { ...current, ...stats } });
     });
     await act(async () => pending.resolve({ data: profile("a", kind === "name" ? "Changed A" : "a"), error: null }));
-    await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+    await waitFor(() => expect(mockNotice).toHaveBeenCalledWith(strings.en.profileSaved));
     const accepted = mockAuthStore.getState().profile;
     const cached = mockQueryClient.getQueryData<Profile>(["publicProfile", uid("a")]);
     expect(accepted).toMatchObject({
@@ -661,7 +692,7 @@ it("caches newer same-owner stats published synchronously during the save notifi
   });
   try {
     fireEvent.press(screen.getByTestId("save"));
-    await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+    await waitFor(() => expect(mockNotice).toHaveBeenCalledWith(strings.en.profileSaved));
     expect(observed).toBe(true);
     expect(mockAuthStore.getState().profile).toMatchObject({ ...stats, display_name: "Changed A" });
     expect(mockQueryClient.getQueryData(["publicProfile", uid("a")])).toEqual(mockAuthStore.getState().profile);
@@ -669,4 +700,75 @@ it("caches newer same-owner stats published synchronously during the save notifi
   } finally {
     unsubscribe();
   }
+});
+
+it("closes the editor after a successful save and keeps the draft until then", async () => {
+  const pending = deferred<Response>();
+  mockWrite.mockReturnValue(pending.promise);
+  const screen = await open();
+  change(screen);
+  fireEvent.press(screen.getByTestId("save"));
+  await waitFor(() => expect(mockWrite).toHaveBeenCalledTimes(1));
+  expect(screen.getByLabelText(strings.en.authDisplayName).props.value).toBe("Changed A");
+  await act(async () => pending.resolve({ data: profile("a", "Changed A"), error: null }));
+  await flush();
+  expect(screen.queryByLabelText(strings.en.authDisplayName)).toBeNull();
+  expect(mockNotice).toHaveBeenCalledWith(strings.en.profileSaved);
+});
+
+it("asks before discarding changed fields; keep editing retains them", async () => {
+  const screen = await open();
+  change(screen, "Unsaved A");
+  act(() => mockCloseEdit());
+  expect(screen.getByText(strings.en.discardChangesMessage)).toBeTruthy();
+  fireEvent.press(screen.getByText(strings.en.discardChangesKeepEditing));
+  expect(screen.getByLabelText(strings.en.authDisplayName).props.value).toBe("Unsaved A");
+  act(() => mockCloseEdit());
+  fireEvent.press(screen.getByText(strings.en.discardChangesConfirm));
+  await flush();
+  expect(screen.queryByLabelText(strings.en.authDisplayName)).toBeNull();
+  expect(mockWrite).not.toHaveBeenCalled();
+});
+
+it("closes an unchanged editor without asking", async () => {
+  const screen = await open();
+  act(() => mockCloseEdit());
+  await flush();
+  expect(screen.queryByText(strings.en.discardChangesMessage)).toBeNull();
+  expect(screen.queryByLabelText(strings.en.authDisplayName)).toBeNull();
+});
+
+it("rejects an unsupported or undecoded photo before upload and keeps the previous draft", async () => {
+  mockPicker.mockResolvedValueOnce({
+    canceled: false,
+    assets: [{ uri: "file:synthetic.heic", mimeType: "image/heic", width: 10, height: 10 }],
+  });
+  const screen = await open();
+  fireEvent.press(screen.getByText(strings.en.profileChangePhoto));
+  await flush();
+  expect(screen.getByText(strings.en.profilePhotoInvalidType)).toBeTruthy();
+  mockPicker.mockResolvedValueOnce({ canceled: false, assets: [{ uri: "file:synthetic.png", mimeType: "image/png", width: 0, height: 0 }] });
+  fireEvent.press(screen.getByText(strings.en.profileChangePhoto));
+  await flush();
+  expect(screen.getByText(strings.en.profilePhotoUnreadable)).toBeTruthy();
+  mockPicker.mockResolvedValueOnce({
+    canceled: false,
+    assets: [{ uri: "file:synthetic.png", mimeType: "image/png", width: 10, height: 10, fileSize: 3 * 1024 * 1024 + 1 }],
+  });
+  fireEvent.press(screen.getByText(strings.en.profileChangePhoto));
+  await flush();
+  expect(screen.getByText(strings.en.profilePhotoTooLarge)).toBeTruthy();
+  // Nothing was taken as a draft, so Save stays unavailable and nothing uploads.
+  expect(screen.getByTestId("save").props.accessibilityState?.disabled ?? screen.getByTestId("save").props.disabled).toBe(true);
+  expect(mockUpload).not.toHaveBeenCalled();
+});
+
+it("labels the owner's figures as local while sync waits for restore consent", async () => {
+  mockRestorePause = "pending_consent";
+  const screen = render(<ProfileModalContent />);
+  await flush();
+  expect(screen.getByText(strings.en.profileStatsAwaitingSync)).toBeTruthy();
+  mockRestorePause = null;
+  screen.rerender(<ProfileModalContent />);
+  expect(screen.queryByText(strings.en.profileStatsAwaitingSync)).toBeNull();
 });

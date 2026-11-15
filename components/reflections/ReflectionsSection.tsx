@@ -14,6 +14,7 @@ import { formatAyahRef } from "@/lib/arabic";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fetchReflections, fetchReflectionCount } from "@/lib/reflections/api";
+import { formatCompactCount } from "@/lib/reflections/format";
 import { ReflectionCard } from "./ReflectionCard";
 import { CommentsSheet } from "./CommentsSheet";
 import { WriteReflectionSheet } from "./WriteReflectionSheet";
@@ -42,7 +43,7 @@ function ReflectionsSectionContent({
   onNavigate,
   user,
 }: Props & { user: ReturnType<typeof useAuthStore.getState>["user"] }) {
-  const { isDark, isRTL, themeColors } = useSettings();
+  const { isDark, isRTL, themeColors, uiLanguage } = useSettings();
   const s = useStrings();
   const showNotice = useOperationNotice();
   const netInfo = useNetInfo();
@@ -145,18 +146,34 @@ function ReflectionsSectionContent({
     [firstPage?.data],
   );
 
-  const handleCommentAdded = useCallback(
-    (reflectionId: string) => {
+  const adjustCommentCount = useCallback(
+    (reflectionId: string, step: 1 | -1) => {
       const base = allReflections.find((row) => row.id === reflectionId)?.comments_count;
       setAllReflections((prev) =>
         (prev ?? firstPage?.data ?? []).map((row) =>
           row.id === reflectionId && row.comments_count === base
-            ? { ...row, comments_count: row.comments_count + 1 }
+            ? { ...row, comments_count: Math.max(0, row.comments_count + step) }
             : row,
         ),
       );
     },
     [allReflections, firstPage?.data],
+  );
+  const handleCommentAdded = useCallback(
+    (reflectionId: string) => adjustCommentCount(reflectionId, 1),
+    [adjustCommentCount],
+  );
+  const handleCommentRemoved = useCallback(
+    (reflectionId: string) => adjustCommentCount(reflectionId, -1),
+    [adjustCommentCount],
+  );
+  // After the author's delete settles the row leaves this list; the shared caches refetch it.
+  const handleReflectionGone = useCallback(
+    (gone: Reflection) => {
+      setAllReflections((prev) => (prev ?? firstPage?.data ?? []).filter((row) => row.id !== gone.id));
+      setCommentsReflectionId((current) => (current === gone.id ? null : current));
+    },
+    [firstPage?.data],
   );
 
   if (!supabaseConfigured) return null;
@@ -187,7 +204,7 @@ function ReflectionsSectionContent({
                   className="text-primary-accent dark:text-primary-bright"
                   style={{ fontFamily: "Manrope_700Bold", fontSize: 10 }}
                 >
-                  {count}
+                  {formatCompactCount(count, uiLanguage)}
                 </Text>
               </View>
             )}
@@ -243,6 +260,7 @@ function ReflectionsSectionContent({
                 // Guests stay in the sheet and get the feed's polite sign-in notice.
                 onAuthRequired={() => showNotice(s.reflectionFeedAuthRequired)}
                 onNavigate={onNavigate}
+                onGone={handleReflectionGone}
               />
             ))
           )}
@@ -323,6 +341,7 @@ function ReflectionsSectionContent({
         onClose={() => setCommentsReflectionId(null)}
         onNavigate={onNavigate}
         onCommentAdded={handleCommentAdded}
+        onCommentRemoved={handleCommentRemoved}
       />
 
       {/* Write reflection sheet */}

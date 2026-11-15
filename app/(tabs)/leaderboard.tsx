@@ -149,9 +149,14 @@ function BoardContent({ userId }: { userId: string }) {
       {loading ? (
         <StandingsSkeleton label={s.loading} />
       ) : !view ? (
+        // Nothing private is shown without a current read; local study is unaffected.
         <SocialNotice
           icon={offline ? CloudOff : undefined}
-          message={offline ? s.socialOfflineEmpty : board.error ? socialFailureMessage(board.error, s) : s.socialLoadFailed}
+          message={
+            offline
+              ? s.socialOfflineEmpty
+              : `${board.error ? socialFailureMessage(board.error, s) : s.socialLoadFailed} ${s.boardLocalReassurance}`
+          }
           actionLabel={offline ? undefined : s.socialTryAgain}
           onAction={offline ? undefined : () => void refresh()}
         />
