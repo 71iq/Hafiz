@@ -91,10 +91,54 @@ type AccountRestoreResult = {
   restoreCompleted?: boolean;
 };
 
-export type SyncResult = AccountRestoreResult & {
-  pushed: number;
-  status: "synced" | "partial" | "failed" | "not_connected";
-};
+type SyncCounts = AccountRestoreResult & { pushed: number };
+
+/** A stored restore pause. Either value stops every sync until the account owner retries. */
+export type RestorePauseState = "pending_consent" | "cancelled";
+
+/** Study categories named in the restore confirmation. */
+export type RestoreCategory =
+  | "studyCards"
+  | "reviewHistory"
+  | "bookmarks"
+  | "highlights"
+  | "notes"
+  | "journey"
+  | "achievements"
+  | "wordMeanings"
+  | "habitDays"
+  | "reviewSessions"
+  | "recitationErrors"
+  | "settings";
+
+export type RestoreConsentSummary = Readonly<{
+  categories: readonly Readonly<{ key: RestoreCategory; count: number }>[];
+  pendingChanges: number;
+}>;
+
+/**
+ * What the confirmation shows. The token is opaque and only means something to acceptRestoreConsent
+ * in this process; the snapshot and local fingerprint it stands for never leave this module.
+ */
+export type RestoreConsentRequest = Readonly<{
+  token: string;
+  userId: string;
+  accountEmail: string | null;
+  summary: RestoreConsentSummary;
+  preparedAt: number;
+  expiresAt: number;
+}>;
+
+export type SyncResult =
+  | (SyncCounts & { status: "synced" | "partial" | "failed" | "not_connected" })
+  /** Replacing local data needs the owner's consent. Nothing was cleared, pushed or pulled. */
+  | (SyncCounts & { status: "needs_restore_consent"; request: RestoreConsentRequest })
+  /** A stored pause stopped this run before any remote request. */
+  | (SyncCounts & { status: "sync_paused"; pause: RestorePauseState })
+  /** Local data changed after consent was prepared. Nothing was cleared; prepare consent again. */
+  | (SyncCounts & { status: "restore_consent_stale" })
+  /** The token was expired, used, cancelled or belonged to another account or session. */
+  | (SyncCounts & { status: "restore_consent_invalid" });
 
 type PushResult = { pushed: number; failed: number; hadSuccessfulEntry: boolean };
 type PullResult = { pulled: number; complete: boolean };
@@ -346,23 +390,32 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
   return { pulled: totalPulled, complete };
 }
 
+const NO_COUNTS: SyncCounts = { pushed: 0, pulled: 0, accountRestored: false, localDataReplaced: false };
+
 /**
  * Full sync: restore account state before any upload, then run normal queue sync.
+ *
+ * A stored restore pause returns before any remote request unless `resume` is set, which only the
+ * owner's explicit Resume sync passes. A first restore that would replace local study data returns
+ * `needs_restore_consent` before replacement, push or pull.
  */
-export async function fullSync(db: AppDatabase): Promise<SyncResult> {
-  const empty: SyncResult = {
-    status: "not_connected",
-    pushed: 0,
-    pulled: 0,
-    accountRestored: false,
-    localDataReplaced: false,
-  };
+export async function fullSync(db: AppDatabase, options: { resume?: boolean } = {}): Promise<SyncResult> {
+  const empty: SyncResult = { status: "not_connected", ...NO_COUNTS };
   if (!isSupabaseConfigured()) return empty;
   const owner = captureSyncOwner();
   if (!owner) return empty;
   owner.requireCurrent();
-  const restored = await restoreAccountDataIfNeeded(db, owner);
+  const pause = await readRestorePause(db, owner.userId);
   owner.requireCurrent();
+  if (pause && !options.resume) return { status: "sync_paused", pause, ...NO_COUNTS };
+  const restored = await restoreAccountDataIfNeeded(db, owner, pause !== null);
+  owner.requireCurrent();
+  if ("consent" in restored) return { status: "needs_restore_consent", request: restored.consent, ...NO_COUNTS };
+  return runOrdinarySync(db, owner, restored);
+}
+
+/** Push, pull and report, after the account restore has completed for this owner. */
+async function runOrdinarySync(db: AppDatabase, owner: SyncOwner, restored: AccountRestoreResult): Promise<SyncResult> {
   const pushed = await pushSyncQueue(db, owner);
   owner.requireCurrent();
   const pulled = await pullRemoteChanges(db, owner);
@@ -446,7 +499,13 @@ async function markAccountRestoreComplete(
   );
 }
 
-async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Promise<AccountRestoreResult> {
+type RestoreOutcome = AccountRestoreResult | { consent: RestoreConsentRequest };
+
+async function restoreAccountDataIfNeeded(
+  db: AppDatabase,
+  owner: SyncOwner,
+  hadPause: boolean,
+): Promise<RestoreOutcome> {
   if (!isSupabaseConfigured()) return { pulled: 0, accountRestored: false, localDataReplaced: false };
 
   owner.requireCurrent();
@@ -455,63 +514,95 @@ async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Pr
   const completed = await hasCompletedAccountRestore(db, userId);
   owner.requireCurrent();
   if (completed) {
+    // Another tab may have finished this account's restore while this one was paused.
+    if (hadPause) await clearRestorePause(db, userId);
+    owner.requireCurrent();
     return { pulled: 0, accountRestored: false, localDataReplaced: false };
   }
 
+  // The whole snapshot is fetched and decoded before anything local changes. A failed page throws.
   const snapshotStartedAt = new Date().toISOString();
   const remoteRows = await fetchRemoteAccountRows(userId, owner);
   owner.requireCurrent();
-  const remoteRowCount = REMOTE_RESTORE_TABLES.reduce((sum, tableName) => sum + remoteRows[tableName].length, 0);
+  const remoteRowCount = countRemoteRows(remoteRows);
   if (remoteRowCount === 0) {
+    // Unchanged remote-empty behavior: local rows stay and ordinary sync uploads them.
     await markAccountRestoreComplete(db, userId, false, snapshotStartedAt, owner);
+    owner.requireCurrent();
+    if (hadPause) await clearRestorePause(db, userId);
     owner.requireCurrent();
     return { pulled: 0, accountRestored: false, localDataReplaced: false, restoreCompleted: true };
   }
 
-  const hadLocalData = await hasLocalSyncableData(db);
+  if (!(await requiresRestoreConsent(db))) {
+    owner.requireCurrent();
+    let replaced = false;
+    await db.withTransactionAsync(async (tx) => {
+      owner.requireCurrent();
+      // The same trigger again, inside the transaction that would clear: a change admitted since the
+      // first check turns this into a consent request instead of a silent replacement.
+      if (await requiresRestoreConsent(tx)) return;
+      owner.requireCurrent();
+      await replaceLocalAccountData(tx, remoteRows, owner, snapshotStartedAt);
+      replaced = true;
+    });
+    owner.requireCurrent();
+    if (replaced) {
+      return { pulled: remoteRowCount, accountRestored: true, localDataReplaced: false, restoreCompleted: true };
+    }
+  }
   owner.requireCurrent();
-  await db.withTransactionAsync(async (tx) => {
-    owner.requireCurrent();
-    // A device that finished onboarding stays past it even when the account predates the synced flag.
-    const onboarded =
-      (await tx.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'onboarding_completed'"))
-        ?.value === "true";
-    await clearLocalSyncableData(tx);
-    owner.requireCurrent();
-    const studyLogKeysByCard = new Map<string, Set<string>>();
-    await applyRemoteAccountRows(tx, remoteRows, studyLogKeysByCard);
-    owner.requireCurrent();
-    if (onboarded) await putUserSetting(tx, "onboarding_completed", "true");
-    owner.requireCurrent();
-    // Reviews from app versions before wird days were synced still count for their days.
-    await reconcileHabitDaysFromLogs(tx, { now: new Date() });
-    owner.requireCurrent();
-    // The restored cards are as the restored plan left them.
-    await markUnitAppliedFromPlan(tx, new Date());
-    owner.requireCurrent();
-    // ERR-06: weak spots that formed across devices get their cloze card from the restored errors,
-    // and a card whose weak spot restored dismissals ended goes.
-    const restoredErrors = remoteRows.recitation_errors.map((row) => ({
-      location: { surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null },
-      dismissed: row.deleted_at != null,
-    }));
-    await createWeakSpotCards(tx, restoredErrors.map((error) => error.location), new Date());
-    await removeDismissedWeakSpotCards(
-      tx,
-      restoredErrors.filter((error) => error.dismissed).map((error) => error.location),
-    );
-    owner.requireCurrent();
-    await markAccountRestoreComplete(tx, userId, true, snapshotStartedAt, owner);
-    owner.requireCurrent();
-  });
-  owner.requireCurrent();
+  return { consent: await prepareRestoreConsent(db, owner, remoteRows, snapshotStartedAt) };
+}
 
-  return {
-    pulled: remoteRowCount,
-    accountRestored: true,
-    localDataReplaced: hadLocalData,
-    restoreCompleted: true,
-  };
+function countRemoteRows(rows: RemoteAccountRows): number {
+  return REMOTE_RESTORE_TABLES.reduce((sum, tableName) => sum + rows[tableName].length, 0);
+}
+
+/**
+ * Clear the replaced local scope and apply the account snapshot, with the existing reconciliation and
+ * restore markers. Runs only inside a transaction, so a failure or owner change rolls all of it back.
+ */
+async function replaceLocalAccountData(
+  tx: DatabaseExecutor,
+  remoteRows: RemoteAccountRows,
+  owner: SyncOwner,
+  snapshotStartedAt: string,
+): Promise<void> {
+  const { userId } = owner;
+  owner.requireCurrent();
+  // A device that finished onboarding stays past it even when the account predates the synced flag.
+  const onboarded =
+    (await tx.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'onboarding_completed'"))
+      ?.value === "true";
+  await clearLocalSyncableData(tx);
+  owner.requireCurrent();
+  const studyLogKeysByCard = new Map<string, Set<string>>();
+  await applyRemoteAccountRows(tx, remoteRows, studyLogKeysByCard);
+  owner.requireCurrent();
+  if (onboarded) await putUserSetting(tx, "onboarding_completed", "true");
+  owner.requireCurrent();
+  // Reviews from app versions before wird days were synced still count for their days.
+  await reconcileHabitDaysFromLogs(tx, { now: new Date() });
+  owner.requireCurrent();
+  // The restored cards are as the restored plan left them.
+  await markUnitAppliedFromPlan(tx, new Date());
+  owner.requireCurrent();
+  // ERR-06: weak spots that formed across devices get their cloze card from the restored errors,
+  // and a card whose weak spot restored dismissals ended goes.
+  const restoredErrors = remoteRows.recitation_errors.map((row) => ({
+    location: { surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null },
+    dismissed: row.deleted_at != null,
+  }));
+  await createWeakSpotCards(tx, restoredErrors.map((error) => error.location), new Date());
+  await removeDismissedWeakSpotCards(
+    tx,
+    restoredErrors.filter((error) => error.dismissed).map((error) => error.location),
+  );
+  owner.requireCurrent();
+  await markAccountRestoreComplete(tx, userId, true, snapshotStartedAt, owner);
+  await clearRestorePause(tx, userId);
+  owner.requireCurrent();
 }
 
 async function fetchRemoteAccountRows(userId: string, owner: SyncOwner): Promise<RemoteAccountRows> {
@@ -557,7 +648,15 @@ async function fetchRemoteRows<K extends SyncTable>(
   return rows;
 }
 
-async function hasLocalSyncableData(db: DatabaseExecutor): Promise<boolean> {
+const ONBOARDING_SETTING = "onboarding_completed";
+
+/**
+ * Whether replacing local data with a nonempty account snapshot needs the owner's consent: any
+ * replaced study row, any syncable setting, or any unsent queued change. Completed onboarding alone
+ * does not count, because the restore keeps it. Derived/internal settings and qf_sync_queue alone
+ * never prompt, though they are still replaced and still part of the exact fingerprint.
+ */
+async function requiresRestoreConsent(db: DatabaseExecutor): Promise<boolean> {
   const [
     settings,
     cards,
@@ -571,6 +670,7 @@ async function hasLocalSyncableData(db: DatabaseExecutor): Promise<boolean> {
     habitDays,
     reviewSessions,
     recitationErrors,
+    queued,
   ] =
     await Promise.all([
       db.getAllAsync<{ key: string }>("SELECT key FROM user_settings"),
@@ -585,10 +685,15 @@ async function hasLocalSyncableData(db: DatabaseExecutor): Promise<boolean> {
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM habit_days"),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM review_sessions"),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM recitation_errors"),
+      db.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(*) as count FROM sync_queue
+         WHERE status IN ('pending', 'failed')
+           AND NOT (table_name = 'user_settings' AND row_id = '${ONBOARDING_SETTING}')`,
+      ),
     ]);
 
   return (
-    settings.some((row) => isSyncableUserSetting(row.key)) ||
+    settings.some((row) => row.key !== ONBOARDING_SETTING && isSyncableUserSetting(row.key)) ||
     [
       cards,
       logs,
@@ -601,33 +706,104 @@ async function hasLocalSyncableData(db: DatabaseExecutor): Promise<boolean> {
       habitDays,
       reviewSessions,
       recitationErrors,
+      queued,
     ].some(
       (row) => (row?.count ?? 0) > 0,
     )
   );
 }
 
+/**
+ * The tables an account restore replaces, in full, each with the key that orders its rows. This list
+ * and isReplacedUserSetting are the one definition of replaced state: clearLocalSyncableData deletes
+ * exactly this scope and the consent fingerprint reads exactly this scope.
+ */
+const REPLACED_LOCAL_TABLES: readonly Readonly<{ table: string; orderBy: string; category?: RestoreCategory }>[] = [
+  { table: "study_cards", orderBy: "id", category: "studyCards" },
+  { table: "study_log", orderBy: "id", category: "reviewHistory" },
+  { table: "bookmarks", orderBy: "surah, ayah", category: "bookmarks" },
+  { table: "highlights", orderBy: "id", category: "highlights" },
+  { table: "private_notes", orderBy: "id", category: "notes" },
+  { table: "reflection_journey_entries", orderBy: "level_id", category: "journey" },
+  { table: "achievement_unlocks", orderBy: "achievement_id", category: "achievements" },
+  { table: "user_word_meanings", orderBy: "surah, ayah, word_pos", category: "wordMeanings" },
+  { table: "habit_days", orderBy: "local_date", category: "habitDays" },
+  { table: "review_sessions", orderBy: "id", category: "reviewSessions" },
+  { table: "recitation_errors", orderBy: "id", category: "recitationErrors" },
+  { table: "sync_queue", orderBy: "id" },
+  { table: "qf_sync_queue", orderBy: "id" },
+];
+
+/** Settings an account restore replaces: syncable, sync-internal and account-derived device keys. */
+function isReplacedUserSetting(key: string): boolean {
+  return isSyncableUserSetting(key) || isSyncInternalSetting(key) || isAccountDerivedDeviceSetting(key);
+}
+
 async function clearLocalSyncableData(db: DatabaseExecutor): Promise<void> {
-  await db.runAsync("DELETE FROM study_cards");
-  await db.runAsync("DELETE FROM study_log");
-  await db.runAsync("DELETE FROM bookmarks");
-  await db.runAsync("DELETE FROM highlights");
-  await db.runAsync("DELETE FROM private_notes");
-  await db.runAsync("DELETE FROM reflection_journey_entries");
-  await db.runAsync("DELETE FROM achievement_unlocks");
-  await db.runAsync("DELETE FROM user_word_meanings");
-  await db.runAsync("DELETE FROM habit_days");
-  await db.runAsync("DELETE FROM review_sessions");
-  await db.runAsync("DELETE FROM recitation_errors");
-  await db.runAsync("DELETE FROM sync_queue");
-  await db.runAsync("DELETE FROM qf_sync_queue");
+  for (const { table } of REPLACED_LOCAL_TABLES) await db.runAsync(`DELETE FROM ${table}`);
 
   const settings = await db.getAllAsync<{ key: string }>("SELECT key FROM user_settings");
   for (const row of settings) {
-    if (isSyncableUserSetting(row.key) || isSyncInternalSetting(row.key) || isAccountDerivedDeviceSetting(row.key)) {
-      await db.runAsync("DELETE FROM user_settings WHERE key = ?", [row.key]);
-    }
+    if (isReplacedUserSetting(row.key)) await db.runAsync("DELETE FROM user_settings WHERE key = ?", [row.key]);
   }
+}
+
+type ReplacedLocalState = { fingerprint: string; summary: RestoreConsentSummary };
+
+/** One stored value with its storage type, so 1, "1", null and an empty string all differ. */
+function canonicalValue(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return ["n", Object.is(value, -0) ? "-0" : String(value)];
+  if (typeof value === "string") return ["s", value];
+  if (typeof value === "bigint") return ["i", value.toString()];
+  if (typeof value === "boolean") return ["b", value ? 1 : 0];
+  if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
+    const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+    return ["x", Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")];
+  }
+  return ["?", String(value)];
+}
+
+function canonicalRow(row: Record<string, unknown>): unknown[] {
+  return Object.keys(row)
+    .sort()
+    .map((column) => [column, canonicalValue(row[column])]);
+}
+
+function isUnsentUserChange(row: Record<string, unknown>): boolean {
+  return (
+    (row.status === "pending" || row.status === "failed") &&
+    !(row.table_name === "user_settings" && row.row_id === ONBOARDING_SETTING)
+  );
+}
+
+/**
+ * Read the whole replaced scope once: the exact canonical fingerprint (every column of every row, in
+ * key order) and the counts the confirmation shows. The fingerprint holds private data; it stays in
+ * memory and is never logged or returned to UI.
+ */
+async function readReplacedLocalState(db: DatabaseExecutor): Promise<ReplacedLocalState> {
+  const parts: unknown[] = [];
+  const categories: { key: RestoreCategory; count: number }[] = [];
+  let pendingChanges = 0;
+  for (const { table, orderBy, category } of REPLACED_LOCAL_TABLES) {
+    const rows = await db.getAllAsync<Record<string, unknown>>(`SELECT * FROM ${table} ORDER BY ${orderBy}`);
+    parts.push([table, rows.map(canonicalRow)]);
+    if (category) {
+      const live = rows.filter((row) => row.deleted_at == null).length;
+      if (live > 0) categories.push({ key: category, count: live });
+    }
+    if (table === "sync_queue") pendingChanges = rows.filter(isUnsentUserChange).length;
+  }
+  const settings = (
+    await db.getAllAsync<Record<string, unknown>>("SELECT * FROM user_settings ORDER BY key")
+  ).filter((row) => isReplacedUserSetting(String(row.key)));
+  parts.push(["user_settings", settings.map(canonicalRow)]);
+  const shownSettings = settings.filter(
+    (row) => row.key !== ONBOARDING_SETTING && isSyncableUserSetting(String(row.key)) && row.deleted_at == null,
+  ).length;
+  if (shownSettings > 0) categories.push({ key: "settings", count: shownSettings });
+  return { fingerprint: JSON.stringify(parts), summary: { categories, pendingChanges } };
 }
 
 /**
@@ -648,6 +824,182 @@ const ACCOUNT_DERIVED_DEVICE_KEYS = new Set([
 
 function isAccountDerivedDeviceSetting(key: string): boolean {
   return ACCOUNT_DERIVED_DEVICE_KEYS.has(key);
+}
+
+// ─── Restore pause and consent ─────────────────────────────────
+
+const RESTORE_PAUSE_VERSION = 1;
+const RESTORE_PAUSE_STATES: ReadonlySet<string> = new Set<RestorePauseState>(["pending_consent", "cancelled"]);
+/** How long a prepared consent request stays valid. */
+export const RESTORE_CONSENT_TTL_MS = 5 * 60_000;
+
+/** Device-only and outside every syncable prefix, so the pause never uploads or restores. */
+export function restorePauseKey(userId: string): string {
+  return `device_sync_restore_pause_${userId}`;
+}
+
+function decodeRestorePause(value: string | null | undefined): RestorePauseState | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object") return null;
+    const { version, state } = parsed as { version?: unknown; state?: unknown };
+    if (version !== RESTORE_PAUSE_VERSION || typeof state !== "string" || !RESTORE_PAUSE_STATES.has(state)) return null;
+    return state as RestorePauseState;
+  } catch {
+    return null;
+  }
+}
+
+/** This account's stored pause on this device. A pause for another account never applies. */
+export async function readRestorePause(db: DatabaseExecutor, userId: string): Promise<RestorePauseState | null> {
+  const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [
+    restorePauseKey(userId),
+  ]);
+  return decodeRestorePause(row?.value);
+}
+
+async function writeRestorePause(db: DatabaseExecutor, userId: string, state: RestorePauseState): Promise<void> {
+  const now = new Date().toISOString();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, ?, ?, NULL)",
+    [restorePauseKey(userId), JSON.stringify({ version: RESTORE_PAUSE_VERSION, state, updated_at: now }), now],
+  );
+}
+
+async function clearRestorePause(db: DatabaseExecutor, userId: string): Promise<void> {
+  await db.runAsync("DELETE FROM user_settings WHERE key = ?", [restorePauseKey(userId)]);
+}
+
+type PreparedConsent = {
+  token: string;
+  owner: SyncOwner;
+  remoteRows: RemoteAccountRows;
+  remoteRowCount: number;
+  snapshotStartedAt: string;
+  fingerprint: string;
+  expiresAt: number;
+  consumed: boolean;
+};
+
+/** At most one request exists, in memory only. A new preparation, cancel or account change retires it. */
+let preparedConsent: PreparedConsent | null = null;
+
+function newConsentToken(): string {
+  const random = globalThis.crypto?.randomUUID?.();
+  return random ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function prepareRestoreConsent(
+  db: AppDatabase,
+  owner: SyncOwner,
+  remoteRows: RemoteAccountRows,
+  snapshotStartedAt: string,
+): Promise<RestoreConsentRequest> {
+  preparedConsent = null;
+  const captured: { state?: ReplacedLocalState } = {};
+  // The pause is written first, then the fingerprint is read, in one short serialized transaction that
+  // closes before any UI is shown.
+  await db.withTransactionAsync(async (tx) => {
+    owner.requireCurrent();
+    await writeRestorePause(tx, owner.userId, "pending_consent");
+    captured.state = await readReplacedLocalState(tx);
+    owner.requireCurrent();
+  });
+  owner.requireCurrent();
+  const state = captured.state;
+  if (!state) throw new Error("Restore consent was not prepared");
+  const preparedAt = Date.now();
+  const token = newConsentToken();
+  preparedConsent = {
+    token,
+    owner,
+    remoteRows,
+    remoteRowCount: countRemoteRows(remoteRows),
+    snapshotStartedAt,
+    fingerprint: state.fingerprint,
+    expiresAt: preparedAt + RESTORE_CONSENT_TTL_MS,
+    consumed: false,
+  };
+  return {
+    token,
+    userId: owner.userId,
+    accountEmail: useAuthStore.getState().user?.email ?? null,
+    summary: state.summary,
+    preparedAt,
+    expiresAt: preparedAt + RESTORE_CONSENT_TTL_MS,
+  };
+}
+
+function isOwnerCurrent(owner: SyncOwner): boolean {
+  try {
+    owner.requireCurrent();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Replace local data with the prepared account snapshot after the owner's explicit consent. Inside one
+ * serialized transaction this rechecks the owner and token, recomputes the exact local fingerprint and
+ * clears/applies only if it is unchanged. No network request runs inside it. On success the pause is
+ * cleared with the restore markers and ordinary sync runs under the same owner.
+ */
+export async function acceptRestoreConsent(db: AppDatabase, token: string): Promise<SyncResult> {
+  const invalid: SyncResult = { status: "restore_consent_invalid", ...NO_COUNTS };
+  const prepared = preparedConsent;
+  if (!isSupabaseConfigured() || !prepared || prepared.token !== token || prepared.consumed) return invalid;
+  const current = captureSyncOwner();
+  if (Date.now() >= prepared.expiresAt || !current || current.userId !== prepared.owner.userId || !isOwnerCurrent(prepared.owner)) {
+    preparedConsent = null;
+    return invalid;
+  }
+  const { owner } = prepared;
+  let outcome = "stale" as "stale" | "replaced";
+  try {
+    await db.withTransactionAsync(async (tx) => {
+      owner.requireCurrent();
+      if (preparedConsent !== prepared || prepared.consumed || Date.now() >= prepared.expiresAt) {
+        throw new Error("Restore consent is no longer valid");
+      }
+      const local = await readReplacedLocalState(tx);
+      owner.requireCurrent();
+      if (local.fingerprint !== prepared.fingerprint) return;
+      prepared.consumed = true;
+      await replaceLocalAccountData(tx, prepared.remoteRows, owner, prepared.snapshotStartedAt);
+      outcome = "replaced";
+    });
+  } finally {
+    // One use: replaced, stale, rolled back or thrown, this token never authorizes again.
+    prepared.consumed = true;
+    if (preparedConsent === prepared) preparedConsent = null;
+  }
+  owner.requireCurrent();
+  if (outcome === "stale") return { status: "restore_consent_stale", ...NO_COUNTS };
+  return runOrdinarySync(db, owner, {
+    pulled: prepared.remoteRowCount,
+    accountRestored: true,
+    localDataReplaced: true,
+    restoreCompleted: true,
+  });
+}
+
+/**
+ * Cancel sync: retire the in-memory request and store `cancelled` for the current account. Local rows,
+ * both queues and the restore markers stay as they are. Only an explicit Resume sync runs again.
+ */
+export async function cancelRestoreConsent(db: AppDatabase): Promise<boolean> {
+  preparedConsent = null;
+  const owner = captureSyncOwner();
+  if (!owner) return false;
+  await writeRestorePause(db, owner.userId, "cancelled");
+  return isOwnerCurrent(owner);
+}
+
+/** Forget any prepared request. Called on every account or session transition. */
+export function clearRestoreConsentRequests(): void {
+  preparedConsent = null;
 }
 
 async function applyRemoteAccountRows(

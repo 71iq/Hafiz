@@ -9,7 +9,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { AppNavigation } from "@/components/ui/AppNavigation";
 import { useSync } from "@/lib/sync/useSync";
 import { SyncIndicator } from "@/components/ui/SyncIndicator";
-import { Toast } from "@/components/ui/Toast";
+import { RestoreConsentDialog, SyncPausedStatus } from "@/components/sync/RestoreConsent";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,33 +17,32 @@ import { ChromeProvider, useChrome } from "@/lib/ui/chrome";
 import { StatusBar } from "expo-status-bar";
 
 function SyncOverlay() {
-  const { status, accountRestoreNotice, dismissAccountRestoreNotice } = useSync();
+  const { status } = useSync();
   const { isDark, isRTL } = useSettings();
   const insets = useSafeAreaInsets();
-  const s = useStrings();
-
-  if (status === "idle" && !accountRestoreNotice) return null;
 
   return (
     <>
-      {status !== "idle" ? (
-        <View
-          style={{
-            position: "absolute",
-            top: insets.top + 8,
-            ...(isRTL ? { left: 16 } : { right: 16 }),
-            zIndex: 100,
-          }}
-          pointerEvents="none"
-        >
-          <SyncIndicator status={status} isDark={isDark} />
-        </View>
-      ) : null}
-      <Toast
-        message={accountRestoreNotice ? s.syncAccountRestoredNotice : null}
-        onDismiss={dismissAccountRestoreNotice}
-        duration={5000}
-      />
+      <View
+        style={{
+          position: "absolute",
+          top: insets.top + 8,
+          ...(isRTL ? { left: 16 } : { right: 16 }),
+          zIndex: 100,
+          alignItems: isRTL ? "flex-start" : "flex-end",
+          gap: 4,
+        }}
+        pointerEvents="box-none"
+      >
+        {status !== "idle" ? (
+          <View pointerEvents="none">
+            <SyncIndicator status={status} isDark={isDark} />
+          </View>
+        ) : null}
+        <SyncPausedStatus />
+      </View>
+      {/* W07: the one restore consent confirmation, beside the sync results it answers. */}
+      <RestoreConsentDialog />
     </>
   );
 }

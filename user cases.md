@@ -8,7 +8,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - UI-02. Open the root URL. First-time users enter onboarding, returning users enter Home, and a failed onboarding-status lookup also opens Home.
 - UI-03. Leave and reopen the app. Restore saved preferences and any signed-in session, then load local study data. A failed profile lookup can use a fallback account identity.
 - UI-04. Lose connectivity. The offline banner appears while local study remains available. Reconnecting removes the banner and lets configured account sync resume.
-- UI-05. Sign in, reconnect, or return to the foreground. Background sync shows syncing, synced, offline, or error status. Successful sync refreshes affected data, and an account-data restoration shows a temporary notice.
+- UI-05. Sign in, reconnect, or return to the foreground. Background sync shows syncing, synced, offline, or error status. Successful sync refreshes affected data. When a first account restore would replace local study records or pending changes, a confirmation names the account and the affected counts and offers Use account progress or Cancel sync; Cancel keeps local data and shows Sync paused with Resume sync until the owner retries.
 - UI-06. Open a shared sheet or dialog. It animates above the current screen, fits the viewport, and blocks background scrolling on web. Supported forms move above the software keyboard.
 - UI-07. Dismiss a shared overlay through its close control, backdrop, web Escape, or native Back when allowed. Return to the underlying screen and restore web focus. Escape closes the top shared overlay first.
 - UI-08. Open a confirmation. Cancel returns without applying the action. Confirm starts the action, disables duplicate confirmation, and prevents dismissal while the operation is pending.
@@ -97,7 +97,7 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 - WORD-03. In word detail, browse previous/next words and view their reference and frequency, plus root/lemma metadata in Arabic UI. Switch Meaning, I'rab, Tajweed, Tasreef, and Occurrences tabs. Boundary arrows disable; closing resets the initial tab.
 - WORD-04. Open the current word's ayah detail above the word sheet. Meaning starts Translation where available, otherwise Tafsir. Other word tabs start Tafsir. Close ayah detail to return to the word sheet.
 - WORD-05. Read the word translation/transliteration or Arabic meaning. Add its meaning to vocabulary, then show saving/saved feedback or a retryable failure.
-- WORD-06. When Arabic meaning is absent, enter a custom meaning and save it locally. The saved meaning gains the normal vocabulary action. Empty text cannot save; a failure retains the editor and error.
+- WORD-06. When Arabic meaning is absent, enter a custom meaning and save it locally. The saved meaning gains the normal vocabulary action. Empty text cannot save; a failure retains the editor and error. Your own meaning offers Edit and a confirmed Delete; a bundled meaning offers neither.
 - WORD-07. Read I'rab with the selected word highlighted and scrolled into view, or read Tasreef morphology. Loading/missing-data states replace unavailable content.
 - WORD-08. Expand or collapse individual Tajweed rules in the selected UI language. Show the no-rules state when none applies.
 - WORD-09. Select a root occurrence. Close word detail and move Mushaf to that ayah/word with a highlight. Missing roots or occurrences show an empty state.

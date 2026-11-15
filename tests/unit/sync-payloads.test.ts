@@ -4,7 +4,7 @@ import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
 import type { Session } from "@supabase/supabase-js";
 import { observeAuthSession } from "@/lib/auth/commands";
 import { createSchema } from "@/lib/database/schema";
-import { fullSync } from "@/lib/database/sync";
+import { acceptRestoreConsent, fullSync, type SyncResult } from "@/lib/database/sync";
 import { State } from "@/lib/fsrs/scheduler";
 import { getReviewStats } from "@/lib/fsrs/queries";
 import { encouragementAcksKey } from "@/lib/halaqa/encouragement-notifications";
@@ -173,6 +173,20 @@ function insertStudyLog(row: Record<string, SQLInputValue>) {
   sql
     .prepare(`INSERT INTO study_log (${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`)
     .run(...Object.values(row));
+}
+/**
+ * These cases test how a restore is applied. Their local fixture rows make replacement need consent
+ * (the W07 cases in tests/unit/sync-restore-contract.test.ts cover that gate), so the owner consents here.
+ */
+async function syncAccepting(database: AppDatabase): Promise<SyncResult> {
+  const counted = transactions;
+  let result = await fullSync(database);
+  // A failed earlier acceptance left the account paused; the owner's Resume sync prepares again.
+  if (result.status === "sync_paused") result = await fullSync(database, { resume: true });
+  if (result.status !== "needs_restore_consent") return result;
+  // The consent preparation's short read transaction is not part of applying the restore.
+  transactions = counted;
+  return acceptRestoreConsent(database, result.request.token);
 }
 function restoreComplete() {
   putSetting(`sync_account_restore_${USER_ID}_20260614_account_restore_v1`, "true");
@@ -460,7 +474,7 @@ it.each(
   target.seedLocal(direction.local);
   mockTableRows.set(target.table + ":incremental", [target.remoteRow(direction.remote)]);
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
 
   const localResult =
     typeof target.localResult === "function" ? target.localResult(direction.local) : target.localResult;
@@ -493,7 +507,7 @@ it.each([
   sql.prepare("UPDATE study_cards SET updated_at=? WHERE id='2:255'").run(local);
   mockIncrementalCards = [{ ...card(), state: State.New, updated_at: remote }];
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
 
   expect(sql.prepare("SELECT state,updated_at FROM study_cards WHERE id='2:255'").get()).toEqual(
     winner === "local" ? { state: State.Review, updated_at: local } : { state: State.New, updated_at: remote },
@@ -507,7 +521,7 @@ it("retains a row and cursor on malformed local time, then retries after manual 
   mockIncrementalCards = [{ ...card(), state: State.New, updated_at: "2026-06-01T00:00:00.1001Z" }];
   const before = snapshot();
 
-  const failed = await fullSync(db);
+  const failed = await syncAccepting(db);
 
   expect(failed).toMatchObject({ status: "failed", pulled: 0 });
   expect(snapshot()).toEqual(before);
@@ -515,7 +529,7 @@ it("retains a row and cursor on malformed local time, then retries after manual 
 
   const repaired = "2026-06-01T00:00:00.100Z";
   sql.prepare("UPDATE study_cards SET updated_at=? WHERE id='2:255'").run(repaired);
-  const retried = await fullSync(db);
+  const retried = await syncAccepting(db);
 
   expect(retried).toMatchObject({ status: "synced", pulled: 1 });
   expect(sql.prepare("SELECT state,updated_at FROM study_cards WHERE id='2:255'").get()).toEqual({
@@ -536,14 +550,14 @@ it("does not duplicate an incremental review with an equivalent timestamp spelli
     studyLogRow({ card_id: "review-equivalent", reviewed_at: "2026-06-01T02:00:00Z", rating: 1 }),
   ]);
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
 
   const rows = sql.prepare("SELECT * FROM study_log WHERE card_id='review-equivalent'").all();
   const stats = await getReviewStats(db);
   expect({ rows, totalReviews: stats.totalReviews }).toEqual({ rows: [original], totalReviews: 1 });
 
   putSetting("last_pull_at", OLD);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
   expect(sql.prepare("SELECT * FROM study_log WHERE card_id='review-equivalent'").all()).toEqual([original]);
 });
 
@@ -565,7 +579,7 @@ it("deduplicates an equivalent restore review across the 500-row page boundary",
   });
   mockTableRows.set("study_log:restore", [first, ...otherEvents, equivalent]);
 
-  await expect(fullSync(db)).resolves.toMatchObject({
+  await expect(syncAccepting(db)).resolves.toMatchObject({
     status: "synced",
     pulled: 501,
     accountRestored: true,
@@ -607,7 +621,7 @@ it("preserves historical duplicate reviews when an equivalent incremental event 
     studyLogRow({ card_id: "historical-duplicates", reviewed_at: "2026-06-01T02:00:00.000Z", rating: 2 }),
   ]);
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
 
   const rows = sql.prepare("SELECT * FROM study_log WHERE card_id='historical-duplicates' ORDER BY id").all();
   const stats = await getReviewStats(db);
@@ -646,7 +660,7 @@ it("keeps distinct cards and sub-millisecond review instants", async () => {
     studyLogRow({ card_id: "other-card", reviewed_at: "2026-06-01T02:00:00.1001Z", rating: 2 }),
   ]);
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 4 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 4 });
 
   expect(sql.prepare("SELECT id,card_id,rating,reviewed_at,sync_status FROM study_log ORDER BY id").all()).toEqual([
     {
@@ -693,13 +707,13 @@ it("fails closed on a malformed same-card review timestamp and retries after rep
   ]);
   const before = snapshot();
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
   expect(snapshot()).toEqual(before);
   expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
   expect(studyLogTimestampCandidateRowsLoaded).toBe(1);
 
   sql.prepare("UPDATE study_log SET reviewed_at='2026-06-01T01:00:00Z' WHERE id=101").run();
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
   expect(sql.prepare("SELECT card_id,reviewed_at FROM study_log ORDER BY id").all()).toEqual([
     { card_id: "malformed-review", reviewed_at: "2026-06-01T01:00:00Z" },
     { card_id: "malformed-review", reviewed_at: "2026-06-01T02:00:00Z" },
@@ -724,12 +738,12 @@ it("rolls back an incremental review page after a later SQL insert failure and r
   );
   const before = snapshot();
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
   expect(snapshot()).toEqual(before);
   expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
 
   sql.exec("DROP TRIGGER fail_later_incremental_review");
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 2 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 2 });
   expect(sql.prepare("SELECT card_id,reviewed_at,sync_status FROM study_log ORDER BY id").all()).toEqual([
     { card_id: "incremental-original", reviewed_at: OLD, sync_status: "pending" },
     { card_id: "incremental-before-trigger", reviewed_at: "2026-06-01T11:00:00Z", sync_status: "synced" },
@@ -753,7 +767,7 @@ it("keeps the literal review lookup ahead of unrelated malformed history", async
     studyLogRow({ card_id: "literal-review", reviewed_at: "2026-06-01T02:00:00Z" }),
   ]);
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
 
   expect(sql.prepare("SELECT id FROM study_log WHERE card_id='literal-review' ORDER BY id").all()).toEqual([
     { id: 111 },
@@ -772,7 +786,7 @@ it("preserves local history on an empty account restore", async () => {
   const beforeLogs = sql.prepare("SELECT * FROM study_log ORDER BY id").all();
   const beforeQueue = snapshot().queue;
 
-  await fullSync(db);
+  await syncAccepting(db);
 
   expect(sql.prepare("SELECT * FROM study_log ORDER BY id").all()).toEqual(beforeLogs);
   expect(snapshot().queue).toEqual(beforeQueue);
@@ -794,14 +808,17 @@ it("discards restore duplicate keys when a later insert rolls back, then retries
     "CREATE TEMP TRIGGER fail_later_review_insert BEFORE INSERT ON study_log " +
       "WHEN NEW.card_id='trigger-failure' BEGIN SELECT RAISE(ABORT,'RF157 synthetic insert failure'); END",
   );
+  const prepared = await fullSync(db);
+  if (prepared.status !== "needs_restore_consent") throw new Error("Expected a consent request");
   const before = snapshot();
+  transactions = 0;
 
-  await expect(fullSync(db)).rejects.toThrow("RF157 synthetic insert failure");
+  await expect(acceptRestoreConsent(db, prepared.request.token)).rejects.toThrow("RF157 synthetic insert failure");
   expect(snapshot()).toEqual(before);
   expect(transactions).toBe(1);
 
   sql.exec("DROP TRIGGER fail_later_review_insert");
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 2, accountRestored: true });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 2, accountRestored: true });
   expect(sql.prepare("SELECT card_id,rating,reviewed_at,sync_status FROM study_log ORDER BY id").all()).toEqual([
     {
       card_id: "restore-before-trigger",
@@ -829,8 +846,8 @@ it.each(invalidStates.flatMap((entry) => ["restore", "incremental"].map((mode) =
       mockIncrementalCards = [incoming];
     }
     const before = snapshot();
-    if (mode === "restore") await expect(fullSync(db)).rejects.toThrow("Invalid synced study card state");
-    else await fullSync(db); // Existing RF029 partial-error reporting remains a separate task.
+    if (mode === "restore") await expect(syncAccepting(db)).rejects.toThrow("Invalid synced study card state");
+    else await syncAccepting(db); // Existing RF029 partial-error reporting remains a separate task.
     expect(snapshot()).toEqual(before);
     expect(transactions).toBe(0);
     expect(writes).toEqual([]);
@@ -841,7 +858,7 @@ it.each(invalidStates.flatMap((entry) => ["restore", "incremental"].map((mode) =
 it("validates a later restore page before clearing any local tables", async () => {
   mockRestoreCards = [...Array.from({ length: 500 }, (_, i) => card(`synthetic-${i}`)), { ...card(), state: 999 }];
   const before = snapshot();
-  await expect(fullSync(db)).rejects.toThrow("Invalid synced study card state");
+  await expect(syncAccepting(db)).rejects.toThrow("Invalid synced study card state");
   expect(requests.filter((request) => request.table === "study_cards").map((request) => request.offset)).toEqual([
     0, 500,
   ]);
@@ -854,7 +871,7 @@ it("rejects an incremental page's valid prefix before starting the page transact
   restoreComplete();
   mockIncrementalCards = [card("synthetic-valid"), { ...card(), state: 999 }];
   const before = snapshot();
-  await fullSync(db);
+  await syncAccepting(db);
   expect(snapshot()).toEqual(before);
   expect(transactions).toBe(0);
   expect(writes).toEqual([]);
@@ -871,7 +888,7 @@ it.each(
     restoreComplete();
     mockIncrementalCards = [incoming];
   }
-  await expect(fullSync(db)).resolves.toMatchObject({ pulled: 1, accountRestored: mode === "restore" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ pulled: 1, accountRestored: mode === "restore" });
   expect(sql.prepare("SELECT state, updated_at FROM study_cards WHERE id = '2:255'").get()).toEqual({
     state,
     updated_at: NEW,
@@ -886,7 +903,7 @@ it.each(["restore", "incremental"])("applies an omitted-state tombstone during %
     restoreComplete();
     mockIncrementalCards = [tombstone];
   }
-  await fullSync(db);
+  await syncAccepting(db);
   // Restore starts from no local row, so the omitted fields take their defaults. A card this device
   // already holds is deleted but keeps its own deck and schedule, which a restore would bring back.
   expect(sql.prepare("SELECT state, deck_id, deleted_at FROM study_cards WHERE id = '2:255'").get()).toEqual(
@@ -902,7 +919,7 @@ it.each([OLD, NEW])(
     restoreComplete();
     sql.prepare("UPDATE study_cards SET updated_at = ?").run(localUpdatedAt);
     mockIncrementalCards = [{ ...card(), state: State.New, updated_at: OLD }];
-    await fullSync(db);
+    await syncAccepting(db);
     expect(sql.prepare("SELECT state, updated_at FROM study_cards WHERE id = '2:255'").get()).toEqual({
       state: State.Review,
       updated_at: localUpdatedAt,
@@ -964,7 +981,7 @@ describe("card merge: the schedule by review time, the rest by row time", () => 
     restoreComplete();
     holdLocally(aSuspended);
     mockIncrementalCards = [remote];
-    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+    await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
     expect(stored()).toEqual(merged);
     expect(transactions).toBe(1);
     expect(queued()).toEqual({ count: 0 });
@@ -977,7 +994,7 @@ describe("card merge: the schedule by review time, the rest by row time", () => 
     restoreComplete();
     holdLocally(bAgain);
     mockIncrementalCards = [remote];
-    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+    await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
     expect(stored()).toEqual(merged);
     expect(transactions).toBe(1);
     expect(queued()).toEqual({ count: 0 });
@@ -987,7 +1004,7 @@ describe("card merge: the schedule by review time, the rest by row time", () => 
     restoreComplete();
     holdLocally(seen);
     mockIncrementalCards = [{ ...seen, due: "2026-11-25T08:00:00.000Z", updated_at: at("09:05") }];
-    await fullSync(db);
+    await syncAccepting(db);
     expect(stored()).toEqual({ ...seen, due: "2026-11-25T08:00:00.000Z", updated_at: at("09:05") });
   });
 
@@ -995,7 +1012,7 @@ describe("card merge: the schedule by review time, the rest by row time", () => 
     restoreComplete();
     holdLocally({ ...seen, updated_at: at("09:05"), deleted_at: at("09:05") });
     mockIncrementalCards = [bAgain];
-    await fullSync(db);
+    await syncAccepting(db);
     expect(stored()).toEqual({ ...bAgain, updated_at: at("09:05"), deleted_at: at("09:05") });
   });
 
@@ -1005,7 +1022,7 @@ describe("card merge: the schedule by review time, the rest by row time", () => 
   ])("merges both versions of a card met in one restore snapshot: $label", async ({ snapshot }) => {
     // Offset paging by synced_at can return a card twice when it is uploaded during the restore.
     mockRestoreCards = snapshot;
-    await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+    await expect(syncAccepting(db)).resolves.toMatchObject({ accountRestored: true });
     expect(stored()).toEqual(merged);
     expect(transactions).toBe(1);
     expect(queued()).toEqual({ count: 0 });
@@ -1029,7 +1046,7 @@ describe("word meaning restore and incremental recovery", () => {
     const before = snapshot();
     writes.length = 0;
 
-    const outcome = await fullSync(db).then(
+    const outcome = await syncAccepting(db).then(
       () => null,
       (failure: unknown) => failure,
     );
@@ -1051,7 +1068,7 @@ describe("word meaning restore and incremental recovery", () => {
   it("rejects a missing meaning table instead of completing an otherwise empty snapshot", async () => {
     const error = Object.assign(new Error("Synthetic missing word-meaning table"), { code: "42P01" });
     failPage("user_word_meanings", "restore", 0, error);
-    await expect(fullSync(db)).rejects.toBe(error);
+    await expect(syncAccepting(db)).rejects.toBe(error);
     expect(
       sql.prepare("SELECT value FROM user_settings WHERE key LIKE 'sync_account_restore_%'").get(),
     ).toBeUndefined();
@@ -1077,7 +1094,7 @@ describe("word meaning restore and incremental recovery", () => {
       putMeaning(meaning({ meaning: "keep local incremental meaning", updated_at: OLD }));
       const initialQueue = snapshot().queue;
 
-      await expect(fullSync(db)).resolves.toMatchObject({
+      await expect(syncAccepting(db)).resolves.toMatchObject({
         status: "partial",
         pulled: offset + 1,
         accountRestored: false,
@@ -1100,7 +1117,7 @@ describe("word meaning restore and incremental recovery", () => {
       mockIncrementalCards = [];
       mockRestoreHighlights = [];
       mockIncrementalHighlights = [];
-      const retry = await fullSync(db);
+      const retry = await syncAccepting(db);
       expect(retry).toMatchObject({ status: "synced", pulled: 1, accountRestored: false });
       expect(requests.filter((r) => r.table === "user_word_meanings" && r.incremental).map((r) => r.since)).toEqual(
         offset === 500 ? [OLD, OLD, OLD] : [OLD, OLD],
@@ -1119,13 +1136,13 @@ describe("word meaning restore and incremental recovery", () => {
     mockRestoreCards = [card("synthetic-remote-card")];
     const error = new Error("Synthetic retryable snapshot failure");
     failPage("user_word_meanings", "restore", 0, error);
-    await expect(fullSync(db)).rejects.toBe(error);
+    await expect(syncAccepting(db)).rejects.toBe(error);
     expect(sql.prepare("SELECT meaning FROM user_word_meanings").get()).toEqual({
       meaning: "keep until a complete snapshot",
     });
     mockQueryErrors.clear();
     mockMeaningRestoreRows.push(meaning({ meaning: "restored from a complete snapshot" }));
-    await expect(fullSync(db)).resolves.toMatchObject({ pulled: 2, accountRestored: true, localDataReplaced: true });
+    await expect(syncAccepting(db)).resolves.toMatchObject({ pulled: 2, accountRestored: true, localDataReplaced: true });
     expect(sql.prepare("SELECT surah,ayah,word_pos,meaning,updated_at FROM user_word_meanings").get()).toEqual({
       surah: 2,
       ayah: 256,
@@ -1142,9 +1159,34 @@ describe("word meaning restore and incremental recovery", () => {
     restoreComplete();
     putSetting("last_pull_at", OLD);
     mockMeaningIncrementalRows.length = 0;
-    await fullSync(db);
+    await syncAccepting(db);
     expect(requests.some((r) => r.table === "user_word_meanings" && r.incremental && r.since === OLD)).toBe(true);
     expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value).not.toBe(OLD);
+  });
+});
+
+describe("W07 custom meaning tombstone on another device", () => {
+  const DELETED = "2026-02-15T00:00:00.000Z";
+  const tombstone = () => meaning({ updated_at: DELETED, deleted_at: DELETED, synced_at: DELETED });
+
+  it("deletes the unchanged original row when the fresh tombstone arrives", async () => {
+    restoreComplete();
+    putMeaning(meaning({ updated_at: OLD }));
+    mockMeaningIncrementalRows.push(tombstone());
+
+    await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+    expect(sql.prepare("SELECT COUNT(*) AS count FROM user_word_meanings").get()).toEqual({ count: 0 });
+  });
+
+  it("keeps a genuinely newer local edit over the older tombstone", async () => {
+    restoreComplete();
+    putMeaning(meaning({ meaning: "edited later here", updated_at: "2026-03-01T00:00:00.000Z" }));
+    mockMeaningIncrementalRows.push(tombstone());
+
+    await syncAccepting(db);
+
+    expect(sql.prepare("SELECT meaning FROM user_word_meanings").all()).toEqual([{ meaning: "edited later here" }]);
   });
 });
 
@@ -1172,10 +1214,10 @@ describe("sync cursor snapshot windows", () => {
     };
 
     try {
-      await fullSync(db);
+      await syncAccepting(db);
       const firstCursor = sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value;
       requests.length = 0;
-      await fullSync(db);
+      await syncAccepting(db);
 
       expect(
         sql.prepare("SELECT meaning FROM user_word_meanings WHERE surah=2 AND ayah=258 AND word_pos=1").get(),
@@ -1228,7 +1270,7 @@ describe("sync cursor snapshot windows", () => {
       };
 
       try {
-        await fullSync(db);
+        await syncAccepting(db);
         const target = restoreKind === "empty" ? 260 : 259;
         const expected = restoreKind === "empty" ? "late restore meaning" : "late updated meaning";
         expect(
@@ -1295,7 +1337,7 @@ it.each(
     for (const row of newerFirst ? [newer, older] : [older, newer]) putHighlight(row);
     const preserved = sql.prepare("SELECT * FROM highlights WHERE sync_id=?").get(newId);
     mockIncrementalHighlights.push(remoteHighlightDeletion({ sync_id: identity === "missing" ? null : oldId }));
-    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+    await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
     expect(highlightRows()).toEqual([preserved]);
     expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).not.toEqual({ value: OLD });
   },
@@ -1314,7 +1356,7 @@ it.each([false, true])("deletes only instant-older highlight targets, reverse in
     remoteHighlightDeletion({ updated_at: "2026-06-01T02:00:00Z", deleted_at: "2026-06-01T02:00:00Z" }),
   );
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
 
   expect(
     highlightRows()
@@ -1335,7 +1377,7 @@ it("keeps a highlight whose identity changes after target selection", async () =
     remoteHighlightDeletion({ updated_at: "2026-06-01T02:00:00Z", deleted_at: "2026-06-01T02:00:00Z" }),
   );
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
 
   expect(sql.prepare("SELECT sync_id,ayah FROM highlights").all()).toEqual([
     { sync_id: "edited-highlight-id", ayah: 256 },
@@ -1353,7 +1395,7 @@ it("keeps a highlight edited after target selection", async () => {
     remoteHighlightDeletion({ updated_at: "2026-06-01T02:00:00Z", deleted_at: "2026-06-01T02:00:00Z" }),
   );
 
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
 
   expect(sql.prepare("SELECT sync_id,updated_at FROM highlights").all()).toEqual([
     { sync_id: HIGHLIGHT_CANONICAL_ID, updated_at: editedTimestamp },
@@ -1370,7 +1412,7 @@ it.each([
   putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID + ":101", updatedAt));
   const sibling = highlightRows()[1];
   mockIncrementalHighlights.push(remoteHighlightDeletion());
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
   expect(highlightRows()).toEqual(retained ? [sibling] : []);
 });
 
@@ -1381,7 +1423,7 @@ it("protects a newer ID match when another older row matches the deletion coordi
   putHighlight(highlightRow(protectedId, NEW, 256));
   const preserved = highlightRows()[1];
   mockIncrementalHighlights.push(remoteHighlightDeletion({ sync_id: protectedId }));
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
   expect(highlightRows()).toEqual([preserved]);
 });
 
@@ -1394,7 +1436,7 @@ it.each([
   putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID + ":101", NEW));
   const preserved = highlightRows()[1];
   mockIncrementalHighlights.push(remoteHighlightDeletion({ updated_at: null, created_at, synced_at }));
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
   expect(highlightRows()).toEqual([preserved]);
 });
 
@@ -1436,12 +1478,12 @@ it.each(
     writes.length = 0;
 
     if (mode === "restore") {
-      await expect(fullSync(db)).rejects.toThrow();
+      await expect(syncAccepting(db)).rejects.toThrow();
       expect(mockPending).not.toHaveBeenCalled();
       expect(transactions).toBe(0);
       expect(writes).toEqual([]);
     } else {
-      await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
+      await expect(syncAccepting(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
       expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
       expect(mockPending).toHaveBeenCalled();
     }
@@ -1458,7 +1500,7 @@ it("retains the legacy unrestricted deletion when resolved highlight updated_at 
   putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, OLD));
   putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID + ":101", NEW));
   mockIncrementalHighlights.push(remoteHighlightDeletion({ updated_at: "" }));
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
   expect(highlightRows()).toEqual([]);
 });
 
@@ -1470,7 +1512,7 @@ describe("RF-169 live highlight with an empty remote updated_at", () => {
     putHighlight({ ...highlightRow(HIGHLIGHT_CANONICAL_ID, NEW), color: "yellow" });
     mockIncrementalHighlights.push(live());
 
-    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+    await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
 
     expect(highlightRows()).toMatchObject([{ sync_id: HIGHLIGHT_CANONICAL_ID, updated_at: NEW }]);
   });
@@ -1479,7 +1521,7 @@ describe("RF-169 live highlight with an empty remote updated_at", () => {
     restoreComplete();
     mockIncrementalHighlights.push(live());
 
-    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+    await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
 
     expect(highlightRows()).toMatchObject([{ sync_id: HIGHLIGHT_CANONICAL_ID, updated_at: OLD, deleted_at: null }]);
   });
@@ -1532,8 +1574,8 @@ it.each(
   mockTableRows.set(`${table}:${mode}`, [row, { ...row, user_id: "foreign-owner" }]);
   const before = snapshot();
   writes.length = 0;
-  if (mode === "restore") await expect(fullSync(db)).rejects.toThrow();
-  else await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
+  if (mode === "restore") await expect(syncAccepting(db)).rejects.toThrow();
+  else await expect(syncAccepting(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
   expect(snapshot()).toEqual(before);
   expect(transactions).toBe(0);
   expect(writes).toEqual([]);
@@ -1548,7 +1590,7 @@ it.each(Object.keys(boundaryRows))("rejects a malformed later %s restore page be
   ]);
   const before = snapshot();
   writes.length = 0;
-  await expect(fullSync(db)).rejects.toThrow();
+  await expect(syncAccepting(db)).rejects.toThrow();
   expect(requests.filter((r) => r.table === table).map((r) => r.offset)).toEqual([0, 500]);
   expect(snapshot()).toEqual(before);
   expect(writes).toEqual([]);
@@ -1559,7 +1601,7 @@ it.each([null, {}, { length: 0 }])("rejects non-array account results %p before 
   putQueueRow();
   mockRawResponses.set("highlights:restore:0", data);
   const before = snapshot();
-  await expect(fullSync(db)).rejects.toThrow();
+  await expect(syncAccepting(db)).rejects.toThrow();
   expect(snapshot()).toEqual(before);
   expect(transactions).toBe(0);
   expect(writes).toEqual([]);
@@ -1571,13 +1613,13 @@ it("pulls the wird tables in full once per account, then from the shared cursor"
   const wirdTables = new Set(["habit_days", "review_sessions", "recitation_errors"]);
   const sinceByTable = () =>
     Object.fromEntries(requests.filter((r) => r.incremental).map((r) => [r.table, r.since]));
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   const first = sinceByTable();
   for (const table of wirdTables) expect(first[table]).toBe("1970-01-01T00:00:00Z");
   expect(first.study_log).toBe(OLD);
   const cursor = sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value;
   requests.length = 0;
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   const second = sinceByTable();
   for (const table of wirdTables) expect(second[table]).toBe(cursor);
 });
@@ -1587,7 +1629,7 @@ it("keeps a pulled page card's cached tier", async () => {
   mockTableRows.set("study_cards:incremental", [
     { ...card("page:madani15:5"), tier: "manzil", tier_changed_at: NEW, updated_at: NEW },
   ]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(sql.prepare("SELECT tier, tier_changed_at FROM study_cards WHERE id = 'page:madani15:5'").get()).toEqual({
     tier: "manzil",
     tier_changed_at: NEW,
@@ -1595,9 +1637,9 @@ it("keeps a pulled page card's cached tier", async () => {
 });
 
 it("reports a finished restore when the account has no remote data yet", async () => {
-  await expect(fullSync(db)).resolves.toMatchObject({ pulled: 0, accountRestored: false, restoreCompleted: true });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ pulled: 0, accountRestored: false, restoreCompleted: true });
   // The next sync has nothing left to restore.
-  await expect(fullSync(db)).resolves.not.toHaveProperty("restoreCompleted");
+  await expect(syncAccepting(db)).resolves.not.toHaveProperty("restoreCompleted");
 });
 
 it("drops device state built from the replaced account when restoring another", async () => {
@@ -1605,7 +1647,7 @@ it("drops device state built from the replaced account when restoring another", 
   putSetting("device_wird_extras", "{}");
   putSetting("hifz_auto_delay_ms", "900");
   mockTableRows.set("user_settings:restore", [boundaryRows.user_settings]);
-  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ accountRestored: true });
   const keys = sql.prepare("SELECT key FROM user_settings").all().map((row) => row.key);
   expect(keys).not.toContain("device_hifz_today_plan");
   expect(keys).not.toContain("device_wird_extras");
@@ -1621,7 +1663,7 @@ it("keeps another account's pending encouragement batches through a restore, wit
   putSetting("notif_group_pending", pending);
   putSetting(acksKey, "{}");
   mockTableRows.set("user_settings:restore", [boundaryRows.user_settings]);
-  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ accountRestored: true });
   expect(sql.prepare("SELECT value FROM user_settings WHERE key = 'notif_group_pending'").get()).toEqual({ value: pending });
   expect(sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(acksKey)).toEqual({ value: "{}" });
 });
@@ -1643,7 +1685,7 @@ it("pulls wird days before reviews and marks a day whose minimum two devices met
   mockTableRows.set("study_log:incremental", [
     { ...boundaryRows.study_log, card_id: "half:madani15:5:b", reviewed_at: remoteAt, local_date: today, grader: "self" },
   ]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   const tables = requests.filter((r) => r.incremental).map((r) => r.table);
   expect(tables.indexOf("habit_days")).toBeLessThan(tables.indexOf("study_log"));
   expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(today)).toEqual({ status: "done" });
@@ -1659,7 +1701,7 @@ it("credits pulled make-up reviews to the missed day, not to today", async () =>
   mockTableRows.set("study_log:incremental", [
     { ...boundaryRows.study_log, card_id: "page:madani15:5", reviewed_at: earlier, local_date: today, grader: "self", makeup_for: yesterday },
   ]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(sql.prepare("SELECT makeup_for FROM study_log WHERE card_id = 'page:madani15:5'").get()).toEqual({ makeup_for: yesterday });
   expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(yesterday)).toEqual({ status: "made_up" });
   expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(today)).toBeUndefined();
@@ -1693,26 +1735,26 @@ const liveClozeCards = () =>
 
 it("gives a restored weak spot its cloze card when the account's errors came from several devices", async () => {
   mockTableRows.set("recitation_errors:restore", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
-  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ accountRestored: true });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
 });
 
 it("does not make a cloze card on restore for a word wrong in fewer than 3 sessions", async () => {
   mockTableRows.set("recitation_errors:restore", [weakSpotError(1), weakSpotError(2), weakSpotError(3, { deleted_at: NEW })]);
-  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ accountRestored: true });
   expect(liveClozeCards()).toEqual([]);
 });
 
 it("removes the cloze card when another device's dismissal takes the word below 3 sessions", async () => {
   restoreComplete();
   mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
 
   mockTableRows.set("recitation_errors:incremental", [
     { ...weakSpotError(3, { updated_at: NEW, deleted_at: NEW }), synced_at: "2099-01-01T00:00:00.000Z" },
   ]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(liveClozeCards()).toEqual([]);
 });
 
@@ -1726,7 +1768,7 @@ it("keeps a trained cloze card when this device has fewer of its errors than the
   restoreComplete();
   mockTableRows.set("study_cards:incremental", [clozeCard()]);
   mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2)]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
   expect(sql.prepare("SELECT reps FROM study_cards WHERE id = 'cloze:2:255:4'").get()).toEqual({ reps: 7 });
 });
@@ -1735,19 +1777,19 @@ it("keeps the cloze card when a pulled dismissal leaves a word this device never
   restoreComplete();
   mockTableRows.set("study_cards:incremental", [clozeCard()]);
   mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2)]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   mockTableRows.set("study_cards:incremental", []);
   mockTableRows.set("recitation_errors:incremental", [
     { ...weakSpotError(2, { updated_at: later(5), deleted_at: later(5) }), synced_at: "2099-01-01T00:00:00.000Z" },
   ]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
 });
 
 it("brings back a cloze card another device deleted while the word is still weak here", async () => {
   restoreComplete();
   mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
   const deletedAt = new Date(Date.now() + 60_000).toISOString();
   mockTableRows.set("recitation_errors:incremental", []);
@@ -1756,7 +1798,7 @@ it("brings back a cloze card another device deleted while the word is still weak
     // applies here first. It carries the training that device saw.
     { ...clozeCard({ updated_at: deletedAt, deleted_at: deletedAt }), synced_at: "2099-01-01T00:00:00.000Z" },
   ]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
   // Restored as it was, training kept, and stamped after the deletion so its upload wins.
   const restored = sql.prepare("SELECT reps, state, stability, updated_at FROM study_cards WHERE id = 'cloze:2:255:4'").get() as {
@@ -1772,7 +1814,7 @@ it("brings back a cloze card another device deleted while the word is still weak
 it("keeps this device's newer training when a deletion from a device behind on reviews arrives", async () => {
   restoreComplete();
   mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   // This device trained the card nine times, the last review an hour ago.
   const lastReview = new Date(Date.now() - 60 * 60_000).toISOString();
   sql.prepare("UPDATE study_cards SET reps = 9, last_review = ?, updated_at = ? WHERE id = 'cloze:2:255:4'").run(lastReview, lastReview);
@@ -1785,7 +1827,7 @@ it("keeps this device's newer training when a deletion from a device behind on r
       synced_at: "2099-01-01T00:00:00.000Z",
     },
   ]);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   // The word is still weak here, so the card comes back with the nine reviews.
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
   expect(sql.prepare("SELECT reps, last_review FROM study_cards WHERE id = 'cloze:2:255:4'").get()).toEqual({ reps: 9, last_review: lastReview });
@@ -1794,14 +1836,14 @@ it("keeps this device's newer training when a deletion from a device behind on r
 it("removes a restored cloze card whose weak spot a restored dismissal ended", async () => {
   mockTableRows.set("study_cards:restore", [clozeCard()]);
   mockTableRows.set("recitation_errors:restore", [weakSpotError(1), weakSpotError(2), weakSpotError(3, { deleted_at: NEW })]);
-  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ accountRestored: true });
   expect(liveClozeCards()).toEqual([]);
 });
 
 it("keeps a restored cloze card when only errors not yet uploaded are missing", async () => {
   mockTableRows.set("study_cards:restore", [clozeCard()]);
   mockTableRows.set("recitation_errors:restore", [weakSpotError(1), weakSpotError(2)]);
-  await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: true });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ accountRestored: true });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
 });
 
@@ -1812,14 +1854,14 @@ it("keeps committed page counts and the cursor when a later incremental page is 
   const valid = Array.from({ length: 501 }, (_, i) => ({ ...row, id: `boundary-note-${i}` }));
   mockTableRows.set("private_notes:incremental", [...valid.slice(0, 500), { ...valid[500], updated_at: "invalid" }]);
   const queueBefore = sql.prepare("SELECT * FROM sync_queue ORDER BY id").all();
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "partial", pulled: 500 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "partial", pulled: 500 });
   expect(sql.prepare("SELECT COUNT(*) AS count FROM private_notes WHERE id LIKE 'boundary-note-%'").get()).toEqual({
     count: 500,
   });
   expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
   expect(sql.prepare("SELECT * FROM sync_queue ORDER BY id").all()).toEqual(queueBefore);
   mockTableRows.set("private_notes:incremental", valid);
-  await expect(fullSync(db)).resolves.toMatchObject({ status: "partial", pulled: 501 });
+  await expect(syncAccepting(db)).resolves.toMatchObject({ status: "partial", pulled: 501 });
   expect(sql.prepare("SELECT COUNT(*) AS count FROM private_notes WHERE id LIKE 'boundary-note-%'").get()).toEqual({
     count: 501,
   });
@@ -1832,7 +1874,7 @@ it.each(
 )("applies a valid $table row during $mode", async ({ table, mode }) => {
   if (mode === "incremental") restoreComplete();
   mockTableRows.set(`${table}:${mode}`, [boundaryRows[table]]);
-  const result = await fullSync(db);
+  const result = await syncAccepting(db);
   expect(result).toMatchObject({ status: "synced", pulled: 1, accountRestored: mode === "restore" });
   const keys: Record<string, string[]> = {
     user_settings: ["key"],

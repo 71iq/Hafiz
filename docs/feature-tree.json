@@ -61,7 +61,7 @@
         },
         {
           "id": "shell.sync",
-          "title": "Background sync indicator and restore notice",
+          "title": "Background sync indicator, restore consent and Sync paused status",
           "kind": "widget",
           "cases": ["UI-05"],
           "uses": [],
