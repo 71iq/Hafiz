@@ -455,17 +455,22 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     expect(view.getByText("occurrence 45")).toBeTruthy();
     expect(view.queryByText(strings[language].listShowMore.replace("{{count}}", "15"))).toBeNull();
   });
-  it("preserves fallback deep link and delayed navigation after result tap", async () => {
+  it("submits the fallback target once, after the search sheet has closed", async () => {
     const view = mount();
     view.edit("active");
     await advance();
     await settle(() => textRequest().pending.resolve([row("tap result")]));
     fireEvent.press(view.getByText("tap result"));
-    expect(mockPendingLink).toHaveBeenCalledWith({ surah: 2, ayah: 1, wordPos: undefined });
+    expect(view.close).toHaveBeenCalledTimes(1);
+    // The target waits for the sheet to close, then is submitted once.
+    expect(mockPendingLink).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
-    view.unmount();
-    await advance(150);
+    view.visible(false);
+    expect(mockPendingLink).toHaveBeenCalledTimes(1);
+    expect(mockPendingLink).toHaveBeenCalledWith({ surah: 2, ayah: 1, wordPos: undefined });
     expect(mockNavigate).toHaveBeenCalledWith("/(tabs)/mushaf");
+    view.unmount();
+    expect(mockPendingLink).toHaveBeenCalledTimes(1);
   });
   it("reuses history query and mode and clears history explicitly", async () => {
     mockHistory = [{ id: 1, query: "saved query", mode: "text", created_at: "2026-01-01T00:00:00Z" }];
