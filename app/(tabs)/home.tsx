@@ -757,10 +757,16 @@ export default function HomeScreen() {
                       ...textStartStyle(isRTL),
                     }}
                   >
-                    {journeySummary.currentLevelTitle
-                      ? interpolate(s.reflectionJourneyCurrentLevel, { title: journeySummary.currentLevelTitle })
-                      : s.reflectionJourneySubtitle}
+                    {s.reflectionJourneySubtitle}
                   </Text>
+                  {journeySummary.currentLevelTitle ? (
+                    <Text
+                      className="text-charcoal dark:text-neutral-200 mt-1"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, lineHeight: 21, ...textStartStyle(isRTL) }}
+                    >
+                      {interpolate(s.reflectionJourneyCurrentLevel, { title: journeySummary.currentLevelTitle })}
+                    </Text>
+                  ) : null}
                 </View>
                 <View className="h-12 w-12 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
                   <BookMarked size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />

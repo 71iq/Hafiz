@@ -5,6 +5,7 @@ import {
   REFLECTION_JOURNEY_MAX_RESPONSE_CHARS,
   REFLECTION_JOURNEY_MIN_RESPONSE_CHARS,
 } from "./schema";
+import { checkJourneyCompletion, selectDefaultJourneyLevel } from "./selection";
 import type {
   ReflectionJourneyEntry,
   ReflectionJourneyEntryStatus,
@@ -50,30 +51,14 @@ export async function listReflectionJourneyLevels(
   ]);
 
   const entryMap = new Map(entryRows.map((row) => [row.level_id, rowToEntry(row)]));
-  let previousCompleted = true;
 
+  // Every level is open; the order is a suggestion. Each status comes from that level's own entry.
   return levelRows.map((row) => {
     const level = rowToLevel(row);
     const entry = entryMap.get(row.id) ?? null;
-    const isCompleted = entry?.status === "completed";
-    const isDraft = entry?.status === "draft";
-    const isLocked = !previousCompleted && !isCompleted;
-    const status = isCompleted
-      ? "completed"
-      : isLocked
-        ? "locked"
-        : isDraft
-          ? "draft"
-          : "available";
-
-    previousCompleted = isCompleted;
-
-    return {
-      ...level,
-      status,
-      entry,
-      isLocked,
-    };
+    const status =
+      entry?.status === "completed" ? "completed" : entry?.status === "draft" ? "draft" : "available";
+    return { ...level, status, entry };
   });
 }
 
@@ -90,10 +75,7 @@ export async function getReflectionJourneySummary(
 ): Promise<ReflectionJourneySummary> {
   const levels = await listReflectionJourneyLevels(db);
   const completedLevels = levels.filter((level) => level.status === "completed").length;
-  const currentLevel =
-    levels.find((level) => level.status === "available" || level.status === "draft") ??
-    levels[levels.length - 1] ??
-    null;
+  const currentLevel = selectDefaultJourneyLevel(levels);
 
   return {
     totalLevels: levels.length,
@@ -112,12 +94,11 @@ export async function saveReflectionJourneyDraft(
   if (!level) {
     throw new Error(`Reflection Journey level "${levelId}" was not found.`);
   }
-  if (level.isLocked) {
-    throw new Error("This Reflection Journey level is still locked.");
-  }
 
   const existing = level.entry;
   if (existing?.status === "completed") {
+    // Editing a completed level keeps its completion and timestamp, under the completion limits.
+    assertCompletable(responseText);
     return upsertReflectionJourneyEntry(db, levelId, responseText, "completed", existing.completedAt);
   }
 
@@ -133,21 +114,9 @@ export async function completeReflectionJourneyLevel(
   if (!level) {
     throw new Error(`Reflection Journey level "${levelId}" was not found.`);
   }
-  if (level.isLocked) {
-    throw new Error("This Reflection Journey level is still locked.");
-  }
 
   const trimmed = responseText.trim();
-  if (trimmed.length < REFLECTION_JOURNEY_MIN_RESPONSE_CHARS) {
-    throw new Error(
-      `Reflection Journey responses must be at least ${REFLECTION_JOURNEY_MIN_RESPONSE_CHARS} characters.`
-    );
-  }
-  if (trimmed.length > REFLECTION_JOURNEY_MAX_RESPONSE_CHARS) {
-    throw new Error(
-      `Reflection Journey responses must be ${REFLECTION_JOURNEY_MAX_RESPONSE_CHARS} characters or fewer.`
-    );
-  }
+  assertCompletable(trimmed);
 
   return upsertReflectionJourneyEntry(
     db,
@@ -155,6 +124,16 @@ export async function completeReflectionJourneyLevel(
     trimmed,
     "completed",
     level.entry?.completedAt ?? null
+  );
+}
+
+function assertCompletable(responseText: string) {
+  const check = checkJourneyCompletion(responseText);
+  if (check.ok) return;
+  throw new Error(
+    check.reason === "short"
+      ? `Reflection Journey responses must be at least ${REFLECTION_JOURNEY_MIN_RESPONSE_CHARS} characters.`
+      : `Reflection Journey responses must be ${REFLECTION_JOURNEY_MAX_RESPONSE_CHARS} characters or fewer.`
   );
 }
 

@@ -1189,7 +1189,7 @@
       "children": [
         {
           "id": "journey.levels",
-          "title": "Level strip / side list and locking",
+          "title": "Level strip / side list, open levels and Next marker",
           "kind": "widget",
           "cases": ["JOURNEY-02"],
           "uses": [],

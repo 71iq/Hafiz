@@ -187,13 +187,13 @@ User flows in the current project, reviewed on 6 November 2026. Shared flows app
 
 ## Reflection journey
 
-- JOURNEY-01. Open the journey. Select the first available/draft level automatically, otherwise the first level. View progress, level status, lesson blocks, response prompt, and saved text. No levels shows an empty state.
-- JOURNEY-02. Select an unlocked level from the phone level strip or wider side list. Completed levels remain accessible; later incomplete levels stay locked until their predecessor is complete.
-- JOURNEY-03. Read lesson text, Quran, translation, and tafsir. Press an ayah/text row to open ayah detail, starting Translation for translation blocks and Tafsir otherwise. Block/font loading shows feedback; failed loads can leave missing content without Retry. Recitation blocks display Coming soon.
-- JOURNEY-04. Write a response and save a draft. Show character count, saving, saved status/toast, or an error. Return later to load the saved draft.
-- JOURNEY-05. Complete a response with 10 to 5000 trimmed characters. Save completion, update progress, and unlock the next level. Too-short input shows validation; save failure keeps the response.
-- JOURNEY-06. Edit a completed response and save it complete again. Retain its completion status. Use Open next when an unlocked successor exists; the final level has no next action.
-- JOURNEY-07. Switch levels or leave through Home without saving. Discard unsaved response text without a confirmation, then load the destination level's saved response when selected.
+- JOURNEY-01. Open the Reflection Journey. Select the first level with a saved draft, otherwise the first unfinished level, otherwise the last completed level, in suggested order. Home's current-level summary uses the same choice. View progress, Draft or Completed status, a Next marker on an unfinished level without a draft, lesson blocks, response prompt and saved text. No levels shows Coming soon with a way back to Home; a failed load offers Retry.
+- JOURNEY-02. Select any level from the level strip (below 1024px) or the side list. Every level is open; the strip centers the selected level and fades its trailing edge when more levels continue. Previous and Next move between levels without completing them.
+- JOURNEY-03. Read lesson text, Quran, translation, and tafsir with each source named. Press an ayah/text row to open ayah detail, starting Translation for translation blocks and Tafsir otherwise, or use its book action to open the Mushaf at that ayah. Font loading holds one line of space; a failed section shows Retry inside its card. Recitation blocks play their range with the chosen reciter only on Play.
+- JOURNEY-04. Write a private response and save a draft, including one shorter than ten characters. Show character count, characters still needed to complete, saving, a saved notice, or an inline error with Retry that keeps the text. Return later to load the saved draft.
+- JOURNEY-05. Complete a response with 10 to 5000 trimmed characters; Complete stays disabled outside that range. A completed level shows Level completed with Open next level. Completing a later level never completes earlier ones, and You finished the journey appears only when every level is completed.
+- JOURNEY-06. Edit a completed response and use Save changes, enabled once the text differs and meets the completion limits. Keep its completion record and time. Saving never publishes the response.
+- JOURNEY-07. Switch levels, use Home or Android Back with unsaved text. Confirm Discard unsaved changes? or keep editing. A change of account clears the unsaved text at once without asking.
 
 ## Progress and achievements
 
