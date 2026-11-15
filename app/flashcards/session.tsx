@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
+import { BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, NotebookPen, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -85,6 +85,7 @@ import {
 } from "@/components/habit/SessionHabitCards";
 import { Toast } from "@/components/ui/Toast";
 import { getGradeSchedulePreviews, GradingButtons } from "@/components/flashcards/GradingButtons";
+import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
 import { formatAyahs, formatDays, formatNumber } from "@/lib/i18n/count";
 import { formatAyahRef } from "@/lib/arabic";
 
@@ -243,6 +244,8 @@ function FlashcardSessionScreen() {
   const [sessionCardTotal, setSessionCardTotal] = useState(0);
   const [currentSideIndex, setCurrentSideIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  // W03 note entry point: the card back offers Add note for the ayah under review.
+  const [noteOpen, setNoteOpen] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   /** The queue could not load: an error with Try again, never an empty completion. */
@@ -1045,7 +1048,7 @@ function FlashcardSessionScreen() {
     };
   }, [buildSummary, cardMissing, mutationBusy]);
 
-  const overlayOpen = cardMenuOpen || !!confirmCardAction || dueDateOpen || answerEditOpen || exitConfirmOpen;
+  const overlayOpen = cardMenuOpen || !!confirmCardAction || dueDateOpen || answerEditOpen || exitConfirmOpen || noteOpen;
   const gradingVisible = (phase === "side" && revealed && isLastSide) || phase === "grading";
   // The latest handlers and state for the key and Back listeners, which are registered once.
   const inputRef = useRef({ phase, revealed, isLastSide, gradingVisible, overlayOpen, revealFirstSide, handleNext, handleGrade, handleEndSession });
@@ -1336,10 +1339,33 @@ function FlashcardSessionScreen() {
                   {currentCard.textUthmani}
                 </Text>
               )}
+              {currentCard.surah > 0 && currentCard.ayah > 0 ? (
+                <Pressable
+                  onPress={() => setNoteOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.noteAdd}
+                  className="mt-4 min-h-11 self-center flex-row items-center justify-center gap-2 rounded-full px-4"
+                  style={{ direction: isRTL ? "rtl" : "ltr" }}
+                >
+                  <NotebookPen size={16} color={isDark ? "#5eead4" : "#0d9488"} />
+                  <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+                    {s.noteAdd}
+                  </Text>
+                </Pressable>
+              ) : null}
             </Card>
           )}
         </View>
       </ScrollView>
+      {currentCard.surah > 0 && currentCard.ayah > 0 ? (
+        <PrivateNoteSheet
+          open={noteOpen}
+          onClose={() => setNoteOpen(false)}
+          surah={currentCard.surah}
+          ayahStart={currentCard.ayah}
+          ayahEnd={currentCard.ayah}
+        />
+      ) : null}
 
       {/* Bottom action area */}
       <View
