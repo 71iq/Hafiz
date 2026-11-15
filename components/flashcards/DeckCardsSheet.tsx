@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View, type ViewStyle } from "react-native";
-import { CalendarDays, Clock3, PauseCircle, RotateCcw, Search, Star, Trash2 } from "lucide-react-native";
+import { BookOpen, CalendarDays, Clock3, PauseCircle, RotateCcw, Search, Star, Trash2 } from "lucide-react-native";
 import { DueDateSheet } from "@/components/flashcards/DueDateSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMenu";
@@ -23,6 +23,18 @@ import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { useSettings } from "@/lib/settings/context";
 import { State } from "@/lib/fsrs/scheduler";
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
+import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
+import type { DeepLinkTarget } from "@/lib/deep-link";
+
+/** The ayah an ayah or word card studies, for Open in Mushaf; ids are "2:255" or "word:2:255:4". */
+export function deckCardMushafTarget(card: Pick<DeckCardListItem, "id" | "kind">): DeepLinkTarget | null {
+  const match =
+    card.kind === "ayah" ? /^(\d+):(\d+)$/.exec(card.id) : card.kind === "word" ? /^word:(\d+):(\d+):(\d+)$/.exec(card.id) : null;
+  if (!match) return null;
+  const target: DeepLinkTarget = { surah: Number(match[1]), ayah: Number(match[2]) };
+  if (match[3]) target.wordPos = Number(match[3]);
+  return target;
+}
 
 type Props = {
   visible: boolean;
@@ -78,6 +90,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
   const [dueTarget, setDueTarget] = useState<DeckCardListItem | null>(null);
   const [dueDateText, setDueDateText] = useState("");
   const [dueDateError, setDueDateError] = useState<string | null>(null);
+  const openMushaf = useOpenMushaf();
 
   /** Reload the list; false when it failed and its own error is showing. */
   const loadCards = useCallback(async () => {
@@ -266,6 +279,12 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                       isRTL={isRTL}
                       rowFlexStyle={rowFlexStyle}
                       s={s}
+                      onOpenInMushaf={() => {
+                        const target = deckCardMushafTarget(card);
+                        if (!target) return;
+                        onClose();
+                        openMushaf(target);
+                      }}
                       onDelete={() => {
                         setError(null);
                         setConfirmAction({ type: "delete", card });
@@ -316,7 +335,9 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
         message={confirmAction?.type === "delete" ? s.cardDeleteConfirm : s.cardResetConfirm}
         cancelLabel={s.flashcardsCancel}
         confirmLabel={confirmAction?.type === "delete" ? s.flashcardsDelete : s.cardResetProgress}
-        destructive={confirmAction?.type === "delete"}
+        // Reset also removes the card's scheduling history, so it is styled as destructive too.
+        destructive
+        itemName={confirmAction ? (isRTL ? confirmAction.card.titleAr : confirmAction.card.title) : undefined}
         confirmLoading={!!confirmAction && busyId === confirmAction.card.id}
         error={error}
         isDark={isDark}
@@ -389,6 +410,7 @@ function DeckCardRow({
   isRTL,
   rowFlexStyle,
   s,
+  onOpenInMushaf,
   onDelete,
   onReset,
   onToggleMark,
@@ -398,6 +420,7 @@ function DeckCardRow({
 }: {
   card: DeckCardListItem;
   busy: boolean;
+  onOpenInMushaf: () => void;
   isRTL: boolean;
   rowFlexStyle: ViewStyle;
   s: UIStrings;
@@ -411,6 +434,16 @@ function DeckCardRow({
   const now = new Date().toISOString();
   const isBuried = !!card.buried_until && card.buried_until > now;
   const menuItems: DropdownMenuItem[] = [
+    ...(deckCardMushafTarget(card)
+      ? [
+          {
+            key: "open",
+            label: s.cardOpenInMushaf,
+            icon: (color: string) => <BookOpen size={15} color={color} />,
+            onPress: onOpenInMushaf,
+          },
+        ]
+      : []),
     {
       key: "mark",
       label: card.marked_at ? s.cardUnmark : s.cardMark,
@@ -440,6 +473,8 @@ function DeckCardRow({
       label: s.cardResetProgress,
       icon: (color) => <RotateCcw size={15} color={color} />,
       onPress: onReset,
+      // Reset and Delete change the card's history, so a divider sets them apart.
+      separatorBefore: true,
     },
     {
       key: "delete",

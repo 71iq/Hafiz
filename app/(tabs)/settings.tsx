@@ -1027,6 +1027,7 @@ export default function SettingsScreen() {
         confirmLabel={s.authLogout}
         destructive
         confirmLoading={authLoading}
+        pendingLabel={s.sharedLoggingOut}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={() => {
