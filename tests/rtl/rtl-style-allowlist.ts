@@ -41,11 +41,6 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     reason: "Focus controls include full-width phone chrome and progress-thumb coordinates.",
   },
   {
-    file: "components/mushaf/GoToNavigator.tsx",
-    pattern: /textAlign: "right"/,
-    reason: "Navigator displays fixed Arabic surah labels that intentionally align RTL.",
-  },
-  {
     file: "components/mushaf/MushafSlider.tsx",
     pattern: /paddingLeft|paddingRight/,
     reason: "Slider center padding is symmetric wheel geometry, not semantic inline spacing.",
@@ -54,11 +49,6 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     file: "components/mushaf/PageMushaf.tsx",
     pattern: /left|right/,
     reason: "Page reader uses horizontal page coordinates and full-width overlays around unmirrored Mushaf content.",
-  },
-  {
-    file: "components/mushaf/PageViewNavigationSheet.tsx",
-    pattern: /left|marginLeft|marginRight/,
-    reason: "Floating page menu uses measured viewport coordinates and direction-aware icon spacing.",
   },
   {
     file: "components/mushaf/SurahHeader.tsx",

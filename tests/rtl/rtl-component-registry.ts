@@ -292,13 +292,31 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/mushaf/PageViewNavigationSheet.tsx",
     "overlay",
     "source",
-    "Page-view menu uses measured coordinates; internal rows mirror.",
+    "Page layout options render through the shared DropdownMenu, whose rows mirror.",
   ),
   entry(
     "components/mushaf/QiraatBlocks.tsx",
     "quran-text",
     "rntl",
     "Supplied Arabic headings and bodies retain RTL alignment and order in both Qiraat callers.",
+  ),
+  entry(
+    "components/mushaf/QuranLoadError.tsx",
+    "mushaf-reading",
+    "source",
+    "Centered message and Retry; text direction follows the UI locale.",
+  ),
+  entry(
+    "components/mushaf/ReaderHelpSheet.tsx",
+    "overlay",
+    "source",
+    "Shortcut and gesture rows mirror by hand; key names stay LTR.",
+  ),
+  entry(
+    "components/mushaf/ReaderToolbar.tsx",
+    "mushaf-reading",
+    "playwright",
+    "Toolbar order mirrors through direction and wraps; tooltip and menus need rendered checks.",
   ),
   entry(
     "components/mushaf/ReadingSettingsSheet.tsx",

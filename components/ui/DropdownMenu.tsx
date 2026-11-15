@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { MoreHorizontal } from "lucide-react-native";
+import { Check, MoreHorizontal } from "lucide-react-native";
 import { useSettings } from "@/lib/settings/context";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,10 @@ export type DropdownMenuItem = {
   onPress: () => void;
   disabled?: boolean;
   destructive?: boolean;
+  /** Set for radio choices: the item is a menuitemradio and shows a check when true. */
+  checked?: boolean;
+  /** A heading shown before the first item of each consecutive group. */
+  group?: string;
 };
 
 type AnchorRect = {
@@ -30,6 +34,8 @@ type DropdownMenuProps = {
   width?: number;
   isRTL?: boolean;
   className?: string;
+  /** Replaces the default "more" icon on the trigger. */
+  triggerIcon?: (color: string) => ReactNode;
 };
 
 const MENU_MARGIN = 12;
@@ -43,6 +49,7 @@ export function DropdownMenu({
   width = 220,
   isRTL: explicitIsRTL,
   className,
+  triggerIcon,
 }: DropdownMenuProps) {
   const { height, width: viewportWidth } = useWindowDimensions();
   const triggerRef = useRef<View>(null);
@@ -52,7 +59,8 @@ export function DropdownMenu({
   const [anchor, setAnchor] = useState<AnchorRect | null>(null);
 
   const menuWidth = Math.min(width, viewportWidth - MENU_MARGIN * 2);
-  const estimatedHeight = Math.min(items.length * ITEM_HEIGHT + 12, height - MENU_MARGIN * 2);
+  const groupCount = items.filter((item, index) => item.group && item.group !== items[index - 1]?.group).length;
+  const estimatedHeight = Math.min((items.length + groupCount) * ITEM_HEIGHT + 12, height - MENU_MARGIN * 2);
   const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
   const textColor = isDark ? "#f5f5f5" : "#2D2D2D";
   const mutedColor = isDark ? "#a3a3a3" : "#8B8178";
@@ -103,7 +111,7 @@ export function DropdownMenu({
             opacity: disabled ? 0.35 : pressed || anchor ? 0.72 : 1,
           })}
         >
-          <MoreHorizontal size={17} color={iconColor} />
+          {triggerIcon ? triggerIcon(iconColor) : <MoreHorizontal size={17} color={iconColor} />}
         </Pressable>
       </View>
 
@@ -128,38 +136,64 @@ export function DropdownMenu({
                 width: menuWidth,
               }}
             >
-              {items.map((item) => {
+              {items.map((item, index) => {
                 const color = item.disabled ? mutedColor : item.destructive ? destructiveColor : textColor;
+                const heading = item.group && item.group !== items[index - 1]?.group ? item.group : null;
+                const isRadio = item.checked !== undefined;
                 return (
-                  <Pressable
-                    key={item.key}
-                    accessibilityRole="menuitem"
-                    accessibilityLabel={item.label}
-                    disabled={item.disabled}
-                    onPress={() => selectItem(item)}
-                    className="min-h-11 items-center gap-3 px-3.5"
-                    style={({ pressed }) => ({
-                      backgroundColor: pressed ? themeColors.surfaceLow : "transparent",
-                      direction: "ltr",
-                      flexDirection: isRTL ? "row-reverse" : "row",
-                      opacity: item.disabled ? 0.45 : 1,
-                    })}
-                  >
-                    {item.icon ? <View className="h-5 w-5 items-center justify-center">{item.icon(color)}</View> : null}
-                    <Text
-                      className="min-w-0 flex-1"
-                      style={{
-                        color,
-                        fontFamily: "Manrope_600SemiBold",
-                        fontSize: 13,
-                        ...textStartStyle(isRTL),
-                        writingDirection: isRTL ? "rtl" : "ltr",
-                      }}
-                      numberOfLines={1}
+                  <View key={item.key}>
+                    {heading ? (
+                      <Text
+                        accessibilityRole="header"
+                        className="px-3.5 pb-1 pt-2"
+                        style={{
+                          color: mutedColor,
+                          fontFamily: "Manrope_600SemiBold",
+                          fontSize: 11,
+                          ...textStartStyle(isRTL),
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                      >
+                        {heading}
+                      </Text>
+                    ) : null}
+                    <Pressable
+                      accessibilityRole={isRadio ? ("menuitemradio" as "menuitem") : "menuitem"}
+                      accessibilityState={isRadio ? { checked: item.checked } : undefined}
+                      accessibilityLabel={item.label}
+                      disabled={item.disabled}
+                      onPress={() => selectItem(item)}
+                      className="min-h-11 items-center gap-3 px-3.5"
+                      style={({ pressed }) => ({
+                        backgroundColor: pressed ? themeColors.surfaceLow : "transparent",
+                        direction: "ltr",
+                        flexDirection: isRTL ? "row-reverse" : "row",
+                        opacity: item.disabled ? 0.45 : 1,
+                      })}
                     >
-                      {item.label}
-                    </Text>
-                  </Pressable>
+                      {item.icon ? (
+                        <View className="h-5 w-5 items-center justify-center">{item.icon(color)}</View>
+                      ) : null}
+                      <Text
+                        className="min-w-0 flex-1"
+                        style={{
+                          color,
+                          fontFamily: "Manrope_600SemiBold",
+                          fontSize: 13,
+                          ...textStartStyle(isRTL),
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                        numberOfLines={1}
+                      >
+                        {item.label}
+                      </Text>
+                      {isRadio ? (
+                        <View className="h-5 w-5 items-center justify-center">
+                          {item.checked ? <Check size={16} color={color} /> : null}
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  </View>
                 );
               })}
             </View>

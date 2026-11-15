@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
 import { toArabicNumber } from "@/lib/arabic";
+import { findJuzForAyah, loadMushafIndex } from "@/lib/mushaf/position";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -11,6 +12,8 @@ export type SurahInfoTarget = {
   surahNumber: number;
   nameArabic: string;
   nameEnglish: string;
+  ayahCount?: number;
+  revelationType?: string;
 };
 
 type SurahInfoRow = {
@@ -47,16 +50,44 @@ export function SurahInfoModal({
   const s = useStrings();
   const [info, setInfo] = useState<LoadedSurahInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  // A failed query is not the same as a surah with no information text.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [juzRange, setJuzRange] = useState<{ first: number; last: number } | null>(null);
+
+  // Revelation place, ayah count and juz come from local data, so they show even without info text.
+  useEffect(() => {
+    if (!target) {
+      setJuzRange(null);
+      return;
+    }
+    let cancelled = false;
+    loadMushafIndex(db)
+      .then((index) => {
+        if (cancelled) return;
+        const first = findJuzForAyah(index, target.surahNumber, 1);
+        const last = target.ayahCount ? findJuzForAyah(index, target.surahNumber, target.ayahCount) : first;
+        setJuzRange({ first, last });
+      })
+      .catch(() => {
+        if (!cancelled) setJuzRange(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [db, target?.surahNumber, target?.ayahCount]);
 
   useEffect(() => {
     if (!target) {
       setInfo(null);
       setLoading(false);
+      setFailed(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     db.getAllAsync<SurahInfoRow>(
       "SELECT surah, language, summary, sections_json, source_name, source_url FROM surah_info WHERE surah = ?",
       [target.surahNumber]
@@ -67,7 +98,10 @@ export function SurahInfoModal({
         setInfo(selected ? normalizeInfo(selected) : null);
       })
       .catch(() => {
-        if (!cancelled) setInfo(null);
+        if (!cancelled) {
+          setInfo(null);
+          setFailed(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -76,7 +110,7 @@ export function SurahInfoModal({
     return () => {
       cancelled = true;
     };
-  }, [db, target?.surahNumber, uiLanguage]);
+  }, [db, target?.surahNumber, uiLanguage, attempt]);
 
   const contentIsRTL = info?.language === "ar";
   const title = target ? (uiLanguage === "ar" ? target.nameArabic : target.nameEnglish) : s.surahInfoTitle;
@@ -84,6 +118,20 @@ export function SurahInfoModal({
     ? `${s.surahInfoTitle}${uiLanguage === "ar" ? "، " : " · "}${uiLanguage === "ar" ? toArabicNumber(target.surahNumber) : target.surahNumber}`
     : s.surahInfoTitle;
   const sections = useMemo(() => info?.sections.filter((section) => section.body.trim().length > 0) ?? [], [info]);
+  const digits = (value: number) => (uiLanguage === "ar" ? toArabicNumber(value) : String(value));
+  const shownInEnglish = !!info && uiLanguage !== info.language && info.language === "en";
+  const facts = target
+    ? [
+        target.revelationType ? (target.revelationType === "Makkiyah" ? s.meccan : s.medinan) : null,
+        target.ayahCount ? `${digits(target.ayahCount)} ${s.ayahs}` : null,
+        juzRange
+          ? juzRange.first === juzRange.last
+            ? `${s.tabJuz} ${digits(juzRange.first)}`
+            : `${s.tabJuz} ${digits(juzRange.first)}-${digits(juzRange.last)}`
+          : null,
+      ].filter((fact): fact is string => !!fact)
+    : [];
+  const writingDirection = isRTL ? "rtl" : "ltr";
 
   return (
     <ResponsiveSheet
@@ -101,6 +149,25 @@ export function SurahInfoModal({
         isRTL={isRTL}
       />
       <OverlayBody contentContainerClassName="px-5 pt-4 pb-6">
+        {shownInEnglish ? (
+          <Text
+            className="mb-3 text-warm-500 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection }}
+          >
+            {s.surahInfoShownInEnglish}
+          </Text>
+        ) : null}
+        {facts.length > 0 ? (
+          <View className="mb-4 flex-row flex-wrap gap-2" style={{ direction: writingDirection }}>
+            {facts.map((fact) => (
+              <View key={fact} className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5">
+                <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>
+                  {fact}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {loading ? (
           <View className="min-h-[160px] items-center justify-center">
             <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -110,6 +177,24 @@ export function SurahInfoModal({
             >
               {s.surahInfoLoading}
             </Text>
+          </View>
+        ) : failed ? (
+          <View className="min-h-[160px] items-center justify-center gap-3 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-4">
+            <Text
+              className="text-warm-600 dark:text-neutral-300 text-center"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 14, lineHeight: 22, writingDirection }}
+            >
+              {s.surahInfoLoadFailed}
+            </Text>
+            <Pressable
+              onPress={() => setAttempt((value) => value + 1)}
+              accessibilityRole="button"
+              className="min-h-[44px] justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-5"
+            >
+              <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+                {s.errorTryAgain}
+              </Text>
+            </Pressable>
           </View>
         ) : !info ? (
           <View className="min-h-[160px] justify-center rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-4">
@@ -159,6 +244,36 @@ export function SurahInfoModal({
               </View>
             ))}
 
+            {info.sourceName ? (
+              <View className="flex-row flex-wrap items-center gap-1" style={{ direction: writingDirection }}>
+                <Text
+                  className="text-warm-500 dark:text-neutral-400"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, writingDirection }}
+                >
+                  {s.surahInfoSourcePrefix}
+                </Text>
+                {info.sourceUrl ? (
+                  <Pressable
+                    accessibilityRole="link"
+                    onPress={() => {
+                      void Linking.openURL(info.sourceUrl!).catch(() => {});
+                    }}
+                    className="min-h-[44px] justify-center"
+                  >
+                    <Text
+                      className="text-primary-accent dark:text-primary-bright underline"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                    >
+                      {info.sourceName}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Text className="text-warm-600 dark:text-neutral-300" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                    {info.sourceName}
+                  </Text>
+                )}
+              </View>
+            ) : null}
           </View>
         )}
       </OverlayBody>
