@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { useNavigation } from "expo-router";
 import {
+  abandonPendingAuthReturn,
   adoptAuthReturn,
   clearAuthReturn,
   completeAuthReturn,
@@ -29,7 +30,10 @@ export function useAuthReturn({ ownsReturn = true }: Options = {}) {
     );
     return navigation.addListener("beforeRemove", (event) => {
       const type = event.data?.action?.type;
-      if (type === "GO_BACK" || type === "POP" || type === "POP_TO_TOP") clearAuthReturn();
+      // Switching between Login and Sign up replaces the screen and keeps the target. Any other way
+      // out (in-app Back, or the web browser's Back, which resets the root) abandons it, so a stale
+      // target cannot steer a later sign-in. A completed sign-in has already consumed it.
+      if (type !== "REPLACE") abandonPendingAuthReturn();
     });
   }, [navigation, ownsReturn]);
 

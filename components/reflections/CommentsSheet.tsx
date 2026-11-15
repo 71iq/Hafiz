@@ -46,6 +46,11 @@ type Props = {
   onCommentRemoved?: (reflectionId: string) => void;
   /** After the author's delete of the shown reflection settled; the sheet has already closed. */
   onReflectionGone?: (reflection: Reflection) => void;
+  /**
+   * Where a guest returns after signing in from this sheet: the ayah it was opened from (ayah
+   * detail) or the feed. Defaults to the feed.
+   */
+  authReturn?: { surface: "ayah"; surah: number; ayah: number } | { surface: "feed" };
 };
 
 /** The composer shows its counter from this length. */
@@ -80,6 +85,7 @@ export function CommentsSheet({
   onCommentAdded,
   onCommentRemoved,
   onReflectionGone,
+  authReturn = { surface: "feed" },
 }: Props) {
   const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
@@ -826,7 +832,10 @@ export function CommentsSheet({
                     if (reflectionId) {
                       captureAuthReturn({
                         route: "comments",
-                        params: { reflectionId, surah: reflection?.surah, ayah: reflection?.ayah_start },
+                        params:
+                          authReturn.surface === "ayah"
+                            ? { reflectionId, surah: authReturn.surah, ayah: authReturn.ayah }
+                            : { reflectionId },
                       });
                     }
                     router.push("/auth/login");

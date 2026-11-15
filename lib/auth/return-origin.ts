@@ -32,7 +32,7 @@ export type AuthReturnInput = { route: string; params?: Record<string, unknown> 
 /** A surface the destination should reopen once, holding only its safe target reference. */
 export type AuthReopenRequest =
   | { kind: "reflection-editor"; surah: number; ayahStart: number; ayahEnd: number }
-  | { kind: "comments"; reflectionId: string };
+  | { kind: "comments"; reflectionId: string; surface: "mushaf" | "feed" };
 
 export const HOME_RETURN: AuthReturnTarget = { route: "home" };
 
@@ -268,6 +268,16 @@ export function consumeAuthReturn(): AuthReturnTarget {
   return target;
 }
 
+/**
+ * Drops a capture that never completed, without touching a reopen request that a completed sign-in
+ * already set. Used when an auth screen is left by any route other than switching Login/Sign up.
+ */
+export function abandonPendingAuthReturn(): void {
+  pending = null;
+  awaitingRedirect = false;
+  clearRedirectCopy();
+}
+
 export function clearAuthReturn(): void {
   pending = null;
   reopen = null;
@@ -325,7 +335,11 @@ export function peekAuthReopen(): AuthReopenRequest | null {
 function reopenFor(target: AuthReturnTarget): AuthReopenRequest | null {
   if (target.route === "reflection-editor")
     return { kind: "reflection-editor", surah: target.surah, ayahStart: target.ayahStart, ayahEnd: target.ayahEnd };
-  if (target.route === "comments") return { kind: "comments", reflectionId: target.reflectionId };
+  if (target.route === "comments") {
+    // The same destination resolveAuthReturn navigates to: the ayah in the Mushaf, or the feed.
+    const surface = target.surah !== undefined && target.ayah !== undefined ? "mushaf" : "feed";
+    return { kind: "comments", reflectionId: target.reflectionId, surface };
+  }
   return null;
 }
 

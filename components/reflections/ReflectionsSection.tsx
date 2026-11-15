@@ -338,6 +338,7 @@ function ReflectionsSectionContent({
       {/* Comments sub-sheet */}
       <CommentsSheet
         reflectionId={commentsReflectionId}
+        authReturn={{ surface: "ayah", surah, ayah }}
         onClose={() => setCommentsReflectionId(null)}
         onNavigate={onNavigate}
         onCommentAdded={handleCommentAdded}

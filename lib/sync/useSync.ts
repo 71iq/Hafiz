@@ -205,6 +205,18 @@ export function useSync() {
       else if (mode.kind === "resume") updateRestoreConsent(userId, { busy: "resuming" });
 
       try {
+        if (obeysPause) {
+          // A stored pause stops every automatic trigger and Sync now before any account work; only
+          // Resume sync continues. fullSync checks again. It is read before connectivity so a cold
+          // start offline still shows Sync paused and labels local figures (W07.9).
+          const pause = await readRestorePause(db, userId);
+          if (!isCurrent()) return;
+          if (pause) {
+            if (getRestoreConsentView().pause !== pause) updateRestoreConsent(userId, { pause });
+            setStatus("idle");
+            return;
+          }
+        }
         // Accepting applies the snapshot already held in memory, so it does not wait for connectivity.
         if (mode.kind !== "accept") {
           const netState = await NetInfo.fetch();
@@ -216,17 +228,6 @@ export function useSync() {
           }
           // Unknown connectivity is not offline, but it is not a connection to sync over either.
           if (netState.isConnected !== true) return;
-        }
-        if (obeysPause) {
-          // A stored pause stops every automatic trigger and Sync now before any account work; only
-          // Resume sync continues. fullSync checks again.
-          const pause = await readRestorePause(db, userId);
-          if (!isCurrent()) return;
-          if (pause) {
-            if (getRestoreConsentView().pause !== pause) updateRestoreConsent(userId, { pause });
-            setStatus("idle");
-            return;
-          }
         }
         setStatus("syncing");
         setFailure(null);

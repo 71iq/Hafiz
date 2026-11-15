@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import {
+  abandonPendingAuthReturn,
   captureAuthReturn,
   completeAuthReturn,
   completeRedirectReturn,
@@ -168,6 +169,26 @@ describe("allowlisted auth return origin", () => {
     expect(Object.keys(reopen ?? {}).sort()).toEqual(["ayahEnd", "ayahStart", "kind", "surah"]);
     // One use only: a later screen cannot replay it.
     expect(consumeAuthReopen("reflection-editor")).toBeNull();
+  });
+
+  it("routes a comments reopen to the surface the sign-in returns to", () => {
+    captureAuthReturn({ route: "comments", params: { reflectionId: REFLECTION_ID, surah: 2, ayah: 255 } });
+    completeAuthReturn(tabsBelowAuth);
+    expect(peekAuthReopen()).toEqual({ kind: "comments", reflectionId: REFLECTION_ID, surface: "mushaf" });
+    consumeAuthReopen("comments");
+    captureAuthReturn({ route: "comments", params: { reflectionId: REFLECTION_ID } });
+    completeAuthReturn(tabsBelowAuth);
+    expect(peekAuthReopen()).toEqual({ kind: "comments", reflectionId: REFLECTION_ID, surface: "feed" });
+  });
+
+  it("abandons an uncompleted capture without dropping a completed reopen", () => {
+    captureAuthReturn({ route: "reflection-editor", params: { surah: 2, ayahStart: 255, ayahEnd: 255 } });
+    abandonPendingAuthReturn();
+    expect(peekAuthReturn()).toBeNull();
+    captureAuthReturn({ route: "reflection-editor", params: { surah: 2, ayahStart: 255, ayahEnd: 255 } });
+    completeAuthReturn(tabsBelowAuth);
+    abandonPendingAuthReturn();
+    expect(peekAuthReopen()).toEqual({ kind: "reflection-editor", surah: 2, ayahStart: 255, ayahEnd: 255 });
   });
 
   it("does not reopen anything when auth is left without a session", () => {

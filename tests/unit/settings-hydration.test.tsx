@@ -428,3 +428,54 @@ describe("W14 settings write feedback and translation choice", () => {
     expect(fixture.settings.get("translation_active_lang")).toBe("fr");
   });
 });
+
+describe("failed setting writes restore the last committed value (C03)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsReady = true;
+    jest.replaceProperty(Platform, "OS", "android");
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function deferredWrites(fixture: SettingsFixture) {
+    const pending: { resolve: () => void; reject: (error: Error) => void }[] = [];
+    fixture.runAsync.mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          pending.push({ resolve: () => resolve({ changes: 1, lastInsertRowId: 0 }), reject });
+        }),
+    );
+    return pending;
+  }
+
+  it("returns to the saved value when every overlapping write fails", async () => {
+    const fixture = createFixture();
+    const { result } = await renderLoadedSettings(fixture);
+    const pending = deferredWrites(fixture);
+    act(() => result.current.setAudioRepeatRange(2));
+    act(() => result.current.setAudioRepeatRange(3));
+    await act(async () => {
+      pending[0].reject(new Error("disk"));
+      pending[1].reject(new Error("disk"));
+      await Promise.resolve();
+    });
+    expect(result.current.audioRepeatRange).toBe(1);
+  });
+
+  it("returns to an earlier write that succeeded when the newest one fails", async () => {
+    const fixture = createFixture();
+    const { result } = await renderLoadedSettings(fixture);
+    const pending = deferredWrites(fixture);
+    act(() => result.current.setAudioRepeatRange(2));
+    act(() => result.current.setAudioRepeatRange(3));
+    await act(async () => {
+      pending[0].resolve();
+      await Promise.resolve();
+      pending[1].reject(new Error("disk"));
+      await Promise.resolve();
+    });
+    expect(result.current.audioRepeatRange).toBe(2);
+  });
+});

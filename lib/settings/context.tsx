@@ -592,6 +592,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [loadedDb, setLoadedDb] = useState<AppDatabase | null>(null);
   // Per-key write generations: a failed write reverts only if no newer choice was made since (C03).
   const writeGenerations = useRef(new Map<string, number>());
+  const writesInFlight = useRef(new Map<string, number>());
+  // How to show each key's last committed value again; set when a write starts with none in flight
+  // and replaced by every successful write.
+  const committedRestore = useRef(new Map<string, () => void>());
   const committedLanguage = useRef<UILanguage>(uiLanguage);
   const committedTheme = useRef<ThemeMode>(theme);
   const isLoaded = db !== null && loadedDb === db;
@@ -856,20 +860,37 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   });
 
   const persist = useCallback(
-    (key: string, value: string, onFailure?: () => void, onSuccess?: () => void) => {
+    (
+      key: string,
+      value: string,
+      onFailure?: () => void,
+      onSuccess?: () => void,
+      restore?: () => void,
+      onCommitted?: () => void,
+    ) => {
       const generation = (writeGenerations.current.get(key) ?? 0) + 1;
       writeGenerations.current.set(key, generation);
       // Before the database is ready (public pages, startup) keep the in-memory choice and web cache
       // instead of reverting a deliberate change.
       if (!db) return;
+      // C03: a failure reverts to the last committed value. With no write in flight, the value shown
+      // before this one is the committed one; a later successful write becomes the new baseline.
+      const inFlight = writesInFlight.current.get(key) ?? 0;
+      if (inFlight === 0 && onFailure) committedRestore.current.set(key, onFailure);
+      writesInFlight.current.set(key, inFlight + 1);
+      const settle = () => writesInFlight.current.set(key, Math.max(0, (writesInFlight.current.get(key) ?? 1) - 1));
       writeSetting(db, key, value).then(
         () => {
+          settle();
+          if (restore) committedRestore.current.set(key, restore);
+          onCommitted?.();
           if (writeGenerations.current.get(key) === generation) onSuccess?.();
         },
         () => {
+          settle();
           console.warn(`[Settings] Failed to save ${key}`);
           if (writeGenerations.current.get(key) !== generation) return;
-          onFailure?.();
+          (committedRestore.current.get(key) ?? onFailure)?.();
           emitSettingSaveFailed(key);
         },
       );
@@ -882,7 +903,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (index < 0 || index >= FONT_SIZE_STEPS.length) return;
       const previous = latestValues.current.fontSizeIndex;
       setFontSizeIndexState(index);
-      persist("font_size_index", String(index), () => setFontSizeIndexState(previous));
+      persist(
+        "font_size_index",
+        String(index),
+        () => setFontSizeIndexState(previous),
+        undefined,
+        () => setFontSizeIndexState(index),
+      );
     },
     [persist],
   );
@@ -898,9 +925,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           setThemeState(committedTheme.current);
           cacheThemeMode(committedTheme.current);
         },
+        () => void writeUiBootstrap(committedLanguage.current, newTheme),
+        () => {
+          setThemeState(newTheme);
+          cacheThemeMode(newTheme);
+        },
         () => {
           committedTheme.current = newTheme;
-          void writeUiBootstrap(committedLanguage.current, newTheme);
         },
       );
     },
@@ -911,7 +942,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (mode: ViewMode) => {
       const previous = latestValues.current.viewMode;
       setViewModeState(mode);
-      persist("view_mode", mode, () => setViewModeState(previous));
+      persist(
+        "view_mode",
+        mode,
+        () => setViewModeState(previous),
+        undefined,
+        () => setViewModeState(mode),
+      );
     },
     [persist],
   );
@@ -920,7 +957,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (style: QuranFontStyle) => {
       const previous = latestValues.current.quranFontStyle;
       setQuranFontStyleState(style);
-      persist("quran_font_style", style, () => setQuranFontStyleState(previous));
+      persist(
+        "quran_font_style",
+        style,
+        () => setQuranFontStyleState(previous),
+        undefined,
+        () => setQuranFontStyleState(style),
+      );
     },
     [persist],
   );
@@ -929,7 +972,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (style: QuranMarkerStyle) => {
       const previous = latestValues.current.quranMarkerStyle;
       setQuranMarkerStyleState(style);
-      persist("quran_marker_style", style, () => setQuranMarkerStyleState(previous));
+      persist(
+        "quran_marker_style",
+        style,
+        () => setQuranMarkerStyleState(previous),
+        undefined,
+        () => setQuranMarkerStyleState(style),
+      );
     },
     [persist],
   );
@@ -946,7 +995,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (mark: boolean) => {
       const previous = latestValues.current.markSimilarVerses;
       setMarkSimilarVersesState(mark);
-      persist("mark_similar_verses", String(mark), () => setMarkSimilarVersesState(previous));
+      persist(
+        "mark_similar_verses",
+        String(mark),
+        () => setMarkSimilarVersesState(previous),
+        undefined,
+        () => setMarkSimilarVersesState(mark),
+      );
     },
     [persist],
   );
@@ -955,7 +1010,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (scroll: PageScroll) => {
       const previous = latestValues.current.pageScroll;
       setPageScrollState(scroll);
-      persist("page_scroll", scroll, () => setPageScrollState(previous));
+      persist(
+        "page_scroll",
+        scroll,
+        () => setPageScrollState(previous),
+        undefined,
+        () => setPageScrollState(scroll),
+      );
     },
     [persist],
   );
@@ -1016,7 +1077,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (source: TafseerSource) => {
       const previous = latestValues.current.tafseerSource;
       setTafseerSourceState(source);
-      persist("tafseer_source", source, () => setTafseerSourceState(previous));
+      persist(
+        "tafseer_source",
+        source,
+        () => setTafseerSourceState(previous),
+        undefined,
+        () => setTafseerSourceState(source),
+      );
     },
     [persist],
   );
@@ -1026,7 +1093,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const next = normalizeRecitationId(id);
       const previous = latestValues.current.recitationId;
       setRecitationIdState(next);
-      persist("recitation_id", String(next), () => setRecitationIdState(previous));
+      persist(
+        "recitation_id",
+        String(next),
+        () => setRecitationIdState(previous),
+        undefined,
+        () => setRecitationIdState(next),
+      );
     },
     [persist],
   );
@@ -1079,9 +1152,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           setUiLanguageState(committedLanguage.current);
           cacheUiLanguage(committedLanguage.current);
         },
+        () => void writeUiBootstrap(lang, committedTheme.current),
+        () => {
+          setUiLanguageState(lang);
+          cacheUiLanguage(lang);
+        },
         () => {
           committedLanguage.current = lang;
-          void writeUiBootstrap(lang, committedTheme.current);
         },
       );
     },
@@ -1092,14 +1169,26 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const previous = accountPromoDismissedAt;
     const now = new Date().toISOString();
     setAccountPromoDismissedAt(now);
-    persist(DEVICE_SETTING_KEYS.accountPromoDismissedAt, now, () => setAccountPromoDismissedAt(previous));
+    persist(
+      DEVICE_SETTING_KEYS.accountPromoDismissedAt,
+      now,
+      () => setAccountPromoDismissedAt(previous),
+      undefined,
+      () => setAccountPromoDismissedAt(now),
+    );
   }, [accountPromoDismissedAt, persist]);
 
   const setBookmarksOrder = useCallback(
     (order: BookmarksOrder) => {
       const previous = bookmarksOrder;
       setBookmarksOrderState(order);
-      persist(DEVICE_SETTING_KEYS.bookmarksOrder, order, () => setBookmarksOrderState(previous));
+      persist(
+        DEVICE_SETTING_KEYS.bookmarksOrder,
+        order,
+        () => setBookmarksOrderState(previous),
+        undefined,
+        () => setBookmarksOrderState(order),
+      );
     },
     [bookmarksOrder, persist],
   );
@@ -1108,7 +1197,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (follow: boolean) => {
       const previous = audioFollow;
       setAudioFollowState(follow);
-      persist(DEVICE_SETTING_KEYS.audioFollow, String(follow), () => setAudioFollowState(previous));
+      persist(
+        DEVICE_SETTING_KEYS.audioFollow,
+        String(follow),
+        () => setAudioFollowState(previous),
+        undefined,
+        () => setAudioFollowState(follow),
+      );
     },
     [audioFollow, persist],
   );
@@ -1118,7 +1213,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (!Number.isInteger(count) || count < AUDIO_REPEAT_MIN || count > AUDIO_REPEAT_MAX) return;
       const previous = audioRepeatRange;
       setAudioRepeatRangeState(count);
-      persist(DEVICE_SETTING_KEYS.audioRepeatRange, String(count), () => setAudioRepeatRangeState(previous));
+      persist(
+        DEVICE_SETTING_KEYS.audioRepeatRange,
+        String(count),
+        () => setAudioRepeatRangeState(previous),
+        undefined,
+        () => setAudioRepeatRangeState(count),
+      );
     },
     [audioRepeatRange, persist],
   );
@@ -1128,7 +1229,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (!Number.isInteger(count) || count < AUDIO_REPEAT_MIN || count > AUDIO_REPEAT_MAX) return;
       const previous = audioRepeatEach;
       setAudioRepeatEachState(count);
-      persist(DEVICE_SETTING_KEYS.audioRepeatEach, String(count), () => setAudioRepeatEachState(previous));
+      persist(
+        DEVICE_SETTING_KEYS.audioRepeatEach,
+        String(count),
+        () => setAudioRepeatEachState(previous),
+        undefined,
+        () => setAudioRepeatEachState(count),
+      );
     },
     [audioRepeatEach, persist],
   );
@@ -1138,7 +1245,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (!Number.isInteger(seconds) || seconds < AUDIO_DELAY_MIN_SECONDS || seconds > AUDIO_DELAY_MAX_SECONDS) return;
       const previous = audioDelaySeconds;
       setAudioDelaySecondsState(seconds);
-      persist(DEVICE_SETTING_KEYS.audioDelaySeconds, String(seconds), () => setAudioDelaySecondsState(previous));
+      persist(
+        DEVICE_SETTING_KEYS.audioDelaySeconds,
+        String(seconds),
+        () => setAudioDelaySecondsState(previous),
+        undefined,
+        () => setAudioDelaySecondsState(seconds),
+      );
     },
     [audioDelaySeconds, persist],
   );
@@ -1147,7 +1260,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (enabled: boolean) => {
       const previous = hapticsEnabled;
       setHapticsEnabledState(enabled);
-      persist(DEVICE_SETTING_KEYS.hapticsEnabled, String(enabled), () => setHapticsEnabledState(previous));
+      persist(
+        DEVICE_SETTING_KEYS.hapticsEnabled,
+        String(enabled),
+        () => setHapticsEnabledState(previous),
+        undefined,
+        () => setHapticsEnabledState(enabled),
+      );
     },
     [hapticsEnabled, persist],
   );

@@ -164,6 +164,8 @@ it("retires a deferred connectivity result and admits the latest account after i
   const response = deferred<Awaited<ReturnType<typeof NetInfo.fetch>>>();
   jest.mocked(NetInfo.fetch).mockReturnValueOnce(response.promise);
   const { result, rerender } = renderHook(() => useSync());
+  // The stored pause is read first; wait until A's run is waiting on connectivity.
+  await waitFor(() => expect(NetInfo.fetch).toHaveBeenCalledTimes(1));
   await act(async () => {
     activate(session(B));
     rerender({});
@@ -679,6 +681,14 @@ describe("W07 restore pause and consent", () => {
       },
     };
   }
+
+  it("shows a stored pause at an offline cold start without reaching the network", async () => {
+    mockPause.mockResolvedValue("pending_consent");
+    jest.mocked(NetInfo.fetch).mockResolvedValue(network(false));
+    renderHook(() => useSync());
+    await waitFor(() => expect(getRestoreConsentView()).toMatchObject({ userId: A, pause: "pending_consent" }));
+    expect(mockFullSync).not.toHaveBeenCalled();
+  });
 
   it("stops every automatic trigger and every profile/QF upload while the account is paused", async () => {
     mockPause.mockResolvedValue("cancelled");

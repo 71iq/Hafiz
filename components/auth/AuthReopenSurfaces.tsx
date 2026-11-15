@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { CommentsSheet } from "@/components/reflections/CommentsSheet";
 import { WriteReflectionSheet } from "@/components/reflections/WriteReflectionSheet";
 import { useAuthStore } from "@/lib/auth/store";
-import { consumeAuthReopen, subscribeAuthReopen, type AuthReopenRequest } from "@/lib/auth/return-origin";
+import {
+  consumeAuthReopen,
+  peekAuthReopen,
+  subscribeAuthReopen,
+  type AuthReopenRequest,
+} from "@/lib/auth/return-origin";
 
 type EditorTarget = Omit<Extract<AuthReopenRequest, { kind: "reflection-editor" }>, "kind">;
 
@@ -26,9 +31,16 @@ export function AuthReopenSurfaces({ surface }: { surface: "mushaf" | "feed" }) 
           setEditor({ surah: request.surah, ayahStart: request.ayahStart, ayahEnd: request.ayahEnd, owner: userId });
         }
       }
-      const request = consumeAuthReopen("comments");
-      if (request) setComments({ reflectionId: request.reflectionId, owner: userId });
+      // Only the surface the sign-in returned to takes the comments request.
+      const pendingComments = peekAuthReopen();
+      if (pendingComments?.kind === "comments" && pendingComments.surface === surface) {
+        const request = consumeAuthReopen("comments");
+        if (request) setComments({ reflectionId: request.reflectionId, owner: userId });
+      }
     };
+    // A new account or session starts with nothing reopened; only a fresh request opens a surface.
+    setEditor(null);
+    setComments(null);
     take();
     return subscribeAuthReopen(take);
   }, [surface, userId]);

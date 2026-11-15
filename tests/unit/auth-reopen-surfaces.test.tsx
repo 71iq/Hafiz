@@ -11,8 +11,10 @@ jest.mock("@/lib/auth/store", () => ({
   useAuthStore: (select: (state: { user: { id: string } | null }) => unknown) =>
     select({ user: mockUserId ? { id: mockUserId } : null }),
 }));
+let mockPending: Record<string, unknown> | null = null;
 jest.mock("@/lib/auth/return-origin", () => ({
   consumeAuthReopen: (kind: string) => mockConsume(kind),
+  peekAuthReopen: () => mockPending,
   subscribeAuthReopen: () => () => {},
 }));
 jest.mock("@/components/reflections/WriteReflectionSheet", () => ({
@@ -23,6 +25,7 @@ jest.mock("@/components/reflections/CommentsSheet", () => ({
 }));
 
 beforeEach(() => {
+  mockPending = null;
   mockUserId = "user-1";
   mockConsume.mockReset().mockReturnValue(null);
   mockEditor.mockClear();
@@ -50,9 +53,9 @@ describe("reopening a surface after sign-in (W13)", () => {
   });
 
   it("reopens comments for the reflection only, and an account change closes it", () => {
-    mockConsume.mockImplementation((kind: string) =>
-      kind === "comments" ? { kind, reflectionId: "11111111-1111-4111-8111-111111111111" } : null,
-    );
+    const request = { kind: "comments", reflectionId: "11111111-1111-4111-8111-111111111111", surface: "feed" };
+    mockPending = request;
+    mockConsume.mockImplementation((kind: string) => (kind === "comments" ? request : null));
     const view = render(<AuthReopenSurfaces surface="feed" />);
     expect(mockComments.mock.calls.at(-1)?.[0]).toMatchObject({
       reflectionId: "11111111-1111-4111-8111-111111111111",
@@ -61,6 +64,14 @@ describe("reopening a surface after sign-in (W13)", () => {
     mockConsume.mockReturnValue(null);
     mockUserId = "user-2";
     act(() => view.rerender(<AuthReopenSurfaces surface="feed" />));
+    expect(mockComments).not.toHaveBeenCalled();
+  });
+
+  it("leaves a comments request for the surface the sign-in returned to", () => {
+    mockPending = { kind: "comments", reflectionId: "11111111-1111-4111-8111-111111111111", surface: "mushaf" };
+    mockConsume.mockImplementation((kind: string) => (kind === "comments" ? mockPending : null));
+    render(<AuthReopenSurfaces surface="feed" />);
+    expect(mockConsume).not.toHaveBeenCalledWith("comments");
     expect(mockComments).not.toHaveBeenCalled();
   });
 });

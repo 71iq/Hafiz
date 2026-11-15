@@ -2156,7 +2156,7 @@ describe("Flashcard session due-date editor characterization", () => {
       jest.mocked(loadReviewQueue).mockResolvedValue([]);
       jest.mocked(getNextEligibleReviewDate).mockResolvedValue(new Date(2026, 10, 19, 9, 0, 0).toISOString());
       const view = renderSession();
-      await waitFor(() => expect(view.getByText(s.sessionNothingToReview)).toBeTruthy());
+      await waitFor(() => expect(view.getByText(s.sessionNothingWasDue)).toBeTruthy());
       expect(view.getByText(interpolate(s.sessionNextDue, { when: "Thursday, 19 November" }))).toBeTruthy();
       expect(view.queryByText(s.flashcardsSummaryReviewed)).toBeNull();
     });
