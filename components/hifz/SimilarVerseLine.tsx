@@ -106,10 +106,12 @@ function spokenVerse(
 /**
  * "النبأ 78:2 · Page 582": the Arabic surah name isolated in English so the digits after it keep their
  * order, and the page when a template is given (MUT-01). An Arabic comma joins it in Arabic, since a
- * middle dot beside Arabic-Indic digits reads as a zero.
+ * middle dot beside Arabic-Indic digits reads as a zero. In English a mark leads too: Android sets a
+ * line's direction from its first strong letter, and the Arabic name would make the line right to left.
  */
 function referenceLabel(reference: SimilarRef, isRTL: boolean, pageTemplate?: string): string {
-  const label = `${reference.surahName}${isRTL ? "" : "\u200E"} ${formatAyahRef(isRTL, reference.surah, reference.ayah)}`;
+  const mark = isRTL ? "" : "\u200E";
+  const label = `${mark}${reference.surahName}${mark} ${formatAyahRef(isRTL, reference.surah, reference.ayah)}`;
   if (!pageTemplate) return label;
   return `${label}${isRTL ? "، " : " · "}${interpolate(pageTemplate, { n: formatNumber(reference.page, isRTL ? "ar" : "en") })}`;
 }

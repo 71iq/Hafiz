@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef } from "react";
-import { PanResponder, Text, View, type LayoutChangeEvent } from "react-native";
+import { PanResponder, Platform, Text, View, type LayoutChangeEvent } from "react-native";
 import { quranPageFontName, quranPageFontPaletteStyle, quranPageMarkerFontPaletteStyle } from "@/lib/fonts/loader";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import type { PageLine, PageToken, RecitationPage as PageData } from "@/lib/hifz/page-data";
@@ -9,6 +9,20 @@ import { useSettings } from "@/lib/settings/context";
 const BASMALA = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 /** Page-font glyphs fill a line at about this many font sizes (the reader's MUSHAF_LINE_WIDTH_SCALE). */
 const LINE_WIDTH_SCALE = 19.5;
+/**
+ * The ink of a hidden word. Android's renderer reads a color of 0, fully transparent black, as no
+ * color at all, so a "transparent" word inherits the line's ink and shows. One step of alpha is still
+ * a color there and draws nothing visible.
+ */
+const HIDDEN_INK = "rgba(0, 0, 0, 0.004)";
+/**
+ * The space between two words while words can be tapped. Android maps a tap to the nearest character
+ * boundary, then to the shortest text span touching it. A word is a single glyph, as short as a plain
+ * space, so on a word's edge the space's span could win and the tap was lost: about half of every word
+ * ignored taps. Word joiners have no width and do not move a line break; before the space they make
+ * every gap longer than any word, so a tap anywhere on a word reaches that word.
+ */
+const TAP_GAP = Platform.OS === "android" ? "\u2060\u2060\u2060 " : " ";
 
 export type RevealState = Readonly<{
   /** Every word shows: the self-check after Done, or full-text practice. */
@@ -56,7 +70,7 @@ type Props = {
 /**
  * One mushaf page for recitation (4.5.1), drawn from the canonical page-font glyphs with the
  * reader's line breaks, so the page looks like the one the user memorized. Hidden words keep their
- * place (drawn transparent) and ayah markers stay visible. L1 draws each word's first letter, which
+ * place (drawn in HIDDEN_INK) and ayah markers stay visible. L1 draws each word's first letter, which
  * is rendered from the canonical text and never stored (ETH-12).
  */
 export function RecitationPage({
@@ -117,6 +131,7 @@ export function RecitationPage({
   const markedBackground = isDark ? "rgba(251, 191, 36, 0.28)" : "rgba(217, 119, 6, 0.18)";
   const gapBackground = isDark ? "rgba(45, 212, 191, 0.16)" : "rgba(13, 148, 136, 0.12)";
 
+  const tappable = reveal.all && onWordPress !== undefined;
   let tokenIndex = 0;
   return (
     <View
@@ -171,7 +186,7 @@ export function RecitationPage({
                   : reveal.all || level === 0 || token.isMarker || shownByPointer || (level === 3 && lineTouched);
                 const firstLetterOnly = !visible && level === 1;
                 const isMarked = marked?.has(key) ?? false;
-                const color = visible ? undefined : firstLetterOnly ? undefined : level === 3 ? faint : "transparent";
+                const color = visible ? undefined : firstLetterOnly ? undefined : level === 3 ? faint : HIDDEN_INK;
                 const pressable = reveal.all && !token.isMarker && onWordPress;
                 return (
                   <Fragment key={key}>
@@ -196,7 +211,7 @@ export function RecitationPage({
                         {token.glyph}
                       </Text>
                     )}
-                    {offset < line.tokens.length - 1 ? " " : null}
+                    {offset < line.tokens.length - 1 ? (tappable ? TAP_GAP : " ") : null}
                   </Fragment>
                 );
               })}

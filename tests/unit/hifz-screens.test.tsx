@@ -879,7 +879,7 @@ describe("sabaq screen", () => {
         press(t.hifzSimilarShowMeaning);
         expect(screen.getByText(meanings[1])).toBeTruthy();
         // Each verse's reference with its page, the context cue (MUT-01).
-        expect(screen.getByText(language === "ar" ? "لقمان ٣١:٥، صفحة ٤١١" : "لقمان\u200E 31:5 · Page 411")).toBeTruthy();
+        expect(screen.getByText(language === "ar" ? "لقمان ٣١:٥، صفحة ٤١١" : "\u200Eلقمان\u200E 31:5 · Page 411")).toBeTruthy();
       } finally {
         reads.mockImplementation(async () => []);
       }

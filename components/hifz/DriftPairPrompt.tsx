@@ -47,8 +47,10 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
   const answer = target === "self" ? pair.self : pair.sibling;
   // Mushaf order, so the right answer's position follows the verses, not the prompt.
   const options = [pair.self, pair.sibling].sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
-  // The Arabic surah name is isolated in English, so the digits after it keep their order.
-  const answerRef = `${answer.surahName}${isRTL ? "" : "\u200E"} ${formatAyahRef(isRTL, answer.surah, answer.ayah)}`;
+  // The Arabic surah name is isolated in English, so the digits after it keep their order, and a mark
+  // leads it so Android does not set the line right to left from the name.
+  const mark = isRTL ? "" : "\u200E";
+  const answerRef = `${mark}${answer.surahName}${mark} ${formatAyahRef(isRTL, answer.surah, answer.ayah)}`;
   const meaningOf = (ref: SimilarRef) => {
     const text = chosen === null ? undefined : meanings.get(meaningKey(ref));
     return text

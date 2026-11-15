@@ -188,7 +188,7 @@ describe("pairs that read the same", () => {
     expect(within(options[0]).getByText("المؤمنون")).toBeTruthy();
     expect(within(options[1]).getByText("المعارج")).toBeTruthy();
     // Only the name: the reference itself is still hidden.
-    expect(screen.queryByText("المعارج\u200E 70:31")).toBeNull();
+    expect(screen.queryByText("\u200Eالمعارج\u200E 70:31")).toBeNull();
   });
 });
 

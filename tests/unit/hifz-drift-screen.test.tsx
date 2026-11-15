@@ -21,7 +21,7 @@ import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 
 /** A verse reference as English shows it: the Arabic surah name isolated so the digits keep their order. */
-const refLabel = (surahName: string, ref: string) => `${surahName}\u200E ${ref}`;
+const refLabel = (surahName: string, ref: string) => `\u200E${surahName}\u200E ${ref}`;
 /** An option's reference once shown: with its page, MUT-01's context cue. */
 const optionLabel = (surahName: string, ref: string, page: number) => `${refLabel(surahName, ref)} · Page ${page}`;
 
@@ -457,7 +457,7 @@ describe("interleaved similar-verse prompts (MUT-03)", () => {
       expect(screen.getByText(`${n(3)} / ${n(4)}`)).toBeTruthy();
       expect(screen.getByText(s.hifzPairTitle)).toBeTruthy();
       // In English the Arabic surah name is isolated, so the digits after it keep their order.
-      expect(screen.getByText(language === "ar" ? "البقرة ٢:٥" : "البقرة\u200E 2:5")).toBeTruthy();
+      expect(screen.getByText(language === "ar" ? "البقرة ٢:٥" : "\u200Eالبقرة\u200E 2:5")).toBeTruthy();
       expect(screen.queryByText(MEANINGS[0][language])).toBeNull();
       fireEvent.press(screen.getAllByRole("radio")[0]);
       expect(screen.getByText(s.hifzPairRight)).toBeTruthy();

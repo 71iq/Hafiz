@@ -152,21 +152,25 @@ export function HalaqaSharingSheet({
         ) : null}
       </OverlayBody>
       <OverlayFooter isRTL={isRTL} className="px-5 pb-5">
-        {/* A save error shows here, by the button the person pressed, not at the end of the scroll. */}
-        {error ? (
-          <View className="mb-3">
-            <SocialErrorText message={error} />
+        {/* The footer is a row: this column takes its width, so the error sits above the buttons and
+            their row has a width for flex-1 to share (without one, native collapses them). */}
+        <View className="flex-1">
+          {/* A save error shows here, by the button the person pressed, not at the end of the scroll. */}
+          {error ? (
+            <View className="mb-3">
+              <SocialErrorText message={error} />
+            </View>
+          ) : null}
+          <View className="gap-3" style={socialRowStyle(isRTL)}>
+            <Button variant="ghost" className="flex-1" label={s.socialCancel} onPress={close} disabled={pending} />
+            <Button
+              className="flex-1"
+              label={s.socialSave}
+              onPress={() => onSave(draft, visibility && loaded ? { ...visibility, expectedMinor: loaded.isMinor } : null)}
+              disabled={pending}
+              accessibilityState={{ disabled: pending, busy: pending }}
+            />
           </View>
-        ) : null}
-        <View className="gap-3" style={socialRowStyle(isRTL)}>
-          <Button variant="ghost" className="flex-1" label={s.socialCancel} onPress={close} disabled={pending} />
-          <Button
-            className="flex-1"
-            label={s.socialSave}
-            onPress={() => onSave(draft, visibility && loaded ? { ...visibility, expectedMinor: loaded.isMinor } : null)}
-            disabled={pending}
-            accessibilityState={{ disabled: pending, busy: pending }}
-          />
         </View>
       </OverlayFooter>
     </ResponsiveSheet>

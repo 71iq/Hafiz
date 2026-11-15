@@ -212,7 +212,9 @@ export function HalaqaStart({
           <SocialErrorText message={error} />
         </OverlayBody>
         <OverlayFooter isRTL={isRTL} className="gap-3 px-5 pb-5">
-          <View className="gap-3" style={socialRowStyle(isRTL)}>
+          {/* flex-1: the footer is already a row, and a row inside it without a width collapses its
+              flex-1 buttons to nothing on native. */}
+          <View className="flex-1 gap-3" style={socialRowStyle(isRTL)}>
             <Button variant="ghost" className="flex-1" label={s.socialCancel} onPress={close} disabled={pending} />
             <Button
               className="flex-1"

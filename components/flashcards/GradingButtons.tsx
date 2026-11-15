@@ -98,8 +98,11 @@ export function GradingButtons({
                 accessibilityRole="button"
                 accessibilityState={{ disabled: disabled || isCapped, selected: suggested }}
                 accessibilityHint={suggested ? s.hifzSuggestedGrade : undefined}
-                className={`flex-1 rounded-2xl overflow-hidden ${isCapped ? "bg-surface-high dark:bg-surface-dark-high" : ""}`}
+                className={`rounded-2xl overflow-hidden ${isCapped ? "bg-surface-high dark:bg-surface-dark-high" : ""}`}
                 style={({ pressed }) => ({
+                  // Grow to the row's height without flex-1: its zero basis collapses the button to
+                  // nothing on native, where the wrapper's height comes from its content.
+                  flexGrow: 1,
                   opacity: disabled && !isCapped ? 0.55 : pressed ? 0.88 : 1,
                   transform: [{ scale: pressed ? 0.98 : 1 }],
                 })}
