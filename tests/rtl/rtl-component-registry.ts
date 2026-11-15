@@ -59,6 +59,18 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Download/update card row mirrors with settings RTL; copy aligns to the reading side.",
   ),
   entry(
+    "components/app-update/IssueReporter.tsx",
+    "overlay",
+    "source",
+    "Fallback dialog text and actions mirror; the issue URL stays LTR.",
+  ),
+  entry(
+    "components/app-update/WhatsNewSheet.tsx",
+    "overlay",
+    "source",
+    "Release note bullets follow the UI direction.",
+  ),
+  entry(
     "components/auth/AccountSyncPrompt.tsx",
     "button",
     "rntl",
@@ -514,6 +526,25 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Composer sheet chrome and actions mirror; text input can auto-direct.",
   ),
   entry(
+    "components/settings/AccountSyncCard.tsx",
+    "card",
+    "source",
+    "Sync status row, message and action mirror with the UI direction.",
+  ),
+  entry(
+    "components/settings/LogoutConfirmDialog.tsx",
+    "overlay",
+    "source",
+    "Uses the shared confirmation dialog, which mirrors.",
+  ),
+  entry(
+    "components/settings/NavigationBarTheme.android.tsx",
+    "direction-neutral",
+    "source",
+    "Renders nothing; sets Android system button contrast only.",
+  ),
+  entry("components/settings/NavigationBarTheme.tsx", "direction-neutral", "source", "Renders nothing on web and iOS."),
+  entry(
     "components/settings/ReadingStepper.tsx",
     "button",
     "rntl",
@@ -715,6 +746,18 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Centered toast is position-neutral; action order mirrors when present.",
   ),
   entry("components/ui/ToggleGroup.tsx", "tab-segmented", "rntl", "Segment order and active item placement mirror."),
+  entry(
+    "components/zayt/ZaytPreviewScreen.tsx",
+    "app-shell",
+    "source",
+    "Development preview header and controls mirror; artwork stays unmirrored.",
+  ),
+  entry(
+    "components/zayt/ZaytPreviewStates.tsx",
+    "media-preview",
+    "source",
+    "Centered loading and error states are position-neutral.",
+  ),
   entry(
     "components/zayt/ZaytRivePreview.native.tsx",
     "media-preview",
