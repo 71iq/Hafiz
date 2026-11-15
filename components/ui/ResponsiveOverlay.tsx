@@ -1,5 +1,17 @@
 import { OperationNoticeOverlay } from "@/components/ui/OperationNoticeProvider";
-import { useEffect, useMemo, useRef, useState, type Ref, type RefObject } from "react";
+import {
+  Children,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type Ref,
+  type RefObject,
+} from "react";
 import {
   Animated,
   Keyboard,
@@ -9,9 +21,12 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
+  type LayoutChangeEvent,
   type ScrollViewProps,
+  type TextProps,
   type ViewStyle,
 } from "react-native";
 import { X } from "lucide-react-native";
@@ -36,9 +51,16 @@ type ResponsiveOverlayProps = {
   dismissOnEscape?: boolean;
   maxWidth?: number;
   maxHeight?: OverlayMaxHeight;
+  /**
+   * Phone sheets take their content height up to maxHeight ("content", the default). "max" keeps
+   * the sheet at maxHeight, for bodies laid out with flex: 1 (tabbed detail, pinned composers),
+   * which collapse to nothing in a content-sized native container.
+   */
+  phoneSheetHeight?: "content" | "max";
   surfaceColor?: string;
   dir?: Direction;
   avoidKeyboard?: boolean;
+  /** Focus target on open. Without one, focus moves to the header title so it is announced. */
   initialFocusRef?: RefObject<{ focus?: () => void } | null>;
   restoreFocusRef?: RefObject<{ focus?: () => void } | null>;
   children: React.ReactNode;
@@ -52,6 +74,7 @@ type OverlayHeaderProps = {
   leading?: React.ReactNode;
   actions?: React.ReactNode;
   onClose?: () => void;
+  /** Retired: the grab handle looked draggable but was not. Kept so callers still compile. */
   showHandle?: boolean;
   dir?: Direction;
   isRTL?: boolean;
@@ -71,20 +94,41 @@ type OverlayFooterProps = {
   dir?: Direction;
   isRTL?: boolean;
   className?: string;
+  /**
+   * Forces the stacked layout. Footers also stack below 360px and when an OverlayFooterLabel wraps.
+   * Stacked actions keep their order reversed, so the main action (last child) sits on top.
+   */
+  stacked?: boolean;
 };
+
+/** Footers narrower than this stack their actions vertically. */
+export const OVERLAY_FOOTER_STACK_WIDTH = 360;
+/** Gap kept between a focused field and the top of the on-screen keyboard. */
+const KEYBOARD_FIELD_GAP = 16;
 
 let bodyScrollLockCount = 0;
 let restoreBodyOverflow = "";
 let restoreBodyTouchAction = "";
+let restoreBodyPaddingRight = "";
 const overlayStack: string[] = [];
 
 function lockBodyScroll() {
   if (Platform.OS !== "web" || typeof document === "undefined") return;
   if (bodyScrollLockCount === 0) {
-    restoreBodyOverflow = document.body.style.overflow;
-    restoreBodyTouchAction = document.body.style.touchAction;
-    document.body.style.overflow = "hidden";
-    document.body.style.touchAction = "none";
+    const body = document.body;
+    // Hiding overflow removes a desktop scrollbar; pad by its width so the page does not shift.
+    const viewportWidth = document.documentElement.clientWidth;
+    const scrollbarWidth =
+      typeof window === "undefined" || viewportWidth <= 0 ? 0 : Math.max(0, window.innerWidth - viewportWidth);
+    restoreBodyOverflow = body.style.overflow;
+    restoreBodyTouchAction = body.style.touchAction;
+    restoreBodyPaddingRight = body.style.paddingRight;
+    if (scrollbarWidth > 0) {
+      const currentPadding = Number.parseFloat(window.getComputedStyle(body).paddingRight) || 0;
+      body.style.paddingRight = `${currentPadding + scrollbarWidth}px`;
+    }
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
   }
   bodyScrollLockCount += 1;
 }
@@ -95,22 +139,75 @@ function unlockBodyScroll() {
   if (bodyScrollLockCount === 0) {
     document.body.style.overflow = restoreBodyOverflow;
     document.body.style.touchAction = restoreBodyTouchAction;
+    if (restoreBodyPaddingRight) document.body.style.paddingRight = restoreBodyPaddingRight;
+    else document.body.style.removeProperty("padding-right");
   }
 }
 
-function pushOverlay(id: string) {
+/**
+ * Registers a surface (overlay or menu) in the shared keyboard stack. Only the topmost surface
+ * handles Escape and other surface keys. Returns the matching unregister function.
+ */
+export function registerOverlayLayer(id: string): () => void {
   const existing = overlayStack.indexOf(id);
   if (existing >= 0) overlayStack.splice(existing, 1);
   overlayStack.push(id);
+  return () => {
+    const index = overlayStack.indexOf(id);
+    if (index >= 0) overlayStack.splice(index, 1);
+  };
 }
 
-function popOverlay(id: string) {
-  const existing = overlayStack.indexOf(id);
-  if (existing >= 0) overlayStack.splice(existing, 1);
-}
-
-function isTopOverlay(id: string) {
+export function isTopOverlayLayer(id: string): boolean {
   return overlayStack[overlayStack.length - 1] === id;
+}
+
+/** True while any overlay or menu is open, for global shortcuts that must yield to it (C07). */
+export function hasOpenOverlay(): boolean {
+  return overlayStack.length > 0;
+}
+
+function createOverlayId(prefix: string) {
+  return `${prefix}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Stable id for a surface that registers itself with registerOverlayLayer. */
+export function useOverlayLayerId(prefix = "overlay"): string {
+  return useRef(createOverlayId(prefix)).current;
+}
+
+type OverlayChrome = { titleRef: MutableRefObject<unknown> };
+const OverlayChromeContext = createContext<OverlayChrome | null>(null);
+
+function asHTMLElement(node: unknown): HTMLElement | null {
+  return typeof HTMLElement !== "undefined" && node instanceof HTMLElement ? node : null;
+}
+
+function focusWebElement(node: unknown): boolean {
+  const element = asHTMLElement(node);
+  if (!element) return false;
+  if (!element.hasAttribute("tabindex")) element.setAttribute("tabindex", "-1");
+  element.focus({ preventScroll: true });
+  return document.activeElement === element;
+}
+
+function useWebKeyboardInset(enabled: boolean) {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    if (!enabled || Platform.OS !== "web" || typeof window === "undefined" || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+    // Mobile browsers overlay the keyboard on the layout viewport; the visual viewport shrinks.
+    const update = () => setInset(Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)));
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+      setInset(0);
+    };
+  }, [enabled]);
+  return inset;
 }
 
 export function ResponsiveOverlay({
@@ -122,6 +219,7 @@ export function ResponsiveOverlay({
   dismissOnEscape = dismissOnBackdrop,
   maxWidth,
   maxHeight,
+  phoneSheetHeight = "content",
   surfaceColor,
   dir: explicitDir,
   avoidKeyboard = true,
@@ -135,17 +233,22 @@ export function ResponsiveOverlay({
   const dir = useUIDirection(explicitDir);
   const reduceMotion = useReducedMotionPreference();
   const animation = useRef(new Animated.Value(0)).current;
-  const overlayId = useRef(`overlay-${Math.random().toString(36).slice(2)}`).current;
+  const overlayId = useOverlayLayerId();
+  const contentRef = useRef<View>(null);
+  const titleRef = useRef<unknown>(null);
+  const chrome = useMemo<OverlayChrome>(() => ({ titleRef }), []);
+  const latestClose = useRef(onClose);
+  latestClose.current = onClose;
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const activePresentation = isPhone ? phonePresentation : desktopPresentation === "dialog" ? "dialog" : "panel";
   const resolvedSurfaceColor = surfaceColor ?? themeSurface;
 
   useEffect(() => {
     if (!open) return;
-    pushOverlay(overlayId);
+    const unregister = registerOverlayLayer(overlayId);
     lockBodyScroll();
     return () => {
-      popOverlay(overlayId);
+      unregister();
       unlockBodyScroll();
     };
   }, [open, overlayId]);
@@ -162,22 +265,33 @@ export function ResponsiveOverlay({
     }).start();
   }, [animation, open, reduceMotion]);
 
+  // Escape belongs to the topmost surface only. It is consumed even when this overlay does not
+  // dismiss on Escape, so it cannot reach a lower sheet or the reader. The Modal's own focus trap
+  // (react-native-web) keeps Tab and Shift+Tab cycling inside the topmost overlay.
   useEffect(() => {
-    if (!open || Platform.OS !== "web" || typeof window === "undefined" || !dismissOnEscape) return;
+    if (!open || Platform.OS !== "web" || typeof window === "undefined") return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !isTopOverlay(overlayId)) return;
+      if (event.key !== "Escape" || event.isComposing || !isTopOverlayLayer(overlayId)) return;
       event.preventDefault();
       event.stopPropagation();
-      onClose();
+      if (dismissOnEscape) latestClose.current();
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [dismissOnEscape, onClose, open, overlayId]);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [dismissOnEscape, open, overlayId]);
 
   useEffect(() => {
     if (!open) return;
     const activeElement = Platform.OS === "web" && typeof document !== "undefined" ? document.activeElement : null;
-    const focusTimer = requestAnimationFrame(() => initialFocusRef?.current?.focus?.());
+    const focusTimer = requestAnimationFrame(() => {
+      if (initialFocusRef?.current?.focus) {
+        initialFocusRef.current.focus();
+        return;
+      }
+      // Web: move focus to the title so screen readers announce what opened, or to the surface
+      // itself when there is no title.
+      if (Platform.OS === "web" && !focusWebElement(titleRef.current)) focusWebElement(contentRef.current);
+    });
     return () => {
       cancelAnimationFrame(focusTimer);
       const restoreTarget = restoreFocusRef?.current;
@@ -212,6 +326,23 @@ export function ResponsiveOverlay({
     };
   }, [androidAvoidsKeyboard]);
 
+  // Mobile web: shrink the sheet to the visual viewport and keep the focused field above the keyboard.
+  const webKeyboardInset = useWebKeyboardInset(Platform.OS === "web" && avoidKeyboard && open);
+  useEffect(() => {
+    if (webKeyboardInset <= 0 || typeof document === "undefined") return;
+    const frame = requestAnimationFrame(() => {
+      const focused = asHTMLElement(document.activeElement);
+      const surface = asHTMLElement(contentRef.current);
+      if (!focused || !surface?.contains(focused)) return;
+      const tag = focused.tagName.toLowerCase();
+      if (tag !== "input" && tag !== "textarea" && !focused.isContentEditable) return;
+      focused.style.scrollMarginBottom = `${KEYBOARD_FIELD_GAP}px`;
+      focused.scrollIntoView({ block: "nearest" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [webKeyboardInset]);
+  const keyboardInset = androidAvoidsKeyboard ? androidKeyboardInset : webKeyboardInset;
+
   const computedMaxHeight = useMemo(() => {
     if (maxHeight != null) return maxHeight;
     if (activePresentation === "fullscreen") return "100%" as const;
@@ -226,18 +357,21 @@ export function ResponsiveOverlay({
     return Math.min(width - (isPhone ? 24 : 32), widthCap);
   }, [activePresentation, desktopPresentation, isPhone, maxWidth, width]);
 
+  const isPhoneSheet = activePresentation === "sheet" && isPhone;
   const contentStyle = useMemo<ViewStyle>(
     () => ({
       width: contentWidth,
       maxWidth: activePresentation === "sheet" ? "100%" : contentWidth,
       maxHeight: computedMaxHeight,
-      height: activePresentation === "sheet" && isPhone ? computedMaxHeight : undefined,
-      // Lets a fixed-height phone sheet shrink above the keyboard instead of being pushed off screen.
+      // Short phone sheets fit their content up to maxHeight; long bodies scroll between a fixed
+      // header and footer. "max" keeps the former fixed height for flex-laid-out bodies.
+      height: isPhoneSheet && phoneSheetHeight === "max" ? computedMaxHeight : undefined,
+      // Lets a phone sheet shrink above the keyboard instead of being pushed off screen.
       // Content-sized dialogs and panels must not shrink: their flex-1 bodies would collapse to zero.
-      ...(activePresentation === "sheet" && isPhone ? { flexShrink: 1, minHeight: 0 } : null),
+      ...(isPhoneSheet ? { flexShrink: 1, minHeight: 0 } : null),
       backgroundColor: resolvedSurfaceColor,
-      borderTopLeftRadius: activePresentation === "sheet" ? 28 : 28,
-      borderTopRightRadius: activePresentation === "sheet" ? 28 : 28,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
       borderBottomLeftRadius: activePresentation === "sheet" ? 0 : 28,
       borderBottomRightRadius: activePresentation === "sheet" ? 0 : 28,
       overflow: "hidden",
@@ -254,13 +388,22 @@ export function ResponsiveOverlay({
           : [{ scale: animation.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) }],
       opacity: animation,
     }),
-    [activePresentation, animation, computedMaxHeight, contentWidth, isPhone, resolvedSurfaceColor],
+    [
+      activePresentation,
+      animation,
+      computedMaxHeight,
+      contentWidth,
+      isPhoneSheet,
+      phoneSheetHeight,
+      resolvedSurfaceColor,
+    ],
   );
 
   const overlayAlignment = activePresentation === "sheet" ? "items-stretch justify-end" : "items-center justify-center";
   const Container = avoidKeyboard && Platform.OS === "ios" ? KeyboardAvoidingView : View;
-  // Android Back reaches the modal even while its keyboard is open; the first press only hides the
-  // keyboard, as elsewhere in Android, so a typed query or note is not closed with it.
+  // Android Back reaches only the topmost modal, even while its keyboard is open; the first press
+  // only hides the keyboard, as elsewhere in Android, so a typed query or note is not closed with
+  // it. The next press goes to onClose, which editors guard with the discard prompt.
   const handleRequestClose = () => {
     if (Platform.OS === "android" && Keyboard.isVisible()) {
       Keyboard.dismiss();
@@ -283,7 +426,7 @@ export function ResponsiveOverlay({
           backgroundColor: "rgba(0,0,0,0.55)",
           direction: dir,
           paddingTop: insets.top,
-          ...(androidAvoidsKeyboard ? { paddingBottom: androidKeyboardInset } : null),
+          ...(keyboardInset > 0 ? { paddingBottom: keyboardInset } : null),
         }}
       >
         <Pressable
@@ -292,13 +435,14 @@ export function ResponsiveOverlay({
           onPress={dismissOnBackdrop ? onClose : undefined}
         />
         <Animated.View
+          ref={contentRef}
           className={cn(
             "overflow-hidden bg-surface dark:bg-surface-dark shadow-2xl",
             activePresentation === "sheet" ? "rounded-t-[28px]" : "rounded-[28px]",
           )}
           style={[contentStyle, { direction: dir }]}
         >
-          {children}
+          <OverlayChromeContext.Provider value={chrome}>{children}</OverlayChromeContext.Provider>
         </Animated.View>
       </Container>
       <OperationNoticeOverlay overlayId={overlayId} open={open} />
@@ -321,24 +465,27 @@ export function OverlayHeader({
   leading,
   actions,
   onClose,
-  showHandle = false,
   dir: explicitDir,
   isRTL: explicitIsRTL,
 }: OverlayHeaderProps) {
   const dir = useUIDirection(explicitDir);
   const { effectiveTheme, isDark } = useSettings();
   const s = useStrings();
+  const chrome = useContext(OverlayChromeContext);
   const isRTL = explicitIsRTL ?? dir === "rtl";
   const rowClassName = isRTL ? "flex-row-reverse" : "flex-row";
   const closeIconColor = isDark ? "#a3a3a3" : effectiveTheme === "white" ? "#71717A" : "#8B8178";
+  const attachTitle = useCallback(
+    (node: unknown) => {
+      if (!chrome) return;
+      if (node) chrome.titleRef.current = node;
+      else if (chrome.titleRef.current) chrome.titleRef.current = null;
+    },
+    [chrome],
+  );
 
   return (
     <View className="px-5 pt-3 pb-4 border-b border-warm-200 dark:border-neutral-800">
-      {showHandle ? (
-        <View className="items-center pb-3">
-          <View className="h-1.5 w-10 rounded-full bg-surface-high dark:bg-surface-dark-high" />
-        </View>
-      ) : null}
       <View className={cn("items-center justify-between gap-3", rowClassName)} style={{ direction: "ltr" }}>
         <View
           className={cn("min-w-0 flex-1 items-start gap-3", rowClassName, isRTL ? "items-end" : "items-start")}
@@ -349,6 +496,8 @@ export function OverlayHeader({
             <View className={cn("min-w-0 flex-1", isRTL ? "items-end" : "items-start")}>
               {title ? (
                 <Text
+                  ref={attachTitle as Ref<Text>}
+                  accessibilityRole="header"
                   numberOfLines={titleNumberOfLines}
                   className="text-charcoal dark:text-neutral-100"
                   style={{
@@ -356,6 +505,7 @@ export function OverlayHeader({
                     fontSize: 18,
                     ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
+                    ...(Platform.OS === "web" ? { outlineStyle: "none" as never } : null),
                   }}
                 >
                   {title}
@@ -385,8 +535,7 @@ export function OverlayHeader({
               onPress={onClose}
               accessibilityRole="button"
               accessibilityLabel={s.genericClose}
-              hitSlop={8}
-              className="h-9 w-9 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
+              className="h-11 w-11 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
               style={{ cursor: Platform.OS === "web" ? "pointer" : undefined }}
             >
               <X size={18} color={closeIconColor} />
@@ -403,6 +552,11 @@ export function OverlayHeader({
 // Reading Settings showed only its header; web sized it from content and hid the bug.
 const OVERLAY_BODY_FLEX = { flexGrow: 1, flexShrink: 1, flexBasis: "auto" } as const;
 
+function assignRef<T>(target: Ref<T> | undefined, value: T | null) {
+  if (typeof target === "function") target(value);
+  else if (target && typeof target === "object") (target as MutableRefObject<T | null>).current = value;
+}
+
 export function OverlayBody({
   children,
   scrollRef,
@@ -412,13 +566,41 @@ export function OverlayBody({
   contentContainerStyle,
 }: OverlayBodyProps) {
   const insets = useSafeAreaInsets();
+  const ownScrollRef = useRef<ScrollView | null>(null);
+  const attachScroll = useCallback(
+    (node: ScrollView | null) => {
+      ownScrollRef.current = node;
+      assignRef(scrollRef, node);
+    },
+    [scrollRef],
+  );
+
+  // Native: once the keyboard is up, scroll the focused field to sit 16px above it.
+  useEffect(() => {
+    if (!scrollEnabled || Platform.OS === "web") return;
+    const subscription = Keyboard.addListener("keyboardDidShow", () => {
+      const focused = TextInput.State.currentlyFocusedInput?.();
+      const scroll = ownScrollRef.current;
+      if (!focused || !scroll?.scrollResponderScrollNativeHandleToKeyboard) return;
+      requestAnimationFrame(() => {
+        try {
+          scroll.scrollResponderScrollNativeHandleToKeyboard(focused, KEYBOARD_FIELD_GAP, true);
+        } catch {
+          // The field may belong to another scroll container; leaving the position is harmless.
+        }
+      });
+    });
+    return () => subscription.remove();
+  }, [scrollEnabled]);
+
   if (!scrollEnabled) {
     // The content container's padding applies here too; dropping it left fixed bodies edge to edge.
     const hasContentContainer = contentContainerClassName != null || contentContainerStyle != null;
     return (
       <View className={cn("min-h-0", className)} style={OVERLAY_BODY_FLEX}>
         {hasContentContainer ? (
-          <View className={cn("min-h-0 flex-1", contentContainerClassName)} style={contentContainerStyle}>
+          // Basis auto, not flex-1: a content-sized sheet would otherwise collapse this container.
+          <View className={cn("min-h-0", contentContainerClassName)} style={[OVERLAY_BODY_FLEX, contentContainerStyle]}>
             {children}
           </View>
         ) : (
@@ -430,10 +612,11 @@ export function OverlayBody({
 
   return (
     <ScrollView
-      ref={scrollRef}
+      ref={attachScroll}
       className={cn("min-h-0", className)}
       style={OVERLAY_BODY_FLEX}
-      showsVerticalScrollIndicator={false}
+      // Web shows its scrollbar so a long sheet reads as scrollable.
+      showsVerticalScrollIndicator={Platform.OS === "web"}
       // The first tap on a button must act, not only dismiss the keyboard.
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={contentContainerStyle}
@@ -446,10 +629,73 @@ export function OverlayBody({
   );
 }
 
-export function OverlayFooter({ children, dir: explicitDir, isRTL: explicitIsRTL, className }: OverlayFooterProps) {
+type FooterLayout = { reportWrapped: () => void };
+const OverlayFooterContext = createContext<FooterLayout | null>(null);
+
+/**
+ * A footer action label that reports when it wraps, so the footer stacks its actions full width
+ * instead of squeezing them (common with Arabic labels).
+ */
+export function OverlayFooterLabel({ onLayout, style, ...props }: TextProps) {
+  const footer = useContext(OverlayFooterContext);
+  const lineHeight = 20;
+  return (
+    <Text
+      {...props}
+      style={[{ lineHeight, textAlign: "center" }, style]}
+      onLayout={(event: LayoutChangeEvent) => {
+        onLayout?.(event);
+        if (event.nativeEvent.layout.height > lineHeight * 1.5) footer?.reportWrapped();
+      }}
+    />
+  );
+}
+
+export function OverlayFooter({
+  children,
+  dir: explicitDir,
+  isRTL: explicitIsRTL,
+  className,
+  stacked: forceStacked = false,
+}: OverlayFooterProps) {
   const insets = useSafeAreaInsets();
   const dir = useUIDirection(explicitDir);
   const isRTL = explicitIsRTL ?? dir === "rtl";
+  const [rowWidth, setRowWidth] = useState(0);
+  // The widest row at which a side-by-side label wrapped. Stacking gives labels room so they stop
+  // wrapping; keeping the threshold avoids flipping back and forth. A wider footer tries the row again.
+  const [wrapThreshold, setWrapThreshold] = useState(0);
+  const rowWidthRef = useRef(0);
+  const stackedRef = useRef(false);
+  const pendingWrap = useRef(false);
+  const footerLayout = useMemo<FooterLayout>(
+    () => ({
+      reportWrapped: () => {
+        if (stackedRef.current) return;
+        const width = rowWidthRef.current;
+        if (width === 0) {
+          pendingWrap.current = true;
+          return;
+        }
+        setWrapThreshold((current) => Math.max(current, width));
+      },
+    }),
+    [],
+  );
+  const stacked =
+    forceStacked || (rowWidth > 0 && (rowWidth < OVERLAY_FOOTER_STACK_WIDTH || rowWidth <= wrapThreshold));
+  stackedRef.current = stacked;
+  const handleRowLayout = (event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    if (next === rowWidthRef.current) return;
+    rowWidthRef.current = next;
+    setRowWidth(next);
+    if (pendingWrap.current) {
+      pendingWrap.current = false;
+      setWrapThreshold((current) => Math.max(current, next));
+    }
+  };
+
   return (
     <View
       className={cn(
@@ -459,9 +705,27 @@ export function OverlayFooter({ children, dir: explicitDir, isRTL: explicitIsRTL
       )}
       style={{ paddingBottom: Math.max(insets.bottom, 12) }}
     >
-      <View className={cn("w-full gap-3", isRTL ? "flex-row-reverse" : "flex-row")} style={{ direction: "ltr" }}>
-        {children}
-      </View>
+      <OverlayFooterContext.Provider value={footerLayout}>
+        {stacked ? (
+          // Each action sits in its own full-width row, so a flex-1 button fills the width instead of
+          // collapsing in the column. Reversed, the main (last) action comes first.
+          <View className="w-full gap-3" style={{ flexDirection: "column-reverse" }} onLayout={handleRowLayout}>
+            {Children.toArray(children).map((child, index) => (
+              <View key={index} className="w-full" style={{ flexDirection: "row", direction: "ltr" }}>
+                {child}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View
+            className={cn("w-full gap-3", isRTL ? "flex-row-reverse" : "flex-row")}
+            style={{ direction: "ltr" }}
+            onLayout={handleRowLayout}
+          >
+            {children}
+          </View>
+        )}
+      </OverlayFooterContext.Provider>
     </View>
   );
 }

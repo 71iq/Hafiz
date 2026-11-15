@@ -1,4 +1,5 @@
-import { Modal, View, Pressable, type ModalProps, Animated, useWindowDimensions } from "react-native";
+import { Modal, View, Pressable, Platform, type ModalProps, Animated, useWindowDimensions } from "react-native";
+import { isTopOverlayLayer, registerOverlayLayer, useOverlayLayerId } from "@/components/ui/ResponsiveOverlay";
 import { useSettings } from "@/lib/settings/context";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,27 @@ export const Sheet = forwardRef<View, SheetProps>(({ open, onClose, children, cl
   const { themeSurface } = useSettings();
 
   const reduceMotion = useReducedMotionPreference();
+  const layerId = useOverlayLayerId("sheet");
+  const latestClose = useRef(onClose);
+  latestClose.current = onClose;
+
+  // Joins the shared surface stack: Escape closes this sheet only while it is the topmost surface.
+  useEffect(() => {
+    if (!open) return;
+    const unregister = registerOverlayLayer(layerId);
+    if (Platform.OS !== "web" || typeof window === "undefined") return unregister;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing || !isTopOverlayLayer(layerId)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      latestClose.current();
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      unregister();
+    };
+  }, [layerId, open]);
 
   useEffect(() => {
     if (reduceMotion) {

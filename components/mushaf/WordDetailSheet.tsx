@@ -195,6 +195,7 @@ export function WordDetailSheet() {
         onClose={handleClose}
         maxWidth={760}
         maxHeight={maxModalHeight}
+        phoneSheetHeight="max"
         dir="ltr"
       >
         <OverlayHeader
