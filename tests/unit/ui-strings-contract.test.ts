@@ -6,6 +6,9 @@ describe("UI string contracts", () => {
       "progressHadith",
       "flashcardsLearningStepsInfo",
       "flashcardsRelearningStepsInfo",
+      // Root search examples are Arabic roots by design.
+      "homeSearchPlaceholderRoot",
+      "homeSearchExamplesRoot",
     ]);
     const arabicScript = /[\u0600-\u06FF]/;
 

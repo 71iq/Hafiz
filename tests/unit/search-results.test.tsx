@@ -41,8 +41,16 @@ const mockTextRequests: { sql: string; params: readonly unknown[]; pending: Retu
 const mockRootRequests: { sql: string; params: readonly unknown[]; pending: ReturnType<typeof deferred<RootRow[]>> }[] =
   [];
 const mockIndexRequests: ReturnType<typeof deferred<IndexRow[]>>[] = [];
+// Sanitized surah fixture: two real names plus a deliberately repeated alias for the choice list.
+const mockSurahs = [
+  { number: 2, name_arabic: "البقرة", name_english: "The Cow" },
+  { number: 18, name_arabic: "الكهف", name_english: "The Cave" },
+  { number: 40, name_arabic: "اسم مكرر", name_english: "Repeated Name" },
+  { number: 41, name_arabic: "اسم مكرر", name_english: "Repeated Name" },
+];
 const mockGetAll = jest.fn((sql: string, params: readonly unknown[] = []) => {
   if (sql.includes("FROM search_history")) return Promise.resolve(mockHistory);
+  if (sql.startsWith("SELECT number, name_arabic, name_english FROM surahs")) return Promise.resolve(mockSurahs);
   if (sql.includes("SELECT root, lemma, word_text")) {
     const pending = deferred<IndexRow[]>();
     mockIndexRequests.push(pending);
@@ -74,7 +82,14 @@ jest.mock("@/lib/settings/context", () => ({
 jest.mock("@/lib/word/context", () => ({
   useWordInteraction: () => ({ clearTooltip: mockClearTooltip, closeDetail: mockCloseDetail }),
 }));
-jest.mock("expo-router", () => ({ router: { navigate: (path: unknown) => mockNavigate(path) } }));
+jest.mock("expo-router", () => ({
+  router: { navigate: (path: unknown) => mockNavigate(path) },
+  useNavigation: () => ({ getState: () => ({ type: "tab" }) }),
+}));
+jest.mock("@/lib/mushaf/position", () => ({
+  ...jest.requireActual("@/lib/mushaf/position"),
+  loadMushafIndex: async () => ({ pageByNumber: new Map([[300, { page: 300, surah_start: 11, ayah_start: 6 }]]) }),
+}));
 jest.mock("@/lib/deep-link", () => ({ setPendingDeepLink: (target: unknown) => mockPendingLink(target) }));
 jest.mock("@/components/ui/ResponsiveOverlay", () => ({
   ResponsiveSheet: ({ open, children }: { open: boolean; children: React.ReactNode }) => (open ? children : null),
@@ -112,6 +127,7 @@ jest.mock("lucide-react-native", () => {
     ChevronDown: () => null,
     ChevronLeft: () => null,
     ChevronRight: () => null,
+    CornerDownLeft: () => null,
   };
 });
 
@@ -166,8 +182,8 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     const close = jest.fn();
     const view = render(<SearchCommand visible onClose={close} onNavigateToAyah={navigate} />);
     const edit = (value: string) =>
-      fireEvent.changeText(view.getByPlaceholderText(strings[language].searchPlaceholder), value);
-    const submit = () => fireEvent(view.getByPlaceholderText(strings[language].searchPlaceholder), "submitEditing");
+      fireEvent.changeText(view.getByPlaceholderText(strings[language].homeSearchPlaceholderText), value);
+    const submit = () => fireEvent(view.getByPlaceholderText(strings[language].homeSearchPlaceholderText), "submitEditing");
     const visible = (open: boolean) =>
       view.rerender(<SearchCommand visible={open} onClose={close} onNavigateToAyah={navigate} />);
     return { ...view, edit, submit, visible, close };
@@ -180,18 +196,18 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     await advance();
     return view;
   }
-  it("keeps newer results and history when old success arrives last", async () => {
+  it("keeps newer results when old success arrives last, without saving typed queries", async () => {
     const view = await twoRequests();
     await settle(() => textRequest(1).pending.resolve([row("current result")]));
     await settle(() => textRequest().pending.resolve([row("obsolete result")]));
     expect(view.getByText("current result")).toBeTruthy();
     expect(view.queryByText("obsolete result")).toBeNull();
-    expect(mockRun.mock.calls.filter((call) => call[0].startsWith("INSERT")).map((call) => call[1]?.[0])).toEqual([
-      "newer",
-    ]);
+    // Debounced typing searches but never fills history.
+    expect(mockRun).not.toHaveBeenCalled();
   });
   it("keeps current loading state when old success finishes", async () => {
     const view = await twoRequests();
+    await advance(200);
     await settle(() => textRequest().pending.resolve([row("obsolete result")]));
     expect(view.getByTestId("search-busy")).toBeTruthy();
     expect(mockRun).not.toHaveBeenCalled();
@@ -209,6 +225,7 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     const view = await twoRequests();
     const error = new Error("old SQL failure");
     expectedErrors.push(error);
+    await advance(200);
     await settle(() => textRequest().pending.reject(error));
     expect(view.getByTestId("search-busy")).toBeTruthy();
   });
@@ -249,7 +266,7 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     await settle();
     expect(mockTextRequests).toHaveLength(0);
     expect(view.queryByTestId("search-busy")).toBeNull();
-    expect(view.getByPlaceholderText(strings[language].searchPlaceholder).props.value).toBe("");
+    expect(view.getByPlaceholderText(strings[language].homeSearchPlaceholderText).props.value).toBe("");
   });
   it("ignores old SQL after close and a newer reopened search", async () => {
     const view = mount();
@@ -262,7 +279,8 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     await settle(() => textRequest(1).pending.resolve([row("current result")]));
     await settle(() => textRequest().pending.resolve([row("obsolete result")]));
     expect(view.getByText("current result")).toBeTruthy();
-    expect(mockRun.mock.calls.filter((call) => call[0].startsWith("INSERT"))).toHaveLength(1);
+    expect(view.queryByText("obsolete result")).toBeNull();
+    expect(mockRun).not.toHaveBeenCalled();
   });
   it("does not launch queued SQL after unmount", async () => {
     const view = mount();
@@ -329,9 +347,7 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
       rootRequest().pending.resolve([{ ...row("old root"), word_pos: 3, word_text: "جاء", root: "جيأ", lemma: "جاء" }]),
     );
     expect(view.getByText("current result")).toBeTruthy();
-    expect(mockRun.mock.calls.filter((call) => call[0].startsWith("INSERT")).map((call) => call[1]?.[1])).toEqual([
-      "text",
-    ]);
+    expect(view.queryByText("old root")).toBeNull();
   });
   it("submit starts one request and cancels its queued debounce", async () => {
     const view = mount();
@@ -378,19 +394,22 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     await advance();
     await settle(() => textRequest().pending.reject(error));
     expect(view.getByText(strings[language].searchFailed)).toBeTruthy();
-    fireEvent.press(view.getByText(strings[language].errorTryAgain));
+    fireEvent.press(view.getByText(strings[language].homeSearchRetry));
     await settle(() => textRequest(1).pending.resolve([row("retry result")]));
     expect(view.getByText("retry result")).toBeTruthy();
     expect(view.queryByTestId("search-busy")).toBeNull();
   });
-  it("preserves parameter binding, grouping and active history SQL order", async () => {
+  it("preserves parameter binding, grouping and saves history when the search key is pressed", async () => {
     const view = mount();
     view.edit("  سَلَام  ");
     await advance();
     expect(textRequest().params).toEqual(["سلام", "سَلَام"]);
+    expect(mockRun).not.toHaveBeenCalled();
+    view.submit();
+    expect(textRequest(1).params).toEqual(["سلام", "سَلَام"]);
     expect(textRequest().sql).toContain("LIMIT 200");
     await settle(() =>
-      textRequest().pending.resolve([row("first result"), row("second result", 2), row("third result", 1, 3)]),
+      textRequest(1).pending.resolve([row("first result"), row("second result", 2), row("third result", 1, 3)]),
     );
     expect(view.getByText("first result")).toBeTruthy();
     expect(view.getByText("second result")).toBeTruthy();
@@ -421,10 +440,16 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
         { ...row("third root result", 3), word_pos: 5, word_text: "word", root: "جيء", lemma: "group two" },
       ]),
     );
+    // Thirty places or fewer open every group; a header still collapses its group.
     expect(view.getByText("first root result")).toBeTruthy();
-    expect(view.queryByText("third root result")).toBeNull();
-    fireEvent.press(view.getByText("group two"));
     expect(view.getByText("third root result")).toBeTruthy();
+    fireEvent.press(view.getByText("group two"));
+    expect(view.queryByText("third root result")).toBeNull();
+    // Two distinct roots offer choices, defaulting to all of them.
+    fireEvent.press(view.getByText("ج ي ء"));
+    expect(view.queryByText("first root result")).toBeNull();
+    fireEvent.press(view.getByText(strings[language].homeSearchAllRoots));
+    expect(view.getByText("first root result")).toBeTruthy();
     fireEvent.press(view.getByText("first root result"));
     expect(view.close).toHaveBeenCalledTimes(1);
     expect(navigate).not.toHaveBeenCalled();
@@ -484,5 +509,142 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     await settle();
     expect(mockRun).toHaveBeenCalledWith("DELETE FROM search_history");
     expect(view.queryByText("saved query")).toBeNull();
+  });
+  const inserts = () => mockRun.mock.calls.filter((call) => call[0].startsWith("INSERT")).map((call) => call[1]?.slice(0, 2));
+  it("saves the query of the results when a result is opened", async () => {
+    const navigate = jest.fn();
+    const view = mount(navigate);
+    view.edit("mercy");
+    await advance();
+    await settle(() => textRequest().pending.resolve([row("chosen result", 5)]));
+    expect(inserts()).toEqual([]);
+    fireEvent.press(view.getByText("chosen result"));
+    await settle();
+    expect(inserts()).toEqual([["mercy", "text"]]);
+    view.visible(false);
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(2, 5, undefined);
+  });
+  it("shows the skeleton only after a search has run for 200 ms", async () => {
+    const view = mount();
+    view.edit("slow");
+    await advance();
+    expect(view.queryByTestId("search-busy")).toBeNull();
+    await advance(199);
+    expect(view.queryByTestId("search-busy")).toBeNull();
+    await advance(1);
+    expect(view.getByTestId("search-busy")).toBeTruthy();
+  });
+  it("ignores a search that finishes after the sheet closed, including history", async () => {
+    const view = mount();
+    view.edit("pending");
+    await advance();
+    // The search key saves the query deliberately; only the late search result must be ignored.
+    await settle(() => view.submit());
+    const writesBeforeClose = mockRun.mock.calls.length;
+    view.visible(false);
+    await settle(() => textRequest(1).pending.resolve([row("late result")]));
+    view.visible(true);
+    await settle();
+    expect(view.queryByText("late result")).toBeNull();
+    expect(mockRun.mock.calls.length).toBe(writesBeforeClose);
+  });
+  it("routes 2:255 through Go to without a text query and remembers it", async () => {
+    const navigate = jest.fn();
+    const view = mount(navigate);
+    await settle();
+    view.edit("2:255");
+    await advance();
+    expect(mockTextRequests).toHaveLength(0);
+    const label = language === "ar" ? "البقرة ٢:٢٥٥" : "Al-Baqara 2:255";
+    fireEvent.press(view.getByText(label));
+    await settle();
+    expect(view.close).toHaveBeenCalledTimes(1);
+    expect(inserts()).toEqual([["2:255", "text"]]);
+    view.visible(false);
+    expect(navigate).toHaveBeenCalledWith(2, 255, undefined);
+  });
+  it("opens a numeric reference with the search key and rejects an ayah past the surah", async () => {
+    const navigate = jest.fn();
+    const view = mount(navigate);
+    await settle();
+    view.edit("2:300");
+    expect(view.getByText(/286|٢٨٦/)).toBeTruthy();
+    view.edit("٢:٢٥٥");
+    view.submit();
+    await settle();
+    view.visible(false);
+    expect(navigate).toHaveBeenCalledWith(2, 255, undefined);
+  });
+  it.each(["page 300", "ص ٣٠٠"])("opens %s at the first ayah of that page", async (input) => {
+    const navigate = jest.fn();
+    const view = mount(navigate);
+    await settle();
+    view.edit(input);
+    await advance();
+    expect(mockTextRequests).toHaveLength(0);
+    const label = strings[language].pageN.replace("{{n}}", language === "ar" ? "٣٠٠" : "300");
+    await settle(() => fireEvent.press(view.getByText(label)));
+    view.visible(false);
+    expect(navigate).toHaveBeenCalledWith(11, 6, undefined);
+  });
+  it("offers a surah name as Go to and still searches the text", async () => {
+    const navigate = jest.fn();
+    const view = mount(navigate);
+    await settle();
+    view.edit(language === "ar" ? "الكهف" : "Al-Kahf");
+    await advance();
+    expect(mockTextRequests).toHaveLength(1);
+    const label = language === "ar" ? "سورة الكهف (١٨)" : "Al-Kahf (18)";
+    fireEvent.press(view.getByText(label));
+    view.visible(false);
+    expect(navigate).toHaveBeenCalledWith(18, 1, undefined);
+  });
+  it("lists every surah that shares an ambiguous name", async () => {
+    const navigate = jest.fn();
+    const view = mount(navigate);
+    await settle();
+    view.edit("Repeated Name");
+    const choices = language === "ar" ? ["سورة اسم مكرر (٤٠)", "سورة اسم مكرر (٤١)"] : ["Ghafir (40)", "Fussilat (41)"];
+    for (const choice of choices) expect(view.getByText(choice)).toBeTruthy();
+    // The search key does not guess between them.
+    view.submit();
+    expect(view.close).not.toHaveBeenCalled();
+    fireEvent.press(view.getByText(choices[1]));
+    view.visible(false);
+    expect(navigate).toHaveBeenCalledWith(41, 1, undefined);
+  });
+  it("clears with the field X and closes only with Cancel", async () => {
+    const view = mount();
+    await settle();
+    view.edit("query");
+    fireEvent.press(view.getByLabelText(strings[language].homeSearchClear));
+    expect(view.close).not.toHaveBeenCalled();
+    expect(view.getByPlaceholderText(strings[language].homeSearchPlaceholderText).props.value).toBe("");
+    fireEvent.press(view.getByLabelText(strings[language].homeSearchClose));
+    expect(view.close).toHaveBeenCalledTimes(1);
+  });
+  it("removes one history entry through the history owner", async () => {
+    mockHistory = [
+      { id: 1, query: "first query", mode: "text", created_at: "2026-01-02T00:00:00Z" },
+      { id: 2, query: "second query", mode: "root", created_at: "2026-01-01T00:00:00Z" },
+    ];
+    const view = mount();
+    await settle();
+    await settle(() =>
+      fireEvent.press(view.getByLabelText(strings[language].homeSearchRemoveNamed.replace("{{query}}", "first query"))),
+    );
+    expect(mockRun).toHaveBeenCalledWith("DELETE FROM search_history WHERE id = ?", [1]);
+    expect(view.queryByText("first query")).toBeNull();
+    expect(view.getByText("second query")).toBeTruthy();
+  });
+  it("offers root search after an empty single-word text search and keeps the query", async () => {
+    const view = mount();
+    view.edit("كتب");
+    await advance();
+    await settle(() => textRequest().pending.resolve([]));
+    fireEvent.press(view.getByText(strings[language].homeSearchTryRoot));
+    expect(mockIndexRequests).toHaveLength(1);
+    expect(view.getByPlaceholderText(strings[language].homeSearchPlaceholderRoot).props.value).toBe("كتب");
   });
 });

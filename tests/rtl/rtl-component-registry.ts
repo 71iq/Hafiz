@@ -71,10 +71,10 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Release note bullets follow the UI direction.",
   ),
   entry(
-    "components/auth/AccountSyncPrompt.tsx",
-    "button",
+    "components/auth/AccountPromoCard.tsx",
+    "card",
     "rntl",
-    "Controlled compact row is covered by the ProgressScreen and LeaderboardScreen route fixtures.",
+    "Shared guest promotion row, actions and close control mirror; covered by the ProgressScreen and Home fixtures.",
   ),
   entry(
     "components/auth/AuthScreenShell.tsx",

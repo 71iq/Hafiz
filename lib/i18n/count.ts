@@ -95,3 +95,32 @@ export function formatReviews(n: number, language: Language): string {
   if (language === "ar") return arabicCount(n, REVIEWS);
   return n === 1 ? "1 review" : `${n.toLocaleString("en")} reviews`;
 }
+
+const RESULTS: ArabicForms = { one: "نتيجة واحدة", two: "نتيجتان", few: "نتائج", many: "نتيجة" };
+const FORMS: ArabicForms = { one: "صيغة واحدة", two: "صيغتان", few: "صيغ", many: "صيغة" };
+
+/** Search results: "1 result", "نتيجتان", "١٢ نتيجة". */
+export function formatResults(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, RESULTS);
+  return n === 1 ? "1 result" : `${n.toLocaleString("en")} results`;
+}
+
+/** Word forms found for a root: "3 forms", "٣ صيغ". */
+export function formatForms(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, FORMS);
+  return n === 1 ? "1 form" : `${n.toLocaleString("en")} forms`;
+}
+
+/** Places a root search found: "42 places", "٤٢ موضعًا". */
+export function formatPlaces(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, OCCURRENCES);
+  return n === 1 ? "1 place" : `${n.toLocaleString("en")} places`;
+}
+
+const JUZ: ArabicForms = { one: "جزء واحد", two: "جزآن", few: "أجزاء", many: "جزءًا" };
+
+/** Whole juz: "1 juz", "3 juz", "جزآن", "٣ أجزاء". */
+export function formatJuz(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, JUZ);
+  return `${n.toLocaleString("en")} juz`;
+}

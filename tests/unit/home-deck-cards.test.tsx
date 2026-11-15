@@ -2,8 +2,8 @@ import { textStartStyle } from "@/lib/ui/direction";
 import React from "react";
 import { I18nManager, StyleSheet, useWindowDimensions } from "react-native";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
-import { Languages, Layers, Settings2 } from "lucide-react-native";
-import HomeScreen from "@/app/(tabs)/home";
+import { Languages, Layers } from "lucide-react-native";
+import HomeScreen, { mergeUnlockQueue } from "@/app/(tabs)/home";
 import { Card } from "@/components/ui/Card";
 import { strings, type UIStrings } from "@/lib/i18n/strings";
 import type { useSettings } from "@/lib/settings/context";
@@ -14,15 +14,25 @@ import type { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
 import type { DeckReviewSettingsSheet } from "@/components/flashcards/DeckReviewSettingsSheet";
 import type { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
 import { toArabicNumber } from "@/lib/arabic";
+import { consumePendingDeepLink } from "@/lib/deep-link";
+import { clearAuthReturn, peekAuthReturn } from "@/lib/auth/return-origin";
+import type { AchievementUnlock } from "@/lib/achievements/types";
 
 type CardsProps = React.ComponentProps<typeof DeckCardsSheet>;
 type ReviewProps = React.ComponentProps<typeof DeckReviewSettingsSheet>;
 type FilterProps = React.ComponentProps<typeof SmartDeckFilterSheet>;
 type Stats = Awaited<ReturnType<typeof getDeckTodayStats>>;
-const mockSettings: Pick<ReturnType<typeof useSettings>, "isDark" | "isRTL" | "uiLanguage" | "themeColors"> = {
+const mockDismissAccountPromo = jest.fn();
+const mockSettings: Pick<
+  ReturnType<typeof useSettings>,
+  "isDark" | "isRTL" | "uiLanguage" | "themeColors" | "accountPromoDismissed" | "dismissAccountPromo" | "effectiveTheme"
+> = {
   isDark: false,
   isRTL: false,
   uiLanguage: "en",
+  effectiveTheme: "white",
+  accountPromoDismissed: false,
+  dismissAccountPromo: () => mockDismissAccountPromo(),
   themeColors: {
     surface: "#ffffff",
     surfaceLow: "#eeeeee",
@@ -34,7 +44,7 @@ const mockSettings: Pick<ReturnType<typeof useSettings>, "isDark" | "isRTL" | "u
 };
 const mockDatabase = {
   getAllAsync: jest.fn(async () => [{ number: 7, name_arabic: "اسم تجريبي", name_english: "Fixture chapter" }]),
-  getFirstAsync: jest.fn(async () => null),
+  getFirstAsync: jest.fn(async (_sql: string): Promise<unknown> => null),
   runAsync: jest.fn(() => {
     throw new Error("Database writes forbidden in home fixture");
   }),
@@ -53,9 +63,22 @@ jest.mock("@react-navigation/native", () => {
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockRouterPush, setParams: jest.fn() }),
   useLocalSearchParams: () => ({}),
+  useNavigation: () => ({ getState: () => ({ type: "tab" }) }),
   router: { navigate: jest.fn() },
 }));
-jest.mock("@/lib/auth/store", () => ({ useAuthStore: () => ({ id: "isolated-home-user" }) }));
+const mockAuthState: { user: { id: string } | null; isLoading: boolean; isInitialized: boolean } = {
+  user: { id: "isolated-home-user" },
+  isLoading: false,
+  isInitialized: true,
+};
+jest.mock("@/lib/auth/store", () => ({
+  useAuthStore: (selector?: (state: typeof mockAuthState) => unknown) => (selector ? selector(mockAuthState) : mockAuthState),
+}));
+let mockSyncConfigured = false;
+jest.mock("@/lib/supabase", () => ({
+  ...jest.requireActual("@/lib/supabase"),
+  isSupabaseConfigured: () => mockSyncConfigured,
+}));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDatabase }));
 jest.mock("@/lib/settings/context", () => ({ useSettings: () => mockSettings }));
 jest.mock("@/lib/fsrs/queries", () => ({
@@ -72,7 +95,7 @@ jest.mock("@/lib/fsrs/smart-decks", () => ({
 jest.mock("@/lib/fsrs/review-events", () => ({ subscribeReviewActivity: () => () => {} }));
 jest.mock("@/lib/sync/events", () => ({ subscribeSyncCompleted: () => () => {} }));
 jest.mock("@/lib/achievements/queries", () => ({
-  getLatestUnseenUnlock: jest.fn(async () => null),
+  getUnseenUnlocks: jest.fn(async () => []),
   markAchievementSeen: jest.fn(),
   subscribeAchievementUnlocks: () => () => {},
 }));
@@ -174,6 +197,10 @@ beforeEach(() => {
       jest.requireActual<typeof import("@/lib/fsrs/queries")>("@/lib/fsrs/queries").readDeckReviewSettings,
     );
   mockDatabase.getFirstAsync.mockResolvedValue(null);
+  mockAuthState.user = { id: "isolated-home-user" };
+  mockSyncConfigured = false;
+  mockSettings.accountPromoDismissed = false;
+  consumePendingDeepLink();
   if (typeof globalThis.fetch === "function")
     jest.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("Remote access forbidden in home fixture");
@@ -244,14 +271,17 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
         flexDirection: language === "ar" ? "row-reverse" : "row",
       });
       expect(scope.getByText(num(stats.total))).toBeTruthy();
+      // New and Due are colored only above zero; a zero stays muted.
       const newNodes = scope.getAllByText(num(stats.newCount));
       const dueNodes = scope.getAllByText(num(stats.dueCount));
       expect(newNodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? "#4ade80" : "#16a34a"))).toBe(
-        true,
+        stats.newCount > 0,
       );
       expect(dueNodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? "#f87171" : "#dc2626"))).toBe(
-        true,
+        stats.dueCount > 0,
       );
+      // Without cards for today the caption says so instead of "0 left today".
+      if (stats.newCount + stats.dueCount === 0) expect(scope.getByText(s.homeDeckNothingDue, { includeHiddenElements: true })).toBeTruthy();
       const start = startTarget(view, title);
       expect(start.props.accessibilityRole).toBe("button");
       expect(StyleSheet.flatten(start.props.style)).toMatchObject({ position: "absolute", backgroundColor: "transparent" });
@@ -312,12 +342,12 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(review().deckId).toBe(MEANINGS_DECK_ID);
     act(() => review().onClose());
     expect(mockRouterPush).not.toHaveBeenCalled();
+    // A deck with only future cards opens its card list instead of an empty session.
     fireEvent.press(startTarget(view, s.smartDeckRetentionTitle));
+    expect(cards()).toMatchObject({ visible: true, deckId: SMART_DECK_IDS.retention });
+    act(() => cards().onClose());
     fireEvent.press(startTarget(view, s.vocabDeckTitle));
-    expect(mockRouterPush.mock.calls).toEqual([
-      [{ pathname: "/flashcards/session", params: { deckId: SMART_DECK_IDS.retention } }],
-      [{ pathname: "/flashcards/session", params: { deckId: MEANINGS_DECK_ID } }],
-    ]);
+    expect(mockRouterPush.mock.calls).toEqual([[{ pathname: "/flashcards/session", params: { deckId: MEANINGS_DECK_ID } }]]);
   });
   it("keeps an empty smart deck disabled even with nonzero due/new counts and omits empty vocabulary", async () => {
     jest.mocked(getDeckTodayStats).mockResolvedValue({ total: 0, newCount: 37, dueCount: 31 });
@@ -364,8 +394,8 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     {
       name: "surah range",
       value: { type: "surah", surahs: [7], ranges: [{ surah: 7, ayahStart: 3, ayahEnd: 5 }] },
-      tail: (s: UIStrings) =>
-        s.flashcardsScopeBysurah + ": " + (language === "ar" ? "اسم تجريبي" : "Fixture chapter") + ` ${num(3)}-${num(5)}`,
+      // English uses the transliterated surah name; the "Surah:" prefix is gone.
+      tail: () => (language === "ar" ? "اسم تجريبي" : "Al-Araf") + ` ${num(3)}-${num(5)}`,
     },
     {
       name: "multiple ranges",
@@ -377,23 +407,23 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
           { surah: 8, ayahStart: 1, ayahEnd: 2 },
         ],
       },
-      tail: (s: UIStrings) => s.flashcardsScopeBysurah + `: ${num(2)} ` + s.flashcardsScopeCustom,
+      tail: () => (language === "ar" ? "سورتان" : "2 surahs"),
     },
     {
       name: "unknown single surah",
       value: { type: "surah", surahs: [99] },
-      tail: (s: UIStrings) => s.flashcardsScopeBysurah + `: ${num(99)}`,
+      tail: () => num(99),
     },
     {
       name: "multiple surahs",
       value: { type: "surah", surahs: [7, 8] },
-      tail: (s: UIStrings) => s.flashcardsScopeBysurah + `: ${num(2)}`,
+      tail: () => (language === "ar" ? "سورتان" : "2 surahs"),
     },
     {
       name: "juz",
       value: { type: "juz", juzNumbers: [2, 5] },
       // Arabic digits and comma in Arabic.
-      tail: (s: UIStrings) => s.flashcardsScopeByjuz + (language === "ar" ? `: ${num(2)}، ${num(5)}` : ": 2, 5"),
+      tail: () => (language === "ar" ? `الجزء ${num(2)}، ${num(5)}` : "Juz 2, 5"),
     },
   ] satisfies { name: string; value: BuiltInDeckFilter; tail: (s: UIStrings) => string }[])(
     "keeps $name filter text only on smart cards",
@@ -483,4 +513,102 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
       expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(newerSmart.total))).toBeTruthy();
     },
   );
+});
+
+describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home order and entry points in %s", (language) => {
+  beforeEach(() => {
+    Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar" });
+    jest.replaceProperty(I18nManager, "isRTL", language === "ar");
+  });
+
+  it("lists decks with cards first and puts empty decks under More decks", async () => {
+    jest
+      .mocked(getDeckTodayStats)
+      .mockImplementation(async (_db, id) =>
+        id === SMART_DECK_IDS.mutashabihat ? { total: 5, newCount: 1, dueCount: 0 } : { total: 0, newCount: 0, dueCount: 0 },
+      );
+    const view = await home();
+    const s = strings[language];
+    const titles = view
+      .getAllByText(/.+/)
+      .map((node) => node.props.children)
+      .filter((text) => text === s.smartDeckMutashabihatTitle || text === s.homeMoreDecks || text === s.smartDeckRetentionTitle);
+    expect(titles).toEqual([s.smartDeckMutashabihatTitle, s.homeMoreDecks, s.smartDeckRetentionTitle]);
+    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(s.homeDeckNoCards, { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it("offers an honest start card to a new reader and opens Al-Fatiha as one explicit target", async () => {
+    const view = await home();
+    const s = strings[language];
+    fireEvent.press(view.getByText(s.homeStartReading));
+    expect(consumePendingDeepLink()).toEqual({ surah: 1, ayah: 1 });
+    expect(consumePendingDeepLink()).toBeNull();
+  });
+
+  it("continues reading at the saved ayah as an explicit target", async () => {
+    mockDatabase.getFirstAsync.mockImplementation(async (sql: string) => {
+      if (sql.includes("last_mushaf_position")) return { value: JSON.stringify({ mode: "verse", surah: 7, ayah: 12 }) };
+      if (sql.includes("v2_page")) return { v2_page: 153 };
+      return null;
+    });
+    const view = await home();
+    const s = strings[language];
+    fireEvent.press(view.getByText(s.continueReading));
+    expect(consumePendingDeepLink()).toEqual({ surah: 7, ayah: 12 });
+  });
+
+  it("shows the guest promotion last and dismisses it through the shared setting", async () => {
+    mockAuthState.user = null;
+    mockSyncConfigured = true;
+    const view = await home();
+    const s = strings[language];
+    expect(view.getByText(s.homeAuthCardSubtitle)).toBeTruthy();
+    fireEvent.press(view.getByRole("button", { name: s.homeDismiss }));
+    expect(mockDismissAccountPromo).toHaveBeenCalledTimes(1);
+    view.unmount();
+    mockSettings.accountPromoDismissed = true;
+    const dismissed = await home();
+    expect(dismissed.queryByText(s.homeAuthCardSubtitle)).toBeNull();
+  });
+
+  it("opens Login or Signup from the promotion with Home as the return target", async () => {
+    mockAuthState.user = null;
+    mockSyncConfigured = true;
+    const view = await home();
+    const s = strings[language];
+    fireEvent.press(view.getByRole("button", { name: s.homeAuthCardSignIn }));
+    expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
+    expect(peekAuthReturn()).toEqual({ route: "home" });
+    clearAuthReturn();
+    fireEvent.press(view.getByText(s.homeAuthCardSignUp));
+    expect(mockRouterPush).toHaveBeenCalledWith("/auth/signup");
+    expect(peekAuthReturn()).toEqual({ route: "home" });
+    clearAuthReturn();
+  });
+
+  it("hides the promotion when accounts are not configured", async () => {
+    mockAuthState.user = null;
+    mockSyncConfigured = false;
+    const view = await home();
+    expect(view.queryByText(strings[language].homeAuthCardSubtitle)).toBeNull();
+  });
+});
+
+describe("achievement notice queue", () => {
+  const unlock = (achievementId: string): AchievementUnlock => ({
+    achievementId,
+    unlockedAt: "2026-11-01T00:00:00.000Z",
+    seenAt: null,
+    localPayload: {},
+    publicPayload: {},
+  });
+
+  it("keeps the visible notice first while newer unlocks wait behind it", () => {
+    const queue = mergeUnlockQueue([unlock("first_review")], [unlock("newer"), unlock("first_review")]);
+    expect(queue.map((entry) => entry.achievementId)).toEqual(["first_review", "newer"]);
+  });
+
+  it("shows the newest unseen unlock once the visible one is gone", () => {
+    expect(mergeUnlockQueue([], [unlock("b"), unlock("a")]).map((entry) => entry.achievementId)).toEqual(["b", "a"]);
+  });
 });

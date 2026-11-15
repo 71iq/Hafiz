@@ -1,10 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { router, type Href } from "expo-router";
-import { captureAuthReturn } from "@/lib/auth/return-origin";
+import { router, useLocalSearchParams, type Href } from "expo-router";
 import { AlertCircle, BarChart3, BookOpen, ChevronLeft, ChevronRight, Trophy } from "lucide-react-native";
-import { AccountSyncPrompt, type AccountSyncPromptProps } from "@/components/auth/AccountSyncPrompt";
+import { AccountPromoCard } from "@/components/auth/AccountPromoCard";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -25,8 +24,7 @@ import { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
-import { useAuthStore } from "@/lib/auth/store";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { useAccountPromo } from "@/lib/auth/account-promo";
 import { consistencyFromHabit, loadStudyMetrics, type StudyMetrics } from "@/lib/progress/metrics";
 import { useHabitOverview } from "@/lib/habit/use-habit-overview";
 import { nextLocalMidnight, useDayBoundaryRefresh } from "@/lib/habit/use-day-boundary";
@@ -56,9 +54,6 @@ export default function ProgressScreen() {
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, effectiveTheme } = useSettings();
   const db = useDatabase();
-  const user = useAuthStore((state) => state.user);
-  const authLoading = useAuthStore((state) => state.isLoading);
-  const authInitialized = useAuthStore((state) => state.isInitialized);
   const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
 
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
@@ -76,6 +71,13 @@ export default function ProgressScreen() {
   const [boundary, setBoundary] = useState<number | null>(null);
   const latestLoad = useRef(0);
   const focused = useRef(false);
+  // Home's achievement notice opens this list once through ?achievements=1.
+  const { achievements: openAchievements } = useLocalSearchParams<{ achievements?: string }>();
+  useEffect(() => {
+    if (openAchievements !== "1") return;
+    setAchievementsModalOpen(true);
+    router.setParams({ achievements: undefined });
+  }, [openAchievements]);
 
   // Each section keeps its last valid value when its query fails; the figures never fall to zero
   // for a failure. Only the latest load may publish.
@@ -139,7 +141,8 @@ export default function ProgressScreen() {
   // A return to the foreground and local midnight reload, so the day rolls over while Progress is open.
   useDayBoundaryRefresh(boundary, reloadIfFocused);
 
-  const showSyncPrompt = isSupabaseConfigured() && authInitialized && !authLoading && !user;
+  // One 14-day dismissal shared with Home; Progress also waits for the first completed review.
+  const accountPromo = useAccountPromo("progress", metrics?.totalReviews ?? 0);
   // The interface language picks the digits; toLocaleString would follow the device locale.
   const formatStat = (val: number) => formatNumber(val, uiLanguage);
   const percent = (val: number) => `${formatStat(val)}${uiLanguage === "ar" ? "٪" : "%"}`;
@@ -333,18 +336,12 @@ export default function ProgressScreen() {
           ) : null}
         </Card>
 
-        {showSyncPrompt && (
-          <ProgressSignInPrompt
-            label={s.progressSignInPrompt}
-            buttonLabel={s.authLogin}
-            isDark={isDark}
-            isRTL={isRTL}
-            // Names Progress as the origin so a successful sign-in can return here (W13 allowlist).
-            onPress={() => {
-              // W13: the allowlisted return origin brings the guest back to Progress after sign-in.
-              captureAuthReturn({ route: "progress" });
-              router.push("/auth/login");
-            }}
+        {accountPromo.visible && (
+          <AccountPromoCard
+            surface="progress"
+            message={s.progressSignInPrompt}
+            logInLabel={s.authLogin}
+            onDismiss={accountPromo.dismiss}
           />
         )}
 
@@ -562,14 +559,5 @@ export default function ProgressScreen() {
         onChanged={() => void loadData()}
       />
     </Screen>
-  );
-}
-
-/** The guest prompt sits on a light teal card so it reads as secondary to the figures. */
-function ProgressSignInPrompt(props: AccountSyncPromptProps) {
-  return (
-    <Card elevation="low" className="mb-6 px-5 py-4 bg-primary-accent/10 dark:bg-primary-bright/10">
-      <AccountSyncPrompt {...props} />
-    </Card>
   );
 }

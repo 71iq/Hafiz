@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/Button";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { HifzSetupFlow } from "@/components/hifz/HifzSetupFlow";
@@ -10,7 +11,7 @@ import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react-native";
+import { ArrowLeft, ArrowRight, BookOpen, Languages } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,21 +23,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
  */
 function OnboardingInner() {
   const db = useDatabase();
-  const { isDark, isLoaded, isRTL, themeColors, uiLanguage } = useSettings();
+  const { isDark, isLoaded, isRTL, themeColors, uiLanguage, setUiLanguage } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [screen, setScreen] = useState<"welcome" | "setup">("welcome");
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once the plan is saved: a failed completion then retries only the completion, never the plan.
+  const [savedNext, setSavedNext] = useState<Href | null>(null);
 
   const isWide = width >= SIDEBAR_BREAKPOINT;
   const dir = isRTL ? "rtl" : "ltr";
   const rowDirection = isRTL ? "row-reverse" : "row";
   const accentColor = isDark ? "#2dd4bf" : "#0d9488";
-  // White text needs the deeper teal in every theme: on the bright dark-theme accent it reads at 1.9:1.
-  const buttonFill = "#0d9488";
-  const buttonPressed = "#0f766e";
   const goldColor = "#FDDC91";
   const textPrimary = isDark ? "#F5F5F5" : "#2D2D2D";
   const textMuted = isDark ? "#A3A3A3" : "#8a7058";
@@ -159,6 +159,43 @@ function OnboardingInner() {
     </View>
   );
 
+  const otherLanguage = uiLanguage === "ar" ? "en" : "ar";
+  const renderLanguagePill = () => (
+    <View style={{ alignItems: isRTL ? "flex-start" : "flex-end" }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={otherLanguage === "ar" ? "العربية" : "English"}
+        accessibilityHint={s.setupLanguageHint}
+        accessibilityLanguage={otherLanguage}
+        onPress={() => setUiLanguage(otherLanguage)}
+        style={({ pressed }) => ({
+          minHeight: 44,
+          borderRadius: 22,
+          paddingHorizontal: 16,
+          flexDirection: rowDirection,
+          alignItems: "center",
+          gap: 8,
+          backgroundColor: softPanelBg,
+          borderWidth: 1,
+          borderColor,
+          opacity: pressed ? 0.75 : 1,
+        })}
+      >
+        <Languages size={16} color={accentColor} />
+        <Text
+          style={{
+            color: textPrimary,
+            fontFamily: "Manrope_600SemiBold",
+            fontSize: 14,
+            writingDirection: otherLanguage === "ar" ? "rtl" : "ltr",
+          }}
+        >
+          {otherLanguage === "ar" ? "العربية" : "English"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+
   const renderWelcome = () => (
     <View style={{ flex: 1, justifyContent: "center", gap: 28 }}>
       <View style={{ alignItems: "center" }}>{renderWelcomeArt()}</View>
@@ -187,42 +224,59 @@ function OnboardingInner() {
         >
           {s.onboardingSubtitle}
         </Text>
-        <View style={{ alignItems: "center", gap: 4, paddingTop: 2 }}>
-          <Text
-            style={{
-              color: accentColor,
-              fontFamily: "Manrope_700Bold",
-              fontSize: 14,
-              lineHeight: 20,
-              textAlign: "center",
-              writingDirection: dir,
-            }}
-          >
-            {s.onboardingFocusTitle}
-          </Text>
-          <Text
-            style={{
-              color: textMuted,
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 13,
-              lineHeight: 19,
-              textAlign: "center",
-              writingDirection: dir,
-            }}
-          >
-            {s.onboardingFocusPractice}
-          </Text>
-        </View>
       </View>
     </View>
   );
 
-  if (!isLoaded) {
+  // The same boot look as the rest of the app while saved settings load.
+  if (!isLoaded) return <LoadingScreen progress={null} />;
+
+  const errorText = (message: string) => (
+    <Text
+      accessibilityRole="alert"
+      style={{ color: isDark ? "#f87171" : "#b91c1c", fontFamily: "Manrope_600SemiBold", fontSize: 13, lineHeight: 19, textAlign: "center", writingDirection: dir }}
+    >
+      {message}
+    </Text>
+  );
+
+  // The plan is saved but finishing setup failed: retry the completion alone, so the plan is not
+  // written twice and the first session still opens once.
+  if (savedNext && !error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={accentColor} accessibilityLabel={s.setupSavingAnnouncement} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+  if (savedNext) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
         <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" color={accentColor} />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 16, paddingHorizontal: 24 }}>
+          {errorText(s.onboardingSaveFailed)}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy: completing, disabled: completing }}
+            disabled={completing}
+            onPress={() => complete(savedNext)}
+            style={({ pressed }) => ({
+              minHeight: 44,
+              borderRadius: 22,
+              paddingHorizontal: 20,
+              flexDirection: rowDirection,
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              backgroundColor: "#0d9488",
+              opacity: completing ? 0.6 : pressed ? 0.85 : 1,
+            })}
+          >
+            {completing ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+            <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_700Bold", fontSize: 14 }}>{s.setupRetry}</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -240,13 +294,12 @@ function OnboardingInner() {
             s={s}
             initialPlan={null}
             onCancel={() => setScreen("welcome")}
-            onDone={({ plan, declaredPages }) => complete(firstSession(plan, declaredPages))}
+            onDone={({ plan, declaredPages }) => {
+              const next = firstSession(plan, declaredPages);
+              setSavedNext(next);
+              void complete(next);
+            }}
           />
-          {error ? (
-            <Text style={{ color: "#dc2626", fontFamily: "Manrope_600SemiBold", fontSize: 13, textAlign: "center", writingDirection: dir, paddingBottom: 12 }}>
-              {error}
-            </Text>
-          ) : null}
         </View>
       </SafeAreaView>
     );
@@ -257,35 +310,29 @@ function OnboardingInner() {
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
       <View style={{ flex: 1, alignItems: "center", backgroundColor: themeColors.surface }}>
         <View style={{ flex: 1, width: "100%", maxWidth: 560, paddingHorizontal: isWide ? 32 : 22, paddingTop: 8, paddingBottom: 12, gap: 18 }}>
+          {renderLanguagePill()}
           {renderWelcome()}
           <View style={{ gap: 12 }}>
-            {error ? (
-              <Text style={{ color: "#dc2626", fontFamily: "Manrope_600SemiBold", fontSize: 13, textAlign: "center", writingDirection: dir }}>
-                {error}
-              </Text>
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
+            {error ? errorText(error) : null}
+            {/* The shared primary button: the label wraps to a second line and the pill grows from 54 px. */}
+            <Button
+              accessibilityLabel={s.onboardingGetStarted}
               onPress={() => setScreen("setup")}
-              style={({ pressed }) => ({
-                minHeight: 54,
-                borderRadius: 27,
-                backgroundColor: pressed ? buttonPressed : buttonFill,
-                flexDirection: rowDirection,
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                paddingHorizontal: 22,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              })}
+              disabled={completing}
+              dir={dir}
+              className="h-auto min-h-[54px] rounded-full px-6 py-3"
             >
               <ForwardIcon size={18} color="#FFFFFF" />
-              <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: "center", writingDirection: dir }}>
+              <Text
+                className="text-white"
+                style={{ flexShrink: 1, fontFamily: "Manrope_700Bold", fontSize: 16, lineHeight: 22, textAlign: "center", writingDirection: dir }}
+              >
                 {s.onboardingGetStarted}
               </Text>
-            </Pressable>
+            </Button>
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{ busy: completing, disabled: completing }}
               onPress={() => complete("/(tabs)/home")}
               disabled={completing}
               hitSlop={8}

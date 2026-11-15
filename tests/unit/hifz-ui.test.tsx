@@ -246,3 +246,81 @@ describe("the notice after saving a plan (7.6)", () => {
     );
   });
 });
+
+describe("HifzSetupFlow save and surah list recovery", () => {
+  const surahRows = [
+    { number: 1, name_arabic: "الفاتحة", name_english: "The Opening", ayah_count: 7 },
+    { number: 67, name_arabic: "الملك", name_english: "The Sovereignty", ayah_count: 30 },
+    { number: 68, name_arabic: "القلم", name_english: "The Pen", ayah_count: 52 },
+  ];
+  beforeEach(() => jest.mocked(applyHifzSetup).mockReset());
+
+  function renderFlow(db: AppDatabase, onDone = jest.fn()) {
+    return render(
+      <DirectionProvider dir="ltr">
+        <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={null} onDone={onDone} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+  }
+
+  it("keeps the step and draft after a failed save, locks Back while saving and saves once on retry", async () => {
+    const db = { getAllAsync: jest.fn(async () => surahRows) } as unknown as AppDatabase;
+    const onDone = jest.fn();
+    let failSave: (error: Error) => void = () => {};
+    jest.mocked(applyHifzSetup).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failSave = reject;
+        }),
+    );
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const view = renderFlow(db, onDone);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByLabelText("Juz 30"));
+    for (let step = 0; step < 3; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByText(s.hifzSaveMemorized));
+    // Pending: both controls report busy and Back cannot leave the step.
+    expect(view.getByText(s.hifzSaving)).toBeTruthy();
+    const back = view.getByRole("button", { name: s.hifzBack });
+    expect(back.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+    await act(async () => failSave(new Error("synthetic save failure")));
+    expect(view.getByText(s.hifzSaveFailedGeneric)).toBeTruthy();
+    expect(view.getByText(s.hifzWhenTitle)).toBeTruthy();
+    expect(onDone).not.toHaveBeenCalled();
+    jest.mocked(applyHifzSetup).mockResolvedValueOnce({ declaredPages: 20, migratedPages: 0 } as never);
+    await act(async () => fireEvent.press(view.getByText(s.hifzSaveMemorized)));
+    expect(applyHifzSetup).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(applyHifzSetup).mock.calls[1][1].memorizedJuz).toEqual([30]);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Retry when the surah list fails to load", async () => {
+    const getAllAsync = jest.fn().mockRejectedValueOnce(new Error("synthetic load failure")).mockResolvedValue(surahRows);
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const view = renderFlow({ getAllAsync } as unknown as AppDatabase);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByText(s.hifzBySurah));
+    expect(view.getByText(s.setupSurahsLoadFailed)).toBeTruthy();
+    await act(async () => fireEvent.press(view.getByText(s.setupRetry)));
+    expect(view.queryByText(s.setupSurahsLoadFailed)).toBeNull();
+    expect(view.getByText("67. Al-Mulk")).toBeTruthy();
+    expect(view.getByText("30 ayahs")).toBeTruthy();
+  });
+
+  it("selects only the filtered surahs and keeps earlier choices", async () => {
+    const view = renderFlow({ getAllAsync: jest.fn(async () => surahRows) } as unknown as AppDatabase);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByText(s.hifzBySurah));
+    fireEvent.press(view.getByText("1. Al-Fatiha"));
+    fireEvent.changeText(view.getByPlaceholderText(s.setupSurahSearchPlaceholder), "Mulk");
+    fireEvent.press(view.getByText(s.setupSelectResults));
+    fireEvent.changeText(view.getByPlaceholderText(s.setupSurahSearchPlaceholder), "zzz");
+    expect(view.getByText(s.setupNoSurahMatches.replace("{{query}}", "zzz"))).toBeTruthy();
+    fireEvent.press(view.getByText(s.homeSearchClear));
+    expect(view.getByText("2 surahs")).toBeTruthy();
+    expect(view.getByText("Al-Fatiha, Al-Mulk")).toBeTruthy();
+  });
+});

@@ -14,15 +14,22 @@ import { strings } from "@/lib/i18n/strings";
 import { findAncestorByClassName, flattenStyle, type RtlTestNode } from "../rtl/rtl-test-utils";
 
 const mockDatabase = { name: "isolated-progress-fixture" };
+const mockDismissAccountPromo = jest.fn();
 const mockSettings: {
   isDark: boolean;
   isRTL: boolean;
   uiLanguage: "ar" | "en";
+  effectiveTheme: "white";
+  accountPromoDismissed: boolean;
+  dismissAccountPromo: () => void;
   themeColors: Record<string, string>;
 } = {
   isDark: false,
   isRTL: true,
   uiLanguage: "ar",
+  effectiveTheme: "white",
+  accountPromoDismissed: false,
+  dismissAccountPromo: () => mockDismissAccountPromo(),
   themeColors: {
     surface: "#FFF8F1",
     surfaceLow: "#F9F3EB",
@@ -52,7 +59,8 @@ jest.mock("@react-navigation/native", () => {
 });
 
 jest.mock("expo-router", () => ({
-  router: { push: (...args: unknown[]) => mockRouterPush(...args) },
+  router: { push: (...args: unknown[]) => mockRouterPush(...args), setParams: jest.fn() },
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: (...args: unknown[]) => mockRouterPush(...args) }),
   useNavigation: () => ({ navigate: jest.fn() }),
 }));
@@ -169,6 +177,7 @@ describe("ProgressScreen RTL behavior", () => {
     mockSettings.isRTL = true;
     mockSettings.uiLanguage = "ar";
     mockSettings.isDark = false;
+    mockSettings.accountPromoDismissed = false;
     mockAuthState.user = null;
     mockAuthState.isLoading = false;
     mockAuthState.isInitialized = true;
@@ -211,7 +220,7 @@ describe("ProgressScreen RTL behavior", () => {
     await waitFor(() => expect(arabic.getByText("الإنجازات")).toBeTruthy());
 
     const arabicLabel = arabic.getByText(strings.ar.progressSignInPrompt);
-    const arabicRow = findAncestorByClassName(arabicLabel, "items-center gap-3");
+    const arabicRow = findAncestorByClassName(arabicLabel, "items-start gap-3");
     const arabicButton = arabic.getByRole("button", { name: "تسجيل الدخول" });
     const arabicButtonText = arabic.getByText("تسجيل الدخول");
     const arabicButtonRow = findAncestorByClassName(arabicButtonText, "flex-row items-center gap-2");
@@ -235,7 +244,8 @@ describe("ProgressScreen RTL behavior", () => {
     expect(arabicButtonChildren[1]).toEqual(
       expect.objectContaining({ props: expect.objectContaining({ children: "تسجيل الدخول" }) }),
     );
-    expect(arabicCard.props.className).toContain("mb-6 px-5 py-4");
+    // The shared promotion keeps Progress's light teal card and outline Log In button.
+    expect(arabicCard.props.className).toContain("px-5 py-4");
     expect(arabicCard.props.className).toContain("rounded-4xl overflow-hidden");
     expect(arabicCard.props.className).toContain("bg-primary-accent/10");
     expect(resolvePressableStyle(arabicButton.props.style)).toMatchObject({
@@ -244,6 +254,9 @@ describe("ProgressScreen RTL behavior", () => {
       minHeight: 44,
     });
     expect(flattenStyle(arabicButtonText.props.style)).toMatchObject({ color: "#0f766e" });
+    // The close control is labeled and keeps its own 44 px target.
+    const arabicDismiss = arabic.getByRole("button", { name: "إغلاق" });
+    expect(arabicDismiss.props.className).toContain("h-11 w-11");
 
     await fireEvent.press(arabicButton);
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
@@ -262,7 +275,7 @@ describe("ProgressScreen RTL behavior", () => {
     await waitFor(() => expect(english.getByText("Achievements")).toBeTruthy());
 
     const englishLabel = english.getByText(strings.en.progressSignInPrompt);
-    const englishRow = findAncestorByClassName(englishLabel, "items-center gap-3");
+    const englishRow = findAncestorByClassName(englishLabel, "items-start gap-3");
     const englishButton = english.getByRole("button", { name: "Log In" });
     const englishButtonText = english.getByText("Log In");
     const englishButtonRow = findAncestorByClassName(englishButtonText, "flex-row items-center gap-2");
@@ -286,7 +299,7 @@ describe("ProgressScreen RTL behavior", () => {
     expect(englishButtonChildren[1]).toEqual(
       expect.objectContaining({ props: expect.objectContaining({ children: "Log In" }) }),
     );
-    expect(englishCard.props.className).toContain("mb-6 px-5 py-4");
+    expect(englishCard.props.className).toContain("px-5 py-4");
     expect(englishCard.props.className).toContain("rounded-4xl overflow-hidden");
     expect(englishCard.props.className).toContain("bg-primary-accent/10");
     expect(resolvePressableStyle(englishButton.props.style)).toMatchObject({
@@ -296,11 +309,31 @@ describe("ProgressScreen RTL behavior", () => {
     });
     expect(flattenStyle(englishButtonText.props.style)).toMatchObject({ color: "#2dd4bf" });
 
+    await fireEvent.press(english.getByRole("button", { name: "Dismiss" }));
+    expect(mockDismissAccountPromo).toHaveBeenCalledTimes(1);
     await fireEvent.press(englishButton);
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
     // The return to Progress is captured through the allowlisted origin, not a URL parameter.
     expect(peekAuthReturn()).toEqual({ route: "progress" });
+  });
+
+  it.each([
+    ["the shared dismissal is active", { dismissed: true, reviews: 2 }],
+    ["no review has been completed", { dismissed: false, reviews: 0 }],
+  ])("hides the prompt when %s", async (_case, state) => {
+    jest.mocked(isSupabaseConfigured).mockReturnValue(true);
+    mockSettings.accountPromoDismissed = state.dismissed;
+    jest.mocked(getReviewStats).mockImplementation(async () => ({
+      activity: [],
+      activeDays: 0,
+      totalReviews: state.reviews,
+      averageDailyReviews: 0,
+      longestStreak: 0,
+    }));
+    const view = renderProgress();
+    await waitFor(() => expect(view.getByText("الإنجازات")).toBeTruthy());
+    expect(view.queryByText(strings.ar.progressSignInPrompt)).toBeNull();
   });
 
   it.each([
