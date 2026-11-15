@@ -180,7 +180,10 @@ export function TeacherSabaqAssignment({
       <View className="gap-2" style={socialRowStyle(isRTL)}>
         {fields.map(([label, value, setValue, maxLength]) => (
           <Field key={label} dir={dir} className="min-w-0 flex-1">
-            <Label dir={dir}>{label}</Label>
+            {/* Full width, so in Arabic the label sits at the field's right edge above its number. */}
+            <Label dir={dir} className="w-full">
+              {label}
+            </Label>
             <Input
               dir={dir}
               className="w-full"

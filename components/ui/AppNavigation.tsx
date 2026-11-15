@@ -145,9 +145,10 @@ function BottomTabItem({
       style={[animatedStyle, styles.bottomTabSlot]}
     >
       {/* The pill hugs the label; the press target is the item's whole share of the bar. */}
-      <View
-        style={[styles.bottomTabItem, compact && styles.bottomTabItemCompact, isFocused && styles.bottomTabItemActive]}
-      >
+      <View style={[styles.bottomTabItem, compact && styles.bottomTabItemCompact]}>
+        {/* Android drops a view's rounding when its background arrives after mount, which turned the
+            pill into a rectangle on a tab switch. The fill exists from mount and only fades. */}
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.bottomTabPill, { opacity: isFocused ? 1 : 0 }]} />
         {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
         {/* Arabic labels keep their natural line height so marks above and below are not clipped. */}
         <Text
@@ -846,7 +847,8 @@ const styles = StyleSheet.create({
   bottomTabItemCompact: {
     paddingHorizontal: 6,
   },
-  bottomTabItemActive: {
+  bottomTabPill: {
+    borderRadius: 9999,
     backgroundColor: NAV_TOKENS.activeBackground,
   },
   bottomLabel: {
