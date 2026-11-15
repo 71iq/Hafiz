@@ -31,13 +31,14 @@ const ICONS: Record<AchievementDefinition["icon"], LucideIcon> = {
   trophy: Trophy,
 };
 
-const RARITY_COLOR: Record<AchievementDefinition["rarity"], string> = {
-  common: "#0d9488",
-  uncommon: "#2563eb",
-  rare: "#7c3aed",
-  epic: "#c2410c",
-  legendary: "#b45309",
-};
+// Every badge uses the teal accent; rarity is named in a text chip instead of a color code.
+const RARITY_LABEL_KEY = {
+  common: "achievementRarityCommon",
+  uncommon: "achievementRarityUncommon",
+  rare: "achievementRarityRare",
+  epic: "achievementRarityEpic",
+  legendary: "achievementRarityLegendary",
+} as const satisfies Record<AchievementDefinition["rarity"], string>;
 
 type Props = {
   item: AchievementDashboardItem;
@@ -49,7 +50,8 @@ export function AchievementBadge({ item, compact = false }: Props) {
   const s = useStrings();
   const Icon = ICONS[item.icon];
   const unlocked = !!item.unlockedAt;
-  const color = RARITY_COLOR[item.rarity];
+  const color = isDark ? "#2dd4bf" : "#0d9488";
+  const rarity = s[RARITY_LABEL_KEY[item.rarity]];
   const juzNumber = getJuzNumber(item.id);
   const title = interpolate(stringByKey(s, item.titleKey, item.id), { n: String(juzNumber ?? item.target) });
   const description = interpolate(stringByKey(s, item.descriptionKey), { n: String(juzNumber ?? item.target) });
@@ -88,6 +90,14 @@ export function AchievementBadge({ item, compact = false }: Props) {
           >
             {title}
           </Text>
+          <View
+            className="mt-1 rounded-full bg-surface-high px-2 py-0.5 dark:bg-surface-dark-high"
+            style={{ alignSelf: isRTL ? "flex-end" : "flex-start" }}
+          >
+            <Text className="text-warm-700 dark:text-neutral-300" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}>
+              {rarity}
+            </Text>
+          </View>
           {!compact && (
             <Text
               className="mt-1 text-warm-700 dark:text-neutral-400"

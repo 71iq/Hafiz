@@ -11,15 +11,22 @@ import { getDefaultDeckProgress, getLocalSurahProgress } from "@/lib/profile/pro
 import { findAncestorByClassName, flattenStyle, type RtlTestNode } from "../rtl/rtl-test-utils";
 
 const mockDatabase = { name: "isolated-progress-fixture" };
+const mockDismissAccountPromo = jest.fn();
 const mockSettings: {
   isDark: boolean;
   isRTL: boolean;
   uiLanguage: "ar" | "en";
+  effectiveTheme: "white";
+  accountPromoDismissed: boolean;
+  dismissAccountPromo: () => void;
   themeColors: Record<string, string>;
 } = {
   isDark: false,
   isRTL: true,
   uiLanguage: "ar",
+  effectiveTheme: "white",
+  accountPromoDismissed: false,
+  dismissAccountPromo: () => mockDismissAccountPromo(),
   themeColors: {
     surface: "#FFF8F1",
     surfaceLow: "#F9F3EB",
@@ -49,7 +56,8 @@ jest.mock("@react-navigation/native", () => {
 });
 
 jest.mock("expo-router", () => ({
-  router: { push: (...args: unknown[]) => mockRouterPush(...args) },
+  router: { push: (...args: unknown[]) => mockRouterPush(...args), setParams: jest.fn() },
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: (...args: unknown[]) => mockRouterPush(...args) }),
   useNavigation: () => ({ navigate: jest.fn() }),
 }));
@@ -129,10 +137,6 @@ const safeAreaMetrics = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
 
-function resolvePressableStyle(style: unknown) {
-  return flattenStyle(typeof style === "function" ? style({ pressed: false }) : style);
-}
-
 function renderProgress() {
   return render(
     <SafeAreaProvider initialMetrics={safeAreaMetrics}>
@@ -156,6 +160,7 @@ describe("ProgressScreen RTL behavior", () => {
     mockSettings.isRTL = true;
     mockSettings.uiLanguage = "ar";
     mockSettings.isDark = false;
+    mockSettings.accountPromoDismissed = false;
     mockAuthState.user = null;
     mockAuthState.isLoading = false;
     mockAuthState.isInitialized = true;
@@ -194,44 +199,13 @@ describe("ProgressScreen RTL behavior", () => {
     await waitFor(() => expect(arabic.getByText("الإنجازات")).toBeTruthy());
 
     const arabicLabel = arabic.getByText("سجّل الدخول لمزامنة نتائجك");
-    const arabicRow = findAncestorByClassName(arabicLabel, "items-center gap-3");
-    const arabicButton = arabic.getByRole("button", { name: "تسجيل الدخول" });
-    const arabicButtonText = arabic.getByText("تسجيل الدخول");
-    const arabicButtonRow = findAncestorByClassName(arabicButtonText, "flex-row items-center gap-2");
-    const arabicCard = findAncestorByClassName(arabicLabel, "mb-6");
-
-    expect(flattenStyle(arabicRow.props.style)).toMatchObject({
-      direction: "ltr",
-      flexDirection: "row-reverse",
-    });
-    expect(flattenStyle(arabicLabel.props.style)).toMatchObject({
-      ...textStartStyle(true),
-      writingDirection: "rtl",
-    });
-    expect(arabicLabel.props.className).toContain("text-charcoal dark:text-neutral-100");
-    expect(flattenStyle(arabicButtonRow.props.style)).toMatchObject({
-      direction: "ltr",
-      flexDirection: "row-reverse",
-    });
-    const arabicButtonChildren = React.Children.toArray(arabicButtonRow.props.children);
-    expect(arabicButtonChildren).toHaveLength(2);
-    expect(arabicButtonChildren[1]).toEqual(
-      expect.objectContaining({ props: expect.objectContaining({ children: "تسجيل الدخول" }) }),
-    );
-    expect(arabicCard.props.className).toContain("mb-6 px-5 py-4");
-    expect(arabicCard.props.className).toContain("rounded-4xl overflow-hidden");
-    expect(arabicCard.props.className).toContain("bg-surface-low dark:bg-surface-dark-low");
-    expect(resolvePressableStyle(arabicButton.props.style)).toMatchObject({
-      backgroundColor: "#003638",
-    });
-    expect(flattenStyle(arabicButtonText.props.style)).toMatchObject({
-      color: "#FDDC91",
-      fontFamily: "Manrope_700Bold",
-      fontSize: 12,
-    });
-
-    await fireEvent.press(arabicButton);
-    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    const arabicRow = findAncestorByClassName(arabicLabel, "items-start gap-3");
+    expect(flattenStyle(arabicRow.props.style)).toMatchObject({ direction: "ltr", flexDirection: "row-reverse" });
+    expect(flattenStyle(arabicLabel.props.style)).toMatchObject({ ...textStartStyle(true), writingDirection: "rtl" });
+    // The close control is labeled and keeps its own 44 px target.
+    const arabicDismiss = arabic.getByRole("button", { name: "إغلاق" });
+    expect(arabicDismiss.props.className).toContain("h-11 w-11");
+    await fireEvent.press(arabic.getByRole("button", { name: "تسجيل الدخول" }));
     expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
 
     arabic.unmount();
@@ -242,48 +216,32 @@ describe("ProgressScreen RTL behavior", () => {
     const english = renderProgress();
 
     await waitFor(() => expect(english.getByText("Sign in to sync your results")).toBeTruthy());
-    await waitFor(() => expect(english.getByText("Achievements")).toBeTruthy());
-
     const englishLabel = english.getByText("Sign in to sync your results");
-    const englishRow = findAncestorByClassName(englishLabel, "items-center gap-3");
-    const englishButton = english.getByRole("button", { name: "Log In" });
-    const englishButtonText = english.getByText("Log In");
-    const englishButtonRow = findAncestorByClassName(englishButtonText, "flex-row items-center gap-2");
-    const englishCard = findAncestorByClassName(englishLabel, "mb-6");
-
-    expect(flattenStyle(englishRow.props.style)).toMatchObject({
-      direction: "ltr",
-      flexDirection: "row",
-    });
-    expect(flattenStyle(englishLabel.props.style)).toMatchObject({
-      ...textStartStyle(false),
-      writingDirection: "ltr",
-    });
-    expect(englishLabel.props.className).toContain("text-charcoal dark:text-neutral-100");
-    expect(flattenStyle(englishButtonRow.props.style)).toMatchObject({
-      direction: "ltr",
-      flexDirection: "row",
-    });
-    const englishButtonChildren = React.Children.toArray(englishButtonRow.props.children);
-    expect(englishButtonChildren).toHaveLength(2);
-    expect(englishButtonChildren[1]).toEqual(
-      expect.objectContaining({ props: expect.objectContaining({ children: "Log In" }) }),
-    );
-    expect(englishCard.props.className).toContain("mb-6 px-5 py-4");
-    expect(englishCard.props.className).toContain("rounded-4xl overflow-hidden");
-    expect(englishCard.props.className).toContain("bg-surface-low dark:bg-surface-dark-low");
-    expect(resolvePressableStyle(englishButton.props.style)).toMatchObject({
-      backgroundColor: "#1B4D4F",
-    });
-    expect(flattenStyle(englishButtonText.props.style)).toMatchObject({
-      color: "#FDDC91",
-      fontFamily: "Manrope_700Bold",
-      fontSize: 12,
-    });
-
-    await fireEvent.press(englishButton);
-    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    const englishRow = findAncestorByClassName(englishLabel, "items-start gap-3");
+    expect(flattenStyle(englishRow.props.style)).toMatchObject({ direction: "ltr", flexDirection: "row" });
+    expect(flattenStyle(englishLabel.props.style)).toMatchObject({ ...textStartStyle(false), writingDirection: "ltr" });
+    await fireEvent.press(english.getByRole("button", { name: "Dismiss" }));
+    expect(mockDismissAccountPromo).toHaveBeenCalledTimes(1);
+    await fireEvent.press(english.getByRole("button", { name: "Log In" }));
     expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
+  });
+
+  it.each([
+    ["the shared dismissal is active", { dismissed: true, reviews: 2 }],
+    ["no review has been completed", { dismissed: false, reviews: 0 }],
+  ])("hides the prompt when %s", async (_case, state) => {
+    jest.mocked(isSupabaseConfigured).mockReturnValue(true);
+    mockSettings.accountPromoDismissed = state.dismissed;
+    jest.mocked(getReviewStats).mockImplementation(async () => ({
+      activity: [],
+      activeDays: 0,
+      totalReviews: state.reviews,
+      averageDailyReviews: 0,
+      longestStreak: 0,
+    }));
+    const view = renderProgress();
+    await waitFor(() => expect(view.getByText("الإنجازات")).toBeTruthy());
+    expect(view.queryByText("سجّل الدخول لمزامنة نتائجك")).toBeNull();
   });
 
   it.each([

@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { BookOpen, ChevronDown, Trophy } from "lucide-react-native";
-import { AccountSyncPrompt, type AccountSyncPromptProps } from "@/components/auth/AccountSyncPrompt";
+import { AccountPromoCard } from "@/components/auth/AccountPromoCard";
 import { Card } from "@/components/ui/Card";
 import {
   Screen,
@@ -20,8 +20,7 @@ import { AchievementGrid } from "@/components/achievements/AchievementGrid";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
-import { useAuthStore } from "@/lib/auth/store";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { useAccountPromo } from "@/lib/auth/account-promo";
 import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount } from "@/lib/fsrs/queries";
 import { useHabitOverview } from "@/lib/habit/use-habit-overview";
 import { HifzProgressCard } from "@/components/hifz/HifzProgressCard";
@@ -50,9 +49,6 @@ export default function ProgressScreen() {
   const s = useStrings();
   const { isDark, isRTL, uiLanguage } = useSettings();
   const db = useDatabase();
-  const user = useAuthStore((state) => state.user);
-  const authLoading = useAuthStore((state) => state.isLoading);
-  const authInitialized = useAuthStore((state) => state.isInitialized);
   const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
 
   const [totalAyahCards, setTotalAyahCards] = useState(0);
@@ -67,6 +63,13 @@ export default function ProgressScreen() {
   const [achievementDashboard, setAchievementDashboard] = useState<AchievementDashboard | null>(null);
   const [surahProgressModalOpen, setSurahProgressModalOpen] = useState(false);
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
+  // Home's achievement notice opens this list once through ?achievements=1.
+  const { achievements: openAchievements } = useLocalSearchParams<{ achievements?: string }>();
+  useEffect(() => {
+    if (openAchievements !== "1") return;
+    setAchievementsModalOpen(true);
+    router.setParams({ achievements: undefined });
+  }, [openAchievements]);
   const [hifzProgress, setHifzProgress] = useState<HifzProgress | null>(null);
 
   const loadData = useCallback(async () => {
@@ -127,7 +130,8 @@ export default function ProgressScreen() {
     [loadData],
   );
 
-  const showSyncPrompt = isSupabaseConfigured() && authInitialized && !authLoading && !user;
+  // One 14-day dismissal shared with Home; Progress also waits for the first completed review.
+  const accountPromo = useAccountPromo("progress", totalReviews);
   // The interface language picks the digits; toLocaleString would follow the device locale.
   const formatStat = (val: number) => formatNumber(val, uiLanguage);
   const masteryPct = totalAyahCards > 0 ? Math.round((memorizedAyahCards / totalAyahCards) * 100) : 0;
@@ -211,13 +215,11 @@ export default function ProgressScreen() {
           </View>
         </Card>
 
-        {showSyncPrompt && (
-          <ProgressSignInPrompt
-            label={s.progressSignInPrompt}
-            buttonLabel={s.authLogin}
-            isDark={isDark}
-            isRTL={isRTL}
-            onPress={() => router.push("/auth/login" as any)}
+        {accountPromo.visible && (
+          <AccountPromoCard
+            message={s.progressSignInPrompt}
+            onDismiss={accountPromo.dismiss}
+            actions={[{ label: s.authLogin, onPress: () => router.push("/auth/login" as any), primary: true }]}
           />
         )}
 
@@ -426,14 +428,6 @@ export default function ProgressScreen() {
         </OverlayBody>
       </ResponsiveModal>
     </Screen>
-  );
-}
-
-function ProgressSignInPrompt(props: AccountSyncPromptProps) {
-  return (
-    <Card elevation="low" className="mb-6 px-5 py-4">
-      <AccountSyncPrompt {...props} />
-    </Card>
   );
 }
 

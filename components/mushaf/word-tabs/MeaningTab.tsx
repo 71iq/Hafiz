@@ -13,7 +13,7 @@ import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DiscardChangesDialog, isEditableTextDirty, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
-import { addMeaningCard, fetchMeaningCardDue, isMeaningCardSaved } from "@/lib/fsrs/queries";
+import { addMeaningCard, fetchMeaningCardDue, getTotalCardCount, isMeaningCardSaved, MEANINGS_DECK_ID } from "@/lib/fsrs/queries";
 import { formatDays } from "@/lib/i18n/count";
 import { useDelayedLoading } from "./use-delayed-loading";
 
@@ -55,6 +55,8 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const [saveError, setSaveError] = useState(false);
   // Read only: shows when the saved word comes up next, without creating or rescheduling a card.
   const [reviewDue, setReviewDue] = useState<string | null>(null);
+  // The first saved word also makes the Vocabulary Review deck appear on Home; say where it went.
+  const [firstVocabWord, setFirstVocabWord] = useState(false);
   const showLoading = useDelayedLoading(loading);
 
   useEffect(() => {
@@ -62,6 +64,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
     setSaveError(false);
     setSavingToVocab(false);
     setReviewDue(null);
+    setFirstVocabWord(false);
     isMeaningCardSaved(db, surah, ayah, wordPos)
       .then(async (saved) => {
         if (cancelled) return;
@@ -83,8 +86,15 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
     setSavingToVocab(true);
     setSaveError(false);
     try {
-      await addMeaningCard(db, surah, ayah, wordPos);
+      let deckWasEmpty = false;
+      try {
+        deckWasEmpty = (await getTotalCardCount(db, MEANINGS_DECK_ID)) === 0;
+      } catch {
+        // Only the notice depends on this count; the save goes ahead without it.
+      }
+      const { created } = await addMeaningCard(db, surah, ayah, wordPos);
       setSavedToVocab(true);
+      setFirstVocabWord(created && deckWasEmpty);
       fetchMeaningCardDue(db, surah, ayah, wordPos)
         .then(setReviewDue)
         .catch(() => undefined);
@@ -412,6 +422,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
           isRTL={isRTL}
         />
         {saveError && <SaveErrorText isRTL={isRTL} label={s.addToVocabFailed} />}
+        {firstVocabWord ? <MutedLine isRTL={isRTL} label={s.homeVocabAdded} /> : null}
         {reviewNote ? <MutedLine isRTL={isRTL} label={reviewNote} /> : null}
       </View>
     );
@@ -461,6 +472,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         isRTL={isRTL}
       />
       {saveError && <SaveErrorText isRTL={isRTL} label={s.addToVocabFailed} />}
+      {firstVocabWord ? <MutedLine isRTL={isRTL} label={s.homeVocabAdded} /> : null}
       {reviewNote ? <MutedLine isRTL={isRTL} label={reviewNote} /> : null}
     </View>
   );

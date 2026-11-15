@@ -59,7 +59,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Download/update card row mirrors with settings RTL; copy aligns to the reading side.",
   ),
   entry(
-    "components/auth/AccountSyncPrompt.tsx",
+    "components/auth/AccountPromoCard.tsx",
     "button",
     "rntl",
     "Controlled compact row is covered by the ProgressScreen and LeaderboardScreen route fixtures.",
