@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { parseCommentRow, parseCommentRows, parseReflectionRow, parseReflectionRows, parseSavedRow } from "./rows";
 import { reflectionWriteError } from "./errors";
+import { normalizeFeedSort } from "./types";
 
 const PAGE_SIZE = 5;
 const FEED_PAGE_SIZE = 10;
@@ -176,23 +177,11 @@ export async function fetchReflectionFeed({
     query = query.ilike("content", `%${escapeIlikePattern(normalizedSearch)}%`);
   }
 
-  switch (sort) {
-    case "oldest":
-      query = query
-        .order("created_at", { ascending: true })
-        .order("likes_count", { ascending: false })
-        .order("comments_count", { ascending: false });
-      break;
+  switch (normalizeFeedSort(sort)) {
     case "popular":
       query = query
         .order("likes_count", { ascending: false })
         .order("comments_count", { ascending: false })
-        .order("created_at", { ascending: false });
-      break;
-    case "less":
-      query = query
-        .order("likes_count", { ascending: true })
-        .order("comments_count", { ascending: true })
         .order("created_at", { ascending: false });
       break;
     case "newest":
@@ -359,4 +348,28 @@ export async function reportReflection(reporterId: string, reflectionId: string,
     .insert({ reporter_id: reporterId, reflection_id: reflectionId, reason });
 
   if (error) throw error;
+}
+
+/**
+ * Deletes the signed-in author's own reflection with its comments and likes (physical delete on the
+ * server, which checks the expected account). Resolves true when the server deleted it and false when
+ * it no longer exists or is not this account's. Errors are thrown, never reported as a deletion.
+ */
+export async function deleteReflection(userId: string, reflectionId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("delete_reflection", {
+    p_user_id: userId,
+    p_reflection_id: reflectionId,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
+/** Deletes the signed-in author's own comment with its likes. True, false and errors as above. */
+export async function deleteReflectionComment(userId: string, commentId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("delete_reflection_comment", {
+    p_user_id: userId,
+    p_comment_id: commentId,
+  });
+  if (error) throw error;
+  return data === true;
 }

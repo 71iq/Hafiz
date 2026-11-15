@@ -25,7 +25,10 @@ jest.mock("@tanstack/react-query", () => ({
   }),
   useQueryClient: () => ({ invalidateQueries: mockForbidden, getQueryState: () => ({ dataUpdateCount: 1 }) }),
 }));
-jest.mock("expo-router", () => ({ router: { push: mockForbidden } }));
+jest.mock("expo-router", () => ({
+  router: { push: mockForbidden },
+  useNavigation: () => ({ getState: () => ({ type: "tab" }) }),
+}));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => ({ getAllAsync: mockForbidden }) }));
 jest.mock("@/lib/settings/context", () => ({
   useSettings: () => ({ isDark: false, isRTL: mockLanguage === "ar", uiLanguage: mockLanguage }),
@@ -113,24 +116,26 @@ describe.each(locales)("Reflection feed juz labels in %s", (language) => {
     jest.useRealTimers();
   });
   const number = (juz: number) => (language === "ar" ? toArabicNumber(juz) : String(juz));
+  // References use the interface's digits; the numeric token is isolated left to right.
+  const ref = (text: string) => `\u2066${text.replace(/\d/g, (d) => number(Number(d)))}\u2069`;
   const label = () => render(<ReflectionFeedScreen />).getByTestId("reference-label").props.children;
 
   it("omits juz when no range matches rather than using the reader fallback", () => {
-    expect(label()).toBe(`${strings[language].tabSurah} 2:1`);
+    expect(label()).toBe(`${strings[language].tabSurah} ${ref("2:1")}`);
   });
   it("uses the first matching parent group even when the row juz is zero", () => {
     mockGroups = [
       { juz: 22, ranges: [row(0)] },
       { juz: 7, ranges: [row(9)] },
     ];
-    expect(label()).toBe(`${strings[language].tabSurah} 2:1 · ${strings[language].tabJuz} ${number(22)}`);
+    expect(label()).toBe(`${strings[language].tabSurah} ${ref("2:1")} · ${strings[language].tabJuz} ${number(22)}`);
   });
   it("preserves reordered overlap precedence", () => {
     mockGroups = [
       { juz: 7, ranges: [row(9)] },
       { juz: 22, ranges: [row(0)] },
     ];
-    expect(label()).toBe(`${strings[language].tabSurah} 2:1 · ${strings[language].tabJuz} ${number(7)}`);
+    expect(label()).toBe(`${strings[language].tabSurah} ${ref("2:1")} · ${strings[language].tabJuz} ${number(7)}`);
   });
   it("resolves start and end inclusively across separate groups", () => {
     mockReflection.ayah_end = 6;
@@ -138,16 +143,16 @@ describe.each(locales)("Reflection feed juz labels in %s", (language) => {
       { juz: 4, ranges: [row(4, 1, 5)] },
       { juz: 5, ranges: [row(5, 6, 10)] },
     ];
-    expect(label()).toBe(`${strings[language].tabSurah} 2:1-6 · ${strings[language].tabJuz} ${number(4)}-${number(5)}`);
+    expect(label()).toBe(`${strings[language].tabSurah} ${ref("2:1-6")} · ${strings[language].tabJuz} ${ref("4-5")}`);
   });
   it("prefers stored finite juz labels over lookup", () => {
     mockReflection.juz_start = 8;
     mockReflection.juz_end = 8;
     mockGroups = [{ juz: 22, ranges: [row(0)] }];
-    expect(label()).toBe(`${strings[language].tabSurah} 2:1 · ${strings[language].tabJuz} ${number(8)}`);
+    expect(label()).toBe(`${strings[language].tabSurah} ${ref("2:1")} · ${strings[language].tabJuz} ${number(8)}`);
   });
   it("retains omission for a matching parent zero label", () => {
     mockGroups = [{ juz: 0, ranges: [row(9)] }];
-    expect(label()).toBe(`${strings[language].tabSurah} 2:1`);
+    expect(label()).toBe(`${strings[language].tabSurah} ${ref("2:1")}`);
   });
 });

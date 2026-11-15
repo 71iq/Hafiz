@@ -1,6 +1,8 @@
 import {
   addComment,
   createReflection,
+  deleteReflection,
+  deleteReflectionComment,
   fetchComments,
   fetchReflectionFeed,
   fetchReflections,
@@ -322,4 +324,46 @@ it("creation refuses an already retired caller before calling the server", async
   expect(mockFrom).not.toHaveBeenCalled();
   expect(mockRpc).not.toHaveBeenCalled();
   expect(builders).toHaveLength(0);
+});
+
+describe("author deletion uses the existing physical-delete server functions", () => {
+  it("sends the expected account and ids and reports true only when the server deleted", async () => {
+    results = [{ data: true }, { data: true }];
+    await expect(deleteReflection("viewer", "post")).resolves.toBe(true);
+    await expect(deleteReflectionComment("viewer", "comment")).resolves.toBe(true);
+    expect(mockRpc).toHaveBeenNthCalledWith(1, "delete_reflection", { p_user_id: "viewer", p_reflection_id: "post" });
+    expect(mockRpc).toHaveBeenNthCalledWith(2, "delete_reflection_comment", {
+      p_user_id: "viewer",
+      p_comment_id: "comment",
+    });
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("returns false for a reflection or comment that is gone or not this account's", async () => {
+    results = [{ data: false }, { data: false }, { data: null }];
+    await expect(deleteReflection("viewer", "post")).resolves.toBe(false);
+    await expect(deleteReflectionComment("viewer", "comment")).resolves.toBe(false);
+    await expect(deleteReflection("viewer", "post")).resolves.toBe(false);
+  });
+
+  it("throws server errors instead of reporting a deletion", async () => {
+    const error = { code: "42501", message: "account_changed" };
+    results = [
+      { data: null, error },
+      { data: true, error },
+    ];
+    await expect(deleteReflection("viewer", "post")).rejects.toBe(error);
+    await expect(deleteReflectionComment("viewer", "comment")).rejects.toBe(error);
+  });
+});
+
+it("reads an old unsupported feed sort as Newest", async () => {
+  results = [{ data: [] }];
+  await fetchReflectionFeed({
+    filter: { type: "all" },
+    sort: "oldest" as never,
+    page: 0,
+  });
+  const orders = builders[0].calls.filter(([method]) => method === "order");
+  expect(orders[0]).toEqual(["order", "created_at", { ascending: false }]);
 });

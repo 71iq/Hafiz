@@ -87,3 +87,11 @@ export function formatCards(n: number, language: Language): string {
   if (language === "ar") return arabicCount(n, CARDS);
   return n === 1 ? "1 card" : `${n.toLocaleString("en")} cards`;
 }
+
+const POINTS: ArabicForms = { one: "نقطة واحدة", two: "نقطتان", few: "نقاط", many: "نقطة" };
+
+/** Board points: "1 point", "12 points", "نقطتان", "١٢ نقطة". */
+export function formatPoints(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, POINTS);
+  return n === 1 ? "1 point" : `${n.toLocaleString("en")} points`;
+}

@@ -1,7 +1,7 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
-import { ChevronDown, Heart, Send } from "lucide-react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
+import { ChevronDown, Flag, Heart, Send, Trash2 } from "lucide-react-native";
 import { router } from "expo-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
@@ -10,7 +10,6 @@ import { useAuthStore } from "@/lib/auth/store";
 import { hapticLight } from "@/lib/haptics";
 import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
-import { formatRelativeTime } from "@/lib/i18n/relative-time";
 import { fetchComments, addComment, toggleCommentLike } from "@/lib/reflections/api";
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
@@ -20,9 +19,15 @@ import { DiscardChangesDialog, isEditableTextDirty, useDiscardGuard } from "@/co
 import { formatNumber } from "@/lib/i18n/count";
 import { Input } from "@/components/ui/Input";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { ReflectionCard } from "./ReflectionCard";
+import { formatCommentDateTime, formatLocalRelativeTime, ReflectionTime } from "./ReflectionTime";
 import { useReflectionMutationScope, type ReflectionMutationLease } from "./use-mutation-scope";
+import { useDeleteComment, useReportReflection } from "./use-reflection-actions";
 import { textStartStyle } from "@/lib/ui/direction";
+
+export { formatCommentDateTime };
 
 type Props = {
   reflectionId: string | null;
@@ -36,6 +41,10 @@ type Props = {
   /** Called after this sheet closes for a navigation, so a sheet that contains it can close too. */
   onNavigate?: () => void;
   onCommentAdded: (reflectionId: string) => void;
+  /** After the server confirmed deleting one of the viewer's comments, so the count shown drops by one. */
+  onCommentRemoved?: (reflectionId: string) => void;
+  /** After the author's delete of the shown reflection settled; the sheet has already closed. */
+  onReflectionGone?: (reflection: Reflection) => void;
 };
 
 /** The composer shows its counter from this length. */
@@ -44,25 +53,6 @@ export const COMMENT_MAX_LENGTH = 2000;
 /** Long comments start clamped to this many lines, with Show more. */
 const COMMENT_CLAMP_LINES = 6;
 const COMMENT_LINE_HEIGHT = 20;
-const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-
-function localizeDigits(value: string, language: string) {
-  return language === "ar" ? value.replace(/[0-9]/g, (digit) => ARABIC_INDIC_DIGITS[Number(digit)]) : value;
-}
-
-/** The full local date and time for a comment, in the interface's language and digits. */
-export function formatCommentDateTime(dateStr: string, language: string): string {
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return "";
-  let text: string;
-  try {
-    text = date.toLocaleString(language === "ar" ? "ar" : "en", { dateStyle: "long", timeStyle: "short" });
-  } catch {
-    text = date.toLocaleString();
-  }
-  return localizeDigits(text, language);
-}
-
 function sortComments(comments: ReflectionComment[], sort: ReflectionCommentSort): ReflectionComment[] {
   const sorted = [...comments];
   const createdAt = (comment: ReflectionComment) => new Date(comment.created_at).getTime();
@@ -87,6 +77,8 @@ export function CommentsSheet({
   onClose,
   onNavigate,
   onCommentAdded,
+  onCommentRemoved,
+  onReflectionGone,
 }: Props) {
   const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
@@ -132,6 +124,16 @@ export function CommentsSheet({
   const closeNow = useCallback(() => {
     if (retire()) onClose();
   }, [retire, onClose]);
+  // Comments have no report of their own: "Report reflection" reports the parent, and says so.
+  const parentReport = useReportReflection(reflection ?? null);
+  const removeLocalComment = useCallback(
+    (removed: ReflectionComment, deleted: boolean) => {
+      setLocalComments((prev) => prev.filter((row) => row.id !== removed.id));
+      if (deleted) onCommentRemoved?.(removed.reflection_id);
+    },
+    [onCommentRemoved],
+  );
+  const commentRemoval = useDeleteComment(reflectionId, removeLocalComment);
   // A typed comment asks before any intentional close or switch away from this reflection.
   const { guard, dialogProps } = useDiscardGuard(isEditableTextDirty(text, ""));
   const handleClose = useCallback(() => guard(closeNow), [closeNow, guard]);
@@ -368,6 +370,7 @@ export function CommentsSheet({
       >
         <OverlayHeader
           title={reflection ? s.reflectionPostTitle : s.reflectionComments}
+          subtitle={reflection ? referenceLabel : undefined}
           onClose={handleClose}
           isRTL={isRTL}
         />
@@ -388,6 +391,11 @@ export function CommentsSheet({
                 onCommentsPress={() => {}}
                 onLikeToggled={onLikeToggled ?? (() => {})}
                 onAuthRequired={requireAuth}
+                onGone={(gone) => {
+                  // The post is gone, so a typed comment has nowhere to go: close without asking.
+                  closeNow();
+                  onReflectionGone?.(gone);
+                }}
               />
             ) : null}
 
@@ -525,14 +533,48 @@ export function CommentsSheet({
                           handleSize={10}
                         />
                       </Pressable>
-                      <CommentTime
-                        relative={localizeDigits(formatRelativeTime(c.created_at, s.justNow, uiLanguage), uiLanguage)}
+                      <ReflectionTime
+                        relative={formatLocalRelativeTime(c.created_at, s.justNow, uiLanguage)}
                         full={formatCommentDateTime(c.created_at, uiLanguage)}
                         hint={s.commentFullDateHint}
                         revealed={dateRevealId === c.id}
                         onReveal={(show) => setDateRevealId((current) => (show ? c.id : current === c.id ? null : current))}
                         color={mutedColor}
                       />
+                      {user ? <View className="flex-1" /> : null}
+                      {user ? (
+                        <View>
+                          <DropdownMenu
+                            triggerLabel={s.commentOptions}
+                            align="end"
+                            isRTL={isRTL}
+                            items={
+                              c.user_id === user.id
+                                ? [
+                                    {
+                                      key: "delete",
+                                      label: s.commentDeleteAction,
+                                      destructive: true,
+                                      icon: (color) => <Trash2 size={16} color={color} />,
+                                      disabled: commentRemoval.pending,
+                                      onPress: () => commentRemoval.request(c),
+                                    },
+                                  ]
+                                : reflection
+                                  ? [
+                                      {
+                                        key: "report-parent",
+                                        label: parentReport.reported ? s.reflectionReported : s.reflectionReportAction,
+                                        icon: (color) => <Flag size={16} color={color} />,
+                                        disabled: parentReport.reported || parentReport.pending,
+                                        onPress: parentReport.request,
+                                      },
+                                    ]
+                                  : []
+                            }
+                          />
+                        </View>
+                      ) : null}
                     </View>
                     <View>
                       {/* An unclamped hidden copy tells whether the comment needs Show more. */}
@@ -792,6 +834,36 @@ export function CommentsSheet({
         </View>
       </ResponsiveSheet>
       <DiscardChangesDialog {...dialogProps} title={s.commentDiscardTitle} />
+      <ConfirmDialog
+        visible={commentRemoval.open}
+        title={s.commentDeleteTitle}
+        message={s.commentDeleteBody}
+        cancelLabel={s.reflectionCancel}
+        confirmLabel={s.reflectionDeleteConfirm}
+        pendingLabel={s.reflectionDeleting}
+        destructive
+        confirmLoading={commentRemoval.pending}
+        error={commentRemoval.error}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={commentRemoval.cancel}
+        onConfirm={() => void commentRemoval.confirm()}
+      />
+      <ConfirmDialog
+        visible={parentReport.open}
+        title={s.reflectionReportTitle}
+        message={interpolate(s.reflectionReportFromCommentBody, { reference: referenceLabel ?? s.reflectionPostTitle })}
+        cancelLabel={s.reflectionCancel}
+        confirmLabel={s.reflectionReportConfirm}
+        pendingLabel={s.reflectionReporting}
+        tone="info"
+        confirmLoading={parentReport.pending}
+        error={parentReport.error}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={parentReport.cancel}
+        onConfirm={() => void parentReport.confirm()}
+      />
     </>
   );
 }
@@ -807,43 +879,6 @@ function RetryButton({ label, onPress, isRTL }: { label: string; onPress: () => 
       <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
         {label}
       </Text>
-    </Pressable>
-  );
-}
-
-/**
- * Relative time that reveals the full date and time on long-press, pointer hover or keyboard
- * focus. Screen readers get the full date as its label.
- */
-function CommentTime({
-  relative,
-  full,
-  hint,
-  revealed,
-  onReveal,
-  color,
-}: {
-  relative: string;
-  full: string;
-  hint: string;
-  revealed: boolean;
-  onReveal: (show: boolean) => void;
-  color: string;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="text"
-      accessibilityLabel={full}
-      accessibilityHint={hint}
-      onLongPress={() => onReveal(!revealed)}
-      onHoverIn={() => onReveal(true)}
-      onHoverOut={() => onReveal(false)}
-      onFocus={() => onReveal(true)}
-      onBlur={() => onReveal(false)}
-      focusable={Platform.OS === "web"}
-      hitSlop={8}
-    >
-      <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color }}>{revealed ? full : relative}</Text>
     </Pressable>
   );
 }

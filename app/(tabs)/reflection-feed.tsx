@@ -1,11 +1,19 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { ChevronDown, MessageSquare, Search, X } from "lucide-react-native";
+import { ChevronDown, CloudOff, MessageSquare, Search, X } from "lucide-react-native";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
 import { Toast } from "@/components/ui/Toast";
@@ -15,12 +23,22 @@ import { CommentsSheet } from "@/components/reflections/CommentsSheet";
 import { useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { fetchReflectionFeed } from "@/lib/reflections/api";
-import type { Reflection, ReflectionFeedFilter, ReflectionFeedSort, ReflectionJuzRange } from "@/lib/reflections/types";
+import {
+  normalizeFeedSort,
+  type Reflection,
+  type ReflectionFeedFilter,
+  type ReflectionFeedSort,
+  type ReflectionJuzRange,
+} from "@/lib/reflections/types";
+import { formatAyahReference, isolateReference } from "@/lib/reflections/format";
+import { markCommentCountStale } from "@/lib/reflections/cache";
+import { useIsOffline } from "@/lib/social/use-social-query";
+import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
+import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { setPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { findJuzRangeForAyah } from "@/lib/mushaf/position";
@@ -42,7 +60,7 @@ type JuzOption = {
 };
 
 type FilterKind = "none" | "surah" | "juz";
-type PickerMode = "filter-kind" | "location" | "sort" | null;
+type PickerMode = "location" | "sort" | null;
 
 type FilterOptions = {
   surahs: SurahOption[];
@@ -67,7 +85,12 @@ export default function ReflectionFeedScreen() {
   const [filterKind, setFilterKind] = useState<FilterKind>("none");
   const [selectedSurah, setSelectedSurah] = useState<number | null>(null);
   const [selectedJuz, setSelectedJuz] = useState<number | null>(null);
-  const [sort, setSort] = useState<ReflectionFeedSort>("newest");
+  // Only Newest and Popular exist; any older saved value ("oldest", "less") reads as Newest.
+  const [sortState, setSortState] = useState<ReflectionFeedSort>("newest");
+  const sort = normalizeFeedSort(sortState);
+  const setSort = (value: unknown) => setSortState(normalizeFeedSort(value));
+  const offline = useIsOffline();
+  const openMushaf = useOpenMushaf();
   const [searchText, setSearchText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
@@ -204,7 +227,8 @@ export default function ReflectionFeedScreen() {
         const overlay = commentDeltas[reflection.id];
         return {
           ...reflection,
-          comments_count:
+          comments_count: Math.max(
+            0,
             reflection.comments_count +
             (overlay?.viewerId === user?.id &&
             overlay?.revision === feedRevision &&
@@ -212,6 +236,7 @@ export default function ReflectionFeedScreen() {
             overlay?.base === reflection.comments_count
               ? overlay.count
               : 0),
+          ),
         };
       }),
     [commentDeltas, rawReflections, user?.id, feedRevision, feedScope],
@@ -252,31 +277,33 @@ export default function ReflectionFeedScreen() {
     [s.reflectionFeedFilterAll, s.tabJuz, selectedJuz, uiLanguage],
   );
 
-  const selectedFilterKindLabel =
-    filterKind === "surah"
-      ? s.reflectionFeedFilterSurah
-      : filterKind === "juz"
-        ? s.reflectionFeedFilterJuz
-        : s.reflectionFeedFilterNone;
+  const locationLabel =
+    filterKind === "juz" && selectedJuz !== null
+      ? selectedJuzLabel
+      : filterKind === "surah" && selectedSurah !== null
+        ? selectedSurahLabel
+        : s.reflectionFeedAllReflections;
 
   const sortOptions: { value: ReflectionFeedSort; label: string }[] = [
     { value: "newest", label: s.reflectionFeedSortNewest },
-    { value: "oldest", label: s.reflectionFeedSortOldest },
     { value: "popular", label: s.reflectionFeedSortPopular },
-    { value: "less", label: s.reflectionFeedSortLessPopular },
   ];
   const selectedSortLabel = `${s.reflectionFeedSortBy}: ${
     sortOptions.find((option) => option.value === sort)?.label ?? s.reflectionFeedSortNewest
   }`;
 
-  // C06: one target through the shared store, then a tab switch; pushing would stack another tab root.
-  const handleReferencePress = useCallback((reflection: Reflection) => {
-    setPendingDeepLink({ surah: reflection.surah, ayah: reflection.ayah_start });
-    router.navigate("/(tabs)/mushaf");
-  }, []);
+  // C06: one target through the shared open-Mushaf helper, which only switches tab from here (pushing
+  // would stack another tab root). The feed stays mounted, so its scroll is where the reader left it.
+  const handleReferencePress = useCallback(
+    (reflection: Reflection) => {
+      openMushaf({ surah: reflection.surah, ayah: reflection.ayah_start });
+    },
+    [openMushaf],
+  );
 
-  const handleCommentAdded = useCallback(
-    (reflectionId: string) => {
+  // The count changes in place; the feed is only marked stale, so the post does not move or reload.
+  const adjustCommentCount = useCallback(
+    (reflectionId: string, step: 1 | -1) => {
       const base = rawReflections.find((row) => row.id === reflectionId)?.comments_count;
       if (base !== undefined && queryClient.getQueryState(feedKey)?.dataUpdateCount === feedRevision)
         setCommentDeltas((prev) => {
@@ -293,14 +320,19 @@ export default function ReflectionFeedScreen() {
                 previous.viewerId === user?.id &&
                 previous.revision === feedRevision &&
                 previous.scope === feedScope
-                  ? previous.count + 1
-                  : 1,
+                  ? previous.count + step
+                  : step,
             },
           };
         });
-      void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
+      markCommentCountStale(queryClient, reflectionId);
     },
     [rawReflections, user?.id, queryClient, feedKey, feedRevision, feedScope],
+  );
+  const handleCommentAdded = useCallback((reflectionId: string) => adjustCommentCount(reflectionId, 1), [adjustCommentCount]);
+  const handleCommentRemoved = useCallback(
+    (reflectionId: string) => adjustCommentCount(reflectionId, -1),
+    [adjustCommentCount],
   );
 
   const openPostModal = useCallback((reflectionId: string) => {
@@ -311,31 +343,30 @@ export default function ReflectionFeedScreen() {
     setToast(s.reflectionFeedAuthRequired);
   }, [s.reflectionFeedAuthRequired]);
 
+  // Reference digits follow the interface language; the numeric token stays left to right.
   const formatReference = useCallback(
     (reflection: Reflection) => {
       const surah = surahByNumber.get(reflection.surah);
       const surahName = uiLanguage === "ar" ? surah?.nameArabic : surah?.nameEnglish;
-      const ayahPart =
-        reflection.ayah_start === reflection.ayah_end
-          ? `${reflection.surah}:${reflection.ayah_start}`
-          : `${reflection.surah}:${reflection.ayah_start}-${reflection.ayah_end}`;
+      const ayahPart = formatAyahReference(reflection.surah, reflection.ayah_start, reflection.ayah_end, uiLanguage);
       const juzStart = Number.isFinite(reflection.juz_start)
         ? reflection.juz_start
         : findJuzForAyah(reflection.surah, reflection.ayah_start);
       const juzEnd = Number.isFinite(reflection.juz_end)
         ? reflection.juz_end
         : findJuzForAyah(reflection.surah, reflection.ayah_end);
+      const digits = (n: number) => (uiLanguage === "ar" ? toArabicNumber(n) : String(n));
       const juzPart =
         juzStart && juzEnd
-          ? juzStart === juzEnd
-            ? `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(juzStart) : juzStart}`
-            : `${s.tabJuz} ${uiLanguage === "ar" ? `${toArabicNumber(juzStart)}-${toArabicNumber(juzEnd)}` : `${juzStart}-${juzEnd}`}`
+          ? `${s.tabJuz} ${juzStart === juzEnd ? digits(juzStart) : isolateReference(`${digits(juzStart)}-${digits(juzEnd)}`)}`
           : null;
 
       return `${surahName ?? s.tabSurah} ${ayahPart}${juzPart ? ` · ${juzPart}` : ""}`;
     },
     [findJuzForAyah, s.tabJuz, s.tabSurah, surahByNumber, uiLanguage],
   );
+
+  const closePost = useCallback(() => setCommentsReflectionId(null), []);
 
   const renderReflection = useCallback(
     ({ item }: { item: Reflection }) => (
@@ -349,6 +380,7 @@ export default function ReflectionFeedScreen() {
         onPress={openPostModal}
         onLikeToggled={() => {}}
         onAuthRequired={showAuthRequired}
+        clamp
       />
     ),
     [formatReference, handleReferencePress, openPostModal, showAuthRequired],
@@ -362,13 +394,14 @@ export default function ReflectionFeedScreen() {
   const listFooter =
     configured && (feedQuery.hasNextPage || feedQuery.error) ? (
       <Pressable
+        accessibilityRole="button"
         onPress={() =>
           feedQuery.error && !feedQuery.isFetchNextPageError
             ? feedQuery.refetch({ cancelRefetch: false })
             : feedQuery.fetchNextPage({ cancelRefetch: false })
         }
         disabled={feedQuery.isFetching}
-        className="mb-10 mt-2 items-center rounded-full bg-primary-accent py-3 dark:bg-primary-bright"
+        className="mb-10 mt-2 min-h-11 items-center justify-center rounded-full bg-primary-accent py-3 dark:bg-primary-bright"
         style={({ pressed }) => ({ opacity: pressed || feedQuery.isFetching ? 0.65 : 1 })}
       >
         {feedQuery.isFetching ? (
@@ -379,23 +412,49 @@ export default function ReflectionFeedScreen() {
           </Text>
         )}
       </Pressable>
+    ) : configured && reflections.length > 0 ? (
+      <Text
+        className="mb-10 mt-2 text-center text-warm-500 dark:text-neutral-400"
+        style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 }}
+      >
+        {s.reflectionFeedEnd}
+      </Text>
     ) : (
       <View style={{ height: 36 }} />
     );
+
+  // Posts already loaded for this account stay through a failed refresh or lost connection, with a
+  // notice. The query key carries the viewer, so another account never sees them.
+  const staleNotice =
+    configured && reflections.length > 0 && !feedQuery.isFetching
+      ? offline
+        ? s.reflectionFeedStaleOffline
+        : feedQuery.isRefetchError
+          ? s.reflectionFeedStaleFailed
+          : null
+      : null;
+  const clearSearch = () => {
+    setSearchText("");
+    setSearchQuery("");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <View className="flex-1" style={contentContainerStyle}>
         <View className="flex-1" style={railStyle}>
           <View className="mt-4 mb-4 gap-2" style={{ direction: isRTL ? "rtl" : "ltr" }}>
+            <Text
+              accessibilityRole="header"
+              className="text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 22, lineHeight: 30, ...textStartStyle(isRTL) }}
+            >
+              {s.reflectionFeedTitle}
+            </Text>
             <ReflectionFeedSearch
               value={searchText}
               onChangeText={setSearchText}
               onSubmitSearch={() => setSearchQuery(searchText)}
-              onClear={() => {
-                setSearchText("");
-                setSearchQuery("");
-              }}
+              onClear={clearSearch}
               placeholder={s.reflectionFeedSearchPlaceholder}
               clearLabel={s.reflectionFeedClearSearch}
               isDark={isDark}
@@ -410,27 +469,12 @@ export default function ReflectionFeedScreen() {
               }}
             >
               <FilterSelect
-                accessibilityLabel={s.reflectionFeedSelectFilterType}
-                label={selectedFilterKindLabel}
+                accessibilityLabel={`${s.reflectionFeedLocation}: ${locationLabel}`}
+                label={locationLabel}
                 isDark={isDark}
                 isRTL={isRTL}
-                minWidth={112}
-                flex={0.8}
-                onPress={() => setPickerMode("filter-kind")}
-              />
-              <FilterSelect
-                accessibilityLabel={filterKind === "juz" ? s.reflectionFeedSelectJuz : s.reflectionFeedSelectSurah}
-                label={
-                  filterKind === "juz"
-                    ? selectedJuzLabel
-                    : filterKind === "surah"
-                      ? selectedSurahLabel
-                      : s.reflectionFeedFilterAll
-                }
-                isDark={isDark}
-                isRTL={isRTL}
-                minWidth={184}
-                flex={1.55}
+                minWidth={160}
+                flex={1.4}
                 onPress={() => setPickerMode("location")}
               />
               <FilterSelect
@@ -445,7 +489,23 @@ export default function ReflectionFeedScreen() {
             </View>
           </View>
 
+          {staleNotice ? (
+            <View
+              accessibilityLiveRegion="polite"
+              className="mb-3 items-center gap-2 rounded-2xl bg-surface-low px-4 py-3 dark:bg-surface-dark-low"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+            >
+              <CloudOff size={16} color={isDark ? "#a3a3a3" : "#6E5A47"} />
+              <Text
+                className="flex-1 text-warm-700 dark:text-neutral-300"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20, ...textStartStyle(isRTL) }}
+              >
+                {staleNotice}
+              </Text>
+            </View>
+          ) : null}
           {!configured ? (
+            // The service is not set up in this build: say so rather than calling it offline.
             <View className="flex-1 items-center justify-center">
               <EmptyState
                 icon={MessageSquare}
@@ -454,8 +514,19 @@ export default function ReflectionFeedScreen() {
                 isDark={isDark}
               />
             </View>
-          ) : feedQuery.isLoading ? (
+          ) : feedQuery.isLoading && !offline ? (
             <ReflectionsSkeleton isDark={isDark} className="flex-1" />
+          ) : reflections.length === 0 && offline ? (
+            <View className="flex-1 items-center justify-center">
+              <EmptyState
+                icon={CloudOff}
+                title={s.reflectionFeedOfflineTitle}
+                subtitle={s.reflectionFeedOfflineBody}
+                actionLabel={s.reflectionFeedRetry}
+                onAction={() => feedQuery.refetch({ cancelRefetch: false })}
+                isDark={isDark}
+              />
+            </View>
           ) : feedQuery.error && reflections.length === 0 ? (
             <View className="flex-1 items-center justify-center">
               <EmptyState
@@ -467,12 +538,23 @@ export default function ReflectionFeedScreen() {
                 isDark={isDark}
               />
             </View>
+          ) : reflections.length === 0 && normalizedSearchQuery ? (
+            <View className="flex-1 items-center justify-center">
+              <EmptyState
+                icon={Search}
+                title={interpolate(s.reflectionFeedSearchNoMatch, { q: normalizedSearchQuery })}
+                subtitle={s.reflectionFeedSearchEmptySubtitle}
+                actionLabel={s.reflectionFeedClearSearchAction}
+                onAction={clearSearch}
+                isDark={isDark}
+              />
+            </View>
           ) : reflections.length === 0 ? (
             <View className="flex-1 items-center justify-center">
               <EmptyState
                 icon={MessageSquare}
                 title={s.reflectionFeedEmptyTitle}
-                subtitle={normalizedSearchQuery ? s.reflectionFeedSearchEmptySubtitle : s.reflectionFeedEmptySubtitle}
+                subtitle={s.reflectionFeedEmptySubtitle}
                 isDark={isDark}
               />
             </View>
@@ -507,8 +589,8 @@ export default function ReflectionFeedScreen() {
         isDark={isDark}
         isRTL={isRTL}
         uiLanguage={uiLanguage}
-        onSelectKind={(kind) => {
-          setFilterKind(kind);
+        onSelectAll={() => {
+          setFilterKind("none");
           setSelectedSurah(null);
           setSelectedJuz(null);
           setPickerMode(null);
@@ -540,8 +622,10 @@ export default function ReflectionFeedScreen() {
         onReferencePress={handleReferencePress}
         onLikeToggled={() => {}}
         onAuthRequired={showAuthRequired}
-        onClose={() => setCommentsReflectionId(null)}
+        onClose={closePost}
         onCommentAdded={handleCommentAdded}
+        onCommentRemoved={handleCommentRemoved}
+        onReflectionGone={closePost}
       />
 
       <Toast message={toast} onDismiss={() => setToast(null)} />
@@ -682,7 +766,7 @@ function FilterPicker({
   isDark,
   isRTL,
   uiLanguage,
-  onSelectKind,
+  onSelectAll,
   onSelectSurah,
   onSelectJuz,
   onSelectSort,
@@ -698,9 +782,9 @@ function FilterPicker({
   isDark: boolean;
   isRTL: boolean;
   uiLanguage: "en" | "ar";
-  onSelectKind: (kind: FilterKind) => void;
-  onSelectSurah: (surah: number | null) => void;
-  onSelectJuz: (juz: number | null) => void;
+  onSelectAll: () => void;
+  onSelectSurah: (surah: number) => void;
+  onSelectJuz: (juz: number) => void;
   onSelectSort: (sort: ReflectionFeedSort) => void;
   onClose: () => void;
 }) {
@@ -708,119 +792,157 @@ function FilterPicker({
   const { width, height } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxHeight = Math.min(height - (isPhone ? 16 : 48), 680);
-  const title =
-    mode === "filter-kind"
-      ? s.reflectionFeedSelectFilterType
-      : mode === "sort"
-        ? s.reflectionFeedSortBy
-        : filterKind === "none"
-          ? s.reflectionFeedFilterAll
-          : filterKind === "surah"
-            ? s.reflectionFeedSelectSurah
-            : s.reflectionFeedSelectJuz;
+  const digits = (n: number) => (uiLanguage === "ar" ? toArabicNumber(n) : String(n));
+  // The Location sheet opens on the section that is in use; its tabs only change what is listed.
+  const [section, setSection] = useState<FilterKind>(filterKind);
+  const [surahQuery, setSurahQuery] = useState("");
+  const [openedFor, setOpenedFor] = useState<PickerMode>(null);
+  if (openedFor !== mode) {
+    setOpenedFor(mode);
+    if (mode === "location") {
+      setSection(filterKind);
+      setSurahQuery("");
+    }
+  }
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledFor = useRef<string | null>(null);
+  const activeKey =
+    mode === "location" && section === filterKind
+      ? section === "surah" && selectedSurah !== null
+        ? `surah:${selectedSurah}`
+        : section === "juz" && selectedJuz !== null
+          ? `juz:${selectedJuz}`
+          : null
+      : null;
+  if (mode !== "location") scrolledFor.current = null;
+  // Opens scrolled to the active surah or juz, once per opening.
+  const revealActive = (key: string, y: number) => {
+    if (key !== activeKey || scrolledFor.current === key) return;
+    scrolledFor.current = key;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 120), animated: false });
+  };
+
+  const surahMatches = useMemo(() => {
+    const query = surahQuery.trim().toLowerCase();
+    if (!query) return options.surahs;
+    const asciiQuery = query.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+    return options.surahs.filter(
+      (surah) =>
+        surah.nameEnglish.toLowerCase().includes(query) ||
+        surah.nameArabic.includes(surahQuery.trim()) ||
+        String(surah.number) === asciiQuery,
+    );
+  }, [options.surahs, surahQuery]);
+
+  const title = mode === "sort" ? s.reflectionFeedSortBy : s.reflectionFeedLocation;
+  const sectionItems: { value: FilterKind; label: string }[] = [
+    { value: "none", label: s.reflectionFeedFilterAll },
+    { value: "surah", label: s.reflectionFeedFilterSurah },
+    { value: "juz", label: s.reflectionFeedFilterJuz },
+  ];
 
   return (
     <ResponsiveSheet open={mode !== null} onClose={onClose} maxWidth={560} maxHeight={maxHeight}>
       <OverlayHeader title={title} onClose={onClose} showHandle={isPhone} isRTL={isRTL} />
-      <OverlayBody contentContainerClassName="px-5 pt-3 pb-6">
-        {mode === "filter-kind" ? (
+      {mode === "location" ? (
+        <View className="gap-3 px-5 pt-3">
+          <ToggleGroup<FilterKind>
+            value={section}
+            onValueChange={setSection}
+            items={sectionItems}
+            dir={isRTL ? "rtl" : "ltr"}
+          />
+          {section === "surah" ? (
+            <View
+              className="min-h-11 items-center gap-2 rounded-2xl bg-surface-low px-4 dark:bg-surface-dark-low"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+            >
+              <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
+              <TextInput
+                value={surahQuery}
+                onChangeText={setSurahQuery}
+                placeholder={s.reflectionFeedSearchSurahs}
+                accessibilityLabel={s.reflectionFeedSearchSurahs}
+                placeholderTextColor={isDark ? "#737373" : "#8B8178"}
+                autoCorrect={false}
+                className="min-h-11 flex-1 py-2 text-charcoal dark:text-neutral-100"
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 14,
+                  ...inputTextStartStyle(isRTL),
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+      <OverlayBody scrollRef={scrollRef} contentContainerClassName="px-5 pt-3 pb-6">
+        {mode === "sort" ? (
           <>
-            <PickerRow
-              active={filterKind === "none"}
-              isDark={isDark}
-              isRTL={isRTL}
-              leading=""
-              title={s.reflectionFeedFilterNone}
-              onPress={() => onSelectKind("none")}
-            />
-            <PickerRow
-              active={filterKind === "surah"}
-              isDark={isDark}
-              isRTL={isRTL}
-              leading=""
-              title={s.reflectionFeedFilterSurah}
-              onPress={() => onSelectKind("surah")}
-            />
-            <PickerRow
-              active={filterKind === "juz"}
-              isDark={isDark}
-              isRTL={isRTL}
-              leading=""
-              title={s.reflectionFeedFilterJuz}
-              onPress={() => onSelectKind("juz")}
-            />
-          </>
-        ) : mode === "sort" ? (
-          <>
-            {sortOptions.map((option, index) => (
+            {sortOptions.map((option) => (
               <PickerRow
                 key={option.value}
                 active={sort === option.value}
                 isDark={isDark}
                 isRTL={isRTL}
-                leading={uiLanguage === "ar" ? toArabicNumber(index + 1) : String(index + 1)}
+                leading=""
                 title={option.label}
                 onPress={() => onSelectSort(option.value)}
               />
             ))}
           </>
-        ) : filterKind === "none" ? (
+        ) : section === "none" ? (
           <PickerRow
-            active
+            active={filterKind === "none"}
             isDark={isDark}
             isRTL={isRTL}
             leading=""
-            title={s.reflectionFeedFilterAll}
-            onPress={onClose}
+            title={s.reflectionFeedAllReflections}
+            onPress={onSelectAll}
           />
-        ) : filterKind === "surah" ? (
+        ) : section === "surah" ? (
           <>
-            <PickerRow
-              active={selectedSurah === null}
-              isDark={isDark}
-              isRTL={isRTL}
-              leading=""
-              title={s.reflectionFeedFilterAll}
-              onPress={() => onSelectSurah(null)}
-            />
-            {options.surahs.map((surah) => {
-              const active = selectedSurah === surah.number;
+            {surahMatches.length === 0 ? (
+              <Text
+                className="py-6 text-center text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
+              >
+                {s.reflectionFeedNoSurahMatch}
+              </Text>
+            ) : null}
+            {surahMatches.map((surah) => {
+              const active = filterKind === "surah" && selectedSurah === surah.number;
               return (
                 <PickerRow
                   key={surah.number}
                   active={active}
                   isDark={isDark}
                   isRTL={isRTL}
-                  leading={uiLanguage === "ar" ? toArabicNumber(surah.number) : String(surah.number)}
+                  leading={digits(surah.number)}
                   title={uiLanguage === "ar" ? surah.nameArabic : surah.nameEnglish}
                   subtitle={uiLanguage === "ar" ? surah.nameEnglish : surah.nameArabic}
                   onPress={() => onSelectSurah(surah.number)}
+                  onLayoutY={active ? (y) => revealActive(`surah:${surah.number}`, y) : undefined}
                 />
               );
             })}
           </>
         ) : (
           <>
-            <PickerRow
-              active={selectedJuz === null}
-              isDark={isDark}
-              isRTL={isRTL}
-              leading=""
-              title={s.reflectionFeedFilterAll}
-              onPress={() => onSelectJuz(null)}
-            />
             {options.juz.map((juz) => {
-              const active = selectedJuz === juz.juz;
+              const active = filterKind === "juz" && selectedJuz === juz.juz;
               return (
                 <PickerRow
                   key={juz.juz}
                   active={active}
                   isDark={isDark}
                   isRTL={isRTL}
-                  leading={uiLanguage === "ar" ? toArabicNumber(juz.juz) : String(juz.juz)}
-                  title={`${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(juz.juz) : juz.juz}`}
-                  subtitle={`${uiLanguage === "ar" ? juz.surahNameArabic : juz.surahNameEnglish} ${juz.startSurah}:${juz.startAyah}`}
+                  leading={digits(juz.juz)}
+                  title={`${s.tabJuz} ${digits(juz.juz)}`}
+                  subtitle={`${uiLanguage === "ar" ? juz.surahNameArabic : juz.surahNameEnglish} ${formatAyahReference(juz.startSurah, juz.startAyah, juz.startAyah, uiLanguage)}`}
                   onPress={() => onSelectJuz(juz.juz)}
+                  onLayoutY={active ? (y) => revealActive(`juz:${juz.juz}`, y) : undefined}
                 />
               );
             })}
@@ -839,6 +961,7 @@ function PickerRow({
   title,
   subtitle,
   onPress,
+  onLayoutY,
 }: {
   active: boolean;
   isDark: boolean;
@@ -847,11 +970,15 @@ function PickerRow({
   title: string;
   subtitle?: string;
   onPress: () => void;
+  onLayoutY?: (y: number) => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      className={`mb-1.5 items-center rounded-2xl px-3 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onLayout={onLayoutY ? (event) => onLayoutY(event.nativeEvent.layout.y) : undefined}
+      className={`mb-1.5 min-h-11 items-center rounded-2xl px-3 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
       style={({ pressed }) => ({
         backgroundColor: active
           ? isDark

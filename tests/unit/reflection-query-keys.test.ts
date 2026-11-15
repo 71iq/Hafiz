@@ -80,7 +80,7 @@ describe("reflection query keys preserve existing cache contracts", () => {
     const variants: Parameters<typeof keys.feed.list>[0][] = [
       base,
       { ...base, viewerId: "b" },
-      { ...base, sort: "oldest" },
+      { ...base, sort: "newest" },
       { ...base, filter: { type: "surah", surah: 2 } },
       { ...base, juzRanges: [] },
       { ...base, searchTerm: "other" },
@@ -92,7 +92,7 @@ describe("reflection query keys preserve existing cache contracts", () => {
   it("feed family invalidation reaches every viewer/filter but leaves comments/public data alone", async () => {
     const a = feed("a"),
       b = feed("b"),
-      c = keys.feed.list({ filter: { type: "all" }, sort: "less", searchTerm: "" });
+      c = keys.feed.list({ filter: { type: "all" }, sort: "popular", searchTerm: "" });
     const other = [
       ["publicProfile", "a"],
       keys.comments.list({ reflectionId: "p", sort: "oldest", viewerId: "a" }),
