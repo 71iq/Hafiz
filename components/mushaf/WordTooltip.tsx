@@ -18,7 +18,6 @@ const DISMISS_DRAG_DISTANCE = 8;
 const WORD_TOKEN_SELECTOR = "[data-hafiz-quran-token='word']";
 const TOOLTIP_SELECTOR = "[data-hafiz-word-tooltip='true']";
 
-/** The rendered word token, so focus can return to it after the gloss or detail sheet closes. */
 function wordElement(word: Pick<WordRef, "surah" | "ayah" | "wordPos">): HTMLElement | null {
   if (Platform.OS !== "web" || typeof document === "undefined") return null;
   return document.querySelector<HTMLElement>(
@@ -65,7 +64,6 @@ function TooltipPopup({
     tooltipWidth > 0
       ? Math.max(SIDE_MARGIN, Math.min(centerX - tooltipWidth / 2, viewportWidth - tooltipWidth - SIDE_MARGIN))
       : centerX;
-  // A two-line meaning makes the pill taller; it still ends just above the word.
   const top = position.y - tooltipHeight - ARROW_SIZE - GAP;
 
   return (
@@ -103,7 +101,6 @@ function TooltipPopup({
           alignItems: "center",
           gap: 5,
           maxWidth: maxTooltipWidth,
-          // Ambient teal-tinted shadow
           shadowColor: "#000",
           shadowOpacity: 0.04,
           shadowRadius: 32,
@@ -129,7 +126,6 @@ function TooltipPopup({
         </Text>
         <TooltipChevron size={12} color={colors.muted} />
       </View>
-      {/* Down-pointing caret */}
       <View
         style={{
           alignSelf: "center",
@@ -185,7 +181,6 @@ export function FloatingWordTooltip() {
     uiLanguage,
   ]);
 
-  // Escape closes the gloss (the topmost reader surface) and returns focus to its word.
   useEffect(() => {
     if (!tooltipWord || Platform.OS !== "web" || typeof window === "undefined") return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -266,7 +261,6 @@ export function FloatingWordTooltip() {
       isDark={isDark}
       openLabel={s.wordTooltipOpenDetail}
       onPress={() => {
-        // Focus moves to the word first, so the detail sheet restores focus to it when it closes.
         wordElement(tooltipWord)?.focus?.();
         openDetail(tooltipWord);
       }}

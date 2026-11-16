@@ -13,11 +13,6 @@ import {
 import type { Reflection, ReflectionComment } from "@/lib/reflections/types";
 import { useReflectionMutationScope } from "./use-mutation-scope";
 
-/**
- * Reports this session has sent, per account and reflection, so the card and a comment's "Report
- * reflection" agree on the truthful Reported state. In memory only; the reports table stays the
- * record, and nothing is hidden automatically.
- */
 const sentReports = new Set<string>();
 const reportListeners = new Set<() => void>();
 const reportKey = (viewerId: string | undefined, reflectionId: string | undefined) =>
@@ -30,7 +25,6 @@ function recordReport(key: string) {
   sentReports.add(key);
   reportListeners.forEach((listener) => listener());
 }
-/** Test hook: forget reports sent in earlier cases. */
 export function resetSentReportsForTests() {
   sentReports.clear();
 }
@@ -44,10 +38,6 @@ export type ConfirmAction = {
   confirm: () => Promise<void>;
 };
 
-/**
- * Report a reflection through the existing reporting flow after a confirmation. Pending admission
- * prevents duplicate reports; a failure keeps the dialog open with its error and Try again.
- */
 export function useReportReflection(reflection: Reflection | null | undefined): ConfirmAction & { reported: boolean } {
   const s = useStrings();
   const user = useAuthStore((state) => state.user);
@@ -61,7 +51,6 @@ export function useReportReflection(reflection: Reflection | null | undefined): 
   );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // A different reflection or account starts closed.
   const [owner, setOwner] = useState(key);
   if (owner !== key) {
     setOwner(key);
@@ -108,12 +97,6 @@ export function useReportReflection(reflection: Reflection | null | undefined): 
   };
 }
 
-/**
- * Delete the signed-in author's reflection through delete_reflection. Only a confirmed `true`
- * removes it from the caches; `false` means it is gone or not this account's, so the lists refresh
- * and the person is told it is no longer available, never that it was deleted. A completion after
- * the account, session or card changed does nothing.
- */
 export function useDeleteReflection(reflection: Reflection, onGone?: (reflection: Reflection) => void): ConfirmAction {
   const s = useStrings();
   const user = useAuthStore((state) => state.user);
@@ -185,11 +168,6 @@ export function useDeleteReflection(reflection: Reflection, onGone?: (reflection
   };
 }
 
-/**
- * Delete one of the signed-in author's comments through delete_reflection_comment. `onRemoved`
- * runs only after a confirmed `true`, so the caller can lower the visible count; `false` refreshes
- * the comments and says the comment is no longer available.
- */
 export function useDeleteComment(
   reflectionId: string | null,
   onRemoved: (comment: ReflectionComment, deleted: boolean) => void,

@@ -8,10 +8,6 @@ import type { UIStrings } from "@/lib/i18n/strings";
 
 type Props = { language: "en" | "ar"; s: UIStrings; showZayt: boolean; onChoose: (level: SupportLevel) => void };
 
-/**
- * 6.4 welcome back, without blame: the user says how their memorization feels, which sets the
- * starting support level, and the review opens with their strongest pages.
- */
 export function WelcomeBackCard({ language, s, showZayt, onChoose }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const options: { label: string; level: SupportLevel }[] = [

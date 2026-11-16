@@ -24,11 +24,9 @@ type Props = {
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
-  /** Opens the hifz plan and memorized portion setup. */
   onOpenPlan: () => void;
 };
 
-/** A short page count for a segmented chip: "½", "1" or "١", under a "Pages" caption. */
 function shortPages(pages: number, language: "en" | "ar"): string {
   return pages === 0.5 ? "½" : formatNumber(pages, language);
 }
@@ -49,11 +47,6 @@ function Row({ label, hint, dir, children }: { label: string; hint?: string; dir
   );
 }
 
-/**
- * Wird settings (spec 7.6): the minimum wird, whether meaning reviews count toward it, the week
- * start for steady weeks (STR-28), the streak goal (STR-19) and the excused days and pause sheet.
- * All are synced settings, so a change follows the account.
- */
 export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const mutedIcon = mutedIconColor(useSettings().effectiveTheme);

@@ -54,8 +54,6 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
     setMatchY(event.nativeEvent.layout.y);
   };
 
-  // A phrase such as "على الناس" is stored once per word with the same text and analysis; show it once
-  // and treat it as the tapped word's entry when any of its words is the one tapped.
   const groupedRows = rows.reduce<{ row: WordIrabDaasRow; wordPositions: number[] }[]>((groups, row) => {
     const previous = groups[groups.length - 1];
     if (previous && previous.row.word === row.word && previous.row.irab === row.irab) {
@@ -108,7 +106,6 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
                 ? "border-r-[3px] border-primary-accent bg-primary-accent/10 dark:border-primary-bright dark:bg-primary-bright/10"
                 : "bg-surface-high dark:bg-surface-dark-high"
             }`}
-            // The accent sits where the Arabic analysis starts reading, on the right in both interfaces.
           >
             {row.word && (
               <Text

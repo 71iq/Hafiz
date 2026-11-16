@@ -18,11 +18,6 @@ export type ReviewTransition = Readonly<{
   shouldRequeueInSession: boolean;
 }>;
 
-/**
- * A card counts as due once it is due within this window, like Anki's learn-ahead limit. Home counts,
- * session queues and in-session requeues share it, so a card on a 1m or 10m learning step comes back
- * after the cards ahead of it while one scheduled hours out waits until it is nearly due.
- */
 export const REVIEW_LEARN_AHEAD_MS = 20 * 60 * 1000;
 
 export function reviewDueCutoff(now = new Date()): string {

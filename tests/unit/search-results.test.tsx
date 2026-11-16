@@ -41,7 +41,6 @@ const mockTextRequests: { sql: string; params: readonly unknown[]; pending: Retu
 const mockRootRequests: { sql: string; params: readonly unknown[]; pending: ReturnType<typeof deferred<RootRow[]>> }[] =
   [];
 const mockIndexRequests: ReturnType<typeof deferred<IndexRow[]>>[] = [];
-// Sanitized surah fixture: two real names plus a deliberately repeated alias for the choice list.
 const mockSurahs = [
   { number: 2, name_arabic: "البقرة", name_english: "The Cow" },
   { number: 18, name_arabic: "الكهف", name_english: "The Cave" },
@@ -202,7 +201,6 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     await settle(() => textRequest().pending.resolve([row("obsolete result")]));
     expect(view.getByText("current result")).toBeTruthy();
     expect(view.queryByText("obsolete result")).toBeNull();
-    // Debounced typing searches but never fills history.
     expect(mockRun).not.toHaveBeenCalled();
   });
   it("keeps current loading state when old success finishes", async () => {
@@ -440,12 +438,10 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
         { ...row("third root result", 3), word_pos: 5, word_text: "word", root: "جيء", lemma: "group two" },
       ]),
     );
-    // Thirty places or fewer open every group; a header still collapses its group.
     expect(view.getByText("first root result")).toBeTruthy();
     expect(view.getByText("third root result")).toBeTruthy();
     fireEvent.press(view.getByText("group two"));
     expect(view.queryByText("third root result")).toBeNull();
-    // Two distinct roots offer choices, defaulting to all of them.
     fireEvent.press(view.getByText("ج ي ء"));
     expect(view.queryByText("first root result")).toBeNull();
     fireEvent.press(view.getByText(strings[language].homeSearchAllRoots));
@@ -487,7 +483,6 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     await settle(() => textRequest().pending.resolve([row("tap result")]));
     fireEvent.press(view.getByText("tap result"));
     expect(view.close).toHaveBeenCalledTimes(1);
-    // The target waits for the sheet to close, then is submitted once.
     expect(mockPendingLink).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
     view.visible(false);
@@ -539,7 +534,6 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     const view = mount();
     view.edit("pending");
     await advance();
-    // The search key saves the query deliberately; only the late search result must be ignored.
     await settle(() => view.submit());
     const writesBeforeClose = mockRun.mock.calls.length;
     view.visible(false);
@@ -607,7 +601,6 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     view.edit("Repeated Name");
     const choices = language === "ar" ? ["سورة اسم مكرر (٤٠)", "سورة اسم مكرر (٤١)"] : ["Ghafir (40)", "Fussilat (41)"];
     for (const choice of choices) expect(view.getByText(choice)).toBeTruthy();
-    // The search key does not guess between them.
     view.submit();
     expect(view.close).not.toHaveBeenCalled();
     fireEvent.press(view.getByText(choices[1]));

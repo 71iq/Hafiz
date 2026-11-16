@@ -18,11 +18,6 @@ import { ChromeProvider, useChrome } from "@/lib/ui/chrome";
 import { StatusBar } from "expo-status-bar";
 import { isSearchShortcut, openSearch } from "@/lib/navigation/search-launcher";
 
-/**
- * The one sync runner for the tabs. Its status reaches the profile card and account row through
- * context; there is no floating indicator over screens. A paused restore (W07) keeps one persistent
- * Resume sync affordance, and the restore consent confirmation lives beside the results it answers.
- */
 function SyncOwner({ children }: { children: ReactNode }) {
   const { immersive } = useChrome();
   const { status, pendingCount, failure, lastSyncedAt, syncNow } = useSync();
@@ -54,7 +49,6 @@ function SyncOwner({ children }: { children: ReactNode }) {
   );
 }
 
-/** Ctrl/Cmd+K and `/` open the existing Search outside text editing and open overlays (web). */
 function useSearchShortcut() {
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
@@ -69,7 +63,6 @@ function useSearchShortcut() {
   }, []);
 }
 
-// Home is the tab navigator's initial route so Back never lands on the hidden index redirect.
 export const unstable_settings = {
   initialRouteName: "home",
 };
@@ -85,21 +78,15 @@ function TabsWithStrings() {
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeSurface} />
       {!immersive && <OfflineBanner uiLanguage={uiLanguage} />}
       <Tabs
-        // Android Back from a tab returns to Home, then leaves the app. The hidden index route only
-        // decides between onboarding and Home, so it must never be a Back destination.
         backBehavior="initialRoute"
         screenOptions={{
           headerShown: false,
         }}
         tabBar={(props) => <AppNavigation {...props} isRTL={isRTL} />}
-        // Each tab has its own boundary, so a crash keeps the tab bar and sidebar usable.
         screenLayout={({ children, route }) => (
           <ErrorBoundary section={`tab:${route.name}`}>{children}</ErrorBoundary>
         )}
       >
-        {/* Home is declared first: the router takes the first screen as the initial route that
-            backBehavior returns to, so the hidden index redirect must not come first (Back from Home
-            showed its blank screen). */}
         <Tabs.Screen
           name="home"
           options={{
@@ -118,10 +105,6 @@ function TabsWithStrings() {
           name="index"
           options={{ href: null }}
         />
-        {/* Hidden routes.
-            `search` stays hidden in Phase 2 because /search is currently a
-            redirect placeholder. It will become a visible mobile tab once the
-            real full-screen search UI ships. */}
         <Tabs.Screen
           name="flashcards"
           options={{ href: null }}
@@ -150,9 +133,6 @@ function TabsWithStrings() {
             ),
           }}
         />
-        {/* Phones show Home, Mushaf, Progress and Settings (AppNavigation PHONE_TAB_ROUTES); Halaqa and
-            Board are reached from labeled rows on Home and Progress. From 768px the panel and sidebar
-            list all six destinations. The Board keeps the leaderboard route. */}
         <Tabs.Screen
           name="mushaf"
           options={{

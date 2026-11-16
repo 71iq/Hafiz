@@ -4,16 +4,6 @@ import * as fc from "fast-check";
 import { mergeHabitDays } from "@/lib/habit/merge";
 import { EARNED_STATUSES, effectiveStatus, type HabitDayRow } from "@/lib/habit/types";
 
-/**
- * supabase/tests/habit-merge-cases.json is the shared contract between lib/habit/merge.ts and the
- * server trigger private.merge_habit_day. This test proves every expected row is what the TypeScript
- * merge returns for each order of its inputs; supabase/tests/learning_consistency.test.sql proves the
- * server returns the same rows. Regenerate with UPDATE_HABIT_MERGE_FIXTURE=1 after a deliberate change.
- *
- * Times mostly use one spelling (".000Z"). The server stores instants, so it never sees the spelling.
- * The excuse register therefore orders by instant, then reason, on both sides, and the spelling only
- * picks which equal string the client keeps; the named "spelled differently" cases pin that down.
- */
 const FIXTURE = path.join(process.cwd(), "supabase/tests/habit-merge-cases.json");
 const TODAY = "2026-11-13";
 const T = (hour: number) => `2026-11-13T${String(hour).padStart(2, "0")}:00:00.000Z`;

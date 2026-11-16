@@ -7,16 +7,8 @@ import { getLocalSurahProgress } from "@/lib/profile/progress";
 import { hasCompletedAccountRestore, readRestorePause } from "@/lib/database/sync";
 import { errorMessage } from "@/lib/error-message";
 
-/**
- * After a sync, repair this account's own surah progress on the server from the device. The server
- * also maintains it from synced study cards; only the owner can read it (spec 5.6, SOC-01).
- *
- * Client-written scores, totals and streaks were retired with daily_scores: board points are computed
- * by the server from synced wird days (PTS-02, PTS-05).
- */
 type StatsOwner = {
   userId: string;
-  /** Account and session; the unchanged-upload memory belongs to exactly one. */
   key: string;
   isCurrent: () => boolean;
 };
@@ -36,11 +28,6 @@ function captureStatsOwner(): StatsOwner | null {
 
 let statsQueue: { owner: StatsOwner; tail: Promise<void> } | null = null;
 
-/**
- * The local figures last uploaded successfully for one account/session, in memory only. Repeated
- * triggers (profile open, review, sync) with unchanged figures skip the upload; a failure records
- * nothing, so the next trigger retries; another owner starts empty.
- */
 let lastUploaded: { ownerKey: string; figures: string } | null = null;
 
 function enqueueStats(owner: StatsOwner, work: () => Promise<void>): Promise<void> {
@@ -57,7 +44,6 @@ function enqueueStats(owner: StatsOwner, work: () => Promise<void>): Promise<voi
   return result;
 }
 
-/** Account-derived uploads wait for a completed restore and stay off while sync is paused for consent. */
 async function canWriteAccountDerivedStats(db: DatabaseExecutor, owner: StatsOwner): Promise<boolean> {
   const [restored, pause] = await Promise.all([
     hasCompletedAccountRestore(db, owner.userId),
@@ -68,7 +54,6 @@ async function canWriteAccountDerivedStats(db: DatabaseExecutor, owner: StatsOwn
   return restored && pause === null;
 }
 
-/** Repairs this account's server-side surah progress from local cards. Bound to the account that started it. */
 export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const owner = captureStatsOwner();
@@ -133,7 +118,6 @@ export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
   });
 }
 
-/** Test hook: forget the last uploaded figures. */
 export function resetProfileStatsMemoryForTests() {
   lastUploaded = null;
 }

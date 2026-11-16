@@ -17,7 +17,6 @@ import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
 
 type BusyAction = "copy" | "highlight" | "remove-highlight" | "bookmark";
 
-/** "Al-Baqarah 2:255" / "البقرة ٢:٢٥٥", or a range "2:255-257" in the same surah. */
 export function selectionTitle(
   index: MushafIndex | null,
   isRTL: boolean,
@@ -164,8 +163,6 @@ export function SelectionActionBar() {
     >
       <OverlayHeader title={title} onClose={handleClose} isRTL={isRTL} />
       <OverlayBody contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 }}>
-        {/* Five equal columns with two-line labels fit 320px phones. The row mirrors by hand, so it
-            pins LTR coordinates; an inherited "rtl" would flip it back. */}
         <View
           style={{
             direction: "ltr",
@@ -370,9 +367,7 @@ function ActionButton({
   isDark: boolean;
   isRTL: boolean;
   active?: boolean;
-  /** This action's write is pending: a spinner replaces its icon. */
   busy?: boolean;
-  /** Another action's write is pending: this one is disabled and dimmed. */
   dimmed?: boolean;
   expanded?: boolean;
 }) {

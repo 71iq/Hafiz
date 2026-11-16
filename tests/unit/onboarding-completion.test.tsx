@@ -28,7 +28,6 @@ jest.mock("@/lib/settings/context", () => ({
 }));
 jest.mock("@/lib/database/user-settings", () => ({ writeUserSetting: jest.fn() }));
 jest.mock("@/lib/habit/use-habit-overview", () => ({ emitHabitChanged: jest.fn() }));
-// The five-step flow has its own tests; here it stands in for one committed plan save.
 jest.mock("@/components/hifz/HifzSetupFlow", () => {
   const { Pressable, Text } = jest.requireActual<typeof import("react-native")>("react-native");
   const { DEFAULT_HIFZ_PLAN: plan } = jest.requireActual<typeof import("@/lib/hifz/plan")>("@/lib/hifz/plan");

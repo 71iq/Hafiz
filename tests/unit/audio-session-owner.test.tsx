@@ -147,7 +147,6 @@ describe("audio session owner", () => {
     await flush();
     expect(audio.session?.status).toBe("error");
 
-    // A late load of the abandoned file does not revive it.
     setStatus({ isLoaded: true, playing: true });
     expect(audio.session?.status).toBe("error");
     setStatus({ isLoaded: false, playing: false });
@@ -269,7 +268,6 @@ describe("audio session owner", () => {
     expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: "https://audio.test/3/1-1.mp3" });
     expect(audio.session).toMatchObject({ kind: "preview" });
     expect(audio.mainActive).toBe(false);
-    // A preview never shows as the ayah's own playback or takes the lock screen.
     expect(audio.getAyahState(1, 1, 3).active).toBe(false);
     expect(mockPlayer.setActiveForLockScreen.mock.calls.filter(([active]) => active === true)).toHaveLength(1);
 
@@ -293,7 +291,6 @@ describe("audio session owner", () => {
       });
     });
     setStatus({ isLoaded: true, playing: true });
-    // Headphones unplugged: the platform pauses the player.
     setStatus({ playing: false });
     await act(async () => {
       jest.advanceTimersByTime(1000);

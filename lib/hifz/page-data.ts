@@ -1,14 +1,11 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 
-/** One page-font glyph on a recitation page. A null wordPos is the ayah-end marker or an unaligned word. */
 export type PageToken = Readonly<{
   glyph: string;
   surah: number;
   ayah: number;
-  /** 1-based word position, or null for the ayah marker and for words that could not be aligned. */
   wordPos: number | null;
   isMarker: boolean;
-  /** L1 cue: the word's first letter with its marks, or null when the word could not be aligned. */
   firstLetter: string | null;
 }>;
 
@@ -26,15 +23,10 @@ export type RecitationPage = Readonly<{
   ayahs: readonly { surah: number; ayah: number }[];
 }>;
 
-/** Per page, the glyphs on each line (the reader's page-words data). */
 export type PageWordsLines = Readonly<Record<string, string>>;
 
 const ARABIC_MARK = /[ؐ-ًؚ-ٰٟۖ-ۜ۟-۪ۨ-ۭ]/;
 
-/**
- * The first letter of an Uthmani word with the marks that sit on it, so L1 shows "ٱ" for "ٱللَّهِ"
- * and "إِ" for "إِنَّ". Rendered from the canonical text and never stored (ETH-12).
- */
 export function firstLetterOf(word: string): string {
   const chars = Array.from(word);
   if (chars.length === 0) return "";
@@ -84,13 +76,6 @@ function structural(row: LineRow): PageLine {
   };
 }
 
-/**
- * Build a recitation page with the same line breaks as the reader (MushafPage): the page-words
- * lines when their glyphs match the page's ayat exactly, otherwise each line's word-id range.
- * Each ayah's glyphs are its words then its end marker. When an ayah has more glyphs than Unicode
- * words (a few hundred ayat carry an extra mark glyph), its words keep no position or first letter
- * rather than a wrong one.
- */
 export function buildRecitationPage(
   page: number,
   ayahs: readonly AyahRow[],

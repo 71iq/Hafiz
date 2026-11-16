@@ -1,7 +1,6 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { RotateCcw } from "lucide-react-native";
 
-/** Loading and error states drawn inside the preview box. */
 export function ZaytPreviewLoading({ label, isDark }: { label: string; isDark: boolean }) {
   return (
     <View className="flex-1 items-center justify-center gap-3">

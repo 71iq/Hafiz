@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""Run a backlog task's full verification argv list once, stopping at the first failure.
-
-Writes logs to .ralph/runs/<task>-primary-*
-and a primary-verification-started event. Run it detached under the 6 GiB scope, for example:
-systemd-run --user --unit=hafiz-verify-<task> --collect -p MemoryMax=6G -p MemorySwapMax=0 \
-  -p WorkingDirectory=$PWD --setenv=PATH=$PATH --setenv=HOME=$HOME python3 -I scripts/ralph/verify-task.py RF-123
-"""
 import json, subprocess, sys, time, datetime
 from pathlib import Path
 root = Path(__file__).resolve().parents[2]

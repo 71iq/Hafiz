@@ -11,15 +11,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-// ─── Supabase Configuration ────────────────────────────────────
-// These are the PUBLIC anon key and URL — safe to embed in client code.
-// All data access is controlled by Row Level Security (RLS) on the server.
-//
-// To connect to your own Supabase project:
-// 1. Create a project at https://supabase.com
-// 2. Run the SQL in supabase/schema.sql to create tables + RLS policies
-// 3. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env.
-//    Vercel builds map Supabase integration vars in scripts/vercel-build.sh.
 
 const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as Record<
   string,
@@ -52,8 +43,6 @@ const SUPABASE_ANON_KEY =
   expoExtra.supabasePublishableKey ??
   "YOUR_ANON_KEY";
 
-/** Returns true if the Supabase client is configured with real credentials */
-/** The public (anon) API key, for a request that must run without any user session. */
 export function supabaseAnonKey(): string {
   return SUPABASE_ANON_KEY;
 }
@@ -62,9 +51,6 @@ export function isSupabaseConfigured(): boolean {
   return !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_ANON_KEY");
 }
 
-// Lazy-initialize the Supabase client so the app can boot without
-// valid credentials (offline-first). The client is only created when
-// auth, sync, or community features actually access it.
 let _client: SupabaseClient | null = null;
 let _runtime: ReturnType<typeof createRootAuthRuntime> | null = null;
 
@@ -72,8 +58,6 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
     if (!_client) {
       if (!isSupabaseConfigured()) {
-        // Return a safe stub for unconfigured environments.
-        // Auth store's initialize() checks isSupabaseConfigured() and skips.
         if (prop === "auth") {
           return {
             getSession: () => Promise.resolve({ data: { session: null }, error: null }),
@@ -109,7 +93,6 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
 });
 
 function ownedRuntime() {
-  // Preserve lazy initialization and the unconfigured main proxy behavior.
   void supabase.auth;
   if (!_runtime) throw new Error("Supabase not configured");
   return _runtime;

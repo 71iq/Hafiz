@@ -1,5 +1,3 @@
-# Layer over Supabase self-hosted/v0.8.2, commit
-# 564eab8ad7840b13324f68b1bfac074ef8d51c21. Always use project name hafiz.
 services:
   api-gw:
     container_name: hafiz-gateway
@@ -40,8 +38,6 @@ services:
     env_file: /etc/hafiz/functions.env
     mem_limit: 384m
     cpus: 0.75
-  # The app uses REST sync, not Realtime subscriptions. Administration and
-  # pooling services are available only when explicitly requested by an operator.
   studio:
     container_name: hafiz-studio
     profiles: [operator]

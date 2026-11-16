@@ -1,12 +1,6 @@
 import { getSmartCardContent } from "@/lib/fsrs/smart-decks";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
-/**
- * The similar-verse card prompt shows the ayah up to the end of its similar words. The bundled
- * segments are the Uthmani text, which the plain text does not always spell the same way: in 15:88
- * the similar words carry "أَزْوَٰجًا" and the plain text "أَزْوَاجًا". The ayat and refs are copied
- * from the bundled database; the page-font glyphs are stand-ins.
- */
 const AYAT: [number, number, string, string][] = [
   [
     15,
@@ -71,11 +65,6 @@ test("a similar-verse card prompt ends with the similar words when only the Uthm
   });
 });
 
-/**
- * 101:6's similar words run on into 101:7 ("فَأَمَّا مَن ثَقُلَتْ مَوَٰزِينُهُۥ فَهُوَ فِى عِيشَةٍ رَّاضِيَةٍ"),
- * so only their start is in the ayah, and the prompt is the whole ayah. Copied from the bundled
- * database; glyphs are stand-ins.
- */
 test("a similar-verse card prompt runs to the ayah's end when its similar words run on into the next ayah", async () => {
   store.sql.exec(
     "INSERT INTO surahs (number, name_arabic, name_english, ayah_count, revelation_type) VALUES (7, 'الأعراف', 'Al-A''raf', 206, 'Makkiyah'), (101, 'القارعة', 'Al-Qariah', 11, 'Makkiyah')",

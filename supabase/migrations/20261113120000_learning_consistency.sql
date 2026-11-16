@@ -1,75 +1,20 @@
--- Learning and consistency: wird-day sync, private-by-default social data, halaqa groups and the
--- weekly board (spec 5.6, 5.7, 7.1, 7.5). Hafiz has no users yet, so the schema is reshaped directly:
--- no backfills, compatibility views or notices.
---
--- Privacy model (SOC-01, ETH-07):
--- - profiles keeps only identity (username, display name, avatar, bio, country), which the public
---   reflection feed needs. Totals and client-written streaks are dropped. A profile whose owner
---   stated they are a minor is readable only by its owner; halaqa co-members see the name through
---   the halaqa RPCs and the board shows only the nickname (BRD-07). A minor has no photo and no
---   matched halaqa: stating it clears the avatar and leaves matched halaqas, whose members are
---   strangers, and the public avatars bucket refuses their uploads. Invite halaqas stay.
--- - A minor's reflections, comments and likes carry their id, so they are readable only by that minor,
---   and the public like and comment counts leave them out. Clients write them only through RPCs, and
---   a write the app showed as private is refused once the writer is no longer a minor. Each row stores
---   whether it was written privately, from the writer's minority at that moment, so what a minor wrote
---   stays readable only by them after minority is withdrawn.
--- - Every write that sets is_minor carries the value its form loaded and is refused with
---   privacy_changed when the stored value differs, so a form left open on another device cannot
---   clear minority.
--- - Helpers that RLS policies call live in the rls schema, which PostgREST does not expose, so a
---   client cannot call them as RPCs.
--- - Board and visibility choices live in profile_privacy, readable only by the owner, because
---   is_minor or a nickname next to a username must never be public.
--- - Activity and progress data are readable by their owner, or by halaqa members the owner shared
---   that field with. Board fields are returned only by the board RPC to members of the same cohort.
--- - Halaqa and board tables have RLS with no client policies. Every read and write goes through the
---   SECURITY DEFINER RPCs below, which check auth.uid() themselves.
--- - Board points come only from synced habit_days (PTS-02, PTS-05, SB-04). Excused and grace days
---   never add points and their reason never leaves the owner's rows (SB-03).
---
--- Board weeks start on each user's own week start (BRD-01, STR-28), which the client sends and the
--- server stores with the board choice. Cohorts are keyed by their week's first date, so users with
--- different week starts never share one. There is no cron on the self-hosted stack: a board read
--- places its caller and, in the same pass, a bounded batch of other joined users with the same week
--- start who have not been placed for that week yet, from the bands they last reported. The app
--- reports changed bands (refresh_board_bands), and a user skipped for inactivity returns to the
--- queue with their next synced wird day.
---
--- Concurrency: each user's board placement, joining and leaving serialize on that user's
--- profile_privacy row; cohort choice and capacity serialize on one advisory lock per board week.
--- Halaqa joins serialize on one advisory lock per user. Joining, leaving and sending encouragement
--- lock the group row first and then a membership row. Recording or withdrawing minority locks the
--- user's profiles row, then their halaqa lock, then their profile_privacy row, and then leaves
--- matched halaqas group row first (private.lock_minor_change). Account deletion locks the profiles
--- row and then cascades to its children, so board placement, joining and leaving the board, and
--- sending encouragement take the profiles rows they depend on before any child row. The wird-day
--- requeue is the exception, explained at private.requeue_board_after_wird_day. Reflection activity
--- follows one order: the writer's profiles row, then reflections in id order, then comments in id
--- order, then the like or comment row (section 5, reflection writes).
 
 CREATE SCHEMA IF NOT EXISTS private;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;
 
--- Helpers that RLS policies call. anon and authenticated need USAGE to evaluate those policies, but
--- PostgREST exposes only public, so no client can call these as RPCs.
 CREATE SCHEMA IF NOT EXISTS rls;
 REVOKE ALL ON SCHEMA rls FROM PUBLIC;
 GRANT USAGE ON SCHEMA rls TO anon, authenticated;
 
--- ─── 1. Review detail on existing sync tables (7.1) ──────────────────────────
 ALTER TABLE public.study_log
   ADD COLUMN IF NOT EXISTS session_id TEXT,
   ADD COLUMN IF NOT EXISTS duration_ms INTEGER CHECK (duration_ms >= 0),
   ADD COLUMN IF NOT EXISTS support_level SMALLINT CHECK (support_level BETWEEN 0 AND 4),
   ADD COLUMN IF NOT EXISTS proposed_rating SMALLINT CHECK (proposed_rating BETWEEN 0 AND 4),
   ADD COLUMN IF NOT EXISTS grader TEXT CHECK (grader IN ('self', 'teacher', 'salah', 'asr')),
-  -- Nullable: older clients omit it.
   ADD COLUMN IF NOT EXISTS local_date TEXT CHECK (local_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),
   ADD COLUMN IF NOT EXISTS tz TEXT,
   ADD COLUMN IF NOT EXISTS error_count INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
-  -- STR-08: the missed day a review was graded toward while it could still be made up. The
-  -- attribution travels with the review, so every device credits it to the same day.
   ADD COLUMN IF NOT EXISTS makeup_for TEXT CHECK (makeup_for ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 ALTER TABLE public.study_cards
@@ -77,22 +22,6 @@ ALTER TABLE public.study_cards
     CHECK (tier IN ('sabaq', 'sabqi', 'manzil', 'manzil.needs_work', 'manzil.unverified')),
   ADD COLUMN IF NOT EXISTS tier_changed_at TIMESTAMPTZ;
 
--- A card merges in two groups, as upsertStudyCard in lib/database/sync.ts does on each device. The
--- schedule (due through last_review) comes from the version reviewed later; every other column and
--- updated_at come from the version written later, as sync_keep_newer_row decides. Whole-row last
--- write wins let a status change (suspend, bury, mark, due date, unit switch) made on a device holding
--- an older schedule replace a review made since on another device.
---
--- Postgres runs BEFORE triggers in name order, so this one runs before sync_keep_newer_row:
--- - An upload reviewed earlier keeps the stored schedule. If it is written later, it brings the rest.
--- - An upload reviewed later but written earlier brings only its schedule. The stored row keeps its
---   other columns and updated_at, so sync_keep_newer_row sees equal times and lets it through, and the
---   new synced_at sends the merged row to other devices.
--- - Equal review times, both null included, leave the whole row to sync_keep_newer_row, so a due-date
---   change without a review still follows updated_at. No review counts as the earliest.
--- A deletion is one of the other columns: a card deleted on a device behind on reviews stays deleted
--- with the later schedule, which is what comes back if the card is restored. A repair that moves
--- last_review earlier without a later updated_at keeps the stored schedule; disable the trigger for it.
 CREATE OR REPLACE FUNCTION private.study_cards_merge_schedule()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -134,12 +63,8 @@ DROP TRIGGER IF EXISTS study_cards_merge_schedule ON public.study_cards;
 CREATE TRIGGER study_cards_merge_schedule BEFORE UPDATE ON public.study_cards
   FOR EACH ROW EXECUTE FUNCTION private.study_cards_merge_schedule();
 
--- ─── 2. Wird days (DB-02) ────────────────────────────────────────────────────
--- One row per user-local day. The earned status only rises in precedence; the excuse is a separate
--- last-write-wins register so a withdrawn excuse never comes back. There is no deleted_at.
 CREATE TABLE IF NOT EXISTS public.habit_days (
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  -- A real calendar date, so server date arithmetic on these rows can never fail.
   local_date TEXT NOT NULL CHECK (
     CASE WHEN local_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
       THEN to_char(local_date::DATE, 'YYYY-MM-DD') = local_date
@@ -162,7 +87,6 @@ CREATE TABLE IF NOT EXISTS public.habit_days (
   PRIMARY KEY (user_id, local_date)
 );
 
--- ─── 3. Review sessions and recitation errors (DB-03, last write wins) ───────
 CREATE TABLE IF NOT EXISTS public.review_sessions (
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   id TEXT NOT NULL,
@@ -258,8 +182,6 @@ DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.recitation_errors;
 CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.recitation_errors
   FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('updated_at', 'created_at', 'synced_at');
 
--- ─── 4. Wird-day merge, identical to lib/habit/merge.ts mergeHabitDays ──────
--- DB-02 precedence: done > made_up > earned_back > excused > paused > grace.
 CREATE OR REPLACE FUNCTION private.habit_status_rank(status TEXT)
 RETURNS INTEGER
 LANGUAGE sql
@@ -277,7 +199,6 @@ AS $$
   END;
 $$;
 
--- effectiveStatus in lib/habit/types.ts: an excuse ranks between earned_back and paused.
 CREATE OR REPLACE FUNCTION private.effective_habit_status(earned TEXT, reason TEXT)
 RETURNS TEXT
 LANGUAGE sql
@@ -292,9 +213,6 @@ AS $$
   END;
 $$;
 
--- Every part is a maximum over a total order or an OR, so the merge is commutative, associative and
--- idempotent. Ties keep `a`, as the TypeScript merge does. String ties compare bytes (C collation),
--- which matches JavaScript's code-unit order for the ASCII session ids and IANA zone names stored here.
 CREATE OR REPLACE FUNCTION private.merge_habit_day(a public.habit_days, b public.habit_days)
 RETURNS public.habit_days
 LANGUAGE plpgsql
@@ -314,7 +232,6 @@ BEGIN
     RAISE EXCEPTION 'Cannot merge different habit days';
   END IF;
 
-  -- Earned part: precedence, then session id, then zone.
   earned_cmp := sign(private.habit_status_rank(a.earned_status) - private.habit_status_rank(b.earned_status));
   IF earned_cmp = 0 THEN
     left_text := COALESCE(a.source_session_id, '');
@@ -334,7 +251,6 @@ BEGIN
     END IF;
   END IF;
 
-  -- Excuse register: a written excuse beats none, then the later write, then the reason spelling.
   IF a.excuse_updated_at IS NULL OR b.excuse_updated_at IS NULL THEN
     excuse_cmp := (CASE WHEN a.excuse_updated_at IS NULL THEN 0 ELSE 1 END)
       - (CASE WHEN b.excuse_updated_at IS NULL THEN 0 ELSE 1 END);
@@ -365,7 +281,6 @@ BEGIN
   merged.minimum_met := COALESCE(a.minimum_met, false) OR COALESCE(b.minimum_met, false);
   merged.full_met := COALESCE(a.full_met, false) OR COALESCE(b.full_met, false);
   merged.manzil_cycle_completed := COALESCE(a.manzil_cycle_completed, false) OR COALESCE(b.manzil_cycle_completed, false);
-  -- GREATEST and LEAST skip nulls, which is laterOptional for credited_through.
   merged.credited_through := GREATEST(a.credited_through, b.credited_through);
   merged.created_at := LEAST(a.created_at, b.created_at);
   merged.updated_at := GREATEST(a.updated_at, b.updated_at);
@@ -374,9 +289,6 @@ BEGIN
 END;
 $$;
 
--- Inserts store the effective status of their own parts. An upload that meets an existing row (the
--- client's INSERT ... ON CONFLICT DO UPDATE) merges with it instead of replacing it, so an older or
--- concurrent upload still contributes. Runs as owner only to reach the private helpers.
 CREATE OR REPLACE FUNCTION private.habit_days_before_write()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -400,8 +312,6 @@ DROP TRIGGER IF EXISTS habit_days_merge ON public.habit_days;
 CREATE TRIGGER habit_days_merge BEFORE INSERT OR UPDATE ON public.habit_days
   FOR EACH ROW EXECUTE FUNCTION private.habit_days_before_write();
 
--- ─── 5. Points rework and privacy (5.6, SB-01..04, SOC-01, ETH-07) ───────────
--- Client-written scores and totals are gone. Board points are computed from habit_days.
 DROP TABLE IF EXISTS public.daily_scores;
 
 ALTER TABLE public.profiles
@@ -411,8 +321,6 @@ ALTER TABLE public.profiles
   DROP COLUMN IF EXISTS longest_streak,
   DROP COLUMN IF EXISTS last_review_date;
 
--- Review-count aggregates revealed quantity and used UTC days (DAY-02). The owner has the same data
--- on the device and habit_days now carries consistency, so they are retired with their triggers.
 DROP TRIGGER IF EXISTS study_log_public_review_stats_insert ON public.study_log;
 DROP TRIGGER IF EXISTS study_log_public_review_stats_update ON public.study_log;
 DROP TRIGGER IF EXISTS study_log_public_review_stats_delete ON public.study_log;
@@ -436,19 +344,13 @@ CREATE TABLE IF NOT EXISTS public.profile_privacy (
   show_streak BOOLEAN NOT NULL DEFAULT false,
   show_juz_completions BOOLEAN NOT NULL DEFAULT false,
   is_minor BOOLEAN NOT NULL DEFAULT false,
-  -- The board's matching inputs as the user last reported them (8.13, STR-28), so a weekly pass can
-  -- place users who keep studying without opening the Board tab. 0 is Sunday, as in JavaScript.
   board_week_start SMALLINT CHECK (board_week_start BETWEEN 0 AND 6),
   board_level_band TEXT CHECK (board_level_band IN ('starting', 'juz_amma', 'juz_4_15', 'juz_16_29', 'hafiz')),
   board_pace_band TEXT CHECK (board_pace_band IN ('maintenance', 'light', 'half_page', 'page_plus')),
   board_utc_offset_minutes INTEGER CHECK (board_utc_offset_minutes BETWEEN -720 AND 840),
-  -- The latest board week this user was considered for, by their own read or another user's pass.
   board_enrolled_week DATE,
-  -- A pass found no recent wird day and left this user unplaced for board_enrolled_week. Their next
-  -- synced wird day returns them to the queue (private.requeue_board_after_wird_day).
   board_waiting BOOLEAN NOT NULL DEFAULT false,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  -- BRD-07: a minor appears on the board only under a nickname.
   CONSTRAINT profile_privacy_minor_nickname CHECK (NOT (is_minor AND board_joined AND board_nickname IS NULL)),
   CONSTRAINT profile_privacy_board_inputs CHECK (
     NOT board_joined OR (
@@ -458,9 +360,6 @@ CREATE TABLE IF NOT EXISTS public.profile_privacy (
   )
 );
 
--- Users a board pass still has to place, by week start and the last week they were considered for,
--- then user id: the pass reads them in that order, so with user_id in the index it stops after its
--- batch of 100 instead of sorting every pending row (earlier drafts lacked user_id).
 DROP INDEX IF EXISTS public.idx_profile_privacy_board_pending;
 CREATE INDEX idx_profile_privacy_board_pending
   ON public.profile_privacy(board_week_start, board_enrolled_week, user_id) WHERE board_joined;
@@ -473,11 +372,6 @@ CREATE POLICY "Users can read own profile privacy"
 REVOKE ALL ON public.profile_privacy FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.profile_privacy TO authenticated;
 
--- ETH-07: minors cannot go public. Identity stays readable for the reflection feed, except a profile
--- whose owner stated they are a minor, which only its owner reads. profile_privacy is owner-only, so
--- the policy asks this definer helper. It must not read profiles itself, or the policy would recurse.
--- It answers for any user id, so it stays out of public, where anon could call it as an RPC and
--- learn who is a minor.
 CREATE OR REPLACE FUNCTION rls.profile_identity_visible(target UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -498,23 +392,11 @@ CREATE POLICY "Profiles are readable unless the owner is a minor"
   USING (rls.profile_identity_visible(id));
 DROP FUNCTION IF EXISTS public.profile_identity_visible(UUID);
 
--- ETH-07: the same rule for public activity. A reflection, comment or like carries its author's id,
--- so a hidden profiles row alone would still show a minor's id and words here. A minor may still
--- write them: their rows are readable only by them, so the app keeps working for the minor and
--- strangers never see the rows, and the public counts leave them out (private.recount_reflection).
--- A row also stores whether it was written privately (section 5, reflection writes): a row a minor
--- wrote stays readable only by them for good, even after they withdraw minority, while rows they wrote
--- as an adult are hidden only while they are a minor. Nothing publishes a private row later. A
--- comment or like also follows its parent, so one on a hidden reflection or comment is hidden with
--- it, and a stranger cannot react to what they cannot read.
 ALTER TABLE public.reflections ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.reflection_comments ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.reflection_likes ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.reflection_comment_likes ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
 
--- Whether the caller may read a reflection, comment or like: always their own, and anyone else's only
--- when it was not written privately and its author is not a minor now. The public counts apply the
--- same rule to every reader (private.activity_public).
 CREATE OR REPLACE FUNCTION rls.activity_visible(author UUID, written_private BOOLEAN)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -563,10 +445,6 @@ CREATE POLICY "Comment likes follow their comment unless private"
     AND EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id)
   );
 
--- ETH-07: a minor's photo never goes public. The avatars bucket is public, so a stated minor may not
--- upload or replace an avatar there (deleting stays allowed). Stating it clears the profile's photo
--- in the same transaction. The app deletes the stored files before it records minority, once more
--- after, and once per app session while the account is a minor (lib/profile/privacy.ts).
 CREATE OR REPLACE FUNCTION rls.caller_is_minor()
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -603,10 +481,6 @@ CREATE POLICY "Users can update own avatar images"
     AND NOT rls.caller_is_minor()
   );
 
--- Each photo sits in a folder named after its owner's id (lib/profile/avatar.ts), and PostgREST and
--- the storage list endpoint read storage.objects under this policy. A minor's files that the app has
--- not deleted yet are therefore listed only to the minor, who still needs to list them to delete
--- them. Names outside an id folder stay listed as before.
 CREATE OR REPLACE FUNCTION rls.avatar_object_visible(object_name TEXT)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -627,7 +501,6 @@ CREATE POLICY "Avatar images are publicly readable"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'avatars' AND rls.avatar_object_visible(name));
 
--- Whether a person stated they are a minor, for definer functions that return someone else's details.
 CREATE OR REPLACE FUNCTION private.is_minor(member UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -637,9 +510,6 @@ AS $$
   SELECT EXISTS (SELECT 1 FROM public.profile_privacy AS pp WHERE pp.user_id = member AND pp.is_minor);
 $$;
 
--- Whether a reflection, comment or like is public, so the public counts include it: it was not
--- written privately and its author is not a minor now. rls.activity_visible applies the same rule
--- to readers other than the author.
 CREATE OR REPLACE FUNCTION private.activity_public(author UUID, written_private BOOLEAN)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -649,22 +519,6 @@ AS $$
   SELECT NOT written_private AND NOT private.is_minor(author);
 $$;
 
--- Every write that can change is_minor (set_profile_privacy, join_board) calls this before it writes,
--- whichever way it changes, and holds both locks until it commits:
--- - The profiles row. A photo update in progress holds it, so the minority write waits for that
---   update to commit and then clears its photo. A photo update that comes later waits on the row,
---   and profiles_minor_photo then reads the committed minority. FOR NO KEY UPDATE conflicts with that
---   update but not with the key-share locks that foreign keys take, so an encouragement, membership
---   or sync insert that references this profile does not wait on it. A reflection write by this user
---   takes the row FOR SHARE (private.lock_activity_writer, private.visible_step), so it either commits
---   first and is recounted here (private.recount_minor_activity), or waits and reads the committed
---   minority.
---   Account deletion locks the row too, so a board join waits for it rather than deadlocking with it.
--- - The user's halaqa lock, which join_matched_halaqa takes before it checks minority. A matched join
---   either commits first, and private.apply_minor_privacy then leaves that halaqa, or reads the
---   committed minority and is refused.
--- Nothing takes these locks in the other order: halaqa joins take the halaqa lock and only key-share
--- the profile, and board reads and writes take the profile_privacy row, which this write takes last.
 CREATE OR REPLACE FUNCTION private.lock_minor_change(member UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -676,10 +530,6 @@ BEGIN
 END;
 $$;
 
--- Runs for every write that sets is_minor, whichever path made it. The photo is cleared without
--- checking it first, so the update waits on a photo update still in progress and clears the photo it
--- commits. Matched halaqas are left as leave_halaqa leaves them (ETH-07): their members are
--- strangers. Invite halaqas hold people the minor chose, and stay.
 CREATE OR REPLACE FUNCTION private.apply_minor_privacy()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -699,16 +549,12 @@ BEGIN
 END;
 $$;
 
--- Earlier drafts of this migration used these names.
 DROP TRIGGER IF EXISTS profile_privacy_minor_avatar ON public.profile_privacy;
 DROP FUNCTION IF EXISTS private.clear_minor_avatar();
 DROP TRIGGER IF EXISTS profile_privacy_minor ON public.profile_privacy;
 CREATE TRIGGER profile_privacy_minor AFTER INSERT OR UPDATE OF is_minor ON public.profile_privacy
   FOR EACH ROW WHEN (NEW.is_minor) EXECUTE FUNCTION private.apply_minor_privacy();
 
--- A minor's profile never keeps a photo, whatever URL a client writes (ETH-07): the avatars bucket
--- refuses their uploads, and this covers an outside image URL set directly on the profile. A BEFORE
--- trigger runs once the row is locked, so an update that waited on a minority write reads it.
 CREATE OR REPLACE FUNCTION private.profiles_minor_photo()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -727,13 +573,6 @@ DROP TRIGGER IF EXISTS profiles_minor_photo ON public.profiles;
 CREATE TRIGGER profiles_minor_photo BEFORE INSERT OR UPDATE OF avatar_url ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION private.profiles_minor_photo();
 
--- ETH-07: like and comment counts are public, so they count only likes and comments that others can
--- read: never one written privately, and never a current minor's (private.activity_public). A single
--- new or deleted like or comment adds or subtracts one when it was not written privately and its
--- author is not a minor (private.visible_step); a private one never moves a count. A statement that
--- changes several rows, a cascade from a deleted account, and recording or withdrawing minority
--- recount each count they affect once instead. A recount locks its row first, in its own statement,
--- so the count reads every like and comment committed before it, and a later change waits for this one.
 CREATE OR REPLACE FUNCTION private.recount_reflection(target UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -769,14 +608,6 @@ BEGIN
 END;
 $$;
 
--- How one like or comment by `author` moves a public count: by `step` when others can read it, not
--- at all when the author is a minor. The counter triggers call this only for a row not written
--- privately, since a private row never counts whatever its author's minority. The author's profiles
--- row stays locked FOR SHARE until commit, and recording or withdrawing minority holds it FOR NO KEY
--- UPDATE (private.lock_minor_change), so the minority read here holds until the count commits, and a
--- minority write after it recounts.
--- NULL means the author's profile was deleted in this transaction: their privacy row may already be
--- gone, so the caller recounts instead.
 CREATE OR REPLACE FUNCTION private.visible_step(author UUID, step INTEGER)
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -791,12 +622,6 @@ BEGIN
 END;
 $$;
 
--- A recount reads the minority of the authors of new rows, and a minority write in flight cannot see
--- those rows until they commit, so it would not recount them. Their profiles rows are therefore
--- locked FOR SHARE first, in id order, as in private.visible_step. Rows being deleted stay visible to
--- a minority write until the deletion commits, so a recount after a deletion needs no author lock.
--- Privately written rows never count, so their authors are not locked and their parents are not
--- recounted for them.
 CREATE OR REPLACE FUNCTION private.lock_activity_authors(authors UUID[])
 RETURNS VOID
 LANGUAGE plpgsql
@@ -807,9 +632,6 @@ BEGIN
 END;
 $$;
 
--- The counter triggers run once per statement, with the changed rows in `changed`, and as their
--- owner, so a reaction to another author's post still updates its count under RLS. A parent that is
--- being deleted takes its likes and comments with it, so they are skipped before any lock is taken.
 CREATE OR REPLACE FUNCTION public.update_reflection_likes_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -960,11 +782,6 @@ CREATE TRIGGER trg_reflection_comment_likes_count_insert AFTER INSERT ON public.
 CREATE TRIGGER trg_reflection_comment_likes_count_delete AFTER DELETE ON public.reflection_comment_likes
   REFERENCING OLD TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION public.update_reflection_comment_likes_count();
 
--- Recording minority, or withdrawing it, changes which of the person's likes and comments the
--- public counts include, so every count they touched is recounted once: reflections in id order,
--- then comments in id order. The callers hold private.lock_minor_change, so none of the person's
--- own likes or comments is in flight. What they wrote privately counts neither way, so withdrawing
--- minority adds only what they wrote as an adult, and their private rows need no recount.
 CREATE OR REPLACE FUNCTION private.recount_minor_activity()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -999,20 +816,12 @@ DROP TRIGGER IF EXISTS profile_privacy_activity_counts ON public.profile_privacy
 CREATE TRIGGER profile_privacy_activity_counts AFTER INSERT OR UPDATE OF is_minor ON public.profile_privacy
   FOR EACH ROW EXECUTE FUNCTION private.recount_minor_activity();
 
--- Deleting an account deletes the person's reflections, likes and comments with it, and the counter
--- triggers recount what they touched (private.visible_step returns NULL once the profile is gone).
--- The profiles row is locked before this trigger runs, so it takes the rest in the order every other
--- path uses: each reflection the cascade deletes or recounts, in id order, then each such comment, in
--- id order. Reached one table at a time, the cascade could lock a comment before its reflection, or
--- reflections out of order, and deadlock with a minority write or a reflection write.
 CREATE OR REPLACE FUNCTION private.lock_account_activity()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
-  -- Each branch reads only this account's rows through an index, so the cost follows the account's
-  -- own activity, not the size of the community.
   PERFORM 1 FROM public.reflections AS r
   WHERE r.id IN (
     SELECT own.id FROM public.reflections AS own WHERE own.user_id = OLD.id
@@ -1035,23 +844,14 @@ BEGIN
 END;
 $$;
 
--- Account deletion finds the comments an account wrote (private.lock_account_activity).
 CREATE INDEX IF NOT EXISTS idx_reflection_comments_user ON public.reflection_comments(user_id);
 
 DROP TRIGGER IF EXISTS profiles_lock_activity ON public.profiles;
 CREATE TRIGGER profiles_lock_activity BEFORE DELETE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION private.lock_account_activity();
 
--- Reflection writes. Clients add and remove reflections, comments and likes only through the RPCs
--- below, which lock in the order recording minority and account deletion use: the writer's profiles
--- row FOR SHARE, then the reflection, then the comment, then the row itself. A direct delete locks
--- its row first and its counter trigger the profile after it, which deadlocks with a minority write
--- that holds the profile and then recounts that row, or with an account deletion that holds the
--- profile and then deletes the row. A direct insert key-shares its parent before the profile.
 REVOKE INSERT, DELETE ON public.reflections, public.reflection_likes, public.reflection_comments,
   public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
--- The app never edits a stored reflection. An owner who could update the row could also set its like
--- and comment counts, which now leave minors out, or show a post that moderation hid.
 REVOKE UPDATE ON public.reflections, public.reflection_likes, public.reflection_comments,
   public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
 DROP POLICY IF EXISTS "Users can update own reflections" ON public.reflections;
@@ -1063,13 +863,8 @@ DROP POLICY IF EXISTS "Users can insert own comments" ON public.reflection_comme
 DROP POLICY IF EXISTS "Users can delete own comments" ON public.reflection_comments;
 DROP POLICY IF EXISTS "Users can insert own comment likes" ON public.reflection_comment_likes;
 DROP POLICY IF EXISTS "Users can delete own comment likes" ON public.reflection_comment_likes;
--- Earlier drafts of this migration locked the author in each counter trigger with this.
 DROP FUNCTION IF EXISTS private.lock_activity_author(UUID);
 
--- The signed-in writer. Their profiles row stays locked FOR SHARE until commit, so a minority write
--- either commits first and the write reads it, or waits and then recounts the write. The client names
--- the account it writes for, so a request that arrives after an account switch is refused instead of
--- being written for the other account.
 CREATE OR REPLACE FUNCTION private.lock_activity_writer(expected UUID)
 RETURNS UUID
 LANGUAGE plpgsql
@@ -1089,14 +884,6 @@ BEGIN
 END;
 $$;
 
--- ETH-07: the composer and the comment input tell a stated minor that what they write is visible only
--- to them, from a cached copy of their privacy that another device may have changed. Each write
--- carries what the screen promised, and its caller holds the writer's profiles row
--- (private.lock_activity_writer), so this reads the committed minority. A write promised to stay
--- private is refused once the writer is no longer a minor, and the app reloads their privacy so they
--- can decide again. Writing as an adult when the server has a minor only makes the text more private.
--- Each write then stores the minority it read under the same lock as the row's is_private, so the
--- promise holds after the writer withdraws minority too. The flag never comes from the client.
 CREATE OR REPLACE FUNCTION private.check_promised_visibility(author UUID, promised_private BOOLEAN)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1113,8 +900,6 @@ BEGIN
 END;
 $$;
 
--- Locks a reflection the caller may react to, which is one the read policy shows them: active, and
--- neither written privately nor a current minor's, unless it is the caller's own.
 CREATE OR REPLACE FUNCTION private.lock_readable_reflection(target UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1133,8 +918,6 @@ BEGIN
 END;
 $$;
 
--- Locks a comment the caller may like, which is one the read policies show them. A comment like
--- changes only the comment's count, so the reflection is read without a lock.
 CREATE OR REPLACE FUNCTION private.lock_readable_comment(target UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1207,8 +990,6 @@ BEGIN
 END;
 $$;
 
--- Likes and unlikes are idempotent: the result is the state the caller asked for. A like stores the
--- writer's minority as it is now, and liking again keeps the stored like as it was written.
 CREATE OR REPLACE FUNCTION public.set_reflection_like(p_user_id UUID, p_reflection_id UUID, p_liked BOOLEAN)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -1257,7 +1038,6 @@ BEGIN
 END;
 $$;
 
--- Deletes the caller's own comment, with its likes. False when there is no such comment.
 CREATE OR REPLACE FUNCTION public.delete_reflection_comment(p_user_id UUID, p_comment_id UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -1278,8 +1058,6 @@ BEGIN
 END;
 $$;
 
--- Deletes the caller's own reflection with its comments and likes. The comments it deletes are
--- locked first, in id order, as a minority write or an account deletion would lock them.
 CREATE OR REPLACE FUNCTION public.delete_reflection(p_user_id UUID, p_reflection_id UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -1299,7 +1077,6 @@ BEGIN
 END;
 $$;
 
--- ─── 6. Halaqa (5.7.1) ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.halaqa_groups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   kind TEXT NOT NULL CHECK (kind IN ('invite', 'matched')),
@@ -1311,7 +1088,6 @@ CREATE TABLE IF NOT EXISTS public.halaqa_groups (
   created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ,
-  -- Lets halaqa_members carry the kind, so one active matched membership per user is a constraint.
   CONSTRAINT halaqa_groups_id_kind_key UNIQUE (id, kind),
   CONSTRAINT halaqa_groups_kind_fields CHECK (
     (kind = 'invite' AND name IS NOT NULL AND invite_code IS NOT NULL
@@ -1323,7 +1099,6 @@ CREATE TABLE IF NOT EXISTS public.halaqa_groups (
 
 CREATE TABLE IF NOT EXISTS public.halaqa_members (
   group_id UUID NOT NULL,
-  -- The group's kind, kept equal to it by the foreign key below.
   kind TEXT NOT NULL CHECK (kind IN ('invite', 'matched')),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'teacher')),
@@ -1343,26 +1118,18 @@ CREATE TABLE IF NOT EXISTS public.halaqa_encouragements (
   group_id UUID NOT NULL REFERENCES public.halaqa_groups(id) ON DELETE CASCADE,
   from_user UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   to_user UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  -- Fixed set, rendered in each reader's own language (MAT-01). Keep in sync with lib/halaqa/api.ts.
   template_id TEXT CHECK (template_id IN (
     'ease', 'missed_you', 'keep_going', 'small_steady', 'dua', 'together', 'welcome_back', 'well_done',
     'firm_heart'
   )),
-  -- Free text only in invite halaqas (SOC-06), checked by send_halaqa_encouragement.
   body TEXT CHECK (body IS NULL OR (char_length(btrim(body)) BETWEEN 1 AND 200 AND body !~ '[[:cntrl:]]')),
-  -- The sender's local date as their device sent it, for display only.
   local_date TEXT NOT NULL CHECK (local_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),
-  -- SOC-06: the sender's calendar day by the server's clock in their stored zone
-  -- (private.member_today), which the caller cannot choose. One send per group, sender and day.
   sent_on DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (template_id IS NOT NULL OR body IS NOT NULL),
   CHECK (from_user <> to_user)
 );
 
--- SOC-03: a teacher's next sabaq for a member of their halaqa, a page and a range of its lines. One per
--- member and halaqa; the member's app memorizes those lines next (lib/hifz/teacher-sabaq.ts). Written
--- and read only through RPCs, and only while the member shares their plan with teachers.
 CREATE TABLE IF NOT EXISTS public.halaqa_sabaq_assignments (
   group_id UUID NOT NULL REFERENCES public.halaqa_groups(id) ON DELETE CASCADE,
   learner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -1376,7 +1143,6 @@ CREATE TABLE IF NOT EXISTS public.halaqa_sabaq_assignments (
   CHECK (learner_id <> teacher_id)
 );
 
--- SOC-05 review partners. The table and its read rule ship now; pairing RPCs come with the partner UI.
 CREATE TABLE IF NOT EXISTS public.review_partners (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_a UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -1389,16 +1155,13 @@ CREATE TABLE IF NOT EXISTS public.review_partners (
 
 CREATE INDEX IF NOT EXISTS idx_halaqa_members_user_active ON public.halaqa_members(user_id) WHERE left_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_halaqa_members_group_active ON public.halaqa_members(group_id) WHERE left_at IS NULL;
--- SOC-04: one standing matched halaqa per user.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_members_one_matched
   ON public.halaqa_members(user_id) WHERE kind = 'matched' AND left_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_halaqa_groups_matched
   ON public.halaqa_groups(level_band, pace_band, utc_offset_band) WHERE kind = 'matched' AND deleted_at IS NULL;
--- Serves get_received_encouragements' (created_at, id) cursor.
 CREATE INDEX IF NOT EXISTS idx_halaqa_encouragements_to_user ON public.halaqa_encouragements(to_user, created_at, id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_encouragements_sender_day
   ON public.halaqa_encouragements(group_id, from_user, sent_on);
--- Serves get_my_sabaq_assignment, which reads across the learner's halaqas.
 CREATE INDEX IF NOT EXISTS idx_halaqa_sabaq_assignments_learner ON public.halaqa_sabaq_assignments(learner_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_review_partners_active_pair
   ON public.review_partners(user_a, user_b) WHERE ended_at IS NULL;
@@ -1419,8 +1182,6 @@ REVOKE ALL ON public.halaqa_groups, public.halaqa_members, public.halaqa_encoura
 REVOKE ALL ON public.halaqa_sabaq_assignments FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.review_partners TO authenticated;
 
--- ─── 7. Board (5.7.2) ────────────────────────────────────────────────────────
--- week_start is the first date of the members' week (BRD-01, STR-28); its weekday is their week start.
 CREATE TABLE IF NOT EXISTS public.board_cohorts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   week_start DATE NOT NULL,
@@ -1437,8 +1198,6 @@ CREATE TABLE IF NOT EXISTS public.board_members (
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   left_at TIMESTAMPTZ,
   PRIMARY KEY (cohort_id, user_id),
-  -- One cohort per user per week (SB-04): rejoining returns to the same cohort while it has room,
-  -- and otherwise moves this row to another cohort of the week.
   UNIQUE (user_id, week_start)
 );
 
@@ -1449,9 +1208,6 @@ ALTER TABLE public.board_cohorts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.board_members ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.board_cohorts, public.board_members FROM PUBLIC, anon, authenticated;
 
--- ─── 8. Activity and progress readers ────────────────────────────────────────
--- Juz completions are the only progress a halaqa member can share (SOC-02). Per-surah counts stay
--- with the owner.
 CREATE OR REPLACE FUNCTION public.halaqa_shares_with_me(target UUID, field TEXT)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -1496,7 +1252,6 @@ CREATE POLICY "Users can read own surah progress"
   USING ((SELECT auth.uid()) = user_id);
 REVOKE ALL ON public.public_surah_progress FROM anon;
 
--- ─── 9. Shared helpers ───────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION private.require_user()
 RETURNS UUID
 LANGUAGE plpgsql
@@ -1513,7 +1268,6 @@ BEGIN
 END;
 $$;
 
--- The caller's local date. Every zone is within a day of UTC, so anything further is rejected.
 CREATE OR REPLACE FUNCTION private.checked_local_date(value TEXT)
 RETURNS DATE
 LANGUAGE plpgsql
@@ -1539,7 +1293,6 @@ BEGIN
 END;
 $$;
 
--- Today in a stored IANA zone, or in UTC when the zone is missing or unknown.
 CREATE OR REPLACE FUNCTION private.local_today(zone TEXT)
 RETURNS DATE
 LANGUAGE plpgsql
@@ -1556,7 +1309,6 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- A member's own today, from the zone of their latest recorded wird day.
 CREATE OR REPLACE FUNCTION private.member_today(member UUID)
 RETURNS DATE
 LANGUAGE sql
@@ -1571,12 +1323,6 @@ AS $$
   ));
 $$;
 
--- Current streak: consecutive covered dates (any status) ending today or yesterday. Paused days keep
--- the run without adding to it (8.2). Days after today are ignored.
--- STR-07: a missed yesterday can still be made up today before Dhuhr, and the app keeps the streak
--- meanwhile, with today's own run added when today is covered (lib/habit/streak.ts computeStreak).
--- The cutoff comes from prayer times the server never sees (ETH-11), so on the make-up day the run
--- through the day before yesterday stands all day; the next day it is gone unless made up.
 CREATE OR REPLACE FUNCTION private.habit_streak(member UUID, today DATE)
 RETURNS INTEGER
 LANGUAGE sql
@@ -1592,8 +1338,6 @@ AS $$
     SELECT covered_on, status, covered_on - (row_number() OVER (ORDER BY covered_on))::INTEGER AS run_id
     FROM covered
   ),
-  -- The last day of each run the streak counts: today's run when today is covered, yesterday's when
-  -- it is not, and the run through the day before yesterday when yesterday is missing.
   ends AS (
     SELECT today AS end_on WHERE EXISTS (SELECT 1 FROM covered WHERE covered_on = today)
     UNION
@@ -1610,9 +1354,6 @@ AS $$
   WHERE i.run_id IN (SELECT x.run_id FROM islands AS x JOIN ends AS e ON x.covered_on = e.end_on);
 $$;
 
--- PTS-02: per wird day, 1 for the minimum, +1 for the full wird, +1 for a completed manzil cycle, at
--- most 3. Only recited days count; excused, paused and grace days add nothing (SB-03). Dates more
--- than a day ahead of UTC cannot have been recited yet, so they never count.
 CREATE OR REPLACE FUNCTION private.board_points(member UUID, week_start DATE)
 RETURNS INTEGER
 LANGUAGE sql
@@ -1628,8 +1369,6 @@ AS $$
     AND h.local_date <= to_char((now() AT TIME ZONE 'UTC')::DATE + 1, 'YYYY-MM-DD');
 $$;
 
--- Wird days in a week, Monday first, as seven booleans. Excused, paused and grace days are false
--- like any other day without a wird, so no reason or excuse is ever visible (SB-03).
 CREATE OR REPLACE FUNCTION private.week_wird_days(member UUID, week_start DATE)
 RETURNS JSONB
 LANGUAGE sql
@@ -1658,7 +1397,6 @@ AS $$
   WHERE a.user_id = member AND a.achievement_id ~ '^juz_[0-9]{2}_completed$';
 $$;
 
--- 8.13 matching bands.
 CREATE OR REPLACE FUNCTION private.level_band_rank(band TEXT)
 RETURNS INTEGER
 LANGUAGE sql
@@ -1674,7 +1412,6 @@ AS $$
   END;
 $$;
 
--- offsetBand in lib/social/bands.ts: Math.round(minutes / 120), where halves round up.
 CREATE OR REPLACE FUNCTION private.offset_band(utc_offset_minutes INTEGER)
 RETURNS INTEGER
 LANGUAGE sql
@@ -1699,7 +1436,6 @@ BEGIN
 END;
 $$;
 
--- STR-28: the user's week start, 0 (Sunday) to 6 (Saturday), as lib/habit/settings.ts effectiveWeekStart.
 CREATE OR REPLACE FUNCTION private.check_week_start(week_start_day INTEGER)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1713,7 +1449,6 @@ BEGIN
 END;
 $$;
 
--- The first date of the week holding `day` for a week that starts on week_start_day (BRD-01).
 CREATE OR REPLACE FUNCTION private.board_week(day DATE, week_start_day INTEGER)
 RETURNS DATE
 LANGUAGE sql
@@ -1723,14 +1458,6 @@ AS $$
   SELECT day - ((extract(dow FROM day)::INTEGER - week_start_day + 7) % 7);
 $$;
 
--- MAT-03: a pure, replayable match rule shared by board cohorts and matched halaqas. Returns the
--- preference tier of a group for a user, or NULL when the user may not join it:
---   1. same level, pace and 2-hour offset band, while the group has room;
---   2. same level and pace, offset within 3 hours;
---   3. same level, any pace, offset within 3 hours;
---   4. one level band either way, offset within 3 hours.
--- Tiers 2 to 4 widen the match (BRD-08) and only fill groups still under 10 people, so a group that
--- already has enough close matches is not diluted.
 CREATE OR REPLACE FUNCTION private.match_tier(
   group_level TEXT,
   group_pace TEXT,
@@ -1767,7 +1494,6 @@ AS $$
   SELECT COALESCE(NULLIF(btrim(p.display_name), ''), p.username) FROM public.profiles AS p WHERE p.id = member;
 $$;
 
--- ─── 10. Profile visibility RPCs ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.get_profile_privacy()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -1790,12 +1516,8 @@ BEGIN
 END;
 $$;
 
--- Earlier drafts of this migration had no expected minority.
 DROP FUNCTION IF EXISTS public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN);
 
--- p_expected_minor is the minority the form loaded. A form loaded before another device recorded
--- minority would otherwise clear it and make the profile public (ETH-07), so a stored value that
--- differs refuses the write with privacy_changed and the app reloads.
 CREATE OR REPLACE FUNCTION public.set_profile_privacy(
   p_show_streak BOOLEAN,
   p_show_juz_completions BOOLEAN,
@@ -1810,26 +1532,16 @@ AS $$
 DECLARE
   uid UUID := private.require_user();
   current_row public.profile_privacy;
-  -- Whether recording minority took a Board member without a nickname off the Board, for the screen
-  -- to say so.
   leaves_board BOOLEAN;
 BEGIN
   IF p_show_streak IS NULL OR p_show_juz_completions IS NULL OR p_is_minor IS NULL OR p_expected_minor IS NULL THEN
     RAISE EXCEPTION 'invalid_privacy';
   END IF;
-  -- Recording minority clears the photo and leaves matched halaqas (private.apply_minor_privacy), and
-  -- recording or withdrawing it recounts the person's likes and comments. Every minority write holds
-  -- this lock, so the stored value compared below holds until this write commits.
   PERFORM private.lock_minor_change(uid);
-  -- The row lock comes last, as in join_board. It waits for a board placement in progress, so the
-  -- Board choice read here is the committed one.
   SELECT * INTO current_row FROM public.profile_privacy WHERE user_id = uid FOR UPDATE;
   IF COALESCE(current_row.is_minor, false) IS DISTINCT FROM p_expected_minor THEN
     RAISE EXCEPTION 'privacy_changed';
   END IF;
-  -- Under 18s appear on the Board only under a nickname (BRD-07). Recording minority must not fail on
-  -- that rule, so a member without one leaves the Board in this transaction, as leave_board does, and
-  -- can join again with a nickname.
   leaves_board := p_is_minor AND COALESCE(current_row.board_joined, false) AND current_row.board_nickname IS NULL;
   INSERT INTO public.profile_privacy (user_id, show_streak, show_juz_completions, is_minor, updated_at)
   VALUES (uid, p_show_streak, p_show_juz_completions, p_is_minor, now())
@@ -1846,10 +1558,6 @@ BEGIN
 END;
 $$;
 
--- What a viewer may see of another person's consistency: the owner always; a halaqa member when the
--- person shared that field with the group; anyone when the person turned it on for their profile,
--- unless they stated they are a minor (ETH-07). Null fields are hidden. A minor's profile is hidden
--- as a whole from anyone but the owner and their halaqa co-members, as the profiles policy hides it.
 CREATE OR REPLACE FUNCTION public.get_profile_summary(p_user_id UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -1894,7 +1602,6 @@ BEGIN
 END;
 $$;
 
--- ─── 11. Halaqa RPCs ─────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION private.halaqa_active_count(target_group UUID)
 RETURNS INTEGER
 LANGUAGE sql
@@ -1941,8 +1648,6 @@ BEGIN
 END;
 $$;
 
--- Serializes one user's halaqa joins, so the 10-group limit and the single matched halaqa are checked
--- against committed state. Taken before any group row lock.
 CREATE OR REPLACE FUNCTION private.lock_halaqa_user(member UUID)
 RETURNS VOID
 LANGUAGE sql
@@ -1952,9 +1657,6 @@ AS $$
   SELECT pg_advisory_xact_lock(hashtextextended('hafiz:halaqa-user:' || member::TEXT, 0));
 $$;
 
--- SOC-06: one encouragement per sender per calendar day in each group. `today` is the sender's day
--- by the server (private.member_today). A send on a later day also counts: that day can only come
--- from the sender's stored zone moving west, which must not open a second send.
 CREATE OR REPLACE FUNCTION private.encouraged_today(target_group UUID, sender UUID, today DATE, recipient UUID DEFAULT NULL)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -1981,7 +1683,6 @@ AS $$
     'invite_code', g.invite_code,
     'member_count', private.halaqa_active_count(g.id),
     'role', m.role,
-    -- created_by is null once the creator deletes their account; the client needs a boolean.
     'is_creator', COALESCE(g.created_by = member, false),
     'share_consistency', m.share_consistency,
     'share_juz', m.share_juz,
@@ -2005,7 +1706,6 @@ DECLARE
   code TEXT := '';
   i INTEGER;
 BEGIN
-  -- Bytes 6 and 8 carry the UUID version and variant, so use the other fully random bytes.
   FOREACH i IN ARRAY ARRAY[0, 1, 2, 3, 4, 5, 9, 10] LOOP
     code := code || substr(alphabet, (get_byte(bytes, i) % 32) + 1, 1);
   END LOOP;
@@ -2066,8 +1766,6 @@ BEGIN
 END;
 $$;
 
--- SOC-02: invite halaqas hold up to 50 people. The group row lock orders this join with leave_halaqa,
--- so a group is never deleted as empty while someone is joining it.
 CREATE OR REPLACE FUNCTION public.join_halaqa_by_code(p_code TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -2094,7 +1792,6 @@ BEGIN
   IF private.halaqa_active_count(target.id) >= 50 THEN
     RAISE EXCEPTION 'halaqa_full';
   END IF;
-  -- Rejoining keeps the earlier sharing choices but never a teacher role.
   INSERT INTO public.halaqa_members (group_id, kind, user_id, role)
   VALUES (target.id, 'invite', uid, 'member')
   ON CONFLICT (group_id, user_id) DO UPDATE SET left_at = NULL, role = 'member', joined_at = now();
@@ -2102,9 +1799,6 @@ BEGIN
 END;
 $$;
 
--- Leaving takes the group row lock that joining takes before it changes membership or checks for an
--- empty group, so a join that is still committing is counted. False when the member was not in the
--- group. leave_halaqa and recording minority (private.apply_minor_privacy) both leave through this.
 CREATE OR REPLACE FUNCTION private.halaqa_leave(target_group UUID, member UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -2120,7 +1814,6 @@ BEGIN
   IF NOT FOUND THEN
     RETURN false;
   END IF;
-  -- SOC-03: a member who leaves takes their next sabaq with them, and a teacher the ones they set.
   DELETE FROM public.halaqa_sabaq_assignments
   WHERE group_id = target_group AND (learner_id = member OR teacher_id = member);
   IF private.halaqa_active_count(target_group) = 0 THEN
@@ -2145,11 +1838,6 @@ BEGIN
 END;
 $$;
 
--- SOC-04: a standing matched halaqa of about 20. Minors join only invite halaqas (ETH-07), and a
--- re-match never returns the user to a halaqa they left. The per-user lock makes concurrent requests
--- by one user find each other's membership; idx_halaqa_members_one_matched backs it. Minority is
--- checked under that lock, which recording minority also takes (private.lock_minor_change), so a join
--- either commits before a minority write, which then leaves the halaqa, or is refused.
 CREATE OR REPLACE FUNCTION public.join_matched_halaqa(
   p_level_band TEXT,
   p_pace_band TEXT,
@@ -2193,7 +1881,6 @@ BEGIN
   ORDER BY c.tier, c.size DESC, c.created_at, c.id
   LIMIT 1;
 
-  -- A last member may be leaving the chosen group right now; its row lock settles that first.
   IF chosen IS NOT NULL THEN
     SELECT id INTO chosen FROM public.halaqa_groups WHERE id = chosen AND deleted_at IS NULL FOR UPDATE;
   END IF;
@@ -2233,7 +1920,6 @@ BEGIN
     share_plan_with_teachers = p_share_plan_with_teachers,
     share_grades_with_teachers = p_share_grades_with_teachers
   WHERE group_id = p_group_id AND user_id = uid;
-  -- SOC-03: a teacher's next sabaq needs the plan shared; sharing it again does not bring one back.
   IF NOT p_share_plan_with_teachers THEN
     DELETE FROM public.halaqa_sabaq_assignments WHERE group_id = p_group_id AND learner_id = uid;
   END IF;
@@ -2241,7 +1927,6 @@ BEGIN
 END;
 $$;
 
--- Only the creator of an invite halaqa assigns teachers (SOC-03). Matched halaqas have none.
 CREATE OR REPLACE FUNCTION public.set_halaqa_member_role(p_group_id UUID, p_member_id UUID, p_role TEXT)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -2268,9 +1953,6 @@ BEGIN
 END;
 $$;
 
--- SOC-07: the week's shared goal is a total, with no individual ranking. Only members who share
--- their consistency contribute, so a total can never expose a member who chose not to share.
--- The target is five wird days per contributing member.
 CREATE OR REPLACE FUNCTION private.halaqa_goal(target_group UUID, week_start DATE)
 RETURNS JSONB
 LANGUAGE sql
@@ -2312,8 +1994,6 @@ BEGIN
 END;
 $$;
 
--- The group view. Members see each other's wird days this week, current streak and juz completions
--- only where each member shared them (SOC-02). Never mistakes, grades or recordings.
 CREATE OR REPLACE FUNCTION public.get_halaqa_detail(p_group_id UUID, p_today TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -2339,7 +2019,6 @@ BEGIN
           'user_id', p.id,
           'name', private.member_name(p.id),
           'username', p.username,
-          -- A minor has no photo (ETH-07), even if one were ever stored.
           'avatar_url', CASE WHEN NOT private.is_minor(p.id) THEN p.avatar_url END,
           'role', m.role,
           'is_me', m.user_id = uid,
@@ -2360,7 +2039,6 @@ BEGIN
     'received', (
       SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'id', e.id,
-        -- A minor who has left this matched halaqa is not named to the strangers in it (ETH-07).
         'from_name', CASE WHEN mine.kind = 'matched' AND private.is_minor(e.from_user) THEN NULL
           ELSE private.member_name(e.from_user) END,
         'template_id', e.template_id,
@@ -2398,14 +2076,7 @@ DECLARE
   clean_body TEXT := NULLIF(btrim(COALESCE(p_body, '')), '');
   new_id UUID;
 BEGIN
-  -- The sender's and recipient's profiles rows first, in key-share mode, before any halaqa row:
-  -- deleting either account locks its profile and then cascades to the group (as creator) and the
-  -- memberships, so a send that held those rows and only key-shared the profiles at its insert
-  -- would deadlock with it.
   PERFORM 1 FROM public.profiles WHERE id IN (uid, p_to_user) ORDER BY id FOR KEY SHARE;
-  -- The group row, then the sender's membership row: the order leave_halaqa and the joins use, so a
-  -- send and a leave cannot deadlock. Membership is checked under both locks, so a sender who is
-  -- leaving cannot send, and concurrent sends by one sender see each other.
   SELECT kind INTO group_kind FROM public.halaqa_groups WHERE id = p_group_id AND deleted_at IS NULL FOR SHARE;
   PERFORM 1 FROM public.halaqa_members
   WHERE group_id = p_group_id AND user_id = uid AND left_at IS NULL
@@ -2443,13 +2114,6 @@ BEGIN
 END;
 $$;
 
--- 5.8.2 group_encouragement: what the caller received in the last 7 days in the halaqas they are
--- still in, oldest first by (created_at, id), one page of at most 100 after the cursor the previous
--- page ended on; `more` says whether another page follows. The app reads every page at each check
--- (lib/halaqa/api.ts), so a burst larger than a page is listed in full, and so is a send that commits
--- after a later one. The device acknowledges ids instead of keeping a time watermark. checked_at is
--- the server's time, for pruning acknowledged ids by age.
--- It replaces a version without parameters, which would make a call without arguments ambiguous.
 DROP FUNCTION IF EXISTS public.get_received_encouragements();
 CREATE OR REPLACE FUNCTION public.get_received_encouragements(
   p_after_created_at TIMESTAMPTZ DEFAULT NULL,
@@ -2469,7 +2133,6 @@ BEGIN
   IF (p_after_created_at IS NULL) <> (p_after_id IS NULL) THEN
     RAISE EXCEPTION 'invalid_cursor';
   END IF;
-  -- One row past the page tells whether another page follows; it is not returned.
   SELECT COALESCE(jsonb_agg(jsonb_build_object('id', listed.id, 'created_at', listed.created_at)
     ORDER BY listed.created_at, listed.id), '[]'::JSONB)
   INTO page
@@ -2493,9 +2156,6 @@ BEGIN
 END;
 $$;
 
--- SOC-03: a member's next sabaq from a teacher counts while both are still in the halaqa, the teacher
--- still teaches there and the member still shares their plan with teachers. Leaving, a change of role
--- and withdrawn sharing also delete it; this check keeps a read right while one of those commits.
 CREATE OR REPLACE FUNCTION private.live_sabaq_assignments(learner UUID)
 RETURNS SETOF public.halaqa_sabaq_assignments
 LANGUAGE sql
@@ -2529,9 +2189,6 @@ AS $$
   );
 $$;
 
--- SOC-03: a teacher sees a member's plan and tiers, and recent grades and mistake-inbox count, each
--- only with that member's consent in this halaqa, with the next sabaq a teacher set. Null sections
--- were not shared.
 CREATE OR REPLACE FUNCTION public.get_halaqa_teacher_view(p_group_id UUID, p_member_id UUID, p_today TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -2587,7 +2244,6 @@ BEGIN
           LIMIT 20
         ) AS l
       ),
-      -- The inbox keeps open mistakes for 28 days (4.6).
       'mistake_inbox_count', (
         SELECT count(*) FROM public.recitation_errors AS e
         WHERE e.user_id = p_member_id AND e.resolved_at IS NULL AND e.deleted_at IS NULL
@@ -2598,11 +2254,6 @@ BEGIN
 END;
 $$;
 
--- SOC-03: a teacher sets a member's next sabaq, replacing any earlier one in this halaqa, while the member
--- shares their plan with teachers. Both profiles are key-shared first, as send_halaqa_encouragement does,
--- since deleting an account locks its profile and then cascades to its memberships. Then the group is
--- locked as leaving locks it, then both memberships, so a concurrent leave, change of role or withdrawn
--- sharing either commits first and refuses this, or waits and then deletes what this wrote.
 CREATE OR REPLACE FUNCTION public.set_halaqa_sabaq_assignment(
   p_group_id UUID,
   p_member_id UUID,
@@ -2653,7 +2304,6 @@ BEGIN
 END;
 $$;
 
--- SOC-03: any teacher of the halaqa clears a member's next sabaq, whatever the member shares.
 CREATE OR REPLACE FUNCTION public.clear_halaqa_sabaq_assignment(p_group_id UUID, p_member_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -2672,7 +2322,6 @@ BEGIN
 END;
 $$;
 
--- SOC-03: the caller's latest next sabaq from a teacher in any of their halaqas, or null.
 CREATE OR REPLACE FUNCTION public.get_my_sabaq_assignment()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -2692,9 +2341,6 @@ BEGIN
 END;
 $$;
 
--- ─── 12. Board RPCs ──────────────────────────────────────────────────────────
--- Active members of a cohort who are still on the board. Leaving the board also closes the
--- membership, so the join only matters while a leave is still committing.
 CREATE OR REPLACE FUNCTION private.board_cohort_size(cohort UUID)
 RETURNS INTEGER
 LANGUAGE sql
@@ -2707,7 +2353,6 @@ AS $$
   WHERE bm.cohort_id = cohort AND bm.left_at IS NULL;
 $$;
 
--- MAT-03, BRD-08: the best cohort of a board week for these bands, or NULL when none has room.
 CREATE OR REPLACE FUNCTION private.board_choose_cohort(
   board_week DATE,
   user_level TEXT,
@@ -2736,12 +2381,6 @@ AS $$
   LIMIT 1;
 $$;
 
--- Places a user in a board week's cohort, idempotently. Every change runs under the week's advisory
--- lock, so cohort choice and the capacity of 30 see committed sizes. A returning member goes back to
--- their cohort while it has room (SB-04). Otherwise their row moves to another cohort of the week by
--- the normal rules, so a user never holds two. An active membership in an overlapping week, left
--- from before the user changed their week start, is closed. Callers hold the member's
--- profile_privacy row lock and have checked board_joined under it.
 CREATE OR REPLACE FUNCTION private.board_place(
   member UUID,
   board_week DATE,
@@ -2796,16 +2435,6 @@ BEGIN
 END;
 $$;
 
--- The weekly placement (BRD-01, MAT-03) without cron. Each board read continues it for the reader's
--- week: up to 100 joined users who share that week start and were not yet considered for the week
--- are placed from the bands they last reported. Users with no synced wird day in the two weeks
--- before are marked as waiting, so people who stopped using the app do not fill cohorts; their next
--- synced wird day returns them to the queue (private.requeue_board_after_wird_day), and their own
--- board read places them anyway. Rows another transaction holds (that user reading, joining or
--- leaving the board, or syncing a wird day) are skipped and left for a later pass.
--- idx_profile_privacy_board_pending serves the scan in this order, so a pass reads at most 100
--- candidates. Each candidate's profiles row is key-shared before their privacy row, as get_board
--- does, and skipped while an account deletion holds it.
 CREATE OR REPLACE FUNCTION private.board_enroll_pending(board_week DATE)
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -2852,15 +2481,6 @@ BEGIN
 END;
 $$;
 
--- A waiting board user who records a wird day returns to the queue: their considered week moves back
--- a week, so the next pass of the current week places them from their latest bands. The trigger is
--- deferred to commit and first locks the user's privacy row, so a pass considering them at the same
--- time either finishes first (and is undone here) or skips the locked row and sees this day later.
--- Runs as owner because the client writes habit_days and has no access to profile_privacy.
--- It takes no profiles lock first, unlike the board paths: the sync that fires it already holds its
--- habit_days rows, and an account deletion waits on those rows, so waiting here for that deletion's
--- profile lock would deadlock. The deletion's cascade reaches habit_days before profile_privacy, so
--- it waits on the sync's rows before it can hold the privacy row this locks.
 CREATE OR REPLACE FUNCTION private.requeue_board_after_wird_day()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -2882,10 +2502,6 @@ CREATE CONSTRAINT TRIGGER habit_days_board_requeue AFTER INSERT OR UPDATE ON pub
   DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW WHEN (NEW.status IS NOT NULL) EXECUTE FUNCTION private.requeue_board_after_wird_day();
 
--- BRD-05, BRD-07, BRD-08: standings show only when the cohort has at least 5 people. Each row has a
--- nickname or display name, weekly points and current streak. The avatar is never shown for a minor
--- or under a nickname, since a photo would identify the person behind it. No user ids are returned.
--- Only members still on the board are listed.
 CREATE OR REPLACE FUNCTION private.board_view(member UUID, board_week DATE, cohort UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -2941,12 +2557,6 @@ BEGIN
 END;
 $$;
 
--- Called when the Board tab opens. The client sends its bands and offset (8.13), its local date and
--- its week start (STR-28); the server picks the cohort and computes every score. The caller's
--- profile_privacy row lock is the one leave_board and join_board take, so the consent read here
--- holds until this placement commits. The caller's profiles row is key-shared before it: deleting
--- the account locks that row and then cascades to profile_privacy, so a placement that held the
--- privacy row and only key-shared the profile at its board_members insert would deadlock with it.
 CREATE OR REPLACE FUNCTION public.get_board(
   p_level_band TEXT,
   p_pace_band TEXT,
@@ -2990,10 +2600,6 @@ BEGIN
 END;
 $$;
 
--- 8.13: the app reports its bands when they change and at most once a day otherwise
--- (lib/board/refresh.ts), so a weekly pass places a joined user who has not opened the Board tab
--- from their current bands. A new week start is a new board week, so the user returns to the queue
--- for it. Users who are not on the board are left alone.
 CREATE OR REPLACE FUNCTION public.refresh_board_bands(
   p_level_band TEXT,
   p_pace_band TEXT,
@@ -3026,11 +2632,8 @@ BEGIN
 END;
 $$;
 
--- Earlier drafts of this migration had no expected minority.
 DROP FUNCTION IF EXISTS public.join_board(TEXT, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER);
 
--- BRD-04: opt-in from the Board tab, optionally under a nickname. A minor must use one (BRD-07).
--- p_expected_minor is the minority the form loaded, compared as in set_profile_privacy.
 CREATE OR REPLACE FUNCTION public.join_board(
   p_nickname TEXT,
   p_is_minor BOOLEAN,
@@ -3051,7 +2654,6 @@ DECLARE
   today DATE := private.checked_local_date(p_today);
   clean_nickname TEXT := NULLIF(btrim(COALESCE(p_nickname, '')), '');
   minor BOOLEAN := p_is_minor;
-  -- Whether recording minority here leaves a matched halaqa, for the screen to say so (ETH-07).
   leaves_matched BOOLEAN := false;
 BEGIN
   PERFORM private.check_bands(p_level_band, p_pace_band, p_utc_offset_minutes);
@@ -3065,14 +2667,10 @@ BEGIN
   IF minor AND clean_nickname IS NULL THEN
     RAISE EXCEPTION 'nickname_required';
   END IF;
-  -- As in set_profile_privacy, since this write sets is_minor either way. The profiles row lock also
-  -- comes before the profile_privacy row that this upsert and the placement in get_board hold.
   PERFORM private.lock_minor_change(uid);
-  -- Every minority write holds that lock, so the stored value read here holds until this commits.
   IF private.is_minor(uid) IS DISTINCT FROM p_expected_minor THEN
     RAISE EXCEPTION 'privacy_changed';
   END IF;
-  -- Read under the halaqa lock lock_minor_change took, so no matched join can slip in after it.
   IF minor THEN
     leaves_matched := EXISTS (
       SELECT 1 FROM public.halaqa_members AS m
@@ -3099,11 +2697,6 @@ BEGIN
 END;
 $$;
 
--- One tap: off the board and out of every cohort. The first update takes the caller's
--- profile_privacy row lock, which a board read holds while it places, so a read in flight either
--- commits its placement first, which the second update then closes, or reads board_joined = false.
--- The profiles row is key-shared first, as in get_board, since this holds the privacy row while it
--- closes board_members rows, both of which an account deletion removes after the profile.
 CREATE OR REPLACE FUNCTION public.leave_board()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -3119,7 +2712,6 @@ BEGIN
 END;
 $$;
 
--- ─── 13. Function privileges ─────────────────────────────────────────────────
 REVOKE ALL ON FUNCTION
   private.habit_status_rank(TEXT),
   private.effective_habit_status(TEXT, TEXT),
@@ -3236,5 +2828,4 @@ GRANT EXECUTE ON FUNCTION
   public.leave_board()
 TO authenticated;
 
--- A profile's opted-in streak and juz completions are public (SOC-01), so signed-out viewers may ask.
 GRANT EXECUTE ON FUNCTION public.get_profile_summary(UUID) TO anon;

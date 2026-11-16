@@ -13,7 +13,6 @@ import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider
 import type { AppDatabase } from "@/lib/database/types";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
-// Selection imports the QF queue module, which loads the Supabase client. No network is used here.
 jest.mock("@/lib/auth/store", () => ({ useAuthStore: { getState: () => ({ user: null, session: null }) } }));
 jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: () => false, supabase: {} }));
 let mockDatabase: AppDatabase;
@@ -154,7 +153,6 @@ describe("RF-175 bookmarks, highlights and their upload queues", () => {
 
   it("keeps the previous highlight when a color change cannot be queued", async () => {
     await replaceAyahHighlight(store.db, 2, 255, "yellow");
-    // The replacement queues the old highlight's deletion first, then the new highlight.
     store.failQueueInsert(2);
 
     await expect(replaceAyahHighlight(store.db, 2, 255, "green")).rejects.toThrow("Synthetic sync_queue write failure");
@@ -174,7 +172,6 @@ describe("RF-175 bookmarks, highlights and their upload queues", () => {
       </OperationNoticeProvider>
     );
     const { result } = renderHook(() => useSelection(), { wrapper });
-    // The owner runs work in order, so this read settles after the provider's initial loads.
     await act(async () => {
       await store.db.getFirstAsync("SELECT 1");
     });

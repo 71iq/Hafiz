@@ -86,18 +86,12 @@ import {
 
 type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 type HifzPageAyah = { key: string; wordCount: number };
-/** Device-only (off the sync allowlist): the reader has dismissed the weak-spot explanation. */
 const WEAK_SPOT_NOTE_KEY = "device_weak_spot_note_seen";
 
 const PAGE_RAIL_MAX_WIDTH = 760;
-// How long after a touch drag, wheel or scroll key a scroll still counts as the reader's own,
-// long enough to cover a fling's momentum.
 const USER_SCROLL_INPUT_WINDOW_MS = 2500;
-// Matches the ayah marker delayLongPress in MushafPage, so a press that selects an ayah never also toggles chrome.
 const LONG_PRESS_MS = 300;
-// Downward scrolling hides the controls only after this much travel, so small adjustments do not flicker them.
 const CHROME_HIDE_SCROLL_PX = 24;
-// A press that moves less than this is a tap (it clears an arrival wash); more is a scroll.
 const TAP_SLOP_PX = 8;
 const HEADER_CONTENT_STYLE = { position: "absolute", top: 0, left: 0, right: 0 } as const;
 const SCROLL_KEYS = new Set(["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "]);
@@ -121,7 +115,6 @@ function isFromReaderInteraction(event: any) {
   );
 }
 
-/** C07: shortcuts never act while the reader types, composes text or works a focused control. */
 function isEditableTarget(target: EventTarget | null): boolean {
   if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) return false;
   const tag = target.tagName.toLowerCase();
@@ -140,7 +133,6 @@ function anyModalOpen(): boolean {
   return typeof document !== "undefined" && document.querySelector('[aria-modal="true"]') !== null;
 }
 
-/** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
   onNavigateToTarget,
 }: {
@@ -202,7 +194,6 @@ export default function MushafScreen() {
 
 function MushafInner() {
   const db = useDatabase();
-  // ERR-06: weak-spot markers for the pages and verses below.
   useWeakSpotsLoader(db);
   const {
     fontSize,
@@ -236,8 +227,6 @@ function MushafInner() {
   const tapRevealGuardUntilRef = useRef(0);
   const lastUserScrollInputRef = useRef(0);
   const downwardTravelRef = useRef(0);
-  // C06 saved-position bookkeeping: an explicit target outranks hydration, and an arrival is not saved
-  // until the reader deliberately scrolls, pages or switches view.
   const positionSessionRef = useRef(INITIAL_POSITION_SESSION);
   const dispatchPosition = useCallback((event: ReaderPositionEvent) => {
     positionSessionRef.current = reducePositionSession(positionSessionRef.current, event);
@@ -291,7 +280,6 @@ function MushafInner() {
     setFocusControlsVisible(true);
   }, [clearFocusControlsTimer, focusModeActive]);
 
-  // Set once the follow-recitation owner exists below: the reader's own scrolling or paging suspends it.
   const suspendFollowRef = useRef<() => void>(() => {});
   const handleScrollChrome = useCallback((e: any) => {
     const y = e?.nativeEvent?.contentOffset?.y;
@@ -305,8 +293,6 @@ function MushafInner() {
     if (Math.abs(dy) > 8 && now - lastUserScrollInputRef.current < USER_SCROLL_INPUT_WINDOW_MS) {
       suspendFollowRef.current();
     }
-    // A step larger than the screen is a programmatic jump (restoring the saved position, opening
-    // a search result), not the reader scrolling, so it must not hide the controls.
     if (now <= tapRevealGuardUntilRef.current || Math.abs(dy) > windowHeight) {
       lastScrollYRef.current = y;
       downwardTravelRef.current = 0;
@@ -318,9 +304,6 @@ function MushafInner() {
       downwardTravelRef.current = 0;
       setChromeVisible(true);
     } else if (dy > 0 && ownScroll) {
-      // Only the reader's own scrolling hides the controls, and only after 24 px of travel. Lists
-      // also move while items measure, retry a scroll to a target or restore a position, and those
-      // must leave the controls shown.
       downwardTravelRef.current += dy;
       if (downwardTravelRef.current >= CHROME_HIDE_SCROLL_PX) {
         downwardTravelRef.current = 0;
@@ -332,15 +315,12 @@ function MushafInner() {
     lastScrollYRef.current = y;
   }, [focusModeActive, markDeliberateMovement, setChromeVisible, windowHeight]);
 
-  // A short tap on empty reading space shows or hides the controls at every width. A tap an ayah
-  // marker already handled is not counted twice.
   const toggleChromeFromReaderTap = useCallback(() => {
     if (isReaderTapClaimed()) {
       releaseReaderTap();
       return;
     }
     if (focusModeActive) {
-      // A tap on the reader brings back the full controls collapsed to the Pause pill.
       if (focusModePlaying && !focusControlsVisible) revealFocusControls();
       else pauseFocusAutoScroll();
       return;
@@ -416,7 +396,6 @@ function MushafInner() {
           }
         },
         onTouchEnd: () => {
-          // A long press selects an ayah; only a short tap shows or hides the reader chrome.
           const startedAt = touchStartRef.current?.at;
           const isShortTap = typeof startedAt === "number" && Date.now() - startedAt < LONG_PRESS_MS;
           if (!touchMovedRef.current && isShortTap) toggleChromeFromReaderTap();
@@ -424,9 +403,6 @@ function MushafInner() {
         },
       } as Record<string, unknown>);
 
-  // Header slides/fades out AND collapses its height so the list fills the
-  // freed vertical space. We measure the natural header height on first
-  // layout and animate height from that to 0.
   const headerHidden = useSharedValue(0);
   useEffect(() => {
     headerHidden.value = withTiming(chromeVisible ? 0 : 1, { duration: 200 });
@@ -445,11 +421,6 @@ function MushafInner() {
   const sliderAnimStyle = useAnimatedStyle(() => ({
     opacity: 1 - headerHidden.value,
   }));
-  // Follows the header's natural height. Keeping only the first measurement froze a height taken
-  // while the toolbar row was still wrapping, which left a tall empty band above page view. The
-  // measured content is positioned out of flow (HEADER_CONTENT_STYLE), so the collapsing container
-  // clips it instead of squashing it; a squashed measurement would become the height the next
-  // reveal animates to, leaving the toolbar a sliver.
   const onHeaderLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
     const h = Math.round(e.nativeEvent.layout.height);
     if (h > 0) setMeasuredHeaderH((current) => (current === h ? current : h));
@@ -457,7 +428,6 @@ function MushafInner() {
 
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
-  // A failed Quran-data query shows Retry instead of an empty reader.
   const [quranLoadFailed, setQuranLoadFailed] = useState(false);
   const [quranLoadAttempt, setQuranLoadAttempt] = useState(0);
   const [showNavigator, setShowNavigator] = useState(false);
@@ -469,7 +439,6 @@ function MushafInner() {
   const [navigatorTab, setNavigatorTab] = useState<GoToTab>("surah");
   const [currentPage, setCurrentPage] = useState(1);
   const [verseHideMode, setVerseHideMode] = useState(false);
-  // Hide mode: revealed ayahs (key to page) live here so virtualization never re-hides them.
   const [verseReveals, setVerseReveals] = useState<VerseReveals>(NO_VERSE_REVEALS);
   const [hifzEnabled, setHifzEnabled] = useState(false);
   const [hifzRevealedAyahCount, setHifzRevealedAyahCount] = useState(0);
@@ -496,14 +465,11 @@ function MushafInner() {
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
   const pendingVersePageRef = useRef<number | null>(null);
-  // The view-switch anchor from page view: the ayah at the top of the viewport.
   const pendingVerseAnchorRef = useRef<{ surah: number; ayah: number } | null>(null);
   const pageTopAyahRef = useRef<(() => { surah: number; ayah: number } | null) | null>(null);
   const verseScrollRequestRef = useRef(0);
 
 
-  // C07 arrival: one wash per arrival with its own generation, cleared after three seconds or by the
-  // next deliberate tap. An older timer can never clear a newer arrival.
   const [arrival, setArrival] = useState<{ id: number; surah: number; ayah: number; wordPos: number | null } | null>(null);
   const arrivalSeqRef = useRef(0);
   const arrivalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -539,7 +505,6 @@ function MushafInner() {
     () => (arrival && arrival.wordPos !== null ? { surah: arrival.surah, ayah: arrival.ayah, wordPos: arrival.wordPos } : null),
     [arrival],
   );
-  // A running recitation highlights the ayah being recited, ahead of an arrival highlight.
   const { rangeState: recitation, session: audioSession } = useAyahAudio();
   const recitingKey =
     recitation.active && recitation.currentAyah ? `${recitation.currentAyah.surah}:${recitation.currentAyah.ayah}` : null;
@@ -557,7 +522,6 @@ function MushafInner() {
 
   const scheduleVerseScrollToIndex = useCallback(
     (index: number, animated = false) => {
-      // Programmatic scrolls (restore, search results, links) must not read as the reader scrolling.
       tapRevealGuardUntilRef.current = Date.now() + 1500;
       clearVerseScrollRetry();
       const request = verseScrollRequestRef.current;
@@ -571,7 +535,6 @@ function MushafInner() {
     [clearVerseScrollRetry]
   );
 
-  // A deliberate tap anywhere clears the arrival wash; a scroll, even a small one, does not.
   const screenTapStartRef = useRef<{ x: number; y: number } | null>(null);
   const screenDismissHighlightProps = Platform.OS === "web"
     ? ({
@@ -603,7 +566,6 @@ function MushafInner() {
         },
       } as Record<string, unknown>);
 
-  // Load shared juz/surah/page index once for the indicator
   useEffect(() => {
     loadMushafIndex(db).then(setMushafIndex).catch((e) => {
       console.warn("[Mushaf] failed to load index:", e);
@@ -696,8 +658,6 @@ function MushafInner() {
   );
   const currentPageHifzAyahs = isPageMode ? pageModeHifzAyahs : verseModeHifzAyahs;
 
-  // ERR-06: the first time weak-spot markers appear on the open page, one dismissible note says what
-  // they mean. The dismissal is read only once markers show, and stays on this device.
   const isWeakSpot = useWeakSpotMarker();
   const weakSpotsOnPage = useMemo(
     () =>
@@ -794,8 +754,6 @@ function MushafInner() {
     setHifzAutoRunning(false);
   }, [clearHifzTimer]);
 
-  // Navigation stops auto reveal; the progress resets only if the page actually changes (see the
-  // currentPage effect), so same-page jumps and view switches keep what was revealed.
   const resetHifzForNavigation = useCallback(() => {
     if (!hifzEnabledRef.current) return;
     stopHifzAuto();
@@ -812,8 +770,6 @@ function MushafInner() {
     stopHifzAuto();
   }, [resetHifzProgress, stopHifzAuto]);
 
-  // One reveal step: the next word, finishing the ayah at its last word. A manual step never
-  // completes or advances the page.
   const stepHifzAuto = useCallback((manual = false) => {
     if (!hifzEnabledRef.current) {
       stopHifzAuto();
@@ -913,7 +869,6 @@ function MushafInner() {
           if (item?.type === "ayah") {
             await loadQuranPageFont(quranFontStyle, item.v2Page);
           }
-          // A surah's first ayah opens on its header, so the reader sees which surah begins.
           const previous = items[idx - 1];
           const scrollIndex =
             target.ayah === 1 && previous?.type === "surah-header" && previous.surahNumber === target.surah
@@ -953,14 +908,11 @@ function MushafInner() {
     (target: MushafTarget, animated = true) => {
       tapRevealGuardUntilRef.current = Date.now() + 1500;
       pauseFocusAutoScroll();
-      // Auto reveal stops; its progress resets only if the page actually changes (see the
-      // currentPage effect), so a same-page jump keeps what was revealed.
       resetHifzForNavigation();
       suspendFollowRef.current();
       setRetryTarget(null);
       void scrollToTarget(target, animated)
         .then((result) => {
-          // Measurement never confirmed the target: offer an explicit retry instead of guessing.
           if (result === "failed") setRetryTarget(target);
         })
         .catch((e) => {
@@ -973,11 +925,9 @@ function MushafInner() {
     [pauseFocusAutoScroll, resetHifzForNavigation, scrollToTarget, startArrival]
   );
 
-  // ---- C06 target contract and the shared "Back to where I was" pill ----
   const ownerId = useAuthStore((state) => state.user?.id ?? null);
   const ownerRef = useRef(ownerId);
   ownerRef.current = ownerId;
-  // The saved position, read once so a jump can offer it back and hydration can apply it.
   const savedPositionRef = useRef<ReaderPosition | null>(null);
   const [savedPositionLoaded, setSavedPositionLoaded] = useState(false);
   useEffect(() => {
@@ -1006,7 +956,6 @@ function MushafInner() {
     setReturnToken((current) => (current ? null : current));
   }, []);
   useEffect(() => dismissReturn, [dismissReturn]);
-  // Another account never restores this account's position.
   useEffect(() => {
     dismissReturn();
   }, [dismissReturn, ownerId]);
@@ -1018,7 +967,6 @@ function MushafInner() {
     return top ? { mode: "verse", surah: top.surah, ayah: top.ayah } : savedPositionRef.current;
   }, [isPageMode]);
 
-  /** An explicit jump: capture the return position once, hold saving, then move and wash. */
   const performJump = useCallback(
     (target: MushafTarget) => {
       const id = ++returnSeqRef.current;
@@ -1037,14 +985,11 @@ function MushafInner() {
     [currentReaderPosition, dispatchPosition, navigateToTarget]
   );
 
-  // A target waits until no reader overlay is open (the commit that closed the opening sheet) and
-  // the reader's data is ready, then moves the reader exactly once.
   const queuedTargetRef = useRef<MushafTarget | null>(null);
   const [targetQueueVersion, setTargetQueueVersion] = useState(0);
   const requestTarget = useCallback(
     (target: MushafTarget) => {
       queuedTargetRef.current = target;
-      // Recorded now, so a saved-position read finishing later cannot move the reader away.
       dispatchPosition("explicit-jump");
       setTargetQueueVersion((version) => version + 1);
     },
@@ -1060,7 +1005,6 @@ function MushafInner() {
     performJump(target);
   }, [performJump, readerDataReady, readerOverlayOpen, targetQueueVersion]);
 
-  // Links, Search, bookmarks and other screens submit through the target store; it is consumed once.
   const consumeLinkTarget = useCallback(() => {
     const target = consumePendingDeepLink();
     if (target) requestTarget(target);
@@ -1071,13 +1015,11 @@ function MushafInner() {
       const unsubscribe = subscribePendingDeepLink(consumeLinkTarget);
       return () => {
         unsubscribe();
-        // Leaving the reader dismisses the return pill.
         dismissReturn();
       };
     }, [consumeLinkTarget, dismissReturn])
   );
 
-  // Restores a captured or saved position in its own mode, switching view first when needed.
   const pendingPositionRef = useRef<ReaderPosition | null>(null);
   const [pendingPositionVersion, setPendingPositionVersion] = useState(0);
   const applyPosition = useCallback(
@@ -1109,7 +1051,6 @@ function MushafInner() {
     dismissReturn();
     if (!position) return;
     markDeliberateMovement();
-    // Returning is explicit navigation: a following recitation waits for Back to ayah.
     suspendFollowRef.current();
     pendingPositionRef.current = position;
     if (position.mode !== viewMode) setViewMode(position.mode);
@@ -1119,12 +1060,10 @@ function MushafInner() {
   const handleVerseRevealChange = useCallback((surah: number, ayah: number, revealed: boolean, page: number) => {
     setVerseReveals((prev) => setVerseReveal(prev, surah, ayah, page, revealed));
   }, []);
-  // Turning hide mode on or off starts from no reveals.
   const toggleVerseHideMode = useCallback(() => {
     setVerseHideMode((prev) => !prev);
     setVerseReveals(NO_VERSE_REVEALS);
   }, []);
-  // A deliberate scroll or jump to another page keeps only that page's reveals.
   useEffect(() => {
     setVerseReveals((prev) => keepPageReveals(prev, currentPage));
   }, [currentPage]);
@@ -1175,7 +1114,6 @@ function MushafInner() {
     []
   );
 
-  // Go to closes first; the target then waits for that close like any other explicit jump.
   const handleGoToTarget = useCallback(
     (target: GoToTarget) => {
       setShowNavigator(false);
@@ -1237,8 +1175,6 @@ function MushafInner() {
     router.navigate("/(tabs)/home");
   }, [pauseFocusAutoScroll]);
 
-  // A view switch keeps the top visible ayah (including a tall one) and washes it so it is easy to
-  // find in the other view. It counts as deliberate movement, so the new position is saved.
   const toggleViewMode = useCallback(() => {
     markDeliberateMovement();
     if (isPageMode) {
@@ -1287,7 +1223,6 @@ function MushafInner() {
     (hifzRevealedAyahCount < currentPageHifzAyahs.length || hifzActiveAyahKey !== null);
   const canHidePreviousHifzAyah =
     showHifzControls && (hifzRevealedAyahCount > 0 || hifzActiveAyahKey !== null);
-  // While auto reveal still runs (about to advance a page) Pause stays reachable instead.
   const hifzPageComplete =
     showHifzControls &&
     !hifzAutoRunning &&
@@ -1341,7 +1276,6 @@ function MushafInner() {
       activeVisibleWordCount: 0,
     });
   }, [applyHifzProgress, hifzActiveAyahKey, hifzRevealedAyahCount, stopHifzAuto]);
-  // Play reveals the first word at once, then waits the interval, so it answers even at slow speeds.
   const startHifzAuto = useCallback(() => {
     if (!hifzEnabled) setHifzEnabled(true);
     setHifzAutoRunning(true);
@@ -1370,10 +1304,8 @@ function MushafInner() {
       ? Math.max(insets.bottom, 16)
       : 0;
   const [railHeight, setRailHeight] = useState(60);
-  // The player bar sits above the page rail while it shows; the return pill sits above both.
   const playerBarBottom =
     railBottomOffset + (showHifzControls || (showBottomSlider && chromeVisible) ? railHeight + 8 : 8);
-  // Mirrors RecitationPlayerBar's own rule: every session except a reciter preview shows the bar.
   const playerBarVisible = !!audioSession && audioSession.kind !== "preview";
   const pageScrollBottomInset = focusModeActive ? Math.max(insets.bottom, 12) + 96 : isPageMode ? 8 : undefined;
   const floatingRailSurface = {
@@ -1386,14 +1318,9 @@ function MushafInner() {
     shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   } as const;
-  // Vertical page view keeps the toolbar in the layout, as verse view does, so it never covers the
-  // top of a page. Only horizontal paging floats it: those pages are fitted to the screen height and
-  // must not re-fit when the toolbar hides.
   const pageHeaderOverlayStyle = isPageMode && pageScroll === "horizontal"
     ? ({
         position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
-        // An absolute child ignores the SafeAreaView's top padding, so native must add the inset
-        // itself or the toolbar draws under the status bar.
         top: Platform.OS === "web" ? 0 : insets.top,
         left: 0,
         right: 0,
@@ -1409,7 +1336,6 @@ function MushafInner() {
     clearFocusControlsTimer();
     setFocusToastMessage(null);
     setFocusModeActive(true);
-    // Focus mode opens paused with its bar shown; scrolling starts on Play.
     setFocusModePlaying(false);
     setFocusControlsVisible(true);
     setImmersive(true);
@@ -1426,8 +1352,6 @@ function MushafInner() {
     setChromeVisible(true);
   }, [clearFocusControlsTimer, setChromeVisible, setImmersive]);
 
-  // Tab screens stay mounted, so the hidden bar and focus mode must end when the reader loses
-  // focus; otherwise every other tab is left without its tab bar.
   const exitFocusModeRef = useRef(exitFocusMode);
   exitFocusModeRef.current = exitFocusMode;
   useFocusEffect(
@@ -1436,7 +1360,6 @@ function MushafInner() {
     }, [])
   );
 
-  // Android Back leaves focus mode before it leaves the reader.
   useEffect(() => {
     if (Platform.OS !== "android" || !focusModeActive) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -1535,22 +1458,17 @@ function MushafInner() {
     stopHifzAuto();
   }, [currentPage, hifzEnabled, resetHifzProgress, stopHifzAuto]);
 
-  // Verse view has no reveal rail: auto reveal stops, the page's reveals wait for the return.
   useEffect(() => {
     if (isPageMode || !hifzEnabled) return;
     stopHifzAuto();
   }, [hifzEnabled, isPageMode, stopHifzAuto]);
 
-  // For page view, derive the topmost ayah from the visible page
   useEffect(() => {
     if (!isPageMode || !mushafIndex) return;
     const top = topmostAyahForPage(mushafIndex, currentPage);
     if (top) setTopAyah(top);
   }, [currentPage, mushafIndex, isPageMode]);
 
-  // Persist the last deliberately read position (debounced). A pending save is flushed at once when
-  // the app goes to the background, the web page hides or the reader unmounts, so leaving within
-  // 600 ms of the last scroll keeps it. An arrival the reader never engaged with is not saved.
   const lastSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<ReaderPosition | null>(null);
   const flushPendingPosition = useCallback(() => {
@@ -1577,7 +1495,6 @@ function MushafInner() {
       lastSaveTimerRef.current = null;
       flushPendingPosition();
     }, 600);
-    // The top ayah's surah and ayah, not its object identity, decide a save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flushPendingPosition, loading, isPageMode, currentPage, topAyah?.surah, topAyah?.ayah]);
   const flushPendingPositionRef = useRef(flushPendingPosition);
@@ -1599,9 +1516,6 @@ function MushafInner() {
     };
   }, [dismissReturn]);
 
-  // Restore the saved position once the reader's data is ready, converting it to the current view
-  // (a saved page opens verse view at its first ayah, a saved ayah opens page view at its page). An
-  // explicit target that already arrived wins, and hydration finishing later cannot move the reader.
   const restoredOnceRef = useRef(false);
   useEffect(() => {
     if (restoredOnceRef.current) return;
@@ -1617,8 +1531,6 @@ function MushafInner() {
       return;
     }
     if (position.mode === "page") {
-      // Committed through the page prop: PageMushaf applies it once its page data has loaded,
-      // whereas a direct jump before then was silently dropped.
       if (position.page > 1 && currentPageRef.current === 1) {
         tapRevealGuardUntilRef.current = Date.now() + 1500;
         commitCurrentPage(position.page);
@@ -1637,13 +1549,10 @@ function MushafInner() {
         return;
       }
       setTopAyah({ surah: position.surah, ayah: position.ayah });
-      // Saving starts once the restored ayah is in view, so the first rows never overwrite it.
       void scheduleVerseScrollToIndex(idx, false).finally(settle);
     }, 150);
   }, [savedPositionLoaded, loading, items, mushafIndex, isPageMode, viewMode, scheduleVerseScrollToIndex, commitCurrentPage, dispatchPosition]);
 
-  // The reader follows a range recitation onto the page, or verse, being recited, until the reader
-  // scrolls, pages or jumps away; Back to ayah brings it back.
   const followRecitedAyah = useCallback(
     ({ surah, ayah }: AyahAudioTarget) => {
       tapRevealGuardUntilRef.current = Date.now() + 1500;
@@ -1666,10 +1575,6 @@ function MushafInner() {
   });
   suspendFollowRef.current = suspendFollow;
 
-  // C07 keyboard priority (web). Editable fields, composition, focused controls, menus and overlays
-  // come first; focus scrolling owns Space and Escape while it runs. Otherwise PageDown/Space page
-  // forward, PageUp/Shift+Space back, arrows keep their page direction, Ctrl/Cmd+K and "/" open
-  // Search, and "?" opens the shortcuts help. Only a handled key prevents the browser default.
   const keyboardStateRef = useRef({ readerOverlayOpen, focusModeActive, isPageMode, windowHeight });
   keyboardStateRef.current = { readerOverlayOpen, focusModeActive, isPageMode, windowHeight };
   useEffect(() => {
@@ -1690,8 +1595,6 @@ function MushafInner() {
       if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
       if (isEditableTarget(e.target)) return;
       const state = keyboardStateRef.current;
-      // Overlays and menus own their keys (C07): ResponsiveOverlay and DropdownMenu register in the
-      // shared layer stack; a reader sheet flag or any other modal also yields.
       if (state.readerOverlayOpen || hasOpenOverlay() || anyModalOpen()) return;
       const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
       if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key ?? "").toLowerCase() === "k") {
@@ -1723,7 +1626,6 @@ function MushafInner() {
         return;
       }
       if (state.isPageMode && (e.key === "ArrowLeft" || e.key === "ArrowRight") && !e.shiftKey) {
-        // The Mushaf pages right to left in both UI languages: ArrowLeft advances, ArrowRight goes back.
         e.preventDefault();
         pageBy(e.key === "ArrowLeft" ? 1 : -1);
       }
@@ -1732,8 +1634,6 @@ function MushafInner() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleOpenHelp, handleOpenSearch, markDeliberateMovement]);
 
-  // Verse view: the current ayah is the first one at least half visible. An ayah taller than twice
-  // the viewport can never reach that, so the ayah covering the top edge counts when none does.
   const primaryTopAyahRef = useRef<Extract<MushafItem, { type: "ayah" }> | null>(null);
   const edgeTopAyahRef = useRef<Extract<MushafItem, { type: "ayah" }> | null>(null);
   const viewabilityConfigCallbackPairs = useRef(
@@ -1791,7 +1691,6 @@ function MushafInner() {
     }
   }, [items, scheduleVerseScrollToIndex, startArrival, viewMode]);
 
-  // Resolve indicator labels from current top ayah
   const indicator = (() => {
     if (!mushafIndex || !topAyah) {
       return {
@@ -1809,7 +1708,6 @@ function MushafInner() {
   const dismissFocusToast = useCallback(() => setFocusToastMessage(null), []);
 
   if (loading && !isPageMode) {
-    // Rows shaped like a surah header and two ayahs; the caption stays for screen readers.
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark" edges={["top"]}>
         <View
@@ -1837,7 +1735,6 @@ function MushafInner() {
         edges={["top"]}
         {...screenDismissHighlightProps}
       >
-        {/* Reader toolbar: six 44px targets below 768px (or whenever the full toolbar does not fit). */}
         <Animated.View
           pointerEvents={chromeVisible ? "auto" : "none"}
           style={[pageHeaderOverlayStyle, headerAnimStyle]}
@@ -1889,7 +1786,6 @@ function MushafInner() {
           </Animated.View>
         )}
 
-        {/* Content */}
         {isPageMode ? (
           <View
             className="flex-1"
@@ -1986,8 +1882,6 @@ function MushafInner() {
           </View>
         )}
 
-        {/* With the controls hidden, a thin band keeps the surah and juz in view, in both views. It has
-            its own band so it never draws over the first Quran line. */}
         {!chromeVisible && !focusModeActive && (
           <View
             pointerEvents="none"
@@ -2026,7 +1920,6 @@ function MushafInner() {
           </View>
         )}
 
-        {/* Go-to navigator modal */}
         <GoToNavigator
           visible={showNavigator}
           onClose={() => setShowNavigator(false)}
@@ -2034,14 +1927,12 @@ function MushafInner() {
           initialTab={navigatorTab}
         />
 
-        {/* Bookmarks sheet */}
         <BookmarksSheet
           visible={showBookmarks}
           onClose={() => setShowBookmarks(false)}
           onNavigate={handleBookmarkNavigate}
         />
 
-        {/* Recitation range sheet */}
         <RecitationRangeSheet
           visible={showRecitation}
           onClose={() => setShowRecitation(false)}
@@ -2057,29 +1948,22 @@ function MushafInner() {
 
         <ReaderHelpSheet visible={showHelp} onClose={() => setShowHelp(false)} />
 
-        {/* Floating word tooltip (portal-based, web only) */}
         <FloatingWordTooltip />
 
-        {/* Search command modal */}
         <SearchCommand
           visible={showSearch}
           onClose={() => setShowSearch(false)}
           onNavigateToAyah={handleBookmarkNavigate}
         />
 
-        {/* Word detail modal */}
         <WordDetailSheet />
 
-        {/* Selection action bar */}
         <SelectionActionBar />
 
-        {/* Web text-selection copy menu */}
         <WebSelectionMenu />
 
-        {/* Bottom page rail / Hifz controls — fades with chrome */}
         {(showBottomSlider || showHifzControls) && (
           <Animated.View
-            // The reveal rail stays on screen with the chrome hidden, like the player bar.
             pointerEvents={chromeVisible || showHifzControls ? "box-none" : "none"}
             style={[
               {
@@ -2133,7 +2017,6 @@ function MushafInner() {
                     suspendFollowRef.current();
                     if (isPageMode) goToPageRef.current?.(p);
                     else {
-                      // Verse view: jump to the first ayah on that page
                       const ayah = mushafIndex
                         ? topmostAyahForPage(mushafIndex, p)
                         : null;
@@ -2153,7 +2036,6 @@ function MushafInner() {
           </Animated.View>
         )}
 
-        {/* Recitation player: single ayah or range, shown even with the chrome hidden. */}
         <RecitationPlayerBar
           bottom={playerBarBottom}
           fixed={isPhone || isTablet}
@@ -2164,7 +2046,6 @@ function MushafInner() {
           onBackToAyah={backToAyah}
         />
 
-        {/* One-time weak-spot explanation, above the page rail. */}
         {weakSpotsOnPage && weakSpotNoteSeen === false && chromeVisible && !focusModeActive && !recitation.active && (
           <View
             pointerEvents="box-none"
@@ -2222,7 +2103,6 @@ function MushafInner() {
           </View>
         )}
 
-        {/* C06 "Back to where I was": one captured position, for five seconds after an explicit jump. */}
         <AuthReopenSurfaces surface="mushaf" />
         {returnToken && !focusModeActive && (
           <View
@@ -2231,7 +2111,6 @@ function MushafInner() {
               position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
               left: 0,
               right: 0,
-              // Above the player bar (and its Back to ayah control) when a recitation shows one.
               bottom: playerBarBottom + (playerBarVisible ? 60 + (followSuspended ? 52 : 0) : 0),
               zIndex: 73,
               alignItems: "center",
@@ -2294,7 +2173,6 @@ function MushafInner() {
           </View>
         )}
 
-        {/* Toast notifications */}
         <Toast message={focusToastMessage} onDismiss={dismissFocusToast} duration={3000} />
       </SafeAreaView>
     </>

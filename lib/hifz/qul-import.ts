@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-/**
- * Importer for the QUL "Mutashabihat ul Quran" export (spec 4.7.1). The data is NOT bundled: its
- * licence is unclear, so it waits for written permission from Tarteel (D-1, D-4). This turns the
- * export into rows for mutashabih_phrases and mutashabih_occurrences, so adding the file later is
- * the only step left. Word positions are QUL's 1-based word positions, which match Hafiz's
- * surah:ayah:word locations.
- */
 
 const range = z.tuple([z.number().int(), z.number().int()]);
 const verseKey = z.string().regex(/^\d{1,3}:\d{1,3}$/);
@@ -32,11 +25,6 @@ function splitKey(key: string): { surah: number; ayah: number } {
   return { surah, ayah };
 }
 
-/**
- * MUT-08 recompute count and ayahs from the ayah map; MUT-09 drop duplicate ranges within an ayah;
- * MUT-10 add the source ayah to its own phrase when missing; MUT-11 reject ranges outside the
- * ayah's word count (or reversed), reporting each one.
- */
 export function importQulPhrases(rawPhrases: unknown, wordCount: (key: string) => number | null): QulImport {
   const phrases = qulPhrasesSchema.parse(rawPhrases);
   const phraseRows: PhraseRow[] = [];

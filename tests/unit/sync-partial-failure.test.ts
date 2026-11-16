@@ -393,7 +393,6 @@ describe("RF-167 backfill queue write failures", () => {
     sql.prepare("INSERT INTO bookmarks (surah,ayah,created_at,updated_at) VALUES (1,1,?,?)").run(OLD, OLD);
     await seedQueueRow("queued-before-backfill");
     queueInsertAttempts = 0;
-    // Backfill order is settings, then bookmarks, then notes. Fail after the setting was queued.
     queueInsertFailureAt = 2;
 
     await expect(fullSync(db)).rejects.toThrow("Synthetic queue write failure");

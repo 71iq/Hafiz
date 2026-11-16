@@ -25,8 +25,6 @@ describe("RTL disclosure chevron contract", () => {
       'trailing={',
     ]);
 
-    // Reciter rows show name, style and the selected check (no ID badge or chevron), with a separate
-    // 44px preview button, mirrored by hand so the RTL reader root does not flip them back.
     expectContains("components/settings/ReciterPicker.tsx", [
       "<Pressable",
       'direction: "ltr",',

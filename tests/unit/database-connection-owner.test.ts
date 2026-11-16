@@ -83,7 +83,6 @@ class SQLiteHarness {
           this.events.push("finalize:" + sql);
           await this.beforeFinalize?.(sql);
           if (this.failFinalize && (!this.failFinalizeSql || this.failFinalizeSql === sql)) throw this.failFinalize;
-          // StatementSync releases through Node's handle lifecycle; this adapter records finalization.
         },
       };
     },
@@ -128,7 +127,6 @@ describe("private SQLite connection owner", () => {
 
   test("W07 restore boundary: an earlier write is seen by the comparison and a later one commits after replacement", async () => {
     await insert(owner, "local", 1);
-    // Admitted before the replacement transaction: the in-transaction fingerprint must observe it.
     const earlier = insert(owner, "earlier", 2);
     const compared = deferred<string>();
     const resumeReplacement = deferred();
@@ -136,8 +134,6 @@ describe("private SQLite connection owner", () => {
     const replacement = owner.database.withTransactionAsync(async (tx) => {
       const seen = await tx.getAllAsync<{ key: string }>("SELECT key FROM records ORDER BY key");
       compared.resolve(seen.map((row) => row.key).join(","));
-      // A write admitted after the comparison, through the root executor, cannot run inside the gap
-      // between comparison and clear.
       laterWrite = insert(owner, "later", 3);
       await resumeReplacement.promise;
       await tx.runAsync("DELETE FROM records");

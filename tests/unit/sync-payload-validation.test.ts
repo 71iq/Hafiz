@@ -198,7 +198,6 @@ it.each(tables)("decodes current unversioned %s rows in both directions without 
 it.each(tables)("rejects malformed %s fields before returning a partial page", (table) => {
   const row = fixtures[table].row;
   expect(() => decodeSyncPage(table, [row, { ...row, ...fixtures[table].bad }], OWNER)).toThrow();
-  // NaN/Infinity serialize as null and must also be rejected on the persisted boundary.
   expect(() => decodeSyncQueueEntry(entry(table, { ...row, ...fixtures[table].bad }), OWNER)).toThrow();
 });
 

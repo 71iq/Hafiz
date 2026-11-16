@@ -11,10 +11,6 @@ type Props = {
 
 const MAX_DETAIL_LENGTH = 600;
 
-/**
- * Diagnostic text shown behind "Show details". Email addresses, URL query strings, long tokens and
- * device file paths are masked so a screenshot of the error does not leak account or device data.
- */
 export function sanitizeDatabaseErrorDetails(message: string): string {
   const masked = message
     .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[email]")
@@ -24,10 +20,6 @@ export function sanitizeDatabaseErrorDetails(message: string): string {
   return masked.length > MAX_DETAIL_LENGTH ? `${masked.slice(0, MAX_DETAIL_LENGTH)}...` : masked;
 }
 
-/**
- * The caller chooses the title language (startup cache or app language); the buttons follow that
- * title so the screen never mixes languages.
- */
 function stringsForTitle(title: string): UIStrings {
   return title === strings.ar.databaseError ? strings.ar : strings.en;
 }

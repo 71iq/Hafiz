@@ -14,34 +14,19 @@ type Props = {
   isRTL: boolean;
   accent: string;
   muted?: boolean;
-  /**
-   * False while a discrimination prompt asks which verse this is (MUT-04). The reference line keeps its
-   * place, hidden, so the card does not grow under the finger when it is shown.
-   */
   showReference?: boolean;
-  /** Shown beside the reference once it is shown, such as the prompt's answer mark or "Your choice". */
   status?: ReactNode;
-  /**
-   * The verses to tell this one apart from: the other verse of an answered prompt, or the siblings in
-   * a comparison. The words that differ from any of them, compared in order so a moved or repeated word
-   * counts too (differingWords), are underlined, and only the shared ones keep the accent.
-   */
   compareWith?: readonly SimilarRef[] | null;
-  /** MUT-05: the verse's meaning in the interface language, with the label naming its source. */
   meaning?: { label: string; text: string } | null;
-  /** MUT-01's context cue: "Page {{n}}", added after the reference when given. */
   pageTemplate?: string;
 };
 
 const CONTEXT_STYLE = { writingDirection: "rtl", textAlign: "right", fontSize: 15, lineHeight: 26 } as const;
-// Browsers skip the underline under descenders by default, which hides it under some of exactly the
-// words that differ.
 const UNDERLINE_STYLE = {
   textDecorationLine: "underline",
   ...(Platform.OS === "web" ? { textDecorationSkipInk: "none" } : null),
 } as const;
 const AYAH_END_STYLE = { fontSize: 15 } as const;
-// Off screen but read, and left out when the verse is copied.
 const SCREEN_READER_ONLY = {
   position: "absolute",
   width: 1,
@@ -57,23 +42,12 @@ function verseWords(reference: SimilarRef): string[] {
 
 const segmentWords = (text: string) => text.split(/\s+/).filter(Boolean);
 
-/**
- * Which words differ from the other verses, compared part by part: the shared passages with each
- * other, the words before with the words before, and the words after with the words after. Compared as
- * one line, a passage that runs on into the sibling's own ayah would match the sibling's passage with
- * the wrong words and underline words the two verses share.
- */
 function differingParts(reference: SimilarRef, others: readonly SimilarRef[]): boolean[] {
   const part = (pick: (ref: SimilarRef) => string) =>
     differingWords(segmentWords(pick(reference)), others.map((other) => segmentWords(pick(other))));
   return [...part((ref) => ref.pre), ...part((ref) => ref.similar), ...part((ref) => ref.post)];
 }
 
-/**
- * Where the passage leaves words of the Quran out (SimilarRef.gaps), a muted "…". A screen reader
- * reads the mark as a stray symbol or not at all, so it is named: on the web here, in its place; on
- * native in the verse's label (spokenVerse), since the spans of one text are read as one.
- */
 function GapMark({ label }: { label: string }) {
   const web = Platform.OS === "web";
   return (
@@ -86,7 +60,6 @@ function GapMark({ label }: { label: string }) {
   );
 }
 
-/** The verse as a native screen reader says it: its words and ayah ends as shown, each gap named. */
 function spokenVerse(
   words: readonly string[],
   ayahEnds: ReadonlyMap<number, number>,
@@ -103,22 +76,12 @@ function spokenVerse(
     .join(" ");
 }
 
-/**
- * "النبأ 78:2 · Page 582": the Arabic surah name isolated in English so the digits after it keep their
- * order, and the page when a template is given (MUT-01). An Arabic comma joins it in Arabic, since a
- * middle dot beside Arabic-Indic digits reads as a zero.
- */
 function referenceLabel(reference: SimilarRef, isRTL: boolean, pageTemplate?: string): string {
   const label = `${reference.surahName}${isRTL ? "" : "\u200E"} ${formatAyahRef(isRTL, reference.surah, reference.ayah)}`;
   if (!pageTemplate) return label;
   return `${label}${isRTL ? "، " : " · "}${interpolate(pageTemplate, { n: formatNumber(reference.page, isRTL ? "ar" : "en") })}`;
 }
 
-/**
- * Which words to underline: those that differ inside the shared passage, plus the nearest differing
- * word on each side of it, where the verses part. The rest of the surrounding text differs anyway, so
- * marking it would bury the difference that matters.
- */
 function underlined(differs: readonly boolean[], from: number, to: number): boolean[] {
   const marks = differs.map((differs, index) => differs && index >= from && index < to);
   for (let index = from - 1; index >= 0; index -= 1) {
@@ -136,12 +99,6 @@ function underlined(differs: readonly boolean[], from: number, to: number): bool
   return marks;
 }
 
-/**
- * One similar verse with the shared wording marked (MUT-01, MUT-04, MUT-05). The text segments come from
- * the bundled similar-verse data, or the verse's Unicode text for a tail-only group, and are only
- * displayed (ETH-12). The verse and any neighbouring words that tell it from an identical sibling stay
- * right to left in both interface directions; its reference and meaning follow the interface.
- */
 export function SimilarVerseLine({
   reference,
   isRTL,
@@ -157,7 +114,6 @@ export function SimilarVerseLine({
   const context = reference.context;
   const words = verseWords(reference);
   const differs = compareWith && compareWith.length > 0 ? differingParts(reference, compareWith) : null;
-  // The marked passage's positions in the verse: the words after the part before it.
   const sharedFrom = reference.pre.split(/\s+/).filter(Boolean).length;
   const sharedTo = sharedFrom + reference.similar.split(/\s+/).filter(Boolean).length;
   const marks = differs ? underlined(differs, sharedFrom, sharedTo) : null;
@@ -174,12 +130,10 @@ export function SimilarVerseLine({
           {status}
         </MirroredRow>
       ) : context?.surahName ? (
-        // The two verses and their neighbours read the same, so only the surah tells them apart.
         <Text dir={dir} variant="caption">
           {reference.surahName}
         </Text>
       ) : (
-        // Hidden until a choice, but holding its line so the card keeps its height.
         <Text
           dir={dir}
           variant="caption"
@@ -207,22 +161,16 @@ export function SimilarVerseLine({
           const underline = marks?.[index] === true;
           const ayahEnd = ayahEnds.get(index);
           return (
-            // The space stays outside the word, so an underline never runs under it. The spans are
-            // react-native's bare Text, so they keep the verse's size and line height.
             <Fragment key={`${index}:${word}`}>
               {index > 0 ? " " : ""}
               <RNText
-                // When compared, the text around the passage is muted, unless it holds where the verses part.
                 className={marks && !inPassage && !underline ? "text-warm-700 dark:text-neutral-400" : undefined}
                 style={underline ? UNDERLINE_STYLE : inPassage ? { color: accent, fontWeight: "700" } : undefined}
               >
                 {word}
               </RNText>
               {ayahEnd !== undefined ? (
-                // The end of an ayah inside the passage, numbered as in the Mushaf, so the verse
-                // under the reference does not read as running on into the next.
                 <RNText className="text-warm-700 dark:text-neutral-400" style={AYAH_END_STYLE}>
-                  {/* A no-break space keeps the number with its ayah's last word, never starting a line. */}
                   {`\u00A0(${toArabicNumber(ayahEnd)})`}
                 </RNText>
               ) : null}
@@ -237,7 +185,6 @@ export function SimilarVerseLine({
         </Text>
       ) : null}
       {meaning && meaning.text ? (
-        // Set apart from the verse, in the interface font and direction, so it never reads as Quran text.
         <View className="mt-1" style={{ gap: 2 }}>
           <Text dir={dir} variant="label-md" className="text-warm-700 dark:text-neutral-400">
             {meaning.label}

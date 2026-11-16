@@ -49,7 +49,6 @@ function expectStatic(view: ReturnType<typeof render>, size: number, color: stri
   const glyph = view.UNSAFE_getByType(LoaderCircle);
   expect(glyph.props.size).toBe(size);
   expect(glyph.props.color).toBe(color);
-  // A busy glyph inside an accessible button is grouped with that button.
   const progress = view.UNSAFE_getAllByType(View).find((node) => node.props.accessibilityRole === "progressbar");
   if (!progress) throw Error("Missing static busy role");
   expect(StyleSheet.flatten(progress.props.style)).toEqual({

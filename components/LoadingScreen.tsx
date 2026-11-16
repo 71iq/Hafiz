@@ -15,13 +15,8 @@ function safeStartupLanguage(): "en" | "ar" {
   }
 }
 
-/** Preparation that runs longer than this shows a truthful slow hint (it can also run after upgrades). */
 export const DATABASE_SLOW_HINT_MS = 10_000;
 
-/**
- * The stage line under the bar. Progress reports a step after it finishes, so the label names the
- * work that runs next. Unknown or missing progress shows the storage stage.
- */
 export function importStageLabelKey(progress: ImportProgress | null): UIStringKey {
   if (!progress) return "databaseStageSchema";
   if (progress.step === "Complete" || progress.current >= progress.total) return "databaseStageFinish";
@@ -38,7 +33,6 @@ export function importStageLabelKey(progress: ImportProgress | null): UIStringKe
 
 type Props = {
   progress: ImportProgress | null;
-  /** The onboarding lookup shows only the logo and title, so the bar does not jump on the way to Home. */
   showProgress?: boolean;
 };
 
@@ -46,9 +40,6 @@ const SUBTITLE_LINE_HEIGHT = 22;
 const STAGE_LINE_HEIGHT = 18;
 
 export function LoadingScreen({ progress, showProgress = true }: Props) {
-  // Web reads its cached language on the first client frame. Native waits for the startup mirror and
-  // shows the logo and progress without language text until it resolves. Text lines keep their height
-  // while the language is unknown, so nothing shifts when it arrives.
   const bootstrap = useUiBootstrap();
   const [webLanguage, setWebLanguage] = useState<"en" | "ar" | null>(() =>
     Platform.OS === "web" && typeof window !== "undefined" ? safeStartupLanguage() : null,

@@ -5,8 +5,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 
-// Uses the app's empty state so the screen follows the theme and language; the bare text and nested
-// Link drew in fixed colours and clipped the home link to "Go to" on Android.
 export default function NotFoundScreen() {
   const s = useStrings();
   const { isDark } = useSettings();
@@ -20,7 +18,6 @@ export default function NotFoundScreen() {
           title={s.notFoundTitle}
           subtitle={s.notFoundMessage}
           actionLabel={s.notFoundHome}
-          // The root entry sends first-time users to onboarding and everyone else to Home.
           onAction={() => router.replace("/")}
           isDark={isDark}
         />

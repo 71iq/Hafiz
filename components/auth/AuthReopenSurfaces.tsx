@@ -11,14 +11,8 @@ import {
 
 type EditorTarget = Omit<Extract<AuthReopenRequest, { kind: "reflection-editor" }>, "kind">;
 
-/**
- * W13: after a guest signs in from the reflection editor or comments, the return target brings them
- * back here and the surface reopens once for the same reference. It opens empty: guest text is never
- * carried over and no action (post, comment, like) is replayed. An account change closes it.
- */
 export function AuthReopenSurfaces({ surface }: { surface: "mushaf" | "feed" }) {
   const userId = useAuthStore((state) => state.user?.id ?? null);
-  // Each reopened surface remembers the account it was opened for; a different account never sees it.
   const [editor, setEditor] = useState<(EditorTarget & { owner: string }) | null>(null);
   const [comments, setComments] = useState<{ reflectionId: string; owner: string } | null>(null);
 
@@ -31,14 +25,12 @@ export function AuthReopenSurfaces({ surface }: { surface: "mushaf" | "feed" }) 
           setEditor({ surah: request.surah, ayahStart: request.ayahStart, ayahEnd: request.ayahEnd, owner: userId });
         }
       }
-      // Only the surface the sign-in returned to takes the comments request.
       const pendingComments = peekAuthReopen();
       if (pendingComments?.kind === "comments" && pendingComments.surface === surface) {
         const request = consumeAuthReopen("comments");
         if (request) setComments({ reflectionId: request.reflectionId, owner: userId });
       }
     };
-    // A new account or session starts with nothing reopened; only a fresh request opens a surface.
     setEditor(null);
     setComments(null);
     take();

@@ -38,10 +38,8 @@ const mockDatabase = {
 };
 let mockParams: Record<string, string> = {};
 let mockGrading: GradingProps | null = null;
-/** What the review screen last passed to the recitation page. */
 let mockRecitation: RecitationProps | null = null;
 let mockHabitInput: SessionHabitInput | null = null;
-// A stable object: the sabaq screen reloads whenever `stop` changes identity.
 const mockAudio = {
   playRange: jest.fn(async () => undefined),
   rangeState: { active: false, paused: false },
@@ -51,19 +49,11 @@ const mockAudio = {
 
 type RemoveAction = { type: string };
 type PreventRemove = { prevent: boolean; callback: (options: { data: { action: RemoveAction } }) => void };
-/** What the screen last passed to usePreventRemove. The prevent flag is what native-stack uses to block the iOS swipe. */
 let mockPreventRemove: PreventRemove | null = null;
 const mockNavigation = { getState: () => undefined, dispatch: jest.fn() };
-/** A hardware back press, a back gesture, or the pop native-stack sends after it blocks the iOS swipe. */
 const BACK: RemoveAction = { type: "GO_BACK" };
-/** The navigation returnToTabs dispatches when the screen leaves on purpose. */
 const EXIT: RemoveAction = { type: "POP_TO" };
 
-/**
- * Remove the screen as React Navigation does: when the latest render prevents removal, the action is
- * stopped and handed to the callback, which may continue it with navigation.dispatch. Returns whether
- * the screen stayed.
- */
 function remove(action: RemoveAction): boolean {
   const guard = mockPreventRemove;
   if (!guard?.prevent) return false;
@@ -73,14 +63,12 @@ function remove(action: RemoveAction): boolean {
 }
 const back = () => remove(BACK);
 const preventing = () => mockPreventRemove?.prevent ?? false;
-/** Each time the screen left on purpose, whether React Navigation let it go or held it. */
 let exits: ("left" | "held")[] = [];
 
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
   useNavigation: () => mockNavigation,
 }));
-/** Screen focus for useIsFocused; a test takes it away and gives it back like a screen pushed on top. */
 const mockFocus = { focused: true, listeners: new Set<() => void>() };
 jest.mock("@react-navigation/native", () => {
   const React = jest.requireActual<typeof import("react")>("react");
@@ -133,7 +121,6 @@ jest.mock("@/components/hifz/RecitationPage", () => ({
   orderedTokens: (lines: RecitationPage["lines"]) => lines.flatMap((line) => line.tokens),
 }));
 jest.mock("@/components/flashcards/GradingButtons", () => ({
-  // The grade handler is called directly, to tap twice before React renders the busy state.
   GradingButtons: (props: GradingProps) => {
     mockGrading = props;
     return null;
@@ -199,7 +186,6 @@ jest.mock("@/lib/hifz/sabaq", () => ({
   completeSabaqChunk: jest.fn(),
   nextSabaqTarget: jest.fn(),
   saveSabaqCleanRun: jest.fn(),
-  // No second look is due in these lessons; tests/unit/hifz-second-look-screen.test.tsx covers them.
   loadSecondLooks: jest.fn(async () => ({ due: [], nextAt: null })),
   saveSecondLook: jest.fn(),
 }));
@@ -207,7 +193,6 @@ jest.mock("@/lib/hifz/similar", () => ({
   ...jest.requireActual<typeof import("@/lib/hifz/similar")>("@/lib/hifz/similar"),
   similarGroupsForAyahs: jest.fn(),
   withMemorizedSiblings: jest.fn(),
-  // No page in these reviews holds a similar verse (MUT-03); tests/unit/hifz-drift-screen.test.tsx covers them.
   similarGroupsOnPages: jest.fn(async () => []),
 }));
 jest.mock("@/lib/hifz/use-weak-spots", () => ({ refreshWeakSpots: jest.fn() }));
@@ -272,17 +257,13 @@ function grading(): GradingProps {
 }
 
 const MINUTE = 60_000;
-/** The device clock while a lifecycle test runs: Date.now reads it, and only the test moves it. */
 let deviceTime = 0;
 const appStateListeners = new Set<(state: AppStateStatus) => void>();
-// React Native's Jest mock leaves currentState as a function; the screens read it as a state.
 const appState = AppState as { currentState: unknown };
 const mockedCurrentState = appState.currentState;
-// The same mock serves every test, so a lifecycle test puts its default subscription back.
 const addAppStateListener = jest.mocked(AppState.addEventListener);
 const mockedAddAppStateListener = addAppStateListener.getMockImplementation();
 
-/** Change AppState as the platform does: the current state first, then the change event. */
 function setAppState(state: AppStateStatus) {
   appState.currentState = state;
   for (const listener of [...appStateListeners]) listener(state);
@@ -291,7 +272,6 @@ function setFocused(focused: boolean) {
   mockFocus.focused = focused;
   for (const listener of [...mockFocus.listeners]) listener();
 }
-/** Six minutes, or any other time, away from the screen: the app in the background, or another screen on top. */
 type Away = "background" | "blur";
 const AWAY_CASES: [string, Away][] = [
   ["the app is in the background", "background"],
@@ -302,7 +282,6 @@ function stayAway(how: Away, ms: number) {
   deviceTime += ms;
   act(() => (how === "background" ? setAppState("active") : setFocused(true)));
 }
-/** Hand Date.now, AppState and screen focus to the tests in the calling describe block. */
 function controlDeviceLifecycle() {
   let nowSpy: jest.SpyInstance;
   beforeEach(() => {
@@ -385,8 +364,6 @@ describe("hifz review screen", () => {
       void buttons.onGrade(1);
     });
     await flush();
-    // The drill that was already queued comes first; the page waits behind it, and the person is told.
-    // The count is of items, so the page coming back does not add one.
     expect(screen.getByText("2 / 2")).toBeTruthy();
     expect(screen.getByText(s.hifzPageComesBack)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDrillShow }));
@@ -395,7 +372,6 @@ describe("hifz review screen", () => {
     });
     await flush();
     expect(screen.getByText("2 / 2")).toBeTruthy();
-    // The page back for its step says so, instead of its tier.
     expect(screen.getByText(s.hifzOnceMore)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
     await flush();
@@ -405,10 +381,8 @@ describe("hifz review screen", () => {
     await flush();
     expect(savePageGrade).toHaveBeenCalledTimes(2);
     expect(jest.mocked(savePageGrade).mock.calls[0][1]).toMatchObject({ card: row, firstGradeInSession: true });
-    // The second recitation is graded from the row the first grade saved, as a later grade in the session.
     expect(jest.mocked(savePageGrade).mock.calls[1][1]).toMatchObject({ card: relearning, firstGradeInSession: false });
     expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
-    // One page of the plan, recited twice: the plan and the pace count it once.
     expect(screen.getByText("Wird 1 of 1 pages")).toBeTruthy();
     expect(jest.mocked(recordReviewPace).mock.calls[0][1]).toMatchObject({ pages: 1 });
     mockDatabase.getFirstAsync.mockResolvedValue(null);
@@ -440,13 +414,11 @@ describe("hifz review screen", () => {
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
 
-    // The title names the half; the count stays a count of pages.
     expect(screen.getByText("1 / 1")).toBeTruthy();
     expect(screen.getByText(`Page 5 · ${s.hifzHalfA}`)).toBeTruthy();
     expect([...mockRecitation!.lineNumbers!]).toEqual([1, 2]);
     expect(screen.getByText(s.hifzRecitePromptHalf)).toBeTruthy();
     expect(screen.getByText(s.hifzReciteInSalah)).toBeTruthy();
-    // A peek in the first half, then its own check, with nothing graded yet.
     fireEvent.press(screen.getByText(s.hifzPeek));
     fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
     await flush();
@@ -460,7 +432,6 @@ describe("hifz review screen", () => {
     expect(screen.queryByText(s.hifzReciteInSalah)).toBeNull();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
     await flush();
-    // The clean second half would propose Good; the page takes the first half's Hard.
     expect(grading().proposed).toBe(2);
     await act(async () => {
       void grading().onGrade(3);
@@ -500,7 +471,6 @@ describe("hifz review screen", () => {
       void buttons.onGrade(3);
     });
     await flush();
-    // The summary is still loading; the grade buttons of the saved page are still on screen.
     await act(async () => {
       void grading().onGrade(3);
     });
@@ -546,12 +516,10 @@ describe("hifz review screen", () => {
     await act(async () => {
       void buttons.onGrade(3);
     });
-    // Nothing is counted yet, so Close would leave at once without asking.
     fireEvent.press(screen.getByRole("button", { name: s.genericClose }));
     expect(returnToTabs).not.toHaveBeenCalled();
     await act(async () => save.resolve(saved));
     await flush();
-    // The screen leaves while removal is still prevented; its own exit goes through.
     expect(exits).toEqual(["left"]);
     expect(endReviewSession).toHaveBeenCalled();
   });
@@ -591,18 +559,15 @@ describe("hifz review screen", () => {
       held = back();
     });
     expect(held).toBe(true);
-    // Close is dimmed while the leave waits for the save.
     expect(screen.getByRole("button", { name: s.genericClose }).props.accessibilityState).toMatchObject({ disabled: true });
     await act(async () => save.resolve(saved));
     await flush();
-    // The held back press goes on to where it was going, not to the tabs.
     expect(mockNavigation.dispatch).toHaveBeenCalledWith(BACK);
     expect(returnToTabs).not.toHaveBeenCalled();
     expect(endReviewSession).toHaveBeenCalled();
   });
 
   it("asks before a back press leaves graded pages, and goes back once confirmed", async () => {
-    // Two pages, so grading the first leaves the session open with graded work in it.
     const row6 = { ...row, id: "page:madani15:6" } as StudyCardRow;
     jest.mocked(loadTodayWird).mockResolvedValue({
       plan: DEFAULT_HIFZ_PLAN,
@@ -625,7 +590,6 @@ describe("hifz review screen", () => {
       await buttons.onGrade(3);
     });
     await flush();
-    // The page is saved, so leaving now would leave graded work: the screen holds the press and asks.
     let held = false;
     act(() => {
       held = back();
@@ -675,7 +639,6 @@ describe("hifz review screen", () => {
     await flush();
     expect(returnToTabs).not.toHaveBeenCalled();
     expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
-    // The page is still open, and the cancelled Close does not carry over to the retry.
     await act(async () => {
       void grading().onGrade(3);
     });
@@ -708,7 +671,6 @@ describe("hifz review screen", () => {
     mockDatabase.getFirstAsync.mockResolvedValue(null);
   });
 
-  // Review time counts toward the daily minimum, so time away from the screen must not.
   describe("time away from the screen", () => {
     controlDeviceLifecycle();
 
@@ -722,7 +684,6 @@ describe("hifz review screen", () => {
         void grading().onGrade(3);
       });
       await flush();
-      // Three minutes on screen, not the nine since the page was shown.
       expect(jest.mocked(savePageGrade).mock.calls[0][1].durationMs).toBe(3 * MINUTE);
       expect(jest.mocked(recordReviewPace).mock.calls[0][1].minutes).toBe(3);
       expect(mockHabitInput?.durationMs).toBe(3 * MINUTE);
@@ -802,15 +763,12 @@ describe("sabaq screen", () => {
     jest.mocked(readMemorizedPageNumbers).mockResolvedValue(new Set());
   });
 
-  /** Walk the lesson to step 6 with its last clean recitation to go and the lines shown. */
   async function openSabaqCleanRun() {
     render(<SabaqRoute />, { wrapper: Wrapper });
     await flush();
-    // Intention, listening and meaning, then ten readings while looking.
     for (let step = 0; step < 3; step += 1) press(s.hifzSabaqNext);
     for (let reading = 0; reading < 10; reading += 1) press(s.hifzSabaqReadOnce);
     press(s.hifzSabaqNext);
-    // One ayah, then the whole chunk twice, each from memory.
     for (let clean = 0; clean < 3; clean += 1) {
       press(s.hifzDrillShow);
       press(s.hifzSabaqClean);
@@ -819,7 +777,6 @@ describe("sabaq screen", () => {
     expect(screen.getByText("Clean in a row: 2 of 3")).toBeTruthy();
   }
 
-  /** Walk the session through step 6's save and the link to its graded fluent check, and return its grade buttons. */
   async function openSabaqCheck() {
     await openSabaqCleanRun();
     press(s.hifzSabaqClean);
@@ -847,7 +804,6 @@ describe("sabaq screen", () => {
       jest.mocked(withMemorizedSiblings).mockReturnValue([
         { groupId: "g1", kind: "similar", self: verse(2, 5, "البقرة", 2), siblings: [verse(31, 5, "لقمان", 411)] },
       ]);
-      // The translations and the Muyassar tafsir for 2:5 and 31:5, copied from the bundled database.
       const meanings = {
         en: [
           "Those are upon [right] guidance from their Lord, and it is those who are the successful",
@@ -870,15 +826,12 @@ describe("sabaq screen", () => {
       try {
         render(<SabaqRoute />, { wrapper: Wrapper });
         await flush();
-        // Intention, listening and the chunk's meaning come first.
         for (let step = 0; step < 3; step += 1) press(t.hifzSabaqNext);
         expect(screen.getByText(t.hifzSimilarTitle)).toBeTruthy();
-        // The chunk's verse shows its meaning; the memorized sibling's waits behind its button.
         expect(await screen.findByText(meanings[0])).toBeTruthy();
         expect(screen.queryByText(meanings[1])).toBeNull();
         press(t.hifzSimilarShowMeaning);
         expect(screen.getByText(meanings[1])).toBeTruthy();
-        // Each verse's reference with its page, the context cue (MUT-01).
         expect(screen.getByText(language === "ar" ? "لقمان ٣١:٥، صفحة ٤١١" : "لقمان\u200E 31:5 · Page 411")).toBeTruthy();
       } finally {
         reads.mockImplementation(async () => []);
@@ -911,7 +864,6 @@ describe("sabaq screen", () => {
   });
 
   it("keeps the lesson's chunk and session when the language changes after step 6 saved it", async () => {
-    // Loading again would choose the next lines, since step 6 memorized these.
     jest.mocked(nextSabaqTarget).mockResolvedValueOnce(target).mockResolvedValue({ ...target, fromLine: 2, toLine: 2, lineNumbers: new Set([2]) });
     await openSabaqCleanRun();
     press(s.hifzSabaqClean);
@@ -924,7 +876,6 @@ describe("sabaq screen", () => {
     await flush();
     expect(nextSabaqTarget).toHaveBeenCalledTimes(1);
     expect(startReviewSession).toHaveBeenCalledTimes(1);
-    // Only the meanings followed the language.
     expect(mockDatabase.getFirstAsync).toHaveBeenCalledWith(expect.stringContaining("FROM tafseer"), [2, 1]);
     expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
     press(s.hifzDrillShow);
@@ -947,7 +898,6 @@ describe("sabaq screen", () => {
       held = back();
     });
     expect(held).toBe(true);
-    // During the save the press waits for it rather than asking.
     expect(screen.queryByText(s.hifzSabaqExitTitle)).toBeNull();
     await act(async () => save.resolve(cleanRunSaved));
     await flush();
@@ -971,20 +921,15 @@ describe("sabaq screen", () => {
     await flush();
     expect(mockNavigation.dispatch).not.toHaveBeenCalledWith(BACK);
     expect(returnToTabs).not.toHaveBeenCalled();
-    // No grade was given at step 6, so the error names the lines and the button that saves them.
     expect(screen.getByText(s.hifzSabaqCleanRunSaveFailed)).toBeTruthy();
     expect(screen.getByText(s.hifzSabaqStepChunk)).toBeTruthy();
-    // The met clean run is saved again, not started over.
     expect(screen.getByRole("button", { name: s.hifzSabaqNotYet })).toBeDisabled();
-    // Nothing of the lesson is saved, so leaving asks again.
     expect(preventing()).toBe(true);
-    // The same button saves again, and the cancelled back press does not carry over.
     press(s.hifzSabaqClean);
     await flush();
     expect(saveSabaqCleanRun).toHaveBeenCalledTimes(2);
     expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
     expect(screen.queryByText(s.hifzSabaqCleanRunSaveFailed)).toBeNull();
-    // The link step's own "Not yet" is open again.
     press(s.hifzDrillShow);
     expect(screen.getByRole("button", { name: s.hifzSabaqNotYet })).toBeEnabled();
     expect(mockNavigation.dispatch).not.toHaveBeenCalledWith(BACK);
@@ -1015,20 +960,17 @@ describe("sabaq screen", () => {
     expect(returnToTabs).not.toHaveBeenCalled();
     await act(async () => save.resolve(chunkSaved));
     await flush();
-    // The screen leaves while removal is still prevented; its own exit goes through.
     expect(exits).toEqual(["left"]);
     expect(endReviewSession).toHaveBeenCalled();
   });
 
   it("asks before Close or a back press leaves an unsaved lesson, and goes once confirmed", async () => {
     await openSabaqCleanRun();
-    // Close asks, and staying keeps the lesson.
     press(s.genericClose);
     expect(screen.getByText(s.hifzSabaqExitTitle)).toBeTruthy();
     press(s.hifzSabaqExitStay);
     await flush();
     expect(returnToTabs).not.toHaveBeenCalled();
-    // A back press asks the same, and leaving carries it out.
     let held = false;
     act(() => {
       held = back();
@@ -1067,7 +1009,6 @@ describe("sabaq screen", () => {
     expect(preventing()).toBe(true);
     await act(async () => save.resolve(chunkSaved));
     await flush();
-    // Saved; the summary is still loading, and leaving now is not held.
     expect(preventing()).toBe(false);
     expect(back()).toBe(false);
     await act(async () => overview.resolve(null));
@@ -1087,7 +1028,6 @@ describe("sabaq screen", () => {
       held = back();
     });
     expect(held).toBe(true);
-    // During the save the press waits for it rather than asking.
     expect(screen.queryByText(s.hifzSabaqExitTitle)).toBeNull();
     await act(async () => save.reject(new Error("disk full")));
     await flush();
@@ -1114,7 +1054,6 @@ describe("sabaq screen", () => {
     await flush();
     expect(returnToTabs).not.toHaveBeenCalled();
     expect(screen.getByText(s.hifzSaveFailed)).toBeTruthy();
-    // The check is still open, and the cancelled Close does not carry over to the retry.
     await act(async () => {
       void grading().onGrade(3);
     });
@@ -1167,7 +1106,6 @@ describe("sabaq screen", () => {
     expect(completeSabaqChunk).toHaveBeenCalledTimes(1);
   });
 
-  // The lesson's time counts toward the daily minimum, so time away from the screen must not.
   describe("time away from the screen", () => {
     controlDeviceLifecycle();
 
@@ -1180,7 +1118,6 @@ describe("sabaq screen", () => {
       deviceTime += 2 * MINUTE;
       press(s.hifzSabaqClean);
       await flush();
-      // Step 6 saves the lesson's four minutes on screen so far; the check's time starts after it.
       expect(jest.mocked(saveSabaqCleanRun).mock.calls[0][1].durationMs).toBe(4 * MINUTE);
       press(s.hifzDrillShow);
       press(s.hifzSabaqClean);
@@ -1193,7 +1130,6 @@ describe("sabaq screen", () => {
       });
       await flush();
       expect(jest.mocked(completeSabaqChunk).mock.calls[0][1].durationMs).toBe(3 * MINUTE);
-      // The summary covers the whole lesson and keeps the minimum step 6 met, though the check met nothing new.
       expect(mockHabitInput?.durationMs).toBe(7 * MINUTE);
       expect(mockHabitInput?.event).toEqual({ kind: "minimum_met" });
     });

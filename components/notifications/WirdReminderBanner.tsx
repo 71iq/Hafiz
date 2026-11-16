@@ -19,15 +19,9 @@ import type { RamadanAnchor, ReminderRoute } from "@/lib/notifications/types";
 import { useSettings } from "@/lib/settings/context";
 
 export type WirdReminderBannerProps = {
-  /** Called on "Start". Defaults to the reminder's own route: the wird review for the plan, al-Kahf or Home. */
   onStart?: (route: ReminderRoute) => void;
 };
 
-/**
- * In-app reminder (NOT-03). On web it replaces scheduled notifications; on native it shows only
- * while notifications are not allowed. It also carries the one-time Ramadan time offer (NOT-10).
- * Renders nothing when there is no reminder due. Refreshes on focus and after reviews.
- */
 export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
   const db = useDatabase();
   const s = useStrings();
@@ -65,7 +59,6 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
       answerRamadanOffer(db, { hijriYear: banner.hijriYear, choice }).catch(() => {});
     };
     return (
-      // Its own top gap, since it renders nothing when there is no reminder (Home's header sits above).
       <Card elevation="mid" className="mt-4 p-4 gap-3" accessibilityRole="alert">
         <Text variant="body">{s.notifRamadanOffer}</Text>
         <MirroredRow className="flex-wrap gap-2">

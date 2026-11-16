@@ -4,11 +4,6 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 
 const FOCUS_KEEP_AWAKE_TAG = "hafiz-focus-scroll";
 
-/**
- * Keeps the screen on while focus auto-scroll plays, through one tagged expo-keep-awake lease.
- * It is acquired on Play and released on pause, exit, backgrounding or unmount, and taken again
- * after the app returns only if scrolling is still playing. A refusal never blocks study.
- */
 export function useFocusKeepAwake(playing: boolean) {
   const [appActive, setAppActive] = useState(AppState.currentState !== "background");
   useEffect(() => {

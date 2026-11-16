@@ -86,7 +86,6 @@ import { useAppReleaseRows } from "@/components/app-update/use-app-release-row";
 
 type SettingsCategoryId = "general" | "content" | "account" | "about";
 
-// Login and Sign up opened from Account return there; the auth screens own the allowlisted return.
 
 type SettingsCategory = {
   id: SettingsCategoryId;
@@ -142,7 +141,6 @@ export default function SettingsScreen() {
   const appVersion = installedAppVersion();
   const syncDetails = useSyncStatusDetails();
   const router = useRouter();
-  // Sign-in from Settings returns to the Account category through the allowlisted return origin (W13).
   const openAccountAuth = (pathname: "/auth/login" | "/auth/signup") => {
     captureAuthReturn({ route: "settings-account" });
     router.push(pathname);
@@ -165,9 +163,7 @@ export default function SettingsScreen() {
   const currentTafseerTitle = stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id);
   const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
-  // Never derive a name from the email; a fallback profile reads "Hafiz user" until the real one loads.
   const accountName = profile?.display_name || profile?.username || (user ? s.navigationHafizUser : s.authProfile);
-  // The sign-out confirmation names the account as the person signed in with it.
   const accountIdentity = user?.email || profile?.username || s.authProfile;
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
   const resolvedThemeLabel = effectiveTheme === "white" ? s.themeWhite : effectiveTheme === "beige" ? s.themeBeige : effectiveTheme === "dark" ? s.themeDark : s.themeAmoled;
@@ -188,9 +184,6 @@ export default function SettingsScreen() {
     effectiveTheme,
     quranMarkerStyle,
   );
-  // Only the latest status request may publish, so a previous account's slow response cannot show
-  // its connection to the next account. Handlers capture the account and check it, by generation and
-  // by the live store user, before showing results. A switch clears the previous account's message.
   const latestQfStatusRequest = useRef(0);
   const handledQfCallback = useRef<string | null>(null);
   const accountGeneration = useRef(0);
@@ -228,7 +221,6 @@ export default function SettingsScreen() {
     refreshQfStatus().catch(console.warn);
   }, [refreshQfStatus]);
 
-  // A failed settings write has already reverted to the last saved choice; say so once.
   useEffect(() => subscribeSettingSaveFailed(() => setToast(s.settingSaveFailed)), [s.settingSaveFailed]);
 
   useEffect(() => {
@@ -261,8 +253,6 @@ export default function SettingsScreen() {
       handledQfCallback.current = null;
       return;
     }
-    // Handle each OAuth return once: the route keeps its params after the URL is cleared, and an
-    // account switch must not replay the previous account's callback.
     const callbackKey = `${qf ?? ""}|${qfError ?? ""}`;
     if (handledQfCallback.current === callbackKey) return;
     handledQfCallback.current = callbackKey;
@@ -388,7 +378,6 @@ export default function SettingsScreen() {
   const issueReporter = useIssueReporter(setToast);
   const openPublicPage = useCallback(
     (page: "about" | "privacy" | "terms" | "credits") => {
-      // The page returns to Settings > About through this captured origin.
       router.push(`/${page}?from=${PUBLIC_PAGE_FROM_SETTINGS}` as Href);
     },
     [router],
@@ -598,7 +587,6 @@ export default function SettingsScreen() {
                   value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
                   onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
                   onIncrement={() => setFontSizeIndex(fontSizeIndex + 1)}
-                  // Swipe pages are fitted to the screen, so the stepper has no effect there.
                   decrementDisabled={fontSizeUsesFittedPageSize || fontSizeIndex === 0}
                   incrementDisabled={fontSizeUsesFittedPageSize || fontSizeIndex === FONT_SIZE_STEPS.length - 1}
                   isDark={isDark}
@@ -607,7 +595,6 @@ export default function SettingsScreen() {
               </View>
 
               <View className="bg-surface dark:bg-surface-dark rounded-2xl px-4 py-4">
-                {/* Glyphs mounted before their page font exists render and measure in the system font. */}
                 {quranPreview && quranPreviewFontReady ? (
                   <View
                     style={{
@@ -654,7 +641,6 @@ export default function SettingsScreen() {
                 />
               </SettingsControlRow>
 
-              {/* The whole row is the switch, so its target is the row, not the 24 px track. */}
               <SwitchRow
                 label={s.hifzSimilarMarkSetting}
                 hint={s.hifzSimilarMarkSettingHint}
@@ -744,7 +730,6 @@ export default function SettingsScreen() {
                 isRTL={isRTL}
                 isDark={isDark}
                 loading={isTranslationLoading}
-                // There is no byte total for a translation, so the row names the phase without a percentage.
                 loadingLabel={Platform.OS === "web" ? s.contentDownloading : s.contentImporting}
                 showDivider
                 onPress={() => setPickerVisible(true)}
@@ -929,7 +914,6 @@ export default function SettingsScreen() {
                   isDark={isDark}
                   isRTL={isRTL}
                 />
-                {/* Without an account service there is nothing to sign in to, so the buttons stay hidden. */}
                 {configured ? (
                   <>
                     <Button
@@ -1146,9 +1130,6 @@ function SettingsCategoryTabs({
   onSelect: (category: SettingsCategoryId) => void;
   compact: boolean;
 }) {
-  // A phone cannot fit four labels plus icons at the regular text size (a fixed-width scrolling
-  // row cut "Account" mid-word and hid "About" at 384dp). Phones drop the icons and size each
-  // segment from its label so all four fit; wider compact layouts keep icons and fill the row.
   const { width } = useWindowDimensions();
   const isPhone = compact && width < SIDEBAR_BREAKPOINT;
   const items = categories.map((category) => {
@@ -1319,7 +1300,6 @@ function ContentSettingsRow({
         paddingVertical: 10,
       }}
     >
-      {/* Label and value wrap onto a second line rather than truncating, e.g. "Translation Language". */}
       <Text
         className="text-charcoal dark:text-neutral-100"
         numberOfLines={2}
@@ -1340,8 +1320,6 @@ function ContentSettingsRow({
           direction: "ltr",
           flexDirection: isRTL ? "row-reverse" : "row",
           gap: 10,
-          // With row-reverse in Arabic, flex-end is the left edge, mirroring the English row where the
-          // value and chevron sit at the end; flex-start left them beside the label at varying offsets.
           justifyContent: "flex-end",
         }}
       >
@@ -1435,7 +1413,6 @@ function SettingsLinkRow({
   icon: LucideIcon;
   title: string;
   description: string;
-  /** Without onPress the row is information only. */
   onPress?: () => void;
   isDark: boolean;
   isRTL: boolean;

@@ -64,7 +64,6 @@ describe("PrayerTimesSetup messages", () => {
     fireEvent.press(view.getByText(s.notifUseMyLocation));
     const denied = await view.findByText(s.notifLocationDenied);
 
-    // The fields open with the message, but the message stays beside the button that caused it.
     expect(view.getByText(s.notifSaveCoordinates)).toBeTruthy();
     const locationGroup = findAncestorByClassName(denied, "gap-2");
     expect(within(locationGroup as never).getByText(s.notifUseMyLocation)).toBeTruthy();

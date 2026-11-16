@@ -43,8 +43,6 @@ const probe = String.raw`
         assert.equal(value.customRandom("abc", 6, (size) => new Uint8Array(size))(), "aaaaaa");
       }
     } else {
-      // Each input has a fresh process and random pool. Rejecting any RNG call
-      // exposes the old invalid-size branch without running an infinite loop.
       const crypto = require("node:crypto");
       function unexpectedRandom() { throw new Error("Invalid size must not request random bytes"); }
       Math.random = unexpectedRandom;

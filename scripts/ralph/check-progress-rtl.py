@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Prove ProgressScreen RTL assertions reject incorrect rendered styles."""
 import hashlib
 import json
 from pathlib import Path
@@ -27,7 +26,6 @@ def main():
         'inner-direction': 'style={{ ...mirroredRowStyle, direction: "rtl" }}',
         'inner-order': 'style={{ ...mirroredRowStyle, flexDirection: isRTL ? "row" : "row-reverse" }}',
     }.items():
-        # Only the inner title/icon row changes. The outer row stays correct.
         candidate = output_dir / f'{name}.tsx'
         candidate.write_text(parts[0] + marker + parts[1] + replacement + parts[2] + marker + parts[3])
         config = output_dir / f'{name}.config.cjs'

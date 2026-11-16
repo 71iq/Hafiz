@@ -133,11 +133,6 @@ function hasActiveBrowserSelection(): boolean {
   return Boolean(selection && !selection.isCollapsed && selection.rangeCount > 0);
 }
 
-/**
- * Build page data using v2_page assignments.
- * QCF2 glyphs are PUA codepoints tied to per-page fonts, so each ayah
- * must be assigned to the page matching its v2_page.
- */
 function buildPageData(
   pages: PageRow[],
   ayahs: AyahRow[],
@@ -145,7 +140,6 @@ function buildPageData(
   offsetLookup: Map<number, number>,
   pageWords: PageWordsData | null
 ): PageData[] {
-  // Group ayahs by their QCF2 page assignment
   const ayahsByPage = new Map<number, AyahRow[]>();
   for (const a of ayahs) {
     if (!a.v2_page) continue;
@@ -210,17 +204,12 @@ type Props = {
   onAutoScrollUserPause?: () => void;
   onAutoScrollEnd?: () => void;
   hifzVisibility?: HifzVisibility | null;
-  /** Changes with every arrival, so a repeated jump to the same ayah is placed and announced again. */
   arrivalId?: number;
-  /** Filled with a reader for the ayah at the top of the viewport (the view-switch anchor). */
   topAyahRef?: React.MutableRefObject<(() => { surah: number; ayah: number } | null) | null>;
-  /** Arrow-key paging is off while an overlay or menu owns the keyboard. */
   keyboardPagingEnabled?: boolean;
-  /** Reports the reader's own keyboard page turn, which counts as deliberate movement. */
   onUserNavigate?: () => void;
 };
 
-// Fixed heights for getItemLayout calculation
 const HORIZONTAL_PAGE_TOP_PADDING = 0;
 const HORIZONTAL_PAGE_BOTTOM_RESERVE = 8;
 const HORIZONTAL_CANCEL_DURATION = 190;
@@ -234,7 +223,6 @@ const HORIZONTAL_FLICK_VELOCITY = 0.26;
 const HORIZONTAL_EASING = Easing.out(Easing.cubic);
 const PAGE_PILL_MS = 1500;
 const PAGE_PILL_FADE_MS = 150;
-/** Arrivals place the target this far down the viewport, matching verse view. */
 const ARRIVAL_VIEWPORT_FRACTION = 0.25;
 
 function PageSeparator({
@@ -295,8 +283,6 @@ function PageSeparator({
 
         <View className="flex-row items-center" style={{ width: "40%" }}>
           <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
-          {/* Android measured three Arabic-Indic digits a little narrower than it draws them, so the
-              last one wrapped out of view (442 drew as ٤٤); the minimum width holds any page number. */}
           <Text
             className="px-3 text-xs text-warm-400 dark:text-neutral-500"
             style={{ minWidth: 64, textAlign: "center", writingDirection: "ltr", flexShrink: 0 }}
@@ -460,7 +446,6 @@ export function PageMushaf({
     }
   }, []);
 
-  // Layout offsets for getItemLayout — enables instant scrollToIndex
   const [layoutInfo, setLayoutInfo] = useState<{
     heights: number[];
     offsets: number[];
@@ -499,7 +484,6 @@ export function PageMushaf({
         setPageRows(pages);
         setJuzRangeRows(juzRanges);
 
-        // Group page lines by page number and compute globalWordOffset per page
         const lineLookup = new Map<number, PageLineLayout[]>();
         const offsetLookup = new Map<number, number>();
 
@@ -518,7 +502,6 @@ export function PageMushaf({
             surah_number: row.surah_number,
           });
 
-          // Track min first_word_id per page for offset calculation
           if (typeof row.first_word_id === "number" && row.first_word_id > 0) {
             const current = offsetLookup.get(row.page_number);
             if (current === undefined || row.first_word_id - 1 < current) {
@@ -556,17 +539,12 @@ export function PageMushaf({
     setPageMetaMap(meta);
   }, [juzRangeRows, pageRows, surahMap, uiLanguage]);
 
-  // Rebuild layout offsets when lineHeight changes (font size adjustment)
   useEffect(() => {
     if (pageData.length > 0) {
       setLayoutInfo(buildLayoutOffsets(pageData, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom, verticalLineHeightMultiplier));
     }
   }, [verticalLineHeightMultiplier, verticalLineSlotHeight, pageData, pagePaddingTop, pagePaddingBottom]);
 
-  // A font or size change rebuilds every page height while the list keeps its pixel offset, which
-  // landed on a different page. Keep the reader on the same page at the same relative position.
-  // When the pages grow, the target can lie past the end of the old content and Android clamps the
-  // scroll there, so the offset stays pending until the list reports content tall enough to hold it.
   const previousLayoutRef = useRef(layoutInfo);
   const pendingAnchorOffsetRef = useRef<number | null>(null);
   useEffect(() => {
@@ -587,20 +565,16 @@ export function PageMushaf({
     pendingAnchorOffsetRef.current = offset + effectiveContainerHeight > contentHeightRef.current ? offset : null;
     flatListRef.current?.scrollToOffset({ offset, animated: false });
     if (pendingAnchorOffsetRef.current === null) return;
-    // Never leave page tracking suspended if the list does not report a new size.
     const timer = setTimeout(() => {
       pendingAnchorOffsetRef.current = null;
     }, 1500);
     return () => clearTimeout(timer);
-    // The container height is read for this layout change only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [horizontal, layoutInfo]);
 
-  // getItemLayout enables instant scrollToIndex without rendering intermediate items
   const getItemLayout = useCallback(
     (_data: ArrayLike<PageData> | null | undefined, index: number) => {
       if (!layoutInfo || index < 0 || index >= layoutInfo.heights.length) {
-        // Fallback estimate
         const estHeight = 15 * verticalLineSlotHeight + pagePaddingTop + pagePaddingBottom + (index > 0 ? SEPARATOR_HEIGHT : 0);
         return { length: estHeight, offset: index * estHeight, index };
       }
@@ -624,8 +598,6 @@ export function PageMushaf({
     [onPageChange, pageData.length]
   );
 
-  // The page pill shows for 1500 ms after a page change, and on every arrival in swipe view so a jump
-  // is noticed even onto a similar-looking page. It fades over 150 ms, instantly with reduced motion.
   const flashPageIndicator = useCallback(() => {
     if (pageIndicatorTimerRef.current) clearTimeout(pageIndicatorTimerRef.current);
     setShowPageIndicator(true);
@@ -652,13 +624,11 @@ export function PageMushaf({
       return;
     }
     flashPageIndicator();
-    // Only a page change shows the pill here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
   useEffect(() => {
     if (horizontal && arrivalId > 0 && highlightedAyahKey) flashPageIndicator();
-    // Each arrival shows the pill once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arrivalId]);
 
@@ -697,7 +667,6 @@ export function PageMushaf({
     [dragX, horizontal, layoutInfo, pageData.length, updateCurrentPage]
   );
 
-  // Expose goToPage function to parent — instant jump via getItemLayout
   useEffect(() => {
     if (goToPageRef) {
       goToPageRef.current = (page: number) => jumpToPage(page, false);
@@ -712,9 +681,6 @@ export function PageMushaf({
     }
   }, [jumpToPage, pageData.length, requestedPage]);
 
-  // An arrival places its target ayah (or, for a surah's first ayah, the surah header) about 25% from
-  // the top of the viewport, as verse view does, instead of leaving the page top in view. The
-  // position on the page comes from the page's line layout.
   useEffect(() => {
     if (horizontal || !highlightedAyahKey || !layoutInfo || pageData.length === 0) return;
     const index = pageData.findIndex((item) =>
@@ -740,8 +706,6 @@ export function PageMushaf({
     const targetY = pageStart + pagePaddingTop + fraction * contentHeight;
     const offset = Math.max(pageStart, targetY - effectiveContainerHeight * ARRIVAL_VIEWPORT_FRACTION);
     if (Math.abs(offset - pageStart) < 2 && fraction === 0) return;
-    // On a cold start the list is still applying its initial page, so the offset stays pending and is
-    // retried until a scroll event confirms it, as for a font size change.
     const frame = requestAnimationFrame(() => {
       verticalOffsetRef.current = offset;
       pendingAnchorOffsetRef.current = offset;
@@ -754,12 +718,9 @@ export function PageMushaf({
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };
-    // Only a new arrival scrolls; later layout or size changes keep the reader's own position.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightedAyahKey, arrivalId, horizontal, pageData.length > 0, layoutInfo !== null]);
 
-  // The view-switch anchor: the ayah at the top of the viewport in vertical view, or the page's first
-  // ayah in swipe view.
   useEffect(() => {
     if (!topAyahRef) return;
     topAyahRef.current = () => {
@@ -788,7 +749,6 @@ export function PageMushaf({
     };
   }, [horizontal, layoutInfo, pageData, pagePaddingBottom, pagePaddingTop, topAyahRef]);
 
-  // Neighbouring page fonts load ahead in both modes, so a page scrolled into view is not a spinner.
   useEffect(() => {
     if (pageData.length === 0) return;
     const start = Math.max(1, currentPage - 2);
@@ -876,8 +836,6 @@ export function PageMushaf({
     [onScroll, pageForVerticalOffset, updateCurrentPage]
   );
 
-  // The JS layout can report the new content height before the native scroll view has it, so the
-  // pending offset is retried briefly until a scroll event confirms the list reached it.
   const retryPendingAnchor = useCallback((attempt = 0) => {
     const pending = pendingAnchorOffsetRef.current;
     if (pending === null) return;
@@ -916,7 +874,6 @@ export function PageMushaf({
         resetHorizontalDrag();
         return;
       }
-      // Reduced motion swaps the page instantly instead of sliding it across.
       if (reduceMotion) {
         dragX.stopAnimation();
         horizontalDragOffsetRef.current = 0;
@@ -1043,8 +1000,6 @@ export function PageMushaf({
         return;
       }
       const pointerType = nativeEvent.pointerType;
-      // Mouse drags select text on web; only touch and pen drags turn pages. Wheel, keyboard and
-      // the edge buttons still page with a mouse.
       if (pointerType === "mouse" || hasActiveBrowserSelection()) {
         return;
       }
@@ -1154,7 +1109,6 @@ export function PageMushaf({
     setDetailAyah({ surah, ayah });
   }, [pauseAutoScrollForUser]);
 
-  // MUT-02: a similar-verse mark opens the same detail sheet on its Similar verses tab.
   const openSimilarVerses = useCallback((surah: number, ayah: number) => {
     pauseAutoScrollForUser();
     setDetailTab("similar");
@@ -1321,8 +1275,6 @@ export function PageMushaf({
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => {
       return (
-        // A page waiting for its font renders a small placeholder; holding the computed height keeps
-        // later pages at the offsets getItemLayout reports, so jumps and the page number stay right.
         <View style={layoutInfo ? { minHeight: layoutInfo.heights[index] } : undefined}>
           <MushafPage
             pageNumber={item.page}
@@ -1510,8 +1462,6 @@ export function PageMushaf({
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           initialScrollIndex={Math.max(0, currentPage - 1)}
-          // A page is a few hundred native views, but rendering only one ahead left blank pages
-          // during a fast scroll; two per batch and a window of five keep pages ready.
           initialNumToRender={2}
           maxToRenderPerBatch={2}
           updateCellsBatchingPeriod={50}

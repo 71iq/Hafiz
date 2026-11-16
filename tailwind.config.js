@@ -8,7 +8,6 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        // The loaded face is Manrope_400Regular; a bare "Manrope" fell back to the default serif on web.
         manrope: ["Manrope_400Regular"],
         "manrope-medium": ["Manrope_500Medium"],
         "manrope-semibold": ["Manrope_600SemiBold"],
@@ -18,43 +17,37 @@ module.exports = {
         "noto-serif-bold": ["NotoSerif_700Bold"],
       },
       colors: {
-        // Surface hierarchy
         surface: {
-          DEFAULT: colorVar("--color-surface", "255 255 255"), // base layer
-          low: colorVar("--color-surface-low", "248 250 252"), // grouped content
-          mid: colorVar("--color-surface-mid", "244 244 245"), // elevated content
-          high: colorVar("--color-surface-high", "229 231 235"), // interactive cards
-          dim: colorVar("--color-surface-dim", "209 213 219"), // receded backgrounds
-          bright: colorVar("--color-surface-bright", "255 255 255"), // most elevated
+          DEFAULT: colorVar("--color-surface", "255 255 255"),
+          low: colorVar("--color-surface-low", "248 250 252"),
+          mid: colorVar("--color-surface-mid", "244 244 245"),
+          high: colorVar("--color-surface-high", "229 231 235"),
+          dim: colorVar("--color-surface-dim", "209 213 219"),
+          bright: colorVar("--color-surface-bright", "255 255 255"),
         },
-        // Dark mode surfaces
         "surface-dark": {
-          DEFAULT: colorVar("--color-surface-dark", "10 10 10"), // base
-          low: colorVar("--color-surface-dark-low", "20 20 20"), // grouped
-          mid: colorVar("--color-surface-dark-mid", "26 26 26"), // elevated
-          high: colorVar("--color-surface-dark-high", "38 38 38"), // interactive
-          dim: colorVar("--color-surface-dark-dim", "15 15 15"), // receded
-          bright: colorVar("--color-surface-dark-bright", "45 45 45"), // most elevated
+          DEFAULT: colorVar("--color-surface-dark", "10 10 10"),
+          low: colorVar("--color-surface-dark-low", "20 20 20"),
+          mid: colorVar("--color-surface-dark-mid", "26 26 26"),
+          high: colorVar("--color-surface-dark-high", "38 38 38"),
+          dim: colorVar("--color-surface-dark-dim", "15 15 15"),
+          bright: colorVar("--color-surface-dark-bright", "45 45 45"),
         },
-        // === Primary (deep teal) ===
         primary: {
-          DEFAULT: "#003638", // deep teal
-          soft: "#1B4D4F", // primary-container
-          muted: "#0f766e", // teal-700 equivalent
-          accent: "#0d9488", // teal-600 — main CTA/interactive
-          light: "#14b8a6", // teal-500
-          bright: "#2dd4bf", // teal-400 — dark mode accent
-          subtle: "#f0fdfa", // teal-50 — lightest bg tint
+          DEFAULT: "#003638",
+          soft: "#1B4D4F",
+          muted: "#0f766e",
+          accent: "#0d9488",
+          light: "#14b8a6",
+          bright: "#2dd4bf",
+          subtle: "#f0fdfa",
         },
-        // === Secondary (warm gold) ===
         gold: {
-          DEFAULT: "#FDDC91", // secondary-container
-          light: "#FFF4D9", // lightest
-          dark: "#785F22", // on-secondary-container
+          DEFAULT: "#FDDC91",
+          light: "#FFF4D9",
+          dark: "#785F22",
         },
-        // === Text ===
-        charcoal: "#2D2D2D", // light mode body text (never pure black)
-        // === Legacy scales (for gradations) ===
+        charcoal: "#2D2D2D",
         warm: {
           50: colorVar("--color-warm-50", "255 248 241"),
           100: colorVar("--color-warm-100", "249 243 235"),
@@ -80,7 +73,6 @@ module.exports = {
           900: "#003638",
           950: "#1B4D4F",
         },
-        // Outline (ghost borders 10% opacity only)
         outline: {
           DEFAULT: "rgba(223, 217, 209, 0.10)",
           subtle: "rgba(223, 217, 209, 0.05)",

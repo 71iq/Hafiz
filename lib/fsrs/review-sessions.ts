@@ -3,7 +3,6 @@ import { enqueueSync } from "@/lib/database/sync-queue";
 import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { createId } from "@/lib/id";
 
-/** 4.4 session kinds. `cards` is the existing deck review. */
 const SESSION_KINDS = [
   "cards",
   "wird",
@@ -43,7 +42,6 @@ export type ReviewSessionRow = {
   deleted_at: string | null;
 };
 
-/** The session a screen is running. Its row is written on the first grade, so empty sessions leave nothing. */
 export type ReviewSessionRef = Readonly<{
   id: string;
   kind: SessionKind;
@@ -111,7 +109,6 @@ function elapsedMs(startedAt: string, now: Date): number {
   return Math.max(0, now.getTime() - new Date(startedAt).getTime());
 }
 
-/** Add one grade's counts to the session row, creating it on the first grade (DB-01). */
 export async function recordSessionProgress(
   db: DatabaseExecutor,
   session: ReviewSessionRef,
@@ -156,7 +153,6 @@ export async function recordSessionProgress(
   return next;
 }
 
-/** Close a session that graded at least one card. A session with no grades has no row and is left alone. */
 export async function endReviewSession(
   database: AppDatabase,
   { session, now = new Date(), fullMet = false }: { session: ReviewSessionRef; now?: Date; fullMet?: boolean },

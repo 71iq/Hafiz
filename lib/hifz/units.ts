@@ -1,14 +1,8 @@
-/**
- * Review units (spec 3.1). Locations are stored canonically as surah:ayah[:word]; pages are a lookup
- * in the current page source, the 604-page QCF2 Madani layout (UNIT-01).
- */
 const PAGE_LAYOUT = "madani15";
 export const PAGE_COUNT = 604;
 export const LINES_PER_PAGE = 15;
 
-/** The page deck holds page, half-page and seam cards for memorized pages (3.4). */
 export const HIFZ_PAGES_DECK_ID = "hifz-pages";
-/** The sabaq deck holds today's new memorization chunks. */
 export const HIFZ_SABAQ_DECK_ID = "hifz-sabaq";
 
 export type PageUnit =
@@ -37,7 +31,6 @@ export function chunkCardId(page: number, fromLine: number, toLine: number): str
   return `${chunkCardPrefix(page)}${fromLine}-${toLine}`;
 }
 
-/** The id prefix every chunk card of a page shares. */
 export function chunkCardPrefix(page: number): string {
   return `chunk:${PAGE_LAYOUT}:${page}:`;
 }
@@ -67,7 +60,6 @@ export function parsePageUnit(cardId: string): PageUnit | null {
   }
 }
 
-/** UNIT-03 aggregate views: Madani 15-line juz boundaries by page, juz 1 has 21 pages, juz 30 has 23. */
 export function juzOfPage(page: number): number {
   if (page <= 21) return 1;
   if (page >= 582) return 30;

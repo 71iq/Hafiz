@@ -68,7 +68,6 @@ describe("recitation range pause", () => {
     });
     expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: "https://audio.test/1-1.mp3" });
 
-    // Ayah 1 ends; the next one is due after the 1 s gap.
     setStatus({ playing: false, isLoaded: true, didJustFinish: true });
     setStatus({ didJustFinish: false });
     act(() => audio.togglePause());

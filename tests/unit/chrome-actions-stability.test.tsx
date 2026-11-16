@@ -31,7 +31,6 @@ describe("chrome context subscriptions", () => {
     act(() => setVisible?.(true));
 
     expect(view.getByText("shown")).toBeTruthy();
-    // Every page holds hundreds of word tokens; scroll-direction changes must not re-render them.
     expect(tokenRenders).toBe(1);
   });
 

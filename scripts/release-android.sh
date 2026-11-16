@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Build, sign and publish the sideloaded Android app at https://hafizquran.app/downloads/android/.
-#
-# Bump expo.version and expo.android.versionCode in app.json first; the installed app offers an
-# update when latest.json carries a higher versionCode. The APK is signed with the private release
-# key kept outside the repository (default ~/.local/share/hafiz-android-release). Every release must
-# use that same key or Android refuses to install it over the previous one: back the folder up.
-# Public Supabase values come from the same GitHub repository variables as the website deploy.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,7 +6,6 @@ SIGNING="${HAFIZ_RELEASE_SIGNING:-$HOME/.local/share/hafiz-android-release/signi
 SSH_CONFIG="${HAFIZ_SSH_CONFIG:-$HOME/.local/share/elpsy-hetzner-migration/ssh_config}"
 SSH_HOST="${HAFIZ_SSH_HOST:-elpsy-hetzner}"
 REMOTE_DIR=/opt/hafiz/public/downloads/android
-# SHA-256 of the release signing certificate; a different key must never be published.
 EXPECTED_CERT="374b11943c7dfb6e51b95e74505eb23736d53e0784e8cf13e71c3faeeec251ac"
 
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}" ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
@@ -47,7 +39,6 @@ test -n "${EXPO_PUBLIC_SUPABASE_URL:-}" && test -n "${EXPO_PUBLIC_SUPABASE_ANON_
   { echo "Public Supabase values are missing (gh variable list failed)." >&2; exit 1; }
 
 echo "Building Hafiz $VERSION_NAME ($VERSION_CODE)"
-# Metro, Hermes and Gradle each get their own 6 GiB scope, as in scripts/android-qa-build.sh.
 OUT="$ROOT/android/app/build/hafiz-prebuilt-bundle"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -57,13 +48,11 @@ HERMESC="$(dirname "$(node --print "require.resolve('hermes-compiler/package.jso
 NODE_OPTIONS=--max-old-space-size=4096 scope npx expo export:embed --platform android --dev false --minify true \
   --entry-file "$ENTRY" --bundle-output "$WORK/index.android.bundle.js" --assets-dest "$OUT/res" --reset-cache --max-workers 2
 scope "$HERMESC" -emit-binary -O -w -out "$OUT/assets/index.android.bundle" "$WORK/index.android.bundle.js"
-# Native C++ compiles use every core by default and exceed 6 GiB; two cores and one worker fit.
 (cd android && CMAKE_BUILD_PARALLEL_LEVEL=2 scope taskset -c 0,1 ./gradlew :app:assembleRelease \
   -PhafizPrebuiltBundle=true -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon --max-workers=1)
 APK="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
 
 APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-# apksigner prints "Signer #1 certificate ..." or, in newer build-tools, "V2 Signer: certificate ...".
 cert=$("$APKSIGNER" verify --print-certs "$APK" 2>/dev/null |
   sed -n -E 's/^(Signer #[0-9]+|V[0-9]+ Signer): certificate SHA-256 digest: //p' | sort -u)
 [ "$cert" = "$EXPECTED_CERT" ] || { echo "APK is not signed with the release key ($cert)." >&2; exit 1; }

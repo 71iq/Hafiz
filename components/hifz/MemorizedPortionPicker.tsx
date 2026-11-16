@@ -18,10 +18,8 @@ type Props = {
   selectedSurahs: ReadonlySet<number>;
   selectedJuz: ReadonlySet<number>;
   onToggleSurah: (surah: number) => void;
-  /** Selects or clears these surahs together, leaving every other selection as it is. */
   onSetSurahs: (surahs: readonly number[], selected: boolean) => void;
   onToggleJuz: (juz: number) => void;
-  /** The local surah query: loading, loaded, or failed with a Retry. */
   loadState: "loading" | "ready" | "error";
   onRetryLoad: () => void;
   language: "en" | "ar";
@@ -29,16 +27,12 @@ type Props = {
   s: UIStrings;
 };
 
-/** Juz 30 and 29 get their own labelled row because most people memorize them first. */
 const MOST_COMMON_JUZ = [30, 29] as const;
 const OTHER_JUZ = Array.from({ length: 28 }, (_, i) => i + 1);
-/** Four even columns: 1 to 28 fill seven full rows, and the first row keeps the same column width. */
 const JUZ_COLUMNS = 4;
 
-/** How many names the summary lists before "+N". */
 const SUMMARY_NAMES = 6;
 
-/** The memorized portion (5.1 step 3): whole juz, or single surahs. */
 export function MemorizedPortionPicker({
   surahs,
   selectedSurahs,
@@ -60,7 +54,6 @@ export function MemorizedPortionPicker({
   const allResultsSelected = filtered.length > 0 && filtered.every((surah) => selectedSurahs.has(surah.number));
   const surahName = (surah: SurahChoice) =>
     language === "ar" ? surah.name_arabic : (surahTransliteration(surah.number) ?? surah.name_english);
-  // The summary names what is chosen, juz first, in the interface's digits and plural forms.
   const selectedNames = [
     ...[...selectedJuz].sort((a, b) => a - b).map((juz) => interpolate(s.hifzJuzN, { n: formatNumber(juz, language) })),
     ...surahs.filter((surah) => selectedSurahs.has(surah.number)).map(surahName),
@@ -70,7 +63,6 @@ export function MemorizedPortionPicker({
     selectedNames.length > SUMMARY_NAMES
       ? `${selectedNames.slice(0, SUMMARY_NAMES).join(listSeparator)}${listSeparator}+${formatNumber(selectedNames.length - SUMMARY_NAMES, language)}`
       : selectedNames.join(listSeparator);
-  // Teal text under 14 px uses the darker token in light mode.
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
   const juzChip = (juz: number) => {
     const selected = selectedJuz.has(juz);
@@ -109,7 +101,6 @@ export function MemorizedPortionPicker({
           </Text>
           <MirroredRow dir={dir} className="gap-2">
             {MOST_COMMON_JUZ.map(juzChip)}
-            {/* Empty slots keep the two chips at the grid's column width. */}
             {Array.from({ length: JUZ_COLUMNS - MOST_COMMON_JUZ.length }, (_, i) => (
               <View key={`slot-${i}`} style={{ flexBasis: "22%", flexGrow: 1 }} />
             ))}
@@ -144,7 +135,6 @@ export function MemorizedPortionPicker({
             </MirroredRow>
           ) : null}
           {searching && filtered.length > 0 ? (
-            // A filtered bulk action changes only the matching surahs; earlier choices stay.
             <MirroredRow dir={dir} className="justify-end">
               <Button
                 variant="ghost"
@@ -198,7 +188,7 @@ export function MemorizedPortionPicker({
         <Text dir={dir} variant="caption" style={{ color: accentText }}>
           {selectedJuz.size + selectedSurahs.size === 0
             ? s.hifzMemorizedNone
-            : // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
+            :
               [
                 selectedJuz.size > 0 ? formatJuz(selectedJuz.size, language) : null,
                 selectedSurahs.size > 0 ? formatSurahs(selectedSurahs.size, language) : null,

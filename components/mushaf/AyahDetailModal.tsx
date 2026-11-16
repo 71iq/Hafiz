@@ -67,7 +67,6 @@ type TafsirRow = {
   text: string;
 };
 
-/** A local read for one ayah. `key` ties the result to the ayah it was read for. */
 type Loaded<T> = { key: string; value: T } | { key: string; failed: true };
 
 type QiraatAvailability = "pending" | "present" | "absent" | "error";
@@ -77,12 +76,10 @@ export type AyahDetailTabKey = "similar" | "translation" | "tafsir" | "hadith" |
 type Props = {
   target: TargetAyah | null;
   onClose: () => void;
-  /** Called after this sheet closes for a navigation, so a sheet that opened it can close too. */
   onNavigate?: () => void;
   initialTab?: AyahDetailTabKey;
 };
 
-/** Arabic tafsir and analysis text: the app's existing Arabic UI face, following system text size. */
 const ARABIC_DETAIL_TEXT = {
   fontFamily: Platform.OS === "web" ? "IBMPlexSansArabic, NotoSansArabic, system-ui" : undefined,
   fontSize: 17,
@@ -123,7 +120,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     isLoaded: settingsLoaded,
   } = useSettings();
   const { isBookmarked, showToast, refreshBookmarks } = useSelection();
-  // W14: a deliberate report carries only public context: the canonical reference and active tab/source.
   const issueReporter = useIssueReporter(showToast);
   const { getAyahState, toggleAyah } = useAyahAudio();
   const { navigateToAyah, hasReaderNavigation } = useWordInteraction();
@@ -131,7 +127,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   const [translation, setTranslation] = useState<Loaded<string> | null>(null);
   const [tafsir, setTafsir] = useState<Loaded<TafsirRow[]> | null>(null);
   const [qiraat, setQiraat] = useState<Loaded<boolean> | null>(null);
-  // A source chip picked in this sheet; null follows the saved tafsir source.
   const [chipSource, setChipSource] = useState<TafsirSourceId | null>(null);
   const [tafsirPickerVisible, setTafsirPickerVisible] = useState(false);
   const [tafsirReloadKey, setTafsirReloadKey] = useState(0);
@@ -150,7 +145,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   const stepped =
     !!target && !!activeTarget && (target.surah !== activeTarget.surah || target.ayah !== activeTarget.ayah);
   const langInfo = getLanguageByCode(translationLanguage);
-  // A chosen non-Arabic translation stays available in either interface language.
   const showTranslation = open && !!langInfo;
   const translationIsRtl = langInfo?.direction === "rtl";
   const bookmarked = activeTarget ? isBookmarked(activeTarget.surah, activeTarget.ayah) : false;
@@ -193,12 +187,8 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   };
   const preferredMissing = !!tafsirRows && !!shownTafsir && shownTafsir.source !== preferredSource;
 
-  // MUT-02, MUT-05: an ayah with a memorized similar verse gets a Similar verses tab, read from the
-  // reader's per-page store. The tab stays while the reads are pending, so a mark that opened it on
-  // this tab does not fall back to Tafsir before they finish.
   const similar = useSimilarAyah(db, activeTarget, row?.v2_page ?? null, settingsLoaded && markSimilarVerses && open);
   const showSimilar = similar.groups.length > 0 || (activeTab === "similar" && !similar.settled);
-  // Qira'at appears for ayahs with known data. A failed read stays visible as an error, never as absence.
   const qiraatPresent = loadedValue(qiraat, targetKey);
   const qiraatAvailability: QiraatAvailability = loadFailed(qiraat, targetKey)
     ? "error"
@@ -229,10 +219,8 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     if (showReflections) list.push({ key: "reflections", label: s.reflections });
     return list;
   }, [langInfo, s, showQiraat, showReflections, showSimilar, showTranslation]);
-  // A tab that is not offered for this ayah (no similar verse, no qira'at, service off) shows Tafsir.
   const shownTab: AyahDetailTabKey = tabs.some((tab) => tab.key === activeTab) ? activeTab : "tafsir";
 
-  // Reopening, or opening on another ayah, starts from the opener's ayah and tab.
   useEffect(() => {
     setCurrentTarget(target);
     setActiveTab(initialTab);
@@ -292,7 +280,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     };
   }, [db, activeTarget?.surah, activeTarget?.ayah]);
 
-  // Translation and tafsir are local, so both are read on open and switching tabs shows text at once.
   useEffect(() => {
     if (!activeTarget || !showTranslation) return;
     const key = targetKey;
@@ -380,8 +367,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     }
   }, [bookmarkBusy, bookmarked, db, activeTarget, isRTL, showToast, s, refreshBookmarks]);
 
-  // Copy and Share use the shared Quran copy format: Unicode text, reference and canonical link,
-  // never page-font glyphs.
   const copyText = useCallback(async () => {
     if (!activeTarget || !row) return null;
     const text = await buildAyahCopyText(db, activeTarget.surah, activeTarget.ayah, activeTarget.ayah, uiLanguage);
@@ -413,7 +398,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
       if (text == null) return;
       await Share.share({ message: text });
     } catch (e) {
-      // Closing the web share sheet rejects with AbortError; that is a choice, not a failure.
       if ((e as { name?: string } | null)?.name !== "AbortError") {
         console.warn("[AyahDetailModal] Failed to share ayah:", e);
         showToast(s.ayahDetailShareFailed);
@@ -437,7 +421,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     setCurrentTarget(nextTarget);
   }, [adjacentAyahs]);
 
-  // Stepping inside the sheet never moves the reader; this explicit action does.
   const handleGoToAyah = useCallback(() => {
     if (!activeTarget) return;
     const destination = { surah: activeTarget.surah, ayah: activeTarget.ayah };
@@ -451,7 +434,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     }
   }, [activeTarget, hasReaderNavigation, navigateToAyah, onClose, onNavigate]);
 
-  // The picker's choice becomes the saved source and the tab shows it on return.
   const handlePickerSelected = useCallback(
     (sourceId: TafsirSourceId) => {
       setTafseerSource(sourceId);
@@ -488,8 +470,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
         maxHeight={maxOverlayHeight}
       >
         <View ref={keyScopeRef} style={{ flexGrow: 1, flexShrink: 1, flexBasis: "auto", minHeight: 0 }}>
-          {/* Phones at 360-393dp leave little room beside the close button, so the header keeps only
-              ayah navigation and the per-ayah actions sit in the body under the ayah text. */}
           <OverlayHeader
             title={title}
             subtitle={subtitle}
@@ -517,7 +497,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
           <OverlayBody contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }} stickyHeaderIndices={[1]}>
             <View className="pt-5">
               <View className="justify-center rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-4">
-                {/* Glyphs mounted before their page font exists render and measure in the system font. */}
                 {fontVisible && row ? (
                   <View className="items-end" style={{ direction: "ltr" }}>
                     <View
@@ -553,7 +532,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                     </View>
                   </View>
                 ) : (
-                  // Two lines at the glyph line height, so the card keeps its size when the text appears.
                   <View accessible accessibilityLabel={s.ayahDetailTextLoading} accessibilityRole="progressbar">
                     {[0.92, 0.6].map((fraction) => (
                       <View
@@ -665,7 +643,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
               {issueReporter.fallback}
             </View>
 
-            {/* Pinned once the ayah scrolls away, so a long tafsir can switch tabs without scrolling back. */}
             <View style={{ backgroundColor: themeSurface }} className="pb-2 pt-4">
               <DetailTabRow
                 tabs={tabs}
@@ -692,7 +669,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                       isRTL={isRTL}
                       accent={accentColor}
                       s={s}
-                      // Until the box is measured, the sheet's width less its padding.
                       width={similarWidth ?? Math.max(0, Math.min(width, 1080) - 72)}
                     />
                   ) : (
@@ -913,7 +889,6 @@ function TranslationPanel({
   }
   return (
     <View>
-      {/* Translation text follows its own language: English stays LTR in the Arabic interface. */}
       <Text
         className="text-charcoal dark:text-neutral-200"
         style={{

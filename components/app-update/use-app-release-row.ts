@@ -5,16 +5,8 @@ import { ANDROID_LATEST_APK_URL, androidReleaseApkUrl } from "@/lib/app-update/r
 import { installedAndroidVersionCode, useAndroidRelease } from "@/lib/app-update/use-android-update";
 import { installedAppVersion, useWebRevision } from "@/lib/app-update/build-info";
 
-/** A row without onPress is information only (shown muted, not a button). */
 export type AppReleaseRow = { key: string; icon: LucideIcon; title: string; description: string; onPress?: () => void };
 
-/**
- * Settings > About app rows. Each row states one fact:
- * - web: the exported web version and revision, then the latest Android APK download;
- * - Android: the installed version (tap to check again), or the newer published release;
- * - iOS: the installed version, with no update check.
- * The side-by-side QA Android build shows only its installed version.
- */
 export function useAppReleaseRows(): AppReleaseRow[] {
   const s = useStrings();
   const { update, checkAgain } = useAndroidRelease();

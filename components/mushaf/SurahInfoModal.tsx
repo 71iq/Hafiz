@@ -50,12 +50,10 @@ export function SurahInfoModal({
   const s = useStrings();
   const [info, setInfo] = useState<LoadedSurahInfo | null>(null);
   const [loading, setLoading] = useState(false);
-  // A failed query is not the same as a surah with no information text.
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [juzRange, setJuzRange] = useState<{ first: number; last: number } | null>(null);
 
-  // Revelation place, ayah count and juz come from local data, so they show even without info text.
   useEffect(() => {
     if (!target) {
       setJuzRange(null);

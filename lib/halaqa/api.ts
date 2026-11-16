@@ -5,14 +5,7 @@ import type { SocialOwner } from "@/lib/social/owner";
 import { callSocialRpc, localDateSchema, readSocial, voidResult, type SocialRead } from "@/lib/social/remote";
 import type { SocialBands } from "@/lib/social/bands";
 
-/**
- * Halaqa service adapter (spec 5.7.1). Every read and write is a SECURITY DEFINER RPC that checks the
- * caller; members see each other's wird days, streak and juz completions only where shared, never
- * mistakes, grades or recordings (SOC-02). Each call runs as the account that started it
- * (lib/social/owner.ts).
- */
 
-/** SOC-06 fixed encouragements, rendered in each reader's language. Keep in step with the server check. */
 export const ENCOURAGEMENT_TEMPLATE_IDS = [
   "ease",
   "missed_you",
@@ -93,7 +86,6 @@ const memberRow = z.object({
 const receivedRow = z.object({
   id: z.string().uuid(),
   from_name: z.string().nullable(),
-  // Unknown future templates still parse; the UI shows a generic line for them.
   template_id: z.string().nullable(),
   body: z.string().nullable(),
   created_at: z.string(),
@@ -143,7 +135,6 @@ const teacherViewSchema = z
       .object({
         hifz_plan: z.string().nullable(),
         tiers: z.record(z.string(), count),
-        // SOC-03: the next sabaq a teacher set, shown with the plan it changes.
         sabaq_assignment: sabaqAssignmentSchema.nullable().optional(),
       })
       .nullable(),
@@ -165,8 +156,6 @@ const teacherViewSchema = z
   })
   .transform((row) => ({
     name: row.name,
-    // The member's synced hifz_plan setting, read with the app's own plan schema (spec 3.3). Null
-    // when they have no plan or it cannot be read.
     plan: row.plan
       ? {
           hifzPlan: parseHifzPlan(row.plan.hifz_plan),
@@ -190,7 +179,6 @@ const teacherViewSchema = z
   }));
 export type TeacherView = z.output<typeof teacherViewSchema>;
 
-/** Query keys carry the viewer's id so one account's halaqa never shows for another (ARCHITECTURE.md). */
 export const halaqaKeys = {
   all: (userId: string | null) => ["halaqa", userId ?? "signed-out"] as const,
   mine: (userId: string | null) => ["halaqa", userId ?? "signed-out", "mine"] as const,
@@ -221,7 +209,6 @@ export function createInviteHalaqa(name: string, asTeacher: boolean, owner: Soci
   );
 }
 
-/** Codes are shared in upper case; spaces and dashes from a pasted link or message are ignored. */
 export function normalizeInviteCode(input: string): string {
   return input.replace(/[\s-]/g, "").toUpperCase();
 }
@@ -260,10 +247,6 @@ export function setHalaqaSharing(groupId: string, sharing: HalaqaSharing, owner:
 
 export type HalaqaRole = z.output<typeof role>;
 
-/**
- * SOC-03: the creator of an invite halaqa makes another member a teacher or takes the role back. The
- * server refuses anyone else, and matched halaqas, with not_allowed.
- */
 export async function setHalaqaMemberRole(
   groupId: string,
   memberId: string,
@@ -312,7 +295,6 @@ export function fetchTeacherView(groupId: string, memberId: string, today: strin
   );
 }
 
-/** One page of the inbox: at most 100 items, oldest first, and whether another page follows. */
 const receivedPageSchema = z.object({
   items: z.array(z.object({ id: z.string().uuid(), created_at: z.string().min(1) })).max(100),
   more: z.boolean(),
@@ -323,23 +305,13 @@ type ReceivedPage = z.output<typeof receivedPageSchema>;
 export type ReceivedEncouragements = Readonly<{
   items: { id: string; createdAt: string }[];
   checkedAt: string;
-  /** False when the read stopped before the server's last page; the rest is listed by later checks. */
   complete: boolean;
 }>;
 
-/**
- * A guard against a server that never stops, not an expected size. Leaving and joining halaqas can
- * legitimately fill seven days with thousands of items.
- */
 const RECEIVED_MAX_PAGES = 300;
 
 type InboxPosition = Readonly<{ ms: number; subMs: number; id: string }>;
 
-/**
- * A page's place in the server's (created_at, id) order. Postgres keeps microseconds, so the digits
- * after the millisecond are compared separately, and a uuid sorts as its lowercase text. Null when
- * the time cannot be read.
- */
 function inboxPosition(createdAt: string, id: string): InboxPosition | null {
   const match = /^([^.]*T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(.*)$/.exec(createdAt);
   if (!match) return null;
@@ -349,7 +321,6 @@ function inboxPosition(createdAt: string, id: string): InboxPosition | null {
   return { ms, subMs: Number(fraction.slice(3, 6)), id: id.toLowerCase() };
 }
 
-/** False only when both places are known and `next` is not after `previous`. */
 function movesForward(next: InboxPosition | null, previous: InboxPosition | null): boolean {
   if (!next || !previous) return true;
   if (next.ms !== previous.ms) return next.ms > previous.ms;
@@ -357,15 +328,6 @@ function movesForward(next: InboxPosition | null, previous: InboxPosition | null
   return next.id > previous.id;
 }
 
-/**
- * Encouragements the reader received in the last 7 days across the halaqas they are still in (5.8.2),
- * each with its id for the device to acknowledge. Reads every page of the window, oldest first, so
- * more arrivals than one page between checks are all listed. Each page must end after the cursor it
- * was asked for. A page that does not, or a read that reaches RECEIVED_MAX_PAGES, stops the read with
- * what it listed so far rather than discarding it: the device acknowledges by id, so a later check
- * lists the rest without announcing anything twice. `checkedAt` is the server's time at the first
- * page, for pruning acknowledged ids by age.
- */
 export async function fetchReceivedEncouragements(owner: SocialOwner): Promise<ReceivedEncouragements> {
   const items = new Map<string, string>();
   const listed = (checkedAt: string, complete: boolean): ReceivedEncouragements => ({

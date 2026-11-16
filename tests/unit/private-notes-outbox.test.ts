@@ -6,7 +6,6 @@ import {
 } from "@/lib/notes/queries";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
-// Notes import the QF queue module, which loads the Supabase client. No network is used here.
 jest.mock("@/lib/auth/store", () => ({ useAuthStore: { getState: () => ({ user: null, session: null }) } }));
 jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: () => false, supabase: {} }));
 
@@ -21,7 +20,6 @@ function noteContent(id: string) {
   return store.sql.prepare("SELECT content, deleted_at FROM private_notes WHERE id = ?").get(id);
 }
 
-/** Wait for detached post-commit work, such as the achievement event, to leave the owner queue. */
 async function settle() {
   await store.db.getFirstAsync("SELECT 1");
 }

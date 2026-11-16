@@ -1,9 +1,6 @@
 import { z } from "zod";
 import type { Reflection, ReflectionComment } from "./types";
 
-// Remote reflection and comment rows. Nullable columns keep a safe fallback (counts 0, a missing
-// owner or time as an empty string that matches no account), but a wrong type or a missing required
-// field rejects the page, so the feed shows its existing error instead of an unchecked row.
 const count = z
   .number()
   .int()
@@ -63,11 +60,6 @@ const commentRow = z.object({
   profiles: profile,
 });
 
-/**
- * The server accepted a write but returned a row that does not decode. The reflection or comment
- * exists, so callers treat it as saved and refetch instead of offering a retry that would post it
- * twice.
- */
 export class SavedRowUnreadableError extends Error {
   constructor(kind: "reflection" | "comment") {
     super(`Saved ${kind} could not be read back`);

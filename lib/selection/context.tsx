@@ -25,9 +25,7 @@ type SelectionContextType = {
   addHighlightForSelection: (color: string) => Promise<void>;
   addHighlightForRefs: (refs: QuranSelectionWordRef[], color: string) => Promise<void>;
   removeHighlightForSelection: () => Promise<void>;
-  /** Highlight rows that color any selected word (word ranges, or the whole ayah). */
   highlightIdsForRefs: (refs: QuranSelectionWordRef[]) => number[];
-  /** Removes exactly the highlight rows that color the selected words. */
   removeHighlightsForRefs: (refs: QuranSelectionWordRef[]) => Promise<void>;
   toggleBookmarkForSelection: () => Promise<"added" | "removed" | null>;
   showToast: (msg: string) => void;
@@ -225,8 +223,6 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     [selection, db, bookmarks, refreshBookmarks]
   );
 
-  // Feedback goes through the root notice owner, which renders inside the top sheet. A toast kept in
-  // the reader screen sits behind an open sheet's Android Modal window and is never seen.
   const showToast = useOperationNotice();
 
   const isBookmarked = useCallback(

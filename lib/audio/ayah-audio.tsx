@@ -30,13 +30,11 @@ export type AyahAudioTarget = {
   ayah: number;
 };
 
-/** Why a recitation could not play: no connection, no file for this ayah/reciter, or the player failed. */
 export type AudioFailure = "offline" | "unavailable" | "playback";
 
 export type AudioSessionKind = "single" | "range" | "preview";
 export type AudioSessionStatus = "loading" | "playing" | "paused" | "error";
 
-/** The one playback the app has: a single ayah, a range or a reciter preview. */
 export type AudioSessionState = {
   kind: AudioSessionKind;
   target: AyahAudioTarget;
@@ -61,7 +59,6 @@ type AyahAudioState = {
 export type ToggleResult = {
   ok: boolean;
   code?: QfContentErrorCode;
-  /** "busy": a reciter preview was refused because a recitation is running. */
   failure?: AudioFailure | "busy";
 };
 
@@ -76,7 +73,6 @@ export type PlayRangeOptions = {
 export type RangeAudioState = {
   active: boolean;
   playing: boolean;
-  /** The reader paused the range; it resumes where it stopped. */
   paused: boolean;
   loading: boolean;
   currentAyah: AyahAudioTarget | null;
@@ -88,13 +84,9 @@ export type RangeAudioState = {
   repeatEachAyah: number;
 };
 
-/** A source lookup or player load that takes longer than this fails with Retry instead of spinning. */
 export const AUDIO_LOAD_TIMEOUT_MS = 15_000;
-/** A reciter preview plays at most this long. */
 export const RECITER_PREVIEW_LIMIT_MS = 10_000;
-/** Reciter previews play Al-Fatihah 1. */
 export const RECITER_PREVIEW_TARGET: AyahAudioTarget = { surah: 1, ayah: 1 };
-/** How long a stop from outside the app must last before a range counts as paused. */
 const EXTERNAL_PAUSE_SETTLE_MS = 800;
 
 type LoadedAudio = QfAudioResponse & { isStale?: boolean };
@@ -110,7 +102,6 @@ type RangeSession = {
   rangeRepeatIndex: number;
   ayahRepeatIndex: number;
   paused: boolean;
-  /** Paused between ayahs or while loading: resuming loads the current ayah instead of playing on. */
   resumeLoadsAyah: boolean;
 };
 
@@ -123,12 +114,10 @@ type SessionCore = {
   surahNames: SurahNames | null;
 };
 
-/** One in-flight load. Its generation must still be current for any of its results to apply. */
 type PendingLoad = {
   gen: number;
   kind: AudioSessionKind;
   phase: "source" | "player";
-  /** Ranges report success once the file is handed to the player; single ayahs wait until it loads. */
   settleOnDispatch: boolean;
   settled: boolean;
   settle: (result: ToggleResult) => void;
@@ -139,18 +128,12 @@ type AyahAudioContextType = {
   toggleAyah: (surah: number, ayah: number, recitationId?: number) => Promise<ToggleResult>;
   playRange: (options: PlayRangeOptions) => Promise<ToggleResult>;
   rangeState: RangeAudioState;
-  /** The current single, range or preview playback, or null when nothing plays. */
   session: AudioSessionState | null;
-  /** A single ayah or range is loaded, playing, paused or failed; reciter previews wait for it. */
   mainActive: boolean;
   stop: () => void;
-  /** Pauses or resumes whatever is playing, keeping a range session where it is. */
   togglePause: () => void;
-  /** Runs the failed request again: the same ayah, or the range from the ayah that failed. */
   retry: () => Promise<ToggleResult>;
-  /** Plays Al-Fatihah 1 in this recitation for at most ten seconds, unless a recitation is running. */
   previewReciter: (recitationId: number) => Promise<ToggleResult>;
-  /** Stops a reciter preview; leaves any other playback alone. */
   stopPreview: () => void;
 };
 
@@ -179,7 +162,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     try {
       player.setActiveForLockScreen(false);
     } catch {
-      // Lock screen controls were never active.
     }
   }, [player]);
   const [activeAyah, setActiveAyah] = useState<ActiveAyah | null>(null);
@@ -208,8 +190,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Recitation keeps playing with the screen off or another app in front, as listeners expect; the
-    // lock screen controls keep Android's foreground service alive past its 3 minute limit.
     setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: true,
@@ -242,7 +222,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     previewTimerRef.current = null;
   }, []);
 
-  /** Starts a new generation: an older load can no longer start, and its caller hears it was cancelled. */
   const beginGeneration = useCallback(() => {
     generationRef.current += 1;
     clearLoadTimer();
@@ -308,10 +287,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
-  /**
-   * Ends the current generation because its load failed. Returns the generation the failure belongs
-   * to, or null when a newer request already replaced it. The range session stays, paused, for Retry.
-   */
   const cancelForFailure = useCallback(
     (gen: number): number | null => {
       if (gen !== generationRef.current) return null;
@@ -379,7 +354,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
   const runSource = useCallback(
     async (gen: number, kind: AudioSessionKind, target: AyahAudioTarget, recitationId: number) => {
       try {
-        // Recitation streams from the network; the cached lookup is only the file's address.
         if (await isDefinitelyOffline()) {
           await failRequest(gen, "offline");
           return;
@@ -461,7 +435,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     setCore(null);
   }, [beginGeneration, clearRangeSession, player, releaseLockScreen, setCore]);
 
-  // The file is loaded: the request has succeeded, so the timeout no longer applies.
   useEffect(() => {
     const pending = pendingRef.current;
     if (!pending || pending.phase !== "player" || pending.gen !== generationRef.current) return;
@@ -537,7 +510,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     }, session.delayMs);
   }, [clearRangeDelayTimer, playCurrentRangeAyah, stop]);
 
-  // Each finished file is handled once, however often this effect re-runs while the flag is still set.
   const finishHandledRef = useRef(false);
   useEffect(() => {
     if (!status.didJustFinish) {
@@ -555,8 +527,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     stop();
   }, [advanceRange, status.didJustFinish, stop]);
 
-  // Headphones unplugged, a call or the lock screen can pause or resume the player outside the app.
-  // A range follows that state so its controls and resume stay truthful.
   const prevPlayingRef = useRef(false);
   useEffect(() => {
     const wasPlaying = prevPlayingRef.current;
@@ -570,7 +540,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!wasPlaying || status.playing || status.didJustFinish || session.paused) return;
-    // An ayah that ends also stops playing first; only a stop with no advance after it is a pause.
     const advances = advanceCountRef.current;
     const timer = setTimeout(() => {
       if (
@@ -593,10 +562,8 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     const session = rangeSessionRef.current;
     if (!session || session.paused) return;
     session.paused = true;
-    // A pending next ayah, or one still loading, starts on resume instead of after the gap.
     if (rangeDelayTimerRef.current || !status.playing || pendingRef.current) session.resumeLoadsAyah = true;
     if (pendingRef.current) {
-      // The ayah still loading must not start once it arrives.
       beginGeneration();
       setLoadingKey(null);
       setCore((prev) => (prev ? { ...prev, loading: false } : prev));
@@ -643,7 +610,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     return startRequest(current.kind, current.target, current.recitationId, false);
   }, [playCurrentRangeAyah, startRequest]);
 
-  // An answer that arrives after the account changed never starts playing.
   const accountRef = useRef(accountId);
   useEffect(() => {
     if (accountRef.current === accountId) return;
@@ -821,7 +787,6 @@ export function useAyahAudio() {
   return ctx;
 }
 
-/** The audio owner, or null on a surface that can render before the database (and audio) exist. */
 export function useOptionalAyahAudio() {
   return useContext(AyahAudioContext);
 }

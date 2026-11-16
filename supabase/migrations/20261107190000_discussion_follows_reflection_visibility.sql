@@ -1,9 +1,3 @@
--- RF170: comments, likes and comment likes follow their reflection's visibility.
--- They were readable by anyone even when the reflection was hidden or soft-deleted. A child row is now
--- visible only when its parent is visible to the viewer. The parent lookups below run under the
--- parent tables' own RLS, and reflections are readable only while active, so discussion on active
--- reflections stays public and disappears with a hidden or soft-deleted reflection. New reactions
--- also require a visible parent. Hard deletes still cascade.
 
 DROP POLICY IF EXISTS "Likes are publicly readable" ON public.reflection_likes;
 DROP POLICY IF EXISTS "Likes follow reflection visibility" ON public.reflection_likes;
@@ -11,7 +5,6 @@ CREATE POLICY "Likes follow reflection visibility"
   ON public.reflection_likes FOR SELECT
   USING (EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id));
 
--- The original FOR ALL likes policy would bypass both checks; RF166 drops it too.
 DROP POLICY IF EXISTS "Users can manage own likes" ON public.reflection_likes;
 DROP POLICY IF EXISTS "Users can insert own likes" ON public.reflection_likes;
 CREATE POLICY "Users can insert own likes"

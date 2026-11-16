@@ -1,7 +1,6 @@
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
-/** Native: write the .ics file to the cache and open the share sheet, where Calendar can import it. */
 export async function saveCalendarFile(fileName: string, contents: string): Promise<void> {
   const file = new File(Paths.cache, fileName);
   file.create({ overwrite: true });

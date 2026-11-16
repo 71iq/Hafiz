@@ -15,8 +15,8 @@ type PageGeometry = {
   usePageWords?: boolean;
 };
 
-export const SEPARATOR_HEIGHT = 48; // py-4 (32) + text-xs line (16)
-const SURAH_HEADER_COMPACT_HEIGHT = 68; // mt-3(12) + card(48) + mb-2(8)
+export const SEPARATOR_HEIGHT = 48;
+const SURAH_HEADER_COMPACT_HEIGHT = 68;
 export const MUSHAF_LINE_COUNT = 15;
 const DESKTOP_PAGE_LINE_MAX_WIDTH = 680;
 export const DESKTOP_PAGE_SAFE_GUTTER = 32;
@@ -90,7 +90,7 @@ function computePageItemHeight(
         if (line.line_type === "surah_name") {
           h += SURAH_HEADER_COMPACT_HEIGHT;
         } else if (line.line_type === "basmallah") {
-          h += lineHeight * 0.85 + 8; // my-1 margins
+          h += lineHeight * 0.85 + 8;
         }
       }
       h += page.pageWordLineNumbers.length * lineHeight * quranLineHeightMultiplier;
@@ -99,14 +99,14 @@ function computePageItemHeight(
         if (line.line_type === "surah_name") {
           h += SURAH_HEADER_COMPACT_HEIGHT;
         } else if (line.line_type === "basmallah") {
-          h += lineHeight * 0.85 + 8; // my-1 margins
+          h += lineHeight * 0.85 + 8;
         } else {
           h += lineHeight * quranLineHeightMultiplier;
         }
       }
     }
   } else {
-    h += 15 * lineHeight * quranLineHeightMultiplier; // fallback: standard 15 lines
+    h += 15 * lineHeight * quranLineHeightMultiplier;
   }
 
   return h;

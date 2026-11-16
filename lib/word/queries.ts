@@ -111,7 +111,6 @@ export async function fetchWordText(
   );
   if (!ayahRow?.text_uthmani) return null;
   const words = ayahRow.text_uthmani.trim().split(/\s+/);
-  // quran_text includes the opening basmallah prefix, but QCF2 wordPos does not.
   if (ayah === 1 && surah !== 1 && surah !== 9 && words.length > 4) {
     return words.slice(4)[wordPos - 1] ?? null;
   }
@@ -132,7 +131,6 @@ export async function fetchWordQcf2Glyph(
   return tokens[wordPos - 1] ?? null;
 }
 
-/** One page of a root's occurrences in mushaf order. Common roots have thousands of rows. */
 export async function fetchRootOccurrences(
   db: DatabaseExecutor,
   root: string,
@@ -162,7 +160,6 @@ export async function fetchTextUthmani(
   return row?.text_uthmani ?? null;
 }
 
-// ─── New tab queries ──────────────────────────────────────────
 
 export type WordMeaningArRow = {
   surah: number;
@@ -170,9 +167,7 @@ export type WordMeaningArRow = {
   word_pos: number;
   word: string | null;
   meaning: string | null;
-  /** Where the shown meaning comes from. A bundled meaning takes precedence over a custom one. */
   source: "bundled" | "custom" | null;
-  /** The custom row's creation time, only when the custom meaning is the one shown. */
   custom_created_at: string | null;
 };
 
@@ -212,10 +207,6 @@ type UserWordMeaningInput = {
   meaning: string;
 };
 
-/**
- * Save a custom word meaning. The row and its upload queue entry commit together or not at all. An
- * edit keeps the row's original created_at.
- */
 export async function upsertUserWordMeaning(database: AppDatabase, params: UserWordMeaningInput): Promise<void> {
   await database.withTransactionAsync((db) => upsertUserWordMeaningRow(db, params));
 }
@@ -245,18 +236,10 @@ export type CustomWordMeaningKey = Readonly<{
   surah: number;
   ayah: number;
   wordPos: number;
-  /** The meaning and creation time the person saw when they chose Delete. */
   meaning: string;
   createdAt: string;
 }>;
 
-/**
- * Delete one custom meaning by its canonical key. In one transaction the local row goes and a
- * user_word_meanings DELETE is queued with updated_at and deleted_at both equal to one fresh deletion
- * time (also the queue time), so the existing tombstone reaches devices holding the unchanged row
- * while a genuinely newer edit elsewhere still wins. Returns "changed", writing nothing, when the
- * row is gone or no longer the one the person saw.
- */
 export async function deleteUserWordMeaning(
   database: AppDatabase,
   key: CustomWordMeaningKey,

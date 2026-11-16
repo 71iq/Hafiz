@@ -3,39 +3,24 @@ import type { DatabaseExecutor } from "@/lib/database/types";
 import { loadRecitationPage, type PageToken, type RecitationPage } from "@/lib/hifz/page-data";
 import type { AssignedSabaq } from "@/lib/hifz/sabaq";
 
-/** How many Uthmani words of the range's first line the preview shows. */
 const OPENING_WORDS = 4;
 
 type AyahRef = Readonly<{ surah: number; ayah: number }>;
 
-/**
- * What a teacher's page and line range holds on the page's layout: its ayah lines, as the learner's
- * lesson reads them (chunkTarget in lib/hifz/sabaq.ts takes only ayah lines with words, inside the
- * range), or none.
- */
 export type SabaqRangeCover =
   | Readonly<{ kind: "empty" }>
   | Readonly<{
       kind: "ayat";
       first: AyahRef;
       last: AyahRef;
-      /** The first and last ayah lines inside the range. */
       firstLine: number;
       lastLine: number;
-      /** The first ayah line goes on with an ayah begun on an earlier line. */
       startsMidAyah: boolean;
-      /** The last ayah line stops before its last ayah ends. */
       endsMidAyah: boolean;
-      /** The first line's opening tokens: up to OPENING_WORDS words and any ayah ends among them. */
       opening: readonly PageToken[];
-      /** The first line goes on after `opening`. */
       openingContinues: boolean;
     }>;
 
-/**
- * The ayat a range covers on a laid-out page. The opening stops before a word whose position in its
- * ayah is unknown (page-data leaves it null), so it never shows a wrong word.
- */
 export function sabaqRangeCover(page: RecitationPage, range: AssignedSabaq): SabaqRangeCover {
   const lines = page.lines.filter((line) => line.kind === "ayah" && line.tokens.length > 0);
   const start = lines.findIndex((line) => line.lineNumber >= range.fromLine && line.lineNumber <= range.toLine);
@@ -54,7 +39,6 @@ export function sabaqRangeCover(page: RecitationPage, range: AssignedSabaq): Sab
     opening.push(token);
     if (!token.isMarker) words += 1;
   }
-  // An opening of only ayah ends says nothing.
   if (words === 0) opening.length = 0;
 
   return {
@@ -72,7 +56,6 @@ export function sabaqRangeCover(page: RecitationPage, range: AssignedSabaq): Sab
 
 export type PreviewAyah = AyahRef & Readonly<{ surahNameArabic: string; surahNameEnglish: string }>;
 
-/** A range's cover with its surah names and the opening as Uthmani text (never the page-font glyphs). */
 export type SabaqRangePreview =
   | Readonly<{ kind: "empty" }>
   | Readonly<{
@@ -83,16 +66,10 @@ export type SabaqRangePreview =
       lastLine: number;
       startsMidAyah: boolean;
       endsMidAyah: boolean;
-      /** The first line's opening words, an ayah's end shown as its number; empty when not known. */
       opening: string;
       openingContinues: boolean;
     }>;
 
-/**
- * SOC-03: what a page and line range holds, for the teacher's next-sabaq form. It lays out the page
- * from the page layout table, without the page-word data, as the learner's lesson does when that data
- * is missing. It reads the local database only.
- */
 export async function loadSabaqRangePreview(db: DatabaseExecutor, range: AssignedSabaq): Promise<SabaqRangePreview> {
   const cover = sabaqRangeCover(await loadRecitationPage(db, range.page, null), range);
   if (cover.kind === "empty") return cover;
@@ -113,7 +90,6 @@ export async function loadSabaqRangePreview(db: DatabaseExecutor, range: Assigne
     const row = surahRows.find((candidate) => candidate.number === ref.surah);
     return { ...ref, surahNameArabic: row?.name_arabic ?? "", surahNameEnglish: row?.name_english ?? "" };
   };
-  // The same split page-data uses to give each word its position.
   const wordsOf = new Map(
     textRows.map((row) => [`${row.surah}:${row.ayah}`, row.text_uthmani.split(" ").filter(Boolean)]),
   );
@@ -121,7 +97,6 @@ export async function loadSabaqRangePreview(db: DatabaseExecutor, range: Assigne
   let words = 0;
   for (const token of cover.opening) {
     const ayahWords = wordsOf.get(`${token.surah}:${token.ayah}`);
-    // An ayah end in brackets, as the similar-verse cards show it, so it never reads as a letter.
     const word = token.isMarker ? `(${toArabicNumber(token.ayah)})` : ayahWords?.[(token.wordPos ?? 0) - 1];
     if (word === undefined) break;
     parts.push(word);

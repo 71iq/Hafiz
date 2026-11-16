@@ -39,7 +39,6 @@ async function grade(cardId: string, at: Date, rating: Grade = Rating.Good, cont
   return persistReviewTransition({ db: store.db, cardId, transition, context: { ...DEFAULT_REVIEW_SAVE_CONTEXT, ...context } });
 }
 
-/** Ten ayah reviews make one page, the default minimum. */
 async function reciteMinimum(date: string, startMinutes: number) {
   let last;
   for (let i = 0; i < 10; i += 1) {
@@ -125,7 +124,6 @@ describe("wird progress on grade (STR-01, DB-01)", () => {
   it("saves nothing when the wird day's upload cannot be queued", async () => {
     const card = await setStudyCardMarked(store.db, DECK, "page:madani15:1", false);
     const transition = calculateReviewTransition({ card, rating: Rating.Good, reviewedAt: atLocalTime(TODAY, 600) });
-    // Queue order inside the grade: card, review log, then the wird day.
     store.failQueueInsert(3);
     await expect(persistReviewTransition({ db: store.db, cardId: card.id, transition })).rejects.toThrow(
       "Synthetic sync_queue write failure",
@@ -147,7 +145,6 @@ describe("make-up window (STR-07, STR-08)", () => {
     expect(row).toMatchObject({ status: "made_up", credited_through: atLocalTime(TODAY, 9 * 60 + 9).toISOString() });
     expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
 
-    // The same reviews never count for today too.
     const overview = await loadHabitOverview(store.db, { now: atLocalTime(TODAY, 10 * 60) });
     expect(overview.minimumProgressToday).toBe(0);
     expect(overview.streak).toMatchObject({ length: 3, atRisk: true });
@@ -171,7 +168,6 @@ describe("make-up window (STR-07, STR-08)", () => {
   });
 
   it("finishes a make-up after another device with an earlier cutoff settled the day as grace", async () => {
-    // This device has Dhuhr at 13:00; the other device has no prayer times, so its cutoff is 12:30.
     const dhuhr = (date: string) => atLocalTime(date, 13 * 60);
     await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
     for (let i = 0; i < 5; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 10 * 60 + i), Rating.Good, { dhuhr });
@@ -242,7 +238,6 @@ describe("settle pass, excuses and pause", () => {
       markExcusedDays(store.db, { from: addDays(TODAY, -4), to: TODAY, reason: "travel", now }),
     ).rejects.toThrow(RangeError);
 
-    // A recited day keeps its status when the excuse is withdrawn.
     await reciteMinimum(TODAY, 700);
     await clearExcusedDay(store.db, { date: TODAY, now: atLocalTime(TODAY, 800) });
     await clearExcusedDay(store.db, { date: addDays(TODAY, 1), now: atLocalTime(TODAY, 800) });
@@ -264,7 +259,6 @@ describe("earn-back on grade (STR-17)", () => {
   it("restores the missed day after 3 recited days in the window", async () => {
     const lastDay = "2026-02-10";
     await seedDone(Array.from({ length: 8 }, (_, i) => addDays(lastDay, -7 + i)));
-    // Return after the make-up cutoff two days later.
     expect((await reciteMinimum(addDays(lastDay, 2), 14 * 60)).wird.kind).toBe("minimum_met");
     expect((await reciteMinimum(addDays(lastDay, 3), 14 * 60)).wird.kind).toBe("minimum_met");
     const restored = await reciteMinimum(addDays(lastDay, 4), 14 * 60);
@@ -307,13 +301,11 @@ describe("recitation errors and the mistake inbox (ERR-01 to ERR-04)", () => {
     expect(store.sql.prepare("SELECT error_count FROM study_log").get()).toEqual({ error_count: 3 });
     expect(await readReviewSession(store.db, session.id)).toMatchObject({ cards_reviewed: 1, errors: 3, local_date: TODAY });
 
-    // A clean recall the same day does not count; two later days resolve it.
     await grade("2:255", atLocalTime(TODAY, 700), Rating.Good, { supportLevel: 4 });
     expect(await countMistakeInbox(store.db, TODAY)).toBe(1);
     await grade("2:255", atLocalTime(addDays(TODAY, 1), 600), Rating.Good, { supportLevel: 4 });
     await grade("2:255", atLocalTime(addDays(TODAY, 1), 700), Rating.Good, { supportLevel: 4 });
     expect((await readMistakeInbox(store.db, addDays(TODAY, 1)))[0]).toMatchObject({ cleanCount: 1 });
-    // A recall with prompts does not count.
     await grade("2:255", atLocalTime(addDays(TODAY, 2), 600), Rating.Good, { supportLevel: 2 });
     expect(await countMistakeInbox(store.db, addDays(TODAY, 2))).toBe(1);
     const resolving = await grade("2:255", atLocalTime(addDays(TODAY, 2), 700), Rating.Easy, { supportLevel: 4 });
@@ -475,7 +467,6 @@ describe("a completed sabaq step 6 (STR-01)", () => {
   };
 
   it("counts a short chunk's first pass as a wird day, in SQL and in sync reconciliation", async () => {
-    // Three lines and one minute: 12 sixtieths and well under five minutes, yet a completed step 6.
     insertLog("chunk:madani15:5:1-3", TODAY, 3);
     expect(await tally(TODAY)).toBe(true);
     await store.db.withTransactionAsync(async (tx) => {
@@ -493,7 +484,6 @@ describe("a completed sabaq step 6 (STR-01)", () => {
             local_date, grader, duration_ms, makeup_for) VALUES (?, 3, 1, ?, 1, 1, 0, 0, ?, ?, 'self', 60000, ?)`,
         )
         .run(cardId, reviewedAt, reviewedAt, TODAY, makeupFor);
-    // The morning pass made yesterday up; the evening look is a later review of the same chunk.
     insertAt("chunk:madani15:7:1-3", at(9 * 60), addDays(TODAY, -1));
     insertAt("chunk:madani15:7:1-3", at(19 * 60), null);
     expect(await tally(TODAY)).toBe(false);
@@ -514,14 +504,12 @@ describe("a completed sabaq step 6 (STR-01)", () => {
 
   it("reconciles a later day whose step 6 a pulled review changes, though only the pulled review's day is given", async () => {
     const [first, between, later] = [addDays(TODAY, -3), addDays(TODAY, -2), addDays(TODAY, -1)];
-    // Two passes of one chunk: the later one is no step, so its day has no wird.
     insertLog("chunk:madani15:9:1-3", first, 3);
     insertLog("chunk:madani15:9:1-3", later, 3);
     await store.db.withTransactionAsync(async (tx) => {
       await reconcileHabitDaysFromLogs(tx, { now: atLocalTime(TODAY, 14 * 60) });
     });
     expect(await readHabitDayRow(store.db, later)).toBeNull();
-    // Sync brings a failed check between them, so the later pass learns the chunk again.
     insertLog("chunk:madani15:9:1-3", between, 1);
     expect(await tally(later)).toBe(true);
     await store.db.withTransactionAsync(async (tx) => {
@@ -539,10 +527,8 @@ describe("a completed sabaq step 6 (STR-01)", () => {
             local_date, grader, duration_ms, makeup_for) VALUES ('chunk:madani15:8:1-3', ?, 1, ?, 1, 1, 0, 0, ?, ?, 'self', 60000, NULL)`,
         )
         .run(rating, at.toISOString(), at.toISOString(), localDateOf(at));
-    // Yesterday: step 6 saved Good, then the fluent check failed, so the lines are offered again.
     insertAt(3, atLocalTime(yesterday, 9 * 60));
     insertAt(1, atLocalTime(yesterday, 9 * 60 + 10));
-    // Today: the lesson again, step 6 then a passed check. Only step 6 is a step.
     insertAt(3, atLocalTime(TODAY, 9 * 60));
     insertAt(3, atLocalTime(TODAY, 9 * 60 + 10));
     expect(await tally(yesterday)).toBe(true);
@@ -586,7 +572,6 @@ describe("make-up attribution on each review (STR-08)", () => {
     for (let i = 0; i < 10; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i), Rating.Good, { session });
     expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "made_up", source_session_id: session.id });
 
-    // The same session goes on, before and after the cutoff: nothing of it counts for today.
     for (let i = 0; i < 10; i += 1) await grade(`3:${i + 1}`, atLocalTime(TODAY, 9 * 60 + 20 + i), Rating.Good, { session });
     for (let i = 0; i < 10; i += 1) await grade(`4:${i + 1}`, atLocalTime(TODAY, 13 * 60 + i), Rating.Good, { session });
     expect(await readHabitDayRow(store.db, TODAY)).toBeNull();
@@ -595,7 +580,6 @@ describe("make-up attribution on each review (STR-08)", () => {
       .all(session.id) as { makeup_for: string | null }[];
     expect(fromSession).toEqual([{ makeup_for: yesterday }]);
 
-    // The next session counts for today as usual.
     const next = startReviewSession("wird", { now: atLocalTime(TODAY, 15 * 60) });
     for (let i = 0; i < 10; i += 1) await grade(`5:${i + 1}`, atLocalTime(TODAY, 15 * 60 + i), Rating.Good, { session: next });
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done", source_session_id: next.id });
@@ -606,7 +590,6 @@ describe("make-up attribution on each review (STR-08)", () => {
     const session = startReviewSession("wird", { now: atLocalTime(TODAY, 9 * 60) });
     for (let i = 0; i < 10; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i), Rating.Good, { session });
     expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "made_up", source_session_id: session.id });
-    // Another device's made-up row wins the merge, with its own session id.
     store.sql.prepare("UPDATE habit_days SET source_session_id = 'session-other-device' WHERE local_date = ?").run(yesterday);
 
     for (let i = 0; i < 10; i += 1) await grade(`3:${i + 1}`, atLocalTime(TODAY, 9 * 60 + 20 + i), Rating.Good, { session });
@@ -621,7 +604,6 @@ describe("make-up attribution on each review (STR-08)", () => {
     await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
     const session = startReviewSession("wird", { now: atLocalTime(TODAY, 9 * 60) });
     for (let i = 0; i < 10; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 9 * 60 + i), Rating.Good, { session });
-    // Another device recorded yesterday as a genuine done day; the merge keeps the stronger status.
     store.sql.prepare("UPDATE habit_days SET status = 'done', earned_status = 'done' WHERE local_date = ?").run(yesterday);
 
     for (let i = 0; i < 10; i += 1) await grade(`3:${i + 1}`, atLocalTime(TODAY, 9 * 60 + 20 + i), Rating.Good, { session });
@@ -631,7 +613,6 @@ describe("make-up attribution on each review (STR-08)", () => {
   it("lets a make-up session that did not finish before the cutoff count for today, never completing the make-up late", async () => {
     await seedDone([addDays(TODAY, -3), addDays(TODAY, -2)]);
     const session = startReviewSession("wird", { now: atLocalTime(TODAY, 11 * 60) });
-    // Five ayat before the cutoff: half the minimum, so yesterday stays missed.
     for (let i = 0; i < 5; i += 1) await grade(`2:${i + 1}`, atLocalTime(TODAY, 11 * 60 + i), Rating.Good, { session });
     for (let i = 0; i < 10; i += 1) await grade(`3:${i + 1}`, atLocalTime(TODAY, 13 * 60 + i), Rating.Good, { session });
     expect((await readHabitDayRow(store.db, yesterday))?.status ?? null).not.toBe("made_up");

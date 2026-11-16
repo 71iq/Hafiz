@@ -55,7 +55,6 @@ jest.mock("react-native-reanimated", () => {
 jest.mock("@shopify/flash-list", () => ({ FlashList: () => null }));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDatabase }));
 jest.mock("@/lib/database/user-settings", () => ({ writeUserSetting: jest.fn(async () => undefined) }));
-// Weak-spot markers (ERR-06) load from recitation errors; this suite covers the reveal owner only.
 jest.mock("@/lib/hifz/use-weak-spots", () => ({ useWeakSpotsLoader: () => undefined, useWeakSpotMarker: () => () => false }));
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
@@ -207,7 +206,6 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     if (enable) fireEvent.press(hideToggle(view));
     return view;
   }
-  // The shared eye toolbar button: verse view names what it does next, page view is the reveal mode.
   function hideToggle(view: ReturnType<typeof render>) {
     return (
       view.queryByLabelText(s.readerHideAyahText) ??
@@ -290,7 +288,6 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     const view = await open();
     press(view, s.hifzContinueAutoReveal);
     expect(progress()).toEqual({ ...hidden, revealedAyahCount: 1 });
-    // Page end: Play gives way to Page revealed, Repeat and Next page.
     expect(view.queryByRole("button", { name: s.hifzContinueAutoReveal })).toBeNull();
     expect(view.getByText(s.revealPageDone)).toBeOnTheScreen();
     expect(view.getByRole("button", { name: s.revealNextPage })).toBeOnTheScreen();
@@ -387,8 +384,6 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     press(view, s.hifzContinueAutoReveal);
     await tick();
     view.unmount();
-    // React act queues a microtask that Jest includes in its timer count.
-    // Drain jobs without advancing any timeout or interval before checking cleanup.
     jest.runAllTicks();
     expect(jest.getTimerCount()).toBe(0);
   });

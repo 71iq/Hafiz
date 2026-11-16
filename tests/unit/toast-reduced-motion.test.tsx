@@ -111,7 +111,6 @@ it("keeps the existing text, pointer behavior, and styles", () => {
     }),
   );
   expect(StyleSheet.flatten(text.props.style)).toEqual({
-    // The inverse-surface pill of the active theme (White outside a settings provider).
     backgroundColor: TOAST_INVERSE_COLORS.white.surface,
     color: TOAST_INVERSE_COLORS.white.text,
     fontFamily: "Manrope_600SemiBold",
@@ -127,7 +126,6 @@ it("keeps the existing text, pointer behavior, and styles", () => {
 });
 
 it.each([
-  // One word: 2000 + 60ms per word (C03).
   [undefined, 2060],
   [3500, 3500],
 ] as const)("uses the %s hold and a separate 200ms dismissal tail", (duration, hold) => {

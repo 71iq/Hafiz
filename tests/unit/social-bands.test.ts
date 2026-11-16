@@ -106,7 +106,6 @@ describe("local inputs", () => {
   it("reads the stored camelCase plan, so the default plan is half a page a day", () => {
     expect(paceBand(newPagesPerDay(parseHifzPlan(JSON.stringify(DEFAULT_HIFZ_PLAN))))).toBe("half_page");
     expect(paceBand(newPagesPerDay(parseHifzPlan('{"newPerDay":1}')))).toBe("page_plus");
-    // The old hand-read snake_case field means nothing to the plan schema.
     expect(newPagesPerDay(parseHifzPlan('{"new_per_day":2}'))).toBe(DEFAULT_HIFZ_PLAN.newPerDay);
   });
 

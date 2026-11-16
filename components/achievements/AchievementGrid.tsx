@@ -26,7 +26,6 @@ const CATEGORY_ORDER: AchievementCategory[] = [
 
 const JUZ_BADGE = /^juz_\d{2}_completed$/;
 
-/** Read-only badge list. The 30 juz completion badges collapse into one row that expands. */
 export function AchievementGrid({ items }: Props) {
   const s = useStrings();
   const { isRTL } = useSettings();
@@ -65,7 +64,6 @@ function JuzCompletionGroup({ items }: { items: AchievementDashboardItem[] }) {
   const { isRTL, uiLanguage, themeColors, effectiveTheme } = useSettings();
   const [expanded, setExpanded] = useState(false);
   const unlocked = items.filter((item) => item.unlockedAt).length;
-  // A bidi isolate keeps Arabic "٣/٣٠" in order.
   const label = interpolate(s.achievementJuzGroup, {
     n: `⁦${formatNumber(unlocked, uiLanguage)}`,
     total: `${formatNumber(items.length, uiLanguage)}⁩`,

@@ -88,7 +88,6 @@ test("isolated Chrome database bridge ignores malformed messages and serves a va
           source: "SELECT 'malformed' AS value",
           params: [new Date()],
         });
-        // Deliberately omit a version on the legacy SQL request.
         channel.postMessage({
           type: "request",
           requestId: legacyRequestId,
@@ -606,7 +605,6 @@ test("Chrome isolates peer rollback and expires an orphaned transaction lease", 
         const orphan = await begin();
         await sql(0, "run", "INSERT INTO " + table + " VALUES ('orphan-A')", orphan);
         const leaseStarted = Date.now();
-        // Give the host lease a five-second head start over B's ordinary 60-second RPC timeout.
         await new Promise((resolve) => setTimeout(resolve, 5_000));
         await sql(1, "run", "INSERT INTO " + table + " VALUES ('after-expiry-B')");
         const leaseElapsed = Date.now() - leaseStarted;

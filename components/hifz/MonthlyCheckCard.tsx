@@ -7,7 +7,6 @@ import type { UIStrings } from "@/lib/i18n/strings";
 
 type Props = { language: "en" | "ar"; s: UIStrings; onStart: () => void; onDecline: () => void };
 
-/** MST-05: the optional monthly check, offered once a month and easy to decline. */
 export function MonthlyCheckCard({ language, s, onStart, onDecline }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   return (

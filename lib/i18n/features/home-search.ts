@@ -1,9 +1,5 @@
-/**
- * W04 Hifz setup, Home and Search. Spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity.
- */
 export const homeSearchStrings = {
   en: {
-    // Search
     homeSearchPlaceholderText: "Search Arabic or English...",
     homeSearchPlaceholderRoot: "Type a root or word, e.g. كتب",
     homeSearchHint: "Type Arabic without diacritics or English words. Use Root to find other forms of a word.",
@@ -26,7 +22,6 @@ export const homeSearchStrings = {
     homeSearchRemove: "Remove",
     homeSearchRemoveNamed: "Remove {{query}}",
     homeSearchRetry: "Retry",
-    // Home
     homeDueNew: "{{due}} due · {{new}} new",
     homeAllCaughtUp: "All caught up for today",
     homeStartReading: "Start reading from Al-Fatiha",
@@ -41,7 +36,6 @@ export const homeSearchStrings = {
     homeDismiss: "Dismiss",
     homeAchievementMore: "+{{n}} more",
     homeVocabAdded: "Added to Vocabulary Review on Home",
-    // Setup
     setupLanguageHint: "Change the app language",
     setupRetry: "Retry",
     setupSavingAnnouncement: "Saving",
@@ -53,7 +47,6 @@ export const homeSearchStrings = {
     setupSurahsLoadFailed: "Could not load the surah list.",
   },
   ar: {
-    // Search
     homeSearchPlaceholderText: "ابحث بالعربية أو الإنجليزية...",
     homeSearchPlaceholderRoot: "اكتب جذرًا أو كلمة، مثل كتب",
     homeSearchHint: "اكتب بالعربية دون تشكيل أو بالإنجليزية. استخدم الجذر لإيجاد صيغ أخرى للكلمة.",
@@ -76,7 +69,6 @@ export const homeSearchStrings = {
     homeSearchRemove: "إزالة",
     homeSearchRemoveNamed: "إزالة {{query}}",
     homeSearchRetry: "إعادة المحاولة",
-    // Home
     homeDueNew: "{{due}} مستحقة · {{new}} جديدة",
     homeAllCaughtUp: "أنهيت مراجعة اليوم",
     homeStartReading: "ابدأ القراءة من الفاتحة",
@@ -91,7 +83,6 @@ export const homeSearchStrings = {
     homeDismiss: "إغلاق",
     homeAchievementMore: "+{{n}} آخر",
     homeVocabAdded: "أضيفت إلى مراجعة المعاني في الرئيسية",
-    // Setup
     setupLanguageHint: "تغيير لغة التطبيق",
     setupRetry: "إعادة المحاولة",
     setupSavingAnnouncement: "جارٍ الحفظ",

@@ -43,7 +43,6 @@ tar -czf "$folder/configuration.tar.gz" \
 readlink /opt/hafiz/current > "$folder/release.txt"
 (cd "$folder" && sha256sum database.dump fingerprints.jsonl roles.sql database-config.tar.gz storage.tar.gz configuration.tar.gz release.txt > SHA256SUMS)
 mv "$folder" "$root/$stamp"
-# Complete dated backups only. Partial backups require operator review.
 find "$root" -mindepth 1 -maxdepth 1 -type d -mtime +7 \
   -regextype posix-extended -regex '.*/[0-9]{8}T[0-9]{6}Z' -exec rm -r -- {} +
 echo "Backup complete: $root/$stamp"

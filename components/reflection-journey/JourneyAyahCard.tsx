@@ -231,8 +231,6 @@ export function JourneyAyahCard({ block }: Props) {
 
   const accent = accentIconColor(effectiveTheme);
   const muted = mutedIconColor(effectiveTheme);
-  // The source is named in its own language and direction: the translation's attribution or name,
-  // and the tafsir's Arabic title.
   const source = useMemo(() => {
     if (block.type === "translation") {
       const language = getLanguageByCode(translationLanguage);
@@ -249,7 +247,6 @@ export function JourneyAyahCard({ block }: Props) {
     return null;
   }, [block, tafseerSource, translationLanguage]);
 
-  // Play belongs to this block while the shared range player is on one of its ayahs.
   const session = audio?.session ?? null;
   const playingHere =
     block.type === "recitation_placeholder" &&
@@ -289,7 +286,6 @@ export function JourneyAyahCard({ block }: Props) {
     </Text>
   );
 
-  // The book action sits beside the row, not inside it, so the two targets never overlap.
   const renderRow = (
     row: { surah: number; ayah: number },
     key: string,
@@ -378,7 +374,6 @@ export function JourneyAyahCard({ block }: Props) {
                 row,
                 `${row.surah}:${row.ayah}`,
                 !fontsReady ? (
-                  // One line of Quran text, so the card keeps its height when the glyphs arrive.
                   <View
                     testID="journey-quran-line-placeholder"
                     accessibilityLabel={s.loading}

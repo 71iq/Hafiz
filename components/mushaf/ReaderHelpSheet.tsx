@@ -4,10 +4,6 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { textStartStyle } from "@/lib/ui/direction";
 
-/**
- * C07 reader shortcuts and gestures help, opened with "?" or from the More menu. It explains the
- * keyboard shortcuts and the ayah marker and word gestures; it adds no new gesture of its own.
- */
 export function ReaderHelpSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const s = useStrings();
   const { isRTL } = useSettings();

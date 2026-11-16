@@ -1,7 +1,3 @@
-/**
- * UI font loading for Manrope (body/UI) and Noto Serif (headlines).
- * Loaded at app startup via root layout.
- */
 export const UI_FONTS = {
   Manrope_400Regular: require("@expo-google-fonts/manrope/400Regular/Manrope_400Regular.ttf"),
   Manrope_500Medium: require("@expo-google-fonts/manrope/500Medium/Manrope_500Medium.ttf"),
@@ -12,15 +8,6 @@ export const UI_FONTS = {
   NotoSerif_700Bold: require("@expo-google-fonts/noto-serif/700Bold/NotoSerif_700Bold.ttf"),
 };
 
-/**
- * Load UI fonts on web via the native FontFace API with `display: swap`.
- *
- * Unlike expo-font (which uses `font-display: auto` and blocks rendering
- * on some browsers until the font is ready), `swap` lets the browser
- * immediately render text with a fallback and replace it once the real
- * font downloads. This drops first-paint from "wait for 7 TTFs" to
- * "render instantly, fonts streaming in".
- */
 export async function loadUiFontsWeb(): Promise<void> {
   if (typeof document === "undefined") return;
   const { Asset } = await import("expo-asset");

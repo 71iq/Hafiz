@@ -3,15 +3,12 @@
  */
 import React, { act, type ReactNode } from "react";
 
-// Renders through React Native Web into a DOM, as the web export does: focus, Escape and menu keys
-// are browser behavior.
 jest.mock("react-native", () => jest.requireActual("react-native-web"));
 jest.mock("lucide-react-native", () => new Proxy({}, { get: () => () => null }));
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 jest.mock("@/lib/ui/reduced-motion", () => ({ useReducedMotionPreference: () => true }));
-// The overlay's crash boundary pulls in expo-router, which needs browser globals jsdom lacks.
 jest.mock("@/components/ui/ErrorBoundary", () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -117,7 +114,6 @@ it("lets only the topmost overlay handle Escape and keeps it from the reader", (
   );
   show(tree(false));
   expect(hasOpenOverlay()).toBe(true);
-  // A topmost overlay that does not dismiss on Escape still consumes it.
   expect(key("Escape").defaultPrevented).toBe(true);
   expect(outer).not.toHaveBeenCalled();
   expect(inner).not.toHaveBeenCalled();
@@ -133,7 +129,6 @@ it("lets only the topmost overlay handle Escape and keeps it from the reader", (
 
 async function openMenu(trigger: HTMLElement) {
   act(() => trigger.click());
-  // react-native-web measures the trigger on a timer.
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
@@ -162,11 +157,8 @@ it("drives a menu by keyboard above a sheet without the reader seeing its keys",
   await openMenu(trigger);
   const items = () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
   expect(items().map((item) => item.getAttribute("aria-label"))).toEqual(["Mark", "Suspend", "Bury", "Delete"]);
-  // The first destructive item is set apart by a divider.
   expect(getComputedStyle(items()[3]).borderTopWidth).toBe("1px");
 
-  // jsdom has no layout, so the menu is never placed and does not take initial focus as it does in
-  // a browser; the first ArrowDown then focuses the first item.
   key("ArrowDown");
   expect(document.activeElement?.getAttribute("aria-label")).toBe("Mark");
   key("ArrowDown");
@@ -174,7 +166,6 @@ it("drives a menu by keyboard above a sheet without the reader seeing its keys",
   key("End");
   expect(document.activeElement?.getAttribute("aria-label")).toBe("Delete");
   key("ArrowUp");
-  // Disabled items are skipped.
   expect(document.activeElement?.getAttribute("aria-label")).toBe("Suspend");
   key("Home");
   expect(document.activeElement?.getAttribute("aria-label")).toBe("Mark");

@@ -11,7 +11,6 @@ type Props = {
   surah: number;
   ayah: number;
   wordPos: number;
-  /** Opens the Occurrences tab for this word's root. */
   onRootPress?: () => void;
 };
 

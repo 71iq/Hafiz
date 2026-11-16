@@ -41,8 +41,6 @@ type LoginForm = {
   password: string;
 };
 
-// Login checks only that a password was entered; the server decides whether it is right.
-// Signup and reset keep the account's password rules.
 function createLoginSchema(s: UIStrings) {
   return z.object({
     email: z.string().trim().toLowerCase().email(s.authValidationInvalidEmail),
@@ -63,7 +61,6 @@ export default function LoginScreen() {
   const resendCooldown = useCooldown();
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const [passwordVisible, setPasswordVisible] = useState(false);
-  // A result from the previous auth screen (a saved password) is shown once.
   const [handoffNotice] = useState(peekAuthHandoffNotice);
   useEffect(() => {
     takeAuthHandoffNotice();
@@ -86,10 +83,8 @@ export default function LoginScreen() {
     defaultValues: { email: readCarriedAuthEmail(), password: "" },
   });
 
-  // The password is hidden again whenever the screen loses focus.
   useFocusEffect(useCallback(() => () => setPasswordVisible(false), []));
 
-  // Leaving for another auth screen carries only the typed email, in memory.
   const carryEmail = () => carryAuthEmail(getValues("email") ?? "");
 
   const onSubmit = async (data: LoginForm) => {
@@ -105,8 +100,6 @@ export default function LoginScreen() {
       flow = signIn(data.email, data.password);
       const result = await flow.result;
       if (!lease.isCurrent() || !flow.isCurrent() || result.status !== "completed" || !result.owner.isCurrent()) return;
-      // A verified session for this screen: replace auth history with the captured context or Home.
-      // Restore consent and sync stay with the sync owner; signing in is not synced progress.
       complete();
     } catch (err: unknown) {
       if (!lease.isCurrent() || (flow && !flow.isCurrent())) return;
@@ -171,7 +164,6 @@ export default function LoginScreen() {
           autoComplete: "email",
           textContentType: "emailAddress",
           importantForAutofill: "yes",
-          // Desktop browsers start in Email; phones wait for a tap so the keyboard does not cover the form.
           autoFocus: Platform.OS === "web" && width >= PERSISTENT_SIDEBAR_BREAKPOINT,
           returnKeyType: "next",
           onSubmitEditing: () => passwordRef.current?.focus(),
@@ -207,7 +199,6 @@ export default function LoginScreen() {
               onPress={() => setPasswordVisible((current) => !current)}
               accessibilityRole="button"
               accessibilityLabel={passwordVisible ? s.authHidePassword : s.authShowPassword}
-              // 20px icon plus 12px on each side reaches the 44px target.
               hitSlop={12}
             >
               {passwordVisible ? <EyeOff size={20} color={colors.muted} /> : <Eye size={20} color={colors.muted} />}

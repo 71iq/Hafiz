@@ -86,10 +86,6 @@ function Chip({
   );
 }
 
-/**
- * Excused days and pause (STR-11 to STR-13). Both are free, private and easy to undo. Excused days
- * can be marked 3 days back to 30 ahead; a pause lasts up to 60 days.
- */
 export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const mutedIcon = mutedIconColor(useSettings().effectiveTheme);

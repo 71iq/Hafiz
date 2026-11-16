@@ -47,12 +47,9 @@ const mockDatabase = {
       return { changes: 1, lastInsertRowId: 0 };
     },
   ),
-  // Syncable settings commit with their queue entry; the queue module is mocked below.
   withTransactionAsync: async (task: (transaction: unknown) => Promise<void>) => task(mockDatabase),
 };
 
-// Preserve the real context value; count committed useSettings call effects.
-// SurahHeader calls it twice, through useStrings and its own field read.
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   const runtime = jest.requireActual<typeof import("react")>("react");

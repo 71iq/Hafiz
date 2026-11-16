@@ -4,20 +4,6 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { MUTASHABIHAT_DATA_VERSION, parseMutashabihatRows } from "@/lib/database/mutashabihat-rows";
 
-/**
- * The bundled similar-verse rows (assets/data/quran.db, and the same rows in
- * assets/data/mutashabihat/nourquran_hafiz_rows.json), as scripts/build-quran-db.mjs rebuilds them
- * from the Uthmani text (scripts/mutashabihat-align.mjs):
- * - each of a ref's pre, similar and post segments is one exact run of its surah's Uthmani words (the
- *   basmala heading it counts as its start), in Mushaf order, near its ayah, and its similar words
- *   reach that ayah;
- * - the Quran words a source passage skipped are filled when they are 12 or fewer, so a skip left
- *   between two segments is longer, and the app shows it as "…";
- * - study card ids are a group id and a sort order, so a sort order keeps its source ayah, and a ref
- *   relabelled to the ayah whose text it holds takes a new one;
- * - the slots left without a ref are listed in assets/data/mutashabihat/nourquran_hafiz_retired_cards.json,
- *   whose cards the app deletes wherever they arrive, and no listed slot holds a ref.
- */
 const ROOT = path.join(__dirname, "../..");
 const MAX_FILL = 12;
 const WINDOW_AYAT = 3;
@@ -58,7 +44,6 @@ db.close();
 const kinds = new Map(groups.map((group) => [group.id, group.kind]));
 const similarRefs = refs.filter((ref) => kinds.get(ref.group_id) === "similar");
 
-/** The ayat of a surah around an ayah as one run of words, with the basmala as ayah 0. */
 function windowAround(surah: number, ayah: number): { word: string; ayah: number }[] {
   const basmala = words(ayat[0].text_uthmani);
   const list: { word: string; ayah: number }[] = [];
@@ -78,10 +63,8 @@ function startsOf(run: readonly string[], text: readonly { word: string }[]): nu
   return starts;
 }
 
-/** A skip between two segments: none, or more than MAX_FILL words. */
 const allowedSkip = (skip: number) => skip === 0 || skip > MAX_FILL;
 
-/** Why a ref's segments break the rule, or null when they keep it. */
 function segmentProblem(ref: Ref): string | null {
   const [pre, similar, post] = [ref.pre_text, ref.similar_text, ref.post_text].map(words);
   if (similar.length === 0) return "no similar words";
@@ -136,13 +119,11 @@ describe("the bundled similar-verse passages", () => {
         "nq-sim-6b0cb090bae7db#2 2:265",
         "nq-sim-f58bbe09e8ddf0#2 65:2",
         "nq-sim-1b532f39044afd#3 11:13",
-        // 101:7's similar words shared with 7:8 and 23:102 are 101:6's, so it is 101:6 as they are.
         "nq-sim-7d0576c830de2e#3 7:8",
         "nq-sim-7d0576c830de2e#4 23:102",
         "nq-sim-7d0576c830de2e#5 101:6",
       ]),
     );
-    // 2:264 held 2:265's text: its old sort order is gone, so its old card cannot show 2:265.
     expect(refs.some((ref) => ref.group_id === "nq-sim-6b0cb090bae7db" && ref.sort_order === 1)).toBe(false);
     expect(refs.some((ref) => ref.group_id === "nq-sim-7d0576c830de2e" && ref.sort_order === 2)).toBe(false);
 

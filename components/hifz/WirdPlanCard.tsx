@@ -16,15 +16,10 @@ import { mutedIconColor } from "@/lib/ui/theme-icons";
 type Props = {
   wird: TodayWird | null;
   inboxCount: number;
-  /** SBQ-03: chunks memorized earlier today whose second look is due now. */
   secondLooksDue?: number;
-  /** When the next of today's second looks opens, while none is due yet. */
   nextLookAt?: Date | null;
-  /** SOC-03: a teacher's next sabaq whose lines are not memorized yet, which sabaq offers first. */
   assignedSabaq?: Readonly<{ page: number; fromLine: number; toLine: number }> | null;
-  /** Ayah review: the ayah cards due now, since the plan lists no pages then (UNIT-02). */
   ayahDue?: number;
-  /** Ayah review: the new ayah cards on offer, shown apart from those due, as extra (ETH-05). */
   ayahNew?: number;
   language: "en" | "ar";
   isDark: boolean;
@@ -35,11 +30,6 @@ type Props = {
   onDrill: () => void;
 };
 
-/**
- * Home's wird card (4.3, GOAL-01, GOAL-04): today's pages as recent and manzil counts, new lines,
- * the time left, and a clear "Wird complete" state with nothing more asked. Without a plan it offers
- * setup instead.
- */
 export function WirdPlanCard({
   wird,
   inboxCount,
@@ -59,7 +49,6 @@ export function WirdPlanCard({
   const { effectiveTheme } = useSettings();
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
-  // Teal text under 14 px uses the darker token in light mode.
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
 
   if (wird === null) {
@@ -85,13 +74,11 @@ export function WirdPlanCard({
     );
   }
 
-  // A page on a due learning step is in both lists; total counts each page once.
   const total = wird.total;
   const complete = wird.todo.length === 0 && total > 0;
   const sabqi = wird.todo.filter((page) => page.tier === "sabqi").length;
   const manzil = wird.todo.length - sabqi;
   const showSabaq = newMemorizationOpen(wird);
-  // Ayah review lists no pages; its work is the ayah cards (Start opens the flashcard session).
   const ayahMode = wird.plan.unit === "ayah";
   const secondLookLabel =
     secondLooksDue > 1 ? interpolate(s.hifzSecondLooksReady, { n: formatNumber(secondLooksDue, language) }) : s.hifzSecondLookReady;
@@ -135,7 +122,6 @@ export function WirdPlanCard({
             </Text>
           ) : null}
           {showSabaq ? (
-            // The lines still left of today's allocation, so a finished lesson does not read as work left.
             <Text dir={dir} variant="caption">
               {wird.sabaqDoneToday
                 ? s.hifzWirdNewDone
@@ -184,13 +170,11 @@ export function WirdPlanCard({
       ) : null}
 
       {complete ? (
-        // Once the wird is complete, new lines stay on offer but nothing more is pressed on the user.
         showSabaq ? (
           <MirroredRow dir={dir} className="mt-4">
             <Button
               variant="outline"
               size="sm"
-              // Small text and width, but still a 44 px touch target.
               className="h-11 border border-warm-300 dark:border-neutral-700"
               label={wird.sabaqDoneToday ? s.hifzSabaqMore : s.hifzSabaqStart}
               onPress={onStartSabaq}
@@ -198,7 +182,6 @@ export function WirdPlanCard({
           </MirroredRow>
         ) : null
       ) : (
-        // Capped on wide layouts like the rows below, so the buttons line up with them.
         <View className="mt-4 w-full max-w-md" style={{ gap: 8, alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}>
           {wird.todo.length > 0 || (ayahMode && ayahDue + ayahNew > 0) ? (
             <Button label={wird.done.length > 0 ? s.hifzWirdContinue : s.hifzWirdStart} onPress={onStartReview} />
@@ -214,13 +197,11 @@ export function WirdPlanCard({
         </View>
       )}
 
-      {/* SBQ-03: the second look is offered even with a backlog or a complete wird; sabaq shows it first. */}
       {secondLooksDue > 0 ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${secondLookLabel}, ${s.hifzSecondLookAction}`}
           onPress={onStartSabaq}
-          // Capped on wide layouts so "Start" stays near its label.
           className="mt-3 w-full max-w-md min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4 py-2.5"
           style={{ alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}
         >
@@ -239,7 +220,6 @@ export function WirdPlanCard({
         </Pressable>
       ) : null}
 
-      {/* Between the lesson and the look, Home says when it opens. */}
       {secondLooksDue === 0 && nextLookAt ? (
         <MirroredRow dir={dir} className="mt-3 items-center gap-2">
           <Eye size={14} color={muted} />

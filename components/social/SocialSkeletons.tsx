@@ -5,10 +5,6 @@ import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { useSettings } from "@/lib/settings/context";
 import { socialRowStyle } from "./SocialControls";
 
-/**
- * Loading placeholders shaped like the rows they stand in for, so the layout does not jump when the
- * data arrives. Each block is one accessible "loading" element.
- */
 function LoadingBlock({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View accessible accessibilityLabel={label} accessibilityState={{ busy: true }} className="gap-2.5">
@@ -17,7 +13,6 @@ function LoadingBlock({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-/** A halaqa while it loads: the goal card, then member rows with avatar, name and week dots. */
 export function HalaqaSkeleton({ label }: { label: string }) {
   const { isRTL } = useSettings();
   return (
@@ -46,10 +41,6 @@ export function HalaqaSkeleton({ label }: { label: string }) {
   );
 }
 
-/**
- * The Board join form while the account's stored choices load, shaped like BoardJoin: one card with
- * the trophy disc and centered headline, the intention text, two toggle rows and Join.
- */
 export function BoardJoinSkeleton({ label }: { label: string }) {
   const { isRTL } = useSettings();
   return (
@@ -76,7 +67,6 @@ export function BoardJoinSkeleton({ label }: { label: string }) {
   );
 }
 
-/** Board standings while they load: rank, avatar, name and points, like StandingRow. */
 export function StandingsSkeleton({ label }: { label: string }) {
   const { isRTL } = useSettings();
   return (
@@ -100,7 +90,6 @@ export function StandingsSkeleton({ label }: { label: string }) {
   );
 }
 
-/** The teacher view while it loads: the plan card's lines and stage rows. */
 export function TeacherViewSkeleton({ label }: { label: string }) {
   const { isRTL } = useSettings();
   return (

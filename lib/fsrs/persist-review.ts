@@ -12,10 +12,8 @@ import { createWeakSpotCards } from "@/lib/hifz/weak-spots";
 import type { Grader, SupportLevel } from "@/lib/hifz/grading";
 import { PAGE_UNITS, recitationUnits } from "@/lib/habit/minimum";
 
-/** What the screen knows about a grade beyond the scheduling transition. */
 export type ReviewSaveContext = Readonly<{
   session: ReviewSessionRef | null;
-  /** Counts the card once in the session summary, on its first grade. */
   firstGradeInSession: boolean;
   durationMs: number | null;
   supportLevel: SupportLevel | null;
@@ -38,34 +36,17 @@ export const DEFAULT_REVIEW_SAVE_CONTEXT: ReviewSaveContext = {
 export type ReviewSaveResult = Readonly<{
   wird: WirdProgressEvent;
   resolvedInboxItems: number;
-  /** The transition that was saved, calculated from the card as it was inside the transaction. */
   transition: ReviewTransition;
 }>;
 
-/**
- * The card as it is now, for a transition calculated inside the grade's transaction. A screen's copy
- * can be older: sync or another grade may have updated the card since its queue was loaded. Null when
- * the card is gone; saving a transition for it then fails with StudyCardDeletedError.
- */
 export async function readCurrentCard(tx: DatabaseExecutor, cardId: string): Promise<StudyCardRow | null> {
   return tx.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [cardId]);
 }
 
-/** ERR-03: only a Good or Easy recall at the hidden level with no new errors counts; salah has no check. */
 function isCleanRecall(rating: number, context: ReviewSaveContext): boolean {
   return rating >= 3 && context.errors.length === 0 && context.supportLevel === 4 && context.grader !== "salah";
 }
 
-/**
- * Save a calculated review (DB-01). The updated card, its review log, the attempt's errors, the
- * session counters, the day's wird status and every queued upload commit together or not at all, so
- * a failed grade leaves the streak, the inbox and the card as they were. Achievements and review
- * listeners run only after the commit.
- *
- * `transition` can be a function of the transaction, for a caller whose card sync or another grade may
- * have changed since it was read: it then reads the card and calculates inside the same transaction.
- * The result carries the transition that was saved.
- */
 export async function persistReviewTransition({
   db,
   cardId,
@@ -78,9 +59,7 @@ export async function persistReviewTransition({
   cardId: string;
   transition: ReviewTransition | ((tx: DatabaseExecutor) => Promise<ReviewTransition>);
   context?: ReviewSaveContext;
-  /** Writes that belong to this grade, such as a manzil cycle completing, run inside its transaction. */
   extraWork?: (tx: DatabaseExecutor) => Promise<void>;
-  /** Writes that must exist before the card is saved, such as creating it, run first in the transaction. */
   beforeWork?: (tx: DatabaseExecutor) => Promise<void>;
 }): Promise<ReviewSaveResult> {
   let saved = null as { result: ReviewSaveResult; log: StudyLogInput } | null;
@@ -92,8 +71,6 @@ export async function persistReviewTransition({
     const reviewedAt = new Date(reviewRecord.reviewedAt);
     const localDate = localDateOf(reviewedAt);
     const dhuhr = context.dhuhr ?? (await readDhuhrResolver(tx));
-    // STR-07, STR-08: decided before the log is written and stored on it, so every device credits
-    // this review to the same day.
     const makeupFor = await makeUpTarget(tx, { now: reviewedAt, dhuhr, sessionId: context.session?.id ?? null });
     const entry: StudyLogInput = {
       cardId,
@@ -122,7 +99,6 @@ export async function persistReviewTransition({
         at: reviewRecord.reviewedAt,
         localDate,
       });
-      // ERR-06: a word wrong in a third session becomes a weak spot with its own cloze card.
       await createWeakSpotCards(tx, context.errors, reviewedAt);
     }
     const resolvedInboxItems = isCleanRecall(reviewRecord.rating, context)
@@ -148,8 +124,6 @@ export async function persistReviewTransition({
     saved = { result: { wird, resolvedInboxItems, transition: resolved }, log: entry };
   });
   if (!saved) throw new Error("The review transaction ended without saving the grade.");
-  // The grade is committed. A listener failing now must not report it unsaved: a retry of the same
-  // grade would then append a second log.
   try {
     publishReviewLogged(db, saved.log);
   } catch (error) {

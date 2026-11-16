@@ -47,7 +47,6 @@ type Props = {
   visible: boolean;
   deckId: SmartDeckId | null;
   onClose: () => void;
-  /** Called after an explicit, committed save with the notice that names the deck. */
   onSaved: (notice: string) => void;
 };
 
@@ -58,12 +57,10 @@ type Baseline = { filter: BuiltInDeckFilter; settings: DeckReviewSettings };
 
 const JUZ_NUMBERS = Array.from({ length: 30 }, (_, i) => i + 1);
 
-/** The surah name a summary or row title shows: Arabic in Arabic, the transliteration in English. */
 function scopeName(surah: ScopeSurah, language: Language): string {
   return language === "ar" ? surah.name_arabic : (surahTransliteration(surah.number) ?? surah.name_english);
 }
 
-/** Two filters select the same cards when their sorted numbers and partial ranges match. */
 function filterKey(filter: BuiltInDeckFilter): string {
   if (filter.type === "juz") return `juz:${[...filter.juzNumbers].sort((a, b) => a - b).join(",")}`;
   if (filter.type === "surah") {
@@ -144,7 +141,6 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const surahByNumber = useMemo(() => new Map(surahs.map((row) => [row.number, row])), [surahs]);
   const sortedSelection = useMemo(() => [...selectedSurahs].sort((a, b) => a - b), [selectedSurahs]);
 
-  /** Selected surahs whose typed range is not valid, in Quran order. */
   const invalidSurahs = useMemo(
     () =>
       sortedSelection.filter((number) => {
@@ -156,7 +152,6 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     [selectedSurahRanges, sortedSelection, surahByNumber],
   );
 
-  /** The exact ranges a valid surah selection covers. */
   const surahRanges = useMemo<ScopeRange[]>(
     () =>
       sortedSelection.flatMap((number) => {
@@ -259,7 +254,6 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     setSaving(true);
     try {
       const settings = { ...baseline.settings, ...fields };
-      // The scope and the scheduler options commit together or not at all.
       await db.withTransactionAsync(async (tx) => {
         await putSmartDeckFilter(tx, deckId, scopeFilter);
         await putDeckReviewSettings(tx, deckId, settings);
@@ -270,8 +264,6 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       setSaving(false);
       return;
     }
-    // The settings are saved. Today's cards are built again when the queue loads, so a failure here
-    // must not present the committed save as failed.
     try {
       await materializeSmartDeckCards(db, deckId, fields.dailyReviewLimit, fields.newCardsLimit);
     } catch (e) {
@@ -658,7 +650,6 @@ function SurahSelectorSheet({
               s={s}
               range={selectedSurahRanges[surah.number] ?? { from: "1", to: String(surah.ayah_count) }}
               onRangePress={() => onRangePress(surah)}
-              // Opening with an invalid range scrolls to its row once, so the highlighted row is in view.
               onLayoutY={
                 surah.number === firstInvalid
                   ? (y) => {
@@ -722,7 +713,6 @@ function SurahFilterItem({
     : parsed.ayahStart === 1 && parsed.ayahEnd === surah.ayah_count
       ? s.deckScopeFullSurah
       : interpolate(s.deckScopeAyahRange, { range: formatAyahSpan(parsed.ayahStart, parsed.ayahEnd, language) });
-  // Arabic UI titles the row in Arabic with the transliteration as its hint; English the reverse.
   const title = language === "ar" ? surah.name_arabic : surah.name_english;
   const hint = language === "ar" ? (surahTransliteration(surah.number) ?? surah.name_english) : surah.name_arabic;
 

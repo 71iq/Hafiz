@@ -12,10 +12,6 @@ type SheetProps = Omit<ModalProps, "animationType"> & {
   className?: string;
 };
 
-/**
- * Bottom sheet with tonal layering (no border).
- * Slides up from bottom with backdrop overlay.
- */
 export const Sheet = forwardRef<View, SheetProps>(({ open, onClose, children, className, ...props }, ref) => {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const { height } = useWindowDimensions();
@@ -26,7 +22,6 @@ export const Sheet = forwardRef<View, SheetProps>(({ open, onClose, children, cl
   const latestClose = useRef(onClose);
   latestClose.current = onClose;
 
-  // Joins the shared surface stack: Escape closes this sheet only while it is the topmost surface.
   useEffect(() => {
     if (!open) return;
     const unregister = registerOverlayLayer(layerId);

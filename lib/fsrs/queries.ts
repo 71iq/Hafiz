@@ -68,11 +68,6 @@ import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID } from "@/lib/hifz/units";
 
 type ReviewActivityDay = { date: string; count: number };
 
-/**
- * Raw review facts by local calendar day. Derived figures (memorized share, average per active day,
- * consistency) are defined once in lib/progress/metrics.ts; consistency comes from lib/habit, never
- * from review-day counts.
- */
 export type ReviewStats = {
   activity: ReviewActivityDay[];
   activeDays: number;
@@ -104,7 +99,6 @@ function cardToSyncData(card: StudyCardRow): Record<string, any> {
     created_at: card.created_at,
     updated_at: card.updated_at,
     deleted_at: card.deleted_at ?? null,
-    // Only page cards carry a tier; leaving the keys out keeps other cards' uploads unchanged.
     ...(card.tier ? { tier: card.tier, tier_changed_at: card.tier_changed_at ?? null } : {}),
   };
 }
@@ -273,7 +267,6 @@ export async function writeDeckReviewSettings(
   await writeUserSetting(db, deckReviewSettingsKey(deckId), JSON.stringify(normalized));
 }
 
-/** writeDeckReviewSettings with the caller's executor, so the setting and its upload commit with the caller's other writes. */
 export async function putDeckReviewSettings(
   db: DatabaseExecutor,
   deckId: string,
@@ -299,7 +292,6 @@ export async function isMeaningCardSaved(
   return (row?.c ?? 0) > 0;
 }
 
-/** The saved meaning card's due time, or null when the word is not in word review. Read only. */
 export async function fetchMeaningCardDue(
   db: DatabaseExecutor,
   surah: number,
@@ -324,13 +316,11 @@ export async function addMeaningCard(
   const cardId = meaningCardId(surah, ayah, wordPos);
 
   let created = false;
-  // The deck setting, the card and their queued uploads commit together or not at all.
   await db.withTransactionAsync(async (tx) => {
     created = await insertMeaningCardRows(tx, cardId, now, emptyCard);
   });
 
   if (created) {
-    // The badge is a side effect of a saved card; its failure must not fail the save.
     recordAchievementEvent(db, {
       type: "vocab_saved",
       cardId,
@@ -362,7 +352,6 @@ async function insertMeaningCardRows(
     }));
   }
 
-  // Created again over a deletion, the card is stamped later than that deletion.
   const updatedAt = (await stampsOverDeletedCards(db, [cardId], new Date(now))).get(cardId) ?? now;
   const result = await db.runAsync(
     `INSERT INTO study_cards
@@ -380,7 +369,6 @@ async function insertMeaningCardRows(
       lapses = excluded.lapses,
       state = excluded.state,
       last_review = excluded.last_review,
-      -- A card added again starts fresh, as its queued upload says: no status kept from before.
       suspended_at = NULL,
       buried_until = NULL,
       marked_at = NULL,
@@ -432,12 +420,7 @@ async function insertMeaningCardRows(
   return created;
 }
 
-// ─── Query helpers ───────────────────────────────────────────
 
-/**
- * Cards studied today. A card counts once however many learning steps or Again presses it took, so
- * learning one new card does not use up several places in the daily limit.
- */
 async function getTodayReviewedCount(db: DatabaseExecutor, deckId?: string): Promise<number> {
   const { start, end } = todayBounds();
   if (deckId) {
@@ -470,7 +453,6 @@ export async function getRemainingReviewLimit(
   return Math.max(0, clampReviewLimit(limit) - await getTodayReviewedCount(db, deckId));
 }
 
-/** New cards of a deck first studied today: a log row written while the card was still new. */
 async function getTodayIntroducedNewCount(db: DatabaseExecutor, deckId: string): Promise<number> {
   const { start, end } = todayBounds();
   const row = await db.getFirstAsync<{ count: number }>(
@@ -486,11 +468,6 @@ async function getTodayIntroducedNewCount(db: DatabaseExecutor, deckId: string):
 
 type DeckQueueOptions = Exclude<DueCardsForReviewOptions, number> & { limit: number; newCardsLimit: number };
 
-/**
- * One deck's queue options for the rest of today: its review limit less the cards studied today and
- * its new-card limit less the new cards introduced today, so neither limit restarts with each
- * session. Null once the daily review limit is used up.
- */
 async function getDeckQueueOptions(
   db: DatabaseExecutor,
   deckId: string,
@@ -509,15 +486,8 @@ async function getDeckQueueOptions(
 
 export type ReviewQueueItem = { card: StudyCardRow; settings: DeckReviewSettings };
 
-/** The decks Home lists, in its order. Review all and the Home due headline cover exactly these. */
 export const REVIEW_DECK_IDS: readonly string[] = [...Object.values(SMART_DECK_IDS), MEANINGS_DECK_ID];
 
-/**
- * The cards a review session loads, each paired with its own deck's review settings, so grading,
- * interval previews and test modes follow the card's deck in Review all as in a single deck. Review
- * all is every deck's own queue in turn, with that deck's limits, so it offers what the deck rows
- * count, including new smart-deck cards that have no row yet.
- */
 export async function loadReviewQueue(db: AppDatabase, deckId?: string): Promise<ReviewQueueItem[]> {
   if (!deckId) {
     const queue: ReviewQueueItem[] = [];
@@ -669,11 +639,6 @@ export async function getNewCount(db: AppDatabase, deckId?: string): Promise<num
   return nonSmartRows.length + smartRows.filter((row) => row.state === 0 && isReviewableCard(row, now)).length;
 }
 
-/**
- * requireLive: the caller acted on a card it loaded as a live row, such as a session card. If that
- * row is gone or deleted the action fails instead of creating or reviving the card. Without it, an
- * action on a virtual smart-deck card creates the row and may revive an earlier deletion.
- */
 export type CardActionOptions = { requireLive?: boolean };
 
 async function ensureStudyCardRow(
@@ -682,8 +647,6 @@ async function ensureStudyCardRow(
   cardId: string,
   requireLive: boolean
 ): Promise<StudyCardRow> {
-  // A card id is global, so a live card in another deck is the same card: keep its progress
-  // instead of creating an empty card that would overwrite it locally and on the server.
   const existing = await db.getFirstAsync<StudyCardRow>(
     "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
     [cardId]
@@ -693,8 +656,6 @@ async function ensureStudyCardRow(
 
   const now = new Date();
   const nowIso = now.toISOString();
-  // Created again over a deletion, the card is stamped later than that deletion, so the action that
-  // follows is not older than a tombstone stamped by a clock running ahead and does not lose to it.
   const updatedAt = (await stampsOverDeletedCards(db, [cardId], now)).get(cardId) ?? nowIso;
   const emptyCard = createEmptyCard(now);
   const row: StudyCardRow = {
@@ -766,14 +727,12 @@ async function ensureStudyCardRow(
   return row;
 }
 
-/** Delete a card. The tombstone and its queued upload commit together or not at all. */
 export async function deleteStudyCard(database: AppDatabase, deckId: string, cardId: string): Promise<void> {
   await database.withTransactionAsync((db) => deleteStudyCardRow(db, deckId, cardId));
 }
 
 
 
-/** Soft-delete a card with its upload queued, using the caller's executor (inside its transaction). */
 export async function deleteStudyCardRow(db: DatabaseExecutor, deckId: string, cardId: string): Promise<void> {
   const row = await db.getFirstAsync<StudyCardRow>(
     "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
@@ -902,11 +861,6 @@ export async function setStudyCardDueDate(
   });
 }
 
-/**
- * The flashcard summary's next review: the earliest card the flashcard queues will show. Hifz page,
- * half-page, seam, gap and sabaq chunk cards are reviewed in the hifz flows, and a chunk past its day
- * keeps a due date no flow shows (SBQ-03), so their decks are left out.
- */
 export async function getNextEligibleReviewDate(db: DatabaseExecutor): Promise<string | null> {
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT *
@@ -997,11 +951,6 @@ type AyahListInfo = {
   text_en: string | null;
 };
 
-/**
- * Ayah text, surah names and translation for every ayah, in one query. The retention deck lists up
- * to 6,236 ayah cards, and three single-row queries per card on the serialized connection kept the
- * card list loading for many seconds. Loaded only when the list holds ayah cards.
- */
 async function loadAyahListLookup(db: DatabaseExecutor, cardIds: string[]): Promise<Map<string, AyahListInfo> | null> {
   if (!cardIds.some((id) => parseStudyCardId(id)?.kind === "ayah")) return null;
   const rows = await db.getAllAsync<AyahListInfo & { surah: number; ayah: number }>(
@@ -1187,10 +1136,6 @@ function parseStudyCardId(cardId: string): { kind: "ayah" | "word"; surah: numbe
   return null;
 }
 
-/**
- * Create the card row if needed, apply a change and queue both uploads in one transaction, so a
- * queue failure leaves the card as it was.
- */
 async function updateStudyCardInTransaction(
   database: AppDatabase,
   deckId: string,
@@ -1208,12 +1153,7 @@ async function updateStudyCardInTransaction(
   return updated;
 }
 
-/**
- * Write a card's scheduling state and queue its upload with the given executor. A card deleted
- * meanwhile, for example by a sync pull, is not revived: the write fails and nothing is queued.
- */
 export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Promise<void> {
-  // A row that carries a tier (page cards) writes it; other callers leave the cached tier alone.
   const writesTier = card.tier !== undefined;
   const stored = await db.getFirstAsync<{ updated_at: string | null }>(
     "SELECT updated_at FROM study_cards WHERE id = ? AND deleted_at IS NULL",
@@ -1241,12 +1181,6 @@ export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Prom
 }
 
 
-/**
- * Undoes a card's deletion: it comes back with its schedule and history as they were, so its training
- * is kept. Its updated_at is later than both now and the version it replaces, so a deletion stamped by
- * a clock running ahead of this one does not win over the restore when it uploads. Queues the upload.
- * Returns false when there is no deleted card with this id.
- */
 export async function restoreDeletedStudyCard(db: DatabaseExecutor, id: string, now: Date): Promise<boolean> {
   const row = await db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NOT NULL", [id]);
   if (!row) return false;
@@ -1260,12 +1194,6 @@ export async function restoreDeletedStudyCard(db: DatabaseExecutor, id: string, 
   return true;
 }
 
-/** The row insertNewStudyCard writes, for a caller that grades a card in the transaction that creates it. */
-/**
- * A memory state a new card starts from instead of an empty card: a review card last reviewed at
- * `lastReview` with this stability and difficulty, next due on the card's `due`. SBQ-02 starts a page
- * memorized through sabaq from its chunks' ratings this way.
- */
 export type StartingSchedule = Readonly<{ stability: number; difficulty: number; lastReview: string; scheduledDays: number }>;
 
 export function newStudyCardRow({
@@ -1308,10 +1236,6 @@ export function newStudyCardRow({
   };
 }
 
-/**
- * Create a new card, or revive a deleted one, with its upload queued, using the caller's executor.
- * Returns false when a live card with this id already exists.
- */
 export async function insertNewStudyCard(
   db: DatabaseExecutor,
   {
@@ -1324,7 +1248,6 @@ export async function insertNewStudyCard(
   }: { id: string; deckId: string; due: Date; tier?: string | null; now: string; start?: StartingSchedule | null },
 ): Promise<boolean> {
   const row = newStudyCardRow({ id, deckId, due, tier, now, start });
-  // Created again over a deletion, the card is stamped later than that deletion.
   const updatedAt = (await stampsOverDeletedCards(db, [id], new Date(now))).get(id) ?? now;
   const result = await db.runAsync(
     `INSERT INTO study_cards
@@ -1359,24 +1282,15 @@ export type StudyLogInput = {
   elapsedDays: number;
   scheduledDays: number;
   reviewedAt: string;
-  /** The review session, when the review came from one. */
   sessionId?: string | null;
-  /** Time from showing the card to grading it. */
   durationMs?: number | null;
-  /** 4.5.1 support level the card was recited at; null for cards without a ladder. */
   supportLevel?: number | null;
-  /** GRD-02: the rubric's proposal, logged beside the final rating. */
   proposedRating?: number | null;
   grader?: Grader;
   errorCount?: number;
-  /** STR-08: the missed day this review was graded toward, or null when it counts for its own day. */
   makeupFor?: string | null;
 };
 
-/**
- * Record one review and queue its upload with the given executor. Its local date and zone are fixed
- * when it happens (DAY-01), so travel never moves a past review to another day.
- */
 export async function putStudyLogRow(db: DatabaseExecutor, log: StudyLogInput): Promise<void> {
   const { cardId, rating, state, due, stability, difficulty, elapsedDays, scheduledDays, reviewedAt } = log;
   const reviewedAtDate = new Date(reviewedAt);
@@ -1420,7 +1334,6 @@ export async function putStudyLogRow(db: DatabaseExecutor, log: StudyLogInput): 
   });
 }
 
-/** Publish a committed review: achievements are a logged side effect, then listeners refresh. */
 export function publishReviewLogged(db: AppDatabase, log: StudyLogInput): void {
   recordAchievementEvent(db, {
     type: "review_logged",

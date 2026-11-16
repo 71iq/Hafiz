@@ -87,7 +87,6 @@ export async function createPrivateNote(
     qf_sync_error: null,
     qf_ranges_json: rangesJson,
   };
-  // The note and both upload queue entries commit together or not at all.
   await db.withTransactionAsync(async (tx) => {
     if (await hasExactPrivateNote(tx, input.surah, input.ayahStart, input.ayahEnd, content)) {
       throw new DuplicatePrivateNoteError();
@@ -102,7 +101,6 @@ export async function createPrivateNote(
     await enqueueSync(tx, "private_notes", "INSERT", id, rowToSyncData(data));
     await enqueueQfSync(tx, "private_note", "UPSERT", id, rowToSyncData(data));
   });
-  // The badge is a side effect of a saved note; its failure must not fail the save.
   recordAchievementEvent(db, {
     type: "private_note_created",
     noteId: id,

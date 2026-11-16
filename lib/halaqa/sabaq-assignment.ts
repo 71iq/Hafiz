@@ -5,12 +5,6 @@ import { forgetSocialCache, readOwnSocialCache, writeOwnSocialCache } from "@/li
 import { requireSocialOwner, type SocialOwner } from "@/lib/social/owner";
 import { callSocialRpc, callSocialRpcRaw, parseSocialPayload, socialFailureOf, voidResult } from "@/lib/social/remote";
 
-/**
- * SOC-03: a teacher's next sabaq for a member, a page and a range of its lines. A teacher sets or clears
- * it from the teacher view while the member shares their plan with teachers; the member's sabaq then
- * memorizes those lines (nextSabaqTarget) until they are memorized. Withdrawn sharing, a change of role
- * or leaving the halaqa ends it on the server.
- */
 const assignmentRow = z
   .object({
     group_id: z.string().uuid(),
@@ -36,21 +30,13 @@ export type SabaqAssignment = z.output<typeof sabaqAssignmentSchema>;
 
 const mineSchema = sabaqAssignmentSchema.nullable();
 
-/** The offline copy's name under the account's social cache (lib/social/cache.ts). */
 const SABAQ_ASSIGNMENT_CACHE = "sabaq-assignment";
 
-/**
- * Reads are numbered as they start. Per account, the number of the newest read whose answer was saved,
- * or of the last forget: an older read's answer is never saved over it, so a slow read cannot bring back
- * an assignment a newer read found cleared, or one the account ended by withdrawing sharing.
- */
 let readCount = 0;
 const savedRead = new Map<string, number>();
-/** Per account, how many forgets have started; a load that sees it change returns nothing. */
 const forgets = new Map<string, number>();
 const changeListeners = new Set<() => void>();
 
-/** Called after forgetMySabaqAssignment, so a screen that keeps its own copy reads again. */
 export function subscribeSabaqAssignmentChanges(listener: () => void): () => void {
   changeListeners.add(listener);
   return () => {
@@ -58,11 +44,6 @@ export function subscribeSabaqAssignmentChanges(listener: () => void): () => voi
   };
 }
 
-/**
- * Drops the account's offline copy once this device has withdrawn plan sharing or left a halaqa, both
- * of which end assignments on the server, so an offline lesson never applies one the account ended.
- * The next online read brings back any assignment from another halaqa that still holds.
- */
 export async function forgetMySabaqAssignment(userId: string): Promise<void> {
   forgets.set(userId, (forgets.get(userId) ?? 0) + 1);
   readCount += 1;
@@ -71,10 +52,6 @@ export async function forgetMySabaqAssignment(userId: string): Promise<void> {
   for (const listener of changeListeners) listener();
 }
 
-/**
- * The server's latest live assignment for the account, across its halaqas, saved as the offline copy
- * unless a newer read or a forget came first. `stale` says the answer was not saved.
- */
 async function readFromServer(userId: string): Promise<{ data: SabaqAssignment | null; stale: boolean }> {
   readCount += 1;
   const read = readCount;
@@ -88,18 +65,10 @@ async function readFromServer(userId: string): Promise<{ data: SabaqAssignment |
   return { data, stale: false };
 }
 
-/** How long the sabaq screen waits for the server before it uses the saved copy. */
 const LOAD_TIMEOUT_MS = 5_000;
 
-/**
- * The signed-in member's next sabaq from a teacher, for choosing a lesson's lines: the server's answer,
- * kept as the offline copy, or that copy when offline, when the server cannot answer in time or fails,
- * or when a newer read or a forget overtook this one. Null when signed out, when the account changed
- * meanwhile, or when nothing is assigned or saved. Never throws, so a lesson always loads.
- */
 export async function loadMySabaqAssignment(userId: string | null, offline: boolean): Promise<AssignedSabaq | null> {
   if (!userId) return null;
-  // A forget that starts while this load awaits ends whatever it found.
   const forgetsBefore = forgets.get(userId) ?? 0;
   const result = await loadAssignment(userId, offline);
   return (forgets.get(userId) ?? 0) === forgetsBefore ? result : null;
@@ -121,7 +90,6 @@ async function loadAssignment(userId: string, offline: boolean): Promise<Assigne
       timer = setTimeout(() => resolve("timeout"), LOAD_TIMEOUT_MS);
     });
     const result = await Promise.race([fresh, timeout]);
-    // A late answer still saves its copy for the next lesson.
     if (result === "timeout") {
       fresh.catch(() => undefined);
       return toAssigned(await saved());
@@ -166,10 +134,6 @@ export function clearSabaqAssignment(groupId: string, memberId: string, owner: S
   );
 }
 
-/**
- * A page and line range a teacher typed, in Western or Arabic-Indic digits, or null when it is not one
- * the server accepts.
- */
 export function parseAssignmentInput(page: string, fromLine: string, toLine: string): AssignedSabaq | null {
   const read = (value: string) => {
     const digits = value

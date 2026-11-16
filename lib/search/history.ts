@@ -1,6 +1,5 @@
 import type { AppDatabase } from "@/lib/database/types";
 
-/** The device-local Search history (search_history table): the ten most recent distinct queries. */
 export type SearchMode = "text" | "root";
 
 export type SearchHistoryEntry = {
@@ -18,7 +17,6 @@ export function loadSearchHistory(db: HistoryDatabase): Promise<SearchHistoryEnt
   );
 }
 
-/** Moves a query to the top of the history, keeping only the latest ten. */
 export async function saveSearchHistory(db: HistoryDatabase, query: string, mode: SearchMode): Promise<void> {
   await db.runAsync("DELETE FROM search_history WHERE query = ? AND mode = ?", [query, mode]);
   await db.runAsync("INSERT INTO search_history (query, mode, created_at) VALUES (?, ?, ?)", [

@@ -21,10 +21,8 @@ import { textStartStyle } from "@/lib/ui/direction";
 type Props = {
   visible: boolean;
   selectedSource: TafsirSourceId;
-  /** Called once the chosen source is installed and still the user's current choice. */
   onSelected: (sourceId: TafsirSourceId) => void;
   onClose: () => void;
-  /** Prefix for the development log when a choice fails; the failure itself shows on its row. */
   logLabel?: string;
   helperText?: string;
 };
@@ -89,7 +87,6 @@ export function TafsirSourcePicker({
     setImportedSourceIds(nextSources);
   }, [db]);
 
-  // Closing from outside (a parent that hides the picker) ends the selection intent too.
   useEffect(() => {
     if (!visible) {
       cancel();
@@ -115,7 +112,6 @@ export function TafsirSourcePicker({
     });
   };
 
-  // Show the current choice when the list opens, once both its section and row are placed.
   const scrollToSelected = () => {
     if (scrolledForOpen.current || !visible) return;
     const section = installedSources.has(selectedSource) ? "installed" : "available";
@@ -131,7 +127,6 @@ export function TafsirSourcePicker({
     const isImporting = source.id === importingSource;
     const isFailed = source.id === failedSource;
     const isIncluded = isBundledTafsirSourceId(source.id);
-    // Installed rows stay usable while a download runs; one download at a time.
     const disabled = isImporting || (needsDownload && importingSource !== null);
     const title = stringByKey(s, source.labelKey, source.id);
     const description = stringByKey(s, source.descriptionKey);
@@ -199,7 +194,6 @@ export function TafsirSourcePicker({
               {title}
             </Text>
             {isIncluded ? (
-              // Bundled sources work without a connection.
               <Text
                 className="rounded-full bg-primary-accent/10 px-2 py-0.5 text-primary-accent dark:bg-primary-bright/15 dark:text-primary-bright"
                 style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}

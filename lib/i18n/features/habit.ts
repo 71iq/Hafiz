@@ -1,11 +1,5 @@
-/**
- * Wird habit strings, spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity. The
- * Arabic is a draft for native review (spec 9). Arabic avoids counted nouns after numbers so one
- * string reads correctly for any count.
- */
 export const habitStrings = {
   en: {
-    // Home streak card
     habitStreakLabel: "Streak",
     habitStreakCount: "Streak: {{days}}",
     habitStreakDays: "{{n}}-day streak",
@@ -28,7 +22,6 @@ export const habitStrings = {
     habitTomorrowTier: "Tomorrow your streak reaches {{days}}",
     habitTakeBreak: "Excuse or pause",
     habitDismiss: "Dismiss",
-    // Break sheet: excused days and pause
     habitBreakTitle: "Excused days and pause",
     habitBreakSubtitle: "Free and private. Your streak is kept.",
     habitBreakTabExcuse: "Excused day",
@@ -60,7 +53,6 @@ export const habitStrings = {
     habitPauseHint: "Up to 60 days. Your streak keeps its length but does not grow, and reminders stop.",
     habitBreakSaved: "Saved",
     habitBreakFailed: "Couldn't save. Try again.",
-    // Session end
     habitMadeUp: "Yesterday's wird is made up. Your {{n}}-day streak continues.",
     habitMinimumMet: "Your streak is safe for today",
     habitEarnedBack: "Your streak is back: {{days}}",
@@ -85,7 +77,6 @@ export const habitStrings = {
     habitExitBodyHalf: "Every grade you gave is already saved. This page is not graded yet.",
     habitExitLeave: "Leave",
     habitExitStay: "Keep reviewing",
-    // Progress calendar
     habitCalendarTitle: "Wird calendar",
     habitLegendDone: "Wird",
     habitLegendMadeUp: "Made up",
@@ -98,7 +89,6 @@ export const habitStrings = {
     habitLongest: "Longest: {{days}}",
     habitCurrent: "Current: {{days}}",
     habitWirdDaysMonth: "Wird days this month: {{n}}",
-    // Settings
     habitSettingsTitle: "Wird",
     habitSettingsMinimum: "Minimum wird",
     habitSettingsMinimumHint: "The smallest wird that keeps your streak, whichever comes first.",

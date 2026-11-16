@@ -1,14 +1,6 @@
-/**
- * Decodes MASAQ morphological and syntactic codes to Arabic labels.
- * Uses the morphology-terms-ar.json reference file + MASAQ-specific compound codes.
- */
 
 const termsData = require("../../assets/data/morphology/morphology-terms-ar.json");
 
-/**
- * Get verb form Arabic name by form number (1-11 for triliteral, 1-4 for quadriliteral).
- * formStr is like "(I)", "(II)", "(IV)" etc.
- */
 export function getVerbFormName(formStr: string | null): string | null {
   if (!formStr) return null;
   const match = formStr.match(/\(([IVX]+)\)/);

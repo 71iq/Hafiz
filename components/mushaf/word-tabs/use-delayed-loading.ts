@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-/** Local reads usually finish at once, so "Loading..." appears only after a short wait. */
 export const LOCAL_LOADING_DELAY_MS = 200;
 
 export function useDelayedLoading(loading: boolean, delayMs = LOCAL_LOADING_DELAY_MS): boolean {

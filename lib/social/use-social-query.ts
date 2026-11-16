@@ -3,16 +3,11 @@ import { useQuery, type QueryKey } from "@tanstack/react-query";
 import { loadWithSocialCache, type SocialSnapshot } from "@/lib/social/cache";
 import type { SocialRead } from "@/lib/social/remote";
 
-/** NetInfo reports null before its first probe; only a definite "not connected" counts as offline. */
 export function useIsOffline(): boolean {
   const net = useNetInfo();
   return net.isConnected === false || net.isInternetReachable === false;
 }
 
-/**
- * A remote social read with the offline copy from lib/social/cache.ts. Runs in every network mode so
- * the saved copy shows offline instead of a paused query. The key must include the viewer's id.
- */
 export function useSocialQuery<T>(options: {
   queryKey: QueryKey;
   userId: string | null;

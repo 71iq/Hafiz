@@ -8,16 +8,10 @@ import { textStartStyle } from "@/lib/ui/direction";
 type Props = {
   surahName: string | null;
   juz: number | null;
-  /** Opens Go to on its Surah tab. */
   onOpenSurah?: () => void;
-  /** Opens Go to on its Juz tab. */
   onOpenJuz?: () => void;
 };
 
-/**
- * Slim header strip that mirrors the printed Mushaf convention: surah name on one side and juz
- * number on the other. Each side opens Go to on the matching tab.
- */
 export function MushafIndicator({ surahName, juz, onOpenSurah, onOpenJuz }: Props) {
   const { isRTL } = useSettings();
   const s = useStrings();

@@ -20,11 +20,6 @@ type Language = "en" | "ar";
 
 const rangeKey = (range: AssignedSabaq) => `${range.page}:${range.fromLine}-${range.toLine}`;
 
-/**
- * What the typed range holds, read from the local database when the range changes. `read` gives Save
- * the same answer, waiting for a read still running. Null while reading and after a failed read: the
- * form then shows no preview and saves as it did before there was one.
- */
 function useRangePreview(db: DatabaseExecutor, range: AssignedSabaq | null) {
   const reads = useRef(new Map<string, Promise<SabaqRangePreview | null>>());
   const read = useCallback(
@@ -57,7 +52,6 @@ function useRangePreview(db: DatabaseExecutor, range: AssignedSabaq | null) {
   return { preview: range && shown?.key === rangeKey(range) ? shown.preview : null, read };
 }
 
-/** "Al-Mulk 67:1 to 67:4", or "سورة الملك، من ٦٧:١ إلى ٦٧:٤" in Arabic. */
 function coversLabel(first: PreviewAyah, last: PreviewAyah, language: Language, s: UIStrings): string {
   const name = (ayah: PreviewAyah) => (language === "ar" ? ayah.surahNameArabic : ayah.surahNameEnglish);
   const ref = (ayah: PreviewAyah) => formatAyahRef(language === "ar", ayah.surah, ayah.ayah);
@@ -73,15 +67,6 @@ function coversLabel(first: PreviewAyah, last: PreviewAyah, language: Language, 
   return interpolate(s.teacherAssignCoversRange, { surah: name(first), from: ref(first), to: ref(last) });
 }
 
-/**
- * SOC-03: the next sabaq a teacher sets for a member who shares their plan: the current one, if any,
- * and a page with a range of its lines. The member memorizes those lines next at their own daily pace,
- * then their plan goes on. Offline or while saving, nothing can be sent.
- *
- * As the numbers change, a preview shows the ayat the lines cover and how the first line opens, and
- * says when the range starts or ends inside an ayah, where the lesson stops too. A range with no ayah
- * lines is refused before anything is sent.
- */
 export function TeacherSabaqAssignment({
   memberName,
   current,
@@ -98,11 +83,8 @@ export function TeacherSabaqAssignment({
   memberName: string;
   current: SabaqAssignment | null;
   pending: boolean;
-  /** The server's refusal or a failed send, from the screen. */
   error: string | null;
-  /** The last save or clear that succeeded, from the screen. */
   saved: string | null;
-  /** Offline: the form shows but cannot send. */
   disabled: boolean;
   language: Language;
   isRTL: boolean;
@@ -116,10 +98,6 @@ export function TeacherSabaqAssignment({
   const [toLine, setToLine] = useState(number(current?.toLine ?? 15));
   const [invalid, setInvalid] = useState(false);
   const [noAyat, setNoAyat] = useState(false);
-  /**
-   * Save is checking the range against the preview. The fields and buttons wait meanwhile, and a second
-   * press is ignored, so a slow check can never send an older range after a newer one was saved.
-   */
   const [checking, setChecking] = useState(false);
   const checkingNow = useRef(false);
   const dir = isRTL ? "rtl" : "ltr";
@@ -134,7 +112,6 @@ export function TeacherSabaqAssignment({
     checkingNow.current = true;
     setChecking(true);
     try {
-      // The preview's answer for this range, waited for if it is still being read.
       if ((await read(range))?.kind === "empty") {
         setNoAyat(true);
         return;
@@ -210,7 +187,6 @@ export function TeacherSabaqAssignment({
         <View className="gap-1">
           <Text variant="body-sm">{coversLabel(preview.first, preview.last, language, s)}</Text>
           {preview.opening ? (
-            // Uthmani text reads right to left in either interface language.
             <Text variant="body" dir="rtl" style={{ lineHeight: 30 }}>
               {preview.openingContinues ? `${preview.opening} …` : preview.opening}
             </Text>

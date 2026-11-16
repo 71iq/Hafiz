@@ -20,15 +20,10 @@ import { inverseSurfaceColors } from "@/lib/ui/inverse-surface";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 type Props = {
-  /** Current page (1-604) */
   currentPage: number;
-  /** Active range — 1..max */
   max?: number;
-  /** Called when user releases the thumb on a page */
   onCommit: (page: number) => void;
-  /** Called continuously while dragging (for the floating label) */
   onPreview?: (page: number) => void;
-  /** Tap the expand chevron → opens GoToNavigator */
   onExpand: () => void;
   index: MushafIndex | null;
   interactive?: boolean;
@@ -54,7 +49,6 @@ export function MushafSlider({
   const { width: windowWidth } = useWindowDimensions();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   const bubbleColors = inverseSurfaceColors(isDark);
-  // The long ticks mark the 30 juz start pages from the existing mappings.
   const juzStarts = useMemo(() => (index ? juzStartPages(index) : new Set<number>()), [index]);
   const listRef = useRef<FlatList<number>>(null);
   const railHostRef = useRef<any>(null);

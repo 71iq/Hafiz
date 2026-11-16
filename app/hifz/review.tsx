@@ -98,7 +98,6 @@ import { hapticMedium } from "@/lib/haptics";
 
 type AyahText = { qcf2: string; page: number; surah: number; ayah: number };
 
-/** The logged drifts into a pair (their error ids, the latest last) and the pair they drifted between. */
 type DriftSource = Readonly<{ errorIds: readonly string[]; pair: SimilarPair }>;
 
 type QueueItem =
@@ -107,45 +106,24 @@ type QueueItem =
       card: PageCard;
       retrievability: number | null;
       again?: boolean;
-      /**
-       * SCH-07: a page drilled because it holds the sibling an earlier drift went into, outside today's
-       * plan, with every drift of the session that needs it, the one it explains first. It leaves once
-       * all of them are dismissed.
-       */
       drift?: readonly DriftSource[];
     }
   | { kind: "half"; card: StudyCardRow; page: number; half: Half }
   | { kind: "seam"; card: StudyCardRow; page: number; prompt: AyahText | null; answer: AyahText | null }
   | { kind: "cloze"; card: StudyCardRow; surah: number; ayah: number; word: number; page: number }
   | { kind: "drill"; item: InboxItem; text: { qcf2: string; page: number } | null }
-  /**
-   * "Which one", asked about one verse of a pair: after a drift (MUT-04), with the live drifts into the
-   * pair that queued it, or interleaved after a reviewed page (MUT-03), with null `errorIds`.
-   */
   | { kind: "pair"; errorIds: readonly string[] | null; pair: SimilarPair; target: "self" | "sibling" };
 
 type Phase = "loading" | "recite" | "check" | "summary" | "empty" | "error";
 
-/** The shared outline Button has no border; on this screen an outline action needs one to read as a button. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
-/** Save and load errors, one style across the review's steps and the sabaq screens. */
 const ERROR_TEXT_STYLE = { fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 } as const;
-/** Helper actions sit on a tinted fill so they read as buttons, at the full touch height. */
 const HELPER_BUTTON = "flex-1 h-11 px-2 bg-surface-low dark:bg-surface-dark-low";
 
-/**
- * `pages` and `clean` take each page once per session, like the session record; `marked` counts the
- * marks of every recitation. `extra` counts half pages and seams reviewed on their own.
- */
 type Totals = { pages: number; clean: number; marked: number; extra: number };
 const NO_TOTALS: Totals = { pages: 0, clean: 0, marked: 0, extra: 0 };
 
-/**
- * What a saved item leaves behind: the totals with its save, the page again when a learning step is
- * due, a "Which one" prompt for the reviewed page (MUT-03), and an inbox item dismissed as not a
- * mistake, whose drift follow-ups leave the session.
- */
 type ItemOutcome = Readonly<{
   totals: Totals;
   requeue?: QueueItem | null;
@@ -153,12 +131,6 @@ type ItemOutcome = Readonly<{
   dismissed?: string | null;
 }>;
 
-/**
- * The queue after the item at `from` is saved. Only items still ahead change: the requeued page goes to
- * the end, an interleaved prompt after two other pages or at the end (MUT-03), and the follow-ups of a
- * dismissed drift leave, apart from a page another drift of the session still needs. A page of today's
- * plan carries no drift, so it always stays.
- */
 function nextQueue(queue: readonly QueueItem[], from: number, outcome: ItemOutcome): readonly QueueItem[] {
   const { requeue, interleave, dismissed } = outcome;
   if (!requeue && !interleave && !dismissed) return queue;
@@ -169,7 +141,6 @@ function nextQueue(queue: readonly QueueItem[], from: number, outcome: ItemOutco
   }
   if (!dismissed) return next;
   const ahead = next.slice(from + 1).flatMap((item): QueueItem[] => {
-    // A drill stays while any drift that queued it is live.
     const without = (ids: readonly string[]) => ids.filter((id) => id !== dismissed);
     if (item.kind === "pair") {
       if (!item.errorIds) return [item];
@@ -186,7 +157,6 @@ function nextQueue(queue: readonly QueueItem[], from: number, outcome: ItemOutco
   return [...next.slice(0, from + 1), ...ahead];
 }
 
-/** The first or last ayah that starts on a page, in the page font. */
 async function ayahOnPage(
   db: ReturnType<typeof useDatabase>,
   page: number,
@@ -226,28 +196,17 @@ function gradeLabel(rating: number, s: UIStrings): string {
   );
 }
 
-/**
- * The wird review (4.4.2): today's planned pages in order, sabqi then manzil, each recited at a
- * support level, checked word by word, and graded with the rubric's proposal (4.2), followed by up
- * to 6 drills from the mistake inbox (ERR-04). Progress saves after every page (REV-01). With the
- * half-page unit (UNIT-02) each page is recited and checked as its first half, then its second, and
- * graded once as the page. A reviewed page with a memorized similar verse brings an ungraded "Which
- * one" prompt two pages later (MUT-03).
- */
 function HifzReviewScreen() {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, fontSize, lineHeight } = useSettings();
-  // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
   const headerJoin = uiLanguage === "ar" ? "، " : " · ";
   const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ mode?: string; level?: string }>();
   const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
   const drillsOnly = mode === "mistakes";
-  // 6.4: a returning user starts with their strongest pages at the support level they chose.
   const welcomeBack = mode === "welcome_back";
-  // MST-05: the monthly check reviews 5 random pages not seen in two weeks and reports honestly.
   const monthlyCheck = mode === "monthly_check";
   const welcomeLevel = ((): SupportLevel | null => {
     const raw = Number(Array.isArray(params.level) ? params.level[0] : params.level);
@@ -265,9 +224,7 @@ function HifzReviewScreen() {
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [surahNames, setSurahNames] = useState<Map<number, string>>(new Map());
   const [attempt, setAttempt] = useState<Attempt>(emptyAttempt(4));
-  /** Half-page review (UNIT-02): the half of the current page on screen. */
   const [part, setPart] = useState<Half>("a");
-  /** Half-page review: the first half's attempt, kept once its check is done, for the page's grade. */
   const [firstHalf, setFirstHalf] = useState<Attempt | null>(null);
   const [reveal, setReveal] = useState<RevealState>(HIDDEN);
   const [markingKey, setMarkingKey] = useState<string | null>(null);
@@ -279,55 +236,33 @@ function HifzReviewScreen() {
   const [drillShown, setDrillShown] = useState(false);
   const [listener, setListener] = useState(false);
   const [totals, setTotals] = useState<Totals>(NO_TOTALS);
-  /** The totals including every finished save, updated in the same tick so finalization never reads a stale render. */
   const totalsRef = useRef<Totals>(NO_TOTALS);
-  /**
-   * One action at a time. Taken synchronously on the tap, before React renders `busy`, and held through
-   * the save, the advance and any finalization, so a second tap cannot save the same item twice.
-   */
   const actionLock = useRef(false);
-  /** The queue index actions may act on. It moves past an item once its save succeeds, so a stale handler for that item does nothing. */
   const actionIndex = useRef(0);
-  /**
-   * Close was pressed while an action held the lock. The screen leaves once the action succeeds, or
-   * stays with the item open to show a failed save, which would otherwise reach a departed screen.
-   */
   const leaveWhenSettled = useRef(false);
-  /** Set once the screen leaves on purpose, so the remove guard below lets that navigation through. */
   const exiting = useRef(false);
-  /** A back press or gesture held for the leave confirmation or a save; leaving carries it out. */
   const pendingBack = useRef<NavigationAction | null>(null);
-  /** The rendered copy of leaveWhenSettled, so Close shows that its press is waiting for the save. */
   const [leavePending, setLeavePending] = useState(false);
-  // Pages the user holds, declared or reviewed: a seam leads only into one of them.
   const [heldPages, setHeldPages] = useState<ReadonlySet<number>>(new Set());
   const [seamText, setSeamText] = useState<AyahText | null>(null);
   const [seamShown, setSeamShown] = useState(false);
   const [planProgress, setPlanProgress] = useState<{ done: number; total: number } | null>(null);
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
   const sessionRef = useRef<ReviewSessionRef | null>(null);
-  // Session and item times count only while the review is on screen with the app active.
   const sessionClock = useActiveClock();
   const itemClock = useActiveClock();
   const wirdEvent = useRef<SessionHabitInput["event"]>(null);
   const againCount = useRef(0);
-  /** Pages graded in this session, so a page a learning step brings back is a later grade, not a new page. */
   const gradedPages = useRef<Set<string>>(new Set());
   const minutesPerPage = useRef(3);
   const pageScrollRef = useRef<ScrollView>(null);
-  /** The queue index whose seam check was already scrolled into view. */
   const seamScrolledFor = useRef<number | null>(null);
-  /** MUT-03: the similar-verse groups on each page of the session, read once when it loads. */
   const interleaveCandidates = useRef<InterleaveCandidates>(new Map());
-  /** MUT-03: the groups and verse pairs the session asks about, drift prompts included, and the prompts it added. */
   const asked = useRef({ groups: new Set<string>(), pairs: new Set<string>(), prompts: 0 });
 
   const current = queue[index] ?? null;
-  // UNIT-02: with the half-page unit, a page is recited in two halves; remediation items stay as they are.
   const inHalves = current?.kind === "page" && plan?.unit === "half";
-  /** Both halves of the page, once the second is on screen: what the page's grade is built from. */
   const halves: HalfAttempts | null = inHalves && part === "b" && firstHalf ? { a: firstHalf, b: attempt } : null;
-  /** What the check grades: the page's whole attempt, from both halves once the second is checked. */
   const gradedAttempt = halves ? combineHalves(halves) : attempt;
 
   const load = useCallback(async () => {
@@ -344,7 +279,6 @@ function HifzReviewScreen() {
       setSurahNames(new Map(names.map((row) => [row.number, row.name_arabic])));
       setBaseSettings(base);
       const items: QueueItem[] = [];
-      /** The page cards, read for the plan or, in a mistakes session, once a drift's sibling page needs one. */
       let pageCards: PageCard[] | null = null;
       if (wird && !drillsOnly) {
         setPlan(wird.plan);
@@ -358,7 +292,6 @@ function HifzReviewScreen() {
           ? pickMonthlyCheck(monthlyCheckCandidates(cards, today)).map((card) => toPlanPage(card, today, now))
           : [...wird.todo];
         if (welcomeBack) {
-          // Three warm-up pages with the highest recall first, then the weakest (6.4 step 3).
           const byRecall = [...todo].sort((a, b) => (b.retrievability ?? 0) - (a.retrievability ?? 0));
           const warmUp = byRecall.slice(0, 3);
           const rest = byRecall.slice(3).reverse();
@@ -371,8 +304,6 @@ function HifzReviewScreen() {
       } else if (wird) {
         setPlan(wird.plan);
       }
-      // SCH-06, SCH-08, ERR-06: relearning half pages and seams, and due weak-spot cloze cards, come
-      // after the pages and before drills.
       if (!welcomeBack && !monthlyCheck) {
         for (const unit of await loadDueRemediation(db, now)) {
           if (unit.kind === "half") {
@@ -400,14 +331,11 @@ function HifzReviewScreen() {
         );
         items.push({ kind: "drill", item, text: row ? { qcf2: row.text_qcf2, page: row.v2_page } : null });
       }
-      // SCH-07, MUT-04: after a drift into a known sibling, the next session recites the sibling's page,
-      // and the next three ask which verse of the pair is which. The ayah's own drill stays above.
       for (const drill of monthlyCheck ? [] : await loadDriftDrills(db, today)) {
         const page = drill.siblingPage;
         const queued = page === null ? -1 : items.findIndex((item) => item.kind === "page" && item.card.page === page);
         const shared = queued < 0 ? null : items[queued];
         if (shared?.kind === "page") {
-          // Another drift's page: it stays while either drift does. A planned page has no drift and stays anyway.
           if (shared.drift) items[queued] = { ...shared, drift: [...shared.drift, { errorIds: drill.errorIds, pair: drill.pair }] };
         } else if (page !== null && wird) {
           pageCards ??= await loadPageCards(db, { today, plan: wird.plan });
@@ -421,12 +349,8 @@ function HifzReviewScreen() {
             });
           }
         }
-        // The prompt alternates between the two verses across its sessions.
         items.push({ kind: "pair", errorIds: drill.errorIds, pair: drill.pair, target: drill.sessionsSince % 2 === 0 ? "self" : "sibling" });
       }
-      // MUT-03: a regular wird review asks "Which one" after a page with a similar verse whose sibling is
-      // memorized. A drift's prompt already covers its group and pair. The candidates are read once; a
-      // failed read leaves the review without these prompts.
       const pairs = items.flatMap((item) => (item.kind === "pair" ? [item.pair] : []));
       asked.current = {
         groups: new Set(pairs.map((pair) => pair.groupId)),
@@ -464,7 +388,6 @@ function HifzReviewScreen() {
     load();
   }, [load]);
 
-  // Load the page for the current item and reset the attempt at its default support level (MOD-01).
   useEffect(() => {
     setSeamText(null);
     setSeamShown(false);
@@ -513,7 +436,6 @@ function HifzReviewScreen() {
     if (!pageData) return null;
     if (current?.kind === "half") return halfLineNumbers(pageData, current.half);
     if (inHalves) return halfLineNumbers(pageData, part);
-    // A cloze shows only the lines that hold its ayah.
     if (current?.kind === "cloze") {
       return new Set(
         pageData.lines
@@ -528,8 +450,6 @@ function HifzReviewScreen() {
     [current],
   );
   const lines = useMemo(() => (pageData ? visibleLines(pageData, lineNumbers) : []), [lineNumbers, pageData]);
-  // SCH-06: after a page whose next page the user also holds, the check offers its seam; in halves,
-  // the second half's check, where the page ends.
   const seamPage =
     current?.kind === "page" &&
     (!inHalves || part === "b") &&
@@ -552,7 +472,6 @@ function HifzReviewScreen() {
   }, [db, phase, seamPage]);
   const tokens = useMemo(() => orderedTokens(lines), [lines]);
 
-  /** End the session with the totals that include the last save, passed in rather than read from a render. */
   const finish = useCallback(
     async (final: Totals) => {
       const session = sessionRef.current;
@@ -581,12 +500,6 @@ function HifzReviewScreen() {
     [db, monthlyCheck, sessionClock],
   );
 
-  /**
-   * Move past the item at `from`, or finish after the last one. Resolves once the summary is ready. A
-   * page whose learning step is due within the learn-ahead window goes to the end of the queue and
-   * comes back after the other items, as in the flashcard session. The queue changes only here, under
-   * the action lock, so the rendered queue is the current one (see nextQueue).
-   */
   const advance = useCallback(
     async (from: number, outcome: ItemOutcome) => {
       setMarkingKey(null);
@@ -603,7 +516,6 @@ function HifzReviewScreen() {
     [finish, queue],
   );
 
-  /** Record a finished save in the totals now, so the advance and finalization see it. */
   const addTotals = (delta: Partial<Totals>): Totals => {
     const value = totalsRef.current;
     const next: Totals = {
@@ -617,10 +529,6 @@ function HifzReviewScreen() {
     return next;
   };
 
-  /**
-   * Run one action on the current item under the action lock: the save, then the advance and, after
-   * the last item, the finalization. A failed save releases the lock and keeps the item open.
-   */
   const runItemAction = async (label: string, save: () => Promise<ItemOutcome>) => {
     const from = index;
     if (actionLock.current || actionIndex.current !== from) return;
@@ -650,10 +558,6 @@ function HifzReviewScreen() {
     }
   };
 
-  /**
-   * Half-page review: the first half is checked, so the second half is recited next, starting at the
-   * level the first half used. Nothing is saved until the page is graded after the second half.
-   */
   const nextHalf = () => {
     if (!inHalves || part !== "a" || actionLock.current) return;
     setFirstHalf(attempt);
@@ -667,10 +571,6 @@ function HifzReviewScreen() {
     requestAnimationFrame(() => pageScrollRef.current?.scrollTo({ y: 0, animated: false }));
   };
 
-  /**
-   * Next at an ungraded support level: nothing is saved, but it still advances only once. Reading the
-   * first half of a page in halves goes on to the second half.
-   */
   const skip = () => {
     if (inHalves && part === "a") nextHalf();
     else runItemAction("Skip", async () => ({ totals: totalsRef.current }));
@@ -724,7 +624,6 @@ function HifzReviewScreen() {
     return true;
   };
 
-  /** A half page, seam or weak-spot cloze reviewed on its own (SCH-06, SCH-08, ERR-06). */
   const gradeRemediation = async (rating: Grade, attemptOverride?: Attempt) => {
     if (!current || (current.kind !== "half" && current.kind !== "seam" && current.kind !== "cloze")) return;
     const card = current.card;
@@ -754,11 +653,6 @@ function HifzReviewScreen() {
     gradeRemediation(clean ? Rating.Good : Rating.Again, { ...emptyAttempt(4), seam });
   };
 
-  /**
-   * MUT-03: the "Which one" prompt a reviewed page brings, for the first of its groups the session does
-   * not ask about yet, within the session's cap. It asks for the page's own verse. A pair that cannot be
-   * read leaves the page without one; the grade is already saved.
-   */
   const interleavePrompt = async (page: number): Promise<ItemOutcome["interleave"]> => {
     const pick = pickInterleavePair(interleaveCandidates.current.get(page) ?? [], asked.current, asked.current.prompts);
     if (!pick) return null;
@@ -780,11 +674,9 @@ function HifzReviewScreen() {
     }
     const grader = source === "salah" ? "salah" : listener ? "teacher" : "self";
     if (!current || current.kind !== "page" || !plan) return;
-    // In halves, a recited page is graded once, after its second half's check.
     const recitedHalves = grader !== "salah" && inHalves ? halves : null;
     if (grader !== "salah" && inHalves && !recitedHalves) return;
     const card = current.card;
-    // Slips are logged at the page's first word, which in halves is on the first half.
     const pageTokens = recitedHalves && pageData ? orderedTokens(visibleLines(pageData, null)) : tokens;
     const firstToken = pageTokens.find((token) => !token.isMarker) ?? pageTokens[0];
     if (!firstToken && grader !== "salah") return;
@@ -808,17 +700,12 @@ function HifzReviewScreen() {
       gradedPages.current.add(card.row.id);
       if (rating === Rating.Again) againCount.current += 1;
       const markedCount = grader === "salah" ? 0 : usedAttempt.marks.size + usedAttempt.peeked.length + usedAttempt.shown.length;
-      // A page counts once toward today's plan, however often a learning step brings it back.
       const coveredBefore = card.history.grades.some((grade) => grade.date === reviewedOn);
-      // A drift's sibling page is drilled outside today's plan, so it does not advance the plan.
       if (!coveredBefore && !current.drift) setPlanProgress((value) => (value ? { ...value, done: value.done + 1 } : value));
-      // A wird milestone is the bigger news; the half page shows up in the queue either way.
       const wirdShown = showWirdNotice(result.wird);
       if (!wirdShown && result.remediation.half) {
         setNotice(result.remediation.half === "a" ? s.hifzHalfScheduledA : s.hifzHalfScheduledB);
       }
-      // The page itself follows FSRS (SCH-08): a relearning step due within the learn-ahead window
-      // brings it back in this session, graded from the row this grade saved.
       const { transition } = result;
       const requeue: QueueItem | null = transition.shouldRequeueInSession
         ? {
@@ -830,7 +717,6 @@ function HifzReviewScreen() {
               history: { ...card.history, grades: [...card.history.grades, { date: reviewedOn, rating: transition.reviewRecord.rating }] },
             },
             retrievability: current.retrievability,
-            // Shown with "Once more", so the page coming back does not read as a grade that failed to save.
             again: true,
           }
         : null;
@@ -845,19 +731,15 @@ function HifzReviewScreen() {
     });
   };
 
-  /** MUT-03, MUT-04: a pair prompt saves nothing and counts toward no total, but still advances only once. */
   const pairDone = () => runItemAction("Pair", async () => ({ totals: totalsRef.current }));
 
   const drillResult = async (result: "clean" | "again" | "not_a_mistake") => {
     if (!current || current.kind !== "drill") return;
     const { id } = current.item;
     await runItemAction("Drill", async () => {
-      // An error logged by mistake leaves the inbox instead of waiting for two clean days.
       if (result === "not_a_mistake") {
         await dismissInboxItem(db, { id });
-        // ERR-06: the dismissal can end a weak spot, so the reader's markers reload.
         refreshWeakSpots(db).catch((refreshError) => console.warn("[HifzReview] Weak spots failed to refresh:", refreshError));
-        // A drift that was not a mistake no longer needs its sibling page or pair prompt (SCH-07, MUT-04).
         return { totals: totalsRef.current, dismissed: id };
       }
       await recordDrillResult(db, { id, clean: result === "clean" });
@@ -894,14 +776,12 @@ function HifzReviewScreen() {
     exiting.current = true;
     const session = sessionRef.current;
     if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
-    // A held back press goes where it was going; Close returns to the tabs.
     const back = pendingBack.current;
     pendingBack.current = null;
     if (back) navigation.dispatch(back);
     else returnToTabs(navigation.getState(), "/(tabs)/home");
   };
 
-  // Leaving by any route that ends the screen without exit() still ends the session.
   useEffect(
     () => () => {
       const session = sessionRef.current;
@@ -910,15 +790,9 @@ function HifzReviewScreen() {
     [db],
   );
 
-  /** Graded work would be left behind, so leaving asks first (the same check as Close). */
   const hasProgress = phase !== "summary" && totals.pages + totals.extra > 0;
 
-  // Back presses, gestures and the iOS swipe behave like Close: with progress they ask first, and
-  // during an unresolved save they wait for it. usePreventRemove, unlike a bare beforeRemove listener,
-  // also tells native-stack to block the native dismissal. `busy` is the rendered copy of the lock.
   usePreventRemove(busy || hasProgress, ({ data }) => {
-    // The screen's own exit goes on, as does a back press this render has not caught up with; React
-    // Navigation marks the action as already checked for this screen.
     if (exiting.current) navigation.dispatch(data.action);
     else if (hasProgress) {
       pendingBack.current = data.action;
@@ -930,7 +804,6 @@ function HifzReviewScreen() {
     } else navigation.dispatch(data.action);
   });
 
-  /** Leave now, or once the action holding the lock settles (see leaveWhenSettled). */
   const leave = () => {
     if (actionLock.current) {
       leaveWhenSettled.current = true;
@@ -943,9 +816,7 @@ function HifzReviewScreen() {
     else leave();
   };
 
-  // A page in halves proposes the lower of its halves' grades, capped by the lower of their levels.
   const proposal = halves ? proposedHalvesRating(halves) : proposedRating(attempt);
-  // Reciting the second half, the page's cap is the lower of the two halves' levels.
   const firstHalfUngraded = inHalves && part === "b" && firstHalf !== null && !isGradable(firstHalf.level);
   const capLevel: SupportLevel =
     inHalves && part === "b" && firstHalf ? (Math.min(firstHalf.level, attempt.level) as SupportLevel) : attempt.level;
@@ -957,7 +828,6 @@ function HifzReviewScreen() {
     if (current.kind !== "page" || !plan) return {};
     return getGradeSchedulePreviews(current.card.row, pagePolicy(current.card.tier, plan, baseSettings), isRTL);
   }, [baseSettings, current, isRTL, plan]);
-  // While the mistake sheet is open, the tapped word stays highlighted so the user sees which one it is.
   const markedKeys = useMemo(() => {
     const keys = new Set(attempt.marks.keys());
     if (markingKey) keys.add(markingKey);
@@ -970,7 +840,6 @@ function HifzReviewScreen() {
         : formatAyahRef(isRTL, token.surah, token.ayah),
     [isRTL],
   );
-  // MUT-05: the pair prompts' meanings, read for the session's pairs rather than on each render.
   const pairVerses = useMemo(
     () => queue.flatMap((item) => (item.kind === "pair" ? [item.pair.self, item.pair.sibling] : [])),
     [queue],
@@ -1038,7 +907,6 @@ function HifzReviewScreen() {
                 </Text>
                 <Text
                   dir={dir}
-                  // A zero is not news, so it stays in regular weight beside the counts that are.
                   style={{ fontFamily: value === 0 ? "Manrope_400Regular" : "Manrope_700Bold", fontSize: 17 }}
                   className={value === 0 ? "text-warm-600 dark:text-neutral-400" : "text-charcoal dark:text-neutral-100"}
                 >
@@ -1076,7 +944,6 @@ function HifzReviewScreen() {
     );
   }
 
-  // Items, not queue entries: a page back for its learning step keeps its place ("1 / 1", "Once more").
   const itemKey = (item: QueueItem): string =>
     item.kind === "drill"
       ? `drill:${item.item.id}`
@@ -1085,12 +952,9 @@ function HifzReviewScreen() {
         : item.kind === "page"
           ? `page:${item.card.row.id}`
           : `${item.kind}:${item.card.id}`;
-  // "Which one" prompts are not counted: an interleaved one joins mid-session (MUT-03), and the count
-  // would jump from "1 / 4" to "2 / 5" under the person.
   const counted = (items: readonly QueueItem[]) => new Set(items.filter((item) => item.kind !== "pair").map(itemKey)).size;
   const progressLabel = `${formatNumber(Math.max(1, counted(queue.slice(0, index + 1))), uiLanguage)} / ${formatNumber(Math.max(1, counted(queue)), uiLanguage)}`;
   const accent = isDark ? "#2dd4bf" : "#0d9488";
-  // Teal text under 14 px uses the darker token in light mode to stay readable on tinted chips.
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
   const muted = isDark ? "#d4d4d4" : "#6e5a47";
   const marking = markingToken && markingKey !== null ? markingToken : null;
@@ -1105,7 +969,6 @@ function HifzReviewScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      {/* The header shares the page column, so the close button sits beside the page on wide screens. */}
       <View className="items-center">
         <MirroredRow
           dir={dir}
@@ -1118,7 +981,6 @@ function HifzReviewScreen() {
             accessibilityRole="button"
             accessibilityLabel={s.genericClose}
             accessibilityState={{ disabled: leavePending }}
-            // Dimmed while Close waits for the save it was pressed during.
             className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${leavePending ? "opacity-50" : ""}`}
           >
             <X size={18} color={muted} />
@@ -1186,7 +1048,6 @@ function HifzReviewScreen() {
         </ScrollView>
       ) : current?.kind === "pair" ? (
         <DriftPairPrompt
-          // A fresh prompt per item, so a choice never carries into the next pair.
           key={`${itemKey(current)}:${index}`}
           pair={current.pair}
           target={current.target}
@@ -1319,7 +1180,6 @@ function HifzReviewScreen() {
                   <Text dir={dir} variant="label-md">
                     {s.hifzLevelLabel}
                   </Text>
-                  {/* Wraps instead of scrolling, so all five levels stay visible in both directions. */}
                   <MirroredRow dir={dir} className="flex-wrap gap-1.5" accessibilityRole="radiogroup">
                     {SUPPORT_LEVELS.slice()
                       .reverse()
@@ -1420,7 +1280,6 @@ function HifzReviewScreen() {
                 elevation="low"
                 className="mt-3 px-5 py-4 rounded-3xl"
                 style={{ width: pageWidth - 16, gap: 10 }}
-                // The seam check sits below the page; bring it into view once so it is not graded unseen.
                 onLayout={() => {
                   if (seamScrolledFor.current === index) return;
                   seamScrolledFor.current = index;
@@ -1487,8 +1346,6 @@ function HifzReviewScreen() {
           </ScrollView>
 
           <View className="px-2 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
-            {/* The actions line up with the page on wide screens instead of spanning the window. */}
-            {/* Header, title, page card and actions all start 8 px inside the page column. */}
             <View style={{ width: "100%", maxWidth: pageWidth - 16, gap: 10 }}>
               {error ? (
                 <Text dir={dir} align="center" className="text-red-700 dark:text-red-400" accessibilityRole="alert" style={ERROR_TEXT_STYLE}>
@@ -1551,7 +1408,6 @@ function HifzReviewScreen() {
                       </Button>
                     </MirroredRow>
                   ) : null}
-                  {/* Line by line is driven by Next line, so it leads and Done steps back to outline. */}
                   {isGradable(attempt.level) && attempt.level === 2 ? (
                     <>
                       <Button label={s.hifzNextLine} onPress={nextLine} disabled={!pageData} />
@@ -1566,10 +1422,8 @@ function HifzReviewScreen() {
                   ) : isGradable(attempt.level) ? (
                     <Button label={s.hifzDone} onPress={done} disabled={!pageData} />
                   ) : (
-                    // Read at full text, the first half still goes on to the second.
                     <Button label={inHalves && part === "a" ? s.hifzNextHalf : s.hifzSabaqNext} onPress={skip} disabled={busy} />
                   )}
-                  {/* Recited in salah logs the whole page, so in halves it is offered before the first half only. */}
                   {current.kind === "page" && (!inHalves || part === "a") ? (
                     <Pressable
                       accessibilityRole="button"
@@ -1597,7 +1451,6 @@ function HifzReviewScreen() {
                   {inHalves && part === "a" ? (
                     <Button label={s.hifzNextHalf} onPress={nextHalf} disabled={busy} />
                   ) : halves && gradeCap === 0 ? (
-                    // The first half was read at full text, so the page is not graded (GRD-03).
                     <>
                       <Text dir={dir} variant="caption">
                         {s.hifzHalfNotGraded}
@@ -1637,7 +1490,6 @@ function HifzReviewScreen() {
         visible={exitOpen}
         title={s.habitExitTitle}
         tone="neutral"
-        // In halves, leaving before the second half's grade leaves the page ungraded.
         message={inHalves && current?.kind === "page" ? s.habitExitBodyHalf : s.habitExitBody}
         cancelLabel={s.habitExitStay}
         confirmLabel={s.habitExitLeave}
@@ -1657,7 +1509,6 @@ function HifzReviewScreen() {
   );
 }
 
-/** Opened from a deep link or a reminder, the route waits for the database like the other routes. */
 export default function HifzReviewScreenRoute() {
   const { isReady, progress, error } = useDatabaseStatus();
   const s = useStrings();

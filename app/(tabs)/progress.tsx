@@ -71,7 +71,6 @@ export default function ProgressScreen() {
   const [boundary, setBoundary] = useState<number | null>(null);
   const latestLoad = useRef(0);
   const focused = useRef(false);
-  // Home's achievement notice opens this list once through ?achievements=1.
   const { achievements: openAchievements } = useLocalSearchParams<{ achievements?: string }>();
   useEffect(() => {
     if (openAchievements !== "1") return;
@@ -79,8 +78,6 @@ export default function ProgressScreen() {
     router.setParams({ achievements: undefined });
   }, [openAchievements]);
 
-  // Each section keeps its last valid value when its query fails; the figures never fall to zero
-  // for a failure. Only the latest load may publish.
   const loadData = useCallback(async () => {
     const request = ++latestLoad.current;
     const [metricsResult, achievements, decks, surahs, hifz, journey] = await Promise.allSettled([
@@ -126,7 +123,6 @@ export default function ProgressScreen() {
       };
     }, [loadData]),
   );
-  // Focus always reloads, so events that arrive while another screen is in front can wait for it.
   const reloadIfFocused = useCallback(() => {
     if (focused.current) void loadData();
   }, [loadData]);
@@ -138,12 +134,9 @@ export default function ProgressScreen() {
       }),
     [reloadIfFocused],
   );
-  // A return to the foreground and local midnight reload, so the day rolls over while Progress is open.
   useDayBoundaryRefresh(boundary, reloadIfFocused);
 
-  // One 14-day dismissal shared with Home; Progress also waits for the first completed review.
   const accountPromo = useAccountPromo("progress", metrics?.totalReviews ?? 0);
-  // The interface language picks the digits; toLocaleString would follow the device locale.
   const formatStat = (val: number) => formatNumber(val, uiLanguage);
   const percent = (val: number) => `${formatStat(val)}${uiLanguage === "ar" ? "٪" : "%"}`;
   const dayStatuses = useMemo(() => {
@@ -151,7 +144,6 @@ export default function ProgressScreen() {
     for (const day of habit?.days ?? []) map.set(day.localDate, day.status);
     return map;
   }, [habit?.days]);
-  // STR-28: the heatmap columns and "Steady weeks" both follow the week start chosen in Settings.
   const weekStart = effectiveWeekStart(habit?.settings ?? { weekStart: null }, uiLanguage);
   const consistency = useMemo(() => consistencyFromHabit(habit, weekStart), [habit, weekStart]);
   const unknown = "—";
@@ -214,7 +206,6 @@ export default function ProgressScreen() {
     flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const),
   };
   const ReadingEndChevron = isRTL ? ChevronLeft : ChevronRight;
-  // A bidi isolate keeps Arabic "٥ / ٥٣" in order instead of "٥٣ / ٥".
   const achievementCount = achievementDashboard
     ? `⁦${formatStat(achievementDashboard.unlockedCount)} / ${formatStat(achievementDashboard.totalCount)}⁩`
     : "";
@@ -245,7 +236,6 @@ export default function ProgressScreen() {
   return (
     <Screen>
       <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} bottomInset={TAB_SCREEN_BOTTOM_INSET}>
-        {/* Activity and stats come first: the figures people open Progress for. */}
         <Card elevation="low" className="mt-8 p-5 mb-6">
           {metricsStatus === "error" && metrics === null ? (
             <EmptyState
@@ -359,7 +349,6 @@ export default function ProgressScreen() {
 
         <SecondaryDestinations destinations={["halaqa", "leaderboard"]} />
 
-        {/* Surah progress */}
         <Text
           accessibilityRole="header"
           className="text-charcoal dark:text-neutral-200 mb-4"
@@ -377,7 +366,6 @@ export default function ProgressScreen() {
           s={s}
         />
 
-        {/* Achievements */}
         {achievementDashboard && (
           <Card elevation="low" className="p-5 mt-6 mb-6">
             <View
@@ -464,14 +452,12 @@ export default function ProgressScreen() {
           </Card>
         )}
 
-        {/* The Journey row sits under Achievements with its completed count. */}
         <SecondaryDestinations
           destinations={["reflection-journey"]}
           details={journeyDetail ? { "reflection-journey": journeyDetail } : undefined}
           className={achievementDashboard ? "mb-6" : "mt-6 mb-6"}
         />
 
-        {/* Hadith banner, after the figures. Arabic shows the hadith once; English adds its translation. */}
         <Card elevation="low" className="mb-6 bg-primary-soft dark:bg-primary-soft px-6 py-7">
           <View style={{ alignSelf: "center", maxWidth: isLaptop ? 720 : "100%", width: "100%" }}>
             <Text

@@ -8,7 +8,6 @@ const { at, registerSourceMapCases } = require("./source-map-cases.cjs");
 
 const filename = require.resolve("tailwindcss/peers/index.js");
 const source = fs.readFileSync(filename, "utf8");
-// Append exports only. The complete installed vendor implementation stays intact.
 const exposure = `
 module.exports.__sourceMapProof = {
   library: require_source_map(),

@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# RF170 probe: isolated PostgreSQL 17 container with no network and synthetic users; never touches
-# production. Shows discussion visibility for anon, another user and the author across active,
-# hidden, deleted, reactivated and hard-deleted reflections, before and after the RF170 migration.
-# Requires Docker and a cached postgres:17 image. Usage: SCHEMA=<old schema.sql> bash scripts/supabase-probes/discussion-visibility.sh
 set -euo pipefail
 WT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCHEMA="${SCHEMA:-$WT/supabase/schema.sql}"
@@ -68,14 +64,13 @@ INSERT INTO public.reflection_comment_likes (user_id, comment_id) VALUES ('$B', 
 SQL
 }
 
-# Prints "reflections/comments/likes/comment_likes" visible to a role ($1 = anon or a user id).
 visible() {
   local prefix
   if [ "$1" = anon ]; then prefix="SET ROLE anon;"; else prefix="SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub', '$1', false);"; fi
   { echo "$prefix"; echo "SELECT (SELECT count(*) FROM public.reflections) || '/' || (SELECT count(*) FROM public.reflection_comments) || '/' || (SELECT count(*) FROM public.reflection_likes) || '/' || (SELECT count(*) FROM public.reflection_comment_likes);"; } | psql -tA | tail -1
 }
 
-as_user_try() { # $1 user, $2 SQL; prints allowed, refused-by-rls (SQLSTATE 42501) or the other error
+as_user_try() {
   local out
   if out=$({ echo "\set VERBOSITY verbose"; echo "SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub', '$1', false);"; echo "$2"; } | psql -tA 2>&1); then
     echo allowed

@@ -8,7 +8,6 @@ const viewerRoots = [
   reflectionQueryKeys.feed.all[0],
   reflectionQueryKeys.reflections.all[0],
   reflectionQueryKeys.comments.all[0],
-  // A count includes the viewer's own private reflections, so it goes with the account.
   reflectionQueryKeys.countAyah({ surah: 0, ayah: 0 })[0],
   "currentUserPublicAchievementUnlocks",
 ];
@@ -30,7 +29,6 @@ export function bindAuthQueryCache(client: QueryClient): () => void {
       const queries = cache.findAll({ predicate: viewerQuery });
       let failure: { error: unknown } | undefined;
       try {
-        // Detach the entire snapshot before any abort or cache notification can admit new work.
         cache.removeMany(queries);
       } catch (error) {
         failure = { error };
@@ -44,7 +42,6 @@ export function bindAuthQueryCache(client: QueryClient): () => void {
         }
       }
       if (failure) throw failure.error;
-      // Retirement finishes after unbind; a same-owner rebind must preserve its fresh replacements.
       if (owner.isCurrent() && cacheOwners.get(client) === binding) binding.status = "complete";
     } finally {
       if (binding.status === "refreshing") binding.status = "incomplete";

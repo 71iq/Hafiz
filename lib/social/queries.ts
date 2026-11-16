@@ -12,10 +12,6 @@ import {
   type SocialBands,
 } from "@/lib/social/bands";
 
-/**
- * Memorized ayah cards ("surah:ayah" ids). Page, half-page, seam, chunk, word and smart-deck cards
- * have other id shapes, so a page learner's cards are never counted as ayat here.
- */
 async function countMemorizedAyahCards(db: DatabaseExecutor): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
     `SELECT count(*) AS count FROM study_cards
@@ -26,7 +22,6 @@ async function countMemorizedAyahCards(db: DatabaseExecutor): Promise<number> {
   return row?.count ?? 0;
 }
 
-/** This device's matching bands, from the local plan and memorized cards (8.13). */
 export async function readLocalSocialBands(db: DatabaseExecutor, at: Date = new Date()): Promise<SocialBands> {
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = 'hifz_plan' AND deleted_at IS NULL",
@@ -46,7 +41,6 @@ export async function readLocalSocialBands(db: DatabaseExecutor, at: Date = new 
   });
 }
 
-/** The board's inputs: the bands, and the week start the rest of the app uses (STR-28, BRD-01). */
 export async function readLocalBoardInputs(
   db: DatabaseExecutor,
   language: "en" | "ar",

@@ -2,13 +2,6 @@ import { importDatabaseFromAssetAsync, openDatabaseAsync } from "expo-sqlite";
 
 const QURAN_AYAH_COUNT = 6236;
 
-/**
- * Web seeds OPFS from the prebuilt Quran database; expo-sqlite skips any database that already exists.
- * A reload while that first copy was still writing left a partial file, which was then skipped on every
- * later visit, and the app fell back to JSON imports the site does not serve ("Database Error" for
- * good). A database without the complete Quran text is copied again. User data is only written after
- * setup succeeds, so a database that fails this check holds none.
- */
 export async function importBundledDatabase(databaseName: string, assetId: number): Promise<void> {
   await importDatabaseFromAssetAsync(databaseName, { assetId });
   if (await hasCompleteQuranText(databaseName)) return;

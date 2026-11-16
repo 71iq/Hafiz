@@ -7,7 +7,6 @@ import { Text } from "@/components/ui/Text";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 
-/** Rows mirror in Arabic; `direction: ltr` keeps the explicit order stable on web and native. */
 export function socialRowStyle(isRTL: boolean): ViewStyle {
   return { direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" };
 }
@@ -16,12 +15,10 @@ export function useSocialAccent() {
   const { isDark, effectiveTheme } = useSettings();
   return {
     accent: isDark ? "#2dd4bf" : "#0d9488",
-    // The theme's secondary text colour, so muted icons match the text beside them.
     muted: mutedIconColor(effectiveTheme),
   };
 }
 
-/** A calm status line: cached data, offline or a recoverable failure, with an optional action. */
 export function SocialNotice({
   message,
   icon: Icon = Info,
@@ -44,8 +41,6 @@ export function SocialNotice({
         onPress={onAction}
       />
     ) : null;
-  // A long message keeps its full width; its action goes below it, at the reading start.
-  // Arabic notices run shorter in characters for the same lines, so the bar is low.
   const stacked = action !== null && message.length > 60;
   return (
     <Card elevation="mid" className="px-4 py-3">
@@ -61,7 +56,6 @@ export function SocialNotice({
   );
 }
 
-/** Shown on Halaqa and Board for signed-out viewers and for builds without the account service. */
 export function SocialGate({
   icon: Icon,
   title,
@@ -102,7 +96,6 @@ export function SocialGate({
   );
 }
 
-/** A labelled switch whose whole row is a 44 pt target. */
 export function SocialToggleRow({
   label,
   hint,

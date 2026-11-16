@@ -2,7 +2,6 @@ import { deleteStudyCardRow, insertNewStudyCard, putCardRow } from "@/lib/fsrs/q
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
-/** A version stamped by a clock running two months ahead of this device. */
 const AHEAD = "2027-01-15T10:00:00.000Z";
 const NOW = new Date("2026-11-14T10:00:00.000Z");
 const ID = "cloze:2:255:4";

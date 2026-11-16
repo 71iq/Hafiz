@@ -3,7 +3,7 @@ import type { StepUnit } from "ts-fsrs";
 export type SurahAyahRange = { surah: number; ayahStart: number; ayahEnd: number };
 
 export interface StudyCardRow {
-  id: string; // ayah "2:255", word "word:2:255:4", or built-in smart deck id
+  id: string;
   deck_id: string;
   due: string;
   stability: number;
@@ -13,7 +13,7 @@ export interface StudyCardRow {
   learning_steps: number;
   reps: number;
   lapses: number;
-  state: number; // State enum: 0=New, 1=Learning, 2=Review, 3=Relearning
+  state: number;
   last_review: string | null;
   suspended_at: string | null;
   buried_until: string | null;
@@ -21,7 +21,6 @@ export interface StudyCardRow {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
-  /** Cached hifz tier of a page card (TIER-01). Derived from history, never the source of truth. */
   tier?: string | null;
   tier_changed_at?: string | null;
 }
@@ -30,7 +29,6 @@ export type DeckCardListItem = StudyCardRow & {
   reference: string;
   title: string;
   subtitle: string;
-  /** The Arabic interface's title and subtitle: Arabic surah names and Arabic-Indic references. */
   titleAr: string;
   subtitleAr: string;
   preview: string;
@@ -39,7 +37,6 @@ export type DeckCardListItem = StudyCardRow & {
   isVirtual: boolean;
 };
 
-/** Test modes available in flashcard review */
 export type TestMode =
   | "nextAyah"
   | "previousAyah"
@@ -121,11 +118,10 @@ export type DeckReviewSettings = {
   wordTestModes: WordTestMode[];
 };
 
-/** Color for each test mode tag */
 export const TEST_MODE_COLORS: Record<TestMode, string> = {
-  nextAyah: "#3b82f6",       // blue
-  previousAyah: "#8b5cf6",   // violet
-  translation: "#0d9488",    // teal
-  tafseer: "#d97706",        // amber
-  surahName: "#e11d48",      // rose
+  nextAyah: "#3b82f6",
+  previousAyah: "#8b5cf6",
+  translation: "#0d9488",
+  tafseer: "#d97706",
+  surahName: "#e11d48",
 };

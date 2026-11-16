@@ -56,7 +56,6 @@ it("offers a retry when a page font fails to load and loads again on press", asy
   );
   await act(async () => {});
 
-  // Before the fix the page stayed a spinner with no way to recover.
   expect(view.getByText(strings.en.mushafPageLoadFailed)).toBeTruthy();
 
   mockLoadQuranPageFont.mockImplementationOnce(async () => {
@@ -69,7 +68,6 @@ it("offers a retry when a page font fails to load and loads again on press", asy
   expect(mockLoadQuranPageFont).toHaveBeenCalledTimes(2);
   expect(view.queryByText(strings.en.mushafPageLoadFailed)).toBeNull();
 
-  // Let the readiness frame run before Jest tears the environment down.
   view.unmount();
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 50));

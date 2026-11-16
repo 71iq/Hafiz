@@ -54,7 +54,6 @@ jest.mock("@/lib/supabase", () => ({
     rpc: (fn: string, args: Record<string, unknown>) =>
       require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
     auth: { getSession: async () => ({ data: { session: mockAuth.session }, error: null }) },
-    // Joining as a minor first deletes the account's stored photos; this account has none.
     storage: {
       from: () => {
         const files = {
@@ -68,7 +67,6 @@ jest.mock("@/lib/supabase", () => ({
   },
 }));
 jest.mock("@/lib/social/queries", () => ({
-  // The real reader takes the week start from the wird settings (tested in social-bands.test.ts).
   readLocalBoardInputs: async (_db: unknown, language: "en" | "ar") => ({
     bands: { levelBand: "juz_4_15", paceBand: "half_page", utcOffsetMinutes: 120 },
     weekStart: language === "ar" ? 6 : 1,
@@ -94,7 +92,6 @@ const ready = {
   ],
 };
 
-// The account's privacy as an earlier read on this device left it in the cache: an adult.
 const cachedAdult = {
   boardJoined: false,
   boardNickname: null,
@@ -104,7 +101,6 @@ const cachedAdult = {
 };
 
 const queryClients: QueryClient[] = [];
-/** `staleTime` as the app sets it, so a cached copy counts as fresh; `seed` fills the cache first. */
 function renderScreen(options: { staleTime?: number; seed?: (client: QueryClient) => void } = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: options.staleTime ?? 0 } },
@@ -171,7 +167,6 @@ describe("Board tab", () => {
         await jest.advanceTimersByTimeAsync(1_000);
       });
       expect(days()).toEqual(["2026-11-15"]);
-      // Past midnight: the new day's inputs load, then its board.
       for (let tick = 0; tick < 3; tick += 1) {
         await act(async () => {
           await jest.advanceTimersByTimeAsync(10_000);
@@ -219,7 +214,6 @@ describe("Board tab", () => {
     });
     const screen = renderScreen();
     await waitFor(() => expect(releasePrivacy).toBeDefined());
-    // Joining now would send "not under 18" and clear the stored choice.
     expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
     expect(screen.queryByText(strings.en.boardIntentionTitle)).toBeNull();
 
@@ -253,7 +247,6 @@ describe("Board tab", () => {
 
     privacyFails = false;
     fireEvent.press(retry);
-    // The retry shows that it is working instead of leaving the same notice up.
     await waitFor(() => expect(releaseRetry).toBeDefined());
     expect(screen.queryByRole("button", { name: strings.en.socialTryAgain })).toBeNull();
     expect(screen.getByLabelText(strings.en.loading)).toBeTruthy();
@@ -269,7 +262,6 @@ describe("Board tab", () => {
     mockRpc.mockImplementation(async (fn, args) => {
       if (fn !== "get_profile_privacy") return base(fn, args);
       await new Promise<void>((resolve) => (releasePrivacy = resolve));
-      // Another device recorded minority after this device cached its copy.
       return { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null };
     });
     const screen = renderScreen({
@@ -277,7 +269,6 @@ describe("Board tab", () => {
       seed: (client) => client.setQueryData(profilePrivacyKeys.mine(USER), cachedAdult),
     });
     await waitFor(() => expect(releasePrivacy).toBeDefined());
-    // Joining from the cached copy would send "not under 18".
     expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
     expect(screen.getByLabelText(strings.en.loading)).toBeTruthy();
 
@@ -316,7 +307,6 @@ describe("Board tab", () => {
       void client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
     });
     await waitFor(() => expect(releasePrivacy).toBeDefined());
-    // The form stays while the read runs: a stale join is refused by the server (privacy_changed).
     expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
     await act(async () => {
       releasePrivacy!();
@@ -340,7 +330,6 @@ describe("Board tab", () => {
     await act(async () => {
       await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
     });
-    // Query notifies on its own tick, so wait for the restart rather than asserting at once.
     await waitFor(() => expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star"));
     expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
   });
@@ -352,7 +341,6 @@ describe("Board tab", () => {
     mockRpc.mockImplementation(async (fn, args) => {
       if (fn === "get_profile_privacy") return { data: stored, error: null };
       if (fn === "join_board") {
-        // Another device recorded minority after this form loaded.
         stored = { ...privacy, is_minor: true, board_nickname: "Little Star" };
         return { data: null, error: { message: "privacy_changed", code: "P0001" } };
       }
@@ -365,7 +353,6 @@ describe("Board tab", () => {
     expect(await screen.findByText(strings.en.socialErrorPrivacyChanged)).toBeTruthy();
     expect(mockRpc).toHaveBeenCalledWith("join_board", expect.objectContaining({ p_is_minor: false, p_expected_minor: false }));
     expect(mockRpc.mock.calls.filter(([fn]) => fn === "get_profile_privacy")).toHaveLength(2);
-    // The form now starts from the reloaded choice.
     expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
     expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
   });
@@ -405,7 +392,6 @@ describe("Board tab", () => {
   it("says the matched halaqa was left after joining as a reader under 18 (ETH-07)", async () => {
     signIn(USER);
     const base = mockRpc.getMockImplementation()!;
-    // The server reports it from the join's own transaction; no halaqa read comes first.
     mockRpc.mockImplementation(async (fn, args) => {
       const result = await base(fn, args);
       return fn === "join_board" ? { ...result, data: { ...(result.data as object), left_matched: true } } : result;
@@ -455,7 +441,6 @@ describe("Board tab", () => {
     fireEvent.press(await screen.findByRole("button", { name: strings.en.boardScoringOpen }));
     expect(await screen.findByText(strings.en.boardRules)).toBeTruthy();
     expect(screen.getByText(strings.en.boardScoringEligibility)).toBeTruthy();
-    // Reading the rules calls nothing new: no join, no other ranking.
     expect(mockRpc.mock.calls.map(([fn]) => fn).filter((fn) => fn !== "get_board")).toEqual([]);
   });
 
@@ -481,7 +466,6 @@ describe("Board tab", () => {
       interpolate(strings.ar.boardPointsA11y, { name: "Little Star", rank: "١", points: "٩ نقاط", streak: "١٢ يومًا" }),
     );
     expect(flattenStyle(row.props.style)).toMatchObject({ direction: "ltr", flexDirection: "row-reverse" });
-    // STR-28: an Arabic reader's week starts on Saturday unless they chose another day.
     expect(mockRpc).toHaveBeenCalledWith("get_board", expect.objectContaining({ p_week_start: 6 }));
   });
 });

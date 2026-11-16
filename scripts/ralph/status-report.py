@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Print a short modernization status from backlog.json and events.jsonl (for 3-hourly updates)."""
 import json, sys, datetime
 from pathlib import Path
 root = Path(__file__).resolve().parents[2]
-since = sys.argv[1] if len(sys.argv) > 1 else None  # ISO time; default: last 3 hours
+since = sys.argv[1] if len(sys.argv) > 1 else None
 if since is None:
     since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=3)).isoformat()
 tasks = {t['id']: t for t in json.loads((root / 'docs/refactoring/backlog.json').read_text())['tasks']}

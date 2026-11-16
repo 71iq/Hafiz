@@ -4,7 +4,6 @@ import { Text } from "@/components/ui/Text";
 import type { RecitationErrorType } from "@/lib/hifz/errors";
 import type { UIStrings } from "@/lib/i18n/strings";
 
-/** The error types a user can mark on a word after reciting (ERR-01), in the order people need them. */
 const MARKABLE_TYPES: readonly RecitationErrorType[] = [
   "wrong_word",
   "skip_word",
@@ -44,7 +43,6 @@ export function errorTypeLabel(type: RecitationErrorType, s: UIStrings): string 
 type Props = {
   open: boolean;
   current: RecitationErrorType | null;
-  /** The tapped word's reference, so the user knows which word they are marking. */
   subtitle?: string;
   dir: "ltr" | "rtl";
   s: UIStrings;
@@ -53,7 +51,6 @@ type Props = {
   onClose: () => void;
 };
 
-/** Choose what went wrong on a tapped word, or remove the mark. Described neutrally (ERR-07). */
 export function MistakeTypeSheet({ open, current, subtitle, dir, s, onChoose, onRemove, onClose }: Props) {
   return (
     <ResponsiveSheet open={open} onClose={onClose} maxWidth={420} maxHeight={560}>

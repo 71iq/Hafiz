@@ -5,13 +5,6 @@ import { fullSync } from "@/lib/database/sync";
 import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
-/**
- * A retired similar-verse slot's card (lib/database/mutashabihat-rows.ts) can reach a device after its
- * launch refresh: a fresh install records the data version first, then the account restore or a pull
- * brings the cards made on the old data. In the old data the ref at nq-sim-6b0cb090bae7db sort order
- * 1 was labelled 2:264 but held 2:265's text; the rows now relabel it to 2:265 at sort order 2, so the
- * card for sort order 1 must not come back. Supabase is mocked; SQLite and the sync queue are real.
- */
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const OLD = "2026-01-01T00:00:00.000Z";
 const NEW = "2026-02-01T00:00:00.000Z";
@@ -55,7 +48,6 @@ jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
   supabase: { from: (table: string) => new MockQuery(table) },
 }));
-// The queue is real, so queued deletions can be read back; nothing is pushed.
 jest.mock("@/lib/database/sync-queue", () => ({
   ...jest.requireActual<typeof import("@/lib/database/sync-queue")>("@/lib/database/sync-queue"),
   getPendingSyncEntries: async () => [],
@@ -66,7 +58,6 @@ jest.mock("@/lib/achievements/queries", () => ({
 }));
 
 const groups = [[GROUP, "similar", "وَمَثَلُ ٱلَّذِينَ يُنفِقُونَ أَمْوَٰلَهُمُ", "nourquran:similars", 0]] as const;
-/** The bundled rows: 2:261 at sort order 0, the 2:264 ref relabelled to 2:265 at sort order 2. */
 const refs = [
   [
     GROUP,
@@ -131,7 +122,6 @@ const minutesAfter = (time: string, minutes: number) => new Date(Date.parse(time
 
 const card = (id: string) =>
   store.sql.prepare("SELECT * FROM study_cards WHERE id = ?").get(id) as Record<string, unknown> | undefined;
-/** The queued card uploads; pulled reviews also queue their wird days, which are not under test. */
 const queued = () =>
   store.sql
     .prepare("SELECT operation, row_id, data FROM sync_queue WHERE table_name = 'study_cards' ORDER BY id")
@@ -159,7 +149,6 @@ beforeEach(async () => {
   observeAuthSession(mockSession);
   jest.spyOn(console, "warn").mockImplementation(() => {});
   store = await openOutboxDatabase();
-  // A fresh install: the bundled rows are already these, so the launch refresh records the version.
   const group = store.sql.prepare(
     "INSERT INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES (?, ?, ?, ?, ?)",
   );
@@ -188,11 +177,9 @@ describe("a retired similar-verse card arriving from the account", () => {
     expect(result.accountRestored).toBe(true);
     expect(card(RETIRED)?.deleted_at).toEqual(expect.any(String));
     expect(queued().map((entry) => [entry.operation, entry.row_id])).toEqual([["DELETE", RETIRED]]);
-    // The upload carries the whole card, so the server keeps its schedule with the deletion.
     expect(JSON.parse(queued()[0].data)).toMatchObject({ id: RETIRED, deck_id: SMART_DECK_IDS.mutashabihat, reps: 3 });
     expect(logCount(RETIRED)).toBe(2);
 
-    // The next launch finds nothing more to do.
     await refreshMutashabihatRows(store.db, async () => rowsFile);
     expect(queued()).toHaveLength(1);
   });
@@ -204,7 +191,6 @@ describe("a retired similar-verse card arriving from the account", () => {
     putSetting(`sync_habit_backfill_${USER_ID}_20261113_habit_v1`, "true");
     putSetting("last_pull_at", OLD);
 
-    // A device still on the old data uploads the card after this device's refresh.
     mockRows.set("study_cards:incremental", [remoteCard(RETIRED)]);
     mockRows.set("study_log:incremental", [remoteLog(RETIRED, "2026-01-20T08:00:00.000Z")]);
     await fullSync(store.db);
@@ -213,8 +199,6 @@ describe("a retired similar-verse card arriving from the account", () => {
     expect(queued().map((entry) => [entry.operation, entry.row_id])).toEqual([["DELETE", RETIRED]]);
     expect(logCount(RETIRED)).toBe(1);
 
-    // Reviewed there again after this device deleted it, it comes down live and newer. A pull never
-    // makes a deleted card live again, so it stays deleted and there is nothing more to upload.
     const reviewedAgain = minutesAfter(deletedAt, 1);
     mockRows.set("study_cards:incremental", [
       remoteCard(RETIRED, { updated_at: reviewedAgain, last_review: reviewedAgain, reps: 4, synced_at: reviewedAgain }),
@@ -223,7 +207,6 @@ describe("a retired similar-verse card arriving from the account", () => {
     expect(card(RETIRED)?.deleted_at).toBe(deletedAt);
     expect(queued()).toHaveLength(1);
 
-    // The server's copy of the deletion comes back down: nothing more is queued either.
     const echoed = minutesAfter(reviewedAgain, 1);
     mockRows.set("study_cards:incremental", [
       remoteCard(RETIRED, { updated_at: echoed, deleted_at: echoed, synced_at: echoed }),

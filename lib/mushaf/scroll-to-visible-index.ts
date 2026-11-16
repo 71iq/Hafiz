@@ -16,10 +16,6 @@ function isVisible(list: ScrollList, index: number): boolean {
   return index >= startIndex && index <= endIndex;
 }
 
-/**
- * Offset of `index` estimated from measured rows: the nearest measured row before it plus the
- * average measured height for each row in between. Null when nothing has been measured yet.
- */
 function estimateOffset(list: ScrollList, index: number): number | null {
   if (!list.getLayout) return null;
   let anchor: { index: number; y: number } | null = null;
@@ -38,12 +34,6 @@ function estimateOffset(list: ScrollList, index: number): number | null {
   return Math.max(0, anchor.y + (index - anchor.index) * average);
 }
 
-/**
- * Scrolls a variable-height list until `index` is measured and visible. When twelve measured
- * attempts fail, it jumps to an estimated offset, waits 300 ms and retries the index once, then
- * confirms the target is actually visible. "failed" means measurement never confirmed it, so the
- * caller can offer an explicit retry.
- */
 export async function scrollToVisibleIndex(
   getList: () => ScrollList | null,
   index: number,
@@ -58,7 +48,6 @@ export async function scrollToVisibleIndex(
         if (!isCurrent()) return "cancelled";
         if (isVisible(list, index)) return "visible";
       } catch {
-        // The ref can exist before FlashList has measured its initial layout.
       }
     }
     await wait(ATTEMPT_DELAY_MS);

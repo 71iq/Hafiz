@@ -3,43 +3,18 @@ import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { deleteStudyCardRow } from "@/lib/fsrs/queries";
 
-/**
- * The similar-verse rows the app ships besides quran.db: exactly the mutashabihat_groups and
- * mutashabihat_refs rows that scripts/build-quran-db.mjs writes there, with each similar passage
- * rebuilt from the Uthmani text. The raw NourQuran JSON is a build input only; the app never imports
- * it, since its passages are not aligned with the Quran text.
- */
 export const MUTASHABIHAT_ROWS_FILE = "mutashabihat/nourquran_hafiz_rows.json";
 
-/**
- * The version of those rows this build of the app ships: the file's own "version", a hash of its
- * rows. tests/unit/mutashabihat-data.test.ts checks that they match, so rebuilt rows come with a new
- * version and installed apps refresh to them.
- */
 export const MUTASHABIHAT_DATA_VERSION = "0071dd8f83fae6bc";
 
-/** Device-only setting (lib/database/user-settings.ts): the version of the rows this database holds. */
 export const MUTASHABIHAT_VERSION_SETTING = "device_mutashabihat_data_version";
 
-/**
- * The study card ids of the similar-verse slots (a group id and a sort order) that held a verse in an
- * earlier version of the rows and hold none now, as scripts/build-quran-db.mjs writes them beside the
- * rows file. A ref relabelled to the ayah whose words it holds takes a new sort order, so the card of
- * its old one would stay with nothing to show. The build never gives a listed slot a ref again.
- */
 const RETIRED_SIMILAR_CARDS: ReadonlySet<string> = new Set(retiredCardsFile.cards);
 
 export function isRetiredSimilarCard(cardId: string): boolean {
   return RETIRED_SIMILAR_CARDS.has(cardId);
 }
 
-/**
- * Deletes the live cards among `cardIds` (every retired id by default) whose slot is retired, in the
- * caller's transaction, each with its upload queued (deleteStudyCardRow); no other card is touched.
- * A card made on the old rows can reach a device after its refresh, from the account restore or a
- * pull (lib/database/sync.ts), so this runs wherever cards arrive and at every launch. Review logs
- * stay, as for any deleted card. Returns the ids deleted.
- */
 export async function retireSimilarCards(
   db: DatabaseExecutor,
   cardIds: Iterable<string> = RETIRED_SIMILAR_CARDS,
@@ -97,10 +72,6 @@ function isRefRow(row: unknown): row is RefRow {
   );
 }
 
-/**
- * The rows file, checked whole: every row has the shape of its table, every ref belongs to a group,
- * and every similar-kind ref has similar words. Anything else throws, and nothing is written.
- */
 export function parseMutashabihatRows(data: unknown): MutashabihatRows {
   const file = data as { schema_version?: unknown; version?: unknown; groups?: unknown; refs?: unknown } | null;
   if (!file || typeof file !== "object" || file.schema_version !== "1.0" || !isText(file.version)) {
@@ -134,7 +105,6 @@ type InstalledRef = {
 
 const REF_COLUMNS = "group_id, sort_order, surah, ayah, surah_name_ar, tail_5, pre_text, similar_text, post_text";
 
-/** Whether the database holds no similar-verse rows, or a similar ref without similar words. */
 async function isIncomplete(db: DatabaseExecutor): Promise<boolean> {
   const row = await db.getFirstAsync<{ groups: number; refs: number; missing: number }>(
     `SELECT (SELECT COUNT(*) FROM mutashabihat_groups) AS groups,
@@ -176,22 +146,6 @@ function sameRows(
 
 export type MutashabihatRefresh = Readonly<{ replaced: boolean; retiredCards: readonly string[] }>;
 
-/**
- * Brings the database's similar-verse rows to the version this app ships. importBundledDatabase keeps
- * an existing database on web and native, so an installed app holds the rows of the bundle it was
- * installed from, and an empty or incomplete table needs them too. Runs at every launch; once the
- * database is current it reads one setting and looks for live retired cards.
- *
- * The rows are replaced in one transaction, with the version setting. The live cards of retired
- * slots (retireSimilarCards) are deleted in the same transaction, with their uploads queued, so no
- * card shows another verse than the one it was reviewed as, and none is left behind with nothing to
- * show. Review logs stay, as for any deleted card. Recitation errors and drift siblings name verses,
- * not refs, and are left as they are: a drift's "Which one" pair is looked up in the current groups
- * (similarPair), so a pair the data no longer holds is not asked.
- *
- * Throws when the file is malformed or is not this version (a stale cached copy); nothing is written
- * then, and the next launch tries again.
- */
 export async function refreshMutashabihatRows(
   db: AppDatabase,
   load: () => Promise<unknown>,
@@ -246,10 +200,6 @@ export async function refreshMutashabihatRows(
   return { replaced: true, retiredCards };
 }
 
-/**
- * The launch check once the rows are current: a retired card that arrived by a path that missed it
- * is deleted in its own transaction. Usually there is none, and nothing is written.
- */
 async function retireLiveCards(db: AppDatabase): Promise<string[]> {
   const ids = [...RETIRED_SIMILAR_CARDS];
   if (ids.length === 0) return [];

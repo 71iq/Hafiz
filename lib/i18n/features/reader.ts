@@ -1,16 +1,11 @@
-/**
- * W05/W06 deep links, reader position, toolbar, gestures, reveal, focus, bookmarks and audio. Spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity.
- */
 export const readerStrings = {
   en: {
-    // /open bridge and invalid links
     openLinkOpening: "Opening ayah...",
     openLinkInvalidTitle: "This link doesn't open an ayah",
     openLinkInvalidBody:
       "The surah or ayah number in the link is missing or out of range. Your reading position has not changed.",
     openLinkSearch: "Search",
 
-    // Toolbar
     readerModeSwitchLabel: "{{current}}. Switch to {{next}}",
     readerModeShortPage: "Page",
     readerModeShortVerse: "Verses",
@@ -23,12 +18,10 @@ export const readerStrings = {
     indicatorOpenSurah: "Surah {{name}}. Open Go to",
     indicatorOpenJuz: "{{juz}}. Open Go to",
 
-    // Arrival and return
     readerBackToWhereIWas: "Back to where I was",
     readerRetryJump: "Try again: go to {{ref}}",
     readerQuranLoadFailed: "Could not load the Quran.",
 
-    // Shortcuts and gestures help
     readerHelpTitle: "Shortcuts and gestures",
     readerHelpGestures: "Gestures",
     readerHelpKeyboard: "Keyboard",
@@ -50,12 +43,10 @@ export const readerStrings = {
     readerHelpEscape: "Close the open menu or sheet",
     readerHelpContextMenu: "Open the menu for selected text or a focused ayah number",
 
-    // Ayah markers
     ayahMarkerLabel: "Ayah {{ref}}",
     ayahMarkerOpenDetails: "Open ayah details",
     ayahMarkerSelect: "Select ayah and show actions",
 
-    // Copy and share
     readerShare: "Share",
     readerShareAyah: "Share ayah",
     readerCopyAyah: "Copy ayah",
@@ -70,11 +61,9 @@ export const readerStrings = {
     highlightColorRose: "Rose",
     highlightColorSky: "Sky",
 
-    // Word gloss
     readerNoWordTranslation: "No translation",
     wordTooltipOpenDetail: "Open word details",
 
-    // Bookmarks
     searchBookmarks: "Search bookmarks",
     readerClearSearch: "Clear search",
     bookmarksOrderLabel: "Order",
@@ -86,20 +75,17 @@ export const readerStrings = {
     removeBookmarkConfirmBody: "{{item}} will be removed from your bookmarks.",
     readerCancel: "Cancel",
 
-    // Go to and rail
     goToAyahRow: "Go to {{ref}}",
     goToPageRow: "Go to page {{page}}",
     goToNoSurahsHint: "Try a number like 18 or a name like Kahf",
     railGoToLabel: "Go to, page {{n}}",
     railJuzN: "Juz {{n}}",
 
-    // Surah information
     surahInfoOpenNamed: "Open information about Surah {{name}}",
     surahInfoShownInEnglish: "Shown in English",
     surahInfoLoadFailed: "Could not load the surah information.",
     surahInfoSourcePrefix: "Source:",
 
-    // Reading settings
     tajweedLegendOpen: "What do the colors mean?",
     tajweedLegendTitle: "Tajweed colors",
     quranMarkerModernOnly: "Available with the Modern font",

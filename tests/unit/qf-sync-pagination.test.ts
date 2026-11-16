@@ -117,7 +117,6 @@ beforeEach(async () => {
       }
     },
   };
-  // Only this fixture adapts Expo's wider API to a real isolated SQLite database.
   db = adapter as unknown as AppDatabase;
   await createSchema(db);
   sql
@@ -599,8 +598,8 @@ it.each(queueAbortCases)(
 );
 
 const FROZEN_SYNC_START = "2026-11-07T12:00:00.000Z";
-const LOCAL_AFTER_START = "2026-11-07T11:30:00-01:00"; // 12:30Z
-const LOCAL_BEFORE_START = "2026-11-07T12:30:00+01:00"; // 11:30Z
+const LOCAL_AFTER_START = "2026-11-07T11:30:00-01:00";
+const LOCAL_BEFORE_START = "2026-11-07T12:30:00+01:00";
 
 function freezeSyncStart() {
   jest.useFakeTimers();

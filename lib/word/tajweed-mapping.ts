@@ -1,9 +1,5 @@
 import type { TajweedRow } from "./queries";
 
-/**
- * Build word boundaries from text_uthmani.
- * Returns an array of [startOffset, endOffset] for each word (0-indexed character positions).
- */
 function buildWordBoundaries(text: string): [number, number][] {
   const boundaries: [number, number][] = [];
   let pos = 0;
@@ -12,17 +8,11 @@ function buildWordBoundaries(text: string): [number, number][] {
     if (word.length > 0) {
       boundaries.push([pos, pos + word.length - 1]);
     }
-    pos += word.length + 1; // +1 for the space
+    pos += word.length + 1;
   }
   return boundaries;
 }
 
-/**
- * Map tajweed annotations to a specific word position.
- * wordPos is 1-indexed (matching database convention).
- *
- * Returns all tajweed rules whose character range overlaps with the given word.
- */
 export function mapTajweedToWord(
   textUthmani: string,
   annotations: TajweedRow[],

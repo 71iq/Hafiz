@@ -2,7 +2,6 @@ import type { ImagePickerAsset } from "expo-image-picker";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 const AVATAR_BUCKET = "avatars";
-/** The avatars bucket's configured file_size_limit (supabase/schema.sql), checked before upload. */
 export const MAX_AVATAR_BYTES = 3 * 1024 * 1024;
 const EXTENSION_BY_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -12,7 +11,6 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   "image/gif": "gif",
 };
 
-/** The avatars bucket's allowed_mime_types, plus the common image/jpg alias. */
 const ALLOWED_AVATAR_TYPES = new Set(Object.keys(EXTENSION_BY_MIME));
 
 export type AvatarProblem = "type" | "size" | "unreadable";
@@ -24,10 +22,6 @@ function avatarTypeOf(asset: Pick<ImagePickerAsset, "mimeType" | "fileName">): s
   return extension === "jpg" || extension === "jpeg" ? "image/jpeg" : `image/${extension}`;
 }
 
-/**
- * Checks a picked image before any upload: a supported type, decoded pixel dimensions and the bucket's
- * size cap. An unknown type or size is checked again on the bytes at upload time.
- */
 export function validateAvatarAsset(
   asset: Pick<ImagePickerAsset, "mimeType" | "fileName" | "fileSize" | "width" | "height">,
 ): AvatarProblem | null {

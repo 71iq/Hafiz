@@ -6,11 +6,6 @@ const NONE: ReadonlyMap<string, string> = new Map();
 
 type Loaded = Readonly<{ language: MeaningLanguage; meanings: ReadonlyMap<string, string> }>;
 
-/**
- * MUT-05: the meanings of `verses` (see loadVerseMeanings), read when the set of verses or the language
- * changes rather than on each render. Until a read finishes, the last one for the same language stays,
- * since a growing set only adds verses. Empty before the first read and after a failed one.
- */
 export function useVerseMeanings(
   db: DatabaseExecutor,
   verses: readonly { surah: number; ayah: number }[],

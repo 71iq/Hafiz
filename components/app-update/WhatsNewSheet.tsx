@@ -5,10 +5,6 @@ import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { textStartStyle } from "@/lib/ui/direction";
 
-/**
- * About > What's new. Bundled notes for this build's version only, opened from the About row; never
- * shown at launch and nothing is stored about having seen it.
- */
 export function WhatsNewSheet({
   open,
   version,

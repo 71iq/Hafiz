@@ -10,11 +10,9 @@ type SwitchControlProps = {
 };
 
 type Props = SwitchControlProps & {
-  /** The setting's name, for screen readers, when the switch sits beside its label. */
   accessibilityLabel?: string;
 };
 
-/** The parts of a React DOM keyboard event the web key handler reads. */
 type WebKeyEvent = {
   key: string;
   repeat: boolean;
@@ -24,11 +22,6 @@ type WebKeyEvent = {
   stopPropagation: () => void;
 };
 
-/**
- * Role, state and keys for the Pressable that is the switch. Native reads accessibilityState.
- * React Native Web 0.21 ignores it, so aria-checked carries the state there, and its Pressable
- * presses only on Enter for this role, so Space is handled here without scrolling the page.
- */
 function switchControlProps({ value, onValueChange, disabled }: SwitchControlProps) {
   const toggle = () => onValueChange(!value);
   const onKeyDown = (event: WebKeyEvent) => {
@@ -83,7 +76,6 @@ function useSwitchLook(value: boolean, disabled: boolean | undefined) {
     height: 20,
     borderRadius: 10,
     backgroundColor: "#ffffff",
-    // Ambient teal-tinted shadow
     shadowColor: "#003638",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -93,15 +85,12 @@ function useSwitchLook(value: boolean, disabled: boolean | undefined) {
   return { track, thumb };
 }
 
-/** shadcn-style animated toggle switch, consistent on web + native */
 export function Switch({ value, onValueChange, disabled, accessibilityLabel }: Props) {
   const look = useSwitchLook(value, disabled);
   return (
     <Pressable
       {...switchControlProps({ value, onValueChange, disabled })}
       accessibilityLabel={accessibilityLabel}
-      // A 44 px target around the 24 px track on every platform (web ignores hitSlop), without moving
-      // the layout around it.
       style={STANDALONE_TARGET}
     >
       <View style={look.track}>
@@ -118,10 +107,6 @@ const STANDALONE_TARGET = {
   marginHorizontal: -4,
 } as const;
 
-/**
- * The switch's look inside a SwitchRow. The row is the switch, so the track has no role, name,
- * focus or touch of its own.
- */
 export function SwitchTrack({ value, disabled }: { value: boolean; disabled?: boolean }) {
   const look = useSwitchLook(value, disabled);
   return (
@@ -136,11 +121,9 @@ type SwitchRowProps = SwitchControlProps & {
   hint?: string;
   className?: string;
   style?: StyleProp<ViewStyle>;
-  /** The row's text and a SwitchTrack, laid out by the caller. */
   children: ReactNode;
 };
 
-/** A labelled row that is the switch, so its whole area is the target rather than the 24 px track. */
 export function SwitchRow({ label, hint, value, onValueChange, disabled, className, style, children }: SwitchRowProps) {
   return (
     <Pressable

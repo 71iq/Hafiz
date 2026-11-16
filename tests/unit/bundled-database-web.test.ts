@@ -6,7 +6,6 @@ jest.mock("expo-sqlite", () => ({
   openDatabaseAsync: (...args: unknown[]) => mockOpen(...args),
 }));
 
-// Jest resolves the native module by default; this exercises the web implementation.
 const { importBundledDatabase } = jest.requireActual<typeof import("@/lib/database/bundled-database")>(
   "../../lib/database/bundled-database.ts",
 );

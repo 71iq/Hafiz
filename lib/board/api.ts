@@ -12,12 +12,6 @@ import {
 } from "@/lib/social/remote";
 import type { SocialBands } from "@/lib/social/bands";
 
-/**
- * Board service adapter (spec 5.7.2). Opt-in weekly cohorts of about 30 people. The server places the
- * caller and computes every score from synced wird days (PTS-02, SB-04); the client only reports its
- * bands and its week start (BRD-01, STR-28). Standings carry no user ids, and never show a photo under
- * a nickname or for a minor (BRD-07).
- */
 const BOARD_NICKNAME_MIN = 3;
 export const BOARD_NICKNAME_MAX = 20;
 
@@ -72,7 +66,6 @@ export const boardViewSchema = z
 export type BoardView = z.output<typeof boardViewSchema>;
 export type BoardStanding = Extract<BoardView, { status: "ready" }>["standings"][number];
 
-/** What the board needs from this device: matching bands (8.13) and the effective week start, 0 to 6. */
 export type BoardInputs = Readonly<{ bands: SocialBands; weekStart: number }>;
 
 export const boardKeys = {
@@ -99,7 +92,6 @@ function boardArgs(inputs: BoardInputs, today: string) {
   };
 }
 
-/** Called when the Board tab opens; places a joined user in this week's cohort if needed. */
 export function boardRead(inputs: BoardInputs, today: string): SocialRead<BoardView> {
   return { fn: "get_board", args: boardArgs(inputs, today), schema: boardViewSchema };
 }
@@ -117,13 +109,6 @@ export function isValidBoardNickname(nickname: string | null): boolean {
   return nickname === null || (nickname.length >= BOARD_NICKNAME_MIN && nickname.length <= BOARD_NICKNAME_MAX);
 }
 
-/**
- * Joining sets the account's minority (ETH-07), as saveProfilePrivacy does. `expectedMinor` is the
- * value the form loaded, and the server refuses the join with ProfilePrivacyChangedError when the
- * stored value differs, so a form loaded before another device recorded minority cannot clear it.
- * Recording minority deletes the stored photo files before the join is sent, which is not sent when
- * that fails, and once more after.
- */
 export async function joinBoard(
   input: { nickname: string | null; isMinor: boolean; expectedMinor: boolean; inputs: BoardInputs; today: string },
   owner: SocialOwner,
@@ -142,7 +127,6 @@ export async function joinBoard(
     throw profilePrivacyWriteError(error);
   });
   const view = parseSocialPayload(boardViewSchema, raw);
-  // Whether this join took the account out of a matched halaqa, decided in the join's transaction.
   const leftMatched = parseSocialPayload(leftMatchedSchema, raw).left_matched === true;
   if (input.isMinor) await deleteAvatarFilesAfterMinority(owner);
   return { view, leftMatched };
@@ -150,7 +134,6 @@ export async function joinBoard(
 
 const leftMatchedSchema = z.object({ left_matched: z.boolean().optional() });
 
-/** Stores the latest bands for the weekly pass (8.13). A no-op on the server for users off the board. */
 export async function refreshBoardBandsRemote(inputs: BoardInputs, today: string, owner: SocialOwner): Promise<void> {
   await callSocialRpc("refresh_board_bands", boardArgs(inputs, today), voidResult, owner);
 }

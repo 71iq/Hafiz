@@ -1,16 +1,8 @@
-/**
- * Pure rules for the reader's C06 target contract: which position is saved, when saved-position
- * hydration may move the reader, and the transient "Back to where I was" token. The Mushaf screen
- * owns the React state; these helpers keep the decisions testable without rendering it.
- */
 import { isValidAyah, isValidPage } from "@/lib/search/reference";
 
-/** The stored `last_mushaf_position` value. Its JSON shape is unchanged from earlier releases. */
 export type ReaderPosition = { mode: "page"; page: number } | { mode: "verse"; surah: number; ayah: number };
 
-/** How long the return pill stays available after an explicit jump. */
 export const RETURN_PILL_MS = 5000;
-/** How long an arrival wash stays when the reader does not tap first. */
 export const ARRIVAL_MS = 3000;
 
 export function parseSavedPosition(raw: string | null | undefined): ReaderPosition | null {
@@ -22,7 +14,6 @@ export function parseSavedPosition(raw: string | null | undefined): ReaderPositi
       return { mode: "verse", surah: value.surah, ayah: value.ayah };
     }
   } catch {
-    // An unreadable value falls back to the reader's default position.
   }
   return null;
 }
@@ -42,16 +33,9 @@ export function samePosition(a: ReaderPosition | null, b: ReaderPosition | null)
     : a.surah === (b as typeof a).surah && a.ayah === (b as typeof a).ayah;
 }
 
-/**
- * Saved-position bookkeeping for one reader visit. An explicit target outranks hydration, and an
- * arrival is not saved until the reader deliberately scrolls, pages or switches view.
- */
 export type ReaderPositionSession = {
-  /** The saved-position restore attempt finished (applied, skipped or failed). */
   restoreSettled: boolean;
-  /** An explicit target arrived; a later hydration result must not move the reader. */
   explicitTarget: boolean;
-  /** The reader is resting on an arrival it has not engaged with. */
   held: boolean;
 };
 
@@ -77,25 +61,20 @@ export function reducePositionSession(
   }
 }
 
-/** Hydration may move the reader only when no explicit target has arrived during this visit. */
 export function mayApplySavedPosition(session: ReaderPositionSession): boolean {
   return !session.explicitTarget;
 }
 
-/** The visible position is saved once restore settled and the reader engaged with it. */
 export function mayPersistPosition(session: ReaderPositionSession): boolean {
   return session.restoreSettled && !session.held;
 }
 
-/** One captured pre-jump position for the shared "Back to where I was" pill. */
 export type ReturnToken = {
   id: number;
   position: ReaderPosition;
-  /** Account or guest owner at capture; another owner never restores it. */
   owner: string | null;
 };
 
-/** A later jump replaces the token; with no previous position there is no pill. */
 export function captureReturnToken(
   position: ReaderPosition | null,
   owner: string | null,
@@ -104,12 +83,10 @@ export function captureReturnToken(
   return position ? { id, position, owner } : null;
 }
 
-/** A timer may clear only the token it was started for. */
 export function expireReturnToken(current: ReturnToken | null, id: number): ReturnToken | null {
   return current?.id === id ? null : current;
 }
 
-/** Restores the captured position once; afterwards the token is gone. */
 export function takeReturnToken(
   current: ReturnToken | null,
   id: number,

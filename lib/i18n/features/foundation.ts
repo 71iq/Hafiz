@@ -1,6 +1,3 @@
-/**
- * W01 foundations: settings controls, startup and device preferences. Spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity.
- */
 export const foundationStrings = {
   en: {
     quranFontChoiceHint:

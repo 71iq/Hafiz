@@ -10,10 +10,6 @@ import { BOARD_NICKNAME_MAX, isValidBoardNickname, normalizeBoardNickname } from
 import { useStrings } from "@/lib/i18n/useStrings";
 import { SocialErrorText, SocialToggleRow, useSocialAccent } from "./SocialControls";
 
-/**
- * BRD-04 and BRD-07: the Board is off until joined here, after a note on intention citing Bukhari 1.
- * A nickname is optional, and required for under 18s, who never appear with a photo.
- */
 export function BoardJoin({
   initialNickname,
   initialIsMinor,

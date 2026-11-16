@@ -1,15 +1,5 @@
-/**
- * Reminder and notification strings, spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity. The
- * Arabic is a draft for native review (spec 9).
- *
- * Templates (notifT*) follow NOT-14: value first, the surah when known, no fear, guilt, threats, reward claims or
- * da'if narrations. Templates marked as citations in lib/notifications/templates.ts quote only the verified texts
- * in spec 9.3. Arabic avoids counted nouns after numbers so one string reads correctly for any count. Each
- * placeholder appears at most once per string.
- */
 export const notificationsStrings = {
   en: {
-    // Notification titles, one per type
     notifTitleWird: "Today's wird",
     notifTitleStreak: "Your streak",
     notifTitleRemindLater: "Your wird is waiting",
@@ -21,7 +11,6 @@ export const notificationsStrings = {
     notifTitleGroup: "From your halaqa",
     notifTitleComeback: "Your wird",
 
-    // wird_reminder
     notifTWird1: "Your wird is ready: {{pages}} pages, about {{minutes}} minutes.",
     notifTWird2: "{{surah}} is due for review today.",
     notifTWird3: "A few minutes after {{prayer}} keeps your hifz steady.",
@@ -36,7 +25,6 @@ export const notificationsStrings = {
     notifTWird12: "Your review pages are ready. Begin with the one you know best.",
     notifTWird13: "\"We have made the Quran easy to remember\" (54:17). Your wird is ready.",
 
-    // streak_at_risk
     notifTRisk1: "Your {{n}}-day streak is waiting for today's wird.",
     notifTRisk2: "One page before you sleep keeps your streak.",
     notifTRisk3: "Five minutes now, and today is done.",
@@ -50,7 +38,6 @@ export const notificationsStrings = {
     notifTRisk11: "Day {{next}} is one short review away.",
     notifTRisk12: "Your evening review is short tonight. Start whenever you are ready.",
 
-    // remind_later
     notifTLater1: "Here is your reminder: your wird is ready.",
     notifTLater2: "An hour has passed. A short review now?",
     notifTLater3: "{{surah}} is still waiting for you today.",
@@ -60,7 +47,6 @@ export const notificationsStrings = {
     notifTLater7: "Your review is open whenever you are free.",
     notifTLater8: "Back to your wird: start with the page you know best.",
 
-    // late_reminder
     notifTLate1: "Still time today: one page keeps your {{n}}-day streak.",
     notifTLate2: "A short page before midnight keeps today counted.",
     notifTLate3: "Your late reminder: one page, then rest.",
@@ -70,7 +56,6 @@ export const notificationsStrings = {
     notifTLate7: "If you are still up, one page keeps your wird today.",
     notifTLate8: "If tonight is not possible, you can still make it up tomorrow before {{cutoff}}.",
 
-    // makeup_window
     notifTMakeUp1: "Yesterday's wird can still be made up before {{cutoff}}.",
     notifTMakeUp2: "Missed last night? Recite before {{cutoff}} and it counts.",
     notifTMakeUp3: "One page before {{cutoff}} keeps your {{n}}-day streak.",
@@ -82,7 +67,6 @@ export const notificationsStrings = {
     notifTMakeUp8: "Start the day with yesterday's wird. It counts until {{cutoff}}.",
     notifTMakeUp9: "A fresh morning: make up yesterday's wird, then today's is next.",
 
-    // grace_used
     notifTGrace1: "A grace day kept your {{n}}-day streak. Grace days left: {{g}}.",
     notifTGrace2: "A grace day covered a missed day. Your streak continues.",
     notifTGrace3: "Your streak is safe. Grace days left: {{g}}.",
@@ -92,7 +76,6 @@ export const notificationsStrings = {
     notifTGrace7: "A grace day kept your streak. {{surah}} is ready for today.",
     notifTGrace8: "Your streak held through a missed day. Pick up today with one page.",
 
-    // earnback_open
     notifTEarn1: "Your {{n}}-day streak paused. Do your wird on 3 days this week to bring it back.",
     notifTEarn2: "Three days of wird bring your streak back. Today can be the first.",
     notifTEarn3: "Your {{n}}-day streak can come back. Start today.",
@@ -102,7 +85,6 @@ export const notificationsStrings = {
     notifTEarn7: "Your steady days are not lost. Three days of wird bring them back.",
     notifTEarn8: "The most beloved deeds are the regular ones, even if small. Three days bring your streak back.",
 
-    // friday_kahf
     notifTKahf1: "It's Friday, a good day to read Surah al-Kahf.",
     notifTKahf2: "Friday reminder: Surah al-Kahf, whenever suits you today.",
     notifTKahf3: "Surah al-Kahf for your Friday, in one sitting or a few.",
@@ -112,7 +94,6 @@ export const notificationsStrings = {
     notifTKahf7: "Friday is here. Open the mushaf at Surah al-Kahf.",
     notifTKahf8: "Your Friday reading: Surah al-Kahf.",
 
-    // group_encouragement
     notifTGroup1: "Your halaqa sent you encouragement today.",
     notifTGroup2: "Encouragement from your halaqa today: {{count}}.",
     notifTGroup3: "\"May Allah make it easy.\" A message from your halaqa.",
@@ -122,7 +103,6 @@ export const notificationsStrings = {
     notifTGroup7: "Someone in your halaqa encouraged you today.",
     notifTGroup8: "Encouragement arrived from your halaqa.",
 
-    // comeback
     notifTBack1: "Welcome back whenever you are ready. Start with what you know well.",
     notifTBack2: "{{surah}} is due today. Just one page to start.",
     notifTBack3: "Just one page today. Your hifz is still with you.",
@@ -135,7 +115,6 @@ export const notificationsStrings = {
     notifTBack10: "Today is a good day to begin again, one page at a time.",
     notifTBack11: "Ramadan has begun. A page a day is a good way to return.",
 
-    // Template values
     notifPrayerFajr: "Fajr",
     notifPrayerDhuhr: "Dhuhr",
     notifPrayerAsr: "Asr",
@@ -143,11 +122,9 @@ export const notificationsStrings = {
     notifPrayerIsha: "Isha",
     notifSurahName: "Surah {{name}}",
 
-    // Native channel and action
     notifChannelName: "Wird reminders",
     notifActionRemindLater: "Remind me in 1 hour",
 
-    // Reminder settings
     notifSettingsTitle: "Reminders",
     notifPromptTitle: "A gentle daily reminder",
     notifMasterLabel: "Daily reminders",
@@ -209,11 +186,9 @@ export const notificationsStrings = {
       "Set from today's {{prayer}} time. Prayer times shift through the year, so move the event when needed.",
     notifSaveFailed: "The reminder setting could not be saved.",
 
-    // Permission ask (onboarding step 9 and session end)
     notifPermissionReasonPrayer: "We'll remind you after {{prayer}}, usually once a day.",
     notifPermissionReasonClock: "We'll remind you at {{time}}, usually once a day.",
 
-    // Prayer times setup
     notifPrayerTimesTitle: "Prayer times",
     notifPrayerTimesIntro:
       "Prayer times place your reminders after the prayer you choose. Your location stays on this device and is never uploaded.",
@@ -257,7 +232,6 @@ export const notificationsStrings = {
     notifMethodTehran: "Institute of Geophysics, Tehran",
     notifMethodTurkey: "Diyanet, Turkey",
 
-    // In-app banner
     notifBannerStart: "Start",
     notifBannerDismiss: "Dismiss reminder",
     notifBannerLabel: "Reminder",

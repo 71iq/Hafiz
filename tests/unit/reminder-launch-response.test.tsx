@@ -3,8 +3,6 @@ import type { ReminderResponse } from "@/lib/notifications/platform-types";
 import { recordReminderOpened, requestRemindLater } from "@/lib/notifications/schedule";
 import { useReminderResponses } from "@/lib/notifications/use-reminder-scheduling";
 
-// The remind-later action opens the app (platform.native.ts), so after Android ended the app's
-// process the tap arrives as the launch response and must still set the follow-up.
 
 const mockDb = { name: "synthetic" };
 let mockLaunch: ReminderResponse | null = null;
@@ -73,7 +71,6 @@ describe("a reminder action that opened the app (NOT-05b)", () => {
     act(() => mockLive!(live));
     expect(requestRemindLater).toHaveBeenCalledTimes(1);
 
-    // The OS kept it as the last response, and the listener subscribes again (database ready again).
     mockLaunch = live;
     first.unmount();
     const second = renderHook(() => useReminderResponses());

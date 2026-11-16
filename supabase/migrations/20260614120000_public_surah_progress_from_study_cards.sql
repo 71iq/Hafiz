@@ -1,6 +1,3 @@
--- Keep public Surah Progress in sync with private study_cards.
--- Existing rows are backfilled once; future study_card writes refresh the
--- affected user's public aggregate on the server.
 
 CREATE SCHEMA IF NOT EXISTS private;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;

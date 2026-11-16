@@ -47,15 +47,12 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
-  // Each loaded word is one generation; a save or delete that settles after a switch is ignored.
   const generation = useRef(0);
   const [loading, setLoading] = useState(true);
   const [savedToVocab, setSavedToVocab] = useState(false);
   const [savingToVocab, setSavingToVocab] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  // Read only: shows when the saved word comes up next, without creating or rescheduling a card.
   const [reviewDue, setReviewDue] = useState<string | null>(null);
-  // The first saved word also makes the Vocabulary Review deck appear on Home; say where it went.
   const [firstVocabWord, setFirstVocabWord] = useState(false);
   const showLoading = useDelayedLoading(loading);
 
@@ -90,7 +87,6 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
       try {
         deckWasEmpty = (await getTotalCardCount(db, MEANINGS_DECK_ID)) === 0;
       } catch {
-        // Only the notice depends on this count; the save goes ahead without it.
       }
       const { created } = await addMeaningCard(db, surah, ayah, wordPos);
       setSavedToVocab(true);
@@ -166,7 +162,6 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         word: wordArabic,
         meaning,
       });
-      // Reload so the shown row carries its real provenance and original created_at.
       const saved = await fetchWordMeaningAr(db, surah, ayah, wordPos).catch(() => null);
       if (generation.current !== own) return;
       setArMeaning(
@@ -223,7 +218,6 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         setArMeaning({ ...shown, meaning: null, source: null, custom_created_at: null });
         return;
       }
-      // The row changed since it was shown: keep the dialog's error and show the current meaning.
       setDeleteError(true);
       const current = await fetchWordMeaningAr(db, surah, ayah, wordPos).catch(() => null);
       if (generation.current === own && current) setArMeaning(current);

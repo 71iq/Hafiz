@@ -5,7 +5,7 @@ import { useUIDirection, type Direction } from "@/lib/ui/direction";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
 type ProgressProps = ViewProps & {
-  value: number; // 0-100
+  value: number;
   dir?: Direction;
 };
 
@@ -13,10 +13,6 @@ export const PROGRESS_EASE_MS = 250;
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
-/**
- * Eases the shown value to each new target over 250 ms (ease-out). The first frame shows the
- * target directly, and reduced motion jumps straight to every new value.
- */
 export function useEasedProgress(target: number): number {
   const reduceMotion = useReducedMotionPreference();
   const [shown, setShown] = useState(target);
@@ -48,10 +44,6 @@ export function useEasedProgress(target: number): number {
   return shown;
 }
 
-/**
- * Hairline progress bar (2px stroke)
- * Track uses outline-variant at 15% opacity, fill uses primary accent.
- */
 export const Progress = forwardRef<View, ProgressProps>(
   ({ value: target, className, dir: explicitDir, style, ...props }, ref) => {
     const dir = useUIDirection(explicitDir);
@@ -63,7 +55,6 @@ export const Progress = forwardRef<View, ProgressProps>(
         style={[
           {
             alignItems: dir === "rtl" ? "flex-end" : "flex-start",
-            // Pinned so flex-end is the right side; an inherited rtl direction made it the left.
             direction: "ltr",
             backgroundColor: "rgba(223, 217, 209, 0.15)",
           },

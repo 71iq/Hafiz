@@ -28,7 +28,6 @@ describe("recitation pages from the bundled Quran data", () => {
         ).flatMap((row) => row.text_qcf2.split(" ").filter(Boolean));
         const laidOut = built.lines.flatMap((line) => line.tokens.map((token) => token.glyph));
         expect({ page, glyphs: laidOut }).toEqual({ page, glyphs: expected });
-        // Same rows as the reader: at most 15 text lines, each line number once among text lines.
         const ayahLines = built.lines.filter((line) => line.kind === "ayah").map((line) => line.lineNumber);
         expect(ayahLines.length).toBeLessThanOrEqual(15);
         expect(new Set(ayahLines).size).toBe(ayahLines.length);

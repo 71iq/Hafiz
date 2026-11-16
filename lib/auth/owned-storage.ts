@@ -121,7 +121,6 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
         }
         await raw.setItem(name, value);
         if (guard && name === key) {
-          // A receipt exists only after the guarded backing write succeeds.
           guard.identity = next;
           guard.committed = true;
         }
@@ -130,7 +129,6 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
       shared.atomic(async (raw) => {
         const guard = active;
         if (guard?.recovery && !guard.committed) {
-          // Recovery must not delete the existing session or its auxiliary state when its own token fails.
           if (name === key || name === key + "-code-verifier" || name === key + "-user") return;
         }
         if (guard && protectedKey(name)) {
@@ -159,8 +157,6 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
     let startingIdentity = parsed.kind === "identified" ? JSON.stringify(parsed) : null;
     let opaqueBase: string | undefined;
     if (replacement) {
-      // Explicit new credentials replace the persisted base present before dispatch. It may
-      // include an earlier private commit whose obsolete notification was suppressed.
       const value = await shared.atomic(async (raw) => raw.getItem(key));
       if (!owner.isCurrent()) throw new AuthError("Auth operation superseded", 409, "operation_superseded");
       if (active) throw new Error("Overlapping owned SDK operation");
@@ -189,8 +185,6 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
     canDispatch: () => {
       if (!active || active.denied) return false;
       if (active.owner.isCurrent()) return true;
-      // A refused refresh can make the SDK attempt SIGNED_OUT cleanup.
-      // Nothing was sent, so that cleanup must not delete the prior session.
       active.denied = true;
       return false;
     },

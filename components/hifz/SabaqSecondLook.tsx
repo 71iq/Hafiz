@@ -18,18 +18,14 @@ import { interpolate } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 
-/** The shared outline Button has no border; here an outline action needs one to read as a button. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
 type Props = {
   look: SecondLook;
-  /** The look's place among today's due looks, from 0. */
   index: number;
   total: number;
-  /** A grade is saving: the grade and skip actions wait for it. */
   busy: boolean;
   error: string | null;
-  /** Close was pressed during a save and waits for it. */
   closePending: boolean;
   surahNames: ReadonlyMap<number, string>;
   isDark: boolean;
@@ -38,17 +34,10 @@ type Props = {
   s: UIStrings;
   onClose: () => void;
   onGrade: (rating: Grade) => void;
-  /** Go on to new lines. Nothing is saved, so the look stays due for the rest of the day. */
   onSkip: () => void;
-  /** A new lesson follows when the look is skipped, so the skip says where it goes. */
   continuesToNewLines: boolean;
 };
 
-/**
- * SBQ-03, the second look: recite lines memorized earlier today from memory, check them against the
- * page and grade the recall, before any new lines. Laid out like the sabaq lesson it precedes. Give
- * it a key per look, so the check starts hidden for each one.
- */
 export function SabaqSecondLook({
   look,
   index,
@@ -70,12 +59,10 @@ export function SabaqSecondLook({
   const pageWidth = Math.min(width, 640);
   const dir = isRTL ? "rtl" : "ltr";
   const [shown, setShown] = useState(false);
-  // Teal text under 14 px uses the darker token in light mode.
   const accent = isDark ? "#2dd4bf" : "#0f766e";
   const { effectiveTheme } = useSettings();
   const muted = mutedIconColor(effectiveTheme);
   const ayahLabel = useCallback((token: PageToken) => formatAyahRef(isRTL, token.surah, token.ayah), [isRTL]);
-  // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
   const portion = `${interpolate(s.hifzPageN, { n: formatNumber(look.page, language) })}${language === "ar" ? "، " : " · "}${interpolate(
     s.hifzSabaqLines,
     {
@@ -111,7 +98,6 @@ export function SabaqSecondLook({
         </View>
       </View>
 
-      {/* Title, page card and actions all start 8 px inside the page column, as in the hifz review. */}
       <ScrollView contentContainerStyle={{ paddingVertical: 16, paddingHorizontal: 8, gap: 14, alignItems: "center" }}>
         <View style={{ width: "100%", maxWidth: pageWidth - 16, gap: 6 }}>
           <Text
@@ -121,7 +107,6 @@ export function SabaqSecondLook({
           >
             {s.hifzSecondLookTitle}
           </Text>
-          {/* Readable at 4.5:1 in both themes; the shared muted tone is lighter. */}
           <Text dir={dir} variant="muted" className="text-warm-700 dark:text-neutral-400" style={{ lineHeight: 20 }}>
             {s.hifzSecondLookHint}
           </Text>
@@ -152,7 +137,6 @@ export function SabaqSecondLook({
 
       <View className="px-2 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
         <View style={{ width: "100%", maxWidth: pageWidth - 16, gap: 10 }}>
-          {/* A failed save shows here, by the grade the person just pressed. */}
           {error ? (
             <Text
               dir={dir}
@@ -171,7 +155,6 @@ export function SabaqSecondLook({
           )}
           <Button variant="outline" className={OUTLINE_BORDER} label={continuesToNewLines ? s.hifzSecondLookSkipToNew : s.hifzSecondLookSkipForNow} onPress={onSkip} disabled={busy} />
           <Text dir={dir} align="center" variant="caption" className="text-warm-700 dark:text-neutral-400" style={{ lineHeight: 18 }}>
-            {/* Skipping skips every look still to come, so the hint counts them. */}
             {total - index > 1 ? s.hifzSecondLooksSkipHint : s.hifzSecondLookSkipHint}
           </Text>
         </View>

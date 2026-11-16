@@ -14,19 +14,11 @@ import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sql
 
 const TODAY = "2026-11-13";
 
-/**
- * SOC-03: a teacher's next sabaq. The plan memorizes from al-Fatihah, so page 1 is its next page; the
- * teacher can send the lesson elsewhere, and the lesson stays inside the lines they chose.
- */
 describe("a teacher's next sabaq (SOC-03)", () => {
   let store: OutboxDatabase;
   const plan = { ...DEFAULT_HIFZ_PLAN, method: "standard" as const, direction: "from_fatiha" as const };
   const pageWords = () => null;
 
-  /**
-   * Page 1: the surah name on line 1, then 7 ayat on lines 2 to 8. Page 2: 3 ayat on lines 1 to 3.
-   * Every line ends its ayah.
-   */
   function seedPages() {
     store.sql.exec(
       "INSERT INTO surahs (number, name_arabic, name_english, ayah_count, revelation_type) VALUES (1, 'الفاتحة', 'Al-Fatihah', 7, 'Meccan')",
@@ -66,7 +58,6 @@ describe("a teacher's next sabaq (SOC-03)", () => {
     jest.restoreAllMocks();
   });
 
-  /** One lesson as the sabaq screen saves it: step 6's clean run, then the fluent check. */
   async function learn(target: SabaqTarget, rating: Grade, checkAt: Date) {
     const session = startReviewSession("sabaq", { now: new Date(checkAt.getTime() - 10 * 60_000) });
     await saveSabaqCleanRun(store.db, {
@@ -91,24 +82,20 @@ describe("a teacher's next sabaq (SOC-03)", () => {
 
     await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60));
     expect(await assignedSabaqOpen(store.db, assigned)).toBe(false);
-    // The assigned lines are memorized; the plan's next page comes back.
     const next = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords, assigned }))!;
     expect(next).toMatchObject({ page: 1, fromLine: 2, toLine: 5, assigned: false });
   });
 
   it("keeps a lesson inside the assigned lines and the plan's lesson size", async () => {
-    // Lines 3 to 8 at three lines a lesson: lines 3 to 5 first, never line 2 before them.
     const assigned = { page: 1, fromLine: 3, toLine: 8 };
     const first = (await nextSabaqTarget(store.db, { plan, wantLines: 3, pageWords, assigned }))!;
     expect(first).toMatchObject({ page: 1, fromLine: 3, toLine: 5, assigned: true });
     await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60));
-    // Lines 6 to 8 next, though the plan's own order would offer line 2.
     const second = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords, assigned }))!;
     expect(second).toMatchObject({ page: 1, fromLine: 6, toLine: 8, assigned: true, completesPage: false });
   });
 
   it("offers assigned lines again after a failed check, as plan lines are", async () => {
-    // Part of the page, since step 6 of a page's last lines adds the page to review.
     const assigned = { page: 2, fromLine: 1, toLine: 2 };
     const first = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords, assigned }))!;
     await learn(first, Rating.Again, atLocalTime(TODAY, 9 * 60));
@@ -129,7 +116,6 @@ describe("a teacher's next sabaq (SOC-03)", () => {
       page: 1,
       assigned: false,
     });
-    // Line 1 of page 1 is the surah name.
     const nameOnly = { page: 1, fromLine: 1, toLine: 1 };
     expect(await assignedSabaqOpen(store.db, nameOnly)).toBe(false);
     expect(await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords, assigned: nameOnly })).toMatchObject({

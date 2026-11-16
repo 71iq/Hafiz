@@ -28,7 +28,6 @@ export type ReminderBanner =
       route: ReminderRoute;
     }>;
 
-/** A small seeded generator, so the banner's template stays the same through the day. */
 function seededRandom(seed: string): () => number {
   let state = 0;
   for (const char of seed) state = (Math.imul(state, 31) + char.charCodeAt(0)) >>> 0;
@@ -49,12 +48,6 @@ const STATE_FOR_TYPE: Partial<Record<NotificationType, readonly string[]>> = {
   earnback_open: ["earn_back"],
 };
 
-/**
- * The in-app reminder for right now (NOT-03). Web always uses it because it cannot schedule; native
- * uses it only while notifications are not allowed. It is the latest reminder due today under the
- * same rules as the notifications, still true at `now`, and not dismissed today. During the first
- * days of Ramadan it offers the Ramadan reminder times once (NOT-10).
- */
 export async function loadReminderBanner(
   db: DatabaseExecutor,
   { now = new Date(), language, clock = deviceClock }: { now?: Date; language?: Language; clock?: DayClock } = {},
@@ -75,7 +68,6 @@ export async function loadReminderBanner(
   const dayStart = clock.at(today, 0);
   const plan = planNotifications({
     ...input,
-    // Plan from just before midnight so every slot of today counts as upcoming.
     now: new Date(dayStart.getTime() - 1),
     horizonDays: 2,
     backoff: 0,
@@ -99,7 +91,6 @@ export async function loadReminderBanner(
   return { kind: "reminder", type: latest.type, localDate: today, title, body, route: latest.route };
 }
 
-/** Hide the banner for the rest of the day. A later reminder of another type can still show. */
 export async function dismissReminderBanner(db: DatabaseExecutor, banner: ReminderBanner): Promise<void> {
   if (banner.kind === "ramadan_offer") {
     await writeLocalSetting(db, LOCAL_KEYS.ramadanOffer, { hijri_year: banner.hijriYear });
@@ -108,7 +99,6 @@ export async function dismissReminderBanner(db: DatabaseExecutor, banner: Remind
   await writeLocalSetting(db, LOCAL_KEYS.bannerDismissed, { local_date: banner.localDate, kind: banner.type });
 }
 
-/** NOT-10: answer the Ramadan offer once. A choice moves the anchor for Ramadan only. */
 export async function answerRamadanOffer(
   db: AppDatabase,
   { hijriYear, choice, now = new Date() }: { hijriYear: number; choice: RamadanAnchor | null; now?: Date },

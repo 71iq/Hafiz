@@ -4,14 +4,6 @@ import { interpolate } from "@/lib/i18n/useStrings";
 import type { PrayerName } from "@/lib/prayer/times";
 import type { NotificationType, PlannedSlot } from "@/lib/notifications/types";
 
-/**
- * Values a template can need. A template is eligible only when every value it needs is known, so
- * copy never mentions a surah, page count or prayer it cannot fill in.
- * - n: the streak length; next: the day the wird would complete; g: grace days left.
- * - onePage, fiveMinutes: the user's minimum wird is at most one page, or at most five minutes, so
- *   "one page is enough" stays true when the user raised their minimum.
- * - ramadan: only for the Ramadan invitation.
- */
 export type TemplateVar =
   | "n"
   | "next"
@@ -33,7 +25,6 @@ export type NotificationTemplate = Readonly<{
   type: NotificationType;
   key: NotificationStringKey;
   needs: readonly TemplateVar[];
-  /** Quotes a hadith or ayah from spec 9.3. At most one a week across all reminders (NOT-14). */
   citation: boolean;
 }>;
 
@@ -171,9 +162,7 @@ const TITLE_KEYS: Readonly<Record<NotificationType, NotificationStringKey>> = {
   comeback: "notifTitleComeback",
 };
 
-/** NOT-12: a template is not repeated within 15 days for the same type. */
 export const NO_REPEAT_DAYS = 15;
-/** NOT-14: at most one hadith or ayah template a week. */
 const CITATION_GAP_DAYS = 7;
 const DAY_MS = 86_400_000;
 
@@ -191,11 +180,6 @@ function citationAllowed(at: Date, history: readonly TemplateUse[]): boolean {
   });
 }
 
-/**
- * NOT-12: pick at random among eligible templates that were not used for this type in the last 15
- * days, falling back to the least recently used eligible template. A Ramadan slot uses the Ramadan
- * templates only. Returns null only when no template of the type has the values it needs.
- */
 export function chooseTemplate(input: {
   type: NotificationType;
   at: Date;
@@ -246,7 +230,6 @@ export function prayerLabel(prayer: PrayerName, language: Language): string {
   return notificationsStrings[language][PRAYER_KEYS[prayer]];
 }
 
-/** Digits for display: Arabic-Indic in Arabic. */
 export function localizeDigits(value: string | number, language: Language): string {
   const text = String(value);
   return language === "ar" ? text.replace(/\d/g, (digit) => toArabicNumber(Number(digit))) : text;
@@ -254,10 +237,6 @@ export function localizeDigits(value: string | number, language: Language): stri
 
 export type SurahNames = (surah: number, language: Language) => string | null;
 
-/**
- * The title and body for a planned slot in `language`. `cutoff` is a prayer key ("dhuhr") or a
- * clock time ("12:30"); `prayer` is a prayer key; `surah` is a surah number.
- */
 export function renderNotification(
   slot: Pick<PlannedSlot, "type" | "templateId" | "vars">,
   language: Language,

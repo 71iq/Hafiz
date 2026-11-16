@@ -40,7 +40,6 @@ describe("/flashcards/vocab legacy route", () => {
     expect(mockDatabaseAccess).not.toHaveBeenCalled();
     const source = fs.readFileSync(path.join(process.cwd(), "app/flashcards/vocab.tsx"), "utf8");
     expect(source).not.toMatch(/vocab_cards\s*(SET|WHERE)|useDatabase|loadReviewQueue|DELETE FROM/);
-    // The retired legacy queue reader and its direct delete are gone, so nothing else can reach them.
     expect(fs.existsSync(path.join(process.cwd(), "lib/vocab/queries.ts"))).toBe(false);
   });
 });

@@ -30,22 +30,16 @@ const ChromeActionsContext = createContext<ChromeActions>({
   markActivity: noop,
 });
 
-/** Chrome state and actions. Re-renders whenever the bar shows or hides. */
 export function useChrome(): ChromeContextType {
   const state = useContext(ChromeStateContext);
   const actions = useContext(ChromeActionsContext);
   return useMemo(() => ({ ...state, ...actions }), [state, actions]);
 }
 
-/**
- * Stable chrome actions only. Word tokens use this: the bar hides and shows on every change of
- * scroll direction, and subscribing hundreds of tokens to that state re-rendered a whole page.
- */
 export function useChromeActions(): ChromeActions {
   return useContext(ChromeActionsContext);
 }
 
-/** Provider for in-app chrome (top header + bottom tab bar) visibility. */
 export function ChromeProvider({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(true);
   const [immersive, setImmersive] = useState(false);

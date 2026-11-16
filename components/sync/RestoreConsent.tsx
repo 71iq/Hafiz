@@ -38,10 +38,6 @@ function consentMessage(request: RestoreConsentRequest, s: UIStrings, language: 
   return [intro, ...lines, "", s.syncRestoreReadingAvailable].join("\n");
 }
 
-/**
- * The one restore confirmation, mounted where sync results are handled. Use account progress submits
- * only the opaque token; Cancel sync (or dismissing) stores the account's pause and keeps local data.
- */
 export function RestoreConsentDialog() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const { request, busy, issue, accept, cancel, prepareAgain } = useRestoreConsent(userId);
@@ -77,7 +73,6 @@ export function RestoreConsentDialog() {
   );
 }
 
-/** A persistent Sync paused / Resume sync status beside the sync indicator. */
 export function SyncPausedStatus() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const { paused, resuming, resume } = useSyncRestorePause(userId);
@@ -92,7 +87,6 @@ export function SyncPausedStatus() {
       accessibilityRole="button"
       accessibilityLabel={`${s.syncPaused}. ${s.syncResume}`}
       accessibilityState={{ busy: resuming, disabled: resuming }}
-      // Rows set their own order from the UI direction, as MirroredRow does.
       style={{ direction: "ltr" }}
       className={`min-h-11 items-center gap-2 rounded-full border border-warm-200 bg-surface px-4 dark:border-neutral-700 dark:bg-surface-dark ${
         isRTL ? "flex-row-reverse" : "flex-row"

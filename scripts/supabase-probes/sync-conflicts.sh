@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# RF169 probe: isolated PostgreSQL 17 container with no network and synthetic users; never touches
-# production. Replays the client's upload and delete statements as the authenticated role to show
-# whether a newer write from another device survives an older one that arrives later, including the
-# case where the older write waits on the newer one's row lock.
-# Requires Docker and a cached postgres:17 image. Usage: SCHEMA=<old schema.sql> bash scripts/supabase-probes/sync-conflicts.sh
 set -euo pipefail
 WT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCHEMA="${SCHEMA:-$WT/supabase/schema.sql}"
@@ -70,8 +65,7 @@ INSERT INTO public.highlights (user_id, sync_id, surah, ayah, color, created_at,
 SQL
 }
 
-# Device upload as PostgREST sends it: INSERT ... ON CONFLICT DO UPDATE with every column.
-upsert_setting() { # $1 value, $2 updated_at
+upsert_setting() {
   echo "INSERT INTO public.user_settings (user_id, key, value, updated_at, deleted_at, synced_at)
         VALUES ('$A', 'daily_review_limit', '$1', '$2', NULL, now())
         ON CONFLICT (user_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at,

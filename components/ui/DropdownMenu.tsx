@@ -14,11 +14,8 @@ export type DropdownMenuItem = {
   onPress: () => void;
   disabled?: boolean;
   destructive?: boolean;
-  /** Draws a divider above this item. The first destructive item gets one automatically. */
   separatorBefore?: boolean;
-  /** Set for radio choices: the item is a menuitemradio and shows a check when true. */
   checked?: boolean;
-  /** A heading shown before the first item of each consecutive group. */
   group?: string;
 };
 
@@ -37,15 +34,12 @@ type DropdownMenuProps = {
   width?: number;
   isRTL?: boolean;
   className?: string;
-  /** Replaces the default "more" icon on the trigger. */
   triggerIcon?: (color: string) => ReactNode;
 };
 
 const MENU_MARGIN = 12;
 const ANCHOR_GAP = 8;
-/** The 32px trigger keeps its look; this slop brings its touch target to 44px. */
 const TRIGGER_HIT_SLOP = 6;
-/** Keys the open menu owns, so they never page or scroll the reader beneath it. */
 const MENU_KEYS = new Set([
   "ArrowDown",
   "ArrowUp",
@@ -69,7 +63,6 @@ type MenuPlacementInput = {
   align: "start" | "end";
 };
 
-/** Opens below the trigger when the measured menu fits, otherwise above it, clamped to the viewport. */
 export function placeDropdownMenu({
   anchor,
   menuWidth,
@@ -84,7 +77,6 @@ export function placeDropdownMenu({
   if (belowTop + menuHeight <= viewportHeight - MENU_MARGIN) return { left, top: belowTop };
   const aboveTop = anchor.y - menuHeight - ANCHOR_GAP;
   if (aboveTop >= MENU_MARGIN) return { left, top: aboveTop };
-  // Neither side fits: keep the whole menu on screen; it scrolls inside its own height cap.
   return { left, top: Math.max(MENU_MARGIN, viewportHeight - MENU_MARGIN - menuHeight) };
 }
 
@@ -128,7 +120,6 @@ export function DropdownMenu({
   const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(95,78,64,0.12)";
   const firstDestructive = items.findIndex((item) => item.destructive);
 
-  // The menu renders hidden first; its measured height decides above or below.
   const menuPosition = useMemo(() => {
     if (!anchor || menuHeight === null) return null;
     return placeDropdownMenu({
@@ -170,8 +161,6 @@ export function DropdownMenu({
     (itemRefs.current[index] as { focus?: () => void } | null)?.focus?.();
   }, []);
 
-  // The open menu is the topmost surface: it owns Escape and the menu keys before any sheet or
-  // the reader sees them. react-native-web's Modal returns focus to the trigger on close.
   useEffect(() => {
     if (!isOpen) return;
     const unregister = registerOverlayLayer(layerId);
@@ -214,13 +203,11 @@ export function DropdownMenu({
     };
   }, [close, focusItem, isOpen, items, layerId, selectItem]);
 
-  // Web: put focus on the first available item once the menu is placed.
   const placed = menuPosition !== null;
   useEffect(() => {
     if (!placed || Platform.OS !== "web") return;
     const frame = requestAnimationFrame(() => focusItem(nextEnabledIndex(items, -1, 1)));
     return () => cancelAnimationFrame(frame);
-    // Only a newly placed menu takes focus; item changes keep the current focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placed]);
 
@@ -293,7 +280,6 @@ export function DropdownMenu({
                             fontSize: 11,
                             ...textStartStyle(isRTL),
                             writingDirection: isRTL ? "rtl" : "ltr",
-                            // A divider sits above the whole group, heading included.
                             borderTopWidth: divider ? 1 : 0,
                             borderTopColor: borderColor,
                           }}

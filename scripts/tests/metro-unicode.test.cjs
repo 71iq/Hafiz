@@ -9,7 +9,6 @@ const { test } = require("node:test");
 const root = process.cwd();
 const rootRequire = createRequire(path.join(root, "package.json"));
 const config = rootRequire("./metro.config.js");
-// Follow the same dependency owner as Expo instead of assuming a hoisted minifier.
 const expoOwner = createRequire(rootRequire.resolve("expo/metro-config"));
 const configOwner = createRequire(expoOwner.resolve("@expo/metro-config/package.json"));
 const facadeOwner = createRequire(configOwner.resolve("@expo/metro/metro-transform-worker"));

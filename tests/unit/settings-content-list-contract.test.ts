@@ -12,7 +12,6 @@ describe("settings content list contract", () => {
     expect(contentStart).toBeGreaterThan(-1);
     expect(accountStart).toBeGreaterThan(contentStart);
     expect(contentSource).toContain("<ContentSettingsPanel isRTL={isRTL}>");
-    // "Reading Content" is the only heading; the old "Inline Content" title is gone.
     expect(contentSource).toContain("<ContentSettingsTitle isRTL={isRTL}>{s.readingContentSettingsLabel}</ContentSettingsTitle>");
     expect(contentSource).not.toContain("sectionInlineContent");
     expect(contentSource).toContain("<ContentSettingsRow");

@@ -47,7 +47,6 @@ afterEach(async () => {
 describe("RF-173 achievement unlocks and their upload queue", () => {
   it("commits no unlock and notifies nobody when a later unlock's queue write fails, then backfills once", async () => {
     seedDeckAndNote();
-    // The deck unlock queues first; fail the note unlock that follows in the same backfill.
     store.failQueueInsert(2);
 
     await expect(backfillAchievements(store.db, { notify: true })).rejects.toThrow(

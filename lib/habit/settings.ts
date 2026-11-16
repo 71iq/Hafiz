@@ -4,20 +4,16 @@ import { isLocalDate } from "@/lib/habit/dates";
 import { parseWirdMinimum, type WirdMinimum } from "@/lib/habit/minimum";
 import type { HabitPause, StreakGoal } from "@/lib/habit/types";
 
-/** Synced habit settings (spec 7.6). Keys under `habit_` and `hifz_` are on the sync allowlist. */
 export const HABIT_SETTING_KEYS = {
   minimum: "hifz_minimum_wird",
   studyCountsTowardMinimum: "hifz_meanings_count",
   goal: "habit_streak_goal",
   pause: "habit_pause",
   weekStart: "habit_week_start",
-  /** 5.11 ZAY-02: Zayt can be turned off anywhere it appears. */
   hideZayt: "habit_hide_zayt",
-  /** ERR-06: weak-spot markers in the reader are on unless turned off. */
   hideWeakSpots: "habit_hide_weak_spots",
 } as const;
 
-/** STR-13: a pause lasts at most 60 days. */
 export const MAX_PAUSE_DAYS = 60;
 
 const localDate = z.string().refine(isLocalDate);
@@ -29,7 +25,6 @@ export type HabitSettings = Readonly<{
   studyCountsTowardMinimum: boolean;
   goal: StreakGoal | null;
   pause: HabitPause | null;
-  /** 0 is Sunday. Null means the locale default (STR-28). */
   weekStart: number | null;
   showZayt: boolean;
   showWeakSpots: boolean;
@@ -69,7 +64,6 @@ export async function readHabitSettings(db: DatabaseExecutor): Promise<HabitSett
   return parseHabitSettings(new Map(rows.map((row) => [row.key, row.value])));
 }
 
-/** STR-28: Saturday in Arabic, Monday elsewhere, unless the user chose a day. */
 export function effectiveWeekStart(settings: Pick<HabitSettings, "weekStart">, language: "en" | "ar"): number {
   if (settings.weekStart !== null) return settings.weekStart;
   return language === "ar" ? 6 : 1;

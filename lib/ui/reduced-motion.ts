@@ -23,7 +23,6 @@ function observePreference() {
       publish(value);
     });
   } catch {
-    // An unavailable listener leaves the initial query and conservative fallback.
   }
 
   try {
@@ -32,11 +31,9 @@ function observePreference() {
         if (active && !receivedEvent) publish(value);
       },
       () => {
-        // Keep motion disabled if the system preference cannot be read.
       },
     );
   } catch {
-    // Older or unsupported targets can throw before returning a promise.
   }
 
   return () => {
@@ -58,7 +55,6 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Live system preference. Unknown and server-rendered states disable motion. */
 export function useReducedMotionPreference(): boolean {
   return useSyncExternalStore(
     subscribe,

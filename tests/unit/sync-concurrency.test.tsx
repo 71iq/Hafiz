@@ -164,7 +164,6 @@ it("retires a deferred connectivity result and admits the latest account after i
   const response = deferred<Awaited<ReturnType<typeof NetInfo.fetch>>>();
   jest.mocked(NetInfo.fetch).mockReturnValueOnce(response.promise);
   const { result, rerender } = renderHook(() => useSync());
-  // The stored pause is read first; wait until A's run is waiting on connectivity.
   await waitFor(() => expect(NetInfo.fetch).toHaveBeenCalledTimes(1));
   await act(async () => {
     activate(session(B));
@@ -404,7 +403,6 @@ it("admits a fresh connectivity trigger after an idle closed A-B-A without a rer
     activate(original);
     listener(network(true));
   });
-  // W02: a reconnect is debounced before it syncs.
   expect(mockFullSync).toHaveBeenCalledTimes(1);
   await act(async () => {
     jest.advanceTimersByTime(RECONNECT_SYNC_DEBOUNCE_MS);
@@ -557,7 +555,6 @@ it.each(["synced", "failed"] as const)(
     mockFullSync.mockResolvedValue({ ...HEALTHY, status });
     const { result } = renderHook(() => useSync());
     await waitFor(() => expect(result.current.status).toBe(status === "synced" ? "synced" : "error"));
-    // Dormant Quran Foundation rows stay stored but are not reported while its gate is off.
     expect(result.current.pendingCount).toBe(0);
     expect(mockQfCount).not.toHaveBeenCalled();
     expect(mockQfSync).not.toHaveBeenCalled();
@@ -840,7 +837,6 @@ describe("W14 account status details", () => {
     });
     expect(result.current.status).toBe("error");
     expect(result.current.failure).toBe("failed");
-    // A failed run never moves the last successful time.
     expect(result.current.lastSyncedAt).toBe(lastSuccess);
 
     mockFullSync.mockResolvedValueOnce({ ...HEALTHY, status: "partial" });

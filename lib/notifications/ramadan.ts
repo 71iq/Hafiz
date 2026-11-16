@@ -20,10 +20,6 @@ function umalquraFormatter(): Intl.DateTimeFormat | null {
   return formatter;
 }
 
-/**
- * The Umm al-Qura date for a civil date, or null when the runtime's Intl has no such calendar.
- * Callers skip Ramadan behavior in that case (NOT-10) instead of guessing.
- */
 export function hijriDateOf(date: LocalDate): HijriDate | null {
   const format = umalquraFormatter();
   if (!format) return null;

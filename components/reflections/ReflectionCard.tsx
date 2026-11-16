@@ -18,7 +18,6 @@ import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMen
 import { formatCommentDateTime, formatLocalRelativeTime, ReflectionTime } from "./ReflectionTime";
 import { useDeleteReflection, useReportReflection } from "./use-reflection-actions";
 
-/** Feed cards clamp long reflections to this many lines; Read more opens the full post. */
 export const REFLECTION_CLAMP_LINES = 8;
 
 type Props = {
@@ -31,11 +30,8 @@ type Props = {
   referenceLabel?: string;
   onReferencePress?: (reflection: Reflection) => void;
   onAuthRequired?: () => void;
-  /** Called before the card navigates away, so the sheet that shows it can close first. */
   onNavigate?: () => void;
-  /** Clamp long content and offer Read more (which calls onPress). The full-post view leaves this off. */
   clamp?: boolean;
-  /** After the author's delete settled (deleted, or no longer available), so a detail view can close. */
   onGone?: (reflection: Reflection) => void;
 };
 
@@ -94,7 +90,6 @@ export function ReflectionCard({
 
   const handleLike = useCallback(async () => {
     if (!user) {
-      // The surface stays open and explains itself; no like is replayed after signing in.
       if (onAuthRequired) onAuthRequired();
       else setFailure("auth");
       return;
@@ -165,7 +160,6 @@ export function ReflectionCard({
   const contentText = (
     <View style={{ marginBottom: canClamp && clamped ? 4 : isFeed ? 14 : 12 }}>
       {canClamp ? (
-        // An unclamped hidden copy tells whether the reflection needs Read more.
         <Text
           aria-hidden
           accessibilityElementsHidden

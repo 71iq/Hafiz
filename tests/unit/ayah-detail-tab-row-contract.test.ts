@@ -10,7 +10,6 @@ describe("Detail tab row contract", () => {
     expect(row).toContain("<ScrollView");
     expect(row).toContain("horizontal");
     expect(row).toContain("showsHorizontalScrollIndicator={false}");
-    // Direction alone mirrors the row; row-reverse under direction "rtl" would flip it back.
     expect(row).toMatch(/direction: isRTL \? "rtl" : "ltr",\s+flexDirection: "row",\s+gap: 8/);
     expect(row).toContain("flexShrink: 0");
     expect(row).toContain("numberOfLines={1}");

@@ -7,7 +7,6 @@ import { comebackCadence, planNotifications, type PlannerInput } from "@/lib/not
 import { DEFAULT_REMINDER_PREFS } from "@/lib/notifications/types";
 import type { DayPrayerTimes } from "@/lib/prayer/times";
 
-/** A fixed UTC+3 clock, so results do not depend on the machine's zone. */
 const OFFSET_MS = 3 * 60 * 60_000;
 const CLOCK: DayClock = {
   at: (date, minutes) => new Date(Date.parse(`${date}T00:00:00Z`) + minutes * 60_000 - OFFSET_MS),
@@ -21,7 +20,6 @@ const CLOCK: DayClock = {
 
 const TODAY: LocalDate = "2026-11-12";
 
-/** Dhuhr moves a little each day, so make-up cutoffs differ from the 12:30 fallback. */
 function prayerTimes(date: LocalDate): DayPrayerTimes {
   const drift = Number(date.slice(8, 10)) % 7;
   const at = (minutes: number) => CLOCK.at(date, minutes + drift);
@@ -32,7 +30,6 @@ function projectionInput(days: readonly HabitDay[], pause: HabitPause | null, wi
   return { habit: { days, pause }, clock: CLOCK, prayers: withPrayers ? prayerTimes : () => null };
 }
 
-/** The last `count` days through yesterday, with an occasional excused day. */
 function longHistory(count: number): HabitDay[] {
   return Array.from({ length: count }, (_, index) => ({
     localDate: addDays(TODAY, index - count),
@@ -61,7 +58,6 @@ function plannerInput(days: HabitDay[]): PlannerInput {
   };
 }
 
-/** Every instant a plan asks about, plus the edges of the make-up window. */
 function instantsFor(date: LocalDate): Date[] {
   return [0, 5 * 60 + 20, 10 * 60 + 35, 12 * 60 + 29, 12 * 60 + 31, 19 * 60, 23 * 60 + 15, 23 * 60 + 59].map((minutes) =>
     CLOCK.at(date, minutes),
@@ -102,7 +98,6 @@ describe("incremental habit projection", () => {
     const yesterday = addDays(TODAY, -1);
     const cases: { days: HabitDay[]; pause: HabitPause | null }[] = [
       { days: longHistory(400), pause: null },
-      // A 400-day streak broke three days ago; two days recited since, one with the full wird.
       {
         days: [
           ...longHistory(403).slice(0, 400),
@@ -111,11 +106,8 @@ describe("incremental habit projection", () => {
         ],
         pause: null,
       },
-      // A pause that started before the window and runs past today.
       { days: longHistory(200).filter((day) => day.localDate < addDays(TODAY, -40)), pause: { start: addDays(TODAY, -45), end: addDays(TODAY, 3) } },
-      // Missed days on both sides of the cut, covered by grace.
       { days: longHistory(120).filter((day) => ![-30, -31, -32, -60].some((offset) => day.localDate === addDays(TODAY, offset))), pause: null },
-      // Only paused days reach the cut: the run continues but adds nothing.
       { days: Array.from({ length: 60 }, (_, index) => ({ localDate: addDays(TODAY, index - 70), status: "paused" as const, fullMet: false })), pause: null },
     ];
     const dates = Array.from({ length: 8 }, (_, offset) => addDays(TODAY, offset));
@@ -133,7 +125,6 @@ describe("incremental habit projection", () => {
   });
   const historyArb = fc.record({
     segments: fc.array(segmentArb, { maxLength: 6 }),
-    /** Where the history ends relative to today; positive values leave future excused days. */
     endOffset: fc.integer({ min: -9, max: 2 }),
     pause: fc.option(fc.record({ start: fc.integer({ min: -60, max: 6 }), length: fc.integer({ min: -2, max: 20 }) }), { nil: null }),
     withPrayers: fc.boolean(),
@@ -149,7 +140,6 @@ describe("incremental habit projection", () => {
     for (const segment of [...segments].reverse()) {
       for (let index = segment.length - 1; index >= 0; index -= 1) {
         const status = segment.pattern[index % segment.pattern.length];
-        // Future days can only be excused.
         if (cursor <= TODAY || status === "excused") {
           result.push({ localDate: cursor, status, fullMet: segment.fullEvery > 0 && index % segment.fullEvery === 0 });
         }

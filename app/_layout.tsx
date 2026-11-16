@@ -32,10 +32,6 @@ import { NavigationBarTheme } from "@/components/settings/NavigationBarTheme";
 const queryClient = createAppQueryClient();
 const NATIVE_UI_FONT_WAIT_MS = 3000;
 
-/**
- * The Hafiz fallback for a crash above the route providers (instead of the Expo Router default). It
- * reads the startup language because the settings provider may be the part that failed.
- */
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   let language: "en" | "ar" = "en";
   try {
@@ -44,10 +40,6 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return <RouteErrorFallback strings={strings[language]} onRetry={() => void retry()} />;
 }
 
-/**
- * Web preloads the three UI faces used on first paint. The URLs are the hashed files the export
- * already emits for these modules, so nothing is downloaded or replaced.
- */
 const PRELOADED_UI_FONT_URLS = [
   UI_FONTS.Manrope_400Regular,
   UI_FONTS.Manrope_700Bold,
@@ -67,8 +59,6 @@ function WebUiFontPreload() {
 
 SplashScreen.preventAutoHideAsync();
 
-// Native: read the small language/theme startup mirror while UI fonts load, so the first frames use
-// the saved choice. A failed read resolves to null and never blocks data preparation.
 const uiBootstrapReady = Platform.OS === "web" ? Promise.resolve(null) : loadUiBootstrap();
 
 function StableDocumentTitle() {
@@ -92,17 +82,12 @@ function StableDocumentTitle() {
   return null;
 }
 
-/** Local reminders: replans on start, foreground, zone change, sync and reviews, and routes taps. */
 function ReminderLifecycle() {
   useReminderScheduling();
   useReminderResponses();
   return null;
 }
 
-/**
- * Social upkeep for the signed-in account: halaqa encouragement since the last check becomes one
- * batched local reminder (5.8.2), and the board bands stay current for the weekly placement pass.
- */
 function EncouragementChecks() {
   const { isReady } = useDatabaseStatus();
   return isReady ? <EncouragementCheckRunner /> : null;
@@ -110,12 +95,10 @@ function EncouragementChecks() {
 
 function EncouragementCheckRunner() {
   useGroupEncouragementChecks();
-  // The weekly board pass places joined users from the bands their device last reported.
   useBoardBandRefresh();
   return null;
 }
 
-/** ETH-07: a minor account's leftover photo files are removed once per app session. */
 function MinorPhotoCleanup() {
   useMinorPhotoCleanup();
   return null;
@@ -133,9 +116,6 @@ function AudioProviderBoundary({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
-  // On web we never block render on fonts — FontFace with display:swap
-  // lets text paint instantly in a fallback and swap when ready. Native
-  // still waits for expo-font since the splash covers the interval.
   const [fontsLoaded, setFontsLoaded] = useState(Platform.OS === "web");
   const initialize = useAuthStore((s) => s.initialize);
 
@@ -148,8 +128,6 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
       return;
     }
-    // A failed UI font load must not leave a blank screen: render with system fonts instead. Stop
-    // waiting after three seconds and let the UI fonts swap in when they arrive.
     let released = false;
     const release = () => {
       if (released) return;
@@ -163,7 +141,6 @@ export default function RootLayout() {
     return () => clearTimeout(cap);
   }, []);
 
-  // Initialize auth (restore session) on mount
   useEffect(() => {
     initialize();
   }, [initialize]);
@@ -175,12 +152,10 @@ export default function RootLayout() {
       <WebUiFontPreload />
       <PasswordRecoveryProvider>
         <DatabaseProvider>
-          {/* The only settings provider: routes share it so opening one never resets language or theme. */}
           <SettingsProvider>
             <DatabaseNoticeBoundary>
               <AudioProviderBoundary>
                 {Platform.OS === "web" ? <StableDocumentTitle /> : null}
-                {/* Android system button contrast follows the resolved theme; web and iOS render nothing. */}
                 <NavigationBarTheme />
                 <ReminderLifecycle />
                 <EncouragementChecks />
@@ -188,8 +163,6 @@ export default function RootLayout() {
                 <AuthRedirectReturn />
                 <Stack
                   screenOptions={{ headerShown: false }}
-                  // Routes outside the tabs get the Hafiz fallback inside the providers; the tabs
-                  // have their own per-tab boundaries.
                   screenLayout={({ children, route }) => (
                     <ScopedErrorBoundary section={`route:${route.name}`}>{children}</ScopedErrorBoundary>
                   )}

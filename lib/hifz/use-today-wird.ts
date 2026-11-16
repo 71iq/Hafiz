@@ -13,19 +13,11 @@ import { countSecondLooks } from "@/lib/hifz/sabaq";
 import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
-/**
- * Today's hifz wird, the count of spots to strengthen (inbox items, plus half pages and seams that
- * are relearning) and the second looks due now (SBQ-03) for a screen, refreshed on focus, after
- * reviews, after sync, after plan changes, on return to the foreground, when the next second look is
- * offered, and at local midnight (useDayBoundaryRefresh). Nothing here depends on the make-up cutoff,
- * so it does not reload then. `wird` is null when no plan is set up; undefined while loading.
- */
 export function useTodayWird(db: AppDatabase) {
   const [wird, setWird] = useState<TodayWird | null | undefined>(undefined);
   const [inboxCount, setInboxCount] = useState(0);
   const [monthlyCheckDue, setMonthlyCheckDue] = useState(false);
   const [secondLooksDue, setSecondLooksDue] = useState(0);
-  /** Half pages, seams and cloze cards due now: review work the wird includes (SCH-06, SCH-08, ERR-06). */
   const [remediationDue, setRemediationDue] = useState(0);
   const [nextLookAt, setNextLookAt] = useState<Date | null>(null);
   const [boundary, setBoundary] = useState<number | null>(null);
@@ -41,7 +33,6 @@ export function useTodayWird(db: AppDatabase) {
         countMistakeInbox(db, localDateOf(now)),
         countDueRemediation(db, now),
         nextRemediationAt(db, now),
-        // The cue is extra: a failed count leaves it off rather than failing the wird.
         countSecondLooks(db, now).catch((error) => {
           console.warn("[Hifz] Second looks failed to load:", error);
           return { due: 0, nextAt: null, offeredAt: null };
@@ -49,9 +40,7 @@ export function useTodayWird(db: AppDatabase) {
       ]);
       const monthly = next ? await monthlyCheckDueFor(db, next.cards, now) : false;
       if (looks.offeredAt) nextBoundary = Math.min(nextBoundary, looks.offeredAt.getTime());
-      // A half page or seam on its 10-minute step becomes work left when it comes due.
       if (nextRemediation) nextBoundary = Math.min(nextBoundary, nextRemediation.getTime());
-      // A page's learning step comes back as a task once it is within the review learn-ahead window.
       if (next?.nextStepAt) nextBoundary = Math.min(nextBoundary, next.nextStepAt.getTime() - REVIEW_LEARN_AHEAD_MS);
       if (load !== latest.current) return;
       setWird(next);
@@ -68,8 +57,6 @@ export function useTodayWird(db: AppDatabase) {
     }
   }, [db]);
 
-  // A screen behind another (Home behind a review) skips events: each grade would otherwise reload
-  // history it cannot show. Focus always refreshes, so nothing is missed.
   const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {

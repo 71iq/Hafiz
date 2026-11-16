@@ -6,7 +6,6 @@ import { pagesOfJuz } from "@/lib/hifz/units";
 
 export type StrengthBands = Readonly<{ steady: number; fair: number; needsReview: number }>;
 
-/** MST-02: steady at recall 0.90 or more, fair from 0.75, needs review below. Accurate, never inflated (ETH-09). */
 export function strengthBands(recalls: readonly number[]): StrengthBands {
   let steady = 0;
   let fair = 0;
@@ -19,7 +18,6 @@ export function strengthBands(recalls: readonly number[]): StrengthBands {
   return { steady, fair, needsReview };
 }
 
-/** MST-03: a juz is complete when every one of its pages is memorized. */
 export function completedJuz(memorized: ReadonlySet<number>): number[] {
   const done: number[] = [];
   for (let juz = 1; juz <= 30; juz += 1) {
@@ -44,7 +42,6 @@ export async function loadHifzProgress(db: DatabaseExecutor, now = new Date()): 
   };
 }
 
-/** MST-05: 5 memorized pages not reviewed in the last 14 days, picked at random. */
 const MONTHLY_CHECK_PAGES = 5;
 const MONTHLY_CHECK_UNREVIEWED_DAYS = 14;
 const MONTHLY_CHECK_KEY = "device_monthly_check";
@@ -67,19 +64,16 @@ export function pickMonthlyCheck(cards: readonly PageCard[], random: () => numbe
   return pool.slice(0, MONTHLY_CHECK_PAGES);
 }
 
-/** The check is offered once per calendar month, when there are enough pages to check. */
 export function monthlyCheckDue(lastMonth: string | null, today: string, candidates: number): boolean {
   return candidates >= MONTHLY_CHECK_PAGES && lastMonth !== today.slice(0, 7);
 }
 
-/** The same check for page cards a caller already loaded (Home has them from today's wird). */
 export async function monthlyCheckDueFor(db: DatabaseExecutor, cards: readonly PageCard[], now = new Date()): Promise<boolean> {
   const today = localDateOf(now);
   const last = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [MONTHLY_CHECK_KEY]);
   return monthlyCheckDue(last?.value ?? null, today, monthlyCheckCandidates(cards, today).length);
 }
 
-/** Record this month's check as done or declined, so it is offered again next month. */
 export async function markMonthlyCheck(db: DatabaseExecutor, now = new Date()): Promise<void> {
   await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, ?, ?, NULL)", [
     MONTHLY_CHECK_KEY,

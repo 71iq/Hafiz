@@ -1,8 +1,3 @@
-/**
- * Normalizes provider failures into a small set of user-facing kinds. Raw provider messages are
- * never shown; the screens map each kind to bilingual copy. Kinds never reveal whether an account
- * exists beyond what the provider already returns for the same request.
- */
 export type AuthErrorKind =
   | "invalid-credentials"
   | "email-not-confirmed"
@@ -14,7 +9,6 @@ export type AuthErrorKind =
 
 export type AuthErrorInfo = {
   kind: AuthErrorKind;
-  /** Seconds until a retry is allowed, only when the provider said so. */
   retryAfterSeconds: number | null;
 };
 
@@ -43,10 +37,6 @@ function headerValue(error: unknown, name: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
-/**
- * Reads an actual retry delay: a Retry-After header (seconds or HTTP date), an explicit numeric
- * field, or the provider's "after N seconds" wording. Returns null when none is present.
- */
 export function readRetryAfterSeconds(error: unknown, now = Date.now()): number | null {
   const explicit = field(error, "retryAfter") ?? field(error, "retry_after");
   if (typeof explicit === "number" && Number.isFinite(explicit) && explicit > 0) return Math.ceil(explicit);

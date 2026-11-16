@@ -7,12 +7,10 @@ describe("verse reveal state", () => {
     reveals = setVerseReveal(reveals, 2, 256, 42, true);
     reveals = setVerseReveal(reveals, 2, 257, 43, true);
 
-    // Same page (a jump within it, or a view switch): the reveals stay exactly as they were.
     const pageOnly = setVerseReveal(reveals, 2, 257, 43, false);
     expect(keepPageReveals(pageOnly, 42)).toBe(pageOnly);
     expect([...pageOnly.keys()]).toEqual(["2:255", "2:256"]);
 
-    // A deliberate scroll or jump onto page 43 keeps only that page's reveal.
     expect([...keepPageReveals(reveals, 43).keys()]).toEqual(["2:257"]);
   });
 

@@ -2,10 +2,6 @@ import type { AppDatabase } from "@/lib/database/types";
 import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import { loadTranslation } from "./translation-requires";
 
-/**
- * Import a translation into the translation_active table.
- * Loads the bundle before replacing the active rows in one owned transaction.
- */
 export class TranslationImportCancelled extends Error {
   constructor() {
     super("Translation import cancelled before it replaced the active rows");
@@ -13,10 +9,6 @@ export class TranslationImportCancelled extends Error {
   }
 }
 
-/**
- * `shouldContinue` is asked once the bundle has loaded. If the selection was cancelled by then, the
- * active rows are left untouched; after the transaction commits the import is complete.
- */
 export async function importTranslation(
   db: AppDatabase,
   langCode: string,

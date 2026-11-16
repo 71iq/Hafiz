@@ -9,11 +9,6 @@ import { useSettings } from "@/lib/settings/context";
 import { textStartStyle } from "@/lib/ui/direction";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
-/**
- * Development-only mascot animation preview (/dev/zayt). It shows no Quran data, so it renders
- * without waiting for the database. Reduced motion starts on the first frame; Play/Pause and Retry
- * are explicit. Product mascot images elsewhere are unrelated to this screen.
- */
 export function ZaytPreviewScreen() {
   const router = useRouter();
   const s = useStrings();

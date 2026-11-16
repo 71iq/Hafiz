@@ -31,7 +31,6 @@ export function Qcf2AyahText({
   const { quranRenderFontStyle: quranFontStyle, showAyahMarkers, quranMarkerStyle, effectiveTheme } = useSettings();
   const visible = useQuranPageFontReady(quranFontStyle, v2Page);
 
-  // Glyphs mounted before their page font exists render and measure in the system font.
   if (!visible) return <View style={{ minHeight: lineHeight }} />;
 
   const allTokens = textQcf2.split(" ").filter(Boolean);
@@ -48,9 +47,6 @@ export function Qcf2AyahText({
   );
 
   if (Platform.OS === "android") {
-    // Android clips each separate Text to its own advance box, and page-font word glyphs draw outside
-    // it, so per-word Text views showed cut fragments of the words. One Text with nested spans draws
-    // every word fully, like the reader's verse view.
     return (
       <Text
         className={colorClassName}

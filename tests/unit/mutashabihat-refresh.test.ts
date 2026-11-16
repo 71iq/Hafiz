@@ -8,13 +8,6 @@ import { getSmartCardContent, getSmartDeckCandidateCardIds, SMART_DECK_IDS } fro
 import { similarPair } from "@/lib/hifz/similar";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
-/**
- * An installed app keeps the similar-verse rows of the bundle it came with, so the launch refresh
- * replaces them with the rows this app ships (lib/database/mutashabihat-rows.ts). In the old rows the
- * ref labelled 2:264 held the text of 2:265; the new rows relabel it to 2:265 under a new sort order.
- * A study card id is the group id and the sort order, so the card reviewed as 2:264 must go, not
- * start showing 2:265. The ayat are copied from the bundled database; glyphs are stand-ins.
- */
 const AYAT: Record<number, string> = {
   261: "مَّثَلُ ٱلَّذِينَ يُنفِقُونَ أَمْوَٰلَهُمْ فِى سَبِيلِ ٱللَّهِ كَمَثَلِ حَبَّةٍ أَنۢبَتَتْ سَبْعَ سَنَابِلَ فِى كُلِّ سُنۢبُلَةٍ مِّا۟ئَةُ حَبَّةٍ وَٱللَّهُ يُضَٰعِفُ لِمَن يَشَآءُ وَٱللَّهُ وَٰسِعٌ عَلِيمٌ",
   264: "يَٰٓأَيُّهَا ٱلَّذِينَ ءَامَنُوا۟ لَا تُبْطِلُوا۟ صَدَقَٰتِكُم بِٱلْمَنِّ وَٱلْأَذَىٰ كَٱلَّذِى يُنفِقُ مَالَهُۥ رِئَآءَ ٱلنَّاسِ وَلَا يُؤْمِنُ بِٱللَّهِ وَٱلْيَوْمِ ٱلْـَٔاخِرِ فَمَثَلُهُۥ كَمَثَلِ صَفْوَانٍ عَلَيْهِ تُرَابٌ فَأَصَابَهُۥ وَابِلٌ فَتَرَكَهُۥ صَلْدًا لَّا يَقْدِرُونَ عَلَىٰ شَىْءٍ مِّمَّا كَسَبُوا۟ وَٱللَّهُ لَا يَهْدِى ٱلْقَوْمَ ٱلْكَٰفِرِينَ",
@@ -33,7 +26,6 @@ const tailRefs = [
   [TAIL, 0, 2, 261, "البقرة", "وٱلله وسع عليم", null, null, null],
   [TAIL, 1, 2, 265, "البقرة", "بما تعملون بصير", null, null, null],
 ] as const;
-/** The old rows: 2:264 at sort order 1, carrying the text of 2:264's end and 2:265. */
 const OLD_REFS = [
   [
     GROUP,
@@ -49,7 +41,6 @@ const OLD_REFS = [
   [GROUP, 1, 2, 264, "البقرة", "بربوة", words(264, 18), words(265, 0, 4), words(265, 4, 13)],
   ...tailRefs,
 ];
-/** The new rows: 2:261 rebuilt in place, the 2:264 ref relabelled to 2:265 at sort order 2. */
 const NEW_REFS = [
   [GROUP, 0, 2, 261, "البقرة", "ينفقون", "وَٱعْلَمْ أَنَّ ٱللَّهَ عَزِيزٌ حَكِيمٌ", words(261, 0, 3), words(261, 3, 8)],
   [GROUP, 2, 2, 265, "البقرة", "بربوة", words(264, 18), words(265, 0, 4), words(265, 4, 13)],
@@ -131,7 +122,6 @@ describe("the similar-verse rows refresh", () => {
   });
 
   it("replaces an installed app's rows and deletes the card whose sort order now belongs to no verse", async () => {
-    // Before: the card for sort order 1 is labelled 2:264 but its passage is 2:265's.
     const before = await getSmartCardContent(store.db, `mutashabihat:${GROUP}:1`);
     expect(before?.targetRef).toMatchObject({ surah: 2, ayah: 264, similarText: words(265, 0, 4) });
     const kept = card(`mutashabihat:${GROUP}:0`);
@@ -148,15 +138,12 @@ describe("the similar-verse rows refresh", () => {
       { group_id: TAIL, sort_order: 0, surah: 2, ayah: 261 },
       { group_id: TAIL, sort_order: 1, surah: 2, ayah: 265 },
     ]);
-    // The 2:264 card is deleted with its upload queued, and its reviews stay in the log.
     expect(card(`mutashabihat:${GROUP}:1`).deleted_at).toEqual(expect.any(String));
     expect(queue()).toEqual([{ table_name: "study_cards", operation: "DELETE", row_id: `mutashabihat:${GROUP}:1` }]);
     expect(logCount(`mutashabihat:${GROUP}:1`)).toBe(3);
-    // A card whose sort order keeps its verse, and any other card, is untouched.
     expect(card(`mutashabihat:${GROUP}:0`)).toEqual(kept);
     expect(card("2:255").deleted_at).toBeNull();
 
-    // The old id shows nothing and is no longer offered; the relabelled ref is a new card for 2:265.
     await expect(getSmartCardContent(store.db, `mutashabihat:${GROUP}:1`)).resolves.toBeNull();
     const relabelled = await getSmartCardContent(store.db, `mutashabihat:${GROUP}:2`);
     expect(relabelled?.targetRef).toMatchObject({ surah: 2, ayah: 265, similarText: words(265, 0, 4) });
@@ -177,7 +164,6 @@ describe("the similar-verse rows refresh", () => {
 
     await refreshMutashabihatRows(store.db, async () => rowsFile());
 
-    // No group holds 2:264 any more, so a drift recorded into it gets no "Which one" prompt (loadDriftDrills).
     await expect(similarPair(store.db, { surah: 2, ayah: 261 }, { surah: 2, ayah: 264 })).resolves.toBeNull();
     const pair = await similarPair(store.db, { surah: 2, ayah: 261 }, { surah: 2, ayah: 265 });
     expect(pair?.groupId).toBe(GROUP);
@@ -186,7 +172,6 @@ describe("the similar-verse rows refresh", () => {
 
   it("deletes a retired slot's card that arrived after the version was recorded, and no other card", async () => {
     await refreshMutashabihatRows(store.db, async () => rowsFile());
-    // The card comes back live, as from a device still on the old rows, after this version was recorded.
     store.sql.prepare("DELETE FROM study_cards WHERE id = ?").run(`mutashabihat:${GROUP}:1`);
     seedCard(`mutashabihat:${GROUP}:1`, 0);
     store.sql.exec("DELETE FROM sync_queue");

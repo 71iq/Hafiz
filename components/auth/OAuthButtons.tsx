@@ -15,9 +15,6 @@ import { getCachedAuthDarkMode } from "@/lib/settings/startup-theme";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { textStartStyle, useUIDirection } from "@/lib/ui/direction";
 
-// NOTE: OAuth providers (Google, Apple, Facebook) must be configured in the
-// Supabase dashboard under Authentication > Providers before these buttons work.
-// Each provider requires its own client ID and secret from the respective platform.
 
 type Props = {
   strings: {
@@ -30,9 +27,7 @@ type Props = {
     authProviderFailed?: string;
   };
   isDark?: boolean;
-  /** Receives the localized failure as well; the notice also shows under the buttons. */
   onError?: (msg: string) => void;
-  /** Runs once a native OAuth flow has established this screen's session. */
   onSignedIn?: () => void;
 };
 
@@ -52,11 +47,6 @@ const PROVIDER_NAMES: Record<BusyProvider, string> = {
 
 type ProviderStyle = { background: string; border: string; text: string; logoTint?: string };
 
-/**
- * Published provider button styles. Google uses its light and dark variants; Apple is black with a
- * white logo in dark themes and white with a black logo in light themes; Facebook keeps its blue
- * mark on the same neutral surface as Google.
- */
 export function providerButtonStyle(provider: SocialProvider, isDark: boolean): ProviderStyle {
   if (provider === "apple")
     return isDark
@@ -104,7 +94,6 @@ export function OAuthButtons({ strings: s, isDark, onError, onSignedIn }: Props)
     setBusyProvider(busy);
     setFailedProvider(null);
     const ownsBusy = () => mounted.current && busyOwner.current === invocation;
-    // Web sign-in leaves the page. Only the validated return target survives the round trip.
     const cancelRedirect = Platform.OS === "web" ? persistAuthReturnForRedirect() : () => {};
     const flow = startAppOAuth(provider, "sign-in", useAuthStore.getState);
     try {
@@ -120,14 +109,11 @@ export function OAuthButtons({ strings: s, isDark, onError, onSignedIn }: Props)
       ) {
         runInitialQfUserSync(db, result.value.qfOwner).catch(console.warn);
       }
-      // Web sign-in leaves the page for the provider and returns with no session here.
-      // Native resolves with the restored session, so leave the auth screen like email login.
       if (ownsBusy() && result.status === "completed" && result.owner.isCurrent() && result.value.session) {
         onSignedIn?.();
       }
     } catch {
       cancelRedirect();
-      // Raw provider details stay out of the notice.
       if (ownsBusy() && flow.isCurrent()) {
         setFailedProvider(busy);
         onError?.(failureText(busy));
@@ -157,7 +143,6 @@ export function OAuthButtons({ strings: s, isDark, onError, onSignedIn }: Props)
 
   return (
     <View>
-      {/* Divider */}
       <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 16 }}>
         <View style={{ flex: 1, height: 1, backgroundColor: mutedColor }} />
         <Text
@@ -238,7 +223,6 @@ export function OAuthButtons({ strings: s, isDark, onError, onSignedIn }: Props)
   );
 }
 
-/** A full-width provider button with its logo and full label, wrapping rather than shrinking. */
 function OAuthProviderButton({
   onPress,
   label,
@@ -284,7 +268,6 @@ function OAuthProviderButton({
         alignItems: "center",
         justifyContent: "center",
         gap: 12,
-        // The tapped provider stays at full strength with its spinner; the others dim.
         opacity: disabled && !loading ? 0.55 : 1,
         transform: [{ scale: pressed && isInteractive ? 0.98 : 1 }],
         boxShadow: focused ? `0 0 0 3px ${focusColor}55` : undefined,

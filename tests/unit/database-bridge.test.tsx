@@ -354,7 +354,6 @@ describe("database bridge message boundary", () => {
     );
     await waitFor(() => expect(statuses.at(-1)?.error).toBe("isolated import failure"));
     expect(mockInitializeDatabase).toHaveBeenCalledTimes(1);
-    // Retry is a no-op while preparation is idle with a live connection, so only failures rerun.
     await act(async () => statuses.at(-1)?.retry());
     await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
     expect(statuses.at(-1)?.error).toBeNull();

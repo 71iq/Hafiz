@@ -8,10 +8,6 @@ export type DeviceLocationResult =
   | { kind: "denied"; canAskAgain: boolean }
   | { kind: "unavailable" };
 
-/**
- * Ask for the device position once, only after the user taps "Use my location". The result is
- * rounded and returned to the caller, which stores it on this device only. Nothing is uploaded.
- */
 export async function requestDeviceCoordinates(): Promise<DeviceLocationResult> {
   const permission = await Location.requestForegroundPermissionsAsync();
   if (!permission.granted) return { kind: "denied", canAskAgain: permission.canAskAgain };
@@ -31,10 +27,6 @@ export async function requestDeviceCoordinates(): Promise<DeviceLocationResult> 
   }
 }
 
-/**
- * Read a typed latitude and longitude. Accepts a comma as the decimal mark and Arabic-Indic digits.
- * Returns null unless both are numbers in range.
- */
 export function parseManualCoordinates(latitudeText: string, longitudeText: string): Coordinates | null {
   const latitude = parseCoordinate(latitudeText);
   const longitude = parseCoordinate(longitudeText);

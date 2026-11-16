@@ -19,7 +19,6 @@ jest.mock("@/lib/settings/context", () => ({
   }),
 }));
 jest.mock("@/lib/database/provider", () => ({ useDatabaseStatus: () => ({ db: {} }) }));
-// The page's marks as the store returns them once read: ayah 2:5 has a memorized similar verse.
 jest.mock("@/lib/hifz/use-similar-markers", () => ({
   useSimilarMarks: (_db: unknown, _page: number, enabled: boolean) => new Map(enabled ? [["2:5", []]] : []),
 }));
@@ -66,7 +65,6 @@ describe("Mushaf page line spacing", () => {
 });
 
 describe("Mushaf page line with a similar-verse mark (MUT-02)", () => {
-  // Synthetic glyphs: two words and a marker for 2:5, one word and a marker for 2:6, on one line.
   const ayahs = [
     { surah: 2, ayah: 5, textQcf2: "G-a G-b G-m5" },
     { surah: 2, ayah: 6, textQcf2: "G-c G-m6" },
@@ -131,15 +129,12 @@ describe("Mushaf page line with a similar-verse mark (MUT-02)", () => {
     const itemStyles = children(plain.line).map(styleOf);
     expect(find(plain.tree, (node) => node.props.testID === "similar-verse-marker")).toBeNull();
 
-    // A new key remounts the memoized page with the marks on.
     mockMarkSimilarVerses = true;
     view.rerender(element("marked"));
     const marked = await lineOf(view);
     const mark = find(marked.tree, (node) => node.props.testID === "similar-verse-marker");
     expect(mark).not.toBeNull();
 
-    // The line row and every flex item in it (words and ayah end markers) keep their styles; the
-    // marked marker only gains a stacking order, which does not affect layout.
     expect(styleOf(marked.line)).toEqual(lineStyle);
     const markedItems = children(marked.line).map(styleOf);
     expect(markedItems).toHaveLength(itemStyles.length);
@@ -149,7 +144,6 @@ describe("Mushaf page line with a similar-verse mark (MUT-02)", () => {
       if (zIndex !== undefined) expect(zIndex).toBe(1);
     });
 
-    // The mark sits in an absolutely positioned layer inside the 2:5 marker, with a 44 px target.
     const layer = find(marked.line, (node) => children(node).includes(mark as Node));
     expect(styleOf(layer as Node)).toMatchObject({ position: "absolute", left: 0, right: 0 });
     expect(styleOf(mark as Node)).toMatchObject({ width: 44 });

@@ -126,8 +126,6 @@ describe.each(variants)(
         writingDirection: "rtl",
       });
       if (kind === "header") {
-        // The compact page-view card shows the calligraphic name in both languages once the font is
-        // ready; English compact cards carry the English name in their subtitle instead.
         const decorativeShown = (language === "ar" || compact) && ready;
         expect(Boolean(view.queryByText(decorative))).toBe(decorativeShown);
         if (!decorativeShown) expect(view.getByText(name)).toBeTruthy();

@@ -49,7 +49,6 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
     loadNotes().catch(console.warn);
   }, [loadNotes]);
 
-  // Deleting asks first; a failure keeps the dialog open with its error and the note in place.
   const confirmDelete = useCallback(async () => {
     const note = pendingDelete;
     if (!note || deletingNoteId) return;

@@ -62,29 +62,17 @@ import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 
-/** 4.4.1 steps after the optional intention. "similar" appears only when MUT-01 applies. */
 type Step = "intention" | "listen" | "meaning" | "similar" | "looking" | "ayah" | "chunk" | "link" | "check" | "done";
 const BASE_STEPS: readonly Step[] = ["intention", "listen", "meaning", "looking", "ayah", "chunk", "link", "check"];
 
-/** The shared outline Button has no border; here an outline action needs one to read as a button. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
 const NO_SECOND_LOOKS: SecondLooks = { due: [], nextAt: null };
 
-/** A wall-clock time as the interface writes times, the same as Home's second-look line. */
 function formatClockTime(at: Date, language: "en" | "ar"): string {
   return formatClockMinutesForDisplay(at.getHours() * 60 + at.getMinutes(), language);
 }
 
-/**
- * Sabaq, new memorization (4.4.1): intention, listening, meaning, reading while looking, ayah by
- * ayah from memory with chaining, the whole chunk three times cleanly, which turns the chunk into a
- * sabaq card (SBQ-02), linking to what came before, then a graded fluent check of that card.
- */
-/**
- * `onRestart` opens the screen again from the start, for the second look the done step offers once
- * it is due (SBQ-03): a fresh load offers due looks before new lines.
- */
 function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   const db = useDatabase();
   const s = useStrings();
@@ -93,12 +81,9 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const pageWidth = Math.min(width, 640);
-  // The done step's text, cards and button share the habit cards' width (max-w-sm, as on the other
-  // end screens), so a wide window does not show three widths at once.
   const doneWidth = Math.min(pageWidth, 384);
   const dir = isRTL ? "rtl" : "ltr";
   const { playRange, rangeState, stop, togglePause } = useAyahAudio();
-  /** SOC-03: who asks for a teacher's next sabaq, and whether to ask the server or the saved copy. */
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const offline = useIsOffline();
   const assignmentSource = useRef({ userId, offline });
@@ -115,32 +100,23 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   const [meanings, setMeanings] = useState<{ key: string; text: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
-  /** The rendered copy of `saveLock === "saved"`: the lesson is saved, so leaving asks nothing. */
   const [lessonSaved, setLessonSaved] = useState(false);
-  /** Step 6's clean run saved the chunk (SBQ-02), so leaving before the check asks nothing either. */
   const [chunkSaved, setChunkSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
   const [showZayt, setShowZayt] = useState(false);
   const [surahNames, setSurahNames] = useState<Map<number, string>>(new Map());
   const [similar, setSimilar] = useState<SimilarGroup[]>([]);
-  /** SBQ-03: today's due second looks, offered one by one before new lines; an index past the end means done or skipped. */
   const [looks, setLooks] = useState<readonly SecondLook[]>([]);
   const [lookIndex, setLookIndex] = useState(0);
   const [looksSaved, setLooksSaved] = useState(0);
-  /** The last look was graded and a lesson can follow: a short end state, not straight into new lines. */
   const [looksDoneStep, setLooksDoneStep] = useState(false);
-  /** When the next of today's second looks comes due, as loaded, for the screen with no new lines. */
   const [nextLookAt, setNextLookAt] = useState<Date | null>(null);
-  /** New memorization waits for review to catch up (PLN-02); a second look is still offered. */
   const [catchUpFirst, setCatchUpFirst] = useState(false);
-  /** Today's new lines are done, so more lines are extra (WirdPlanCard says the same). */
   const [linesDoneToday, setLinesDoneToday] = useState(false);
-  /** What the saved fluent check means for the done step's copy. */
   const [outcome, setOutcome] = useState<{
     passed: boolean;
     partial: boolean;
-    /** This lesson added the page to review, at step 6 or the check. */
     pageAdded: boolean;
     secondLookAt: Date | null;
     secondLookNow: boolean;
@@ -150,59 +126,26 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     [similar.length],
   );
   const sessionRef = useRef<ReviewSessionRef | null>(null);
-  // The lesson's time counts only while it is on screen with the app active.
   const lessonClock = useActiveClock();
-  /**
-   * The fluent check's grade: "open" until it is graded, "saving" while the save is unresolved, then
-   * "saved" for good, since the check is over. Taken before React renders `busy`, so a second tap
-   * cannot grade the chunk again; a failed save opens it again so the user can retry. Step 6's save
-   * and a second look's take it too, and open it again once saved, since the check is still ahead.
-   */
   const saveLock = useRef<"open" | "saving" | "saved">("open");
-  /** What step 6's save meant for the wird and how long the lesson had taken, for the summary. */
   const cleanRunEvent = useRef<SessionHabitInput["event"]>(null);
   const cleanRunMs = useRef(0);
-  /** Step 6's save added the chunk's page to review (SBQ-02). */
   const cleanRunPageAdded = useRef(false);
-  /**
-   * How load chose the lesson's lines, so a graded second look can choose them again. Null when the
-   * screen offers no new lines.
-   */
   const targetQuery = useRef<Parameters<typeof nextSabaqTarget>[1] | null>(null);
-  /**
-   * The rendered copy of `saveLock === "saving"`, for the remove guard below. Unlike `busy` it ends as
-   * soon as the grade is saved, so leaving while the summary loads is not held.
-   */
   const [saving, setSaving] = useState(false);
-  /**
-   * Close was pressed while the grade was saving. The screen leaves once it is saved, or stays on the
-   * check to show a failed save, which would otherwise reach a departed screen.
-   */
   const leaveWhenSaved = useRef(false);
-  /** Set once the screen leaves on purpose, so the remove guard below lets that navigation through. */
   const exiting = useRef(false);
-  /** A back press or gesture held for the unresolved grade; leaving carries it out. */
   const pendingBack = useRef<NavigationAction | null>(null);
-  /** The rendered copy of leaveWhenSaved, so Close shows that its press is waiting for the save. */
   const [leavePending, setLeavePending] = useState(false);
   const step: Step = habitResult ? "done" : STEPS[stepIndex];
 
-  /** The current strings, for load's error text, so a language change does not reload the lesson. */
   const strings = useRef(s);
   strings.current = s;
 
-  /**
-   * Load the lesson once: its target, second looks and review session. It does not depend on the
-   * language, since loading again mid-lesson would choose the next chunk once step 6 has saved this
-   * one, and the check would grade lines the person never memorized. The meanings follow the language
-   * in their own effect below.
-   */
-  /** Show the lesson's lines, with the similar verses the user already knows (MUT-01). */
   const showTarget = useCallback(
     async (next: SabaqTarget | null) => {
       setTarget(next);
       if (!next) return;
-      // MUT-01: before memorizing, show siblings the user already knows, with the difference marked.
       const [groups, memorizedPages] = await Promise.all([similarGroupsForAyahs(db, next.ayahs), readMemorizedPageNumbers(db)]);
       setSimilar(withMemorizedSiblings(groups, memorizedPages));
     },
@@ -211,7 +154,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    // SOC-03: read alongside the lesson's data; it never fails, and it waits at most a few seconds.
     const assignment = loadMySabaqAssignment(assignmentSource.current.userId, assignmentSource.current.offline);
     try {
       const [wird, words, names] = await Promise.all([
@@ -220,7 +162,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         db.getAllAsync<{ number: number; name_arabic: string }>("SELECT number, name_arabic FROM surahs"),
       ]);
       setSurahNames(new Map(names.map((row) => [row.number, row.name_arabic])));
-      // Zayt follows the same setting as the session-end cards; a failed read leaves him hidden.
       readHabitSettings(db)
         .then((settings) => setShowZayt(settings.showZayt))
         .catch(() => setShowZayt(false));
@@ -232,26 +173,20 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       setCatchUpFirst(wird.daily.backlog);
       setLinesDoneToday(wird.sabaqDoneToday);
       const pageWords = (page: number) => words?.[page - 1] ?? null;
-      // SBQ-02: a page completed only by chunks merged from another device joins review now, so the
-      // lesson goes on to the next page. A failure here leaves the lines as they are.
       await addCoveredSabaqPages(db, { plan: wird.plan, pageWords }).catch((healError: unknown) => {
         console.warn("[Sabaq] Could not add a page its merged chunks completed:", healError);
         return 0;
       });
-      // Opened for a second look on a day new memorization is paused, the screen offers no new lines.
       targetQuery.current = newMemorizationOpen(wird)
         ? {
             plan: wird.plan,
-            // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
             wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
             pageWords,
-            // SOC-03: a teacher's next sabaq comes first while its lines are not memorized.
             assigned: await assignment,
           }
         : null;
       const [next, secondLooks] = await Promise.all([
         targetQuery.current ? nextSabaqTarget(db, targetQuery.current) : Promise.resolve(null),
-        // A second look that cannot be read is left for the next visit; new lines still load.
         loadSecondLooks(db, { pageWords }).catch((lookError) => {
           console.warn("[Sabaq] Failed to load second looks:", lookError);
           return NO_SECOND_LOOKS;
@@ -276,8 +211,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     return () => stop();
   }, [load, stop]);
 
-  // The meaning step's text, in the interface language: the Muyassar tafsir in Arabic, the
-  // translation in English. A language change reloads only this.
   useEffect(() => {
     if (!target) return;
     let current = true;
@@ -313,14 +246,12 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     stop();
     const session = sessionRef.current;
     if (session && !habitResult) endReviewSession(db, { session }).catch(console.warn);
-    // A held back press goes where it was going; Close returns to the tabs.
     const back = pendingBack.current;
     pendingBack.current = null;
     if (back) navigation.dispatch(back);
     else returnToTabs(navigation.getState(), "/(tabs)/home");
   };
 
-  // Leaving by any route that ends the screen without exit() still ends the session.
   useEffect(
     () => () => {
       const session = sessionRef.current;
@@ -329,18 +260,9 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     [db],
   );
 
-  /**
-   * The lesson is under way and nothing of it is saved yet: its lines are saved once step 6's clean
-   * run is met, so leaving before that asks first, as the hifz review does with graded pages.
-   */
   const lessonUnsaved = stepIndex > 0 && !habitResult && !saving && !lessonSaved && !chunkSaved;
 
-  // Close, hardware back, a back gesture and the iOS swipe behave alike: during an unresolved grade
-  // they wait for it, and in an unsaved lesson they ask first. usePreventRemove, unlike a bare
-  // beforeRemove listener, also tells native-stack to block the native dismissal.
   usePreventRemove(saving || lessonUnsaved, ({ data }) => {
-    // The screen's own exit goes on, as does a back press this render has not caught up with (the
-    // grade saved, the summary still loading); React Navigation marks the action as already checked.
     if (exiting.current || saveLock.current === "saved") navigation.dispatch(data.action);
     else if (saveLock.current === "saving") {
       pendingBack.current = data.action;
@@ -352,7 +274,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     } else navigation.dispatch(data.action);
   });
 
-  /** Leave now, or once the check's unresolved grade settles (see leaveWhenSaved). */
   const leave = () => {
     if (saveLock.current === "saving") {
       leaveWhenSaved.current = true;
@@ -360,19 +281,16 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     } else exit();
   };
 
-  /** Close: an unsaved lesson asks first. */
   const close = () => {
     if (lessonUnsaved) setExitOpen(true);
     else leave();
   };
 
-  /** Past the current second look. The lesson's own time starts once the looks are over. */
   const nextLook = () => {
     lessonClock.reset();
     setLookIndex((value) => value + 1);
   };
 
-  /** Go on to new lines. Nothing is written, so the skipped looks stay due for the rest of the day. */
   const skipLooks = () => {
     if (saveLock.current !== "open") return;
     setError(null);
@@ -380,12 +298,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     setLookIndex(looks.length);
   };
 
-  /**
-   * SBQ-02: a graded look can change which lines count as memorized: a failed one offers its lines
-   * again, a passed one after a failed check covers them again. So the lesson's lines are chosen
-   * again before it starts. The same lines keep the loaded lesson; a failed read keeps it too, since
-   * the save checks the page in its own transaction.
-   */
   const chooseTargetAgain = async (): Promise<SabaqTarget | null> => {
     const query = targetQuery.current;
     if (!query) return target;
@@ -407,11 +319,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     }
   };
 
-  /**
-   * SBQ-03: save the current second look as a review of its chunk card. It shares the check's save
-   * lock and leave handling: a second tap is ignored, leaving waits for the save, and a failed save
-   * stays on the look to retry. The lock opens again afterwards, since the lesson's check is still ahead.
-   */
   const gradeLook = async (rating: Grade) => {
     const look = looks[lookIndex];
     if (!look || !plan || saveLock.current !== "open") return;
@@ -443,7 +350,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       leaveWhenSaved.current = false;
       pendingBack.current = null;
       setLeavePending(false);
-      // A chunk deleted since the screen loaded, such as by sync, has nothing left to review.
       if (saveError instanceof StudyCardDeletedError) nextLook();
       else {
         console.warn("[Sabaq] Second look save failed:", saveError);
@@ -458,11 +364,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     }
   };
 
-  /**
-   * SBQ-02: step 6's clean run is met, so the chunk is saved now, Good, with the lesson's time so far,
-   * and the check's time starts after it. It shares the check's save lock and leave handling: a second
-   * tap is ignored, leaving waits for the save, and a failed save stays on step 6 to retry.
-   */
   const saveCleanRun = async () => {
     if (!target || !plan || saveLock.current !== "open") return;
     saveLock.current = "saving";
@@ -490,7 +391,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       leaveWhenSaved.current = false;
       pendingBack.current = null;
       setLeavePending(false);
-      // No grade was given here: the lines were not saved, and Clean saves them again.
       setError(s.hifzSabaqCleanRunSaveFailed);
     } finally {
       if (saveLock.current === "saving") {
@@ -518,7 +418,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       saveLock.current = "saved";
       setSaving(false);
       setLessonSaved(true);
-      // SBQ-02: a lower grade than Good offers the lines again, unless step 6 completed their page.
       const pageAdded = cleanRunPageAdded.current || result.pageAdded;
       setOutcome({
         passed: rating >= 3,
@@ -538,7 +437,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         session ? endReviewSession(db, { session }).catch(console.warn) : null,
       ]);
       emitHabitChanged();
-      // The summary covers the whole lesson: step 6's save and the check after it.
       setHabitResult({
         event: strongerWirdEvent(cleanRunEvent.current, result.wird),
         overview,
@@ -594,18 +492,15 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         s={s}
         onClose={close}
         onGrade={(rating) => gradeLook(rating)}
-        // With no lesson after it, skipping leaves: Close already leaves without saving too.
         onSkip={target ? skipLooks : leave}
         continuesToNewLines={target !== null}
       />
     );
   }
 
-  // Opened for a 2-minute look, the person sees it saved and chooses whether to start new lines.
   if (looksDoneStep && target && plan) {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        {/* The padding is on a plain View: the web SafeAreaView's inline padding replaces a className one. */}
         <View className="flex-1 items-center justify-center px-6">
           <EmptyState
             icon={BookOpenCheck}
@@ -624,7 +519,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   }
 
   if (!target || !plan) {
-    // Opened early for a second look, the screen says when it comes due rather than nothing.
     const laterLook = !error && nextLookAt && nextLookAt.getTime() > Date.now() ? nextLookAt : null;
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -633,7 +527,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
             icon={error ? RotateCcw : BookOpenCheck}
             tone={!error && looksSaved > 0 ? "success" : "neutral"}
             title={error ?? (looksSaved > 1 ? s.hifzSecondLooksSaved : looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
-            // The serif title of the sabaq's other ends, as on its done step.
             titleStyle="display"
             subtitle={
               laterLook
@@ -671,26 +564,19 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     done: s.hifzSabaqDoneTitle,
   };
   const hidden = step === "ayah" || step === "chunk" || step === "link" || step === "check";
-  // Teal text under 14 px uses the darker token in light mode.
   const accent = isDark ? "#2dd4bf" : "#0f766e";
   const muted = mutedIconColor(effectiveTheme);
-  // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
   const portion = `${interpolate(s.hifzPageN, { n: formatNumber(target.page, uiLanguage) })}${uiLanguage === "ar" ? "، " : " · "}${interpolate(s.hifzSabaqLines, {
     from: formatNumber(target.fromLine, uiLanguage),
     to: formatNumber(target.toLine, uiLanguage),
   })}`;
-  // The intention and the end are moments, not instructions, so they sit centred.
   const centered = step === "intention" || step === "done";
-  // SBQ-03: the second look the done step promises, with its time later today, or ready now, as after
-  // a check graded Again, whose relearning step is a few minutes away.
   const lookLine =
     step === "done" && outcome?.secondLookAt
       ? interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
       : step === "done" && outcome?.secondLookNow
         ? s.hifzSabaqSecondLookNow
         : null;
-  // After a failed check, the look says when the lines come back. Without one they come back as new
-  // lines, or in tomorrow's review once step 6 has completed their page.
   const doneCaption =
     outcome?.passed === false
       ? lookLine
@@ -704,13 +590,9 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      {/* Header, progress and footer share the page column instead of spanning a wide window. The
-          gutter is the content's: 8 px in, or 20 px on the centred steps, and the column is the same
-          width, so close, progress, text and buttons line up on phones and on wide windows. */}
       <View className={`items-center ${centered ? "px-5" : "px-2"}`}>
         <View style={{ width: "100%", maxWidth: pageWidth - 16 }}>
           <MirroredRow dir={dir} className="items-center justify-between pt-3 pb-2">
-            {/* Dimmed while Close waits for the grade it was pressed during. */}
             <Pressable
               onPress={close}
               disabled={leavePending}
@@ -742,10 +624,8 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       </View>
 
       <ScrollView
-        // Title, page card and actions all start 8 px inside the page column, as in the hifz review.
         contentContainerStyle={{
           paddingVertical: 16,
-          // The centred steps, the intention and the end, keep the wider gutter of the other end screens.
           paddingHorizontal: centered ? 20 : 8,
           gap: 14,
           alignItems: "center",
@@ -767,7 +647,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
           >
             {step === "done" && outcome?.passed === false ? s.hifzSabaqNotFluentTitle : stepTitle[step]}
           </Text>
-          {/* The header already names the page and lines, so the intention has no caption. */}
           {step !== "intention" && !(step === "done" && doneCaption === null) ? (
             <Text
               dir={dir}
@@ -795,8 +674,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
                               : ""}
             </Text>
           ) : null}
-          {/* SBQ-03: only a second look that will be offered today is promised. */}
-          {/* The one thing to act on later, so it reads at body size. */}
           {lookLine ? (
             <Text
               dir={dir}
@@ -858,7 +735,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 
       <View className={`${centered ? "px-5" : "px-2"} pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center`}>
         <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth - 16, gap: 10 }}>
-          {/* Beside the buttons that retry, so a long chunk does not push it below the fold. */}
           {error ? (
             <Text
               dir={dir}
@@ -923,7 +799,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
                 className={`flex-1 ${OUTLINE_BORDER}`}
                 variant="outline"
                 label={s.hifzSabaqNotYet}
-                // Once the clean run is met, it is saved or retried, not started over.
                 disabled={busy || (step === "chunk" && cleanRun >= plan.sabaqRepetitions.cleanInARow)}
                 onPress={() => {
                   setShown(false);
@@ -936,8 +811,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
                 disabled={busy}
                 onPress={() => {
                   if (step === "chunk" && cleanRun + 1 >= plan.sabaqRepetitions.cleanInARow) {
-                    // The clean run is met. The lines stay shown until it is saved, so a failed save
-                    // is retried with the same button.
                     setCleanRun(plan.sabaqRepetitions.cleanInARow);
                     void saveCleanRun();
                     return;
@@ -977,7 +850,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 
           {step === "done" && habitResult ? (
             outcome?.secondLookNow ? (
-              // SBQ-03: after a check graded Again the look is due already, so it is offered here.
               <>
                 <Button label={s.hifzSecondLookStart} onPress={onRestart} />
                 <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
@@ -988,7 +860,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
                   !showsCommitment(habitResult)
                     ? s.flashcardsSummaryDone
                     : outcome?.secondLookAt
-                      ? // The look later today is the next return, not tomorrow (STR-20).
+                      ?
                         interpolate(s.hifzSabaqBackAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
                       : commitLabel
                 }
@@ -1021,7 +893,6 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   );
 }
 
-/** Opened from a deep link or a reminder, the route waits for the database like the other routes. */
 export default function SabaqScreenRoute() {
   const { isReady, progress, error } = useDatabaseStatus();
   const s = useStrings();
@@ -1030,7 +901,6 @@ export default function SabaqScreenRoute() {
   return <SabaqVisit />;
 }
 
-/** One visit of the sabaq screen; "Start second look" on the done step begins another. */
 function SabaqVisit() {
   const [visit, setVisit] = useState(0);
   return <SabaqScreen key={visit} onRestart={() => setVisit((value) => value + 1)} />;

@@ -11,15 +11,9 @@ function releaseQuietly(sentinel: WakeLockSentinelLike | null) {
   try {
     void Promise.resolve(sentinel?.release?.()).catch(() => undefined);
   } catch {
-    // Already released by the browser.
   }
 }
 
-/**
- * Keeps the screen on while focus auto-scroll plays and the page is visible, using the Screen Wake
- * Lock API. Browsers without it, or that deny it, simply let the screen sleep: study goes on. The
- * browser drops the lock when the page hides; it is requested again on return only while playing.
- */
 export function useFocusKeepAwake(playing: boolean) {
   const [visible, setVisible] = useState(isDocumentVisible);
   useEffect(() => {

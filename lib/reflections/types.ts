@@ -12,13 +12,11 @@ export type Reflection = {
   status: "active" | "hidden" | "deleted";
   created_at: string;
   updated_at: string;
-  // Joined from profiles
   profiles?: {
     username: string;
     display_name: string | null;
     avatar_url: string | null;
   };
-  // Whether the current user has liked this reflection
   user_has_liked?: boolean;
 };
 
@@ -29,19 +27,16 @@ export type ReflectionComment = {
   content: string;
   likes_count: number;
   created_at: string;
-  // Joined from profiles
   profiles?: {
     username: string;
     display_name: string | null;
     avatar_url: string | null;
   };
-  // Whether the current user has liked this comment
   user_has_liked?: boolean;
 };
 
 export type ReflectionFeedSort = "newest" | "popular";
 
-/** The feed offers Newest and Popular only. Any other saved or linked value (old "oldest"/"less") is Newest. */
 export function normalizeFeedSort(value: unknown): ReflectionFeedSort {
   return value === "popular" ? "popular" : "newest";
 }

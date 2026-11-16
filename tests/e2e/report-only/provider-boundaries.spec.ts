@@ -15,7 +15,6 @@ const providerBoundaryRoutes = [
   "app/profile/[userId].tsx",
 ];
 
-// The root layout owns the single SettingsProvider that every route shares.
 const rootOwnsSettings = /<SettingsProvider>/.test(fs.readFileSync(path.join(root, "app/_layout.tsx"), "utf8"));
 
 test.describe("report-only provider boundary contract", () => {

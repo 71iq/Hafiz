@@ -1,8 +1,3 @@
-/**
- * Hifz plan and recitation strings, spread into lib/i18n/strings.ts. Keep English and Arabic keys in
- * parity. The Arabic is a draft for native review (spec 9). Errors are described neutrally and never
- * say "forgot" (FB-03, ERR-07).
- */
 export const hifzStrings = {
   en: {
     hifzSuggestedGrade: "Suggested by your recitation",

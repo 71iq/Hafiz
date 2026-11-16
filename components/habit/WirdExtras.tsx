@@ -29,9 +29,7 @@ type Props = {
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
-  /** Opens the mistake drill, where "strengthen" is done. */
   onStrengthen: () => void;
-  /** Opens the wird review, where a listener can follow along ("connect"). */
   onConnect: () => void;
 };
 
@@ -50,16 +48,10 @@ function label(kind: ExtraKind, s: UIStrings): string {
   }
 }
 
-/**
- * Up to 2 optional extras under the wird (5.4), each hidden with one tap, done marked quietly. An extra
- * the app can start (strengthen, connect) opens it; one done away from the app (salah) or already done
- * reads as a plain note, so nothing looks tappable that is not.
- */
 export function WirdExtras({ db, inboxCount, hasMemorizedPages, sabaqToday, language, isDark, s, onStrengthen, onConnect }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
-  // Muted icons take the theme's secondary text colour, so they match the text beside them.
   const muted = mutedIconColor(useSettings().effectiveTheme);
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
   const openers: Partial<Record<ExtraKind, () => void>> = { strengthen: onStrengthen, connect: onConnect };
@@ -126,7 +118,6 @@ export function WirdExtras({ db, inboxCount, hasMemorizedPages, sabaqToday, lang
           </Text>
         );
 
-        // The icon sits in a slot as wide as the hide button, so both ends of a row line up.
         const leading = (color: string, IconNode: typeof BookText) => (
           <View className="w-11 items-center">
             <IconNode size={16} color={color} />
@@ -161,7 +152,6 @@ export function WirdExtras({ db, inboxCount, hasMemorizedPages, sabaqToday, lang
           );
         }
 
-        // A note: nothing to start here, so no fill and a quiet icon.
         return (
           <MirroredRow key={kind} dir={dir} className="min-h-[44px] items-center gap-2 px-1">
             {done ? leading(accent, Check) : leading(muted, Icon)}

@@ -10,7 +10,6 @@ type FormTextFieldProps<TFieldValues extends FieldValues> = {
   name: FieldPath<TFieldValues>;
   label: string;
   error?: string;
-  /** Muted guidance under the field, shown until an error replaces it. */
   hint?: string;
   dir?: Direction;
   inputRef?: Ref<TextInput>;
@@ -29,7 +28,6 @@ export function FormTextField<TFieldValues extends FieldValues>({
 }: FormTextFieldProps<TFieldValues>) {
   return (
     <Field dir={dir} className="w-full">
-      {/* The visible label repeats the input's accessible name, so assistive technology skips it. */}
       <Label
         dir={dir}
         className="text-sm"

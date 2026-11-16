@@ -1,5 +1,3 @@
--- Tests for 20261113120000_learning_consistency.sql. Run by run-learning-consistency.sh as postgres in a
--- disposable database with synthetic users. Any failed assertion raises and stops psql.
 \set ON_ERROR_STOP 1
 \set QUIET 1
 \pset pager off
@@ -10,7 +8,6 @@ SET client_min_messages = notice;
 CREATE SCHEMA hz_test;
 GRANT USAGE ON SCHEMA hz_test TO anon, authenticated;
 
--- ─── Helpers ─────────────────────────────────────────────────────────────────
 CREATE FUNCTION hz_test.login(uid UUID) RETURNS VOID LANGUAGE sql AS $$
   SELECT set_config('request.jwt.claims',
     CASE WHEN uid IS NULL THEN '' ELSE jsonb_build_object('sub', uid, 'role', 'authenticated')::TEXT END, false);
@@ -21,7 +18,6 @@ CREATE FUNCTION hz_test.today_text() RETURNS TEXT LANGUAGE sql STABLE AS $$ SELE
 CREATE FUNCTION hz_test.week_start() RETURNS DATE LANGUAGE sql STABLE AS $$ SELECT date_trunc('week', hz_test.utc_today())::DATE $$;
 CREATE FUNCTION hz_test.d(day DATE) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$ SELECT to_char(day, 'YYYY-MM-DD') $$;
 
--- Runs a statement that must fail with a message containing `fragment`.
 CREATE FUNCTION hz_test.expect_error(stmt TEXT, fragment TEXT) RETURNS VOID LANGUAGE plpgsql AS $$
 BEGIN
   BEGIN
@@ -50,7 +46,6 @@ RETURNS VOID LANGUAGE sql AS $$
   INSERT INTO public.profiles (id, username, display_name, avatar_url) VALUES (uid, username, display_name, avatar);
 $$;
 
--- A recorded wird day, written as the server would store it (status derived by the trigger).
 CREATE FUNCTION hz_test.day(uid UUID, day DATE, earned TEXT, reason TEXT DEFAULT NULL,
   minimum_met BOOLEAN DEFAULT true, full_met BOOLEAN DEFAULT false, manzil BOOLEAN DEFAULT false)
 RETURNS VOID LANGUAGE sql AS $$
@@ -63,7 +58,6 @@ RETURNS VOID LANGUAGE sql AS $$
     manzil_cycle_completed = EXCLUDED.manzil_cycle_completed, updated_at = EXCLUDED.updated_at
 $$;
 
--- Fixture row (lib/habit/types.ts HabitDayRow, flags as 0/1) as a server row for one user.
 CREATE FUNCTION hz_test.to_row(uid UUID, j JSONB) RETURNS public.habit_days LANGUAGE sql STABLE AS $$
   SELECT jsonb_populate_record(NULL::public.habit_days, j || jsonb_build_object(
     'user_id', uid,
@@ -104,13 +98,11 @@ INSERT INTO hz_test.orders VALUES
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA hz_test TO anon, authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA hz_test TO authenticated;
 
--- Synthetic users.
 SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000a', 'teacher_a', 'Teacher A', 'https://example.invalid/a.png');
 SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000b', 'member_b', 'Member B', 'https://example.invalid/b.png');
 SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000c', 'outsider_c', 'Outsider C', NULL);
 SELECT hz_test.make_user('00000000-0000-4000-8000-0000000000aa', 'merge_user', NULL, NULL);
 
--- ─── 1. Schema reshape ───────────────────────────────────────────────────────
 DO $$
 BEGIN
   PERFORM hz_test.eq('daily_scores dropped', to_regclass('public.daily_scores'), NULL::regclass);
@@ -132,7 +124,6 @@ BEGIN
     SELECT count(*) FROM pg_trigger WHERE tgname = 'sync_keep_newer_row'
       AND tgrelid IN ('public.review_sessions'::regclass, 'public.recitation_errors'::regclass)
   ), 2::BIGINT);
-  -- Every SECURITY DEFINER function pins an empty search_path.
   PERFORM hz_test.eq('definer functions pin search_path', (
     SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
     WHERE n.nspname IN ('public', 'private', 'rls') AND p.prosecdef
@@ -150,8 +141,6 @@ BEGIN
     WHERE p.prosecdef AND (n.nspname, p.proname) IN (('rls', 'profile_identity_visible'), ('rls', 'caller_is_minor'),
       ('public', 'get_received_encouragements'), ('public', 'refresh_board_bands'), ('private', 'requeue_board_after_wird_day'))
   ), 5::BIGINT);
-  -- Finding 8 (second review): the RLS helpers live outside public, which is the only schema PostgREST
-  -- serves as RPCs, so no endpoint reveals who is a minor.
   PERFORM hz_test.eq('no public RLS helper', (
     SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public' AND p.proname IN ('profile_identity_visible', 'caller_is_minor')
@@ -163,39 +152,30 @@ BEGIN
     SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
     WHERE n.nspname = 'rls' AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) AS acl WHERE acl.grantee = 0))
   ), 0::BIGINT);
-  -- Finding 15: board weeks follow each user's week start, so cohorts are not limited to Mondays.
   PERFORM hz_test.eq('no Monday-only cohort check', (
     SELECT count(*) FROM pg_constraint WHERE conrelid = 'public.board_cohorts'::regclass AND contype = 'c'
       AND pg_get_constraintdef(oid) LIKE '%isodow%'
   ), 0::BIGINT);
-  -- Finding 16: the weekly pass finds pending users through an index.
   PERFORM hz_test.eq('board pending index', to_regclass('public.idx_profile_privacy_board_pending') IS NOT NULL, true);
-  -- Finding 9: one active matched halaqa per user is a constraint.
   PERFORM hz_test.eq('one matched membership index', (
     SELECT indisunique FROM pg_index WHERE indexrelid = 'public.idx_halaqa_members_one_matched'::regclass
   ), true);
-  -- Finding 11: the caller's date no longer decides the one-a-day limit.
   PERFORM hz_test.eq('no unique key on the caller date', (
     SELECT count(*) FROM pg_constraint WHERE conrelid = 'public.halaqa_encouragements'::regclass AND contype = 'u'
   ), 0::BIGINT);
-  -- Finding 5 (second review): one send per group, sender and server-derived calendar day.
   PERFORM hz_test.eq('unique key on the server day', (
     SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indexrelid = 'public.idx_halaqa_encouragements_sender_day'::regclass
   ), 'CREATE UNIQUE INDEX idx_halaqa_encouragements_sender_day ON public.halaqa_encouragements USING btree (group_id, from_user, sent_on)');
-  -- Ninth review, finding 5: the board pass reads pending users in the index's order, user id last,
-  -- so it stops after its batch instead of sorting every pending row.
   PERFORM hz_test.eq('board pending index ends with user id', (
     SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indexrelid = 'public.idx_profile_privacy_board_pending'::regclass
   ), 'CREATE INDEX idx_profile_privacy_board_pending ON public.profile_privacy USING btree (board_week_start, board_enrolled_week, user_id) WHERE board_joined');
 END $$;
 
--- ─── 2. Wird-day merge equals lib/habit/merge.ts (fixture from the TypeScript merge) ─────
 \set cases `cat /tmp/habit-merge-cases.json`
 CREATE TABLE hz_test.cases AS
   SELECT ordinality AS n, value AS c FROM jsonb_array_elements(:'cases'::JSONB) WITH ORDINALITY;
 GRANT SELECT ON hz_test.cases TO authenticated;
 
--- Pure function, every order of every case.
 DO $$
 DECLARE
   entry RECORD;
@@ -218,8 +198,6 @@ BEGIN
   RAISE NOTICE 'merge function: % ordered merges match the TypeScript merge', checked;
 END $$;
 
--- Finding 8: two excuses written at the same instant but spelled differently ("Z" and ".000Z") are
--- the same instant to the server, so the reason decides, in both orders, as lib/habit/merge.ts does.
 DO $$
 DECLARE
   uid CONSTANT UUID := '00000000-0000-4000-8000-0000000000aa';
@@ -238,7 +216,6 @@ BEGIN
   PERFORM hz_test.eq('in either order', (private.merge_habit_day(plain, withdrawal)).reason, 'illness');
 END $$;
 
--- Through the trigger, as the owner uploading with PostgREST's upsert, every order of every case.
 SELECT hz_test.login('00000000-0000-4000-8000-0000000000aa');
 SET ROLE authenticated;
 DO $$
@@ -274,7 +251,6 @@ BEGIN
   RAISE NOTICE 'upsert trigger: % ordered uploads match the TypeScript merge', checked;
 END $$;
 
--- An insert stores the effective status of its own parts, whatever status the client sent.
 DO $$
 DECLARE
   stored TEXT;
@@ -293,20 +269,17 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- ─── 3. Owner-only sync tables (two users) ───────────────────────────────────
 SELECT hz_test.login('00000000-0000-4000-8000-00000000000b');
 SET ROLE authenticated;
 DO $$
 DECLARE
   pages INTEGER;
 BEGIN
-  -- Last week, so it never meets this week's rows below.
   PERFORM hz_test.day('00000000-0000-4000-8000-00000000000b', hz_test.week_start() - 3, 'done');
   INSERT INTO public.review_sessions (user_id, id, kind, started_at, local_date, tz, pages_reviewed, minimum_met,
     created_at, updated_at)
   VALUES ('00000000-0000-4000-8000-00000000000b', 'session-1', 'wird', now(), hz_test.today_text(), 'UTC', 3, true,
     '2026-11-13T09:00:00Z', '2026-11-13T09:00:00Z');
-  -- An older upload from another device does not replace the newer row.
   INSERT INTO public.review_sessions (user_id, id, kind, started_at, local_date, tz, pages_reviewed, created_at, updated_at)
   VALUES ('00000000-0000-4000-8000-00000000000b', 'session-1', 'wird', now(), hz_test.today_text(), 'UTC', 1,
     '2026-11-13T08:00:00Z', '2026-11-13T08:00:00Z')
@@ -387,13 +360,11 @@ BEGIN
   PERFORM hz_test.expect_error('SELECT * FROM public.profile_privacy', 'permission denied');
   PERFORM hz_test.expect_error($q$SELECT public.get_board('starting', 'light', 0, '2026-11-13', 1)$q$, 'permission denied');
   PERFORM hz_test.expect_error('SELECT public.get_my_halaqas()', 'permission denied');
-  -- Finding 8 (second review): the profiles policy helper is no RPC anon can call.
   PERFORM hz_test.expect_error($q$SELECT public.profile_identity_visible('00000000-0000-4000-8000-00000000000b')$q$,
     'does not exist');
 END $$;
 RESET ROLE;
 
--- ─── 4. Invite halaqa, sharing, encouragement, teacher view ──────────────────
 CREATE TABLE hz_test.state (key TEXT PRIMARY KEY, value TEXT);
 GRANT SELECT, INSERT, UPDATE ON hz_test.state TO anon, authenticated;
 
@@ -430,7 +401,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- B's week: a wird day, an excused day with a flag, and a grace day. Only the wird day is visible.
 SELECT hz_test.day('00000000-0000-4000-8000-00000000000b', hz_test.week_start(), 'done', NULL, true, true, true);
 SELECT hz_test.day('00000000-0000-4000-8000-00000000000b', hz_test.week_start() + 1, NULL, 'illness', true);
 SELECT hz_test.day('00000000-0000-4000-8000-00000000000b', hz_test.week_start() + 2, 'grace', NULL, true);
@@ -457,21 +427,17 @@ BEGIN
   PERFORM hz_test.eq('goal counts wird days of sharing members', (goal->>'wird_days')::INTEGER, 1);
   PERFORM hz_test.eq('goal target is five per contributor', (goal->>'target')::INTEGER, 10);
   PERFORM hz_test.eq('goal has no per-member breakdown', goal ? 'members', false);
-  -- Co-member reads B's shared juz completion, but not B's other badges.
   PERFORM hz_test.eq('co-member reads shared juz badge only',
     (SELECT string_agg(achievement_id, ',') FROM public.achievement_unlocks
       WHERE user_id = '00000000-0000-4000-8000-00000000000b'), 'juz_30_completed');
   PERFORM hz_test.eq('co-member cannot read surah progress',
     (SELECT count(*) FROM public.public_surah_progress WHERE user_id = '00000000-0000-4000-8000-00000000000b'), 0::BIGINT);
-  -- Teacher view without consent returns nothing private.
   detail := public.get_halaqa_teacher_view(gid, '00000000-0000-4000-8000-00000000000b', hz_test.today_text());
   PERFORM hz_test.eq('plan hidden without consent', detail->'plan', 'null'::JSONB);
   PERFORM hz_test.eq('grades hidden without consent', detail->'grades', 'null'::JSONB);
-  -- Encouragement: one per day per group, fixed templates, free text allowed in invite halaqas.
   PERFORM public.send_halaqa_encouragement(gid, '00000000-0000-4000-8000-00000000000b', 'ease', NULL, hz_test.today_text());
   PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'keep_going', NULL, %L)$q$,
     gid, '00000000-0000-4000-8000-00000000000b', hz_test.today_text()), 'already_encouraged_today');
-  -- Finding 11: yesterday's or tomorrow's date (both valid somewhere on Earth) opens no second send.
   PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'keep_going', NULL, %L)$q$,
     gid, '00000000-0000-4000-8000-00000000000b', hz_test.d(hz_test.utc_today() + 1)), 'already_encouraged_today');
   PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'keep_going', NULL, %L)$q$,
@@ -499,7 +465,6 @@ BEGIN
   detail := public.get_halaqa_detail(gid, hz_test.today_text());
   PERFORM hz_test.eq('encouragement received', detail->'received'->0->>'template_id', 'ease');
   PERFORM hz_test.eq('sender named', detail->'received'->0->>'from_name', 'Teacher A');
-  -- The notification inbox lists ids the device acknowledges, not a time watermark.
   inbox := public.get_received_encouragements();
   PERFORM hz_test.eq('inbox lists the encouragement', inbox->'items',
     jsonb_build_array(jsonb_build_object('id', detail->'received'->0->'id', 'created_at', detail->'received'->0->'created_at')));
@@ -510,14 +475,10 @@ BEGIN
     gid, '00000000-0000-4000-8000-00000000000a', hz_test.today_text()), 'not_allowed');
   PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_member_role(%L, %L, 'teacher')$q$,
     gid, '00000000-0000-4000-8000-00000000000b'), 'not_allowed');
-  -- B shares plan and grades with teachers, and stops sharing consistency.
   PERFORM public.set_halaqa_sharing(gid, false, true, true, true);
 END $$;
 RESET ROLE;
 
--- Finding 9 (second review): a send that commits after a later one carries an earlier created_at. A
--- watermark already past it would never return it; the 7-day id list does. Rows older than 7 days
--- are not listed.
 INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, local_date, sent_on, created_at)
 SELECT value::UUID, '00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000b', 'dua',
   hz_test.d(hz_test.utc_today() - 1), hz_test.utc_today() - 1,
@@ -544,9 +505,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Third review, finding 5: the inbox pages the whole 7-day window by a (created_at, id) cursor, so
--- more arrivals than one page are all listed and the oldest is never stuck behind the newest. 230
--- encouragements, three sharing the time that falls on the first page boundary.
 SELECT hz_test.make_user(('00000000-0000-4000-8007-' || lpad(i::TEXT, 12, '0'))::UUID, 'inbox_user_' || i, NULL)
 FROM generate_series(1, 2) AS i;
 SELECT hz_test.login('00000000-0000-4000-8007-000000000001');
@@ -624,8 +582,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- SOC-03: a teacher's next sabaq for a member who shares their plan with teachers. It ends when the
--- member stops sharing, a teacher clears it, the teacher stops teaching or either of them leaves.
 SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000d', 'teacher_d', 'Teacher D', NULL);
 SET ROLE authenticated;
 DO $$
@@ -658,7 +614,6 @@ BEGIN
     '00000000-0000-4000-8000-00000000000c'), 'plan_not_shared');
   PERFORM hz_test.expect_error($q$SELECT count(*) FROM public.halaqa_sabaq_assignments$q$, 'permission denied');
 
-  -- B reads it, and cannot set, clear or read the table.
   PERFORM hz_test.login(b);
   mine := public.get_my_sabaq_assignment();
   PERFORM hz_test.eq('learner reads the assignment', mine->>'page' || ':' || (mine->>'from_line') || '-' || (mine->>'to_line'), '1:1-15');
@@ -666,20 +621,17 @@ BEGIN
   PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid, a), 'not_allowed');
   PERFORM hz_test.expect_error(format($q$SELECT public.clear_halaqa_sabaq_assignment(%L, %L)$q$, gid, b), 'not_allowed');
   PERFORM hz_test.expect_error($q$SELECT count(*) FROM public.halaqa_sabaq_assignments$q$, 'permission denied');
-  -- Withdrawing plan sharing ends it, and sharing again does not bring it back.
   PERFORM public.set_halaqa_sharing(gid, false, true, false, true);
   PERFORM hz_test.eq('withdrawn sharing ends the assignment', public.get_my_sabaq_assignment(), NULL::JSONB);
   PERFORM public.set_halaqa_sharing(gid, false, true, true, true);
   PERFORM hz_test.eq('sharing again brings none back', public.get_my_sabaq_assignment(), NULL::JSONB);
 
-  -- A teacher clears it.
   PERFORM hz_test.login(a);
   PERFORM public.set_halaqa_sabaq_assignment(gid, b, 2, 1, 8);
   PERFORM public.clear_halaqa_sabaq_assignment(gid, b);
   PERFORM hz_test.eq('cleared assignment gone from the teacher view',
     public.get_halaqa_teacher_view(gid, b, hz_test.today_text())->'plan'->'sabaq_assignment', 'null'::JSONB);
 
-  -- D teaches, assigns, and is made a member again: the assignment ends.
   PERFORM hz_test.login(d);
   PERFORM public.join_halaqa_by_code(code);
   PERFORM public.set_halaqa_sharing(gid, true, true, true, false);
@@ -695,7 +647,6 @@ BEGIN
   PERFORM hz_test.login(b);
   PERFORM hz_test.eq('a teacher made a member takes their assignment', public.get_my_sabaq_assignment(), NULL::JSONB);
 
-  -- A assigns D, then D leaves: the assignment ends with the membership.
   PERFORM hz_test.login(a);
   PERFORM public.set_halaqa_sabaq_assignment(gid, d, 4, 1, 15);
   PERFORM hz_test.login(d);
@@ -724,7 +675,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Group cap of 50 and a member limit of 10 halaqas.
 SELECT hz_test.make_user(('00000000-0000-4000-8001-' || lpad(i::TEXT, 12, '0'))::UUID, 'cap_user_' || i, NULL)
 FROM generate_series(1, 49) AS i;
 SET ROLE authenticated;
@@ -743,7 +693,6 @@ BEGIN
     PERFORM public.create_invite_halaqa('Group ' || i);
   END LOOP;
   PERFORM hz_test.expect_error($q$SELECT public.create_invite_halaqa('One too many')$q$, 'halaqa_limit');
-  -- Leaving frees a place.
   PERFORM hz_test.login('00000000-0000-4000-8001-000000000001');
   PERFORM public.leave_halaqa((SELECT value FROM hz_test.state WHERE key = 'group')::UUID);
   PERFORM hz_test.login('00000000-0000-4000-8000-00000000000c');
@@ -752,7 +701,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- ─── 5. Matched halaqas (SOC-04, MAT-01..03) ─────────────────────────────────
 SELECT hz_test.make_user(('00000000-0000-4000-8002-' || lpad(i::TEXT, 12, '0'))::UUID, 'match_user_' || i, NULL)
 FROM generate_series(1, 6) AS i;
 INSERT INTO public.profile_privacy (user_id, is_minor) VALUES ('00000000-0000-4000-8002-000000000006', true);
@@ -784,7 +732,6 @@ BEGIN
   PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'not_a_template', NULL, %L)$q$,
     first_group->>'id', '00000000-0000-4000-8002-000000000001', hz_test.today_text()), 'invalid_template');
   PERFORM public.send_halaqa_encouragement((first_group->>'id')::UUID, '00000000-0000-4000-8002-000000000001', 'together', NULL, hz_test.today_text());
-  -- A re-match never returns the user to the halaqa they left.
   PERFORM public.leave_halaqa((first_group->>'id')::UUID);
   g := public.join_matched_halaqa('juz_amma', 'light', 120);
   PERFORM hz_test.eq('re-match finds another halaqa', g->>'id' <> first_group->>'id', true);
@@ -795,8 +742,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Finding 9: the database itself refuses a second active matched halaqa, and a member row always
--- carries its group's kind.
 DO $$
 DECLARE
   other_group UUID := (SELECT group_id FROM public.halaqa_members WHERE user_id = '00000000-0000-4000-8002-000000000004');
@@ -807,7 +752,6 @@ BEGIN
     VALUES (%L, 'invite', '00000000-0000-4000-8002-000000000001')$q$, other_group), 'halaqa_members_group_kind_fkey');
 END $$;
 
--- Finding 18: the inbox lists encouragements only from halaqas the reader is still in.
 SELECT hz_test.login('00000000-0000-4000-8002-000000000001');
 SET ROLE authenticated;
 DO $$
@@ -820,8 +764,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Finding 5 (second review): the limit is one send per calendar day of the sender, by the server's
--- clock in their stored zone, not one per 20 hours.
 SELECT hz_test.make_user(('00000000-0000-4000-8005-' || lpad(i::TEXT, 12, '0'))::UUID, 'enc_user_' || i, NULL)
 FROM generate_series(1, 2) AS i;
 SELECT hz_test.login('00000000-0000-4000-8005-000000000001');
@@ -836,7 +778,6 @@ BEGIN
     '00000000-0000-4000-8005-000000000002', 'ease', NULL, hz_test.today_text());
 END $$;
 RESET ROLE;
--- The first send was 21 hours ago, earlier the same day.
 UPDATE public.halaqa_encouragements SET created_at = now() - INTERVAL '21 hours'
 WHERE from_user = '00000000-0000-4000-8005-000000000001';
 CREATE FUNCTION hz_test.send_enc() RETURNS JSONB LANGUAGE sql AS $$
@@ -850,7 +791,6 @@ BEGIN
   PERFORM hz_test.expect_error('SELECT hz_test.send_enc()', 'already_encouraged_today');
 END $$;
 RESET ROLE;
--- A send on a later day of the sender's (a stored zone further east) still counts as today.
 UPDATE public.halaqa_encouragements SET sent_on = sent_on + 1 WHERE from_user = '00000000-0000-4000-8005-000000000001';
 SET ROLE authenticated;
 DO $$
@@ -858,7 +798,6 @@ BEGIN
   PERFORM hz_test.expect_error('SELECT hz_test.send_enc()', 'already_encouraged_today');
 END $$;
 RESET ROLE;
--- Yesterday's send, three hours ago, leaves today open. The day comes from the sender's stored zone.
 UPDATE public.halaqa_encouragements SET sent_on = sent_on - 2, created_at = now() - INTERVAL '3 hours'
 WHERE from_user = '00000000-0000-4000-8005-000000000001';
 INSERT INTO public.habit_days (user_id, local_date, earned_status, minimum_met, tz, created_at, updated_at)
@@ -882,7 +821,6 @@ END $$;
 
 DO $$
 BEGIN
-  -- MAT-03: the match rule is a pure function.
   PERFORM hz_test.eq('exact match', private.match_tier('juz_amma', 'light', 2, 29, 30, 'juz_amma', 'light', 180), 1);
   PERFORM hz_test.eq('full group', private.match_tier('juz_amma', 'light', 2, 30, 30, 'juz_amma', 'light', 180), NULL::INTEGER);
   PERFORM hz_test.eq('3 h widening', private.match_tier('juz_amma', 'light', 2, 9, 30, 'juz_amma', 'light', 360), 2);
@@ -891,28 +829,22 @@ BEGIN
   PERFORM hz_test.eq('one level band', private.match_tier('juz_4_15', 'light', 2, 3, 30, 'juz_amma', 'light', 180), 4);
   PERFORM hz_test.eq('two level bands', private.match_tier('juz_16_29', 'light', 2, 3, 30, 'juz_amma', 'light', 180), NULL::INTEGER);
   PERFORM hz_test.eq('beyond 3 h', private.match_tier('juz_amma', 'light', 2, 3, 30, 'juz_amma', 'light', 480), NULL::INTEGER);
-  -- offsetBand rounds halves up, like Math.round.
   PERFORM hz_test.eq('offset band -1 h', private.offset_band(-60), 0);
   PERFORM hz_test.eq('offset band +1 h', private.offset_band(60), 1);
   PERFORM hz_test.eq('offset band -3 h', private.offset_band(-180), -1);
   PERFORM hz_test.eq('offset band +14 h', private.offset_band(840), 7);
 END $$;
 
--- ─── 6. Board (BRD-01..08, PTS-02, SB-03, SB-04) ────────────────────────────
 SELECT hz_test.make_user(('00000000-0000-4000-8003-' || lpad(i::TEXT, 12, '0'))::UUID, 'board_user_' || i,
   'Board ' || i, 'https://example.invalid/board' || i || '.png')
 FROM generate_series(1, 40) AS i;
--- Board 1: 3 points (minimum, full and manzil on one day); last week's and future days never count.
 SELECT hz_test.day('00000000-0000-4000-8003-000000000001', hz_test.week_start(), 'done', NULL, true, true, true);
 SELECT hz_test.day('00000000-0000-4000-8003-000000000001', hz_test.week_start() - 1, 'done', NULL, true, true, true);
 SELECT hz_test.day('00000000-0000-4000-8003-000000000001', hz_test.utc_today() + 2, 'done', NULL, true, true, true);
--- Board 2: excused and grace days with flags set add nothing (SB-03).
 SELECT hz_test.day('00000000-0000-4000-8003-000000000002', hz_test.week_start(), NULL, 'travel', true, true, true);
 SELECT hz_test.day('00000000-0000-4000-8003-000000000002', hz_test.week_start() + 1, 'grace', NULL, true, true, false);
--- Board 3: made_up with the full wird (2) and earned_back with the minimum (1).
 SELECT hz_test.day('00000000-0000-4000-8003-000000000003', hz_test.week_start(), 'made_up', NULL, true, true, false);
 SELECT hz_test.day('00000000-0000-4000-8003-000000000003', hz_test.week_start() + 1, 'earned_back', NULL, true, false, false);
--- Board 4: streak of 3 through yesterday; the paused day keeps the run without adding to it.
 SELECT hz_test.day('00000000-0000-4000-8003-000000000004', hz_test.utc_today() - 1, 'done');
 SELECT hz_test.day('00000000-0000-4000-8003-000000000004', hz_test.utc_today() - 2, 'paused');
 SELECT hz_test.day('00000000-0000-4000-8003-000000000004', hz_test.utc_today() - 3, NULL, 'illness');
@@ -932,9 +864,6 @@ DO $$
 BEGIN
   PERFORM hz_test.eq('streak includes today', private.habit_streak('00000000-0000-4000-8003-000000000004', hz_test.utc_today()), 4);
 END $$;
--- STR-07: yesterday missed, so today is the make-up day; the run through the day before stands all
--- day (the server never knows the Dhuhr cutoff), and is gone the day after unless made up. Its own
--- user, so the Board users' matching below is unchanged.
 SELECT hz_test.make_user('00000000-0000-4000-8019-000000000001', 'makeup_streak_user', 'Make-up', NULL);
 SELECT hz_test.day('00000000-0000-4000-8019-000000000001', hz_test.utc_today() - 2, 'done');
 SELECT hz_test.day('00000000-0000-4000-8019-000000000001', hz_test.utc_today() - 3, 'done');
@@ -944,14 +873,11 @@ BEGIN
   PERFORM hz_test.eq('streak kept on the make-up day', private.habit_streak('00000000-0000-4000-8019-000000000001', hz_test.utc_today()), 3);
   PERFORM hz_test.eq('streak gone the day after a missed make-up', private.habit_streak('00000000-0000-4000-8019-000000000001', hz_test.utc_today() + 1), 0);
 END $$;
--- Made up before the cutoff, yesterday counts and the run goes on through it.
 SELECT hz_test.day('00000000-0000-4000-8019-000000000001', hz_test.utc_today() - 1, 'made_up');
 DO $$
 BEGIN
   PERFORM hz_test.eq('made-up yesterday continues the streak', private.habit_streak('00000000-0000-4000-8019-000000000001', hz_test.utc_today()), 4);
 END $$;
--- Today covered while yesterday is still missing: the older run and today's count together, as the
--- app counts them; a paused today keeps the older run without adding to it.
 SELECT hz_test.make_user('00000000-0000-4000-8019-000000000002', 'makeup_streak_today', 'Make-up today', NULL);
 SELECT hz_test.day('00000000-0000-4000-8019-000000000002', hz_test.utc_today() - 2, 'done');
 SELECT hz_test.day('00000000-0000-4000-8019-000000000002', hz_test.utc_today() - 3, 'done');
@@ -960,7 +886,6 @@ DO $$
 BEGIN
   PERFORM hz_test.eq('older run and today on the make-up day', private.habit_streak('00000000-0000-4000-8019-000000000002', hz_test.utc_today()), 3);
 END $$;
--- Its own user: a stored day's status is never lowered, so done cannot become paused.
 SELECT hz_test.make_user('00000000-0000-4000-8019-000000000003', 'makeup_streak_paused', 'Make-up paused', NULL);
 SELECT hz_test.day('00000000-0000-4000-8019-000000000003', hz_test.utc_today() - 2, 'done');
 SELECT hz_test.day('00000000-0000-4000-8019-000000000003', hz_test.utc_today() - 3, 'done');
@@ -1015,9 +940,7 @@ BEGIN
   PERFORM hz_test.eq('server streak', (me->>'streak')::INTEGER, 4);
   SELECT s INTO me FROM jsonb_array_elements(board->'standings') AS s WHERE (s->>'is_me')::BOOLEAN;
   PERFORM hz_test.eq('caller marked', me->>'name', 'Board 5');
-  -- Opening the tab again is idempotent.
   PERFORM hz_test.eq('lazy placement is idempotent', public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count', '5');
-  -- Leaving is one tap; rejoining the same week returns to the same cohort.
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000002');
   PERFORM public.leave_board();
   PERFORM hz_test.eq('left: not joined', public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 1)->>'status', 'not_joined');
@@ -1025,7 +948,6 @@ BEGIN
   PERFORM hz_test.eq('leaver removed from standings', public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 1)->>'status', 'gathering');
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000002');
   PERFORM hz_test.eq('rejoin returns to the cohort', public.join_board('Quiet Reader', false, false, 'hafiz', 'maintenance', -600, hz_test.today_text(), 1)->>'member_count', '5');
-  -- Fill the cohort to 30; the next exact match starts a new cohort.
   FOR i IN 6 .. 30 LOOP
     PERFORM hz_test.login(('00000000-0000-4000-8003-' || lpad(i::TEXT, 12, '0'))::UUID);
     PERFORM public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
@@ -1033,7 +955,6 @@ BEGIN
   PERFORM hz_test.eq('cohort holds 30', (public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 30);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000031');
   PERFORM hz_test.eq('31st starts a cohort', (public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 1);
-  -- Widening (BRD-08): adjacent level and a 3 h zone join the small cohort; two bands away starts another.
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000032');
   PERFORM hz_test.eq('adjacent level joins small cohort', (public.join_board(NULL, false, false, 'juz_4_15', 'light', 180, hz_test.today_text(), 1)->>'member_count')::INTEGER, 2);
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000033');
@@ -1057,8 +978,6 @@ BEGIN
     SELECT 'small_cohort', cohort_id FROM public.board_members WHERE user_id = '00000000-0000-4000-8003-000000000031';
 END $$;
 
--- Finding 17: a member who left a full cohort and rejoins never pushes it past 30. Their one row for
--- the week moves to another cohort chosen by the normal rules.
 SET ROLE authenticated;
 DO $$
 BEGIN
@@ -1084,8 +1003,6 @@ BEGIN
   ), small_cohort);
 END $$;
 
--- Finding 3: standings and sizes count only members still on the board, even while a leave is
--- committing (simulated here by clearing board_joined alone).
 UPDATE public.profile_privacy SET board_joined = false WHERE user_id = '00000000-0000-4000-8003-000000000010';
 SELECT hz_test.login('00000000-0000-4000-8003-000000000005');
 SET ROLE authenticated;
@@ -1111,15 +1028,12 @@ BEGIN
   ), 0::BIGINT);
 END $$;
 
--- Finding 15: a board week starts on the user's own week start (STR-28), and users with different
--- week starts never share a cohort. Saturday is 6, as in lib/habit/settings.ts.
 SELECT hz_test.make_user(('00000000-0000-4000-8003-' || lpad(i::TEXT, 12, '0'))::UUID, 'board_user_' || i, 'Board ' || i)
 FROM generate_series(41, 45) AS i;
 CREATE FUNCTION hz_test.saturday_week() RETURNS DATE LANGUAGE sql STABLE AS $$
   SELECT hz_test.utc_today() - ((extract(dow FROM hz_test.utc_today())::INTEGER + 1) % 7)
 $$;
 GRANT EXECUTE ON FUNCTION hz_test.saturday_week() TO authenticated;
--- Board 41: one wird day on the Saturday that starts the week, and one the day before it.
 SELECT hz_test.day('00000000-0000-4000-8003-000000000041', hz_test.saturday_week(), 'done', NULL, true, true, false);
 SELECT hz_test.day('00000000-0000-4000-8003-000000000041', hz_test.saturday_week() - 1, 'done', NULL, true, true, true);
 SET ROLE authenticated;
@@ -1143,7 +1057,6 @@ BEGIN
   PERFORM hz_test.eq('Saturday cohort ready', board->>'status', 'ready');
   SELECT s INTO me FROM jsonb_array_elements(board->'standings') AS s WHERE s->>'name' = 'Board 41';
   PERFORM hz_test.eq('points from Saturday to Friday only', (me->>'points')::INTEGER, 2);
-  -- Changing the week start mid-week moves the user; they never hold two active cohorts at once.
   PERFORM hz_test.login('00000000-0000-4000-8003-000000000040');
   PERFORM public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   board := public.get_board('juz_amma', 'light', 180, hz_test.today_text(), 6);
@@ -1164,9 +1077,6 @@ BEGIN
   ), 1::BIGINT);
 END $$;
 
--- Finding 16: without cron, a board read places the other joined users of its week who keep
--- studying, in bounded batches of 100, from the bands they last reported. Wednesday (3) is used by
--- no other test. 8004-...1 to 103 studied recently, 104 did not, 105 left the board.
 SELECT hz_test.make_user(('00000000-0000-4000-8004-' || lpad(i::TEXT, 12, '0'))::UUID, 'pass_user_' || i, NULL)
 FROM generate_series(1, 105) AS i;
 CREATE FUNCTION hz_test.wednesday_week() RETURNS DATE LANGUAGE sql STABLE AS $$
@@ -1181,10 +1091,8 @@ FROM generate_series(1, 105) AS i;
 SELECT hz_test.day(('00000000-0000-4000-8004-' || lpad(i::TEXT, 12, '0'))::UUID, hz_test.wednesday_week() - 3, 'done')
 FROM generate_series(1, 103) AS i;
 SELECT hz_test.day('00000000-0000-4000-8004-000000000105', hz_test.wednesday_week() - 3, 'done');
--- 104's only wird day is a month old.
 SELECT hz_test.day('00000000-0000-4000-8004-000000000104', hz_test.wednesday_week() - 30, 'done');
 
--- Definer, so the count sees board_members, which has no client policies.
 CREATE FUNCTION hz_test.placed_this_wednesday_week() RETURNS BIGINT LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT count(*) FROM public.board_members WHERE week_start = hz_test.wednesday_week() AND left_at IS NULL
 $$;
@@ -1224,8 +1132,6 @@ BEGIN
   ), true);
 END $$;
 
--- Finding 6 (second review): a user a pass left waiting returns to the queue with their next synced
--- wird day, and passes place users from the bands the app last reported (refresh_board_bands).
 SELECT hz_test.day('00000000-0000-4000-8004-000000000104', hz_test.utc_today(), 'done');
 DO $$
 BEGIN
@@ -1234,7 +1140,6 @@ BEGIN
     FROM public.profile_privacy WHERE user_id = '00000000-0000-4000-8004-000000000104'
   ), true);
 END $$;
--- 106 joined with juz_amma bands and now reports hafiz; 107 moves its week start to Saturday.
 SELECT hz_test.make_user(('00000000-0000-4000-8004-' || lpad(i::TEXT, 12, '0'))::UUID, 'pass_user_' || i, NULL)
 FROM generate_series(106, 107) AS i;
 INSERT INTO public.profile_privacy (user_id, board_joined, board_week_start, board_level_band, board_pace_band,
@@ -1277,8 +1182,6 @@ BEGIN
   ), 'juz_amma');
 END $$;
 
--- ─── 7. Profile visibility (SOC-01, ETH-07) ──────────────────────────────────
--- The streak algorithm is checked above; here only who may see it.
 INSERT INTO hz_test.state
   SELECT 'b_streak', private.habit_streak('00000000-0000-4000-8000-00000000000b', hz_test.utc_today())::TEXT;
 SELECT hz_test.login(NULL);
@@ -1294,7 +1197,6 @@ SELECT hz_test.login('00000000-0000-4000-8000-00000000000a');
 SET ROLE authenticated;
 DO $$
 BEGIN
-  -- B stopped sharing consistency with the halaqa but still shares juz completions.
   PERFORM hz_test.eq('co-member sees shared juz only', public.get_profile_summary('00000000-0000-4000-8000-00000000000b'),
     '{"streak": null, "juz_completed": [30]}'::JSONB);
 END $$;
@@ -1327,8 +1229,6 @@ SET ROLE authenticated;
 SELECT public.set_profile_privacy(true, true, true, false);
 RESET ROLE;
 
--- Finding 1 (second review): stating minority clears the profile photo in the same transaction, and
--- the public avatars bucket refuses a minor's uploads and replacements. Deleting stays allowed.
 INSERT INTO storage.objects (bucket_id, name, owner) VALUES
   ('avatars', '00000000-0000-4000-8000-00000000000b/old.png', '00000000-0000-4000-8000-00000000000b'),
   ('avatars', '00000000-0000-4000-8000-00000000000a/old.png', '00000000-0000-4000-8000-00000000000a');
@@ -1342,7 +1242,6 @@ BEGIN
   ), NULL::TEXT);
 END $$;
 SET ROLE authenticated;
--- A minor setting an outside image URL on their own profile keeps no photo.
 UPDATE public.profiles SET avatar_url = 'https://example.invalid/outside.png' WHERE id = '00000000-0000-4000-8000-00000000000b';
 RESET ROLE;
 DO $$
@@ -1350,8 +1249,6 @@ BEGIN
   PERFORM hz_test.eq('a minor cannot set an outside photo URL', (SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000b'), NULL::TEXT);
 END $$;
 SET ROLE authenticated;
--- Fourth review, finding 2: a file the app has not deleted yet sits in a folder named after the
--- minor's id. Only the minor lists it, which they need to delete it.
 DO $$
 BEGIN
   PERFORM hz_test.eq('a minor lists their own leftover photo', (
@@ -1387,9 +1284,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Finding 1: once B states they are a minor, their identity row is hidden from everyone but B. The
--- reflection feed embeds authors through the same policy, so other authors still show. Fourth review,
--- finding 2: B's reflection itself is hidden too, since it carries B's id and words.
 INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content) VALUES
   ('00000000-0000-4000-8000-00000000000a', 1, 1, 1, 1, 1, 'A reflection by an adult author'),
   ('00000000-0000-4000-8000-00000000000b', 1, 2, 2, 1, 1, 'A reflection by a minor author');
@@ -1447,7 +1341,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- SOC-02: halaqa co-members still see the minor's name and what they shared, through the RPCs.
 SELECT hz_test.login('00000000-0000-4000-8000-00000000000a');
 SET ROLE authenticated;
 DO $$
@@ -1466,9 +1359,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Third review, finding 3: recording minority leaves matched halaqas, whose members are strangers,
--- the way leaving does, and keeps invite halaqas. 8006-1 is in a matched halaqa with 8006-2 and an
--- invite halaqa with 8006-3; 8006-4 is alone in a matched halaqa and joins the board as a minor.
 SELECT hz_test.make_user(('00000000-0000-4000-8006-' || lpad(i::TEXT, 12, '0'))::UUID, 'third_user_' || i, 'Third ' || i,
   'https://example.invalid/third' || i || '.png')
 FROM generate_series(1, 4) AS i;
@@ -1498,7 +1388,6 @@ BEGIN
   PERFORM hz_test.expect_error(format($q$SELECT public.get_halaqa_detail(%L, %L)$q$, matched->>'id', hz_test.today_text()),
     'not_a_member');
 
-  -- The stranger keeps the encouragement but no longer sees who the minor is.
   PERFORM hz_test.login('00000000-0000-4000-8006-000000000002');
   detail := public.get_halaqa_detail((matched->>'id')::UUID, hz_test.today_text());
   PERFORM hz_test.eq('the matched halaqa counts the stranger alone', (detail->'group'->>'member_count')::INTEGER, 1);
@@ -1508,7 +1397,6 @@ BEGIN
   PERFORM hz_test.eq('no minor username in the matched halaqa', position('third_user_1' IN detail::TEXT), 0);
   PERFORM hz_test.eq('no minor name in the matched halaqa', position('Third 1' IN detail::TEXT), 0);
 
-  -- The invite halaqa keeps the minor, without a photo.
   PERFORM hz_test.login('00000000-0000-4000-8006-000000000003');
   SELECT m INTO member FROM jsonb_array_elements(public.get_halaqa_detail((invite->>'id')::UUID, hz_test.today_text())->'members') AS m
   WHERE m->>'username' = 'third_user_1';
@@ -1516,7 +1404,6 @@ BEGIN
   PERFORM hz_test.eq('the invite halaqa shows no photo of the minor', member->'avatar_url', 'null'::JSONB);
   INSERT INTO hz_test.state VALUES ('third_invite', invite->>'id');
 
-  -- Joining the board as a minor leaves a matched halaqa too, and closes it once it is empty.
   PERFORM hz_test.login('00000000-0000-4000-8006-000000000004');
   matched := public.join_matched_halaqa('starting', 'maintenance', -720);
   INSERT INTO hz_test.state VALUES ('third_alone', matched->>'id');
@@ -1535,8 +1422,6 @@ BEGIN
   ), 0::BIGINT);
 END $$;
 
--- Third review, finding 2, defense in depth: even a photo stored for a minor by mistake (here with
--- the profile trigger switched off) never reaches another member.
 ALTER TABLE public.profiles DISABLE TRIGGER profiles_minor_photo;
 UPDATE public.profiles SET avatar_url = 'https://example.invalid/stored-by-mistake.png'
 WHERE id = '00000000-0000-4000-8006-000000000001';
@@ -1555,10 +1440,6 @@ END $$;
 RESET ROLE;
 UPDATE public.profiles SET avatar_url = NULL WHERE id = '00000000-0000-4000-8006-000000000001';
 
--- Eighth review, finding 3: under 18s appear on the Board only under a nickname (BRD-07), and the
--- sharing settings have no nickname field. Recording minority for a Board member without one never
--- fails on that rule: it takes them off the Board in the same transaction and says so, and they can
--- join again with a nickname. 8003-1 is on the Board without a nickname.
 SELECT hz_test.login('00000000-0000-4000-8003-000000000001');
 SET ROLE authenticated;
 DO $$
@@ -1587,27 +1468,21 @@ DECLARE
 BEGIN
   PERFORM public.join_board('Quiet Return', true, true, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.eq('eighth: they join again under a nickname', public.get_profile_privacy()->>'board_joined', 'true');
-  -- With a nickname, saving as a minor keeps them on the Board.
   privacy := public.set_profile_privacy(false, false, true, true);
   PERFORM hz_test.eq('eighth: a minor with a nickname stays on the Board', privacy->>'board_joined', 'true');
   PERFORM hz_test.eq('eighth: and the save reports no leave', privacy->'left_board', 'false'::JSONB);
 END $$;
 RESET ROLE;
 
--- Fourth review, finding 2: a minor's reflections, comments and likes are readable only by that
--- minor, and the public counts leave them out. 8008-1 is active as an adult and then states
--- minority; 8008-2 is an adult. Both react to Teacher A's reflection above.
 SELECT hz_test.make_user(('00000000-0000-4000-8008-' || lpad(i::TEXT, 12, '0'))::UUID, 'fourth_user_' || i, 'Fourth ' || i)
 FROM generate_series(1, 2) AS i;
 INSERT INTO hz_test.state SELECT 'adult_reflection', id::TEXT FROM public.reflections WHERE content = 'A reflection by an adult author';
--- The counts on Teacher A's reflection and on 8008-2's comment there, as the caller reads them.
 CREATE FUNCTION hz_test.adult_counts() RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT r.likes_count || ' likes, ' || r.comments_count || ' comments, comment liked ' || COALESCE((
     SELECT c.likes_count FROM public.reflection_comments AS c WHERE c.content = 'An adult comment'
   )::TEXT, '-')
   FROM public.reflections AS r WHERE r.content = 'A reflection by an adult author'
 $$;
--- Every reflection, comment and like row the caller can read, as text.
 CREATE FUNCTION hz_test.public_activity() RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT concat_ws(' | ',
     (SELECT string_agg(to_jsonb(r)::TEXT, ',') FROM public.reflections AS r),
@@ -1635,7 +1510,6 @@ BEGIN
   PERFORM public.set_reflection_comment_like(auth.uid(), adult_comment, true);
   PERFORM hz_test.eq('an adult''s activity is counted', hz_test.adult_counts(), '2 likes, 2 comments, comment liked 1');
 
-  -- Stating minority recounts what they touched. A minor still writes, and reads what they wrote.
   PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM hz_test.eq('stating minority leaves their activity out of the counts', hz_test.adult_counts(),
     '1 likes, 1 comments, comment liked 0');
@@ -1655,8 +1529,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Strangers, signed out or in, read none of it: not the rows, the ids, the words, or the counts.
--- The probe of the review: B (8000-b) is a minor whose reflection used to stay readable.
 SELECT hz_test.login(NULL);
 SET ROLE anon;
 DO $$
@@ -1695,9 +1567,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Withdrawing minority counts again what they wrote as an adult, never what they wrote as a minor,
--- and stating it again leaves it out; removing a like that was never counted, or the whole account,
--- changes no count.
 SELECT hz_test.login('00000000-0000-4000-8008-000000000001');
 SET ROLE authenticated;
 DO $$
@@ -1725,8 +1594,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Stored counts that differ from a full recount, as text, or 'none'. A row counts when it was not
--- written privately and its author is not a minor now.
 CREATE FUNCTION hz_test.count_drift() RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT COALESCE(string_agg(drift, '; ' ORDER BY drift), 'none') FROM (
     SELECT format('reflection %s: %s likes stored, %s counted; %s comments stored, %s counted',
@@ -1745,7 +1612,6 @@ CREATE FUNCTION hz_test.count_drift() RETURNS TEXT LANGUAGE sql STABLE AS $$
     WHERE c.likes_count IS DISTINCT FROM likes.n
   ) AS d
 $$;
--- Scans and row updates of a public table so far in this transaction.
 CREATE FUNCTION hz_test.scans(rel TEXT) RETURNS BIGINT LANGUAGE sql VOLATILE AS $$
   SELECT COALESCE(seq_scan, 0) + COALESCE(idx_scan, 0) FROM pg_stat_xact_user_tables
   WHERE schemaname = 'public' AND relname = rel
@@ -1760,10 +1626,6 @@ BEGIN
   PERFORM hz_test.eq('counts so far match a full recount', hz_test.count_drift(), 'none');
 END $$;
 
--- Fifth review, finding 1: the composer and the comment input promise a stated minor privacy from a
--- cached copy that another device may have changed. A write carries that promise, and one promised
--- private is refused once the writer is no longer a minor, so nothing is published that the screen
--- said would stay private. 8010-1 records minority and withdraws it as another device would.
 SELECT hz_test.make_user(('00000000-0000-4000-8010-' || lpad(i::TEXT, 12, '0'))::UUID, 'fifth_user_' || i, 'Fifth ' || i)
 FROM generate_series(1, 6) AS i;
 INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
@@ -1780,7 +1642,6 @@ BEGIN
   PERFORM public.create_reflection(auth.uid(), 2, 2, 2, 1, 1, 'Kept private as promised', true);
   PERFORM public.add_reflection_comment(auth.uid(), target, 'A comment kept private as promised', true);
 
-  -- Another device withdraws minority while this screen still promises privacy.
   PERFORM public.set_profile_privacy(false, false, false, true);
   PERFORM hz_test.expect_error(format($q$SELECT public.create_reflection(%L, 2, 3, 3, 1, 1,
     'Promised private after the withdrawal', true)$q$, auth.uid()), 'privacy_changed');
@@ -1789,16 +1650,12 @@ BEGIN
   PERFORM hz_test.eq('a refused write stores nothing', (
     SELECT count(*) FROM public.reflections WHERE content = 'Promised private after the withdrawal'
   ) + (SELECT count(*) FROM public.reflection_comments WHERE content = 'Promised private after the withdrawal'), 0::BIGINT);
-  -- Shown as public to an adult, it posts.
   PERFORM public.create_reflection(auth.uid(), 2, 4, 4, 1, 1, 'Shown as public to an adult', false);
 
-  -- The reverse: the screen shows an adult, another device recorded minority. The text only becomes
-  -- more private, so it is accepted.
   PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM public.create_reflection(auth.uid(), 2, 5, 5, 1, 1, 'Shown as public, kept private for a minor', false);
   PERFORM public.add_reflection_comment(auth.uid(), target, 'Shown as public, kept private for a minor', false);
 
-  -- Every write states what the screen showed, for the signed-in account only, and only through the RPCs.
   PERFORM hz_test.expect_error(format($q$SELECT public.create_reflection(%L, 2, 6, 6, 1, 1, 'No promise given', NULL)$q$,
     auth.uid()), 'invalid_visibility');
   PERFORM hz_test.expect_error(format($q$SELECT public.add_reflection_comment(%L, %L, 'Written for another account', false)$q$,
@@ -1811,7 +1668,6 @@ BEGIN
     auth.uid(), target), 'permission denied');
   PERFORM hz_test.expect_error('DELETE FROM public.reflection_comments WHERE user_id = auth.uid()', 'permission denied');
   PERFORM hz_test.expect_error('DELETE FROM public.reflections WHERE user_id = auth.uid()', 'permission denied');
-  -- An owner cannot edit counts or un-hide a post either.
   PERFORM hz_test.expect_error('UPDATE public.reflections SET likes_count = 99 WHERE user_id = auth.uid()', 'permission denied');
   PERFORM hz_test.expect_error($q$UPDATE public.reflections SET status = 'active' WHERE user_id = auth.uid()$q$, 'permission denied');
   PERFORM hz_test.eq('the minor reads what they wrote', (
@@ -1835,10 +1691,6 @@ BEGIN
   PERFORM hz_test.eq('promised writes leave the counts exact', hz_test.count_drift(), 'none');
 END $$;
 
--- Fifth review, findings 3 and 4. A single like or comment moves its count by one and never reads the
--- rest of the discussion; a statement or cascade that changes many rows recounts each parent once;
--- and through likes, unlikes, comments, deletions, minority changes and account deletion every count
--- matches a full recount. 8010-3 wrote a reflection with many comments by 8010-4.
 INSERT INTO public.reflections (user_id, surah, ayah_start, ayah_end, juz_start, juz_end, content)
 VALUES ('00000000-0000-4000-8010-000000000003', 2, 10, 10, 1, 1, 'A busy reflection'),
   ('00000000-0000-4000-8010-000000000003', 2, 11, 11, 1, 1, 'A reflection its author deletes');
@@ -1914,7 +1766,6 @@ BEGIN
   PERFORM hz_test.eq('a comment like counts', (SELECT likes_count FROM public.reflection_comments WHERE id = five_comment), 2);
 END $$;
 
--- 8010-5 records minority and withdraws it, then records it again; each time the counts follow.
 SELECT hz_test.login('00000000-0000-4000-8010-000000000005');
 DO $$
 BEGIN
@@ -1931,7 +1782,6 @@ BEGIN
   PERFORM public.set_profile_privacy(false, false, true, false);
 END $$;
 
--- 8010-3 deletes their second reflection, with its comments and likes.
 SELECT hz_test.login('00000000-0000-4000-8010-000000000003');
 DO $$
 BEGIN
@@ -1948,7 +1798,6 @@ BEGIN
     hz_test.count_drift(), 'none');
 END $$;
 
--- One statement deleting 150 of 8010-4's comments recounts their reflection once, not once per row.
 DO $$
 DECLARE
   updates BIGINT := hz_test.updates('reflections');
@@ -1961,8 +1810,6 @@ BEGIN
   ), 51);
 END $$;
 
--- Deleting the accounts of 8010-4 (an adult with 50 comments and their likes) and 8010-5 (a minor
--- with likes, a comment and comment likes) recounts once per cascade, and leaves every count exact.
 DO $$
 DECLARE
   updates BIGINT := hz_test.updates('reflections');
@@ -1979,8 +1826,6 @@ BEGIN
   PERFORM hz_test.eq('account deletion keeps every count exact', hz_test.count_drift(), 'none');
 END $$;
 
--- Sixth review, finding 2: join_board says whether joining as a minor left a matched halaqa, decided
--- in its own transaction, so the screen can confirm it without reading halaqas first.
 SELECT hz_test.make_user(('00000000-0000-4000-8020-' || lpad(i::TEXT, 12, '0'))::UUID, 'board_minor_' || i, 'Board minor ' || i)
 FROM generate_series(1, 2) AS i;
 SELECT hz_test.login('00000000-0000-4000-8020-000000000001');
@@ -1992,7 +1837,6 @@ BEGIN
     public.join_board('Small Star', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'true');
 END $$;
 RESET ROLE;
--- Clients cannot read memberships directly; the owner checks that it really ended.
 DO $$
 BEGIN
   PERFORM hz_test.eq('and the matched membership has ended', (
@@ -2011,29 +1855,20 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Seventh review: what a minor writes stays private for good. Each reflection, comment and like keeps
--- whether it was written privately, so withdrawing minority later, through set_profile_privacy or
--- join_board, never shows it to anyone else or adds it to a public count, and its owner still reads
--- and deletes it. 8030-1 is an adult author. 8030-2 writes as a minor and withdraws through
--- set_profile_privacy, 8030-3 through join_board. 8030-4 writes as an adult, becomes a minor and
--- withdraws, so their rows hide and show again as before. 8030-5 is a signed-in stranger.
 SELECT hz_test.make_user(('00000000-0000-4000-8030-' || lpad(i::TEXT, 12, '0'))::UUID, 'seventh_user_' || i, 'Seventh ' || i)
 FROM generate_series(1, 5) AS i;
--- The counts on 8030-1's reflection and on their comment there, as the caller reads them.
 CREATE FUNCTION hz_test.seventh_counts() RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT r.likes_count || ' likes, ' || r.comments_count || ' comments, comment liked ' || COALESCE((
     SELECT c.likes_count FROM public.reflection_comments AS c WHERE c.content = 'Seventh adult comment'
   )::TEXT, '-')
   FROM public.reflections AS r WHERE r.content = 'Seventh adult reflection'
 $$;
--- The reflections, comments, likes and comment likes by `author` that the caller can read.
 CREATE FUNCTION hz_test.rows_by(author UUID) RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT (SELECT count(*) FROM public.reflections WHERE user_id = author) || '/'
     || (SELECT count(*) FROM public.reflection_comments WHERE user_id = author) || '/'
     || (SELECT count(*) FROM public.reflection_likes WHERE user_id = author) || '/'
     || (SELECT count(*) FROM public.reflection_comment_likes WHERE user_id = author)
 $$;
--- The likes and comments on 8030-1's reflection and the likes on their comment that the caller can read.
 CREATE FUNCTION hz_test.seventh_rows() RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT (SELECT count(*) FROM public.reflection_likes AS l JOIN public.reflections AS r ON r.id = l.reflection_id
       WHERE r.content = 'Seventh adult reflection') || ' likes, '
@@ -2077,7 +1912,6 @@ BEGIN
   PERFORM public.set_reflection_comment_like(auth.uid(), adult_comment, true);
   PERFORM hz_test.eq('seventh: what minors write is not counted', hz_test.seventh_counts(), '1 likes, 2 comments, comment liked 1');
 
-  -- Existing behavior: an adult who becomes a minor has their earlier rows hidden while they are one.
   PERFORM hz_test.login('00000000-0000-4000-8030-000000000004');
   PERFORM public.set_profile_privacy(false, false, true, false);
   PERFORM hz_test.eq('seventh: becoming a minor leaves earlier activity out', hz_test.seventh_counts(),
@@ -2096,8 +1930,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Minority ends, each way it can. Rows written privately stay out of the counts; rows written as
--- an adult return to them.
 SET ROLE authenticated;
 DO $$
 BEGIN
@@ -2161,7 +1993,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- The flag is stored from the writer's minority when each row was written.
 DO $$
 BEGIN
   PERFORM hz_test.eq('seventh: rows written as a minor are stored private', (
@@ -2184,7 +2015,6 @@ SELECT 'seventh_private_reflection', id::TEXT FROM public.reflections WHERE cont
 UNION ALL
 SELECT 'seventh_private_comment', id::TEXT FROM public.reflection_comments WHERE content = 'Seventh private comment by two';
 
--- A stranger cannot react to a row written privately, even though its author is no longer a minor.
 SELECT hz_test.login('00000000-0000-4000-8030-000000000005');
 SET ROLE authenticated;
 DO $$
@@ -2201,8 +2031,6 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- The owner still reads, likes and deletes what they wrote as a minor, and what they write now as an
--- adult is public.
 SELECT hz_test.login('00000000-0000-4000-8030-000000000003');
 SET ROLE authenticated;
 DO $$
@@ -2262,10 +2090,6 @@ BEGIN
   PERFORM hz_test.eq('seventh: private rows keep every count exact', hz_test.count_drift(), 'none');
 END $$;
 
--- Eighth review, finding 1: a form saves the minority it loaded, and the write is refused with
--- privacy_changed when the stored value differs, so a form left open on another device can neither
--- clear minority nor record it from a stale copy. Both RPCs that set is_minor compare. 8040-1 is
--- recorded as a minor by another device while this one still shows an adult, and then the reverse.
 SELECT hz_test.make_user('00000000-0000-4000-8040-000000000001', 'stale_user_1', 'Stale 1');
 SELECT hz_test.login('00000000-0000-4000-8040-000000000001');
 SET ROLE authenticated;
@@ -2276,15 +2100,12 @@ INSERT INTO hz_test.state
 SET ROLE authenticated;
 DO $$
 BEGIN
-  -- This device loaded "not under 18" before the other device recorded minority.
   PERFORM hz_test.expect_error(format($q$SELECT public.join_board(NULL, false, false, 'juz_amma', 'light', 180, %L, 1)$q$,
     hz_test.today_text()), 'privacy_changed');
   PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(true, true, false, false)', 'privacy_changed');
-  -- A stale form is refused even when what it sends would keep minority.
   PERFORM hz_test.expect_error(format($q$SELECT public.join_board('Stale Star', true, false, 'juz_amma', 'light', 180, %L, 1)$q$,
     hz_test.today_text()), 'privacy_changed');
   PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(false, false, true, false)', 'privacy_changed');
-  -- The loaded value is required.
   PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(false, false, true, NULL)', 'invalid_privacy');
   PERFORM hz_test.expect_error(format($q$SELECT public.join_board('Stale Star', true, NULL, 'juz_amma', 'light', 180, %L, 1)$q$,
     hz_test.today_text()), 'invalid_privacy');
@@ -2305,25 +2126,19 @@ DO $$
 DECLARE
   snapshot TEXT;
 BEGIN
-  -- The other device withdraws minority with the value it loaded, so it writes.
   PERFORM hz_test.eq('eighth: a matching value writes through set_profile_privacy',
     public.set_profile_privacy(true, false, false, true)->>'is_minor', 'false');
-  -- This device still shows a minor.
   snapshot := public.get_profile_privacy()::TEXT;
   PERFORM hz_test.expect_error('SELECT public.set_profile_privacy(false, false, true, true)', 'privacy_changed');
   PERFORM hz_test.expect_error(format($q$SELECT public.join_board('Stale Star', true, true, 'juz_amma', 'light', 180, %L, 1)$q$,
     hz_test.today_text()), 'privacy_changed');
   PERFORM hz_test.eq('eighth: a stale minor form changes nothing', public.get_profile_privacy()::TEXT, snapshot);
-  -- Reloaded, the join goes through.
   PERFORM public.join_board('Stale Star', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.eq('eighth: a matching value writes through join_board', public.get_profile_privacy()->>'is_minor', 'true');
   PERFORM hz_test.eq('eighth: and joins the Board', public.get_profile_privacy()->>'board_joined', 'true');
 END $$;
 RESET ROLE;
 
--- Eighth review, finding 2: deleting a halaqa creator's account clears created_by, and the surviving
--- members' list still says false, not null, for is_creator, so the app can read it. 8050-1 creates an
--- invite halaqa that 8050-2 joins, then deletes their account.
 SELECT hz_test.make_user(('00000000-0000-4000-8050-' || lpad(i::TEXT, 12, '0'))::UUID, 'creator_user_' || i, 'Creator ' || i)
 FROM generate_series(1, 2) AS i;
 SET ROLE authenticated;
@@ -2360,14 +2175,8 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- ─── 8. Card merge: the schedule by review time, the rest by row time ────────
--- Device B grades a card Again at 09:03. Device A, offline with the 08:00 schedule, suspends it at
--- 09:05 (a unit switch writes the whole row). Whichever upload arrives first, the server ends with
--- B's schedule and A's suspension.
 SELECT hz_test.make_user('00000000-0000-4000-8000-0000000000ab', 'card_merge', NULL, NULL);
 
--- An upload as PostgREST makes it for pushUpsert in lib/database/sync.ts: every column the client
--- sends, with a fresh synced_at, through INSERT ... ON CONFLICT DO UPDATE.
 CREATE FUNCTION hz_test.upload_card(card JSONB) RETURNS VOID LANGUAGE sql AS $$
   INSERT INTO public.study_cards (id, user_id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
     learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at,
@@ -2385,7 +2194,6 @@ CREATE FUNCTION hz_test.upload_card(card JSONB) RETURNS VOID LANGUAGE sql AS $$
     synced_at = EXCLUDED.synced_at, tier = EXCLUDED.tier, tier_changed_at = EXCLUDED.tier_changed_at
 $$;
 
--- The stored card: schedule as state/reps/lapses/stability/last review/due, then the other columns.
 CREATE FUNCTION hz_test.stored_card(card_id TEXT) RETURNS JSONB LANGUAGE sql STABLE AS $$
   SELECT jsonb_build_object(
     'schedule', concat_ws('/', state, reps, lapses, stability,
@@ -2396,7 +2204,6 @@ CREATE FUNCTION hz_test.stored_card(card_id TEXT) RETURNS JSONB LANGUAGE sql STA
   FROM public.study_cards WHERE user_id = auth.uid() AND id = card_id
 $$;
 
--- Versions of one card. Everyone held `seen`; B graded it Again; A suspended its copy of `seen`.
 CREATE FUNCTION hz_test.card_version(card_id TEXT, version TEXT) RETURNS JSONB LANGUAGE sql IMMUTABLE AS $$
   SELECT jsonb_build_object('id', card_id, 'deck_id', 'default', 'created_at', '2026-11-01T00:00:00Z',
     'buried_until', NULL, 'marked_at', NULL, 'tier', NULL, 'tier_changed_at', NULL, 'deleted_at', NULL) ||
@@ -2430,13 +2237,11 @@ BEGIN
     WHERE tgrelid = 'public.study_cards'::regclass AND NOT tgisinternal AND tgtype & 2 = 2 AND tgtype & 16 = 16
   ), ARRAY['study_cards_merge_schedule', 'sync_keep_newer_row']);
 
-  -- B's review arrives first; A's suspension, written later on the older schedule, arrives second.
   PERFORM hz_test.upload_card(hz_test.card_version('3:1', 'seen'));
   PERFORM hz_test.upload_card(hz_test.card_version('3:1', 'b_again'));
   PERFORM hz_test.upload_card(hz_test.card_version('3:1', 'a_suspended'));
   PERFORM hz_test.eq('newer status on an older schedule keeps the stored review', hz_test.stored_card('3:1'), merged);
 
-  -- A's suspension arrives first; B's review, written earlier but reviewed later, arrives second.
   PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'seen'));
   PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'a_suspended'));
   SELECT synced_at INTO synced_before FROM public.study_cards WHERE id = '3:2';
@@ -2444,14 +2249,11 @@ BEGIN
   PERFORM hz_test.eq('older status with a later review brings its schedule', hz_test.stored_card('3:2'), merged);
   PERFORM hz_test.eq('the merged row is pulled again',
     (SELECT synced_at > synced_before FROM public.study_cards WHERE id = '3:2'), true);
-  -- Retried uploads of either queue entry change nothing.
   PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'a_suspended'));
   PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'b_again'));
   PERFORM hz_test.upload_card(hz_test.card_version('3:2', 'seen'));
   PERFORM hz_test.eq('retried uploads converge', hz_test.stored_card('3:2'), merged);
 
-  -- Equal review times keep whole-row last write wins: a due-date change without a review applies,
-  -- and an older write with the same review is skipped.
   PERFORM hz_test.upload_card(hz_test.card_version('3:3', 'seen'));
   PERFORM hz_test.upload_card(hz_test.card_version('3:3', 'seen') ||
     '{"due": "2026-11-25T08:00:00Z", "updated_at": "2026-11-13T09:05:00Z"}');
@@ -2460,7 +2262,6 @@ BEGIN
   PERFORM hz_test.eq('equal review: the later write wins whole', hz_test.stored_card('3:3'),
     '{"schedule": "2/3/0/10/08:00/25 08:00", "suspended_at": null, "deleted_at": null, "updated_at": "09:05"}'::JSONB);
 
-  -- A deletion on a device behind on reviews stays a deletion with the later schedule, in both orders.
   PERFORM hz_test.upload_card(hz_test.card_version('3:4', 'seen'));
   PERFORM hz_test.upload_card(hz_test.card_version('3:4', 'b_again'));
   PERFORM hz_test.upload_card(hz_test.card_version('3:4', 'a_deleted'));
@@ -2472,8 +2273,6 @@ BEGIN
   PERFORM hz_test.eq('a review arriving after the deletion', hz_test.stored_card('3:5'),
     '{"schedule": "3/4/1/2/09:03/13 09:13", "suspended_at": null, "deleted_at": "09:05", "updated_at": "09:05"}'::JSONB);
 
-  -- No review is the earliest. A never-reviewed card suspended later takes B's first review, and the
-  -- public surah progress counts it as memorized.
   PERFORM hz_test.upload_card(hz_test.card_version('4:1', 'seen') ||
     '{"reps": 0, "state": 0, "last_review": null, "suspended_at": "2026-11-13T09:05:00Z", "updated_at": "2026-11-13T09:05:00Z"}');
   PERFORM hz_test.eq('unreviewed card is not memorized',

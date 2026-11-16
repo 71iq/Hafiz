@@ -51,7 +51,6 @@ function tree({ ready = true, mounted = true, visible = true } = {}) {
     </SafeAreaProvider>
   );
 }
-// Rows render as "On this device" (English and the active translation), then "Available".
 function renderedOrder() {
   const onDevice = (code: string) => code === "en" || code === mockSettings.translationLanguage;
   return [
@@ -82,7 +81,6 @@ function begin(view: ReturnType<typeof render>, code = "id") {
   if (!result) throw new Error("Missing selection result");
   return result;
 }
-// Built-in English stays usable while another language imports; every other row follows busy.
 function busy(view: ReturnType<typeof render>, expected: boolean) {
   const rows = view.UNSAFE_getAllByType(DisclosureRow);
   const order = renderedOrder();

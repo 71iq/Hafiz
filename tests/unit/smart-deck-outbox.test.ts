@@ -51,7 +51,6 @@ describe("RF-178 smart decks and their upload queue", () => {
 
   it("keeps the legacy deck setting when its tombstone cannot be queued", async () => {
     seedLegacyRetentionCard();
-    // The migrated card queues first; fail the deck setting's tombstone that follows.
     store.failQueueInsert(2);
 
     await expect(migrateLegacyRetentionDecks(store.db)).rejects.toThrow("Synthetic sync_queue write failure");

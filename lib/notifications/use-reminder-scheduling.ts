@@ -28,13 +28,6 @@ function warn(error: unknown) {
   console.warn("[Reminders]", error);
 }
 
-/**
- * NOT-04: replan the next 7 days on app start, on return to the foreground, when the time zone
- * changes, after sync, after review activity (sessions and grades), when the language changes, and
- * when the account signs out or another signs in: only the signed-in account's halaqa encouragement
- * stays scheduled or shown, or shows while the app is open (5.8.2). Mount once, under the database
- * and settings providers.
- */
 export function useReminderScheduling(): void {
   const { db, isReady } = useDatabaseStatus();
   const { uiLanguage, isLoaded } = useSettings();
@@ -44,7 +37,6 @@ export function useReminderScheduling(): void {
     setReminderAccountSource(() => useAuthStore.getState().user?.id ?? null);
   }, []);
 
-  // Replans when another account signs in or out. A run already waiting is shared.
   useEffect(() => {
     if (db && isReady && isLoaded) rescheduleReminders(db, { language: uiLanguage }).catch(warn);
   }, [db, isReady, isLoaded, uiLanguage, accountId]);
@@ -79,7 +71,6 @@ export function useReminderScheduling(): void {
       reviewTimer = setTimeout(run, REVIEW_SETTLE_MS);
     };
     const unsubscribeReview = subscribeReviewActivity(settleThenRun);
-    // Excuses, pauses, onboarding and plan changes (including its reminder time) emit a habit change.
     const unsubscribeHabit = subscribeHabitChanged(settleThenRun);
     return () => {
       active = false;
@@ -93,19 +84,8 @@ export function useReminderScheduling(): void {
   }, [db, isReady, isLoaded, uiLanguage]);
 }
 
-/**
- * Notification taps open the wird review for the user's plan, al-Kahf or Home, and "Remind me in 1
- * hour" sets the follow-up. A cold-start tap waits until the start route has redirected, and is not
- * routed while onboarding is open.
- */
-/**
- * Responses already handled in this app process, by notification and action. A notification is acted
- * on once; the same response can arrive twice, live and again as the launch response the OS keeps, or
- * again when the listener subscribes anew, and must not schedule a follow-up or navigate twice.
- */
 const handledResponses = new Set<string>();
 
-/** Records the response and says whether it is new. */
 export function firstDelivery(response: ReminderResponse): boolean {
   const key = `${response.data.logId}:${response.action}`;
   if (handledResponses.has(key)) return false;

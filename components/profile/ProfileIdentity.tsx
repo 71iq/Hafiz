@@ -13,7 +13,6 @@ type ProfileIdentityProps = {
   nameColor?: string;
   handleColor?: string;
   centered?: boolean;
-  /** Optional muted line under the handle, e.g. "Last synced: 5 min ago". */
   detail?: string;
 };
 

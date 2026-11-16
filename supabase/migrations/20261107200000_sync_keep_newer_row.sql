@@ -1,18 +1,3 @@
--- RF169: keep the newer synced row when an older device write arrives after a newer one.
---
--- Clients check the remote timestamp before uploading, but another device can write between that
--- read and the upsert. This BEFORE UPDATE trigger repeats the same comparison under the row lock
--- that INSERT ... ON CONFLICT DO UPDATE holds, and skips the update when the stored row is strictly
--- newer. Equal times still update, matching the client rule. Inserts, deletes and server updates
--- that leave the timestamps unchanged are not affected. A skipped update returns success, so the
--- client acknowledges its queue entry and later pulls the newer row.
---
--- Trigger arguments name the timestamp columns in client precedence order; the first non-null one
--- is the row's time.
---
--- An upload that omits updated_at keeps the stored value, so the guard sees equal times and only the
--- client pre-check protects it. An administrative repair that lowers or clears a row time is skipped
--- silently; disable the trigger for that repair.
 
 CREATE OR REPLACE FUNCTION public.sync_keep_newer_row()
 RETURNS TRIGGER

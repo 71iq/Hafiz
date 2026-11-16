@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Unit tests for the static release archive validator."""
 
 import gzip
 import hashlib

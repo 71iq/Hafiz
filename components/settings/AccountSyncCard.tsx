@@ -11,17 +11,12 @@ import { useSettings } from "@/lib/settings/context";
 import { useSyncRestorePause } from "@/lib/sync/restore-consent";
 import { textStartStyle } from "@/lib/ui/direction";
 
-/** "Last synced: 5 min ago", or that this device has not synced the account yet. */
 export function lastSyncedLabel(lastSyncedAt: string | null, s: UIStrings, language: "en" | "ar", now = Date.now()) {
   if (!lastSyncedAt) return s.accountNotSyncedYet;
   const time = formatRelativeTime(lastSyncedAt, s.justNow, language, now);
   return time ? interpolate(s.accountLastSynced, { time }) : s.accountNotSyncedYet;
 }
 
-/**
- * The status line for the account: paused, syncing, a specific failure, waiting changes, or up to
- * date. A finished sync is never announced as success here; it shows as "Last synced".
- */
 export function accountSyncSummary(
   details: Pick<SyncStatusDetails, "status" | "pendingCount" | "failure">,
   paused: boolean,
@@ -42,10 +37,6 @@ export function accountSyncSummary(
   return { text: s.accountSyncUpToDate, tone: "muted" };
 }
 
-/**
- * Settings > Account sync details: last complete sync, pending/failure state and one guarded action.
- * A stored restore pause (W07) offers Resume sync instead of Sync now; Sync now never resumes it.
- */
 export function AccountSyncCard() {
   const s = useStrings();
   const { isDark, isRTL, uiLanguage } = useSettings();

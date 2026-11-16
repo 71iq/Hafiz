@@ -34,7 +34,6 @@ describe("daily review limit", () => {
   }
 
   it("counts a card once however many learning steps it took today", async () => {
-    // A new card learned with Again, Good, Good writes three log rows but is one card of the day.
     review("a", "retention", 30);
     review("a", "retention", 29);
     review("a", "retention", 19);

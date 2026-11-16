@@ -2,23 +2,15 @@ import { diffDays, type LocalDate } from "@/lib/habit/dates";
 import type { DeckReviewSettings, SchedulerStep } from "@/lib/fsrs/types";
 import type { HifzPlan } from "@/lib/hifz/plan";
 
-/** Spec 3.2 tiers of a memorized page. */
 const TIERS = ["sabaq", "sabqi", "manzil", "manzil.needs_work", "manzil.unverified"] as const;
 export type Tier = (typeof TIERS)[number];
 
 export type GradeEvent = Readonly<{ date: LocalDate; rating: 1 | 2 | 3 | 4 }>;
 
 export type PageHistory = Readonly<{
-  /** The day the page passed its fluent check in a sabaq session; absent for declared pages. */
   firstFluentDate: LocalDate | null;
-  /** Declared memorized at onboarding or in My memorization, not memorized in the app. */
   declared: boolean;
-  /**
-   * UNIT-02: the page card started from the schedules of its reviewed ayah cards when the user
-   * switched to page review, and has no grades of its own yet. Those ayah reviews verify it.
-   */
   fromAyahReviews?: boolean;
-  /** Graded reviews of the page card, oldest first. */
   grades: readonly GradeEvent[];
 }>;
 
@@ -32,18 +24,6 @@ function needsWork(grades: readonly GradeEvent[]): boolean {
   return true;
 }
 
-/**
- * TIER-01: a page's tier is a pure function of its review history and the plan (8.6), replayed in
- * date order so a decision made on one day is not undone by a later ordinary grade.
- * - Declared pages are manzil, unverified until their first graded review (ONB-04). A page made from
- *   reviewed ayah cards (UNIT-02) is manzil from the start, since those reviews verified it.
- * - A page memorized in the app is sabqi from its fluent check. It graduates to manzil once it is
- *   sabqi_days old and its last 3 grades in this sabqi period are Good or better. Two Again grades
- *   in a row while sabqi send it back to sabaq; the next Good grade passes it again and starts a new
- *   sabqi period from that day.
- * - Once manzil, a page stays manzil: it needs work from its last Again until two Good or better
- *   grades in a row.
- */
 export function tierFor(history: PageHistory, today: LocalDate, plan: Pick<HifzPlan, "sabqiDays">): Tier {
   const { grades } = history;
   if (history.declared || history.fromAyahReviews) {
@@ -59,9 +39,6 @@ export function tierFor(history: PageHistory, today: LocalDate, plan: Pick<HifzP
   let state: State = { kind: "sabqi", since: history.firstFluentDate, grades: [] };
   for (const grade of grades) {
     if (grade.date < history.firstFluentDate) continue;
-    // A page that reached sabqi_days with its last 3 grades Good graduated that day, before this
-    // grade, so the grade is a manzil review. Otherwise a lapse after time-based graduation would be
-    // replayed as sabqi and could send the page back to sabaq.
     if (state.kind === "sabqi" && graduates(state, grade.date)) state = { kind: "manzil", grades: [] };
     if (state.kind === "manzil") {
       state.grades.push(grade);
@@ -87,11 +64,6 @@ const SABAQ_LEARNING: SchedulerStep[] = ["10m", "1h"];
 const SHORT_RELEARNING: SchedulerStep[] = ["10m"];
 const MANZIL_RELEARNING: SchedulerStep[] = ["10m", "1d"];
 
-/**
- * SCH-02, SCH-03: the scheduling policy for a page card by tier. Manzil pages may come sooner than
- * the cycle but never later, by capping the interval at cycle_days rather than moving due dates.
- * Sabqi pages are reviewed daily while in sabqi.
- */
 export function pagePolicy(tier: Tier, plan: Pick<HifzPlan, "cycleDays" | "retention">, base: DeckReviewSettings): DeckReviewSettings {
   switch (tier) {
     case "sabaq":

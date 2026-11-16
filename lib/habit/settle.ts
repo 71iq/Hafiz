@@ -10,25 +10,14 @@ export type SettlementInput = Readonly<{
   days: readonly HabitDay[];
   today: LocalDate;
   now: Date;
-  /** End of the make-up window for a missed day: Dhuhr of the following day, or 12:30. */
   makeUpCutoffFor: (missedDay: LocalDate) => Date;
   pause: HabitPause | null;
 }>;
 
-/** Whether yesterday can still be made up right now (STR-07). */
 export function isMakeUpOpen(input: Pick<SettlementInput, "today" | "now" | "makeUpCutoffFor">): boolean {
   return input.now.getTime() < input.makeUpCutoffFor(addDays(input.today, -1)).getTime();
 }
 
-/**
- * The idempotent "settle days" pass, run on app open, on Home focus and after sync, never as a
- * background job. It records what the rules already decided:
- * 1. Paused days inside the user's pause, through today (STR-13).
- * 2. Grace days for missed days whose make-up window has closed, while grace is held (STR-14, STR-15),
- *    replayed over the whole history so an earlier unsettled gap is not skipped.
- * 3. Earned-back days once an earn-back succeeded (STR-17).
- * Days already covered are never touched, so running it twice writes nothing the second time.
- */
 export function planSettlement(input: SettlementInput): SettlementWrite[] {
   const { today, now, makeUpCutoffFor, pause } = input;
   const days = toDayMap(input.days);
@@ -45,9 +34,6 @@ export function planSettlement(input: SettlementInput): SettlementWrite[] {
     }
   }
 
-  // Walk the whole history in date order with a running balance, so a gap that was never settled
-  // (the app stayed closed, or the next day's wird came from another device) still gets the grace
-  // the rules gave it. Only a day right after a covered day can take grace.
   const dates = [...days.keys()].sort();
   if (dates.length > 0) {
     const counter = new GraceCounter();

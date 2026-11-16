@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-"""Accept a web release through a forced SSH command."""
 import os
 from pathlib import Path
 import re

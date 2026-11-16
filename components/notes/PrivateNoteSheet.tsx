@@ -28,10 +28,8 @@ import { QF_NOTE_MAX_LENGTH, QF_NOTE_MIN_LENGTH, isQfSyncableNoteContent } from 
 import { textStartStyle } from "@/lib/ui/direction";
 import { AyahTextPreview, useAyahEditorContext } from "./AyahEditorPreview";
 
-/** The character counter appears once a note passes this length. */
 export const NOTE_COUNTER_THRESHOLD = 9000;
 const INPUT_MIN_HEIGHT = 156;
-/** The note input grows with its text up to this share of the sheet height. */
 const INPUT_MAX_SHARE = 0.6;
 
 type Props = {
@@ -42,7 +40,6 @@ type Props = {
   ayahEnd: number;
   note?: PrivateNote | null;
   ayahPreview?: string;
-  /** Starting text for a new note, such as a reflection draft the person chose to keep privately. */
   initialContent?: string;
   onSaved?: () => void;
 };
@@ -64,7 +61,6 @@ export function PrivateNoteSheet({
   const { isDark, isRTL, uiLanguage } = useSettings();
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const { width, height } = useWindowDimensions();
-  // "Open existing note" switches the editor to the matching note without asking the caller.
   const [openedNote, setOpenedNote] = useState<PrivateNote | null>(null);
   const activeNote = openedNote ?? note ?? null;
   const baseline = activeNote?.content ?? "";
@@ -93,7 +89,6 @@ export function PrivateNoteSheet({
     setDuplicate(null);
   }, [startingContent]);
 
-  // A new open or target starts from that target's saved text; an older save cannot finish it.
   useLayoutEffect(() => {
     generation.current += 1;
     if (open) resetDraft();
@@ -101,12 +96,10 @@ export function PrivateNoteSheet({
 
   const { guard, dialogProps } = useDiscardGuard(dirty && !saving);
   const requestClose = useCallback(() => {
-    // A local save in flight finishes and closes the sheet itself; closing now could hide it.
     if (saving) return;
     guard(onClose);
   }, [guard, onClose, saving]);
 
-  // An account change clears the draft at once, without asking, and closes the editor.
   const ownerRef = useRef(userId);
   useEffect(() => {
     if (ownerRef.current === userId) return;
@@ -159,7 +152,6 @@ export function PrivateNoteSheet({
         setError(true);
       }
     } finally {
-      // Saving blocks a second attempt, so this always belongs to the attempt that just ended.
       setSaving(false);
     }
   }, [activeNote, ayahEnd, ayahStart, content, db, isValid, onClose, onSaved, s.privateNoteSaved, saving, showNotice, surah]);

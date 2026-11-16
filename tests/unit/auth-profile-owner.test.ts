@@ -79,7 +79,6 @@ const session = (id: string): Session => ({
   expires_in: 3600,
   user: user(id),
 });
-// The neutral stand-in: no name from the email (user(id) has one), replaced once the row loads.
 const fallbackProfile = (id: string): Profile => ({
   id,
   username: "",
@@ -249,7 +248,6 @@ it.each(["success", "empty", "error", "rejection"])(
     const result = await work;
     expect(result).toEqual(outcome === "success" ? profile("a", "old-a") : fallbackProfile("a"));
     expect(useAuthStore.getState().profile).toBe(result);
-    // The inserted username comes from the account id, never from the email address.
     expect(mockInsert).toHaveBeenCalledWith({ id: "a", username: "user_a", display_name: null });
   },
 );
@@ -406,7 +404,6 @@ it.each([
   const real = profile("a", "real-a");
   mockReads.push(Promise.resolve({ data: real, error: null }));
   sync();
-  // A second trigger while the read is pending does not start another read.
   sync();
   for (let i = 0; i < 10; i++) await Promise.resolve();
   expect(useAuthStore.getState().profile).toEqual(real);

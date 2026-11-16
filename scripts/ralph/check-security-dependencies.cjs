@@ -1,4 +1,3 @@
-// Verify the dependency instances used by the existing devtools and CLI.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -15,7 +14,6 @@ async function main() {
   const tarMetadata = cli("tar/package.json");
   assert.equal(tarMetadata.version, "7.5.22");
   const quote = devtools("shell-quote").quote;
-  // Only call the quoting function. Never execute its output in a shell.
   assert.throws(() => quote(["echo", "ok", { comment: "fixture" }, "a\nid;#"]), TypeError);
 
   const reports = path.resolve(__dirname, "../../.refactor-baseline");
@@ -35,7 +33,6 @@ async function main() {
   const tar = await import(pathToFileURL(path.resolve(tarDirectory, esmEntry)).href);
   assert.equal(typeof tar.extract, "function");
   await tar.create({ cwd: input, file: archive, gzip: true }, ["supabase"]);
-  // Match the CLI installer's gunzip and extract(options, files) usage.
   await pipeline(fs.createReadStream(archive), createGunzip(), tar.extract({ cwd: output }, ["supabase"]));
   assert.equal(fs.readFileSync(path.join(output, "supabase"), "utf8"), contents);
   console.log("Patched parent-resolved versions, safe quoting rejection, and installer archive API passed.");

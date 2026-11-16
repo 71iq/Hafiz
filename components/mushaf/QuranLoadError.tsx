@@ -2,7 +2,6 @@ import { Pressable, Text, View } from "react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 
-/** Shown instead of an empty reader when the Quran-data query fails; Retry runs it again. */
 export function QuranLoadError({ onRetry }: { onRetry: () => void }) {
   const s = useStrings();
   const { isRTL } = useSettings();

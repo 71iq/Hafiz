@@ -12,7 +12,6 @@ import { interpolate } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 
-/** Card notes at 13 px in a darker warm tone, readable on the tinted card. */
 const CAPTION_CLASS = "text-warm-600 dark:text-neutral-400";
 const CAPTION_STYLE = { fontSize: 13, lineHeight: 18 } as const;
 
@@ -21,15 +20,12 @@ type Props = {
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
-  /** Hide the grace note after the user has seen it. */
   graceNoteDismissed: boolean;
   onDismissGraceNote: () => void;
-  /** Today's plan still has pages or lines left, so a met minimum is "safe", not "done". */
   wirdLeft?: boolean;
   onOpenBreak: () => void;
 };
 
-/** Arabic dates and times use Arabic-Indic digits throughout, never a mix with Latin digits. */
 function dateLocale(language: "en" | "ar"): string {
   return language === "ar" ? "ar-u-nu-arab" : "en";
 }
@@ -50,7 +46,6 @@ function headlineMessage(overview: HabitOverview, language: "en" | "ar", s: UISt
   const { headline } = overview;
   switch (headline.kind) {
     case "done_today":
-      // The minimum keeps the streak; while the day's plan still has work, the wird is not "done".
       return wirdLeft ? s.habitMinimumMet : s.habitDoneToday;
     case "excused_today":
       return s.habitExcusedToday;
@@ -95,11 +90,6 @@ function HeadlineIcon({ kind, color }: { kind: HabitOverview["headline"]["kind"]
   }
 }
 
-/**
- * The Home streak card (5.3). The count shows the alive streak even before today's wird (STR-03),
- * with one calm message for today's state, progress toward the minimum, the streak goal, held grace
- * days and a way to mark an excuse or pause. No sad states, no fear.
- */
 export function WirdStreakCard({
   overview,
   language,
@@ -112,7 +102,6 @@ export function WirdStreakCard({
 }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
-  // Muted icons take the theme's secondary text colour, so they match the text beside them.
   const muted = mutedIconColor(useSettings().effectiveTheme);
   const { streak, headline, settings, goal } = overview;
   const showMinimum =
@@ -122,11 +111,7 @@ export function WirdStreakCard({
     (headline.kind === "earn_back" && !streak.doneToday);
   const showGraceNote = overview.recentGraceDay !== null && !graceNoteDismissed;
   const tomorrowTier = streak.doneToday && isEveOfStreakTier(streak.length);
-  // With no goal, grace or tier line, the break link sits under the message instead of alone in a row.
   const hasFooterNotes = goal !== null || overview.graceHeld > 0 || tomorrowTier;
-  // The link keeps a 44 pt target around its 18 px line. Negative margins take the extra 13 px above
-  // and below out of the layout, so the card's padding holds whether the link or a wrapped note is
-  // the tallest item in the last row. Under the message it keeps a 6 px gap above its text.
   const renderBreakLink = (margins: string) => (
     <Pressable onPress={onOpenBreak} accessibilityRole="button" className={`min-h-[44px] justify-center ${margins}`}>
       <Text
@@ -209,8 +194,6 @@ export function WirdStreakCard({
       ) : null}
 
       {hasFooterNotes ? (
-      // 12 px above, like the blocks above it: the link's 44 px target adds no height, and this
-      // keeps its target clear of the grace note's dismiss button.
       <MirroredRow dir={dir} className="mt-3 items-center justify-between gap-3">
         <MirroredRow dir={dir} className="flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           {goal ? (

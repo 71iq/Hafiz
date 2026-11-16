@@ -29,7 +29,6 @@ jest.mock("@/lib/word/queries", () => ({
   upsertUserWordMeaning: (...args: unknown[]) => mockUpsert(...args),
   deleteUserWordMeaning: (...args: unknown[]) => mockDelete(...args),
 }));
-// The modal itself needs app providers; its own suites cover it. Render its contract plainly.
 jest.mock("@/components/ui/ConfirmDialog", () => ({
   ConfirmDialog: (props: {
     visible: boolean;

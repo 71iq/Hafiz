@@ -33,7 +33,6 @@ type Props = {
   isRTL: boolean;
   s: DefaultDeckProgressStrings;
   className?: string;
-  /** Opens a deck's card list. Without it the rows are read-only, as on a profile. */
   onOpenDeck?: (item: DefaultDeckProgressItem, title: string) => void;
 };
 
@@ -53,7 +52,6 @@ export function DefaultDeckProgressChart({
     reasonsOfRevelation: s.smartDeckReasonsTitle,
     vocabulary: s["achievementCategory.vocab"] ?? s.vocabDeckTitle,
   };
-  // Digits follow the interface language; toLocaleString would follow the device locale.
   const { uiLanguage } = useSettings();
   const totalCards = items.reduce((sum, item) => sum + item.total, 0);
   const rowFlexStyle = {
@@ -145,14 +143,11 @@ function DefaultDeckProgressRow({
           className="text-warm-500 dark:text-neutral-400"
           style={{ fontFamily: "Manrope_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] }}
         >
-          {/* A bidi isolate keeps Arabic "٥ / ٥٣" in order, as on the achievements count. */}
           {`\u2066${formatNumber(item.startedCount, uiLanguage)} / ${formatNumber(item.total, uiLanguage)}\u2069`}
         </Text>
       </View>
       <View
         className="h-3 overflow-hidden rounded-full"
-        // The track is pinned to ltr so flex-end is the right side; under an inherited rtl direction
-        // it meant the left and Arabic bars filled from the wrong end.
         style={{
           backgroundColor: themeColors.surfaceHigh,
           direction: "ltr",
@@ -175,7 +170,6 @@ function DefaultDeckProgressRow({
     </View>
   );
   if (!onPress) return content;
-  // Each row opens its deck's card list; the chevron points toward the reading end.
   return (
     <Pressable
       accessibilityRole="button"

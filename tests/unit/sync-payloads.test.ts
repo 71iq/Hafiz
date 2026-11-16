@@ -174,17 +174,11 @@ function insertStudyLog(row: Record<string, SQLInputValue>) {
     .prepare(`INSERT INTO study_log (${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`)
     .run(...Object.values(row));
 }
-/**
- * These cases test how a restore is applied. Their local fixture rows make replacement need consent
- * (the W07 cases in tests/unit/sync-restore-contract.test.ts cover that gate), so the owner consents here.
- */
 async function syncAccepting(database: AppDatabase): Promise<SyncResult> {
   const counted = transactions;
   let result = await fullSync(database);
-  // A failed earlier acceptance left the account paused; the owner's Resume sync prepares again.
   if (result.status === "sync_paused") result = await fullSync(database, { resume: true });
   if (result.status !== "needs_restore_consent") return result;
-  // The consent preparation's short read transaction is not part of applying the restore.
   transactions = counted;
   return acceptRestoreConsent(database, result.request.token);
 }
@@ -285,7 +279,6 @@ beforeEach(async () => {
     getAllAsync: async (source: string, params: SQLInputValue[] = []) => {
       const rows = sql.prepare(source).all(...params);
       const normalizedSql = source.replace(/\s+/g, " ").trim().toLowerCase();
-      // The per-card timestamp candidate scan, not the one-pass wird-day reconcile after restore.
       if (normalizedSql.startsWith("select reviewed_at from study_log where card_id")) {
         studyLogTimestampCandidateQueries += 1;
         studyLogTimestampCandidateRowsLoaded += rows.length;
@@ -313,7 +306,6 @@ beforeEach(async () => {
       }
     },
   };
-  // Only this isolated boundary adapts the wider Expo API to real Node SQLite.
   db = adapter as unknown as AppDatabase;
   await createSchema(db);
   putSetting(`sync_initial_backfill_${USER_ID}_20260525_sync_v1`, "true");
@@ -625,7 +617,6 @@ it("preserves historical duplicate reviews when an equivalent incremental event 
 
   const rows = sql.prepare("SELECT * FROM study_log WHERE card_id='historical-duplicates' ORDER BY id").all();
   const stats = await getReviewStats(db);
-  // Rows written before review detail existed keep empty detail columns.
   const noDetail = {
     session_id: null,
     duration_ms: null,
@@ -847,7 +838,7 @@ it.each(invalidStates.flatMap((entry) => ["restore", "incremental"].map((mode) =
     }
     const before = snapshot();
     if (mode === "restore") await expect(syncAccepting(db)).rejects.toThrow("Invalid synced study card state");
-    else await syncAccepting(db); // Existing RF029 partial-error reporting remains a separate task.
+    else await syncAccepting(db);
     expect(snapshot()).toEqual(before);
     expect(transactions).toBe(0);
     expect(writes).toEqual([]);
@@ -904,8 +895,6 @@ it.each(["restore", "incremental"])("applies an omitted-state tombstone during %
     mockIncrementalCards = [tombstone];
   }
   await syncAccepting(db);
-  // Restore starts from no local row, so the omitted fields take their defaults. A card this device
-  // already holds is deleted but keeps its own deck and schedule, which a restore would bring back.
   expect(sql.prepare("SELECT state, deck_id, deleted_at FROM study_cards WHERE id = '2:255'").get()).toEqual(
     mode === "restore"
       ? { state: State.New, deck_id: "deleted", deleted_at: NEW }
@@ -928,8 +917,6 @@ it.each([OLD, NEW])(
 );
 
 describe("card merge: the schedule by review time, the rest by row time", () => {
-  // Device B grades the card Again at 09:03. Device A, offline with the 08:00 schedule, suspends it at
-  // 09:05 (a unit switch writes the whole row). Each device ends with B's schedule and A's suspension.
   const at = (time: string) => `2026-11-13T${time}:00.000Z`;
   const seen = {
     ...card(),
@@ -958,7 +945,6 @@ describe("card merge: the schedule by review time, the rest by row time", () => 
     updated_at: at("09:03"),
   };
   const aSuspended = { ...seen, suspended_at: at("09:05"), updated_at: at("09:05") };
-  // The row the server stores once both uploads have met (private.study_cards_merge_schedule).
   const merged = { ...bAgain, suspended_at: at("09:05"), updated_at: at("09:05") };
   const stored = () =>
     sql
@@ -1020,7 +1006,6 @@ describe("card merge: the schedule by review time, the rest by row time", () => 
     { label: "B's review first", snapshot: [bAgain, aSuspended] },
     { label: "A's suspension first", snapshot: [aSuspended, bAgain] },
   ])("merges both versions of a card met in one restore snapshot: $label", async ({ snapshot }) => {
-    // Offset paging by synced_at can return a card twice when it is uploaded during the restore.
     mockRestoreCards = snapshot;
     await expect(syncAccepting(db)).resolves.toMatchObject({ accountRestored: true });
     expect(stored()).toEqual(merged);
@@ -1638,7 +1623,6 @@ it("keeps a pulled page card's cached tier", async () => {
 
 it("reports a finished restore when the account has no remote data yet", async () => {
   await expect(syncAccepting(db)).resolves.toMatchObject({ pulled: 0, accountRestored: false, restoreCompleted: true });
-  // The next sync has nothing left to restore.
   await expect(syncAccepting(db)).resolves.not.toHaveProperty("restoreCompleted");
 });
 
@@ -1674,7 +1658,6 @@ it("pulls wird days before reviews and marks a day whose minimum two devices met
   const now = new Date();
   const today = localDateOf(now);
   const earlier = new Date(now.getTime() - 60 * 60_000).toISOString();
-  // This device recited the first half of a page; another device recited the second half.
   sql
     .prepare(
       `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at,
@@ -1707,7 +1690,6 @@ it("credits pulled make-up reviews to the missed day, not to today", async () =>
   expect(sql.prepare("SELECT status FROM habit_days WHERE local_date = ?").get(today)).toBeUndefined();
 });
 
-/** A clear error at 2:255 word 4, one per session, as another device uploads it. */
 function weakSpotError(session: number, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: `error-${session}`,
@@ -1758,7 +1740,6 @@ it("removes the cloze card when another device's dismissal takes the word below 
   expect(liveClozeCards()).toEqual([]);
 });
 
-/** A trained cloze card for 2:255 word 4, as another device uploads it. */
 function clozeCard(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return { ...card("cloze:2:255:4"), deck_id: "hifz-pages", reps: 7, state: State.Review, updated_at: NEW, ...overrides };
 }
@@ -1794,13 +1775,10 @@ it("brings back a cloze card another device deleted while the word is still weak
   const deletedAt = new Date(Date.now() + 60_000).toISOString();
   mockTableRows.set("recitation_errors:incremental", []);
   mockTableRows.set("study_cards:incremental", [
-    // Deleted after this device made its card, by a clock running a minute ahead, so the deletion
-    // applies here first. It carries the training that device saw.
     { ...clozeCard({ updated_at: deletedAt, deleted_at: deletedAt }), synced_at: "2099-01-01T00:00:00.000Z" },
   ]);
   await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
-  // Restored as it was, training kept, and stamped after the deletion so its upload wins.
   const restored = sql.prepare("SELECT reps, state, stability, updated_at FROM study_cards WHERE id = 'cloze:2:255:4'").get() as {
     reps: number;
     state: number;
@@ -1815,10 +1793,8 @@ it("keeps this device's newer training when a deletion from a device behind on r
   restoreComplete();
   mockTableRows.set("recitation_errors:incremental", [weakSpotError(1), weakSpotError(2), weakSpotError(3)]);
   await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
-  // This device trained the card nine times, the last review an hour ago.
   const lastReview = new Date(Date.now() - 60 * 60_000).toISOString();
   sql.prepare("UPDATE study_cards SET reps = 9, last_review = ?, updated_at = ? WHERE id = 'cloze:2:255:4'").run(lastReview, lastReview);
-  // Another device that saw only seven reviews deleted it later.
   const deletedAt = new Date(Date.now() + 60_000).toISOString();
   mockTableRows.set("recitation_errors:incremental", []);
   mockTableRows.set("study_cards:incremental", [
@@ -1828,7 +1804,6 @@ it("keeps this device's newer training when a deletion from a device behind on r
     },
   ]);
   await expect(syncAccepting(db)).resolves.toMatchObject({ status: "synced" });
-  // The word is still weak here, so the card comes back with the nine reviews.
   expect(liveClozeCards()).toEqual([{ id: "cloze:2:255:4" }]);
   expect(sql.prepare("SELECT reps, last_review FROM study_cards WHERE id = 'cloze:2:255:4'").get()).toEqual({ reps: 9, last_review: lastReview });
 });
@@ -1893,7 +1868,6 @@ it.each(
     .get(...keys[table].map((key) => incoming[key] as SQLInputValue));
   const expected = table === "achievement_unlocks" ? { ...incoming, public_payload: "{}" } : incoming;
   expect(selected).toMatchObject(expected);
-  // A review from an older app version also reconciles its wird day after an incremental pull.
   const reconciled = table === "study_log" && mode === "incremental";
   expect(transactions).toBe(reconciled ? 2 : 1);
   if (reconciled) {

@@ -88,7 +88,6 @@ describe("strict step-text validation for the settings editor", () => {
     "reports %j instead of dropping a token",
     (input) => {
       expect(validateStepText(input)).toEqual({ ok: false });
-      // The lenient reader would have saved a subset or the fallback without saying so.
       expect(parseStepText(input, fallback)).not.toEqual([]);
     },
   );

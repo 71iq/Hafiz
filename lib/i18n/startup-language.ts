@@ -8,10 +8,6 @@ function primarySubtag(locale: string | null | undefined): string | null {
   return locale.toLowerCase().split(/[-_]/)[0] || null;
 }
 
-/**
- * The device language, used only when there is no explicit saved choice. Arabic is chosen only for
- * an "ar" locale; every other locale uses English.
- */
 export function getDeviceLanguage(): "en" | "ar" {
   if (Platform.OS === "web") {
     if (typeof window === "undefined") return "en";
@@ -27,10 +23,6 @@ export function getDeviceLanguage(): "en" | "ar" {
   return I18nManager.isRTL ? "ar" : "en";
 }
 
-/**
- * The UI language before settings are loaded: the web cache or the native startup mirror, then the
- * device language. Settings from SQLite replace it once they load.
- */
 export function getStartupLanguage(): "en" | "ar" {
   if (Platform.OS === "web" && typeof window !== "undefined") {
     const cached = window.localStorage.getItem(UI_LANGUAGE_CACHE_KEY);

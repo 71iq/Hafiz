@@ -14,8 +14,6 @@ import { createAppQueryClient } from "@/lib/query/native-lifecycle";
 import { socialFailureOf } from "@/lib/social/remote";
 import { bearerSubject, signedIn, type FakeAuthState } from "./social-test-auth";
 
-// Third review, finding 1(d): a minor's photo files left by an interrupted save are removed once per
-// app session and account, as that account.
 
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
 const mockHeaders: Record<string, string> = {};
@@ -63,7 +61,6 @@ jest.mock("@/lib/auth/store", () => ({
   }),
 }));
 
-// Each test uses its own account, since cleanups are remembered for the app session.
 const account = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const privacy = (isMinor: boolean) => ({
   data: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: isMinor },
@@ -87,18 +84,15 @@ function newClient() {
   return client;
 }
 
-/** The app's own client, with its network mode and defaults. */
 function appClient() {
   const client = createAppQueryClient();
   queryClients.push(client);
   return client;
 }
 
-// Query reads the clock for staleness; tests move it forward.
 const realNow = Date.now.bind(Date);
 let clockOffset = 0;
 
-/** What lib/query/native-lifecycle.ts reports when AppState returns to "active", or NetInfo reconnects. */
 async function foreground() {
   await act(async () => {
     focusManager.setFocused(false);
@@ -161,12 +155,10 @@ describe("minor photo cleanup (ETH-07)", () => {
     const first = mount(client);
     await waitFor(() => expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]));
     first.unmount();
-    // The same read, still fresh in the cache: nothing to do.
     mount(client);
     await act(async () => undefined);
     expect(mockRpc).toHaveBeenCalledTimes(1);
     expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]);
-    // A fresh read that still says minor checks once more.
     await act(async () => {
       await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user) });
     });
@@ -180,8 +172,6 @@ describe("minor photo cleanup (ETH-07)", () => {
     const client = newClient();
     mount(client);
     await waitFor(() => expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]));
-    // Elsewhere: withdrawn, a photo uploaded, minority recorded again, and its last pass interrupted.
-    // This device was asleep and only ever reads "minor".
     mockAvatarFiles.add(`${user}/left-by-another-device.jpg`);
     await act(async () => {
       await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user) });
@@ -203,7 +193,6 @@ describe("minor photo cleanup (ETH-07)", () => {
       await firstHeld;
       throw new TypeError("Network request failed");
     };
-    // Still a minor on the server when the files are removed.
     mockRpc.mockResolvedValue(privacy(true));
     const older = cleanUpMinorPhotos(user, 100).catch((error: unknown) => error);
     const newer = cleanUpMinorPhotos(user, 200);
@@ -229,7 +218,6 @@ describe("minor photo cleanup (ETH-07)", () => {
     };
     const older = cleanUpMinorPhotos(user, 100).catch((error: unknown) => error);
     const queued = cleanUpMinorPhotos(user, 200);
-    // An adult read arrives, then the person uploads a photo, then the held request fails.
     forgetMinorPhotoCleanup(user);
     mockAvatarFiles.add(`${user}/adult.jpg`);
     releaseFirst();
@@ -242,7 +230,6 @@ describe("minor photo cleanup (ETH-07)", () => {
   it("keeps a photo uploaded as an adult on another device, though this device's last read said minor", async () => {
     const user = account(12);
     signIn(signedIn(user));
-    // Elsewhere minority was withdrawn and a photo uploaded; the server now says adult.
     mockAvatarFiles.add(`${user}/adult-elsewhere.jpg`);
     mockRpc.mockResolvedValue(privacy(false));
     await expect(cleanUpMinorPhotos(user, 300)).resolves.toBe(true);
@@ -265,8 +252,6 @@ describe("minor photo cleanup (ETH-07)", () => {
     mount(client);
     await waitFor(() => expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]));
 
-    // This device reads the withdrawal, then a minority recorded again on another device whose last
-    // photo pass left a file behind, and comes back to the foreground.
     minor = false;
     await act(async () => {
       await client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user) });
@@ -332,8 +317,6 @@ describe("minor photo cleanup (ETH-07)", () => {
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
   });
 
-  // Fourth review, finding 1: this device read "adult" and kept it, while another device recorded
-  // minority and its last photo pass was cut short. Nothing would read privacy again in this session.
   it.each([
     ["a return to the foreground", foreground, 6],
     ["a reconnect", reconnect, 7],
@@ -348,14 +331,12 @@ describe("minor photo cleanup (ETH-07)", () => {
     expect(mockStorageCalls).toEqual([]);
 
     mockRpc.mockResolvedValue(privacy(true));
-    // A recent copy is kept, so the cost stays at a few reads an hour.
     await trigger();
     expect(mockRpc).toHaveBeenCalledTimes(1);
 
     clockOffset = OWN_PRIVACY_REVALIDATE_MS + 1;
     await trigger();
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
-    // Two reads of the account's privacy, and one more on the server before removing what was found.
     expect(mockRpc).toHaveBeenCalledTimes(3);
     expect(mockStorageCalls.every((call) => bearerSubject(call.auth) === user)).toBe(true);
   });
@@ -372,7 +353,6 @@ describe("minor photo cleanup (ETH-07)", () => {
 
     await reconnect();
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
-    // Two reads of the account's privacy, and one more before removing what was found.
     expect(mockRpc).toHaveBeenCalledTimes(3);
   });
 
@@ -392,8 +372,6 @@ describe("minor photo cleanup (ETH-07)", () => {
 
     await reconnect();
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
-    // Privacy was fresh, so only the cleanup ran again.
-    // The startup read, and one more before removing what was found.
     expect(mockRpc).toHaveBeenCalledTimes(2);
   });
 });

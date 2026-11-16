@@ -106,7 +106,6 @@ it("asks before Cancel or Back discards typed text, and Keep editing keeps it", 
   expect(view.queryByText(en.noteDiscardTitle)).toBeNull();
   expect(input().props.value).toBe("Remember the guidance here");
 
-  // Android Back reaches the sheet's Modal; the same guard answers it.
   act(() => view.UNSAFE_getAllByType(Modal)[0].props.onRequestClose());
   expect(view.getByText(en.noteDiscardTitle)).toBeTruthy();
   fireEvent.press(view.getByText(en.discardChangesConfirm));

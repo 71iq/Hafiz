@@ -16,11 +16,6 @@ import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-/**
- * The first route for a new install (5.1): a welcome, then the hifz setup (goal, memorized portion,
- * review tracks, pace and time), then straight into a first short session so the first recitation
- * starts within about 90 seconds (ONB-01). No account is needed, and every step has "Not now".
- */
 function OnboardingInner() {
   const db = useDatabase();
   const { isDark, isLoaded, isRTL, themeColors, uiLanguage, setUiLanguage } = useSettings();
@@ -30,7 +25,6 @@ function OnboardingInner() {
   const [screen, setScreen] = useState<"welcome" | "setup">("welcome");
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Set once the plan is saved: a failed completion then retries only the completion, never the plan.
   const [savedNext, setSavedNext] = useState<Href | null>(null);
 
   const isWide = width >= SIDEBAR_BREAKPOINT;
@@ -45,7 +39,6 @@ function OnboardingInner() {
   const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(45,45,45,0.08)";
   const ForwardIcon = isRTL ? ArrowLeft : ArrowRight;
 
-  /** ONB-05: completion is a synced setting, so a restored account skips onboarding. */
   const complete = useCallback(
     async (next: Href) => {
       if (completing) return;
@@ -65,7 +58,6 @@ function OnboardingInner() {
     [completing, db, router, s.onboardingSaveFailed],
   );
 
-  /** ONB-01, 5.1 step 8: the first session starts right away, on what the plan offers first. */
   const firstSession = (plan: HifzPlan, declaredPages: number): Href => {
     if (plan.unit === "ayah") return "/flashcards/session";
     if (declaredPages > 0) return "/hifz/review";
@@ -228,7 +220,6 @@ function OnboardingInner() {
     </View>
   );
 
-  // The same boot look as the rest of the app while saved settings load.
   if (!isLoaded) return <LoadingScreen progress={null} />;
 
   const errorText = (message: string) => (
@@ -240,8 +231,6 @@ function OnboardingInner() {
     </Text>
   );
 
-  // The plan is saved but finishing setup failed: retry the completion alone, so the plan is not
-  // written twice and the first session still opens once.
   if (savedNext && !error) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
@@ -314,7 +303,6 @@ function OnboardingInner() {
           {renderWelcome()}
           <View style={{ gap: 12 }}>
             {error ? errorText(error) : null}
-            {/* The shared primary button: the label wraps to a second line and the pill grows from 54 px. */}
             <Button
               accessibilityLabel={s.onboardingGetStarted}
               onPress={() => setScreen("setup")}

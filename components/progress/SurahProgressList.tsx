@@ -28,7 +28,6 @@ type Props = {
   previewLimit?: number;
   onItemPress?: () => void;
   onViewAll?: () => void;
-  /** Offered from the empty state: progress appears after study under the current plan. */
   onSetUpPlan?: () => void;
   readOnly?: boolean;
   s: UIStrings;
@@ -48,7 +47,6 @@ export function SurahProgressList({
 }: Props) {
   const openMushaf = useOpenMushaf();
   const { themeColors, effectiveTheme } = useSettings();
-  // The theme's secondary text colour; the surah's second name is 11 px, so it needs 4.5:1.
   const mutedText = mutedIconColor(effectiveTheme);
   const previewData = previewLimit ? data.slice(0, previewLimit) : data;
   const isHorizontalPreview = !!previewLimit;
@@ -81,7 +79,6 @@ export function SurahProgressList({
   const renderItem = (item: SurahProgress, cardWidth?: number) => {
     const pct = item.totalCards > 0 ? (item.memorized / item.totalCards) * 100 : 0;
     const primaryName = isRTL ? item.nameArabic || item.nameEnglish : item.nameEnglish || item.nameArabic;
-    // English readers get the Arabic name as a subtitle; the Arabic UI shows the Arabic name alone.
     const secondaryName = isRTL ? "" : item.nameArabic && item.nameArabic !== primaryName ? item.nameArabic : "";
     const primaryDirection = isRTL ? "rtl" : "ltr";
     const secondaryDirection = isRTL ? "ltr" : "rtl";
@@ -158,7 +155,6 @@ export function SurahProgressList({
               borderRadius: 999,
               backgroundColor: themeColors.surfaceHigh,
               overflow: "hidden",
-              // Pinned so flex-end is the right side whatever direction the list inherits.
               direction: "ltr",
             }}
           >
@@ -204,8 +200,6 @@ export function SurahProgressList({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        // Direction alone mirrors the row and starts its scroll at the right in Arabic; row-reverse
-        // under "ltr" opened a long list at its end.
         contentContainerStyle={{ gap: 8, direction: isRTL ? "rtl" : "ltr", flexDirection: "row", paddingHorizontal: 1 }}
       >
         {previewData.map((item) => renderItem(item, 184))}
@@ -219,8 +213,6 @@ export function SurahProgressList({
               width: 132,
             })}
           >
-            {/* h-full stretched this card far below the row inside the horizontal scroll and pushed its
-                label out of view; flex-1 matches the surah cards' height. */}
             <Card elevation="low" className="flex-1 min-h-[86px] items-center justify-center p-4">
               <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={rowFlexStyle}>
                 <Text
@@ -229,7 +221,6 @@ export function SurahProgressList({
                 >
                   {s.surahProgressViewAll}
                 </Text>
-                {/* Points toward the reading end: right in English, left in Arabic. */}
                 {isRTL ? (
                   <ChevronLeft size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
                 ) : (
@@ -263,10 +254,6 @@ function memorizedShare(item: SurahProgress): number {
   return item.totalCards > 0 ? item.memorized / item.totalCards : 0;
 }
 
-/**
- * The full surah list behind View all: a search field (name in either language or surah number) and
- * a sort toggle. Searching and sorting never change progress data.
- */
 export function SurahProgressBrowser({
   data,
   isDark,

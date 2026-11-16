@@ -26,9 +26,6 @@ import { formatAyahRef } from "@/lib/arabic";
 export type PageWordsByLine = Record<string, string>;
 export type PageWordsData = PageWordsByLine[];
 
-// Authoritative per-page, per-line word mapping from quran.com
-// pageWordsData[pageIndex] = { "lineNumber": "word1 word2 ..." }
-// On native: require() (small enough at 400KB). On web: lazy-fetched.
 let pageWordsData: PageWordsData | null =
   Platform.OS !== "web"
     ? require("../../assets/data/layout/page-words.json")
@@ -65,7 +62,7 @@ type SurahInfo = {
 
 export type PageLineLayout = {
   line_number: number;
-  line_type: string; // "surah_name" | "basmallah" | "ayah"
+  line_type: string;
   is_centered: number;
   first_word_id: number | null;
   last_word_id: number | null;
@@ -92,7 +89,6 @@ type Props = {
   usePageWords?: boolean;
   pageWordLineNumbers?: number[];
   onOpenAyahDetail?: (surah: number, ayah: number) => void;
-  /** MUT-02: opens the similar verses of a marked ayah. Without it the page marks nothing. */
   onOpenSimilarVerses?: (surah: number, ayah: number) => void;
   highlightedAyahKey?: string | null;
   highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
@@ -104,18 +100,15 @@ type Props = {
   allowLineWrap?: boolean;
   showLoadingIndicator?: boolean;
   hifzVisibility?: HifzVisibility | null;
-  /** Localized marker names from the page list, so each page does not subscribe to UI strings. */
   markerLabels?: AyahMarkerLabels;
 };
 
 export type AyahMarkerLabels = {
-  /** "Ayah {{ref}}" */
   label: string;
   openDetails: string;
   select: string;
 };
 
-// Identity for a single visual word on the page
 type WordIdentity = {
   surah: number;
   ayah: number;
@@ -139,10 +132,6 @@ export function mushafLineWidthScale(fontStyle: string): number {
     : MUSHAF_LINE_WIDTH_SCALE;
 }
 
-/**
- * Build the canonical QCF2 token stream for this page. `page-words.json`
- * is stale on some v2 page boundaries, so this stream is the source of truth.
- */
 function buildPageGlyphs(ayahs: AyahData[]): PageGlyph[] {
   const glyphs: PageGlyph[] = [];
   for (const a of ayahs) {
@@ -221,13 +210,11 @@ function MushafPageInner({
   markerLabels,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
-  // A failed page font load showed a spinner forever; it now offers a retry.
   const [fontLoadFailed, setFontLoadFailed] = useState(false);
   const [fontLoadAttempt, setFontLoadAttempt] = useState(0);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, getWordHighlightColor, selectAyah, selection } = useSelection();
   const isWeakSpot = useWeakSpotMarker();
-  // The long-pressed ayah stays marked while its action bar is open, so the reader sees what it acts on.
   const isSelectedAyah = (surah: number, ayah: number) => {
     if (!selection) return false;
     const { start, end } = selection;
@@ -246,8 +233,6 @@ function MushafPageInner({
     isRTL,
   } = useSettings();
   const arrivalWash = isDark ? "rgba(45, 212, 191, 0.15)" : "rgba(13, 148, 136, 0.15)";
-  // MUT-02: the page's similar-verse marks sit on its ayah end markers, so hidden markers mark nothing.
-  // Nothing is read until the saved setting is known, so a reader who turned the marks off reads none.
   const { db } = useDatabaseStatus();
   const similarMarks = useSimilarMarks(
     db,
@@ -258,10 +243,8 @@ function MushafPageInner({
       onOpenSimilarVerses !== undefined &&
       ayahs.length > 0,
   );
-  // A long press selects the ayah; its release must not also open the ayah's details.
   const skipNextMarkerPressRef = useRef<string | null>(null);
 
-  // On web, trigger async load of page-words data
   useEffect(() => {
     if (pageWordsData) { setWordsLoaded(true); return; }
     loadPageWordsData()
@@ -339,8 +322,6 @@ function MushafPageInner({
     [ayahIndexByKey, hifzVisibility, pageNumber]
   );
 
-  // A single marker tap opens ayah details on every platform. The press claims the touch so the
-  // reader's tap layer does not also toggle the controls.
   const handleMarkerPressIn = useCallback(() => {
     skipNextMarkerPressRef.current = null;
     claimReaderTap();
@@ -363,8 +344,6 @@ function MushafPageInner({
     selectAyah(surah, ayah);
   }, [selectAyah]);
 
-  // The similar-verse mark covers its ayah end marker and takes its presses, so the marker's own
-  // long-press guard is not set: no marker press follows to skip.
   const handleSimilarLongPress = useCallback((surah: number, ayah: number) => {
     claimReaderTap();
     selectAyah(surah, ayah);
@@ -384,7 +363,6 @@ function MushafPageInner({
     quranMarkerStyle,
   );
 
-  // Show loading indicator while font is not loaded at all
   if (!isQuranPageFontLoaded(quranFontStyle, pageNumber)) {
     return (
       <View style={{ width, minHeight: 200 }} className="items-center justify-center gap-3">
@@ -547,7 +525,6 @@ function MushafPageInner({
                 />
               );
             }
-            // Ayah end marker — opens ayah details modal
             if (identity && identity.isMarker) {
               if (!showAyahMarkers) return null;
               const isTargetAyah =
@@ -581,7 +558,6 @@ function MushafPageInner({
                   }}
                   {...(Platform.OS === "web"
                     ? ({
-                        // Shift+F10 or the context-menu key on a focused marker selects the ayah.
                         onContextMenu: (event: any) => {
                           event?.preventDefault?.();
                           handleMarkerLongPress(identity.surah, identity.ayah);
@@ -601,7 +577,6 @@ function MushafPageInner({
                     // @ts-ignore
                     cursor: "pointer",
                     ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
-                    // The mark's target reaches past the marker; above the next word, its taps reach it.
                     ...(similarMarked ? { zIndex: 1 } : null),
                   })}
                 >
@@ -637,7 +612,6 @@ function MushafPageInner({
                 </Pressable>
               );
             }
-            // No identity fallback
             return (
               <Text
                 key={`w-${lineNumber}-${i}`}
@@ -716,7 +690,6 @@ function MushafPageInner({
       });
     }
   } else {
-    // Fallback: render ayahs as continuous text (shouldn't happen with layout data)
     content = (
       <Text
         className="text-charcoal dark:text-neutral-100"
@@ -756,7 +729,6 @@ function MushafPageInner({
 
 export const MushafPage = memo(MushafPageInner);
 
-/** Shown when a page font fails to load. Kept separate so pages do not subscribe to UI strings. */
 function PageFontRetry({ onRetry }: { onRetry: () => void }) {
   const s = useStrings();
   return (

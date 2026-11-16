@@ -28,13 +28,11 @@ type JuzInfo = {
 
 export type GoToTab = "surah" | "juz";
 
-/** Where Go to sends the reader: an ayah (surah and juz rows, typed references) or a page. */
 export type GoToTarget = { kind: "ayah"; surah: number; ayah: number } | { kind: "page"; page: number };
 
 type Props = {
   visible: boolean;
   onClose: () => void;
-  /** Called once per choice; the reader closes this sheet before it moves. */
   onSelectTarget: (target: GoToTarget) => void;
   initialTab?: GoToTab;
 };
@@ -144,8 +142,6 @@ export function GoToNavigator({
     onSelectTarget({ kind: "ayah", surah: juz.startSurah, ayah: juz.startAyah });
   };
 
-  // C06: the shared strict parser turns "2:255" / "٢:٢٥٥" or "p 300" / "ص ٣٠٠" into a top row.
-  // Invalid references (2:999, page 700) offer nothing rather than a nearby ayah or page.
   const reference = useMemo(() => {
     const parsed = parseReference(searchText, { context: "goto" });
     if (parsed.kind === "ayah") {
@@ -161,13 +157,11 @@ export function GoToNavigator({
       };
     }
     return null;
-    // digits depends only on the UI locale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isArabicUI, s.goToAyahRow, s.goToPageRow, searchText]);
 
   const filteredSurahs = searchText ? surahs.filter((surah) => matchesSurahQuery(surah, searchText)) : surahs;
 
-  // A juz matches its own number, or the name of the surah it starts in.
   const juzNumberQuery = /^[\d٠-٩]+$/.test(searchText.trim());
   const filteredJuz = searchText
     ? juzList.filter((juz) =>
@@ -248,8 +242,6 @@ export function GoToNavigator({
               </Text>
             </View>
             <View className="flex-1">
-              {/* Sized by its own text with an explicit family: Android cut the last letter of
-                  content-sized Arabic names measured with the default family ("الكه" for "الكهف"). */}
               <Text
                 className="text-charcoal dark:text-neutral-100"
                 style={{

@@ -1,12 +1,6 @@
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import type { DatabaseExecutor } from "@/lib/database/types";
 
-/**
- * An ISO instant later than `now` and every given stamp, so a write made now supersedes all of them.
- * Card writes stamp past the version they replace: a version stamped by a clock running ahead
- * (another device's deletion, or a restore after it) must not make this device's later grades look
- * older and lose to it in sync. Review times (reviewed_at, last_review, due) stay the real ones.
- */
 export function laterThanAll(now: Date, stamps: readonly (string | null | undefined)[]): string {
   let at = now.toISOString();
   for (const stamp of stamps) {
@@ -17,11 +11,6 @@ export function laterThanAll(now: Date, stamps: readonly (string | null | undefi
   return at;
 }
 
-/**
- * For each id among `ids` that is a deleted card, a stamp later than `now` and the deletion it would
- * replace, so a card created again over a deletion stamped by a clock running ahead is not older than
- * that deletion in sync. Ids without a deleted row are absent from the map.
- */
 export async function stampsOverDeletedCards(
   db: DatabaseExecutor,
   ids: readonly string[],

@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Build an isolated Android QA APK (com.anonymous.hafiz.qa) for arm64 devices. It installs beside any
-# real Hafiz install and uses synthetic public Supabase values, so it never contacts a live backend.
-# The JS bundle is built outside Gradle so Metro, Hermes and Gradle each run in their own 6 GiB scope.
-# Quran datasets ship as .hafizdata assets (scripts/native-data-mirror.cjs), not inside the bundle.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/android/app/build/hafiz-prebuilt-bundle"

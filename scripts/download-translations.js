@@ -1,12 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Download Quran translations from quran.com API
- * Usage: node scripts/download-translations.js
- *
- * Fetches 20 language translations and saves as flat JSON arrays:
- * [{ "surah": 1, "ayah": 1, "text": "..." }, ...]
- */
 
 const fs = require("fs");
 const path = require("path");
@@ -37,7 +30,6 @@ const TRANSLATIONS = [
 
 const OUT_DIR = path.join(__dirname, "..", "assets", "data", "translations");
 
-// Standard Quran surah ayah counts (114 surahs, 6236 total)
 const SURAH_AYAH_COUNTS = [
   7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,
   112,78,118,64,77,227,93,88,69,60,34,30,73,54,45,83,182,88,75,85,54,53,
@@ -64,9 +56,7 @@ function fetch(url) {
 }
 
 function stripHtml(text) {
-  // Remove <sup> footnotes and any other HTML tags
   let clean = text.replace(/<sup[^>]*>.*?<\/sup>/gi, "").replace(/<[^>]*>/g, "");
-  // Decode common HTML entities
   clean = clean
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, "&")
@@ -88,8 +78,6 @@ async function downloadTranslation(trans) {
     throw new Error(`Unexpected response for ${trans.code}: no translations array`);
   }
 
-  // API returns translations in sequential order without verse_key.
-  // Map to surah/ayah using known ayah counts.
   const rows = [];
   let idx = 0;
   for (let s = 0; s < 114; s++) {
@@ -120,7 +108,6 @@ async function main() {
     } catch (err) {
       console.error(`  ERROR downloading ${trans.code}: ${err.message}`);
     }
-    // Small delay to be polite to the API
     await new Promise((r) => setTimeout(r, 500));
   }
 

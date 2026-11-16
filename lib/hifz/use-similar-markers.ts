@@ -7,17 +7,8 @@ import { similarGroupsOnPages, withMemorizedSiblings, type SimilarGroup } from "
 import { isValidPage } from "@/lib/hifz/units";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
-/** The similar-verse groups of each marked ayah on a page, keyed "surah:ayah". */
 export type SimilarMarks = ReadonlyMap<string, readonly SimilarGroup[]>;
 
-/**
- * MUT-02: the reader marks an ayah whose similar verse is already memorized. Every page on screen and
- * the ayah detail sheet ask about the same pages, so one shared store holds them. A page's groups come
- * from the bundled similar-verse data and never change, so each page is read once per database
- * connection. The memorized pages are read once, then again after reviews, plan changes and a sync
- * that pulled rows, which is when they can change. A failed read leaves its page unmarked and is tried
- * again on the next refresh; reading never waits for it.
- */
 type Store = Readonly<{
   db: DatabaseExecutor | null;
   memorized: ReadonlySet<number> | null;
@@ -49,7 +40,6 @@ function publish(next: Partial<Store>): void {
   for (const listener of listeners) listener();
 }
 
-/** A new connection (another account, or a restored database) starts from an empty store. */
 function adoptConnection(db: DatabaseExecutor): void {
   if (store.db === db) return;
   generation += 1;
@@ -65,7 +55,6 @@ function sameSet(a: ReadonlySet<number> | null, b: ReadonlySet<number>): boolean
 
 function readMemorized(db: DatabaseExecutor): void {
   if (memorizedReading) {
-    // A refresh during a read reads again once it settles, so a change made meanwhile is seen.
     memorizedStale = true;
     return;
   }
@@ -109,14 +98,12 @@ function readPage(db: DatabaseExecutor, page: number): void {
     });
 }
 
-/** Read what a page needs and the store lacks: the memorized pages and the page's groups. */
 function ensure(db: DatabaseExecutor, page: number): void {
   adoptConnection(db);
   if (store.memorized === null && !store.memorizedFailed) readMemorized(db);
   readPage(db, page);
 }
 
-/** After reviews, plan changes or a pulled sync: read the memorized pages again and retry failures. */
 function refresh(): void {
   const db = store.db;
   if (!db || listeners.size === 0) return;
@@ -144,8 +131,6 @@ function subscribe(listener: () => void): () => void {
     if (listeners.size === 0 && stopEvents) {
       stopEvents();
       stopEvents = null;
-      // Reviews, plan changes and syncs go unheard from now on, so the memorized pages are read again
-      // when the marks are next shown. The page groups come from bundled data and stay.
       publish({ memorized: null });
     }
   };
@@ -153,7 +138,6 @@ function subscribe(listener: () => void): () => void {
 
 const subscribeNever = () => () => undefined;
 
-/** The groups of `groups` whose ayah has a sibling on a memorized page, keyed by that ayah. */
 export function similarMarksOf(groups: readonly SimilarGroup[], memorized: ReadonlySet<number>): SimilarMarks {
   const marks = new Map<string, SimilarGroup[]>();
   for (const group of withMemorizedSiblings(groups, memorized)) {
@@ -165,19 +149,12 @@ export function similarMarksOf(groups: readonly SimilarGroup[], memorized: Reado
 
 type PageState = Readonly<{ marks: SimilarMarks; settled: boolean }>;
 
-/**
- * MUT-02: the marked ayat on `page`, and whether its reads have finished (or failed). Nothing is read
- * or marked while `enabled` is false: the "Mark similar verses" setting is off, or the caller has no
- * ayah to mark. A component re-renders only when its own page or the memorized pages change.
- */
 function useSimilarPage(db: DatabaseExecutor | null, page: number | null | undefined, enabled: boolean): PageState {
   const pageNumber = typeof page === "number" && isValidPage(page) ? page : null;
   const active = enabled && db !== null && pageNumber !== null;
   useEffect(() => {
     if (active && db && pageNumber !== null) ensure(db, pageNumber);
   }, [active, db, pageNumber]);
-  // Each read selects a value that keeps its identity until it changes, so a page that loads does not
-  // re-render the other pages on screen.
   const subscribeWhileActive = active ? subscribe : subscribeNever;
   const select =
     <T>(pick: (current: Store) => T, idle: T) =>
@@ -211,7 +188,6 @@ function useSimilarPage(db: DatabaseExecutor | null, page: number | null | undef
   return useMemo(() => ({ marks, settled }), [marks, settled]);
 }
 
-/** MUT-02: the marked ayat on a reader page, keyed "surah:ayah"; empty until read or after a failure. */
 export function useSimilarMarks(
   db: DatabaseExecutor | null,
   page: number | null | undefined,
@@ -220,10 +196,6 @@ export function useSimilarMarks(
   return useSimilarPage(db, page, enabled).marks;
 }
 
-/**
- * The similar-verse groups of one ayah with a memorized sibling, for the ayah detail sheet, and whether
- * that is known yet. `page` is the ayah's v2 page, or null while it loads.
- */
 export function useSimilarAyah(
   db: DatabaseExecutor | null,
   target: { surah: number; ayah: number } | null,

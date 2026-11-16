@@ -20,8 +20,6 @@ export type AppOAuthHandle = {
   result: Promise<AuthCommandResult<AppOAuthOutcome>>;
 };
 
-// The handle exists before queued work starts and retains the accepted owner even
-// when a later provider request rejects. UI cleanup owns a separate busy lease.
 export function startAppOAuth(provider: AppOAuthProvider, mode: OAuthMode, getState: StateReader): AppOAuthHandle {
   let owner: AuthOwner | undefined;
   const isCurrent = () => owner?.isCurrent() ?? false;
@@ -34,7 +32,6 @@ export function startAppOAuth(provider: AppOAuthProvider, mode: OAuthMode, getSt
         const isQf = provider === QF_OAUTH_PROVIDER;
         if (!isQf && !isSocialAuthEnabled()) throw new Error("Social sign-in is temporarily unavailable.");
         const redirectTo = getOAuthRedirectTo();
-        // The installed SDK types omit configured custom OAuth providers.
         const credentials: SignInWithOAuthCredentials = {
           provider: provider as SignInWithOAuthCredentials["provider"],
           options: {
@@ -103,8 +100,6 @@ export function startAppOAuth(provider: AppOAuthProvider, mode: OAuthMode, getSt
           if (!isCurrent()) return obsolete;
           session = read.session;
         } else {
-          // Native URL detection is disabled. A tokenless callback cannot establish
-          // attribution to whichever global session happens to exist now.
           return empty();
         }
         if (!isCurrent()) return obsolete;
@@ -116,10 +111,7 @@ export function startAppOAuth(provider: AppOAuthProvider, mode: OAuthMode, getSt
           qfOwner = captureQfRequestOwner({
             getState,
             readSession: async () => {
-              // The adapter's receipt may adopt its own logout before notification.
-              // Intent activity survives that receipt; epoch checks stay in the owner.
               const result = await readOwnedSession(acceptedOwner, session, isIntentCurrent);
-              // Preserve the SDK error before the source owner rejects the now-null session.
               if (result.error) throw result.error;
               return result;
             },
@@ -137,8 +129,6 @@ export function startAppOAuth(provider: AppOAuthProvider, mode: OAuthMode, getSt
         }
         return { session, qfConnected, qfOwner };
       } catch (error) {
-        // A failed SDK renewal can publish its own verified logout. Its receipt
-        // advances this ticket to null; an external logout or ABA cannot do so.
         if (
           Platform.OS !== "web" &&
           !isCurrent() &&

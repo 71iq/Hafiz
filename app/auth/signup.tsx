@@ -51,7 +51,6 @@ function createSignupSchema(s: UIStrings) {
 }
 
 export default function SignupScreen() {
-  // The limited-service notice on Login explains that sign up is unavailable.
   if (!isEmailAuthFlowsEnabled()) return <Redirect href="/auth/login" />;
   return <SignupFormScreen />;
 }
@@ -104,11 +103,9 @@ function SignupFormScreen() {
       const result = await flow.result;
       if (!lease.isCurrent() || !flow.isCurrent() || result.status !== "completed" || !result.owner.isCurrent()) return;
       if (result.value.status === "alreadyRegistered" || result.value.status === "needsEmailConfirmation") {
-        // The same neutral result either way, so the form does not reveal who has an account.
         setPendingConfirmationEmail(data.email);
         return;
       }
-      // A session exists: replace auth with the captured context or Home. No profile setup step.
       complete();
     } catch (err: unknown) {
       if (!lease.isCurrent() || (flow && !flow.isCurrent())) return;

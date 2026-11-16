@@ -6,11 +6,7 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
 
-    -- ============================================================
-    -- PRE-POPULATED TABLES (read-only static data)
-    -- ============================================================
 
-    -- Surah metadata (114 rows)
     CREATE TABLE IF NOT EXISTS surahs (
       number INTEGER PRIMARY KEY,
       name_arabic TEXT NOT NULL,
@@ -19,7 +15,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       revelation_type TEXT NOT NULL
     );
 
-    -- Narrative Surah introductions (offline static data)
     CREATE TABLE IF NOT EXISTS surah_info (
       surah INTEGER NOT NULL,
       language TEXT NOT NULL CHECK (language IN ('en', 'ar')),
@@ -30,7 +25,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, language)
     );
 
-    -- Full Quran text (6,236 rows)
     CREATE TABLE IF NOT EXISTS quran_text (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -42,7 +36,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
-    -- Juz mapping (135 rows)
     CREATE TABLE IF NOT EXISTS juz_map (
       juz INTEGER NOT NULL,
       surah INTEGER NOT NULL,
@@ -50,7 +43,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       ayah_end INTEGER NOT NULL
     );
 
-    -- Hizb mapping (60 rows)
     CREATE TABLE IF NOT EXISTS hizb_map (
       hizb INTEGER NOT NULL,
       surah_start INTEGER NOT NULL,
@@ -59,7 +51,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       ayah_end INTEGER NOT NULL
     );
 
-    -- Word roots (50,268 rows)
     CREATE TABLE IF NOT EXISTS word_roots (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -69,7 +60,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       lemma TEXT
     );
 
-    -- Page-to-ayah mapping for 604-page Mushaf
     CREATE TABLE IF NOT EXISTS page_map (
       page INTEGER PRIMARY KEY,
       surah_start INTEGER NOT NULL,
@@ -78,7 +68,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       ayah_end INTEGER NOT NULL
     );
 
-    -- Tafsir (multi-source)
     CREATE TABLE IF NOT EXISTS tafseer (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -87,7 +76,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah, source)
     );
 
-    -- Sahih International English translation (6,236 rows)
     CREATE TABLE IF NOT EXISTS translations (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -95,7 +83,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
-    -- Word-by-word English translations
     CREATE TABLE IF NOT EXISTS word_translations (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -106,7 +93,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah, word_pos)
     );
 
-    -- MASAQ grammatical analysis (إعراب)
     CREATE TABLE IF NOT EXISTS word_irab (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -120,7 +106,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah, word_pos)
     );
 
-    -- Morphology data (تصريف)
     CREATE TABLE IF NOT EXISTS word_morphology (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -139,7 +124,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah, word_pos)
     );
 
-    -- Page line layout (9,046 rows — line-by-line Mushaf layout)
     CREATE TABLE IF NOT EXISTS page_lines (
       page_number INTEGER NOT NULL,
       line_number INTEGER NOT NULL,
@@ -151,7 +135,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (page_number, line_number)
     );
 
-    -- Tajweed rules
     CREATE TABLE IF NOT EXISTS tajweed_rules (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -160,7 +143,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       end_offset INTEGER NOT NULL
     );
 
-    -- Arabic word meanings (quran-words.com) — separate from English word_translations
     CREATE TABLE IF NOT EXISTS word_meanings_ar (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -170,7 +152,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah, word_pos)
     );
 
-    -- Da'as i'rab per word — separate from MASAQ word_irab (keep that intact)
     CREATE TABLE IF NOT EXISTS word_irab_daas (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -180,7 +161,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah, word_pos)
     );
 
-    -- Arabic descriptions for tajweed rule keys
     CREATE TABLE IF NOT EXISTS tajweed_rules_ar (
       rule_key TEXT PRIMARY KEY,
       name_ar TEXT,
@@ -188,7 +168,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       description_ar TEXT
     );
 
-    -- English descriptions for tajweed rule keys
     CREATE TABLE IF NOT EXISTS tajweed_rules_en (
       rule_key TEXT PRIMARY KEY,
       name TEXT,
@@ -197,7 +176,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       description TEXT
     );
 
-    -- Qira'at encyclopedia per ayah
     CREATE TABLE IF NOT EXISTS qiraat_encyclopedia (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -206,7 +184,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
-    -- Reasons of revelation per ayah
     CREATE TABLE IF NOT EXISTS asbab_al_nuzul (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -216,7 +193,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
-    -- NourQuran mutashabihat and similar ayah tails
     CREATE TABLE IF NOT EXISTS mutashabihat_groups (
       id TEXT PRIMARY KEY,
       kind TEXT NOT NULL CHECK (kind IN ('similar', 'tail')),
@@ -238,7 +214,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (group_id, sort_order)
     );
 
-    -- Reflection Journey curated levels (offline-first bundled content)
     CREATE TABLE IF NOT EXISTS reflection_journey_levels (
       id TEXT PRIMARY KEY,
       slug TEXT UNIQUE NOT NULL,
@@ -253,7 +228,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       content_json TEXT NOT NULL
     );
 
-    -- Quran Foundation ayah audio metadata cache (online enrichment, not synced)
     CREATE TABLE IF NOT EXISTS qf_ayah_audio_cache (
       recitation_id INTEGER NOT NULL,
       surah INTEGER NOT NULL,
@@ -269,7 +243,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (recitation_id, surah, ayah)
     );
 
-    -- Quran Foundation hadith-by-ayah cache (online enrichment, not synced)
     CREATE TABLE IF NOT EXISTS qf_ayah_hadith_cache (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -283,7 +256,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah, language, page, limit_count)
     );
 
-    -- Vocabulary flashcards (saved word meanings)
     CREATE TABLE IF NOT EXISTS vocab_cards (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       surah INTEGER NOT NULL,
@@ -305,7 +277,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       UNIQUE (surah, ayah, word_pos)
     );
 
-    -- User-supplied word meanings for bundled gaps
     CREATE TABLE IF NOT EXISTS user_word_meanings (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -317,11 +288,7 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah, word_pos)
     );
 
-    -- ============================================================
-    -- USER DATA TABLES (read/write, synced)
-    -- ============================================================
 
-    -- FSRS study cards
     CREATE TABLE IF NOT EXISTS study_cards (
       id TEXT PRIMARY KEY,
       deck_id TEXT NOT NULL,
@@ -345,7 +312,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       tier_changed_at TEXT
     );
 
-    -- Study review log
     CREATE TABLE IF NOT EXISTS study_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       card_id TEXT NOT NULL,
@@ -369,7 +335,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       makeup_for TEXT
     );
 
-    -- Review sessions (synced owner-only). One row per session, updated as cards are graded.
     CREATE TABLE IF NOT EXISTS review_sessions (
       id TEXT PRIMARY KEY,
       kind TEXT NOT NULL,
@@ -392,7 +357,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       deleted_at TEXT
     );
 
-    -- Recitation errors (synced owner-only). Open rows feed the mistake inbox until resolved.
     CREATE TABLE IF NOT EXISTS recitation_errors (
       id TEXT PRIMARY KEY,
       card_id TEXT NOT NULL,
@@ -413,7 +377,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       deleted_at TEXT
     );
 
-    -- Wird habit days (synced owner-only). The earned status only rises; the excuse is last write wins.
     CREATE TABLE IF NOT EXISTS habit_days (
       local_date TEXT PRIMARY KEY,
       status TEXT CHECK (status IS NULL OR status IN ('done', 'made_up', 'earned_back', 'excused', 'paused', 'grace')),
@@ -430,7 +393,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       updated_at TEXT NOT NULL
     );
 
-    -- Scheduled reminders on this device. Never synced or restored.
     CREATE TABLE IF NOT EXISTS notification_log (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
@@ -444,7 +406,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       cancelled_at TEXT
     );
 
-    -- User bookmarks
     CREATE TABLE IF NOT EXISTS bookmarks (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -459,7 +420,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
-    -- User highlights
     CREATE TABLE IF NOT EXISTS highlights (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sync_id TEXT,
@@ -473,7 +433,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       deleted_at TEXT
     );
 
-    -- User settings (key-value store)
     CREATE TABLE IF NOT EXISTS user_settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
@@ -481,7 +440,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       deleted_at TEXT
     );
 
-    -- Active non-English translation (6,236 rows max, swapped on language change)
     CREATE TABLE IF NOT EXISTS translation_active (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -489,7 +447,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
-    -- Search history (last 10 searches)
     CREATE TABLE IF NOT EXISTS search_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       query TEXT NOT NULL,
@@ -497,7 +454,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       created_at TEXT NOT NULL
     );
 
-    -- Private ayah notes (synced owner-only)
     CREATE TABLE IF NOT EXISTS private_notes (
       id TEXT PRIMARY KEY,
       surah INTEGER NOT NULL,
@@ -513,7 +469,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       qf_ranges_json TEXT
     );
 
-    -- Reflection Journey owner-only progress and responses
     CREATE TABLE IF NOT EXISTS reflection_journey_entries (
       level_id TEXT PRIMARY KEY,
       status TEXT NOT NULL CHECK (status IN ('draft', 'completed')),
@@ -523,7 +478,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       completed_at TEXT
     );
 
-    -- Achievement unlocks (public badge row syncs without private payload)
     CREATE TABLE IF NOT EXISTS achievement_unlocks (
       achievement_id TEXT PRIMARY KEY,
       unlocked_at TEXT NOT NULL,
@@ -533,7 +487,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       sync_status TEXT DEFAULT 'pending'
     );
 
-    -- Achievement progress cache
     CREATE TABLE IF NOT EXISTS achievement_progress (
       achievement_id TEXT PRIMARY KEY,
       current_value INTEGER NOT NULL DEFAULT 0,
@@ -542,7 +495,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       payload TEXT NOT NULL DEFAULT '{}'
     );
 
-    -- Sync queue for offline-first sync
     CREATE TABLE IF NOT EXISTS sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       table_name TEXT NOT NULL,
@@ -554,7 +506,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       synced_at TEXT
     );
 
-    -- Quran Foundation user API sync queue (separate from Supabase sync)
     CREATE TABLE IF NOT EXISTS qf_sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       entity_type TEXT NOT NULL CHECK (entity_type IN ('bookmark', 'private_note')),
@@ -569,9 +520,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       synced_at TEXT
     );
 
-    -- ============================================================
-    -- INDEXES for performance
-    -- ============================================================
 
     CREATE INDEX IF NOT EXISTS idx_quran_text_surah ON quran_text(surah);
     CREATE INDEX IF NOT EXISTS idx_word_roots_root ON word_roots(root);
@@ -648,7 +596,6 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   await addColumnIfMissing(db, "mutashabihat_refs", "pre_text", "pre_text TEXT");
   await addColumnIfMissing(db, "mutashabihat_refs", "similar_text", "similar_text TEXT");
   await addColumnIfMissing(db, "mutashabihat_refs", "post_text", "post_text TEXT");
-  // Learning and consistency: session and grading detail on each review (spec 7.1).
   await addColumnIfMissing(db, "study_log", "session_id", "session_id TEXT");
   await addColumnIfMissing(db, "study_log", "duration_ms", "duration_ms INTEGER");
   await addColumnIfMissing(db, "study_log", "support_level", "support_level INTEGER");
@@ -657,7 +604,6 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   await addColumnIfMissing(db, "study_log", "local_date", "local_date TEXT");
   await addColumnIfMissing(db, "study_log", "tz", "tz TEXT");
   await addColumnIfMissing(db, "study_log", "error_count", "error_count INTEGER NOT NULL DEFAULT 0");
-  // STR-08: the missed day this review was graded toward, while that day could still be made up.
   await addColumnIfMissing(db, "study_log", "makeup_for", "makeup_for TEXT");
   await addColumnIfMissing(db, "study_cards", "tier", "tier TEXT");
   await addColumnIfMissing(db, "study_cards", "tier_changed_at", "tier_changed_at TEXT");
@@ -693,10 +639,6 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   await backfillStudyLogLocalDates(db);
 }
 
-/**
- * Reviews saved before local dates were recorded get the device's date for their instant, the same
- * date the old streak used. New reviews store their own date and zone when they happen (DAY-01).
- */
 async function backfillStudyLogLocalDates(db: DatabaseExecutor): Promise<void> {
   const rows = await db.getAllAsync<{ id: number; reviewed_at: string }>(
     "SELECT id, reviewed_at FROM study_log WHERE local_date IS NULL",
@@ -760,11 +702,9 @@ async function createUserMigrationIndexes(db: DatabaseExecutor): Promise<void> {
   }
 }
 
-/** Create text_search index — must run AFTER the text_search column migration */
 export async function createTextSearchIndex(db: DatabaseExecutor): Promise<void> {
   try {
     await db.execAsync("CREATE INDEX IF NOT EXISTS idx_quran_text_search ON quran_text(text_search)");
   } catch {
-    // Column may not exist yet on very old databases — the migration will handle it
   }
 }

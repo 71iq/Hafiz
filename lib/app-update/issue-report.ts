@@ -1,10 +1,3 @@
-/**
- * The GitHub issue composer link for Report an issue. It carries only public technical context the
- * person can read and edit before submitting: app version, platform, app language, an optional web
- * revision and, from ayah detail, the canonical reference with the active tab and source. Never
- * email, study records, notes, file paths, tokens, error traces or screenshots. Nothing is submitted
- * by the app; GitHub shows the form and the person decides.
- */
 export const ISSUE_COMPOSER_URL = "https://github.com/71iq/Hafiz/issues/new";
 
 const PLATFORMS = new Set(["web", "android", "ios"]);
@@ -26,7 +19,6 @@ function safeRevision(value: string | null | undefined): string | null {
   return value && /^[0-9a-f]{7,40}$/.test(value) ? value : null;
 }
 
-/** A short public label (tab or source name). Anything with path, URL, mail or control characters is dropped. */
 function safeLabel(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   if (!trimmed || trimmed.length > MAX_LABEL) return null;

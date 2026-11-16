@@ -6,7 +6,6 @@ type Props = {
   selected?: boolean;
   size?: number;
   systemTheme?: "dark" | "white";
-  /** Visible name under the swatch; without it the five swatches (one half black) were guesswork. */
   label?: string;
 };
 

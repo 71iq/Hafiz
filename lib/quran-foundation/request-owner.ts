@@ -37,7 +37,6 @@ export function captureQfRequestOwner({ getState, readSession, sourceSession }: 
     requireCurrent,
     getAccessToken: async () => {
       requireCurrent();
-      // Preserve normal SDK renewal while refusing credentials from another session.
       const { data, error } = await readSession();
       requireCurrent();
       if (error) throw error;

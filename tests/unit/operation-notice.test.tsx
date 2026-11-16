@@ -188,7 +188,6 @@ it("promotes an earlier inline failure once without restarting on late reports",
   expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
   act(() => jest.advanceTimersByTime(1500));
   act(() => expect(attempt.report("Retained inline failure")).toBe("retained"));
-  // Three words hold for 2180ms plus the 200ms fade; the late report did not restart the timer.
   act(() => jest.advanceTimersByTime(880));
   expect(view.queryByText("Retained inline failure")).toBeNull();
 });

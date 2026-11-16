@@ -130,7 +130,6 @@ const SURAH_NAME_GLYPHS: Record<number, string> = {
   114: "\uFBEB",
 };
 
-/** Returns the font family name for a QPC V2 page font, e.g. "QCF2_001" */
 function qpcFontName(page: number): string {
   return `QCF2_${String(page).padStart(3, "0")}`;
 }
@@ -317,18 +316,6 @@ export function quranPageMarkerFontPaletteStyle(
   };
 }
 
-/**
- * Load a QCF2 font on web using the native FontFace API with display: 'swap'.
- *
- * expo-font creates @font-face rules with font-display: auto, which gives
- * the browser discretion over when (or if) to swap in the loaded font.
- * For QCF2's Private Use Area codepoints this is fatal — the browser renders
- * Arabic Presentation Form fallback glyphs (letter pairs like "بي", "تر")
- * and may never swap to the real font.
- *
- * By using FontFace directly with display:'swap', the browser immediately
- * uses the custom font as soon as it's loaded — no post-hoc CSS patching needed.
- */
 async function loadFontWeb(name: string, asset: any): Promise<void> {
   let uri: string;
   if (typeof asset === "string") {
@@ -345,13 +332,10 @@ async function loadFontWeb(name: string, asset: any): Promise<void> {
   await fontFace.load();
 }
 
-/** Load the QPC V2 font for a specific page. No-op if already loaded.
- *  Concurrent calls for the same page share one Promise. */
 async function loadQpcFont(page: number): Promise<void> {
   const name = qpcFontName(page);
   if (loadedFonts.has(name)) return;
 
-  // Share in-flight Promise so concurrent callers don't duplicate work
   const existing = inFlight.get(name);
   if (existing) return existing;
 
@@ -378,7 +362,6 @@ async function loadQpcFont(page: number): Promise<void> {
   return promise;
 }
 
-/** Check if the QPC V2 font for a page is already loaded */
 function isQpcFontLoaded(page: number): boolean {
   return loadedFonts.has(qpcFontName(page));
 }

@@ -9,23 +9,15 @@ import { useSettings } from "@/lib/settings/context";
 import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
-  /** Distance from the bottom of the reader, above the page rail when it shows. */
   bottom: number;
-  /** Web phones and tablets pin the bar to the viewport, like the page rail. */
   fixed: boolean;
   horizontalPadding: number;
   surface: ViewStyle;
-  /** Opens the recitation sheet to change the reciter, range or repeats. */
   onOpenSheet: () => void;
-  /** A manual scroll or jump suspended follow for this recitation; show one Back to ayah control. */
   showBackToAyah: boolean;
   onBackToAyah: () => void;
 };
 
-/**
- * The player for whatever recites in the reader: a single ayah or a range. It stays on screen when
- * the reader chrome hides, so the reader can pause or stop audio after scrolling away.
- */
 export function RecitationPlayerBar({
   bottom,
   fixed,

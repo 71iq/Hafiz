@@ -12,7 +12,6 @@ const AYAH_LINE_HEIGHT = 32;
 type AyahRange = { surah: number; ayahStart: number; ayahEnd: number };
 type AyahEditorContext = { reference: string | null; text: string | null };
 
-/** Localized reference such as "Al-Baqarah 255" or "البقرة ٢٥٥", with a range when it spans ayahs. */
 export function formatAyahEditorReference(
   names: { arabic: string; english: string },
   range: AyahRange,
@@ -21,14 +20,9 @@ export function formatAyahEditorReference(
   const name = language === "ar" ? names.arabic : names.english;
   const start = formatNumber(range.ayahStart, language);
   const ayahs = range.ayahEnd !== range.ayahStart ? `${start}-${formatNumber(range.ayahEnd, language)}` : start;
-  // The numeric token stays an LTR isolate inside RTL text.
   return `${name} ⁦${ayahs}⁩`;
 }
 
-/**
- * Loads the reference and Unicode text (text_uthmani, never glyph data) for an editor's ayahs.
- * A result for an older target is ignored.
- */
 export function useAyahEditorContext({ surah, ayahStart, ayahEnd }: AyahRange, enabled = true): AyahEditorContext {
   const db = useDatabase();
   const { uiLanguage } = useSettings();
@@ -69,14 +63,12 @@ export function useAyahEditorContext({ surah, ayahStart, ayahEnd }: AyahRange, e
   return loaded?.key === key ? loaded.value : { reference: null, text: null };
 }
 
-/** The ayah being written about, collapsed to two lines with Show more / Show less. */
 export function AyahTextPreview({ text }: { text: string }) {
   const s = useStrings();
   const { isRTL } = useSettings();
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
   const [measuredText, setMeasuredText] = useState<string | null>(null);
-  // A new ayah starts collapsed again.
   if (measuredText !== text) {
     setMeasuredText(text);
     setExpanded(false);
@@ -92,7 +84,6 @@ export function AyahTextPreview({ text }: { text: string }) {
 
   return (
     <View>
-      {/* An unclamped hidden copy measures whether the text needs more than two lines. */}
       <Text
         aria-hidden
         accessibilityElementsHidden

@@ -2,17 +2,14 @@ const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 const ARABIC_DIACRITICS_RE = /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
 const NON_ARABIC_RE = /[^\u0600-\u06FF]/g;
 
-/** Convert a number to Eastern Arabic-Indic numerals (٠١٢…٩) */
 export function toArabicNumber(num: number): string {
   return String(num).replace(/\d/g, (d) => ARABIC_DIGITS[parseInt(d, 10)]);
 }
 
-/** "17:105" in English, "١٧:١٠٥" in Arabic, matching the digits the reader shows. */
 export function formatAyahRef(isRTL: boolean, ...parts: number[]): string {
   return parts.map((part) => (isRTL ? toArabicNumber(part) : String(part))).join(":");
 }
 
-/** Drops tashkeel and tatweel only, as Home search does, so "الرَّحْمَٰن" matches "الرحمن". */
 export function stripArabicDiacritics(text: string): string {
   return text.replace(ARABIC_DIACRITICS_RE, "");
 }

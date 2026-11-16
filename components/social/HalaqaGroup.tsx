@@ -25,11 +25,6 @@ import { socialRowStyle, useSocialAccent } from "./SocialControls";
 
 type Language = "en" | "ar";
 
-/**
- * One halaqa: the shared weekly goal (SOC-07), members with their shared consistency (SOC-02),
- * one-tap encouragement (SOC-06), teacher roles (SOC-03), invite sharing and leaving. No member
- * ranking anywhere.
- */
 export function HalaqaGroup({
   detail,
   rolePending,
@@ -41,7 +36,6 @@ export function HalaqaGroup({
   onLeave,
 }: {
   detail: HalaqaDetail;
-  /** A role change is saving; the role controls wait for it. */
   rolePending: boolean;
   onEncourage: (member: HalaqaMember) => void;
   onTeacherView: (member: HalaqaMember) => void;
@@ -56,8 +50,6 @@ export function HalaqaGroup({
   const { accent, muted } = useSocialAccent();
   const { group, goal } = detail;
   const title = group.kind === "matched" ? s.halaqaMatchedName : (group.name ?? s.halaqaMatchedName);
-  // SOC-03: only an invite halaqa's creator assigns teachers, as the server checks. Their own role is
-  // chosen when they create it.
   const managesRoles = group.kind === "invite" && group.isCreator;
 
   return (
@@ -69,12 +61,10 @@ export function HalaqaGroup({
           </Text>
           <Text variant="caption">
             {interpolate(s.halaqaMemberCount, { n: socialNumber(group.memberCount, language) })}
-            {/* An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero. */}
             {group.role === "teacher" ? `${language === "ar" ? "، " : " · "}${s.halaqaYouTeach}` : ""}
           </Text>
         </View>
 
-        {/* ETH-06, ETH-07: what is shared is named in words, one tap from the group. */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={s.halaqaSharingA11y}
@@ -94,7 +84,6 @@ export function HalaqaGroup({
               <Text variant="label-md" className="text-warm-500 dark:text-neutral-400">
                 {s.halaqaInviteCode}
               </Text>
-              {/* The code reads left to right in both languages and sits at the interface's start edge. */}
               <Text variant="title-lg" selectable dir="ltr" align={isRTL ? "end" : "start"} style={{ letterSpacing: 2 }}>
                 {group.inviteCode}
               </Text>
@@ -191,7 +180,6 @@ function WeekDots({ week, s, language }: { week: boolean[]; s: UIStrings; langua
       style={socialRowStyle(isRTL)}
     >
       {week.map((filled, index) => (
-        // A day without a wird is a neutral outline, never "missed" (SB-03).
         <View
           key={index}
           className={
@@ -333,7 +321,6 @@ function ReceivedRow({ item, s }: { item: ReceivedEncouragement; s: UIStrings })
     <View className="items-start gap-3" style={socialRowStyle(isRTL)}>
       <HandHeart size={18} color={accent} />
       <View className="min-w-0 flex-1 gap-0.5">
-        {/* Free text is shown as written; fixed templates render in this reader's language (MAT-01). */}
         <Text variant="body-sm">{item.body ?? encouragementText(item.templateId, s)}</Text>
         {item.fromName ? (
           <Text variant="caption">{interpolate(s.halaqaReceivedFrom, { name: item.fromName })}</Text>

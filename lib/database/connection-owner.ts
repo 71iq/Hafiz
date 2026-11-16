@@ -57,7 +57,6 @@ function metadata(result: SQLiteRunResult): SQLiteRunResult {
   return { lastInsertRowId: result.lastInsertRowId, changes: result.changes };
 }
 
-/** Own one private SQLite handle. No raw statement or handle escapes this facade. */
 export function createConnectionOwner(
   raw: RawConnection,
   onFatal?: (error: Error) => void | Promise<void>,
@@ -74,7 +73,6 @@ export function createConnectionOwner(
     try {
       void Promise.resolve(onFatal?.(asError(error))).catch(() => {});
     } catch {
-      // Notification cannot prevent the failing operation from settling.
     }
   }
 
@@ -185,7 +183,6 @@ export function createConnectionOwner(
           const command: DatabasePreparedCommand = {
             executeAsync: (...params: DbWireParam[]) => {
               if (sealed || state.closed) return rejected();
-              // A later finalize admission must not invalidate already queued executions.
               return schedule(async () => metadata(await execute(statement, params)));
             },
             finalizeAsync: () => {
@@ -214,7 +211,6 @@ export function createConnectionOwner(
           try {
             await finalize(state);
           } catch {
-            // Finalization already recorded this occurrence, including explicit cleanup.
           }
         }
         return cleanupFailures;
@@ -228,14 +224,12 @@ export function createConnectionOwner(
         try {
           onSettlement?.(outcome);
         } catch {
-          // Settlement observation cannot change the database outcome.
         }
       };
       if (retired || (admit && !admit())) throw retired ?? new Error("Database transaction admission cancelled");
       try {
         await raw.execAsync("BEGIN");
       } catch (error) {
-        // BEGIN may have succeeded before its acknowledgement was lost.
         quarantine(error);
         settled({ status: "failed", error });
         throw error;

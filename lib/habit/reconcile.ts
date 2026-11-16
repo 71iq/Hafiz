@@ -36,7 +36,6 @@ function rowFor(date: LocalDate, status: "done" | "made_up", at: string, credite
   };
 }
 
-/** The instants of each chunk card's completed steps 6 (STR-01), by sabaqStepFlags. */
 function sabaqStepInstants(rows: readonly { card_id: string; rating: number; reviewed_at: string }[]): Map<string, Set<number>> {
   const byCard = new Map<string, { at: number; rating: number }[]>();
   for (const row of rows) {
@@ -55,25 +54,11 @@ function sabaqStepInstants(rows: readonly { card_id: string; rating: number; rev
   return steps;
 }
 
-/**
- * Record wird days that the review log proves but no habit row records: reviews saved by app versions
- * before wird days existed, reviews from several devices that meet a minimum only together, and
- * restored accounts whose old devices never uploaded wird days.
- *
- * Each review counts once, for the day stored on it (STR-08): a review graded toward a make-up
- * (makeup_for) counts only for that missed day, which becomes made up when those reviews meet the
- * minimum; every other review counts for its own local date. A review without a grader comes from
- * an older version, and its day counts if it has any review, the rule those versions showed. It only
- * raises days; merging never lowers a status.
- */
 export async function reconcileHabitDaysFromLogs(
   db: DatabaseExecutor,
   { now, dates }: { now: Date; dates?: ReadonlySet<LocalDate> },
 ): Promise<number> {
   const today = localDateOf(now);
-  // Each sabaq chunk's reviews: a pass with no review before it, or right after a failed one, is
-  // a completed step 6 (STR-01), as DAY_TALLY_SQL reads it. Compared as instants, since sync can
-  // change a timestamp's spelling.
   const chunkReviews = await db.getAllAsync<{
     card_id: string;
     rating: number;
@@ -81,9 +66,6 @@ export async function reconcileHabitDaysFromLogs(
     local_date: LocalDate | null;
     makeup_for: LocalDate | null;
   }>("SELECT card_id, rating, reviewed_at, local_date, makeup_for FROM study_log WHERE card_id LIKE 'chunk:%'");
-  // After an incremental pull only the pulled reviews' days can change, so only those are read, with
-  // every day of a chunk reviewed on them: a pulled review can change which later review of that
-  // chunk completes step 6, on another day (a failed check arriving between two passes).
   let only: LocalDate[] | null = null;
   if (dates) {
     const affected = new Set(dates);
@@ -165,7 +147,6 @@ export async function reconcileHabitDaysFromLogs(
 
 const LEGACY_RECONCILE_KEY = "device_habit_legacy_reconciled_v1";
 
-/** Run the reconcile once on this device, for reviews saved before wird days were recorded. */
 export async function reconcileLegacyHabitDaysOnce(db: DatabaseExecutor, now = new Date()): Promise<void> {
   const done = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [
     LEGACY_RECONCILE_KEY,

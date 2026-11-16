@@ -21,7 +21,6 @@ export function ZaytRivePreview({
   const [uri, setUri] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [hasError, setHasError] = useState(false);
-  // Reduced motion starts on the first frame instead of autoplaying.
   const autoplay = useRef(playing).current;
 
   const handleError = useCallback(() => {

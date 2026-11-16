@@ -6,7 +6,6 @@ node_modules
 quran.com-frontend-next
 web-build
 
-# Third-party skills and local execution artifacts
 .agents
 .claude
 .ralph

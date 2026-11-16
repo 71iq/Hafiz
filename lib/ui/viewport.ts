@@ -1,5 +1,3 @@
-// Shared viewport contract for web-first stabilization. Keep behavior changes
-// separate from breakpoint ownership changes.
 export const VIEWPORT_BREAKPOINTS = {
   phoneCompact: 360,
   phoneLarge: 412,
@@ -11,7 +9,6 @@ export const VIEWPORT_BREAKPOINTS = {
 export const SIDEBAR_BREAKPOINT = VIEWPORT_BREAKPOINTS.sidebar;
 export const PERSISTENT_SIDEBAR_BREAKPOINT = VIEWPORT_BREAKPOINTS.sidebarValidation;
 export const PERSISTENT_SIDEBAR_WIDTH = 248;
-/** The edge navigation trigger's target width (768-1023px and wide Mushaf); content gutters clear it. */
 export const FLOATING_NAV_TRIGGER_SIZE = 44;
 export const DESKTOP_CONTENT_MAX_WIDTH = 1040;
 export const SETTINGS_CONTENT_MAX_WIDTH = 880;

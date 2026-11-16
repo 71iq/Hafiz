@@ -51,7 +51,6 @@ describe("RF-195 bulk inserts", () => {
   it.each(["INSERT OR REPLACE", "INSERT OR IGNORE"])(
     "%s stores the same rows as one statement per row, including repeated keys",
     async (verb) => {
-      // 1,000 rows over 7 x 143 x 3 keys repeat keys, so replace/ignore order matters.
       const rows = rowsFor(1000);
       await insertPreparedRows(
         transaction(),
@@ -71,7 +70,6 @@ describe("RF-195 bulk inserts", () => {
       rowsFor(1000),
     );
 
-    // 199 rows of 5 values per statement: 5 full chunks and one of 5 rows.
     expect(executeCalls).toBe(6);
   });
 

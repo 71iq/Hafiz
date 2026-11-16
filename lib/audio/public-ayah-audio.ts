@@ -1,8 +1,3 @@
-/**
- * Per-ayah recitation files on the public Quran audio CDNs, which need no account or API key.
- * Paths match what the public quran.com v4 API reports for each recitation id (checked 2026-11-12);
- * three recitations are served from the quranicaudio EveryAyah mirror instead.
- */
 const VERSES_CDN = "https://verses.quran.foundation";
 const EVERYAYAH_MIRROR = "https://mirrors.quranicaudio.com/everyayah";
 
@@ -21,7 +16,6 @@ const RECITATION_FOLDERS: Record<number, string> = {
   12: `${EVERYAYAH_MIRROR}/Husary_Muallim_128kbps`,
 };
 
-/** The public file for an ayah, or null when the recitation has no known public folder. */
 export function publicAyahAudioUrl(recitationId: number, surah: number, ayah: number): string | null {
   const folder = RECITATION_FOLDERS[recitationId];
   if (!folder) return null;

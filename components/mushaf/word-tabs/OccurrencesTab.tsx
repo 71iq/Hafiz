@@ -15,7 +15,6 @@ import { useSettings } from "@/lib/settings/context";
 import { formatAyahRef } from "@/lib/arabic";
 import { useDelayedLoading } from "./use-delayed-loading";
 
-// Common roots occur thousands of times, so rows load a page at a time.
 const OCCURRENCES_PAGE = 50;
 
 type Props = {
@@ -48,7 +47,6 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
       .then((rows) => {
         if (!cancelled) setSurahNames(new Map(rows.map((row) => [row.number, { ar: row.name_arabic, en: row.name_english }])));
       })
-      // Names only decorate the references; rows still show surah:ayah without them.
       .catch(() => undefined);
     return () => {
       cancelled = true;
@@ -122,7 +120,6 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
     );
   }
 
-  // A word without a root in the dataset may still have one linguistically; say only that data is missing.
   if (!root) {
     return (
       <View className="py-6 items-center">
@@ -133,7 +130,6 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
 
   return (
     <View className="py-4 px-1">
-      {/* Root + count */}
       <View
         className="items-center justify-between mb-3"
         style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
@@ -151,7 +147,6 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
         </View>
       </View>
 
-      {/* Occurrence list. It scrolls with the sheet body: a nested vertical ScrollView does not scroll on Android. */}
       <View>
         {occurrences.map((occ) => {
           const isCurrent =

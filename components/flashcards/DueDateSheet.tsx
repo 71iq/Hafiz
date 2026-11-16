@@ -10,8 +10,6 @@ import { formatLongCardDate } from "@/lib/fsrs/card-dates";
 import { toArabicNumber } from "@/lib/arabic";
 import { textStartStyle } from "@/lib/ui/direction";
 
-// The iOS punctuation pad has digits and "-". Elsewhere it falls back to a full
-// keyboard, while the phone pad (inputmode="tel" on web) has both.
 function dueDateKeyboardType(): InputProps["keyboardType"] {
   return Platform.OS === "ios" ? "numbers-and-punctuation" : "phone-pad";
 }
@@ -43,7 +41,6 @@ export function DueDateSheet({
   autoCapitalize,
   autoCorrect,
 }: DueDateSheetProps) {
-  // A typing error waits until the field loses focus; a pressed Save still reports it at once.
   const [touched, setTouched] = useState(false);
   useEffect(() => {
     if (!visible) setTouched(false);
@@ -84,7 +81,6 @@ export function DueDateSheet({
             {preview}
           </Text>
         ) : null}
-        {/* Quick choices fill the field, so a common date needs no typing. */}
         <View className="mt-3 flex-row flex-wrap gap-2" style={{ direction: isRTL ? "rtl" : "ltr" }}>
           {quickDueDates(s, isRTL).map((choice) => {
             const selected = choice.value === value;
@@ -132,7 +128,6 @@ export function DueDateSheet({
             {s.flashcardsCancel}
           </Text>
         </Button>
-        {/* Dimmed while the date is not valid; a press then shows why instead of saving. */}
         <Button onPress={onSave} disabled={busy} className={`flex-1 ${parsed.ok ? "" : "opacity-50"}`}>
           <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
             {s.cardSaveDueDate}

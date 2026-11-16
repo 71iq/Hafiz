@@ -38,7 +38,6 @@ def check(root):
 
     require(literal("applicationId") == expo["android"]["package"], "Android applicationId differs from app.json")
     require(literal("namespace") == expo["android"]["package"], "Android namespace differs from app.json")
-    # Gradle may read the version from app.json instead of repeating it.
     reads_version = re.search(r"^\s*versionName\s+appJson\.expo\.version\s*$", gradle, re.MULTILINE)
     require(reads_version or literal("versionName") == expo["version"], "Android versionName differs from app.json")
     require(strings.get("app_name") == expo["name"], "Android app name differs from app.json")
@@ -77,7 +76,6 @@ def check(root):
         plugin_names == ["expo-router", "expo-sharing", "expo-asset", "expo-audio", "expo-notifications", "expo-location"],
         "Review changed config-plugin ownership",
     )
-    # expo-notifications: the committed project mirrors the plugin's icon and color by hand.
     notification_meta = {
         item.get(ANDROID + "name"): item.get(ANDROID + "resource") for item in application.findall("meta-data")
     }

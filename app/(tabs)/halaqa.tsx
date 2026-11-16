@@ -51,12 +51,6 @@ import { formatSocialDate } from "@/lib/social/text";
 import { useIsOffline, useSocialQuery } from "@/lib/social/use-social-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
-/**
- * Halaqa tab (spec 5.7.1). An online feature: offline it shows the last saved state with its date,
- * and wird, streak and plan never wait on it (SB-01). Every request runs as the account this screen
- * belongs to (lib/social/owner.ts), so a switch of account mid-request can neither show nor change
- * the other account's halaqas.
- */
 export default function HalaqaScreen() {
   const s = useStrings();
   const user = useAuthStore((state) => state.user);
@@ -81,7 +75,6 @@ export default function HalaqaScreen() {
       </SocialScreen>
     );
   }
-  // A new account starts with fresh screen state; query keys already carry the account id.
   return <HalaqaContent key={user.id} userId={user.id} />;
 }
 
@@ -92,7 +85,6 @@ function HalaqaContent({ userId }: { userId: string }) {
   const language = uiLanguage === "ar" ? "ar" : "en";
   const queryClient = useQueryClient();
   const offline = useIsOffline();
-  // Moves on at local midnight, so a tab left open overnight asks for the new day (BRD-01).
   const today = useLocalToday();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -115,7 +107,6 @@ function HalaqaContent({ userId }: { userId: string }) {
     read: myHalaqasRead(),
   });
   const groups = mine.data?.data ?? [];
-  // The chosen halaqa while it is still listed, else the first one.
   const active = groups.find((group) => group.id === selectedId) ?? groups[0] ?? null;
 
   const detail = useSocialQuery({
@@ -125,8 +116,6 @@ function HalaqaContent({ userId }: { userId: string }) {
     read: active ? halaqaDetailRead(active.id, today) : null,
   });
 
-  // Read from the cache only: the app-wide minor check keeps it (useMinorPhotoCleanup), and the
-  // sharing sheet reads it again each time it opens (HalaqaSharingPanel).
   const privacy = useQuery({
     queryKey: profilePrivacyKeys.mine(userId),
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(userId)),
@@ -192,7 +181,6 @@ function HalaqaContent({ userId }: { userId: string }) {
     onError: (error) => setEncourageError(socialFailureMessage(error, s)),
   });
 
-  // ETH-07: the server takes a minor out of matched halaqas, so the matched join is not offered.
   const isMinor = privacy.data?.isMinor === true;
   const reloadPrivacy = () => queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) });
 
@@ -203,20 +191,15 @@ function HalaqaContent({ userId }: { userId: string }) {
       leavesMatched: boolean;
     }): Promise<{ leftBoard: boolean }> => {
       if (!active) return { leftBoard: false };
-      // One owner for both writes: the second is refused before it is sent if the account changed.
       const owner = requireSocialOwner(userId);
       await setHalaqaSharing(active.id, input.sharing, owner);
-      // SOC-03: withdrawn plan sharing ended any next sabaq a teacher set here; the offline copy goes too.
       if (!input.sharing.planWithTeachers) await forgetMySabaqAssignment(userId);
       if (!input.visibility) return { leftBoard: false };
-      // The server says whether recording minority took a Board member without a nickname off the Board.
       const saved = await saveProfilePrivacy(input.visibility, owner);
       return { leftBoard: saved.leftBoard };
     },
     onSuccess: async (result, input) => {
       setSharingOpen(false);
-      // Saying one is under 18 leaves the matched halaqa, and the Board without a nickname (ETH-07,
-      // BRD-07); the notice says so, not only "Saved".
       setNotice(
         input.leavesMatched && result.leftBoard
           ? s.socialSavedLeftBoth
@@ -229,15 +212,12 @@ function HalaqaContent({ userId }: { userId: string }) {
       await Promise.all([
         refreshAll(),
         reloadPrivacy(),
-        // The Board tab reads whether the account is still on it.
         result.leftBoard ? queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) }) : null,
-        // ETH-07: stating minority clears the photo on the server, so the signed-in profile reloads.
         input.visibility?.isMinor ? useAuthStore.getState().fetchProfile() : null,
       ]);
     },
     onError: (error) => {
       if (error instanceof ProfilePrivacyChangedError) {
-        // Another device changed the age setting. The sheet reloads it and the person decides again.
         setSharingError(s.socialErrorPrivacyChanged);
         void reloadPrivacy();
         return;
@@ -249,7 +229,6 @@ function HalaqaContent({ userId }: { userId: string }) {
   const leave = useMutation({
     mutationFn: async () => {
       await leaveHalaqa(active?.id ?? "", requireSocialOwner(userId));
-      // SOC-03: leaving ended any next sabaq a teacher set here; the offline copy goes too.
       await forgetMySabaqAssignment(userId);
     },
     onSuccess: async () => {
@@ -260,8 +239,6 @@ function HalaqaContent({ userId }: { userId: string }) {
     onError: (error) => setLeaveError(socialFailureMessage(error, s)),
   });
 
-  // SOC-03: the creator of an invite halaqa makes a member a teacher or takes the role back. The dialog
-  // stays open until the group view shows the new role, and keeps the old one with the error on failure.
   const roleMutationKey = [...halaqaKeys.all(userId), "set-role"];
   const changeRole = useMutation({
     mutationKey: roleMutationKey,
@@ -281,10 +258,6 @@ function HalaqaContent({ userId }: { userId: string }) {
   const removesTeacher = roleTarget?.role === "teacher";
   const roleName = { name: roleTarget?.name ?? "" };
 
-  // SOC-03: a teacher sets or clears a member's next sabaq from the teacher view. The view then reads
-  // again, so it shows what the server stored; a refusal, such as sharing withdrawn meanwhile, shows in
-  // the sheet. Each change names its halaqa and member, so closing the sheet mid-save cannot redirect it,
-  // and its outcome shows only on that member's sheet.
   type AssignOutcome = { groupId: string; memberId: string; saved: string | null; error: string | null };
   const [assignOutcome, setAssignOutcome] = useState<AssignOutcome | null>(null);
   const assignMutationKey = [...halaqaKeys.all(userId), "sabaq-assignment"];
@@ -480,7 +453,6 @@ function HalaqaContent({ userId }: { userId: string }) {
 
       {active && sharingOpen ? (
         <HalaqaSharingPanel
-          // One sheet per open; a reconnect reads the stored choices again without dropping its drafts.
           key={active.id}
           userId={userId}
           offline={offline}
@@ -525,8 +497,6 @@ function HalaqaContent({ userId }: { userId: string }) {
         isRTL={isRTL}
         onCancel={() => setRoleTarget(null)}
         onConfirm={() => {
-          // The mutation cache knows at once that a save started; isPending reaches the button a tick
-          // later, so a fast second tap could send the change twice.
           if (!roleTarget || queryClient.isMutating({ mutationKey: roleMutationKey }) > 0) return;
           setRoleError(null);
           changeRole.mutate(roleTarget);
@@ -536,12 +506,6 @@ function HalaqaContent({ userId }: { userId: string }) {
   );
 }
 
-/**
- * ETH-07: the sharing sheet saves the account's age choice with the value it loaded, which the server
- * compares. A cached copy can predate another device changing it, so the profile choices appear only
- * after a read that completed while this panel is open, and give way to a note while a read runs or
- * after one fails. The halaqa choices stay available either way.
- */
 function HalaqaSharingPanel({
   userId,
   offline,
@@ -566,12 +530,8 @@ function HalaqaSharingPanel({
     enabled: !offline,
     retry: false,
     networkMode: "always",
-    // Read again each time the sheet opens, even with a fresh cached copy.
     refetchOnMount: "always",
   });
-  // ETH-07: the profile choices start only from a read that succeeded since the sheet opened. They
-  // stay through later refetches; saving sends the minority they loaded, and the server refuses it if
-  // that changed since (privacy_changed).
   const [verified, setVerified] = useState(false);
   const readSinceOpen = privacy.isFetchedAfterMount && privacy.isSuccess && !privacy.isFetching;
   if (readSinceOpen && !verified) setVerified(true);

@@ -23,12 +23,10 @@ export const strings = {
     appName: "Hafiz",
     genericClose: "Close",
     saving: "Saving...",
-    // Tabs
     tabHome: "Home",
     tabMushaf: "Mushaf",
     tabProgress: "Progress",
     tabSettings: "Settings",
-    // Settings sections & labels
     sectionAppearance: "Appearance",
     sectionReading: "Reading",
     sectionLanguage: "Language",
@@ -84,7 +82,6 @@ export const strings = {
     readingSettingsChooseFont: "Choose Quran font",
     readingSettingsChooseMarkerStyle: "Choose marker style",
     readingSettingsSavedAutomatically: "Settings are saved automatically",
-    // Mushaf header
     goTo: "Go to",
     continueReading: "Continue reading",
     pageN: "Page {{n}}",
@@ -109,7 +106,6 @@ export const strings = {
     hifzIncreaseSpeed: "Increase reveal speed",
     hifzRevealNextAyah: "Reveal next ayah",
     hifzHidePreviousAyah: "Hide last revealed ayah",
-    // GoToNavigator
     goToTitle: "Go To",
     tabPage: "Page",
     tabSurah: "Surah",
@@ -119,7 +115,6 @@ export const strings = {
     searchByJuz: "Search by juz number...",
     noSurahsFound: "No surahs found",
     noJuzFound: "No juz' found",
-    // SurahHeader
     meccan: "Meccan",
     medinan: "Medinan",
     ayahs: "Ayahs",
@@ -127,7 +122,6 @@ export const strings = {
     surahInfoLoading: "Loading Surah information...",
     surahInfoUnavailable: "Surah information is unavailable.",
     surahInfoSource: "Source",
-    // AyahBlock
     tafseer: "Tafsir",
     ayahTabHadith: "Hadith",
     hadithLoading: "Loading hadith references...",
@@ -183,7 +177,6 @@ export const strings = {
     nextAyah: "Next ayah",
     previousWord: "Previous word",
     nextWord: "Next word",
-    // WordDetailSheet tabs (en mode)
     wordTabEnglish: "English",
     wordTabMeaning: "Meaning",
     wordTabIrab: "Grammar",
@@ -191,7 +184,6 @@ export const strings = {
     wordTabTasreef: "Morphology",
     wordTabQiraat: "Qira'at",
     wordTabOccurrences: "Occurrences",
-    // Tab-content strings (both modes use EN keys when in English UI)
     qiraatHeader: "From the Qurʾanic Encyclopedia of Qiraʾat",
     qiraatCoversAyahs: "Covers ayahs",
     noQiraatData: "No qiraʾat data for this ayah",
@@ -209,7 +201,6 @@ export const strings = {
     meaningSourceAttribution: "Source: Meanings of the Words of the Noble Qurʾan — quran-words.com",
     irabSourceAttribution: "Source: Iʿrab al-Qurʾan — al-Daʿas",
     qiraatSourceAttribution: "Source: Qurʾanic Encyclopedia of Qiraʾat — qul.tarteel.ai",
-    // Credits
     creditsSection: "Credits & Sources",
     settingsAboutHafiz: "About Hafiz",
     settingsAboutHafizDesc: "What Hafiz is and how it works",
@@ -248,33 +239,26 @@ export const strings = {
     homeAuthCardSignUp: "Create Account",
     authPromptCloudSync: "Sign in to enable cloud sync",
     authPromptSignIn: "Sign in",
-    // EnglishTab
     wordTranslation: "Translation",
     wordTransliteration: "Transliteration",
     wordArabic: "Arabic",
     noTranslationData: "No translation data available",
-    // IrabTab
     syntacticFunction: "Syntactic Function",
     morphologicalTag: "Morphological Tag",
     noIrabData: "No grammatical analysis available",
-    // TasreefTab
     rootLabel: "Root",
     lemmaLabel: "Lemma",
     patternLabel: "Pattern",
     noTasreefData: "No morphology for this word",
-    // TajweedTab
     noTajweedRules: "No tajweed annotations available for this word",
-    // OccurrencesTab
     occurrences: "{{n}} occurrences",
     listShowMore: "Show more ({{count}} left)",
     noRootData: "No root data available",
-    // MeaningTab
     noMeaningData: "No meaning data available",
     wordMeaningTranslation: "Translation",
     wordMeaningRoot: "Root",
     wordMeaningLemma: "Lemma",
     noTafseerData: "No tafsir is available for this ayah",
-    // Tafsir sources
     tafseerSourceLabel: "Tafsir Source",
     tafseerSourceImportFailed: "Could not load this tafsir source",
     tafseerDownloadHint: "Al-Muyassar and Fi Zilal work offline. Others download once when you choose them.",
@@ -308,7 +292,6 @@ export const strings = {
     tafseerJalalaynEn: "Jalalayn (English)",
     tafseerJalalaynEnDesc: "English translation of Tafsir al-Jalalayn",
     readMore: "Read more",
-    // Home page
     homeTitle: "Home",
     homeSubtitle: "Your spiritual journey continues",
     homeMemorized: "MEMORIZED",
@@ -353,7 +336,6 @@ export const strings = {
     reflectionJourneyLoading: "Loading Reflection Journey",
     reflectionJourneyLoadFailed: "Could not load the Reflection Journey",
     reflectionJourneyRetry: "Retry",
-    // Progress page
     progressTitle: "Progress",
     progressDailyReminder: "Daily Reminder",
     progressHadith: "\"خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ\"",
@@ -429,16 +411,11 @@ export const strings = {
     "achievement.first_vocab_saved.description": "Save a word meaning for review.",
     "achievement.first_mutashabih_pair.title": "First Mutashabih Pair",
     "achievement.first_mutashabih_pair.description": "Review a mutashabih pair.",
-    // Heatmap
     heatmapActiveDays: "Active days",
     heatmapTotalReviews: "Total reviews",
-    // Surah progress
     surahProgressEmpty: "No surahs tracked yet",
     surahProgressEmptyDesc: "Progress appears here after you study. Set up a memorization plan to begin.",
-    // QiraatTab
-    // TranslationLanguagePicker
     translationLanguagePickerTitle: "Translation Language",
-    // LoadingScreen
     preparingDatabase: "Preparing local data...",
     appSubtitle: "Memorize Through Reflection",
     notFoundTitle: "Page not found",
@@ -447,7 +424,6 @@ export const strings = {
     notFoundHome: "Go to home",
     qaReadyTitle: "QA readiness",
     qaReadySubtitle: "Wait for readiness before starting screenshot capture.",
-    // Selection & context menu
     copy: "Copy",
     privateNoteAction: "Note",
     privateNoteTitle: "Private note",
@@ -492,7 +468,6 @@ export const strings = {
     reflectionComingSoon: "Reflections coming soon",
     bookmarksTitle: "Bookmarks",
     noBookmarks: "No bookmarks yet",
-    // Search
     tabSearch: "Search",
     searchTitle: "Search",
     searchPlaceholder: "Search the Quran...",
@@ -504,10 +479,8 @@ export const strings = {
     searchHistory: "Recent searches",
     searchClearHistory: "Clear all",
     searchAllOccurrences: "All occurrences",
-    // Flashcards
     tabFlashcards: "Flashcards",
     flashcardsTitle: "Flashcards",
-    // Home's headline counts due and new cards, so it does not say "due" (the deck rows split them).
     flashcardsDueToday: "Cards today",
     flashcardsNewCards: "New",
     flashcardsTotalCards: "Total cards",
@@ -631,7 +604,6 @@ export const strings = {
     smartDeckComparisonCue: "Comparison cue",
     smartDeckTailCue: "Tail cue",
     smartDeckTailComparisonCue: "Tail comparison cue",
-    // Review session
     flashcardsReveal: "Reveal",
     flashcardsAgain: "Again",
     flashcardsHard: "Hard",
@@ -640,7 +612,6 @@ export const strings = {
     flashcardsGrade: "Grade",
     flashcardsEndSession: "End Session",
     flashcardsCardsRemaining: "{{n}} remaining",
-    // Test modes
     flashcardsModeNextAyah: "Next Ayah",
     flashcardsModePreviousAyah: "Previous Ayah",
     flashcardsModeTranslation: "Translation",
@@ -648,7 +619,6 @@ export const strings = {
     flashcardsModeSurahName: "Surah Name",
     flashcardsModeWordMeaningArabic: "Arabic Meaning",
     flashcardsModeWordMeaningTranslation: "Translation",
-    // Session summary
     flashcardsSummaryTitle: "Session Complete",
     flashcardsSummaryReviewed: "Cards Reviewed",
     flashcardsSummaryNew: "New",
@@ -659,7 +629,6 @@ export const strings = {
     flashcardsSummaryNextReview: "Next Review",
     flashcardsSummaryDone: "Done",
     flashcardsSummaryMinutes: "{{n}} min",
-    // Settings
     deckReviewSettingsTitle: "Review Settings",
     deckReviewSettingsSave: "Save Settings",
     wordFlashcardsTestModes: "Word Review Sides",
@@ -706,7 +675,6 @@ export const strings = {
     flashcardsSortRandom: "Random",
     flashcardsNewSortCreated: "Created",
     flashcardsDueTodayLimit: "{{due}} due ({{limit}} today)",
-    // Auth
     authLogin: "Log In",
     authSignup: "Create account",
     authLogout: "Log Out",
@@ -789,7 +757,6 @@ export const strings = {
     authValidationUsernameMax: "Username must be at most 20 characters",
     authValidationUsernamePattern: "Username can only contain letters, numbers, and underscores",
     authValidationPasswordsMismatch: "Passwords do not match",
-    // Sync
     syncSyncing: "Syncing...",
     syncSynced: "Synced",
     syncOffline: "Offline",
@@ -811,7 +778,6 @@ export const strings = {
     qfContentMisconfigured: "Quran Foundation content is not configured.",
     qfAuthCallbackLoading: "Completing Quran Foundation connection...",
     qfAuthCallbackFailed: "Quran Foundation connection failed",
-    // Leaderboard
     tabLeaderboard: "Leaderboard",
     leaderboardTitle: "Leaderboard",
     leaderboardDaily: "Daily",
@@ -826,7 +792,6 @@ export const strings = {
     leaderboardNotConfigured: "Cloud sync required for leaderboard",
     publicBadges: "Public Badges",
     publicBadgesEmpty: "No public badges yet",
-    // Reflections
     reflections: "Reflections",
     reflectionCount: "{{n}} reflections",
     reflectionWrite: "Write a reflection",
@@ -884,27 +849,22 @@ export const strings = {
     reflectionFeedAuthRequired: "Sign in to like reflections",
     reflectionFeedViewAyah: "View ayah",
     reflectionFeedRetry: "Retry",
-    // Error
     databaseError: "Hafiz could not prepare its local data.",
     genericActionFailed: "Something went wrong. Try again.",
     settingSaveFailed: "Could not save setting",
     translationLoadFailed: "Could not load this translation. Your previous translation is still selected.",
     goToLoadFailed: "Could not load navigation data",
-    // Onboarding
     onboardingWelcome: "Hafiz",
     onboardingSubtitle: "Memorize the Quran and keep it with daily review",
     onboardingGetStarted: "Get Started",
     onboardingSkipForNow: "Skip for now",
     onboardingSaveFailed: "Could not save your setup. Try again.",
-    // Offline
     offlineBanner: "Offline. Your study is saved on this device.",
-    // Empty states
     emptyBookmarksSubtitle: "In verse view, tap the bookmark icon on an ayah. In page view, long-press an ayah number, then choose Bookmark.",
     emptyDecksSubtitle: "Use the retention deck to review ayahs with spaced repetition",
     emptyLeaderboardSubtitle: "Complete flashcard reviews to earn points and appear on the leaderboard",
     emptySearchTextSubtitle: "Search ignores diacritics. Try another word.",
     emptySearchRootSubtitle: "Check the root spelling and try again",
-    // Error boundary
     errorTitle: "Something went wrong",
     errorSubtitle: "This section couldn't load properly",
     errorTryAgain: "Try Again",
@@ -1293,10 +1253,8 @@ export const strings = {
     "achievement.first_vocab_saved.description": "احفظ معنى كلمة للمراجعة.",
     "achievement.first_mutashabih_pair.title": "أول زوج متشابه",
     "achievement.first_mutashabih_pair.description": "راجع زوجًا من المتشابهات.",
-    // Heatmap
     heatmapActiveDays: "أيام النشاط",
     heatmapTotalReviews: "إجمالي المراجعات",
-    // Surah progress
     surahProgressEmpty: "لا توجد سور قيد التتبع",
     surahProgressEmptyDesc: "يظهر التقدم هنا بعد الدراسة. أعدّ خطة حفظ للبدء.",
     translationLanguagePickerTitle: "لغة الترجمة",
@@ -1363,7 +1321,6 @@ export const strings = {
     searchHistory: "عمليات البحث الأخيرة",
     searchClearHistory: "مسح الكل",
     searchAllOccurrences: "جميع المواضع",
-    // Flashcards
     tabFlashcards: "البطاقات",
     flashcardsTitle: "البطاقات",
     flashcardsDueToday: "بطاقات اليوم",
@@ -1489,7 +1446,6 @@ export const strings = {
     smartDeckComparisonCue: "موضع المقارنة",
     smartDeckTailCue: "موضع الخاتمة",
     smartDeckTailComparisonCue: "خاتمة المقارنة",
-    // Review session
     flashcardsReveal: "اكشف",
     flashcardsAgain: "مجددًا",
     flashcardsHard: "صعب",
@@ -1498,7 +1454,6 @@ export const strings = {
     flashcardsGrade: "تقييم",
     flashcardsEndSession: "إنهاء الجلسة",
     flashcardsCardsRemaining: "{{n}} متبقية",
-    // Test modes
     flashcardsModeNextAyah: "الآية التالية",
     flashcardsModePreviousAyah: "الآية السابقة",
     flashcardsModeTranslation: "الترجمة",
@@ -1506,7 +1461,6 @@ export const strings = {
     flashcardsModeSurahName: "اسم السورة",
     flashcardsModeWordMeaningArabic: "المعنى العربي",
     flashcardsModeWordMeaningTranslation: "الترجمة",
-    // Session summary
     flashcardsSummaryTitle: "اكتملت الجلسة",
     flashcardsSummaryReviewed: "البطاقات المراجعة",
     flashcardsSummaryNew: "جديدة",
@@ -1517,7 +1471,6 @@ export const strings = {
     flashcardsSummaryNextReview: "المراجعة القادمة",
     flashcardsSummaryDone: "تم",
     flashcardsSummaryMinutes: "{{n}} دقيقة",
-    // Settings
     deckReviewSettingsTitle: "إعدادات المراجعة",
     deckReviewSettingsSave: "حفظ الإعدادات",
     wordFlashcardsTestModes: "أوجه مراجعة المعاني",
@@ -1564,7 +1517,6 @@ export const strings = {
     flashcardsSortRandom: "عشوائي",
     flashcardsNewSortCreated: "حسب الإنشاء",
     flashcardsDueTodayLimit: "{{due}} مستحقة ({{limit}} اليوم)",
-    // Auth
     authLogin: "تسجيل الدخول",
     authSignup: "إنشاء حساب",
     authLogout: "تسجيل الخروج",
@@ -1647,7 +1599,6 @@ export const strings = {
     authValidationUsernameMax: "يجب ألا يتجاوز اسم المستخدم 20 حرفًا",
     authValidationUsernamePattern: "يمكن أن يحتوي اسم المستخدم على أحرف وأرقام وشرطات سفلية فقط",
     authValidationPasswordsMismatch: "كلمتا المرور غير متطابقتين",
-    // Sync
     syncSyncing: "جارٍ المزامنة...",
     syncSynced: "تمت المزامنة",
     syncOffline: "غير متصل",
@@ -1669,7 +1620,6 @@ export const strings = {
     qfContentMisconfigured: "محتوى Quran Foundation غير مهيأ.",
     qfAuthCallbackLoading: "جارٍ إكمال اتصال Quran Foundation...",
     qfAuthCallbackFailed: "فشل اتصال Quran Foundation",
-    // Leaderboard
     tabLeaderboard: "المتصدرين",
     leaderboardTitle: "لوحة المتصدرين",
     leaderboardDaily: "اليوم",
@@ -1711,7 +1661,6 @@ export const strings = {
     reflectionJourneyLoading: "جارٍ تحميل رحلة التدبر",
     reflectionJourneyLoadFailed: "تعذر تحميل رحلة التدبر",
     reflectionJourneyRetry: "إعادة المحاولة",
-    // Reflections
     reflections: "تأملات",
     reflectionCount: "{{n}} تأملات",
     reflectionWrite: "اكتب تأملًا",
@@ -1774,21 +1723,17 @@ export const strings = {
     settingSaveFailed: "تعذر حفظ الإعداد",
     translationLoadFailed: "تعذر تحميل هذه الترجمة. ما زالت ترجمتك السابقة مختارة.",
     goToLoadFailed: "تعذر تحميل بيانات الانتقال",
-    // Onboarding
     onboardingWelcome: "حافظ",
     onboardingSubtitle: "احفظ القرآن وثبّته بمراجعة يومية",
     onboardingGetStarted: "ابدأ",
     onboardingSkipForNow: "تخطي الآن",
     onboardingSaveFailed: "تعذر حفظ الإعداد. حاول مجددًا.",
-    // Offline
     offlineBanner: "غير متصل. دراستك محفوظة على هذا الجهاز.",
-    // Empty states
     emptyBookmarksSubtitle: "في عرض الآيات، اضغط أيقونة الإشارة على الآية. وفي عرض الصفحات، اضغط مطولًا على رقم الآية ثم اختر «إشارة مرجعية».",
     emptyDecksSubtitle: "استخدم مجموعة التثبيت لمراجعة الآيات بالتكرار المتباعد",
     emptyLeaderboardSubtitle: "أكمل مراجعات البطاقات لكسب النقاط والظهور في لوحة المتصدرين",
     emptySearchTextSubtitle: "البحث يتجاهل التشكيل. جرّب كلمة أخرى.",
     emptySearchRootSubtitle: "تحقق من هجاء الجذر وحاول مجددًا",
-    // Error boundary
     errorTitle: "حدث خطأ ما",
     errorSubtitle: "لم يتم تحميل هذا القسم بشكل صحيح",
     errorTryAgain: "حاول مجددًا",

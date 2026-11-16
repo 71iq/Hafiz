@@ -185,10 +185,6 @@ const TAJWEED_RULES: Record<string, TajweedRuleInfo> = {
   },
 };
 
-/**
- * Get tajweed rule info by rule ID.
- * Returns a fallback if the rule is unknown.
- */
 export function getTajweedRule(ruleId: string, theme = "white"): TajweedRuleInfo {
   const rule =
     TAJWEED_RULES[ruleId] ?? {

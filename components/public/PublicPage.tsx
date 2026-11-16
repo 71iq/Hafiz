@@ -17,7 +17,6 @@ import { useSettings } from "@/lib/settings/context";
 import { textStartStyle } from "@/lib/ui/direction";
 
 const PUBLIC_PAGE_TABS: PublicPageKey[] = ["about", "privacy", "terms", "credits"];
-/** Readable line length for paragraphs, even on wide screens. */
 export const PUBLIC_TEXT_MAX_WIDTH = 680;
 const SETTINGS_ABOUT_HREF = "/settings?category=about";
 
@@ -33,11 +32,6 @@ function getExternalWebLinkProps(href: string) {
   } as const;
 }
 
-/**
- * About, Privacy, Terms and Credits. They read the cached app language and theme from the shared
- * settings provider, which renders before the local database is ready, so public information never
- * waits for data preparation. The language pill changes the shared app language.
- */
 export function PublicPage({ page }: { page: PublicPageKey }) {
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string | string[] }>();
@@ -64,7 +58,6 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
-    // The shared route title owner sets "<title> | Hafiz" / "<title> | حافظ"; this page sets direction.
     document.documentElement.setAttribute("lang", language);
     document.documentElement.setAttribute("dir", isRTL ? "rtl" : "ltr");
     const meta = document.querySelector('meta[name="description"]');
@@ -341,7 +334,6 @@ function PublicPageTabs({
 
   return (
     <View
-      // Phone widths wrap long labels such as Terms of Service onto two lines instead of truncating them.
       className={`mb-10 ${isCompact ? "rounded-3xl" : "rounded-full"} bg-surface-low p-1 dark:bg-surface-dark-low`}
       style={{ alignSelf: isCompact ? "stretch" : isRTL ? "flex-end" : "flex-start", flexDirection: "row" }}
     >

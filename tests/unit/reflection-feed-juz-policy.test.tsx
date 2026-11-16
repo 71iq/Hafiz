@@ -116,7 +116,6 @@ describe.each(locales)("Reflection feed juz labels in %s", (language) => {
     jest.useRealTimers();
   });
   const number = (juz: number) => (language === "ar" ? toArabicNumber(juz) : String(juz));
-  // References use the interface's digits; the numeric token is isolated left to right.
   const ref = (text: string) => `\u2066${text.replace(/\d/g, (d) => number(Number(d)))}\u2069`;
   const label = () => render(<ReflectionFeedScreen />).getByTestId("reference-label").props.children;
 

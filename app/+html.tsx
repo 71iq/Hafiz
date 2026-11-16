@@ -1,7 +1,3 @@
-// This file is web-only and used to configure the root HTML for every
-// web page during static rendering.
-// The contents of this function only run in Node.js environments and
-// do not have access to the DOM or browser APIs.
 export default function Root({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -33,16 +29,13 @@ export default function Root({ children }: { children: React.ReactNode }) {
         />
         <meta name="twitter:image" content="https://hafizquran.app/icon.png?v=2" />
 
-        {/* Favicon / tab icon */}
         <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png?v=2" />
         <link rel="shortcut icon" type="image/png" href="/favicon.png?v=2" />
 
-        {/* PWA / Add-to-Home */}
         <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="theme-color" content="#FFFFFF" />
         <meta name="application-name" content="Hafiz" />
 
-        {/* iOS Add-to-Home */}
         <link rel="apple-touch-icon" href="/icon.png?v=2" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -51,14 +44,8 @@ export default function Root({ children }: { children: React.ReactNode }) {
 
         <script dangerouslySetInnerHTML={{ __html: startupThemeScript }} />
 
-        {/* Allow the document body to overflow by 1px so mobile browsers
-            register a scrollable page and collapse their URL bar. #root stays
-            clipped to the dynamic viewport (100dvh) so internal lists keep
-            working exactly as before. */}
         <style dangerouslySetInnerHTML={{ __html: urlBarHideStyles }} />
 
-        {/* On first load, nudge window scroll so iOS/Android immediately hide
-            the URL bar instead of waiting for the user to scroll the body. */}
         <script dangerouslySetInnerHTML={{ __html: urlBarHideScript }} />
       </head>
       <body>{children}</body>
@@ -68,8 +55,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
 
 const urlBarHideStyles = `
 html {
-  /* Body needs to be the scroll container, not html — iOS only hides the
-     URL bar when a body-level scroll is observed. */
+
   overflow: hidden;
   height: 100%;
 }
@@ -79,12 +65,10 @@ body {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(13, 148, 136, 0.55) transparent;
-  /* Anchor the visible content to the large viewport and add a sliver of
-     extra height so window scroll is always possible. */
+
   min-height: calc(100dvh + 1px);
   background-color: rgb(var(--color-surface, 255 255 255));
-  /* Prefer smooth momentum on iOS so the scroll-to-1px nudge doesn't feel
-     sudden. */
+
   -webkit-overflow-scrolling: touch;
 }
 #root {
@@ -143,8 +127,6 @@ const urlBarHideScript = `
   };
   var run = function () {
     nudge();
-    // Retry — some mobile browsers ignore the first scroll call before the
-    // page is fully settled.
     setTimeout(nudge, 0);
     setTimeout(nudge, 300);
     setTimeout(nudge, 900);

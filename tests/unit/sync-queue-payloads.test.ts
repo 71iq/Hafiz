@@ -569,7 +569,6 @@ it("keeps the existing valid newer-remote timestamp precedence", async () => {
 });
 
 describe("card upload under a remote row written later", () => {
-  // The queued card was reviewed at NEW. The server's row was written later, at LATER.
   const LATER = "2026-03-01T00:00:00.000Z";
   async function queueReviewedCard(): Promise<number> {
     await enqueueSync(db, "study_cards", "UPDATE", "qiraat:2:255", { ...card(), last_review: NEW });
@@ -826,7 +825,6 @@ describe("W07 custom meaning edit and deletion", () => {
       updated_at: data.deleted_at,
       deleted_at: entry.created_at,
     });
-    // The stored row's old updated_at is not reused: a device holding that unchanged row must accept it.
     expect(data.updated_at > OLD).toBe(true);
 
     mockProbeData = [{ updated_at: OLD }];

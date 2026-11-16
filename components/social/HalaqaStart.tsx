@@ -14,7 +14,6 @@ import { SocialErrorText, SocialToggleRow, socialRowStyle, useSocialAccent } fro
 
 type FormMode = "create" | "join" | null;
 
-/** One plain row of the compact card: icon, label and a chevron, a full-width 48 pt target. */
 function CompactAction({ icon: Icon, label, disabled, onPress }: { icon: LucideIcon; label: string; disabled: boolean; onPress: () => void }) {
   const { isRTL } = useSettings();
   const { accent, muted } = useSocialAccent();
@@ -36,10 +35,6 @@ function CompactAction({ icon: Icon, label, disabled, onPress }: { icon: LucideI
   );
 }
 
-/**
- * Ways into a halaqa (SOC-02, SOC-04): create an invite halaqa, join one by code, or join a matched
- * halaqa. `compact` is the "join or create another" card under an existing group.
- */
 export function HalaqaStart({
   compact = false,
   matchedAllowed = true,
@@ -51,7 +46,6 @@ export function HalaqaStart({
   onClearError,
 }: {
   compact?: boolean;
-  /** False for an account under 18: matched halaqas are for adults (ETH-07), so the join is not offered. */
   matchedAllowed?: boolean;
   pending: boolean;
   error: string | null;
@@ -114,7 +108,6 @@ export function HalaqaStart({
           </View>
         )}
         {compact ? (
-          // Under a joined halaqa these are secondary: plain stacked rows, no filled button.
           <View>
             {matchedAllowed ? <CompactAction icon={Users} label={s.halaqaJoinMatched} disabled={pending} onPress={onJoinMatched} /> : null}
             <CompactAction icon={KeyRound} label={s.halaqaJoinCode} disabled={pending} onPress={() => open("join")} />
@@ -131,7 +124,6 @@ export function HalaqaStart({
                 </Text>
               </>
             ) : null}
-            {/* Without the matched join (under 18), joining with a code is the main action. */}
             <Button
               variant={matchedAllowed ? "outline" : "default"}
               className={matchedAllowed ? "border border-warm-300 dark:border-neutral-700" : undefined}

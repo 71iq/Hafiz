@@ -111,10 +111,6 @@ type DeckCardsTarget = {
 
 const GRACE_NOTE_SEEN_KEY = "device_habit_grace_note_seen";
 
-/**
- * Home's achievement notices: the visible one stays first while newer unlocks queue behind it, so a
- * live unlock never replaces a notice the user has not seen yet.
- */
 export function mergeUnlockQueue(current: readonly AchievementUnlock[], unseen: readonly AchievementUnlock[]): AchievementUnlock[] {
   const visible = current[0];
   const keepVisible = visible && unseen.some((unlock) => unlock.achievementId === visible.achievementId);
@@ -128,7 +124,6 @@ function formatArabicDate(date: Date): string {
 export default function HomeScreen() {
   const db = useDatabase();
   const { isDark, isRTL, uiLanguage } = useSettings();
-  // Arabic uses Arabic-Indic digits, matching the reader.
   const localNumber = (value: number) => (isRTL ? toArabicNumber(value) : value.toLocaleString());
   const s = useStrings();
   const router = useRouter();
@@ -136,7 +131,6 @@ export default function HomeScreen() {
   const mirroredRowStyle = isRTL ? ({ direction: "ltr" } as const) : undefined;
   const compactDeckCards = width <= VIEWPORT_BREAKPOINTS.phoneLarge;
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
-  /** The header row's width, measured, so Start Review can take its own full-width line when needed. */
   const [headerWidth, setHeaderWidth] = useState(0);
   const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({
     total: 0,
@@ -146,28 +140,22 @@ export default function HomeScreen() {
   const user = useAuthStore((state) => state.user);
   const accountPromo = useAccountPromo("home");
   const openMushaf = useOpenMushaf();
-  // Ayah reviews due now in the ayah decks, without new cards: ayah review's daily work (UNIT-02).
   const ayahReviewsDue = smartDecks.reduce((sum, deck) => sum + deck.dueCount, 0);
-  // The headline is what the deck rows offer, which is also what Review all loads.
   const totalDue = smartDecks.reduce(
     (sum, deck) => sum + deck.dueCount + deck.newCount,
     vocabStats.dueCount + vocabStats.newCount,
   );
-  // The counts and Start Review need about 330 px at standard text size; each further digit of the
-  // due count widens the big number by about 38 px, and larger system text widens everything.
   const headerNeeds = (totalDue >= 1000 ? 420 : totalDue >= 100 ? 370 : 330) * Math.max(1, fontScale);
   const headerStacked = headerWidth > 0 && headerWidth < headerNeeds;
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
   const { wird, inboxCount, remediationDue, monthlyCheckDue, secondLooksDue, nextLookAt, refresh: refreshWird } = useTodayWird(db);
-  // SOC-03: a teacher's next sabaq, checked again whenever today's wird is read.
   const assignedSabaq = useAssignedSabaq(db, user?.id ?? null, wird);
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   const [dueLoaded, setDueLoaded] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  // Search opened from the sidebar, Ctrl/Cmd+K or the legacy /search?q= link (search-launcher).
   const searchRequest = usePendingSearchRequest();
   useEffect(() => {
     if (!searchRequest) return;
@@ -176,7 +164,6 @@ export default function HomeScreen() {
     setSearchQuery(request.query);
     setShowSearch(true);
   }, [searchRequest]);
-  // The legacy /flashcards link lands here with section=decks and scrolls to the deck cards once.
   const { section } = useLocalSearchParams<{ section?: string }>();
   const scrollRef = useRef<ScrollView>(null);
   const [decksY, setDecksY] = useState<number | null>(null);
@@ -191,13 +178,11 @@ export default function HomeScreen() {
   const [reviewSettingsTarget, setReviewSettingsTarget] = useState<DeckReviewSettingsTarget | null>(null);
   const [deckCardsTarget, setDeckCardsTarget] = useState<DeckCardsTarget | null>(null);
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
-  // undefined while loading; null when no reading position is saved yet.
   const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null | undefined>(undefined);
   const [unlockQueue, setUnlockQueue] = useState<AchievementUnlock[]>([]);
   const latestUnlock = unlockQueue[0] ?? null;
   const [dismissingUnlockId, setDismissingUnlockId] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
-  // The local day the dashboard was loaded for, and when the next one starts.
   const loadedDay = useRef<string | null>(null);
   const [dayBoundary, setDayBoundary] = useState<number | null>(null);
   const [journeySummary, setJourneySummary] = useState<{
@@ -226,7 +211,6 @@ export default function HomeScreen() {
       );
       const nameMap: Record<number, string> = {};
       for (const row of surahRows) {
-        // English uses the transliterated name people know ("Al-Kahf"), as Search does.
         nameMap[row.number] =
           uiLanguage === "ar" ? row.name_arabic : (surahTransliteration(row.number) ?? row.name_english);
       }
@@ -293,8 +277,6 @@ export default function HomeScreen() {
       const currentLevelTitle = reflectionJourneySummary.currentLevelTitle
         ? localizeReflectionJourneyText(reflectionJourneySummary.currentLevelTitle, uiLanguage)
         : null;
-      // Apply the dashboard only once every query succeeded, so a failure keeps the last good values,
-      // and only for the latest load, so an older overlapping load cannot overwrite a newer one.
       if (!isCurrent()) return;
       const loadedAt = new Date();
       loadedDay.current = localDateOf(loadedAt);
@@ -387,8 +369,6 @@ export default function HomeScreen() {
       };
     }, [loadData]),
   );
-  // Due counts roll over with the local day: reload at midnight, or on resume once the date changed.
-  // The wird and habit cards follow their own day boundaries and make-up cutoff.
   const reloadForNewDay = useCallback(() => {
     if (focused.current && loadedDay.current !== localDateOf(new Date())) loadData();
   }, [loadData]);
@@ -412,7 +392,6 @@ export default function HomeScreen() {
     [loadData],
   );
 
-  // A live unlock waits behind the visible notice instead of replacing it.
   useEffect(
     () =>
       subscribeAchievementUnlocks((unlock) =>
@@ -447,7 +426,6 @@ export default function HomeScreen() {
     router.push({ pathname: "/flashcards/session", params: deckId ? { deckId } : {} });
   };
 
-  // A readable scope: "Al-Kahf 1-7", "3 surahs" or "Juz 1, 2", in the interface's digits.
   const getSmartFilterLabel = (filter: BuiltInDeckFilter): string => {
     if (filter.type === "surah") {
       const ranges = filter.ranges ?? [];
@@ -467,21 +445,16 @@ export default function HomeScreen() {
     return s.smartDeckFilterAll;
   };
 
-  // GOAL-04: once the minimum is met and today's pages, new lines and every Home deck are done, the
-  // full wird is complete.
   const planRemaining =
     wird === undefined
       ? 1
       : wird === null
         ? 0
         : wird.todo.length +
-          // A half page or seam due after a missed page is part of today's review (SCH-06, SCH-08).
           remediationDue +
           (wird.newLines > 0 && !wird.daily.backlog && !wird.sabaqDoneToday ? 1 : 0);
   const remainingToday = totalDue + planRemaining;
-  // MST-01: with page or half-page review, Home counts memorized pages instead of ayah cards.
   const pageMode = !!wird && wird.plan.unit !== "ayah";
-  // 6.4: after 7 or more days without a wird, welcome the user back before today's review.
   const lastWirdDay = habit ? habit.days.filter((day) => day.localDate <= habit.today).at(-1)?.localDate ?? null : null;
   const returning =
     !!habit && !!wird && wird.todo.length > 0 && !habit.streak.doneToday && lastWirdDay !== null && diffDays(lastWirdDay, habit.today) >= 7;
@@ -499,7 +472,6 @@ export default function HomeScreen() {
 
   const dueReviews = ayahReviewsDue + vocabStats.dueCount;
   const newCards = smartDecks.reduce((sum, deck) => sum + deck.newCount, 0) + vocabStats.newCount;
-  // Genuinely done: every deck and today's plan work, not merely one empty deck.
   const allCaughtUp = dueLoaded && wird !== undefined && remainingToday === 0;
   const showDeckLabels = width >= VIEWPORT_BREAKPOINTS.sidebar;
   const decksWithCards = smartDecks.filter((deck) => deck.total > 0);
@@ -511,7 +483,6 @@ export default function HomeScreen() {
       deck={deck}
       filterLabel={getSmartFilterLabel(deck.filter)}
       onStartReview={() =>
-        // Only future cards: open the card list to inspect them instead of an empty session.
         deck.dueCount + deck.newCount > 0
           ? handleStartReview(deck.id)
           : setDeckCardsTarget({ id: deck.id, title: deck.title })
@@ -596,15 +567,11 @@ export default function HomeScreen() {
         )}
 
         <View className="mb-6">
-          {/* The counts and Start Review share a row when there is room (about 330 px, 370 px with a
-              three-digit due count). Otherwise Start Review takes its own full-width line below the
-              counts, the same in both languages, instead of wrapping as a stray pill. */}
           <View
             onLayout={(event) => setHeaderWidth(Math.round(event.nativeEvent.layout.width))}
             className={headerStacked ? "gap-3" : `flex-row items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
             style={headerStacked ? undefined : mirroredRowStyle}
           >
-            {/* Stacked, the counts may still need more than one line at very large text sizes. */}
             <View
               className={`${headerStacked ? "flex-wrap" : "grow shrink-0"} flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
               style={mirroredRowStyle}
@@ -613,7 +580,6 @@ export default function HomeScreen() {
                 {dueLoaded ? (
                   <Text
                     className="text-charcoal dark:text-neutral-100"
-                    // Already display size; larger system text grows it only a little more.
                     maxFontSizeMultiplier={1.3}
                     style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}
                   >
@@ -629,7 +595,6 @@ export default function HomeScreen() {
                   {s.flashcardsDueToday}
                 </Text>
                 {dueLoaded ? (
-                  // Cards only: the plan's pages are counted on the plan card, never added in here.
                   <Text
                     className="text-warm-600 dark:text-neutral-400"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, ...textStartStyle(isRTL) }}
@@ -687,8 +652,6 @@ export default function HomeScreen() {
               </View>
             ) : null}
           </View>
-          {/* NOT-03: the in-app reminder, on web and while native notifications are off. Its Start opens
-              the same plan-aware route as a notification tap (lib/notifications/reminder-route). */}
           <WirdReminderBanner />
           {habit ? (
             <WirdStreakCard
@@ -699,11 +662,9 @@ export default function HomeScreen() {
               graceNoteDismissed={habit.recentGraceDay !== null && graceNoteSeen === habit.recentGraceDay}
               onDismissGraceNote={dismissGraceNote}
               onOpenBreak={() => setHabitBreakOpen(true)}
-              // Unknown while the wird loads; without a plan there is no wird review to wait for.
               wirdLeft={wird === undefined || (wird !== null && reviewLeftToday(wird, { remediationDue, ayahReviewsDue }))}
             />
           ) : habitFailed ? null : (
-            // Hold the card's place while it loads, so the content below does not jump down.
             <Skeleton isDark={isDark} height={64} borderRadius={24} className="mt-4" accessibilityElementsHidden />
           )}
         </View>
@@ -731,7 +692,6 @@ export default function HomeScreen() {
             language={uiLanguage}
             isDark={isDark}
             s={s}
-            // Like the wird reminder: the page review, or the ayah review when the plan reviews ayat (UNIT-02).
             onStartReview={() => router.push(reminderHref("wird", wird?.plan ?? null))}
             onStartSabaq={() => router.push("/hifz/sabaq" as Href)}
             onSetup={() => router.push("/hifz/setup" as Href)}
@@ -766,7 +726,6 @@ export default function HomeScreen() {
           />
         ) : null}
 
-        {/* Continue reading opens the saved ayah as one explicit target; a new reader gets a start card. */}
         {resume !== undefined ? (
           <Pressable
             onPress={() => openMushaf(resume ? { surah: resume.surah, ayah: resume.ayah } : { surah: 1, ayah: 1 })}
@@ -782,7 +741,6 @@ export default function HomeScreen() {
                 <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
                   <Text
                     className="text-warm-400 dark:text-neutral-400 uppercase"
-                    // Letter spacing would break the joins between Arabic letters.
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: isRTL ? 0 : 1.5 }}
                   >
                     {s.continueReading}
@@ -816,7 +774,6 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
 
-        {/* Hand-mirrored alignment pins LTR coordinates; under the RTL tab root it flipped twice. */}
         <View
           className={`mb-3 ${isRTL ? "items-end" : "items-start"}`}
           style={{ direction: "ltr" }}
@@ -921,7 +878,6 @@ export default function HomeScreen() {
                   >
                     {s.reflectionJourneySubtitle}
                   </Text>
-                  {/* The level the Journey opens (shared selector); a finished Journey says so above. */}
                   {journeySummary.currentLevelTitle && !journeyComplete ? (
                     <Text
                       className="text-charcoal dark:text-neutral-200"
@@ -943,10 +899,8 @@ export default function HomeScreen() {
 
         <SecondaryDestinations destinations={["halaqa", "leaderboard"]} />
 
-        {/* The web download offer lives in Settings > About; the app keeps its in-app update notice. */}
         {Platform.OS !== "web" ? <AppReleaseCard /> : null}
 
-        {/* Optional sync comes last so it never pushes study down; hidden when accounts are not configured. */}
         {accountPromo.visible ? (
           <AccountPromoCard
             surface="home"
@@ -1012,12 +966,6 @@ export default function HomeScreen() {
   );
 }
 
-/**
- * A deck card whose body starts its review. The start target sits behind the content instead of
- * wrapping it, so the card-list and settings buttons are siblings rather than buttons nested inside
- * a button (invalid on web and read as one control by screen readers). Content ignores touches so
- * taps on the text reach the start target.
- */
 function DeckCardShell({
   canStart,
   onStartReview,
@@ -1068,7 +1016,6 @@ function DeckCardShell({
           </View>
         </View>
       ) : (
-        // box-none goes through the prop: React Native Web ignores it as a style value.
         <View className="items-center gap-3" style={row} pointerEvents="box-none">
           {passive}
           {passiveText}
@@ -1080,7 +1027,6 @@ function DeckCardShell({
   );
 }
 
-/** A deck's card-list or settings control: 40 px, a 44 px target, and a visible label from 768 px. */
 function DeckActionButton({
   icon,
   label,
@@ -1336,8 +1282,6 @@ function DeckStats({
 }) {
   const { themeColors } = useSettings();
   const s = useStrings();
-  // Each count carries a caption: three bare colored numbers left people guessing what they meant.
-  // New and Due take their color only above zero, so a zero never looks like work waiting.
   const stats = [
     { value: total, label: s.deckStatCards, color: undefined },
     ...(showReviewStats
@@ -1348,8 +1292,6 @@ function DeckStats({
       : []),
   ];
   const left = newCount + dueCount;
-  // Today's remaining cards come from the same queue counts, so the daily limit is visible before
-  // starting. Without any, the caption says why the deck has nothing to start.
   const availability = !showReviewStats
     ? null
     : total === 0

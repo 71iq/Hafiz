@@ -39,7 +39,6 @@ type AyahRow = {
   ayah: number;
 };
 
-/** A field-specific validation failure, so its message sits under the field that caused it. */
 class FieldError extends Error {
   constructor(
     readonly field: FieldKey | "general",
@@ -189,7 +188,6 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
           result.failure && result.failure !== "busy" ? audioFailureMessage(result.failure, s) : s.audioPlaybackFailed
         );
       }
-      // The reader and its player bar take over once a valid recitation starts.
       onClose();
     } catch (err) {
       const field = err instanceof FieldError ? err.field : "general";
@@ -383,7 +381,6 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
             isDark={isDark}
             isRTL={isRTL}
           />
-          {/* The whole row is the switch, so its target is the row, not the 24 px track. */}
           <SwitchRow
             label={s.recitationFollow}
             hint={s.recitationFollowHint}
@@ -506,7 +503,6 @@ function LabeledInput({
   isDark: boolean;
   isRTL: boolean;
 }) {
-  // The label is shown, not only announced: Range mode has two identical-looking fields.
   return (
     <View className="gap-1.5">
       <Text
@@ -627,7 +623,6 @@ function LoopControl({
   );
 }
 
-/** An exact "surah:ayah" in any digits, within the canonical ayah counts; the shared C06 parser. */
 function parseAyahReference(value: string): AyahAudioTarget | null {
   const parsed = parseReference(value, { context: "goto" });
   return parsed.kind === "ayah" ? { surah: parsed.surah, ayah: parsed.ayah } : null;

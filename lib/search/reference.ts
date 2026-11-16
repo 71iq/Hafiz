@@ -1,11 +1,6 @@
 import { exactSurahAliasMatches, type SurahSearchFields } from "@/lib/search/surah-match";
 
-/**
- * C06 shared reference parser for Search, Go to, deep links and reference fields. Pure and
- * synchronous so links can be validated while the database is still preparing.
- */
 
-/** Canonical Hafs ayah counts, surah 1..114 (tests compare this with the bundled Quran data). */
 export const SURAH_AYAH_COUNTS: readonly number[] = [
   7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98, 135, 112, 78, 118, 64, 77,
   227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45, 60, 49, 62, 55,
@@ -21,9 +16,7 @@ export type ReferenceParse =
   | { kind: "ayah"; surah: number; ayah: number }
   | { kind: "surah"; surah: number }
   | { kind: "page"; page: number }
-  /** An exact name shared by more than one surah: show these choices. */
   | { kind: "surah-choices"; surahs: number[] }
-  /** Not a reference: ordinary text or root search. */
   | { kind: "text"; text: string }
   | { kind: "invalid"; reason: InvalidReferenceReason };
 
@@ -37,7 +30,6 @@ const DIGIT_MAP: Record<string, string> = {};
   DIGIT_MAP[digit] = String(index);
 });
 
-/** Western, Arabic-Indic and Persian digits become ASCII; surrounding whitespace is removed. */
 export function normalizeReferenceInput(input: string): string {
   return input.replace(/[٠-٩۰-۹]/g, (digit) => DIGIT_MAP[digit] ?? digit).trim();
 }
@@ -75,8 +67,6 @@ function ayahResult(surah: number, ayah: number): ReferenceParse {
 }
 
 const PAGE_PREFIX = /^(?:page|p|صفحة|ص)\s*(.*)$/iu;
-// A digit-led or signed string is a reference attempt, so a bad value ("2:255abc", "-2", "2.5") is
-// invalid rather than a text search. Words that merely contain digits later stay text.
 const REFERENCE_ATTEMPT = /^[+\-]?[\d٫.,:،/]/;
 
 export function parseReference(
@@ -103,8 +93,6 @@ export function parseReference(
     const rest = pageMatch[1];
     const page = toInteger(rest);
     if (page !== null) return pageResult(page);
-    // "page" followed by something that is not a whole number is a malformed page reference;
-    // a word that only starts with the prefix letters ("peace", "صبر") is ordinary text.
     if (rest === "" ? false : REFERENCE_ATTEMPT.test(rest)) return { kind: "invalid", reason: "malformed" };
   }
 
@@ -119,10 +107,6 @@ export function parseReference(
   return { kind: "text", text: value };
 }
 
-/**
- * Strict validation of the existing deep-link parameters (surah, ayah and optional word). Invalid
- * links are rejected, never clamped to a different ayah.
- */
 export function parseAyahLinkParams(params: {
   surah?: string | string[] | null;
   ayah?: string | string[] | null;

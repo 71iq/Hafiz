@@ -1,31 +1,14 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 
-/**
- * Card Uniqueness Algorithm (§3.6.2)
- *
- * Problem: Some ayah texts repeat verbatim (e.g., "فبأي آلاء ربكما تكذبان" × 31 in Ar-Rahman).
- * The "front" of each card must be uniquely identifiable.
- *
- * 1. Check if ayah text_clean is unique across the entire Quran.
- * 2. If not, prepend the previous ayah text until the combo is unique.
- * 3. If still not unique after 2 ayahs of context, add surah name + ayah number.
- * 4. Always show surah name subtly as secondary context.
- */
 
 type UniqueFront = {
-  /** The primary text to show (may include context ayahs) */
   text: string;
-  /** Surah name (always provided as secondary context) */
   surahName: string;
-  /** The ayah number */
   ayahNumber: number;
-  /** How many context ayahs were prepended (0, 1, or 2) */
   contextCount: number;
-  /** Whether explicit surah+ayah label is needed for uniqueness */
   needsExplicitLabel: boolean;
 };
 
-// Cache of text_clean → occurrence count
 let duplicateCache: Map<string, number> | null = null;
 
 async function buildDuplicateCache(db: DatabaseExecutor): Promise<Map<string, number>> {
@@ -42,10 +25,6 @@ async function buildDuplicateCache(db: DatabaseExecutor): Promise<Map<string, nu
   return map;
 }
 
-/**
- * Compute the unique front text for a card.
- * Returns the minimum context needed to make this card's prompt unique.
- */
 export async function computeUniqueFront(
   db: DatabaseExecutor,
   surah: number,
@@ -53,7 +32,6 @@ export async function computeUniqueFront(
 ): Promise<UniqueFront> {
   const dupes = await buildDuplicateCache(db);
 
-  // Get the ayah's own text
   const row = await db.getFirstAsync<{ text_clean: string; text_uthmani: string }>(
     "SELECT text_clean, text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
     [surah, ayah]
@@ -62,14 +40,12 @@ export async function computeUniqueFront(
     return { text: "", surahName: "", ayahNumber: ayah, contextCount: 0, needsExplicitLabel: false };
   }
 
-  // Get surah name
   const surahRow = await db.getFirstAsync<{ name_arabic: string }>(
     "SELECT name_arabic FROM surahs WHERE number = ?",
     [surah]
   );
   const surahName = surahRow?.name_arabic ?? "";
 
-  // If text_clean is unique, no extra context needed
   if (!dupes.has(row.text_clean)) {
     return {
       text: row.text_uthmani,
@@ -80,7 +56,6 @@ export async function computeUniqueFront(
     };
   }
 
-  // Try prepending previous ayah(s) for uniqueness
   for (let ctx = 1; ctx <= 2; ctx++) {
     const prevAyah = ayah - ctx;
     if (prevAyah < 1) break;
@@ -92,14 +67,11 @@ export async function computeUniqueFront(
       [surah, ayah - ctx, ayah]
     );
 
-    if (prevRows.length !== ctx + 1) break; // Can't go further back (start of surah)
+    if (prevRows.length !== ctx + 1) break;
 
     const combinedUthmani = prevRows.map((r) => r.text_uthmani).join(" ﴿...﴾ ");
 
-    // For practical purposes, prepending even 1 ayah makes it unique in nearly all cases
-    // The few remaining cases (e.g., repeated consecutive ayahs) get the explicit label
     if (ctx === 1) {
-      // Check if prev+current combo still appears elsewhere
       const otherMatches = await db.getFirstAsync<{ cnt: number }>(
         `SELECT COUNT(*) as cnt FROM quran_text a
          JOIN quran_text b ON a.surah = b.surah AND a.ayah = b.ayah - 1
@@ -119,7 +91,6 @@ export async function computeUniqueFront(
     }
 
     if (ctx === 2) {
-      // After 2 context ayahs, check again
       const prevClean0 = prevRows[0].text_clean;
       const prevClean1 = prevRows[1].text_clean;
       const otherMatches = await db.getFirstAsync<{ cnt: number }>(
@@ -142,7 +113,6 @@ export async function computeUniqueFront(
     }
   }
 
-  // Still not unique after 2 context ayahs → use explicit surah + ayah label
   return {
     text: row.text_uthmani,
     surahName,

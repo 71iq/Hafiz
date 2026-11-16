@@ -18,11 +18,9 @@ import { readReminderPrefs } from "@/lib/notifications/settings";
 import { prayerLabel } from "@/lib/notifications/templates";
 import type { ReminderAnchor } from "@/lib/notifications/types";
 
-/** ETH-05: suggest rest after this much review in one session. */
 const REST_SUGGESTION_MS = 45 * 60_000;
 
 export type SessionHabitInput = Readonly<{
-  /** The strongest wird event this session produced, or null. */
   event: Exclude<WirdProgressEvent, { kind: "none" }> | null;
   overview: HabitOverview | null;
   againCount: number;
@@ -36,7 +34,6 @@ const EVENT_RANK: Record<Exclude<WirdProgressEvent["kind"], "none">, number> = {
   earned_back: 3,
 };
 
-/** Keep the most notable event of a session for its summary. */
 export function strongerWirdEvent(
   current: SessionHabitInput["event"],
   next: WirdProgressEvent,
@@ -46,17 +43,10 @@ export function strongerWirdEvent(
   return current;
 }
 
-/** STR-20: during the first week the session ends with a commitment instead of a plain Done. */
 export function showsCommitment(input: SessionHabitInput): boolean {
   return input.event !== null && (input.overview?.streak.length ?? 0) <= 7;
 }
 
-/**
- * STR-20: the commitment names when the person comes back, the reminder's anchor (the hifz plan's,
- * or the reminder setting's without a plan): "I'll be back tomorrow after Fajr", or the time for a
- * clock anchor. Read once when the session screen mounts, so it is ready at the end; until then, or
- * when it cannot be read, the commitment has no anchor.
- */
 export function useCommitmentLabel(db: AppDatabase, s: UIStrings, language: "en" | "ar"): string {
   const [anchor, setAnchor] = useState<ReminderAnchor | null>(null);
   useEffect(() => {
@@ -78,11 +68,6 @@ export function useCommitmentLabel(db: AppDatabase, s: UIStrings, language: "en"
 
 type CardKind = "goal" | "rest" | "struggle" | "reminders";
 
-/**
- * SES-01: at most one prompt card after the streak card, so a summary never shows more than 3. Rest
- * and encouragement come first because they answer how the session went; the reminder offer (ONB-02)
- * comes before the streak goal.
- */
 function promptCard(input: SessionHabitInput, reminderOffer: boolean): CardKind | null {
   if (input.durationMs >= REST_SUGGESTION_MS) return "rest";
   if (input.againCount >= 3 && input.total > 0 && input.againCount / input.total >= 0.3) return "struggle";
@@ -91,7 +76,6 @@ function promptCard(input: SessionHabitInput, reminderOffer: boolean): CardKind 
   return null;
 }
 
-/** 5.11: Zayt's mood for the session end, calm in every case (ZAY-01). */
 function sessionMood(input: SessionHabitInput, prompt: CardKind | null, milestone: boolean): ZaytMoodName | null {
   if (prompt === "rest") return "tired_low_energy";
   if (prompt === "struggle") return "compassionate_again";
@@ -110,11 +94,6 @@ function eventLine(input: SessionHabitInput, language: "en" | "ar", s: UIStrings
   return s.habitMinimumMet;
 }
 
-/**
- * Session-end habit cards (5.10): the streak card when this session met today's minimum, made up
- * yesterday or earned a streak back, then one prompt: a streak goal, a rest suggestion, or a word of
- * encouragement after a hard session. Quiet, with no point totals (STR-23, ETH-05, FB-04).
- */
 export function SessionHabitCards({
   input,
   db,
@@ -148,7 +127,6 @@ export function SessionHabitCards({
       });
   };
 
-  // Zayt sits inside the first card beside its text instead of floating between cards.
   const zayt = mood ? (
     <View className="flex-shrink-0">
       <ZaytMood mood={mood} height={64} />
@@ -204,7 +182,6 @@ export function SessionHabitCards({
               <Text dir={dir} variant="caption" className="mt-1.5" style={{ lineHeight: 18 }}>
                 {s.habitGoalOfferBody}
               </Text>
-              {/* The goals share one row; Not now has its own line instead of wrapping alone. */}
               <MirroredRow dir={dir} className="mt-3 flex-wrap gap-2">
                 {STREAK_GOAL_OPTIONS.map((target) => (
                   <Pressable

@@ -1,17 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Build per-page, per-line word mapping from quran.com API.
- *
- * Output: assets/data/layout/page-words.json
- * Format: Array of 604 entries (index 0 = page 1), each entry is an object
- * mapping line_number (string) to space-joined code_v2 values for that line.
- *
- * Example: pageWords[559]["3"] = "ﱁ ﱂ ﱃ ﱄ ﱅ ﱆ ﱇ ﱈﱉ ﱊ ﱋ ﱌﱍ ﱎ"
- *
- * This gives exact word-to-line mapping from the authoritative source,
- * eliminating the need for proportional distribution in MushafPage.
- */
 
 const fs = require("fs");
 const path = require("path");
@@ -39,7 +27,6 @@ async function main() {
   console.log("Fetching per-word line mapping from quran.com API...");
   console.log(`604 pages in batches of ${BATCH_SIZE}\n`);
 
-  // pageWords[pageIndex] = { lineNumber: "code_v2 code_v2 ..." }
   const pageWords = new Array(604).fill(null);
 
   for (let startPage = 1; startPage <= 604; startPage += BATCH_SIZE) {
@@ -59,7 +46,6 @@ async function main() {
             }
           }
 
-          // Join each line's words with spaces
           const result = {};
           for (const [ln, words] of Object.entries(lineMap)) {
             result[ln] = words.join(" ");
@@ -80,21 +66,18 @@ async function main() {
     if (endPage < 604) await sleep(BATCH_DELAY_MS);
   }
 
-  // Verify all pages fetched
   const missing = pageWords.reduce((acc, p, i) => (p === null ? [...acc, i + 1] : acc), []);
   if (missing.length > 0) {
     console.error("Missing pages:", missing);
     process.exit(1);
   }
 
-  // Verify page 560 line 12
   const p560 = pageWords[559];
   const line12words = p560["12"].split(/\s+/).filter(Boolean).length;
   const line14words = p560["14"].split(/\s+/).filter(Boolean).length;
   console.log(`\nPage 560 line 12: ${line12words} words`);
   console.log(`Page 560 line 14: ${line14words} words`);
 
-  // Stats
   let totalLines = 0;
   let totalWords = 0;
   for (const page of pageWords) {
@@ -105,7 +88,6 @@ async function main() {
   }
   console.log(`\nTotal: ${totalLines} lines, ${totalWords} words across 604 pages`);
 
-  // Save
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(pageWords));
   const sizeMB = (fs.statSync(OUTPUT_FILE).size / 1024 / 1024).toFixed(2);
   console.log(`Saved to ${OUTPUT_FILE} (${sizeMB} MB)`);

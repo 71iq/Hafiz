@@ -109,7 +109,6 @@ async function attachUserCommentLikes(comments: ReflectionComment[], userId?: st
   }));
 }
 
-/** Fetch reflections for a specific ayah (or range that includes it) */
 export async function fetchReflections(
   surah: number,
   ayah: number,
@@ -137,7 +136,6 @@ export async function fetchReflections(
   return { data: trimmed, hasMore: resultPage.hasMore };
 }
 
-/** Fetch the global reflection feed with optional Quran filters */
 export async function fetchReflectionFeed({
   filter,
   sort,
@@ -202,7 +200,6 @@ export async function fetchReflectionFeed({
   return { data: trimmed, hasMore: pageResultData.hasMore };
 }
 
-/** Get reflection count for an ayah */
 export async function fetchReflectionCount(surah: number, ayah: number): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
 
@@ -218,15 +215,7 @@ export async function fetchReflectionCount(surah: number, ayah: number): Promise
   return count ?? 0;
 }
 
-// Reflections, comments and likes are written only through server functions, which lock in the same
-// order as minority changes and account deletion. Each names the account it writes for, and the
-// server refuses it when another account is signed in by then.
 
-/**
- * Create a new reflection. `promisedPrivate` is whether the composer told the author it is visible only
- * to them (ETH-07). The server refuses such a post with ReflectionPrivacyChangedError once the account
- * is no longer marked as under 18, so stale privacy on this device never publishes it.
- */
 export async function createReflection(
   userId: string,
   surah: number,
@@ -257,7 +246,6 @@ export async function createReflection(
   return parseSavedRow("reflection", parseReflectionRow, data);
 }
 
-/** Toggle like on a reflection */
 export async function toggleLike(userId: string, reflectionId: string, currentlyLiked: boolean): Promise<boolean> {
   const liked = !currentlyLiked;
   const { error } = await supabase.rpc("set_reflection_like", {
@@ -269,7 +257,6 @@ export async function toggleLike(userId: string, reflectionId: string, currently
   return liked;
 }
 
-/** Fetch comments for a reflection */
 export async function fetchComments(
   reflectionId: string,
   page: number,
@@ -308,7 +295,6 @@ export async function fetchComments(
   return { ...result, data: await attachUserCommentLikes(result.data, userId) };
 }
 
-/** Add a comment to a reflection. `promisedPrivate` works as in createReflection. */
 export async function addComment(
   userId: string,
   reflectionId: string,
@@ -329,7 +315,6 @@ export async function addComment(
   return { ...parseSavedRow("comment", parseCommentRow, data), user_has_liked: false };
 }
 
-/** Toggle like on a comment */
 export async function toggleCommentLike(userId: string, commentId: string, currentlyLiked: boolean): Promise<boolean> {
   const liked = !currentlyLiked;
   const { error } = await supabase.rpc("set_reflection_comment_like", {
@@ -341,7 +326,6 @@ export async function toggleCommentLike(userId: string, commentId: string, curre
   return liked;
 }
 
-/** Report a reflection */
 export async function reportReflection(reporterId: string, reflectionId: string, reason?: string): Promise<void> {
   const { error } = await supabase
     .from("reports")
@@ -350,11 +334,6 @@ export async function reportReflection(reporterId: string, reflectionId: string,
   if (error) throw error;
 }
 
-/**
- * Deletes the signed-in author's own reflection with its comments and likes (physical delete on the
- * server, which checks the expected account). Resolves true when the server deleted it and false when
- * it no longer exists or is not this account's. Errors are thrown, never reported as a deletion.
- */
 export async function deleteReflection(userId: string, reflectionId: string): Promise<boolean> {
   const { data, error } = await supabase.rpc("delete_reflection", {
     p_user_id: userId,
@@ -364,7 +343,6 @@ export async function deleteReflection(userId: string, reflectionId: string): Pr
   return data === true;
 }
 
-/** Deletes the signed-in author's own comment with its likes. True, false and errors as above. */
 export async function deleteReflectionComment(userId: string, commentId: string): Promise<boolean> {
   const { data, error } = await supabase.rpc("delete_reflection_comment", {
     p_user_id: userId,

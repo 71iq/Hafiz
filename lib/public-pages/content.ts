@@ -8,7 +8,6 @@ export type PublicPageLink = {
 };
 
 export type PublicPageSection = {
-  /** Anchor for the table of contents. */
   id: string;
   title: string;
   body?: string[];
@@ -17,9 +16,7 @@ export type PublicPageSection = {
 };
 
 export type PublicPageContent = {
-  /** Label in the page switcher. */
   tabLabel: string;
-  /** Small line above the title, only where it adds to the title. */
   eyebrow?: string;
   title: string;
   description: string;
@@ -27,10 +24,8 @@ export type PublicPageContent = {
   sections: PublicPageSection[];
 };
 
-/** The `from` value Settings > About passes, so Back returns there instead of to Home. */
 export const PUBLIC_PAGE_FROM_SETTINGS = "settings";
 
-/** Pages with at least this many sections open with a table of contents. */
 export const TABLE_OF_CONTENTS_MIN_SECTIONS = 4;
 
 const CREDIT_LINES_EN = [
@@ -75,11 +70,6 @@ const CREDIT_LINES_AR = [
   "شرح أحكام التجويد - بتصرف من مصادر تعليمية متعددة",
 ];
 
-/**
- * NOTICE.md, reproduced for the Credits page. The English lines keep NOTICE.md's wording, source names
- * and license names exactly (only the Markdown code marks are dropped); the Arabic lines translate the
- * descriptions and keep every source name and license name unchanged. Update NOTICE.md first.
- */
 const NOTICE_LICENSE_EN = [
   "The Hafiz source code and project documentation are licensed under the MIT License unless a file says otherwise.",
   "Bundled Quran text, fonts, translations, tafsir, tajweed, morphology, layout data, and other third-party datasets are not relicensed as MIT by this repository. Those materials remain subject to their original source terms, attribution requirements, and usage restrictions.",
@@ -120,7 +110,6 @@ const NOTICE_SOURCES_AR = [
   "بيانات أسباب النزول: من mostafaahmed97/asbab-al-nuzul-dataset، MIT License.",
 ];
 
-/** The named source repositories and the license texts NOTICE.md names. */
 const NOTICE_SOURCE_LINKS: PublicPageLink[] = [
   { label: "spa5k/tafsir_api", href: "https://github.com/spa5k/tafsir_api", external: true },
   { label: "rn0x/Quran-Data", href: "https://github.com/rn0x/Quran-Data", external: true },

@@ -16,9 +16,7 @@ const mockSettings = {
   effectiveTheme: "white",
   themeColors: { surface: "#ffffff", surfaceLow: "#f8fafc", surfaceMid: "#f4f4f5", surfaceHigh: "#e5e7eb", surfaceDim: "#d1d5db", surfaceBright: "#ffffff" },
 };
-// The prayer-times form needs the app database; the flow under test only needs it to render.
 jest.mock("@/components/notifications/PrayerTimesSetup", () => ({ PrayerTimesSetup: () => null }));
-// Saving writes the plan and the memorized portion; these tests check the plan the flow hands over.
 jest.mock("@/lib/hifz/setup", () => ({ applyHifzSetup: jest.fn(async () => ({ declaredPages: 0 })) }));
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
@@ -51,7 +49,6 @@ describe("HifzSetupFlow Not now", () => {
         <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={null} onDone={jest.fn()} onCancel={jest.fn()} />
       </DirectionProvider>,
     );
-    // Let the surah list load settle before interacting.
     await act(async () => {});
     return view;
   }
@@ -60,16 +57,13 @@ describe("HifzSetupFlow Not now", () => {
     const view = await renderFlow();
     fireEvent.press(view.getByText(s.hifzContinue));
 
-    // Memorized portion: choose juz 30, then skip the step.
     fireEvent.press(view.getByLabelText("Juz 30"));
     expect(view.getByLabelText("Juz 30").props.accessibilityState).toMatchObject({ checked: true });
     fireEvent.press(view.getByText(s.hifzNotNow));
 
-    // Review tracks: choose ayah cards, then skip the step.
     fireEvent.press(view.getByText(s.hifzUnitAyah));
     fireEvent.press(view.getByText(s.hifzNotNow));
 
-    // Going back shows both steps as they were before the skipped changes.
     fireEvent.press(view.getByText(s.hifzBack));
     expect(view.getByRole("radio", { name: new RegExp(s.hifzUnitPage) }).props.accessibilityState).toMatchObject({ checked: true });
     expect(view.getByRole("radio", { name: new RegExp(s.hifzUnitAyah) }).props.accessibilityState).toMatchObject({ checked: false });
@@ -92,7 +86,6 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
 
   beforeEach(() => jest.mocked(applyHifzSetup).mockClear());
 
-  /** Open the flow on the pace step, where the counts are edited. */
   async function openPace(initialPlan: HifzPlan | null, language: "en" | "ar" = "en") {
     const text = strings[language];
     const view = render(
@@ -132,7 +125,6 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
     );
     await act(async () => {});
     for (let step = 0; step < 2; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
-    // On the tracks step: choose ayah, then skip the step, which drops that choice.
     fireEvent.press(radio(view, s.hifzUnitAyah));
     fireEvent.press(view.getByText(s.hifzNotNow));
     expect(view.getByText(s.hifzPaceTitle)).toBeTruthy();
@@ -155,8 +147,6 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
 
   it("saves the 20-times preset with the edited plan", async () => {
     const view = await openPace(savedPlan);
-    // Each set of choices is one labelled group for screen readers. The group is not itself an
-    // accessible element (that would hide its options on iOS), so it is found by its props.
     const groups = view.UNSAFE_getAllByProps({ accessibilityRole: "radiogroup" }).map((node) => node.props.accessibilityLabel);
     expect(groups).toEqual(expect.arrayContaining([s.hifzPaceTitle, s.hifzRepsTitle]));
     expect(checked(view, s.hifzRepsLookingThenMemory)).toBe(true);
@@ -176,7 +166,6 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
     expect(checked(view, s.hifzRepsCustom)).toBe(true);
     for (let tap = 0; tap < 5; tap += 1) fireEvent.press(view.getByLabelText("More: Reads while looking"));
     expect(view.getByText("15")).toBeTruthy();
-    // Clean in a row stops at 1 and listening at 5.
     for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("Fewer: Clean recitations"));
     expect(view.getByLabelText("Fewer: Clean recitations").props.accessibilityState).toMatchObject({ disabled: true });
     for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("More: Listens"));
@@ -240,7 +229,6 @@ describe("the notice after saving a plan (7.6)", () => {
     expect(setupSavedNotice({ ...base, unitSwitched: true, plan: { ...DEFAULT_HIFZ_PLAN, unit: "ayah" } }, strings.en, "en")).toBe(
       strings.en.hifzPlanSavedToAyat,
     );
-    // Page to half page applies to the next review, not from tomorrow.
     expect(setupSavedNotice({ ...base, unitChanged: true, plan: { ...DEFAULT_HIFZ_PLAN, unit: "half" } }, strings.en, "en")).toBe(
       strings.en.hifzPlanSavedUnitHalf,
     );
@@ -280,7 +268,6 @@ describe("HifzSetupFlow save and surah list recovery", () => {
     fireEvent.press(view.getByLabelText("Juz 30"));
     for (let step = 0; step < 3; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
     fireEvent.press(view.getByText(s.hifzSaveMemorized));
-    // Pending: both controls report busy and Back cannot leave the step.
     expect(view.getByText(s.hifzSaving)).toBeTruthy();
     const back = view.getByRole("button", { name: s.hifzBack });
     expect(back.props.accessibilityState).toMatchObject({ busy: true, disabled: true });

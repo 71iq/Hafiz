@@ -25,7 +25,6 @@ type TestDocument = {
   documentElement: object;
 };
 
-// Google's published dark and light button outlines.
 const GOOGLE_DARK_BORDER = "#8E918F";
 const GOOGLE_LIGHT_BORDER = "#747775";
 

@@ -118,7 +118,6 @@ describe("account sync restore contract", () => {
   });
 });
 
-// ─── W07 restore consent behavior against real SQLite ──────────────────────
 
 const USER_A = "00000000-0000-4000-8000-0000000000a1";
 const USER_B = "00000000-0000-4000-8000-0000000000b2";
@@ -364,7 +363,6 @@ describe("W07 restore consent", () => {
     const result = await fullSync(restoreDb);
 
     expect(result).toMatchObject({ status: "synced", accountRestored: true });
-    // Still replaced: the derived key and the dormant queue belong to the replaced scope.
     expect(setting("device_hifz_today_plan")).toBeUndefined();
     expect(sql.prepare("SELECT COUNT(*) AS count FROM qf_sync_queue").get()).toEqual({ count: 0 });
   });
@@ -422,7 +420,6 @@ describe("W07 restore consent", () => {
     expect(setting(`sync_account_restore_${USER_A}_20260614_account_restore_v1`)).toBe("true");
     expect(mockUploads.some((upload) => upload.table === "bookmarks")).toBe(false);
     expect(mockRequests.some((request) => request.incremental)).toBe(true);
-    // One use only.
     await expect(acceptRestoreConsent(restoreDb, request.token)).resolves.toMatchObject({
       status: "restore_consent_invalid",
     });
@@ -498,7 +495,6 @@ describe("W07 restore consent", () => {
     const original = sql.prepare.bind(sql);
     let switched = false;
     jest.spyOn(sql, "prepare").mockImplementation((source: string) => {
-      // The first destructive statement of the replacement runs after the fingerprint matched.
       if (!switched && source.startsWith("DELETE FROM study_cards")) {
         switched = true;
         signIn(USER_B);
@@ -523,18 +519,15 @@ describe("W07 restore consent", () => {
     await expect(acceptRestoreConsent(restoreDb, request.token)).resolves.toMatchObject({
       status: "restore_consent_invalid",
     });
-    // A restart loses memory but not the stored pause; every automatic run stops before remote work.
     clearRestoreConsentRequests();
     mockRequests.length = 0;
     await expect(fullSync(restoreDb)).resolves.toMatchObject({ status: "sync_paused", pause: "cancelled" });
     expect(mockRequests).toEqual([]);
     expect(localState()).toEqual(before);
 
-    // Account B is not paused by account A's marker.
     signIn(USER_B);
     expect(await readRestorePause(restoreDb, USER_B)).toBeNull();
 
-    // Back on A, only an explicit resume fetches a fresh snapshot and asks again.
     signIn(USER_A);
     const resumed = await fullSync(restoreDb, { resume: true });
     expect(resumed.status).toBe("needs_restore_consent");

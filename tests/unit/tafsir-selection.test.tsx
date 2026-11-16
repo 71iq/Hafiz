@@ -25,7 +25,6 @@ const mockRemoteAccess = jest.fn<never, unknown[]>(() => {
 });
 const mockDatabase = {
   getFirstAsync: jest.fn(async () => null),
-  // Qurtubi is complete on this device; Al-Razi needs a download.
   getAllAsync: jest.fn(async () => [{ source: "qurtubi", count: 6234 }]),
   runAsync: jest.fn(() => {
     throw new Error("Database writes forbidden in selection fixture");
@@ -201,7 +200,6 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
   });
   afterEach(async () => {
     try {
-      // Settle any import a test left running so it cannot leak into the next one.
       await act(async () => pending.resolve());
       cleanup();
       expect(mockRemoteAccess).not.toHaveBeenCalled();

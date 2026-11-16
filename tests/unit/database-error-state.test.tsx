@@ -40,7 +40,6 @@ jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   return { ...actual, useSettings: () => mockSettings };
 });
-// The navigation module needs native Worklets and must never mount before database readiness.
 jest.mock("@/components/ui/AppNavigation", () => ({
   AppNavigation: jest.fn(() => {
     throw new Error("Navigation must not mount before database readiness");
@@ -83,7 +82,6 @@ describe("route database-error presentation", () => {
       const contextLanguage: Language = language === "ar" ? "en" : "ar";
       mockSettings.uiLanguage = contextLanguage;
       jest.replaceProperty(I18nManager, "isRTL", language === "ar");
-      // The startup owner reads the device locale on native.
       const RealDateTimeFormat = Intl.DateTimeFormat;
       jest.spyOn(Intl, "DateTimeFormat").mockImplementation(((
         ...args: ConstructorParameters<typeof Intl.DateTimeFormat>
@@ -114,7 +112,6 @@ describe("route database-error presentation", () => {
         expect(flattenStyle(title.props.style)).toEqual(
           expect.objectContaining({ fontFamily: "Manrope_700Bold", fontSize: 18 }),
         );
-        // The raw error stays behind Show details until asked for.
         expect(view.queryByText(message)).toBeNull();
         fireEvent.press(view.getByText(s.databaseShowDetails));
         expect(view.getByText(message)).toBeTruthy();

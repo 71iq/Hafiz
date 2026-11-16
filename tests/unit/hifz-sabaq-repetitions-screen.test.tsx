@@ -13,7 +13,6 @@ import { loadSecondLooks, nextSabaqTarget, saveSabaqCleanRun, type SabaqTarget }
 import { similarGroupsForAyahs, withMemorizedSiblings } from "@/lib/hifz/similar";
 import { strings } from "@/lib/i18n/strings";
 
-/** SBQ-01: the sabaq steps follow the repetition counts saved in the plan, not fixed numbers. */
 
 const s = strings.en;
 const mockDatabase = {
@@ -168,14 +167,12 @@ describe("sabaq repetition counts (SBQ-01)", () => {
     await openWith({ listen: 2, looking: 20, cleanInARow: 5 });
     press(s.hifzSabaqNext);
 
-    // Listening: the hint and the player use the plan's count.
     expect(screen.getByText("Listen while you follow the text. Repeats: 2.")).toBeTruthy();
     press(s.hifzSabaqPlay);
     expect(mockAudio.playRange).toHaveBeenCalledWith({ ayahs: target.ayahs, repeatRange: 2 });
     press(s.hifzSabaqNext);
     press(s.hifzSabaqNext);
 
-    // Reading while looking: Next appears only after the 20th reading.
     expect(screen.getByText("0 of 20")).toBeTruthy();
     for (let reading = 0; reading < 19; reading += 1) press(s.hifzSabaqReadOnce);
     expect(screen.getByText("19 of 20")).toBeTruthy();
@@ -185,7 +182,6 @@ describe("sabaq repetition counts (SBQ-01)", () => {
     expect(nextShown()).toBe(true);
     press(s.hifzSabaqNext);
 
-    // The one ayah, then the whole lines five clean times in a row.
     press(s.hifzDrillShow);
     press(s.hifzSabaqClean);
     expect(screen.getByText(s.hifzSabaqStepChunk)).toBeTruthy();
@@ -198,7 +194,6 @@ describe("sabaq repetition counts (SBQ-01)", () => {
     expect(saveSabaqCleanRun).not.toHaveBeenCalled();
     press(s.hifzDrillShow);
     press(s.hifzSabaqClean);
-    // The fifth saves the chunk (SBQ-02), then the lesson moves on.
     await flush();
     expect(saveSabaqCleanRun).toHaveBeenCalledTimes(1);
     expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();

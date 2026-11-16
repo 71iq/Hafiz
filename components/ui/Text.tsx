@@ -7,22 +7,18 @@ import { useUIDirection, textAlignStyle, type Direction } from "@/lib/ui/directi
 const textVariants = cva("text-charcoal dark:text-neutral-200", {
   variants: {
     variant: {
-      // Headlines — Noto Serif
       "display-lg": "font-noto-serif-bold text-4xl leading-tight",
       "display-md": "font-noto-serif-bold text-3xl leading-tight",
       "display-sm": "font-noto-serif-medium text-2xl leading-snug",
       headline: "font-noto-serif-medium text-xl leading-snug",
-      // Body — Manrope
       "title-lg": "font-manrope-bold text-lg",
       "title-md": "font-manrope-semibold text-base",
       "title-sm": "font-manrope-semibold text-sm",
       body: "font-manrope text-base leading-relaxed",
       "body-sm": "font-manrope text-sm leading-relaxed",
-      // Labels
       "label-lg": "font-manrope-medium text-sm",
       "label-md": "font-manrope-medium text-xs",
       "label-sm": "font-manrope-medium text-[10px] tracking-wider uppercase",
-      // Muted: neutral-400 in dark themes reads at 4.5:1 or more on cards as well as the page.
       muted: "font-manrope text-sm text-warm-400 dark:text-neutral-400",
       caption: "font-manrope text-xs text-warm-400 dark:text-neutral-400",
     },

@@ -4,11 +4,6 @@ import type { ProfileSurahProgress } from "@/lib/profile/progress";
 import { useAuthStore } from "@/lib/auth/store";
 import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 
-/**
- * After daily_scores and the public profile totals were retired (spec 5.6), the post-sync job only
- * repairs this account's own surah progress. It must stay bound to the account that started it and
- * must never write scores, streaks or totals.
- */
 type Operation = { table: string; kind: "select" | "upsert" | "delete"; data?: unknown; filters: Array<[string, unknown]> };
 
 const mockOperations: Operation[] = [];

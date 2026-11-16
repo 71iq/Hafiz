@@ -20,23 +20,13 @@ type Props = {
   cancelLabel: string;
   confirmLabel: string;
   destructive?: boolean;
-  /**
-   * "warning" shows the alert icon and "info" an Info icon in the primary accent. Without a tone,
-   * destructive dialogs warn and the rest inform. "neutral" leaves the icon out, for a calm
-   * confirmation such as leaving a review whose grades are already saved.
-   */
   tone?: "warning" | "info" | "neutral";
-  /** "cancel" fills the cancel button instead, when staying is the choice to encourage. */
   emphasis?: "confirm" | "cancel";
-  /** The item the action affects, such as a card title, shown above the message. */
   itemName?: string;
   confirmLoading?: boolean;
-  /** Verb shown beside the spinner while confirming, such as "Logging out...". */
   pendingLabel?: string;
-  /** Confirm label after an error. Defaults to "Try again". */
   retryLabel?: string;
   confirmDisabled?: boolean;
-  /** An error keeps the dialog, its target and this message until the person retries or cancels. */
   error?: string | null;
   isDark: boolean;
   isRTL?: boolean;

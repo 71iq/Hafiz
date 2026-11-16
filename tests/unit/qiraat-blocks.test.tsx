@@ -66,7 +66,6 @@ describe.each(locales)("Qiraat content in $language at $width", ({ language, wid
   it.each([true, false])("preserves literal block rows with showHeader=%s", async (showHeader) => {
     jest.mocked(fetchQiraat).mockResolvedValue({ ...row, text: showHeader ? row.text : `قرئ: ${firstBody}` });
     const view = render(<QiraatTab surah={2} ayah={3} showHeader={showHeader} />);
-    // The read is local, so no "Loading..." flashes before it settles.
     expect(view.queryByText(strings[language].loading)).toBeNull();
     const first = await view.findByText(firstBody, { normalizer: (value) => value });
     const title = view.queryByText(heading);
@@ -85,7 +84,6 @@ describe.each(locales)("Qiraat content in $language at $width", ({ language, wid
       expect(flattenStyle(body.props.style)).toEqual({ writingDirection: "rtl", textAlign: "right" });
     }
     if (title) expect(title.props.className).toBe("text-lg text-primary-accent dark:text-primary-bright mb-1.5");
-    // The source is a heading with showHeader, otherwise a muted footnote at the end of the panel.
     expect(view.getByText(strings[language].qiraatHeader)).toBeTruthy();
     expect(view.getByText(coversRange(language))).toBeTruthy();
     const tree = view.toJSON();

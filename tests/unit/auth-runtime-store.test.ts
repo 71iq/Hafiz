@@ -242,7 +242,6 @@ async function setup(
       if (name === key && nextWrite) {
         const held = nextWrite;
         nextWrite = undefined;
-        // The raw write has committed; hold its return before SDK notification.
         held.committed();
         await held.wait;
       }
@@ -429,13 +428,13 @@ function gateNextSdkSessionRead(runtime: ReturnType<typeof createRootAuthRuntime
   Object.defineProperty(auth, "getSession", {
     configurable: true,
     value: async (...args: Parameters<typeof auth.getSession>) => {
-      await original(...args); // Finish the real read and release the SDK storage lock first.
+      await original(...args);
       if (armed) {
         armed = false;
         entered.resolve();
         await release.promise;
       }
-      return original(...args); // Read the current session after the replacement publishes.
+      return original(...args);
     },
   });
   return {
@@ -480,12 +479,12 @@ it.each(["same-user-new-session", "signout", "closed-ABA"] as const)(
     const signingInA = f.external(a);
     try {
       await gate.entered;
-      await signingInA; // A's auth callback returned while its connection is still pending.
+      await signingInA;
       if (transition === "signout") {
         expect((await f.runtime.auth.signOut()).error).toBeNull();
       } else if (transition === "closed-ABA") {
         await f.external(session(2));
-        await f.external(session(1)); // Same original identity, without provider tokens.
+        await f.external(session(1));
       } else {
         await f.external(session(1, 1));
       }
@@ -1522,7 +1521,6 @@ it("real runtime/store cancellation after validated read cannot dispatch refresh
       const current = isCurrent();
       if (armed && current) {
         armed = false;
-        // Retire after the adapter validates this read but before the SDK resumes.
         queueMicrotask(() => {
           owner.cancel();
           cancelledAfterValidation = true;
@@ -1560,8 +1558,6 @@ it("real runtime/store preserves cleanup for a refresh failure that was actually
     const listener = f.runtime.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") late();
     }).data.subscription;
-    // Drain subscriber initialization while A is still long-lived. Only the
-    // subsequent private password read may issue this failing refresh.
     await f.settleAuth();
     const near = session(1, 0, 60);
     expect(
@@ -1576,9 +1572,7 @@ it("real runtime/store preserves cleanup for a refresh failure that was actually
     expect(f.values.has(f.key + "-code-verifier")).toBe(false);
     expect(useAuthStore.getState().session).toBeNull();
     expect(late).toHaveBeenCalledTimes(1);
-    // A rejected renewal is a confirmed session end, so the profile card can say so.
     expect(useAuthStore.getState().sessionEnded).toBe(true);
-    // A deliberate sign-out on this device is not reported as an ended session.
     await useAuthStore.getState().signOut();
     expect(useAuthStore.getState().sessionEnded).toBe(false);
     listener.unsubscribe();

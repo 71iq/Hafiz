@@ -1,5 +1,3 @@
--- Remote study_log may contain duplicate rows for the same review event from
--- older sync paths. Public profile stats must count unique review events.
 
 CREATE OR REPLACE FUNCTION private.refresh_public_review_stats_for_user(target_user_id UUID)
 RETURNS VOID

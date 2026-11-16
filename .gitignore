@@ -13,7 +13,6 @@ public/data/
 .env
 .env.local
 
-# Scripts & screenshots (not part of the app)
 scrape_zilal.py
 screenshots/
 test-results/
@@ -21,7 +20,6 @@ playwright-report/
 .playwright/
 .playwright-mcp/
 
-# Original SQLite databases (pre-converted to JSON)
 assets/data/masaq/*.db
 assets/data/wbw/*.db
 
@@ -33,7 +31,6 @@ expo-env.d.ts
 .vercel
 supabase/.temp/
 
-# Local modernization evidence and single-writer loop state
 .refactor-baseline/
 .ralph/
 stop.md
@@ -45,5 +42,4 @@ android/local.properties
 .vscode/
 android/.kotlin/
 
-# Generated native dataset mirror (scripts/native-data-mirror.cjs)
 assets/native-data/

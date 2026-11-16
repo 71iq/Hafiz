@@ -9,13 +9,6 @@ import {
   type SocialRead,
 } from "@/lib/social/remote";
 
-/**
- * SB-01: offline, halaqa and board show the last state this account saw, with its date. Entries are
- * keyed by the account id, so another account on the device never reads them. The raw server payload
- * is stored and goes through the same schema as a fresh response when read back. Wird, streak and
- * plan never depend on this cache; a teacher's next sabaq (SOC-03) reads it only to choose which lines
- * a lesson offers.
- */
 const PREFIX = "hafiz_social_cache_v1";
 
 export type SocialSnapshot<T> = Readonly<{ data: T; savedAt: string; source: "network" | "cache" }>;
@@ -47,27 +40,22 @@ async function writeSocialCache(userId: string, name: string, payload: unknown, 
   try {
     await AsyncStorage.setItem(storageKey(userId, name), JSON.stringify({ savedAt, payload }));
   } catch {
-    // A full or unavailable store only loses the offline copy; the fresh result is still shown.
   }
 }
 
-/** Saves `payload` as this signed-in account's copy of `name`; "account_changed" once it is not. */
 export async function writeOwnSocialCache(userId: string, name: string, payload: unknown, savedAt: string): Promise<void> {
   const owner = requireSocialOwner(userId);
   await writeSocialCache(userId, name, payload, savedAt);
   owner.requireCurrent();
 }
 
-/** Drops the account's copy of `name`. A store that cannot remove it leaves the copy. */
 export async function forgetSocialCache(userId: string, name: string): Promise<void> {
   try {
     await AsyncStorage.removeItem(storageKey(userId, name));
   } catch {
-    // The copy stays until the next read replaces it.
   }
 }
 
-/** The saved copy of `name` for this signed-in account, or null; "account_changed" once it is not. */
 export async function readOwnSocialCache<T>(userId: string, name: string, schema: z.ZodType<T>): Promise<SocialSnapshot<T> | null> {
   const owner = requireSocialOwner(userId);
   const cached = await readSocialCache(userId, name, schema);
@@ -75,15 +63,6 @@ export async function readOwnSocialCache<T>(userId: string, name: string, schema
   return cached;
 }
 
-/**
- * Loads fresh data and keeps a copy. When the device is offline or the request cannot reach the
- * server, returns the saved copy instead; with no copy, the offline failure is rethrown. Server
- * refusals and invalid responses are never hidden behind an old copy.
- *
- * The load belongs to `userId`: it runs only while that account is signed in, sends that account's
- * token, and checks the account again before it writes or returns anything, so another account's
- * data never lands under this key.
- */
 export async function loadWithSocialCache<T>(options: {
   userId: string;
   name: string;

@@ -8,28 +8,15 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import { useSettings } from "@/lib/settings/context";
 import { errorIconColor } from "@/lib/ui/theme-icons";
 
-// The support contact published on the About and Terms pages.
 export const SUPPORT_CONTACT_URL = "mailto:support@hafizquran.app";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  /** Optional custom fallback UI rendered when an error is caught. */
   fallback?: ReactNode;
-  /** Section name used for logging context (e.g. "Mushaf", "Flashcards"). */
   section?: string;
-  /**
-   * "screen" fills its route with Retry, Go to Home and the support link. "section" is a smaller
-   * inline card for a boundary around one part of a screen or sheet, so the surrounding controls
-   * (including a sheet's close button) keep working.
-   */
   variant?: "screen" | "section";
-  /** Strings for a boundary outside the settings provider (the root route fallback). */
   strings?: UIStrings;
-  /** Shows the Go to Home action. Off where Home is not reachable or not meaningful. */
   showHome?: boolean;
 }
 
@@ -48,9 +35,6 @@ const viewStyles = StyleSheet.create({
   },
 });
 
-// ---------------------------------------------------------------------------
-// ErrorBoundary (class component — React requirement for error boundaries)
-// ---------------------------------------------------------------------------
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
@@ -73,7 +57,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   private handleHome = () => {
     this.setState({ hasError: false, error: null });
-    // The root entry decides between onboarding and Home.
     router.replace("/");
   };
 
@@ -82,7 +65,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return this.props.children;
     }
 
-    // Custom fallback takes precedence when provided.
     if (this.props.fallback) {
       return this.props.fallback;
     }
@@ -98,7 +80,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 }
 
-/** The route fallback outside the providers reads the startup strings it is given. */
 export function RouteErrorFallback({
   strings,
   onRetry,
@@ -109,8 +90,6 @@ export function RouteErrorFallback({
   return <ErrorFallback onReset={onRetry} onHome={() => router.replace("/")} variant="screen" strings={strings} />;
 }
 
-// The fallback reads strings and theme through hooks, so it follows the app language and dark themes;
-// the class body drew fixed English text in a fixed dark colour.
 function ErrorFallback({
   onReset,
   onHome,

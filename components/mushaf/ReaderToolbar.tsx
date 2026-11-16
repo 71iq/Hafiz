@@ -43,15 +43,6 @@ type Props = {
   onHelp: () => void;
 };
 
-/**
- * The reader toolbar. Below 768px (or whenever the full toolbar does not fit) it is one row of six
- * 44px targets in order: mode switch, Search, Hide/Show, Recitation, Reading settings, More, with
- * 16px gutters and 4px gaps, wrapping below 316px. More holds Bookmarks, Go to, Home, available
- * Focus, the shortcuts help and, in page mode, the Page layout choices. At wider sizes the mode
- * switch shows its short label, page mode adds a 44px direction chevron, and the other actions get
- * their own targets. Every icon has a localized name, shown as a tooltip on web hover or focus and
- * on native long press.
- */
 export function ReaderToolbar({
   viewportWidth,
   isPageMode,
@@ -87,7 +78,6 @@ export function ReaderToolbar({
     current: isPageMode ? s.mushafViewPage : s.mushafViewVerse,
     next: isPageMode ? s.mushafViewVerse : s.mushafViewPage,
   });
-  // Verse view hides ayah text; page view toggles the page reveal mode (selected state shows it is on).
   const hideLabel = isPageMode ? s.revealPageMode : hideActive ? s.readerShowAyahText : s.readerHideAyahText;
   const ModeIcon = isPageMode ? BookOpen : AlignJustify;
 
@@ -240,7 +230,6 @@ export function ReaderToolbar({
   );
 }
 
-/** A small label under a toolbar icon on web hover or focus and on native long press. */
 function ToolbarTooltip({ label, children }: { label: string; children: ReactNode }) {
   const { isDark } = useSettings();
   const [visible, setVisible] = useState(false);
@@ -269,7 +258,6 @@ export function TooltipBubble({
 }: {
   label: string;
   colors: ReturnType<typeof inverseSurfaceColors>;
-  /** Distance from the top of the anchored control. */
   offset?: number;
 }) {
   return (
@@ -305,9 +293,7 @@ function ToolbarButton({
   label: string;
   onPress: () => void;
   active?: boolean;
-  /** Set for toggle buttons, exposed as their pressed state. */
   pressed?: boolean;
-  /** The short current-mode label shown beside the icon on the wide toolbar. */
   wideLabel?: string;
   children: ReactNode;
 }) {

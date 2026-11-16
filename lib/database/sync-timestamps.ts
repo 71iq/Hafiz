@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// Zod 4.6 requires seconds in z.iso.datetime by default; minute-only timestamps (12:34Z) were and
-// remain valid sync times, so accept both forms explicitly (RF200).
 export const syncTimestampSchema = z.union([
   z.iso.datetime({ offset: true }),
   z.iso.datetime({ offset: true, precision: -1 }),

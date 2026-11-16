@@ -14,7 +14,6 @@ const DESTINATIONS: Record<
   SecondaryDestination,
   { href: Href; label: UIStringKey; hint: UIStringKey; icon: LucideIcon }
 > = {
-  // Route names stay as they are: each screen keeps its own sign-in and opt-in gates.
   halaqa: { href: "/(tabs)/halaqa", label: "tabHalaqa", hint: "navigationHalaqaHint", icon: Users },
   leaderboard: { href: "/(tabs)/leaderboard", label: "tabBoard", hint: "navigationBoardHint", icon: Trophy },
   "reflection-journey": {
@@ -25,10 +24,6 @@ const DESTINATIONS: Record<
   },
 };
 
-/**
- * Labeled entry rows for destinations that are not phone tabs (Halaqa, Board, Journey). Home and
- * Progress show them so every destination stays reachable below 768px with four tabs.
- */
 export function SecondaryDestinations({
   destinations,
   className,
@@ -36,7 +31,6 @@ export function SecondaryDestinations({
 }: {
   destinations: readonly SecondaryDestination[];
   className?: string;
-  /** Replaces a row's hint line, such as Journey's "2 / 5 completed" on Progress. */
   details?: Partial<Record<SecondaryDestination, string>>;
 }) {
   const s = useStrings();
@@ -60,7 +54,6 @@ export function SecondaryDestinations({
             className={`min-h-14 flex-row items-center gap-3 px-4 py-3 ${
               index > 0 ? "border-t border-black/5 dark:border-white/5" : ""
             }`}
-            // Web reports hover and keyboard focus on the state; both get the soft accent background.
             style={(state) => {
               const { pressed, hovered, focused } = state as typeof state & { hovered?: boolean; focused?: boolean };
               return {

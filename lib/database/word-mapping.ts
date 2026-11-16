@@ -15,8 +15,6 @@ type SourceWordMatch = {
 
 export type MappedWordRow = [number, number, number, string | null, string | null];
 
-// quran-words.com and Da'as use source-local entry indices; map by Arabic
-// text to MASAQ's canonical Mushaf word positions before storing them.
 function splitArabicParts(text: string | null | undefined): string[] {
   return String(text ?? "")
     .split(/\s+/)
@@ -24,8 +22,6 @@ function splitArabicParts(text: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
-// The first-run import scores many candidate spans for every source word (RF195). Variants and
-// span strings depend only on their inputs, so they are computed once per mapping run.
 const variantCache = new Map<string, string[]>();
 
 function arabicVariants(value: string): string[] {

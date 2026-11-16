@@ -52,11 +52,9 @@ describe("C06 target store", () => {
 
 describe("saved reading position around a jump", () => {
   it("never lets hydration or the first rendered rows turn a 2:255 jump into a saved 1:1", () => {
-    // A cold link: the explicit target arrives before the saved-position read finishes.
     const session = run("explicit-jump");
     expect(mayApplySavedPosition(session)).toBe(false);
     const settled = reducePositionSession(session, "restore-settled");
-    // Verse view first reports 1:1, then the 2:255 arrival; neither is saved until the reader engages.
     expect(mayPersistPosition(settled)).toBe(false);
     expect(mayPersistPosition(reducePositionSession(settled, "deliberate-move"))).toBe(true);
   });

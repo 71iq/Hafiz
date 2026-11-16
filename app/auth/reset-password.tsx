@@ -43,7 +43,6 @@ function createResetPasswordSchema(s: UIStrings) {
     });
 }
 
-// Provider messages stay out of the notice; each known failure has localized copy.
 function passwordResetErrorMessage(error: unknown, strings: UIStrings): string {
   switch (classifyAuthError(error).kind) {
     case "browser-unsupported":
@@ -104,7 +103,6 @@ function ResetPasswordFormScreen() {
               ? s.authResetChecking
               : null;
   const messageType = success ? "success" : checking ? "info" : "error";
-  // An expired or invalid link offers a new one instead of a dead end.
   const requestNewLink =
     invalid || recovery.state.kind === "failed"
       ? { label: s.authResetRequestNew, onPress: () => router.replace("/auth/forgot-password") }

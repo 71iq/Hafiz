@@ -1,12 +1,7 @@
-/**
- * W14 settings, public pages, support and release notes. Spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity.
- */
 export const settingsPublicStrings = {
   en: {
-    // General
     settingsThemeResolved: "Now: {{theme}}",
     settingsViewModeHint: "Pages follow the printed Madani Mushaf.",
-    // Content
     contentDownloading: "Downloading...",
     contentImporting: "Importing...",
     translationPickerOnDevice: "On this device",
@@ -16,7 +11,6 @@ export const settingsPublicStrings = {
     translationSearchEmpty: "No matching languages",
     translationTryAgain: "Try again",
     tafsirOfflineTag: "Offline",
-    // Account and sync
     accountSyncTitle: "Sync",
     accountLastSynced: "Last synced: {{time}}",
     accountNotSyncedYet: "Not synced yet on this device",
@@ -37,7 +31,6 @@ export const settingsPublicStrings = {
     logoutPendingCount: "Changes not yet synced: {{count}}",
     logoutPendingUnknown: "The number of changes not yet synced could not be checked.",
     logoutPendingChecking: "Checking changes not yet synced...",
-    // About
     settingsAboutGroupApp: "App",
     settingsAboutGroupHafiz: "Hafiz",
     settingsAboutGroupLegal: "Legal",
@@ -51,7 +44,6 @@ export const settingsPublicStrings = {
       "Copy this link and open it in your browser. Nothing is sent until you submit the form on GitHub.",
     issueCopyLink: "Copy link",
     linkCopied: "Link copied",
-    // Mascot preview (development only)
     zaytPreviewPlay: "Play",
     zaytPreviewPause: "Pause",
     zaytPreviewRetry: "Retry",

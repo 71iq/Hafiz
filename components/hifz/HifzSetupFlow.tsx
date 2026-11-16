@@ -70,7 +70,6 @@ function prayerLabel(prayer: Prayer, s: UIStrings): string {
   }
 }
 
-/** The chosen time in words for the implementation intention (ANC-01): "After Fajr", "In the morning". */
 function anchorPhrase(anchor: Anchor, language: "en" | "ar", s: UIStrings): string {
   if (anchor.kind === "prayer") return interpolate(s.hifzAfterPrayer, { prayer: prayerLabel(anchor.prayer, s) });
   if (anchor.minutes === 8 * 60) return s.hifzWhenInMorning;
@@ -85,7 +84,6 @@ type StepEntry = Readonly<{
   preset: PlanPreset | null;
   surahs: Set<number>;
   juz: Set<number>;
-  /** The unit chosen on the tracks step, so skipping that step does not leave its choice behind. */
   chosenUnit: HifzPlan["unit"];
 }>;
 
@@ -101,7 +99,6 @@ function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: 
         {title}
       </Text>
       {hint ? (
-        // Readable on the selected teal tint in both themes; the shared caption tone is lighter.
         <Text variant="caption" className="mt-0.5 text-warm-700 dark:text-neutral-400" style={{ lineHeight: 18 }}>
           {hint}
         </Text>
@@ -110,7 +107,6 @@ function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: 
   );
 }
 
-/** A count with 44 px fewer and more buttons; the pair mirrors in RTL like the reading steppers. */
 function CountStepper({
   label,
   value,
@@ -161,7 +157,6 @@ function CountStepper({
           <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }} className="text-charcoal dark:text-neutral-100">
             {formatNumber(value, language)}
           </Text>
-          {/* A web live region reads its text, not its label, so the label travels with the value there. */}
           <Text style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 }}>{`${label}: ${formatNumber(value, language)}`}</Text>
         </View>
         {step(1, value >= max, s.hifzRepsMore)}
@@ -170,10 +165,6 @@ function CountStepper({
   );
 }
 
-/**
- * SBQ-01: how many times sabaq has the user listen, read while looking and recite cleanly. Two
- * presets or custom counts; custom stays chosen once opened, even when its counts match a preset.
- */
 function SabaqRepetitionsSection({
   value,
   onChange,
@@ -244,29 +235,22 @@ function SabaqRepetitionsSection({
   );
 }
 
-/** What a saved setup changed, for the screen that shows the saved notice. */
 export type SetupSaved = Readonly<{
   plan: HifzPlan;
   declaredPages: number;
-  /** Pages made from reviewed ayah cards by a switch to page review (7.6). */
   migratedPages: number;
-  /** No plan was saved before: the wird starts today. */
   firstPlan: boolean;
-  /** The recitation unit changed between page and ayah review. */
   unitSwitched: boolean;
-  /** The recitation unit changed at all, page and half page included; it applies at once. */
   unitChanged: boolean;
   repetitionsChanged: boolean;
 }>;
 
-/** What the saved notice says after editing a plan: only what this save changes, and when (7.6). */
 export function setupSavedNotice(saved: SetupSaved, s: UIStrings, language: "en" | "ar"): string {
   if (saved.firstPlan) return s.hifzPlanSavedFirst;
   if (saved.unitSwitched && saved.plan.unit === "ayah") return s.hifzPlanSavedToAyat;
   if (saved.unitSwitched && saved.migratedPages > 0) {
     return interpolate(s.hifzPlanSavedToPages, { pages: formatPages(saved.migratedPages, language) });
   }
-  // A unit change applies to the next review at once, not from tomorrow.
   if (saved.unitChanged) return saved.plan.unit === "half" ? s.hifzPlanSavedUnitHalf : s.hifzPlanSavedUnitPage;
   return saved.repetitionsChanged && saved.plan.method !== "review_only" ? s.hifzPlanSaved : s.hifzPlanSavedReview;
 }
@@ -276,24 +260,17 @@ type Props = {
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
-  /** The plan to start from, when editing; null starts from the defaults. */
   initialPlan: HifzPlan | null;
   onDone: (result: SetupSaved) => void;
   onCancel?: () => void;
 };
 
-/**
- * Hifz setup (5.1 steps 2 to 6): goal, memorized portion, review tracks (UNIT-02), pace (4.3.2)
- * and the time anchor (ANC-01). Every step can be skipped with sensible defaults (ONB-06).
- */
 export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, onCancel }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const [stepIndex, setStepIndex] = useState(0);
-  // Editing starts from the saved plan as it is: its goal, and its preset only while it still matches.
   const [goal, setGoal] = useState<Goal>(initialPlan?.method === "review_only" ? "keep" : "both");
   const [plan, setPlan] = useState<HifzPlan>(initialPlan ?? applyPreset(DEFAULT_HIFZ_PLAN, "part_time_adult"));
   const [preset, setPreset] = useState<PlanPreset | null>(initialPlan ? presetOf(initialPlan) : "part_time_adult");
-  // The unit chosen on the tracks step. "Short surahs" reviews ayah by ayah; another pace brings this back.
   const [chosenUnit, setChosenUnit] = useState<HifzPlan["unit"]>(
     initialPlan && presetOf(initialPlan) !== "short_surahs" ? initialPlan.unit : DEFAULT_HIFZ_PLAN.unit,
   );
@@ -307,14 +284,12 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   const [prayerTimesOpen, setPrayerTimesOpen] = useState(false);
   const [prayerLocation, setPrayerLocation] = useState<PrayerLocation | null>(null);
   const step = STEPS[stepIndex];
-  // What the current step showed when it opened, so "Not now" can leave it untouched.
   const stepEntry = useRef<StepEntry | null>(null);
   const goToStep = (index: number) => {
     stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit };
     setStepIndex(index);
   };
 
-  // The surah list loads once per attempt; Retry starts a new attempt and a stale one is ignored.
   useEffect(() => {
     let active = true;
     setSurahsState("loading");
@@ -333,12 +308,10 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     };
   }, [db, surahsAttempt]);
 
-  // Saving is announced once when it starts, beside the busy state on both buttons.
   useEffect(() => {
     if (saving) AccessibilityInfo.announceForAccessibility?.(s.setupSavingAnnouncement);
   }, [saving, s.setupSavingAnnouncement]);
 
-  // The optional prayer-times row says whether a location is already saved on this device.
   useEffect(() => {
     if (step !== "when") return;
     let active = true;
@@ -363,7 +336,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      // The atomic save is in flight: stay on this step until it finishes or fails.
       if (saving) return true;
       if (stepIndex === 0 && !onCancel) return false;
       back();
@@ -373,7 +345,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   }, [back, onCancel, saving, stepIndex]);
 
   const chooseGoal = (next: Goal) => {
-    // Tapping the goal already chosen changes nothing, so it does not reset the saved pace.
     if (next === goal) return;
     setGoal(next);
     const nextPreset: PlanPreset = next === "keep" ? "maintenance" : "part_time_adult";
@@ -415,7 +386,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     else save();
   };
 
-  /** Skip this step: undo any change made on it, then move on with what it showed when it opened. */
   const skip = () => {
     const entry = stepEntry.current;
     if (entry) {
@@ -452,7 +422,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   }, [s, step]);
 
   return (
-    // The footer stays above the keyboard while the surah search is focused; dragging the list closes it.
     <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView
         contentContainerStyle={{ padding: 20, gap: 16 }}
@@ -526,7 +495,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                 />
               ))}
             </View>
-            {/* Editing a plan: a switch of unit keeps what was learned (7.6). */}
             {initialPlan ? (
               <Text dir={dir} variant="caption" className="text-warm-700 dark:text-neutral-400" style={{ lineHeight: 18 }}>
                 {s.hifzUnitSwitchKeepsSchedule}
@@ -559,13 +527,11 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                   title={presetLabel(candidate, s)}
                   hint={
                     interpolate(s.hifzPresetSummary, { minutes: formatMinutes(applyPreset(plan, candidate).dailyBudgetMin, language) }) +
-                    // Said only while it is true: chosen, the card describes the plan as it will be saved.
                     (candidate === "short_surahs" && (preset !== candidate || plan.unit === "ayah") ? `. ${s.hifzPresetAyahByAyah}` : "")
                   }
                   selected={preset === candidate}
                   onPress={() => {
                     setPreset(candidate);
-                    // "Short surahs" reviews ayah by ayah; any other pace keeps the unit chosen on step 3.
                     setPlan((value) => {
                       const next = applyPreset(value, candidate);
                       return candidate === "short_surahs" ? next : { ...next, unit: chosenUnit };
@@ -574,7 +540,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                 />
               ))}
             </View>
-            {/* Only when editing a saved plan: onboarding keeps the default counts (5.1, ONB-01). */}
             {initialPlan && goal !== "keep" && plan.method !== "review_only" ? (
               <SabaqRepetitionsSection
                 value={plan.sabaqRepetitions}
@@ -629,8 +594,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                 );
               })}
             </MirroredRow>
-            {/* 5.1 step 7: a prayer anchor needs prayer times; without them it falls back to set clock times.
-                The setup stays one optional row until asked for, so the anchor choice and Save lead the step. */}
             {plan.anchor.kind === "prayer" ? (
               <Card elevation="low" className="mt-2 px-4 py-3">
                 <MirroredRow dir={dir} className="min-h-[44px] items-center gap-3">
@@ -676,7 +639,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
           onPress={next}
           disabled={saving}
           accessibilityState={{ busy: saving, disabled: saving }}
-          // Long labels wrap and the button grows instead of shrinking the text.
           className="h-auto min-h-[44px] py-2.5"
         />
         <MirroredRow dir={dir} className="items-center justify-between">

@@ -15,7 +15,6 @@ type Props = {
   canRevealNext: boolean;
   canHidePrevious: boolean;
   autoRunning: boolean;
-  /** Every ayah on the page is shown: Play gives way to Page revealed, Repeat and Next page. */
   pageComplete: boolean;
   onRevealNext: () => void;
   onRevealNextWord: () => void;
@@ -23,7 +22,6 @@ type Props = {
   onStartAuto: () => void;
   onStopAuto: () => void;
   onRepeatPage: () => void;
-  /** Absent on the last page. */
   onNextPage?: () => void;
 };
 
@@ -31,7 +29,6 @@ const HIFZ_AUTO_DELAY_OPTIONS_MS = [
   5000, 4750, 4500, 4250, 4000, 3750, 3500, 3250, 3000, 2750, 2500, 2250, 2000, 1750, 1500, 1250, 1000, 750, 500, 333, 250,
 ] as const;
 
-/** Seconds between words: "0.5s" in English, "٠٫٥ ث" in Arabic. */
 export function formatSecondsPerWord(ms: number, isRTL: boolean, template: string) {
   const seconds = Math.round(ms / 10) / 100;
   const text = String(Number(seconds.toFixed(2)));
@@ -63,7 +60,6 @@ function RailButton({
   disabled?: boolean;
   label: string;
   hint?: string;
-  /** A visible word under the button, shown on wide screens. */
   caption?: string;
   tone?: "neutral" | "positive" | "negative" | "active";
   onPress: () => void;

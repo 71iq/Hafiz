@@ -89,7 +89,6 @@ describe("Reflection Journey queries without sequential locks", () => {
     expect(row("level-1")).toBeUndefined();
     expect(row("level-2")).toMatchObject({ status: "draft", response_text: "short" });
 
-    // The draft wins the shared default that Home also shows.
     const summary = await getReflectionJourneySummary(store.db);
     expect(summary).toMatchObject({ totalLevels: 3, completedLevels: 1, currentLevelId: "level-2" });
   });
@@ -113,7 +112,6 @@ describe("Reflection Journey queries without sequential locks", () => {
       completed_at: completedAt,
     });
 
-    // The draft path on a completed level applies the same completion limits.
     await expect(saveReflectionJourneyDraft(store.db, "level-1", "short")).rejects.toThrow("at least 10");
     expect(row("level-1")?.response_text).toBe("an edited full reflection");
   });

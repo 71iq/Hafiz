@@ -11,7 +11,6 @@ const state = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 const wireMetadata = { user_id: identity.optional(), synced_at: optionalTimestamp };
 const dates = { created_at: optionalTimestamp, updated_at: optionalTimestamp, deleted_at: optionalTimestamp };
 const coordinates = { surah: position, ayah: position };
-// PostgreSQL int8 identities can exceed JS's safe-number range. Keep decimal strings exact.
 const databaseIdString = z
   .string()
   .refine((value) => /^[1-9]\d{0,18}$/.test(value) && (value.length < 19 || value <= "9223372036854775807"));
@@ -25,7 +24,6 @@ const jsonText = z.string().refine((value) => {
   }
 });
 const jsonContainer = z.union([jsonText, z.array(z.json()), z.record(z.string(), z.json())]);
-// SQLite stores flags as 0/1 and the server as booleans; accept both on the wire.
 const flag = z.union([z.boolean(), z.literal(0), z.literal(1)]);
 const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const nonNegative = integer.min(0);
@@ -97,7 +95,6 @@ const bookmark = z.object({
   qf_bookmark_id: z.string().nullish(),
   qf_synced_at: optionalTimestamp,
   qf_sync_error: z.string().nullish(),
-  // SQLite backfill uses 0/1; current write helpers and remote rows use booleans.
   qf_is_in_default_collection: z.union([z.boolean(), z.literal(0), z.literal(1)]).nullish(),
   qf_collections_count: integer.nullish(),
 });
@@ -111,7 +108,6 @@ const highlight = z.object({
   word_end: position.nullish(),
   color: identity,
   created_at: timestamp,
-  // Empty updated_at is an established legacy deletion contract.
   updated_at: z.union([timestamp, z.literal("")]).nullish(),
 });
 const note = z.object({
@@ -304,7 +300,6 @@ const incomingSchemas = {
   study_cards: z.union([liveCard.passthrough(), deletedCard.passthrough()]),
   user_word_meanings: z.union([meaning.passthrough(), deletedMeaning.passthrough()]),
   highlights: z.union([highlight.passthrough(), deletedHighlight.passthrough()]),
-  // Keep ignored settings in page counts without pretending their values were validated.
   user_settings: incomingSetting,
   study_log: log.passthrough(),
   bookmarks: bookmark.passthrough(),
@@ -341,7 +336,6 @@ export function decodeSyncPage<K extends SyncTable>(table: K, input: unknown, ow
     requireOwner(row, ownerId, table);
     const result = incomingSchemas[table].safeParse(row);
     if (!result.success) fail(table);
-    // The schema is selected by the same key as the mapped return type.
     return result.data as SyncRows[K];
   });
 }
@@ -469,7 +463,6 @@ export type DecodedSyncEntry = {
   operation: "INSERT" | "UPDATE" | "DELETE";
   rowId: string;
   data: Record<string, unknown>;
-  /** When the change was queued; the honest time for a legacy tombstone without deleted_at. */
   queuedAt: string;
 };
 export function decodeSyncQueueEntry(input: unknown, ownerId: string): DecodedSyncEntry {
@@ -492,7 +485,6 @@ export function decodeSyncQueueEntry(input: unknown, ownerId: string): DecodedSy
   if (table === "user_settings" && !isSyncableUserSetting(String(data.key ?? entry.row_id))) fail(table);
   requireIdentity(table, entry.row_id, data, deletion);
   if (deletion) {
-    // These existing DELETE branches dispatch tombstone upserts, so they need complete rows.
     const needsRow =
       (table === "user_word_meanings" && data.surah !== undefined) ||
       (table === "study_cards" && data.deck_id !== undefined) ||
@@ -517,7 +509,6 @@ const freshness = z.object({
 });
 const highlightFreshness = freshness.extend({ updated_at: z.union([timestamp, z.literal("")]).nullish() });
 
-/** A freshness projection may suppress an upload, so malformed data must never mean ACK. */
 export function decodeSyncFreshness(table: SyncTable, input: unknown, ownerId: string): string | null {
   if (!Array.isArray(input) || input.length > 1) fail(table);
   if (input.length === 0) return null;
@@ -536,7 +527,6 @@ export function decodeSyncFreshness(table: SyncTable, input: unknown, ownerId: s
 
 const cardReview = z.object({ last_review: optionalTimestamp });
 
-/** A card's freshness and review time: an upload reviewed later still brings its schedule. */
 export function decodeStudyCardFreshness(
   input: unknown,
   ownerId: string,

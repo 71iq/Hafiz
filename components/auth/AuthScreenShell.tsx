@@ -25,9 +25,7 @@ import { PERSISTENT_SIDEBAR_BREAKPOINT, SIDEBAR_BREAKPOINT } from "@/lib/ui/view
 
 const logoSource = require("@/assets/images/logo.png");
 
-/** Space kept below a focused field so the next field or the submit button can stay visible. */
 const FIELD_REVEAL_OFFSET = 112;
-/** Tablet single-form card width. */
 const TABLET_CARD_MAX_WIDTH = 520;
 
 type AuthScreenShellProps = {
@@ -38,7 +36,6 @@ type AuthScreenShellProps = {
   brandHeadline: string;
   backLabel: string;
   onBack: () => void;
-  /** Accessible name of the language toggle group. */
   languageLabel?: string;
   icon?: React.ReactNode;
   children: React.ReactNode;
@@ -48,21 +45,15 @@ type AuthScreenShellProps = {
 
 type AuthLayout = "phone" | "tablet" | "desktop";
 
-/** Two columns only from the 1024px sidebar breakpoint; 768-1023 shows one centered form card. */
 export function authLayoutForWidth(width: number): AuthLayout {
   if (width >= PERSISTENT_SIDEBAR_BREAKPOINT) return "desktop";
   if (width >= SIDEBAR_BREAKPOINT) return "tablet";
   return "phone";
 }
 
-// A focused TextInput host instance (or a legacy numeric tag), as ScrollView accepts both.
 type FieldHandle = object | number;
 const RevealContext = createContext<(handle: FieldHandle | null) => void>(() => {});
 
-/**
- * Returns an onFocus handler that scrolls the focused field above the on-screen keyboard. Native
- * only: browsers scroll focused inputs into view themselves.
- */
 export function useRevealOnFocus() {
   const reveal = useContext(RevealContext);
   return useCallback(
@@ -75,7 +66,6 @@ export function useRevealOnFocus() {
   );
 }
 
-/** Semantic colors for auth icons, following the active theme (White, Beige, Dark, AMOLED, System). */
 export function useAuthIconColors(): { muted: string; accent: string; error: string; theme: ThemePalette } {
   const { effectiveTheme } = useSettings();
   return {
@@ -116,7 +106,6 @@ export function AuthScreenShell({
     scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(handle, FIELD_REVEAL_OFFSET, true);
   }, []);
 
-  // A field focused before the keyboard opens is measured again once the keyboard has a height.
   useEffect(() => {
     if (Platform.OS === "web") return;
     const subscription = Keyboard.addListener("keyboardDidShow", () => {
@@ -247,10 +236,6 @@ export function AuthScreenShell({
 
 type NoticeTone = "error" | "success" | "info";
 
-/**
- * A form-level notice: server results, not field errors (those sit under their field). Starts with
- * an icon, start-aligns its text and is announced politely once by assistive technology.
- */
 export function AuthFormNotice({
   message,
   tone = "error",
@@ -329,7 +314,6 @@ export function AuthFormNotice({
   );
 }
 
-/** A text link with a 44px tall target, used for Forgot password and Back to Log In. */
 export function AuthTextLink({
   label,
   onPress,
@@ -343,7 +327,6 @@ export function AuthTextLink({
   align?: "start" | "end" | "center";
   disabled?: boolean;
 }) {
-  // Physical alignment under a pinned ltr row: the end side is right in English and left in Arabic.
   const alignItems =
     align === "center" ? "center" : (align === "end") === (dir === "rtl") ? "flex-start" : "flex-end";
   return (
@@ -549,7 +532,6 @@ function TopBar({
   );
 }
 
-/** Desktop brand panel: logo, wordmark and headline only. */
 function BrandPanel({ appName, headline, dir }: { appName: string; headline: string; dir: Direction }) {
   return (
     <View

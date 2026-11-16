@@ -9,10 +9,6 @@ import { accentIconColor, mutedIconColor } from "@/lib/ui/theme-icons";
 
 export type ProgressStatItem = { key: StudyMetricKey; value: string; label: string; help: string };
 
-/**
- * Four primary figures, then More stats for the rest. Pressing a figure shows what it counts, in a
- * line below the grid; screen readers hear the same explanation as the tile's hint.
- */
 export function ProgressStats({
   primary,
   more,

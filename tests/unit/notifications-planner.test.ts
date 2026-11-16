@@ -15,7 +15,6 @@ import { templateById } from "@/lib/notifications/templates";
 import { DEFAULT_REMINDER_PREFS, WIRD_TYPES, type NotificationType, type ReminderPrefs } from "@/lib/notifications/types";
 import type { DayPrayerTimes } from "@/lib/prayer/times";
 
-/** A clock for a named IANA zone, independent of the machine running the tests. */
 function zonedClock(timeZone: string): DayClock {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -57,7 +56,6 @@ const RIYADH = zonedClock("Asia/Riyadh");
 const LONDON = zonedClock("Europe/London");
 const NEW_YORK = zonedClock("America/New_York");
 
-/** 2026-11-12 is a Thursday. */
 const TODAY: LocalDate = "2026-11-12";
 
 function days(statuses: Record<LocalDate, DayStatus>): HabitDay[] {
@@ -66,7 +64,6 @@ function days(statuses: Record<LocalDate, DayStatus>): HabitDay[] {
     .map(([localDate, status]) => ({ localDate, status, fullMet: false }));
 }
 
-/** `count` done days ending `endOffset` days from TODAY. */
 function streak(count: number, endOffset = -1, status: DayStatus = "done"): Record<LocalDate, DayStatus> {
   const result: Record<LocalDate, DayStatus> = {};
   for (let i = 0; i < count; i += 1) result[addDays(TODAY, endOffset - i)] = status;
@@ -165,8 +162,6 @@ describe("planNotifications", () => {
     expect(summary(result)).toContain(`${TODAY} 18:50 streak_at_risk`);
     expect(summary(result)).not.toContain(`${TODAY} 21:00 streak_at_risk`);
 
-    // Isha is 18:30, so 20:00 is in quiet hours with prayer times, but the user chose that time for
-    // the wird reminder, so it is sent either way.
     const evening = prefsWith({ anchor: { kind: "clock", minutes: 20 * 60 } });
     expect(summary(planNotifications(input({ prefs: evening, prayers })))).toContain(`${TODAY} 20:00 wird_reminder`);
     expect(summary(planNotifications(input({ prefs: evening })))).toContain(`${TODAY} 20:00 wird_reminder`);
@@ -174,13 +169,10 @@ describe("planNotifications", () => {
 
   it("ends quiet hours 30 minutes before Fajr, and uses 05:00 only without prayer times (NOT-08)", () => {
     const prayers = prayerTimes(RIYADH, WINTER);
-    // Fajr is 04:50, so quiet hours end at 04:20 with prayer times and at 05:00 without them. The
-    // at-risk reminder is not chosen by the user, so it follows the window.
     const times = (prayersFor: typeof prayers | (() => null)) =>
       buildDayTimes({ clock: RIYADH, prayers: prayersFor, anchor: DEFAULT_REMINDER_PREFS.anchor, ramadanAnchor: null, isRamadan: () => false }, TODAY);
     expect(isQuietAt(times(prayers), RIYADH.at(TODAY, 4 * 60 + 30))).toBe(false);
     expect(isQuietAt(times(() => null), RIYADH.at(TODAY, 4 * 60 + 30))).toBe(true);
-    // The wird reminder at a chosen 04:30 is sent in both cases.
     const early = prefsWith({ anchor: { kind: "clock", minutes: 4 * 60 + 30 } });
     const now = RIYADH.at(TODAY, 0);
     expect(summary(planNotifications(input({ prefs: early, prayers, now })))).toContain(`${TODAY} 04:30 wird_reminder`);
@@ -230,7 +222,6 @@ describe("planNotifications", () => {
     expect(result.slots.filter((slot) => slot.localDate === TODAY)).toEqual([
       expect.objectContaining({ type: "late_reminder", existingOnly: true }),
     ]);
-    // Earlier in the day it is an ordinary slot.
     const evening = planNotifications(input({ prefs, now: RIYADH.at(TODAY, 22 * 60) }));
     expect(evening.slots.find((slot) => slot.type === "late_reminder" && slot.localDate === TODAY)?.existingOnly).toBeUndefined();
   });
@@ -263,12 +254,10 @@ describe("planNotifications", () => {
     const fingerprint = streakFingerprint(projectHabit(base, TODAY, now).snapshot);
     const remindLater = { at: RIYADH.at(TODAY, 6 * 60 + 30).toISOString(), local_date: TODAY, fingerprint };
 
-    // One reminder fired: the follow-up takes the second place and the evening reminder gives way.
     const displaced = planNotifications({ ...base, remindLater });
     expect(summary(displaced).filter((line) => line.startsWith(TODAY))).toEqual([`${TODAY} 06:30 remind_later`]);
     expect(displaced.skipped).toContainEqual(expect.objectContaining({ type: "streak_at_risk", localDate: TODAY, reason: "cap" }));
 
-    // Two fired, one of them a follow-up: no more follow-ups, and the late reminder is the third.
     const later = RIYADH.at(TODAY, 10 * 60);
     const fired = [wird, { type: "remind_later", templateId: "remind_later.1", localDate: TODAY, at: RIYADH.at(TODAY, 6 * 60 + 30) }];
     const capped = planNotifications({
@@ -330,40 +319,31 @@ describe("planNotifications", () => {
   });
 
   it("projects the ignored tally through the batch: the seventh unanswered reminder starts back-off (NOT-09)", () => {
-    // Six ignored since the latest session; a fresh week of daily reminders with no session.
     const plain = planNotifications(input({ backoff: backoffLevel(6) })).slots.map((slot) => slot.localDate);
     const projected = planNotifications(input({ backoff: backoffLevel(6), ignoredCount: 6 })).slots.map((slot) => slot.localDate);
-    // Without the projection every day keeps its reminders; with it, today's first reminder is the
-    // seventh, and from then on only every other day keeps one.
     expect(new Set(plain).size).toBe(7);
     expect(projected[0]).toBe(TODAY);
     expect(new Set(projected).size).toBeLessThan(7);
     expect(new Set(projected).size).toBeGreaterThanOrEqual(3);
-    // A session resets the tally (the next plan starts from 0): every day comes back.
     expect(new Set(planNotifications(input({ backoff: 0, ignoredCount: 0, horizonDays: 2 })).slots.map((slot) => slot.localDate)).size).toBe(2);
   });
 
   it("counts only reminders the daily cap keeps toward back-off (NOT-07, NOT-09)", () => {
-    // Today is a day every-other-day back-off keeps and tomorrow one it skips, so a miscount shows.
     const today = addDays(TODAY, 1);
     const tomorrow = addDays(today, 1);
-    // Five ignored; a group message already took one of today's two places.
     const delivered = [{ type: "group_encouragement" as const, templateId: "group_encouragement.1", localDate: today, at: RIYADH.at(today, 2 * 60) }];
     const result = planNotifications(
       input({ now: RIYADH.at(today, 3 * 60), habit: { days: days(streak(5, 0)), pause: null }, backoff: backoffLevel(5), ignoredCount: 5, delivered }),
     );
     const counted = (slot: { type: string }) => slot.type === "wird_reminder" || slot.type === "streak_at_risk";
-    // Today keeps one counted reminder; the other is capped, never sent, and so never ignored.
     expect(result.slots.filter((slot) => slot.localDate === today && counted(slot))).toHaveLength(1);
     expect(result.skipped.some((slot) => slot.localDate === today && slot.reason === "cap")).toBe(true);
-    // So tomorrow's first reminder is the seventh sent, and tomorrow is not backed off before it.
     const first = result.slots.filter((slot) => slot.localDate === tomorrow).sort((a, b) => a.at.getTime() - b.at.getTime())[0];
     expect(first).toBeDefined();
     expect(result.skipped.filter((slot) => slot.localDate === tomorrow && slot.reason === "backoff" && slot.at < first.at)).toEqual([]);
   });
 
   it("sends the earn-back reminder once, when the window opens", () => {
-    // Excused days count toward the streak but earn no grace, so the break is not covered.
     const habit = { days: days(streak(10, -3, "excused")), pause: null };
     const result = planNotifications(input({ habit }));
     expect(result.slots.filter((slot) => slot.type === "earnback_open").map((slot) => slot.localDate)).toEqual([TODAY]);
@@ -385,8 +365,6 @@ describe("planNotifications", () => {
   });
 
   it("reminds about yesterday's open make-up on a day another device already recorded as done (STR-07)", () => {
-    // Another device with an earlier cutoff settled yesterday as grace and recorded today's wird; this
-    // device's window for yesterday is still open.
     const habit = { days: days({ ...streak(6, -2), [addDays(TODAY, -1)]: "grace", [TODAY]: "done" }), pause: null };
     const types = { ...DEFAULT_REMINDER_PREFS.types, makeup_window: true };
     const result = planNotifications(input({ habit, prefs: prefsWith({ types }), now: RIYADH.at(TODAY, 0) }));
@@ -405,21 +383,17 @@ describe("planNotifications", () => {
         keptAsPast: result.skipped.filter((slot) => slot.localDate === TODAY && slot.type === "makeup_window" && slot.reason === "past").length,
       };
     };
-    // At 11:30 the 11:00 reminder has passed but yesterday can still be made up: a late alarm stays.
     expect(makeUpSlots(11 * 60 + 30)).toEqual({ planned: 0, keptAsPast: 1 });
-    // At 13:00 the 12:30 cutoff has passed: nothing keeps it.
     expect(makeUpSlots(13 * 60)).toEqual({ planned: 0, keptAsPast: 0 });
   });
 
   it("sends no earn-back reminder on a day whose wird is already done", () => {
-    // The earn-back headline leads on Home even when today is done; the planner must still see today as covered.
     const habit = { days: days({ ...streak(10, -3, "excused"), [TODAY]: "done" }), pause: null };
     const result = planNotifications(input({ habit, now: RIYADH.at(TODAY, 0) }));
     expect(result.slots.filter((slot) => slot.localDate === TODAY && WIRD_TYPES.has(slot.type))).toEqual([]);
   });
 
   it("notes a grace day the morning after it is used", () => {
-    // Yesterday was covered by grace at 12:30 today, and today's wird is done.
     const habit = { days: days({ ...streak(6, -2), [addDays(TODAY, -1)]: "grace", [TODAY]: "done" }), pause: null };
     const result = planNotifications(input({ habit, now: RIYADH.at(TODAY, 20 * 60) }));
     const tomorrow = addDays(TODAY, 1);
@@ -456,7 +430,6 @@ describe("planNotifications", () => {
     expect(summary({ slots: group, skipped: [] })).toEqual([`${addDays(TODAY, 1)} 09:00 group_encouragement`]);
     expect(group[0].vars.count).toBe(3);
 
-    // With the wird and at-risk reminders already planned, the encouragement waits (NOT-07).
     const capped = planNotifications(input({ now, groupPending, habit }));
     expect(capped.skipped).toContainEqual(expect.objectContaining({ type: "group_encouragement", reason: "cap" }));
   });
@@ -647,9 +620,6 @@ describe("planNotifications properties", () => {
         const plannerInput = build(scenario);
         const habit = { days: [...plannerInput.habit.days, { localDate: TODAY, status: todayStatus, fullMet: false }], pause: null };
         const result = planNotifications({ ...plannerInput, habit });
-        // A day already done is not set aside: yesterday's open make-up may still be reminded when
-        // another device recorded today while yesterday is makeable here (STR-07). An excused day
-        // gets nothing about the wird.
         for (const slot of result.slots) {
           expect(slot.at.getTime()).toBeGreaterThan(plannerInput.now.getTime());
           expect(plannerInput.clock.dateOf(slot.at)).toBe(slot.localDate);

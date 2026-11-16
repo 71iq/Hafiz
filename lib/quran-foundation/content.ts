@@ -111,8 +111,6 @@ export async function fetchQfAyahAudio(
   ayah: number,
   recitationId = QF_DEFAULT_RECITATION_ID,
 ): Promise<QfAudioResponse | QfContentError> {
-  // Known recitations play straight from the public audio CDNs, so recitation works without the
-  // Quran Foundation API credentials the content function needs.
   const publicUrl = publicAyahAudioUrl(recitationId, surah, ayah);
   if (publicUrl) {
     return {

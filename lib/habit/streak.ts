@@ -8,42 +8,23 @@ export function toDayMap(days: readonly HabitDay[]): Map<LocalDate, HabitDay> {
 }
 
 export type StreakView = Readonly<{
-  /** Days that count toward the streak, through today or the open day before it. */
   length: number;
-  /** First day of the current run, or null when there is no streak. */
   startDay: LocalDate | null;
-  /** Latest covered day of the current run. */
   lastCoveredDay: LocalDate | null;
   todayStatus: DayStatus | null;
-  /** Today is a wird day earned by recitation (STR-04). */
   doneToday: boolean;
-  /** The streak is alive but today has no wird yet (STR-03). */
   atRisk: boolean;
-  /** Yesterday is missed but can still be made up before Dhuhr today (STR-07). */
   makeUpPending: boolean;
 }>;
 
-/**
- * STR-07: a missed day can be made up while it has no status, or only a grace day: another device
- * whose cutoff came earlier (12:30 without prayer times, or an earlier Dhuhr) may settle grace while
- * this device's window is still open. Making it up raises grace to made up and gives the grace day
- * back. An excuse, a pause or recitation already cover the day.
- */
 export function canStillMakeUp(status: DayStatus | string | null): boolean {
   return status === null || status === "grace";
 }
 
-/**
- * STR-03: a streak stays alive while the last covered day is today or yesterday, and shows its full
- * length during the at-risk day. When yesterday was missed but its make-up window is still open,
- * the streak is pending instead of broken.
- */
 export function computeStreak(days: DayMap, today: LocalDate, options: { makeUpOpen: boolean }): StreakView {
   const todayStatus = days.get(today)?.status ?? null;
   const yesterday = addDays(today, -1);
   const yesterdayStatus = days.get(yesterday)?.status ?? null;
-  // Yesterday's gap stays open until its cutoff, whatever today holds: an excused or paused today
-  // must not hide it (STR-07).
   const makeUpPending = canStillMakeUp(yesterdayStatus) && options.makeUpOpen && days.has(addDays(today, -2));
   let length = 0;
   let startDay: LocalDate | null = null;
@@ -74,7 +55,6 @@ export function computeStreak(days: DayMap, today: LocalDate, options: { makeUpO
   };
 }
 
-/** Length of the run that ends on `lastDay`, counted the way the streak counts. */
 export function runLengthEndingOn(days: DayMap, lastDay: LocalDate): number {
   let length = 0;
   let cursor = lastDay;
@@ -85,7 +65,6 @@ export function runLengthEndingOn(days: DayMap, lastDay: LocalDate): number {
   return length;
 }
 
-/** The longest run in the history, through `today`. Future excused days are ignored. */
 export function longestStreak(days: DayMap, today: LocalDate): number {
   const dates = [...days.keys()].filter((date) => date <= today).sort();
   let longest = 0;
@@ -100,7 +79,6 @@ export function longestStreak(days: DayMap, today: LocalDate): number {
   return longest;
 }
 
-/** The latest covered day strictly before `before`, or null. */
 export function lastCoveredBefore(days: DayMap, before: LocalDate): LocalDate | null {
   let latest: LocalDate | null = null;
   for (const date of days.keys()) {
@@ -109,17 +87,12 @@ export function lastCoveredBefore(days: DayMap, before: LocalDate): LocalDate | 
   return latest;
 }
 
-/** Recited days (done or made up), used by grace awards and earn-back progress. */
 export function isRecited(day: HabitDay | undefined): boolean {
   return day !== undefined && RECITED_STATUSES.has(day.status);
 }
 
 const STEADY_STATUSES: ReadonlySet<DayStatus> = new Set<DayStatus>(["done", "made_up", "excused"]);
 
-/**
- * STR-27: a steady week has all 7 days earned by recitation or excused. Grace and paused days do not
- * count. Only weeks that have ended, or end today with today recited, are counted.
- */
 export function countSteadyWeeks(days: DayMap, today: LocalDate, weekStart: number): number {
   let earliest: LocalDate | null = null;
   for (const date of days.keys()) if (earliest === null || date < earliest) earliest = date;

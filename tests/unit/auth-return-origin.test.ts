@@ -131,7 +131,6 @@ describe("allowlisted auth return origin", () => {
     expect(completeAuthReturn(tabsBelowAuth)).toEqual({ route: "progress" });
     expect(mockRouter.dismissTo).toHaveBeenCalledWith("/(tabs)/progress");
     expect(mockRouter.replace).not.toHaveBeenCalled();
-    // Consumed once: a later completion falls back Home.
     completeAuthReturn(coldAuthStack);
     expect(mockRouter.replace).toHaveBeenCalledWith("/(tabs)/home");
   });
@@ -167,7 +166,6 @@ describe("allowlisted auth return origin", () => {
     expect(consumeAuthReopen("comments")).toBeNull();
     const reopen = consumeAuthReopen("reflection-editor");
     expect(Object.keys(reopen ?? {}).sort()).toEqual(["ayahEnd", "ayahStart", "kind", "surah"]);
-    // One use only: a later screen cannot replay it.
     expect(consumeAuthReopen("reflection-editor")).toBeNull();
   });
 

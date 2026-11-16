@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# RF166 probe: isolated PostgreSQL 17 container with no network and synthetic users; never touches
-# production. Loads schema.sql (or SCHEMA=<file>), shows counter drift, applies the RF166 migration
-# and checks cross-author counts, the like-move exploit, privileges and 20 concurrent likes.
-# Requires Docker and a cached postgres:17 image. Usage: bash scripts/supabase-probes/reaction-counters.sh
 set -euo pipefail
 WT="$(cd "$(dirname "$0")/../.." && pwd)"
 NAME="hafiz-rf166-probe-$$"
@@ -11,7 +7,6 @@ trap cleanup EXIT
 
 docker run -d --name "$NAME" --network none --memory 512m --memory-swap 512m \
   -e POSTGRES_PASSWORD=synthetic postgres:17 >/dev/null
-# Wait for the final server (the image restarts once after initialization).
 for _ in $(seq 1 60); do
   if docker exec "$NAME" pg_isready -U postgres -q 2>/dev/null &&
      docker exec "$NAME" sh -c 'test "$(cat /proc/1/comm)" = postgres' &&
@@ -43,7 +38,6 @@ SQL
 psql < "${SCHEMA:-$WT/supabase/schema.sql}" >/dev/null
 psql < "$WT/supabase/migrations/20260614214500_reflection_comment_likes.sql" >/dev/null
 psql <<'SQL'
--- Supabase grants table privileges to API roles by default; RLS decides row access.
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
@@ -61,12 +55,12 @@ INSERT INTO public.reflections (id, user_id, surah, ayah_start, ayah_end, juz_st
 SQL
 }
 
-as_user() { # $1 = user number, stdin = SQL
+as_user() {
   local sub="00000000-0000-4000-8000-$(printf '%012d' "$1")"
   { echo "SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub', '$sub', false);"; cat; } | psql -tA >/dev/null
 }
 
-react() { # user A comments; user B likes A's reflection, comments, and likes A's comment
+react() {
 as_user 1 <<'SQL'
 INSERT INTO public.reflection_comments (id, reflection_id, user_id, content)
   VALUES ('20000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'author comment');
@@ -153,7 +147,6 @@ SELECT 'authenticated UPDATE reflection_likes=' || has_table_privilege('authenti
   || ' reflection_comment_likes=' || has_table_privilege('authenticated', 'public.reflection_comment_likes', 'UPDATE');
 SQL
 
-# Concurrent likes from 20 users on the same reflection.
 pids=()
 for n in $(seq 3 22); do
   as_user "$n" <<SQL &

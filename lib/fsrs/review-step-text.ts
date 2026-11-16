@@ -42,7 +42,6 @@ function parseStepToken(value: string): SchedulerStep | null {
   const canonical = normalized.match(/^(\d+(?:\.\d+)?)\s*([mhd])$/);
   if (canonical) return `${canonical[1]}${canonical[2]}` as SchedulerStep;
 
-  // Arabic dual nouns carry their own count: "دقيقتان" alone means two minutes.
   const dual = normalized.match(/^(?:2\s*)?(دقيقتان|دقيقتين|ساعتان|ساعتين|يومان|يومين)$/);
   if (dual) {
     const unit = dual[1].startsWith("دقيقت") ? "m" : dual[1].startsWith("ساعت") ? "h" : "d";
@@ -76,16 +75,9 @@ export function parseStepText(value: string, fallback: readonly SchedulerStep[])
 
 export type StepTextResult = { ok: true; steps: SchedulerStep[] } | { ok: false };
 
-/**
- * Strict reading of a steps field for the settings editor: every token must be a step, so a typo is
- * reported instead of being dropped (parseStepText above keeps its lenient reading for old callers).
- * Steps are separated by commas, or by spaces; a number may stand apart from its unit ("1 دقيقة").
- * An empty field is valid and means no steps.
- */
 export function validateStepText(value: string): StepTextResult {
   if (value.trim().length === 0) return { ok: true, steps: [] };
   const result = readStrictSteps(value);
-  // "01m" saves as "1m": the number is kept as a value, not as typed.
   return result
     ? { ok: true, steps: result.map((step) => `${parseFloat(step)}${step.slice(-1)}` as SchedulerStep) }
     : { ok: false };
@@ -126,7 +118,6 @@ function formatEnglishStep(step: SchedulerStep): string {
   return `${match[1]} ${value === 1 ? "day" : "days"}`;
 }
 
-/** The steps a valid field will save, spelled out for the "Will use" preview under it. */
 export function formatStepPreview(steps: readonly SchedulerStep[], language: "en" | "ar"): string {
   if (language === "ar") return steps.map(formatArabicStep).join("، ");
   return steps.map(formatEnglishStep).join(", ");

@@ -9,16 +9,10 @@ import { useCooldown } from "@/components/auth/use-cooldown";
 
 type Locale = "en" | "ar";
 
-/** Seconds in the interface's digits. */
 export function formatSeconds(seconds: number, locale: Locale): string {
   return formatNumber(seconds, locale);
 }
 
-/**
- * A screen's current server error, mapped to localized copy. Rate limits with an actual retry delay
- * count down and block submission until it ends; without one, the copy says to try again shortly.
- * Raw provider messages never reach the screen.
- */
 export function useAuthFormError(s: UIStrings, locale: Locale, scope: "attempts" | "requests") {
   const [info, setInfo] = useState<AuthErrorInfo | null>(null);
   const retry = useCooldown();
@@ -69,7 +63,6 @@ export function useAuthFormError(s: UIStrings, locale: Locale, scope: "attempts"
   return { kind: info?.kind ?? null, message, report, clear, blocked: retry.active };
 }
 
-/** Submit button content: a spinner beside a readable pending label. */
 export function PendingLabel({
   pending,
   label,

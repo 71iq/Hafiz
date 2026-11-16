@@ -5,7 +5,6 @@ import { nextStreakMilestone, streakTier } from "@/lib/habit/milestones";
 import { computeStreak, longestStreak, toDayMap, type StreakView } from "@/lib/habit/streak";
 import { COUNTS_TOWARD_LENGTH, type HabitDay, type HabitPause, type StreakGoal } from "@/lib/habit/types";
 
-/** What Home and the session end say about the streak today. One state per day. */
 export type HabitHeadline =
   | { kind: "empty" }
   | { kind: "done_today"; length: number }
@@ -23,9 +22,7 @@ export type HabitSnapshot = Readonly<{
   streak: StreakView;
   headline: HabitHeadline;
   longest: number;
-  /** Grace days held now, usable for the next missed day. */
   graceHeld: number;
-  /** A grace day used yesterday or the day before, for the note without guilt (STR-16). */
   recentGraceDay: LocalDate | null;
   goal: GoalProgress | null;
   nextMilestone: number;
@@ -62,13 +59,9 @@ export function buildHabitSnapshot(input: SnapshotInput): HabitSnapshot {
   const longest = longestStreak(days, today);
   const earnBack = findEarnBack(days, today, { makeUpOpen });
 
-  // An open earn-back leads: it spans several days, and today's wird is one step of it.
   let headline: HabitHeadline;
   const todayStatus = streak.todayStatus;
   if (earnBack && !earnBack.succeeded) headline = { kind: "earn_back", earnBack };
-  // Yesterday's open make-up comes before today's state: an excuse or pause covers today only, and
-  // today's wird can be done on a device whose cutoff came earlier while this one can still make up
-  // yesterday's grace day. Reviews graded now go to yesterday, so Home shows that progress (STR-07).
   else if (streak.makeUpPending) headline = { kind: "make_up_open", length: streak.length, cutoff: makeUpCutoff };
   else if (todayStatus === "done") headline = { kind: "done_today", length: streak.length };
   else if (todayStatus === "excused") headline = { kind: "excused_today", length: streak.length };

@@ -2,14 +2,12 @@ import { useEffect, useRef, type RefObject } from "react";
 import { Platform } from "react-native";
 
 type Options = {
-  /** False while the sheet is closed or another surface sits on top of it. */
   enabled: boolean;
   isRTL: boolean;
   onPrevious: () => void;
   onNext: () => void;
 };
 
-// Controls that use Left and Right themselves, or where the keys move a text caret.
 const ARROW_OWNER_ROLES = new Set([
   "slider",
   "spinbutton",
@@ -34,7 +32,6 @@ type ElementLike = {
   parentElement?: ElementLike | null;
 };
 
-/** True when Left/Right belong to the focused element rather than to sheet navigation. */
 export function arrowKeysBelongToTarget(target: unknown): boolean {
   let node = target as ElementLike | null;
   while (node && typeof node === "object") {
@@ -48,18 +45,12 @@ export function arrowKeysBelongToTarget(target: unknown): boolean {
   return false;
 }
 
-/** Maps a key to a step, mirroring Left and Right in Arabic so Right goes back. */
 export function detailArrowStep(key: string, isRTL: boolean): "previous" | "next" | null {
   if (key === "ArrowLeft") return isRTL ? "next" : "previous";
   if (key === "ArrowRight") return isRTL ? "previous" : "next";
   return null;
 }
 
-/**
- * Web keyboard stepping for a detail sheet. Left and Right step only while focus is inside the
- * sheet (or nowhere yet, right after it opens), never while typing or inside a control that owns
- * the arrow keys, and only for the topmost surface the caller enables.
- */
 export function useDetailArrowKeys(scopeRef: RefObject<unknown>, { enabled, isRTL, onPrevious, onNext }: Options) {
   const latest = useRef({ isRTL, onPrevious, onNext });
   latest.current = { isRTL, onPrevious, onNext };

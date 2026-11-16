@@ -38,7 +38,6 @@ function createForgotPasswordSchema(s: UIStrings) {
 }
 
 export default function ForgotPasswordScreen() {
-  // The limited-service notice on Login explains that password reset is unavailable.
   if (!isEmailAuthFlowsEnabled()) return <Redirect href="/auth/login" />;
   return <ForgotPasswordFormScreen />;
 }
@@ -76,7 +75,6 @@ function ForgotPasswordFormScreen() {
     try {
       await sendPasswordReset(email);
       setSentTo(email.trim().toLowerCase());
-      // The provider limits repeated reset mail; wait before allowing another request.
       sendCooldown.start(EMAIL_RESEND_COOLDOWN_SECONDS);
     } catch (err) {
       formError.report(err);
@@ -107,13 +105,11 @@ function ForgotPasswordFormScreen() {
     : null;
   const pending = sending || isLoading;
 
-  // A neutral confirmation: it never says whether the address has an account.
   const sentPanel = sentTo ? (
     <View className="w-full">
       <AuthFormNotice
         message={
           interpolate(s.authForgotSent, { email: sentTo }) +
-          // Native reset links open the web page; the app cannot finish the reset itself.
           (Platform.OS === "web" ? "" : ` ${s.authForgotSentBrowser}`)
         }
         tone="success"

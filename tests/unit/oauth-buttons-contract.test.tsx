@@ -89,7 +89,6 @@ describe("OAuth social button contracts", () => {
       const style = resolvePressableStyle(getByLabelText(label).props.style);
       expect(style.width).toBe("100%");
       expect(style.minHeight).toBeGreaterThanOrEqual(44);
-      // The full label is visible, so it wraps instead of shrinking.
       expect(getByText(label)).toBeTruthy();
     }
     expect(UNSAFE_getAllByType(Image)).toHaveLength(3);

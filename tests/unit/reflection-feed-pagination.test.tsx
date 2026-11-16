@@ -144,10 +144,6 @@ function deferred() {
   drain = () => resolve(page());
   return { promise, resolve, reject };
 }
-/**
- * A comment changes the count in place and only marks the feed stale (no reload that could move the
- * post); the server count arrives with the next refresh, such as pull to refresh.
- */
 async function laterRefresh() {
   expect(fetchReflectionFeed).toHaveBeenCalledTimes(1);
   expect(
@@ -334,7 +330,6 @@ describe.each(["en", "ar"] as const)("feed search row in %s", (locale) => {
     await flush();
     let row = view.getByPlaceholderText(strings[locale].reflectionFeedSearchPlaceholder).parent;
     while (row && !flattenStyle(row.props.style).flexDirection) row = row.parent;
-    // Under the RTL wrapper, row-reverse without an LTR pin flipped the row back in Arabic.
     expect(flattenStyle(row?.props.style)).toMatchObject({
       direction: "ltr",
       flexDirection: locale === "ar" ? "row-reverse" : "row",

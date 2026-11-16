@@ -204,7 +204,6 @@ describe.each(["en", "ar"] as const)("reflection journey loading in %s", (langua
     expect(button(view, s.reflectionJourneySaveComplete).props.accessibilityState?.disabled).toBe(true);
     expect(view.getByText(s.journeyMoreToComplete.replace("{{n}}", language === "ar" ? "١" : "1"))).toBeTruthy();
 
-    // A draft shorter than ten characters still saves.
     jest.mocked(saveReflectionJourneyDraft).mockResolvedValue(level("third", "draft", "too short").entry!);
     await act(async () => {
       fireEvent.press(button(view, s.reflectionJourneySaveDraft));
@@ -229,7 +228,6 @@ describe.each(["en", "ar"] as const)("reflection journey loading in %s", (langua
     expect(completeReflectionJourneyLevel).toHaveBeenCalledWith(mockDatabase, "third", "long enough reflection");
     expect(completeReflectionJourneyLevel).toHaveBeenCalledTimes(1);
     expect(view.getByText(s.reflectionJourneyCompletedToast)).toBeTruthy();
-    // Visiting and completing the last level does not finish the whole Journey.
     expect(view.queryByText(s.journeyFinished)).toBeNull();
     expect(view.getByText(s.journeyOpenUnfinished)).toBeTruthy();
   });
@@ -240,7 +238,6 @@ describe.each(["en", "ar"] as const)("reflection journey loading in %s", (langua
       .mockResolvedValue([level("first", "completed"), level("second", "completed")]);
     const view = render(<ReflectionJourneyScreen />);
     await act(async () => {});
-    // The default revisits the last completed level, with Save changes disabled until the text changes.
     expect(view.getByText(summary("second"))).toBeTruthy();
     expect(view.getByText(s.journeyFinished)).toBeTruthy();
     expect(view.queryByText(s.journeyNextMarker)).toBeNull();

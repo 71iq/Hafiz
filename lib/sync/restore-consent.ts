@@ -1,16 +1,10 @@
 import { useCallback, useSyncExternalStore } from "react";
 import type { RestoreConsentRequest, RestorePauseState } from "@/lib/database/sync";
 
-/**
- * In-memory view of the restore consent and sync pause for the signed-in account. The sync hook is
- * its only writer; the confirmation and the Settings Account status read it. Nothing here persists:
- * the stored pause lives in the database and is re-read by the next sync run.
- */
 export type RestoreConsentIssue = "stale" | "expired" | "failed" | null;
 
 export type RestoreConsentView = Readonly<{
   userId: string | null;
-  /** The prepared request. The confirmation is open while this is set. */
   request: RestoreConsentRequest | null;
   pause: RestorePauseState | null;
   busy: "accepting" | "cancelling" | "resuming" | null;
@@ -45,18 +39,15 @@ export function getRestoreConsentView(): RestoreConsentView {
   return view;
 }
 
-/** Start over for a new account or session. A request or pause shown for another account is dropped. */
 export function resetRestoreConsent(userId: string | null): void {
   publish({ ...EMPTY, userId });
 }
 
-/** Apply a change for `userId` only. A late result for a previous account is ignored. */
 export function updateRestoreConsent(userId: string, patch: Partial<Omit<RestoreConsentView, "userId">>): void {
   if (view.userId !== userId) return;
   publish({ ...view, ...patch });
 }
 
-/** The sync hook view that currently owns sync registers how the actions run. */
 export function registerRestoreConsentHandlers(next: Handlers): () => void {
   handlers = next;
   return () => {
@@ -69,13 +60,11 @@ function useView(userId: string | null): RestoreConsentView {
   return userId !== null && current.userId === userId ? current : EMPTY;
 }
 
-/** The confirmation's state and actions for the signed-in account. */
 export function useRestoreConsent(userId: string | null) {
   const current = useView(userId);
   const accept = useCallback(() => {
     const request = view.request;
     if (!request || view.busy || view.userId !== userId) return;
-    // An expired request is never submitted; the confirmation offers Prepare again instead.
     if (Date.now() >= request.expiresAt) {
       updateRestoreConsent(request.userId, { issue: "expired" });
       return;
@@ -93,11 +82,6 @@ export function useRestoreConsent(userId: string | null) {
   return { ...current, accept, cancel, prepareAgain };
 }
 
-/**
- * Sync paused / Resume sync for the Settings Account status. `paused` is true while a stored pause
- * applies to this account and no confirmation is open. Resume fetches a fresh complete snapshot and
- * prompts again if replacement is still destructive; it never treats an earlier Cancel as consent.
- */
 export function useSyncRestorePause(userId: string | null) {
   const current = useView(userId);
   const resume = useCallback(() => {

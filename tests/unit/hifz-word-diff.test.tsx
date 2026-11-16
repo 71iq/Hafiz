@@ -10,11 +10,6 @@ import { strings } from "@/lib/i18n/strings";
 import type { SimilarGroup, SimilarRef } from "@/lib/hifz/similar";
 import { ayahSpanIn, differingWords, wordKey } from "@/lib/hifz/word-diff";
 
-/**
- * MUT-01, MUT-04: the words that tell two similar verses apart, compared in order. The passages of
- * 28:20 and 36:20 are copied from the bundled similar-verse data; "رجل" is the same word in both, only
- * moved, and the two spell the rest differently (Uthmani and plain).
- */
 const QASAS: SimilarRef = {
   surah: 28,
   ayah: 20,
@@ -55,13 +50,11 @@ describe("words that tell similar verses apart", () => {
       ["ٱلصَّلَوٰةَ", "الصَّلَاةَ"],
       ["ٱلسَّمَٰوَٰتِ", "السَّمَاوَاتِ"],
       ["أُو۟لَٰٓئِكَ", "أُولَـٰئِكَ"],
-      // Inside a word, before a suffix, alif maqsura with a dagger alif is written as alif (79:32, 47:17).
       ["أَرْسَىٰهَا", "أَرْسَاهَا"],
       ["تَقْوَىٰهُمْ", "تَقْوَاهُمْ"],
     ]) {
       expect(wordKey(uthmani)).toBe(wordKey(plain));
     }
-    // 3:88 and 20:101 share "خالدين"; the plain and Uthmani spellings no longer hide it.
     expect(differingWords(["خَالِدِينَ", "فِيهَا"], [["خَٰلِدِينَ", "فِيهِ"]])).toEqual([false, true]);
   });
 
@@ -103,20 +96,15 @@ describe("what the comparison underlines and how much it shows", () => {
     const other = verse("ثم قال رب انك", "وهن الجسم", "مني كثيرا حقا دوما", 20);
     render(<SimilarVerseLine reference={own} isRTL={false} accent="#0f766e" compareWith={[other]} />);
     const style = (word: string) => StyleSheet.flatten(screen.getByText(word).props.style) ?? {};
-    // Inside the passage: the differing word is underlined, the shared one keeps the accent.
     expect(style("العظم")).toMatchObject({ textDecorationLine: "underline" });
     expect(style("وهن")).toMatchObject({ color: "#0f766e", fontWeight: "700" });
-    // The nearest differing word on each side, where the verses part.
     expect(style("اني")).toMatchObject({ textDecorationLine: "underline" });
     expect(style("شيئا")).toMatchObject({ textDecorationLine: "underline" });
-    // Farther away the text differs anyway and is not underlined.
     expect(style("فقال").textDecorationLine).toBeUndefined();
     expect(style("ابدا").textDecorationLine).toBeUndefined();
   });
 
   it("compares the shared passages with each other, so a passage running into its sibling's ayah keeps its shared words", () => {
-    // 9:98 runs on into 9:99, whose own passage it is compared with (the bundled text): as one line, the
-    // run-on words match the sibling's lead-in and passage, and the shared opening was underlined.
     const own = verse(
       "وَٱللَّهُ عَلِيمٌ حَكِيمٌ",
       "وَمِنَ ٱلْأَعْرَابِ مَن يَتَّخِذُ مَا يُنفِقُ مَغْرَمًا",
@@ -150,7 +138,6 @@ describe("what the comparison underlines and how much it shows", () => {
       ],
     };
     render(<SimilarVerseLine reference={ref} isRTL accent="#0f766e" />);
-    // The default text matcher folds a no-break space into a plain one, so the raw text is compared.
     const raw = { normalizer: (text: string) => text };
     expect(screen.getByText("\u00A0(٣٣)", raw)).toBeTruthy();
     expect(screen.queryByText(" (٣٣)", raw)).toBeNull();
@@ -186,7 +173,6 @@ describe("what the comparison underlines and how much it shows", () => {
 });
 
 describe("where an ayah ends inside a similar-verse passage", () => {
-  // 86:5 as bundled: the end of 86:4, then 86:5, then the start of 86:6, which repeats its last word.
   const passage =
     "إِن كُلُّ نَفْسٍۢ لَّمَّا عَلَيْهَا حَافِظٌۭ فَلْيَنظُرِ ٱلْإِنسَٰانُ مِمَّ خُلِقَ خُلِقَ مِن مَّآءٍۢ دَافِقٍۢ".split(
       " ",
@@ -198,9 +184,7 @@ describe("where an ayah ends inside a similar-verse passage", () => {
   });
 
   it("finds an ayah cut at the passage's edge, and nothing it cannot place with certainty", () => {
-    // Cut after its third word: its end is not in the passage, so no number may follow it.
     expect(ayahSpanIn(passage.slice(0, 9), ayah)).toEqual({ first: 6, last: 8, hasStart: true, hasEnd: false });
-    // Two words are too few to be sure where the ayah starts.
     expect(ayahSpanIn(passage.slice(0, 8), ayah)).toBeNull();
     expect(ayahSpanIn("قال رب".split(" "), "قال رب انك".split(" "))).toBeNull();
     expect(ayahSpanIn(passage, "وَٱلسَّمَآءِ وَٱلطَّارِقِ".split(" "))).toBeNull();
@@ -250,13 +234,10 @@ describe("ayah numbers inside similar-verse passages, only where certain", () =>
       const ref = store.sql.prepare(
         "INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, pre_text, similar_text, post_text) VALUES ('g', ?, 5, ?, 'نوح', ?, ?, ?)",
       );
-      // 5:2 as bundled data can carry it: preceded by another surah's ayah, not by 5:1.
       ref.run(0, 2, "ثم توفى كل نفس ما كسبت وهم لا يظلمون", "فلم يزدهم دعائي", "الا فرارا");
-      // 5:3 after the whole of 5:2, but cut before its own end, at a pause mark.
       ref.run(1, 3, "فلم يزدهم دعائي الا فرارا", "واني كلما دعوتهم", "لتغفر لهم ۗ");
       const [group] = await similarGroupsForAyahs(store.db, [{ surah: 5, ayah: 2 }]);
       expect(group.self.ayahEnds).toEqual([]);
-      // Only the end of 5:2 before it, which is certain.
       expect(group.siblings[0].ayahEnds).toEqual([{ after: 4, ayah: 2 }]);
     } finally {
       await store.close();

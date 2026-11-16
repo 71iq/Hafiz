@@ -52,7 +52,6 @@ export async function listReflectionJourneyLevels(
 
   const entryMap = new Map(entryRows.map((row) => [row.level_id, rowToEntry(row)]));
 
-  // Every level is open; the order is a suggestion. Each status comes from that level's own entry.
   return levelRows.map((row) => {
     const level = rowToLevel(row);
     const entry = entryMap.get(row.id) ?? null;
@@ -97,7 +96,6 @@ export async function saveReflectionJourneyDraft(
 
   const existing = level.entry;
   if (existing?.status === "completed") {
-    // Editing a completed level keeps its completion and timestamp, under the completion limits.
     assertCompletable(responseText);
     return upsertReflectionJourneyEntry(db, levelId, responseText, "completed", existing.completedAt);
   }
@@ -137,7 +135,6 @@ function assertCompletable(responseText: string) {
   );
 }
 
-/** Save a journey entry. The row and its upload queue entry commit together or not at all. */
 async function upsertReflectionJourneyEntry(
   database: AppDatabase,
   levelId: string,

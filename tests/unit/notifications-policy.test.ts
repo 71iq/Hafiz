@@ -96,7 +96,6 @@ describe("back-off counting (8.11, NOT-09)", () => {
     expect(isFired(late, NOW, new Set(["late"]))).toBe(false);
     expect(isFired(late, NOW, new Set())).toBe(true);
     expect(isFired({ ...late, delivered_at: NOW.toISOString() }, NOW, new Set(["late"]))).toBe(true);
-    // The tally waits for it rather than skipping past it.
     const rows = [{ ...late, type: "wird_reminder" }, row("wird_reminder", daysAgo(0.15))];
     const waiting = advanceIgnoredTally(null, rows, null, NOW, new Set(["late"]));
     expect(waiting).toEqual({ count: 0, since: null, cursor: null });
@@ -108,23 +107,19 @@ describe("back-off counting (8.11, NOT-09)", () => {
     const first = advanceIgnoredTally(null, old, null, NOW);
     expect(first.count).toBe(7);
     expect(advanceIgnoredTally(first, old, null, NOW)).toEqual(first);
-    // The seven old rows are pruned and seven new ones are ignored.
     const fresh = Array.from({ length: 7 }, (_, index) => row("wird_reminder", daysAgo(10 - index)));
     expect(advanceIgnoredTally(first, fresh, null, NOW).count).toBe(14);
-    // A new session starts over.
     expect(advanceIgnoredTally(first, fresh, daysAgo(6.5).toISOString(), NOW).count).toBe(3);
   });
 
   it("opens the response window at a delayed delivery, and keeps later rows behind it", () => {
     const at = (time: string) => new Date(`2026-11-12T${time}:00.000Z`);
-    // Scheduled for 05:20, shown at 10:00; the 06:00 reminder showed on time.
     const delayed = { id: "delayed", type: "wird_reminder", scheduled_for: at("05:20").toISOString(), cancelled_at: null, delivered_at: at("10:00").toISOString(), converted: 0 };
     const onTime = { id: "on-time", type: "wird_reminder", scheduled_for: at("06:00").toISOString(), cancelled_at: null, delivered_at: at("06:00").toISOString(), converted: 0 };
     const waiting = advanceIgnoredTally(null, [delayed, onTime], null, at("10:01"));
     expect(waiting).toEqual({ count: 0, since: null, cursor: null });
     expect(advanceIgnoredTally(waiting, [delayed, onTime], null, at("11:59")).count).toBe(0);
     expect(advanceIgnoredTally(waiting, [delayed, onTime], null, at("12:00")).count).toBe(2);
-    // A session at 10:10 answers the delayed reminder; one at 12:05 is too late.
     expect(findConversions([delayed], [at("10:10").toISOString()], at("10:15"))).toEqual(["delayed"]);
     expect(findConversions([delayed], [at("12:05").toISOString()], at("12:10"))).toEqual([]);
   });

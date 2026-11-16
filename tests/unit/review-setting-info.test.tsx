@@ -143,7 +143,6 @@ function openAdvanced(view: ReturnType<typeof render>, language: Locale = "en") 
   fireEvent.press(view.getByRole("button", { name: strings[language].deckSettingsAdvanced }));
 }
 
-/** Waits for the loaded settings: the daily limit input shows the stored value. */
 async function loaded(view: ReturnType<typeof render>, language: Locale = "en") {
   await waitFor(() => expect(view.getByLabelText(strings[language].flashcardsDailyLimit).props.value).toBe("20"));
 }
@@ -233,7 +232,6 @@ describe("review-setting help caller characterization", () => {
           .UNSAFE_getAllByType(OverlayHeader)
           .find((node) => node.props.title === s.flashcardsLearningSteps);
         if (!header) throw new Error("Expected canonical help header");
-        // Inert grab handles are gone from every deck sheet.
         expect(header.props.showHandle).toBeFalsy();
         const panel = modal.findAll(
           (node) => typeof node.props.className === "string" && node.props.className.includes("shadow-2xl"),
@@ -262,7 +260,6 @@ describe("review-setting help caller characterization", () => {
       expect(view.queryByText(body)).toBeNull();
       await act(async () => view.rerender(editor(kind, width, language, onClose, onSaved)));
       await loaded(view, language);
-      // Advanced starts closed again on every opening.
       expect(view.queryByDisplayValue(initial)).toBeNull();
       openAdvanced(view, language);
       expect(view.getByDisplayValue(initial)).toBeTruthy();
@@ -300,7 +297,6 @@ describe("review-setting help caller characterization", () => {
     });
 
     function panel(view: ReturnType<typeof render>): React.ComponentProps<typeof SchedulerOptionsPanel> {
-      // ReactTestInstance erases props; selecting the actual typed component establishes this test boundary.
       return view.UNSAFE_getByType(SchedulerOptionsPanel).props as React.ComponentProps<typeof SchedulerOptionsPanel>;
     }
 
@@ -331,7 +327,6 @@ describe("review-setting help caller characterization", () => {
           requestRetention: 0.9,
           maximumInterval: 36500,
         });
-        // Nothing changed yet, so Save is dimmed.
         expect(save(view, kind, language).props.accessibilityState.disabled).toBe(true);
         act(() => panel(view).onChange({ requestRetention: 9, maximumInterval: 99999 }));
         expect(panel(view).draft).toMatchObject({ requestRetention: 0.99, maximumInterval: 3650 });
@@ -358,7 +353,6 @@ describe("review-setting help caller characterization", () => {
         await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
         const expected = {
           ...settings,
-          // A typed daily limit is kept as typed within the owner's domain: no 500 cap.
           dailyReviewLimit: 750,
           newCardsLimit: 0,
           requestRetention: 0.8,
@@ -403,7 +397,6 @@ describe("review-setting help caller characterization", () => {
         fireEvent.press(save(view, kind));
         expect(writeDeckReviewSettings).not.toHaveBeenCalled();
         expect(putDeckReviewSettings).not.toHaveBeenCalled();
-        // Advanced cannot fold away while its error decides Save.
         fireEvent.press(view.getByRole("button", { name: s.deckSettingsAdvanced }));
         expect(view.getByDisplayValue("1m, bad, 2h")).toBeTruthy();
         fireEvent.changeText(view.getByDisplayValue("1m, bad, 2h"), "1m 10m");
@@ -419,7 +412,6 @@ describe("review-setting help caller characterization", () => {
       fireEvent.changeText(view.getByLabelText(s.flashcardsDailyLimit), text);
       expect(view.getByText(interpolate(s.deckDailyLimitInvalid, { min: "10" }))).toBeTruthy();
       expect(save(view, "deck").props.accessibilityState.disabled).toBe(true);
-      // The stepper still works from the default and fixes the field.
       fireEvent.press(view.getByRole("button", { name: `${s.flashcardsDailyLimit} +` }));
       expect(view.getByLabelText(s.flashcardsDailyLimit).props.value).toBe("30");
       expect(view.queryByText(interpolate(s.deckDailyLimitInvalid, { min: "10" }))).toBeNull();
@@ -526,7 +518,6 @@ describe("review-setting help caller characterization", () => {
         expect(view.getByDisplayValue("19m")).toBeTruthy();
         expect(close).not.toHaveBeenCalled();
         expect(saved).not.toHaveBeenCalled();
-        // A failed commit never builds today's cards from settings that were not saved.
         expect(materializeSmartDeckCards).not.toHaveBeenCalled();
         fireEvent.press(save(view, kind));
         await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
@@ -655,7 +646,6 @@ describe("review-setting help caller characterization", () => {
       const saved = jest.fn();
       const view = render(editor(kind, 390, "en", close, saved));
       await waitFor(() => expect(view.getByText(strings.en.genericActionFailed)).toBeTruthy());
-      // Nothing loaded, so nothing can be saved over the stored settings.
       expect(save(view, kind).props.accessibilityState.disabled).toBe(true);
       expect(writeDeckReviewSettings).not.toHaveBeenCalled();
       expect(saved).not.toHaveBeenCalled();

@@ -32,28 +32,16 @@ import { useSettings } from "@/lib/settings/context";
 
 const LOCAL_CHANGE_SYNC_DELAY_MS = 20_000;
 const PERIODIC_SYNC_INTERVAL_MS = 5 * 60_000;
-/** W02: a reconnect waits this long, so a flapping connection starts one sync. */
 export const RECONNECT_SYNC_DEBOUNCE_MS = 2_000;
 
-/**
- * `auto` is every automatic trigger and obeys a stored restore pause. `manual` is the owner's Sync now
- * or Retry: it waits for a run in progress instead of dropping, and still obeys the pause. `resume` is
- * the owner's explicit Resume sync or Prepare again. `accept` submits a prepared consent token.
- */
 type SyncMode = { kind: "auto" } | { kind: "manual" } | { kind: "resume" } | { kind: "accept"; token: string };
 const AUTO: SyncMode = { kind: "auto" };
 const MANUAL: SyncMode = { kind: "manual" };
 
-/**
- * Why the last run did not finish cleanly, for the account status. `offline`: no connection.
- * `partial`: some changes stayed queued. `failed`: the account could not be reached.
- */
 export type SyncFailure = "offline" | "partial" | "failed";
 
-// The last complete sync per account in this process, so a remounted view keeps it.
 const lastSyncedAtByUser = new Map<string, string>();
 
-/** Pending writes the status may report. Quran Foundation rows stay stored but count only while its gate is on. */
 async function readPendingCount(db: Parameters<typeof getPendingSyncCount>[0]): Promise<number> {
   const [accountCount, qfCount] = await Promise.all([
     getPendingSyncCount(db),
@@ -63,10 +51,8 @@ async function readPendingCount(db: Parameters<typeof getPendingSyncCount>[0]): 
 }
 
 type SyncView = { start: () => Promise<void> };
-// The optional status overlay can remount while its database work is still pending.
 let physicalSyncRun: symbol | null = null;
 let physicalSyncSettled: Promise<void> = Promise.resolve();
-// In-memory consent belongs to one account session. Remounting the overlay keeps it; a transition drops it.
 let consentIdentityKey: string | null = null;
 const syncViews = new Set<SyncView>();
 function latestSyncView(): SyncView | undefined {
@@ -103,8 +89,6 @@ function isOrdinaryResult(result: SyncResult): boolean {
   );
 }
 
-/** Automatic sync never blocks local reads. A retired run keeps the physical
- * single-flight lease until it settles, then the latest eligible owner can run. */
 export function useSync() {
   const db = useDatabase();
   const { isLoaded, isTranslationLoading } = useSettings();
@@ -149,13 +133,11 @@ export function useSync() {
     setPendingCount(0);
     setFailure(null);
     setLastSyncedAt(userId ? (lastSyncedAtByUser.get(userId) ?? null) : null);
-    // An account or session transition retires any prepared consent and its UI at once.
     if (consentIdentityKey !== identityKey) {
       consentIdentityKey = identityKey;
       clearRestoreConsentRequests();
       resetRestoreConsent(identity.kind === "identified" ? userId : null);
     }
-    // identity is derived from identityKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identityKey, clearIdleTimer]);
 
@@ -175,7 +157,6 @@ export function useSync() {
       const explicit = mode.kind !== "auto";
       const obeysPause = mode.kind === "auto" || mode.kind === "manual";
       if (physicalSyncRun) {
-        // Automatic triggers drop while another run holds the lease; an explicit action waits for it.
         if (!explicit) return;
         while (physicalSyncRun) await physicalSyncSettled;
         if (!eligible()) return;
@@ -206,9 +187,6 @@ export function useSync() {
 
       try {
         if (obeysPause) {
-          // A stored pause stops every automatic trigger and Sync now before any account work; only
-          // Resume sync continues. fullSync checks again. It is read before connectivity so a cold
-          // start offline still shows Sync paused and labels local figures (W07.9).
           const pause = await readRestorePause(db, userId);
           if (!isCurrent()) return;
           if (pause) {
@@ -217,7 +195,6 @@ export function useSync() {
             return;
           }
         }
-        // Accepting applies the snapshot already held in memory, so it does not wait for connectivity.
         if (mode.kind !== "accept") {
           const netState = await NetInfo.fetch();
           if (!isCurrent()) return;
@@ -226,7 +203,6 @@ export function useSync() {
             setFailure("offline");
             return;
           }
-          // Unknown connectivity is not offline, but it is not a connection to sync over either.
           if (netState.isConnected !== true) return;
         }
         setStatus("syncing");
@@ -240,7 +216,6 @@ export function useSync() {
         if (!isCurrent()) return;
         let issue: RestoreConsentIssue = null;
         if (result.status === "restore_consent_stale") {
-          // Local data changed after the prompt was prepared: prepare fresh counts and a fresh token.
           issue = "stale";
           result = await fullSync(db, { resume: true });
           if (!isCurrent()) return;
@@ -261,7 +236,6 @@ export function useSync() {
           return;
         }
         if (!isOrdinaryResult(result)) return;
-        // The account restore is complete for this owner, so any pause and request are over.
         const consent = getRestoreConsentView();
         if (consent.request || consent.pause || consent.busy || consent.issue) {
           updateRestoreConsent(userId, { request: null, pause: null, busy: null, issue: null });
@@ -274,8 +248,6 @@ export function useSync() {
             );
         });
         if (!isCurrent()) return;
-        // A finished account restore is announced even when it moved no rows: the local data now
-        // belongs to this account, and screens and the board refresh wait for it.
         if (result.pushed > 0 || result.pulled > 0 || result.accountRestored || result.restoreCompleted)
           emitSyncCompleted(result);
         if (!isCurrent()) return;
@@ -316,7 +288,6 @@ export function useSync() {
           console.warn("[Sync] Error:", error instanceof Error ? error.message : String(error));
           setStatus("error");
           setFailure("failed");
-          // A failed acceptance rolled back and retired its token; consent must be prepared again.
           if (mode.kind === "accept") updateRestoreConsent(userId, { busy: null, issue: "failed" });
           else if (mode.kind === "resume") updateRestoreConsent(userId, { busy: null });
           try {
@@ -335,7 +306,6 @@ export function useSync() {
         if (!retired && explicit && getRestoreConsentView().busy) updateRestoreConsent(userId, { busy: null });
         if (physicalSyncRun === token) physicalSyncRun = null;
         settle();
-        // A replacement view/account waits until the previous physical work settles.
         if (retired) void latestSyncView()?.start();
       }
     },
@@ -355,7 +325,6 @@ export function useSync() {
     } catch (error) {
       console.warn("[Sync] Failed to store the sync pause:", error instanceof Error ? error.message : String(error));
     }
-    // The request is gone either way. A failed write leaves the prepared pending pause in place.
     if (isAuthCurrent())
       updateRestoreConsent(userId, {
         request: null,
@@ -380,14 +349,10 @@ export function useSync() {
     [runSync, cancelRestore],
   );
 
-  // Besides launch, resume and reconnect, a signed-in session syncs shortly after local changes, when
-  // the app goes to the background (so a long session's work reaches the account before the OS
-  // suspends it) and periodically while open (so another device's changes arrive).
   const localChangeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleLocalChangeSync = useCallback(() => {
     if (localChangeTimer.current !== null) clearTimeout(localChangeTimer.current);
     localChangeTimer.current = setTimeout(function runWhenIdle() {
-      // A run in progress may have read its queue before this change; try again once it settles.
       if (physicalSyncRun) {
         localChangeTimer.current = setTimeout(runWhenIdle, LOCAL_CHANGE_SYNC_DELAY_MS);
         return;
@@ -433,19 +398,16 @@ export function useSync() {
       const isAuthCurrent = userId ? captureSyncOwner(userId) : null;
       if (!active || !mounted.current || latestSyncView() !== viewOwner.current || !isAuthCurrent?.()) return;
       if (state.isConnected === false) {
-        // Another offline transition cancels a pending reconnect sync.
         cancelReconnect();
         clearIdleTimer();
         setStatus("offline");
         setFailure("offline");
         return;
       }
-      // Unknown connectivity is neither offline nor a reconnect.
       if (state.isConnected !== true) return;
       cancelReconnect();
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
-        // doSync still obeys the restore pause and the physical single-flight lease.
         if (active && isAuthCurrent()) void doSync();
       }, RECONNECT_SYNC_DEBOUNCE_MS);
     });
@@ -479,8 +441,6 @@ export function useSync() {
     };
   }, [db, userId, identityKey, status]);
 
-  // Before this session's first complete run, the last complete pull recorded for this account's
-  // restored dataset stands in. It is read only once the account restore is complete on this device.
   useEffect(() => {
     if (!userId || lastSyncedAtByUser.has(userId)) return;
     const isAuthCurrent = captureSyncOwner(userId);

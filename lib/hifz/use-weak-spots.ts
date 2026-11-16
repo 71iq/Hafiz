@@ -6,7 +6,6 @@ import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { readWeakSpots } from "@/lib/hifz/errors";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
-// The reader asks about every word on every page, so the weak spots live in one shared store.
 type Store = Readonly<{ keys: ReadonlySet<string>; enabled: boolean }>;
 let store: Store = { keys: new Set(), enabled: true };
 const listeners = new Set<() => void>();
@@ -19,20 +18,17 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-/** Reload weak spots and the marker setting, then redraw any open reader. */
 export async function refreshWeakSpots(db: DatabaseExecutor): Promise<void> {
   const load = ++latest;
   const [spots, settings] = await Promise.all([readWeakSpots(db), readHabitSettings(db)]);
   if (load !== latest) return;
   store = {
-    // An ayah-level weak spot (a skipped ayah) marks the ayah's first word.
     keys: new Set(spots.map((spot) => `${spot.surah}:${spot.ayah}:${spot.word ?? 1}`)),
     enabled: settings.showWeakSpots,
   };
   for (const listener of listeners) listener();
 }
 
-/** Keep the weak-spot store current for a reader screen: on mount, after reviews, sync and setting changes. */
 export function useWeakSpotsLoader(db: AppDatabase | null): void {
   useEffect(() => {
     if (!db) return;
@@ -53,7 +49,6 @@ export function useWeakSpotsLoader(db: AppDatabase | null): void {
   }, [db]);
 }
 
-/** ERR-06: whether the reader marks this word as a weak spot. */
 export function useWeakSpotMarker(): (surah: number, ayah: number, wordPos: number) => boolean {
   const snapshot = useSyncExternalStore(subscribe, () => store, () => store);
   return useCallback(

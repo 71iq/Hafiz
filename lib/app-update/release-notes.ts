@@ -1,8 +1,3 @@
-/**
- * Bundled What's new notes, keyed by the app version they ship in. A build shows only the notes for
- * its own version and nothing is fetched. Each entry has at most three short, accurate bullets about
- * changes present in that build. Missing notes show "No release notes for this version".
- */
 type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 
 export const MAX_RELEASE_NOTE_BULLETS = 3;

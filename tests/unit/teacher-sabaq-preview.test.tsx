@@ -10,27 +10,11 @@ import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sql
 let mockDb: AppDatabase | null = null;
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDb }));
 
-/** Synthetic page-font glyphs: none may reach the preview, which shows the Unicode text. */
 const GLYPH = /\bg\d+\b/;
 
-/**
- * SOC-03: the next-sabaq form previews what a teacher's page and lines hold, read from the local
- * Quran tables, before anything is sent.
- */
 describe("the next sabaq preview (SOC-03)", () => {
   let store: OutboxDatabase;
 
-  /**
-   * Page 562, laid out from its line table, with synthetic words:
-   *   1 surah name, 2 basmalah (Al-Mulk)
-   *   3 ayah 67:1 whole (5 words)
-   *   4 ayah 67:2 words 1 to 3
-   *   5 ayah 67:2 word 4 and its end, then 67:3 words 1 to 3
-   *   6 ayah 67:3 words 4 to 7
-   *   7 surah name, 8 basmalah (Al-Qalam)
-   *   9 ayah 68:1, whose page-font glyphs carry one more mark than its words
-   *   10 to 15 nothing
-   */
   function seedPage() {
     store.sql.exec(`
       INSERT INTO surahs (number, name_arabic, name_english, ayah_count, revelation_type) VALUES
@@ -48,7 +32,6 @@ describe("the next sabaq preview (SOC-03)", () => {
     let glyph = 0;
     for (const [ref, list] of Object.entries(words)) {
       const [surah, n] = ref.split(":").map(Number);
-      // Each word's glyph, an extra mark for 68:1, then the ayah's end marker.
       const glyphs = [...list, ...(ref === "68:1" ? ["mark"] : []), "end"].map(() => `g${(glyph += 1)}`);
       ayah.run(surah, n, list.join(" "), list.join(" "), glyphs.join(" "));
     }
@@ -74,7 +57,6 @@ describe("the next sabaq preview (SOC-03)", () => {
   afterEach(async () => {
     cleanup();
     mockDb = null;
-    // Reads a test left running finish before the database closes.
     await store.db.getFirstAsync("SELECT 1");
     await store.close();
     jest.restoreAllMocks();
@@ -115,7 +97,6 @@ describe("the next sabaq preview (SOC-03)", () => {
     ).toBeTruthy();
     type("562", "3", "6");
     expect(await screen.findByText("Al-Mulk 67:1 to 67:3")).toBeTruthy();
-    // Line 3's first four words; its fifth and the ayah's end follow.
     const opening = screen.getByText("أول ثان ثالث رابع …");
     expect(opening.props.children).not.toMatch(GLYPH);
     expect(screen.queryByText(/mid-ayah/)).toBeNull();
@@ -130,8 +111,6 @@ describe("the next sabaq preview (SOC-03)", () => {
     expect(await screen.findByText("سورة الملك، من ٦٧:١ إلى ٦٧:٣")).toBeTruthy();
     expect(screen.getByText("أول ثان ثالث رابع …")).toBeTruthy();
 
-    // Across a surah's end: both names. Line 6 ends its ayah and line 9's opening is not shown, since
-    // its words cannot be matched to their glyphs.
     type("٥٦٢", "٦", "٩");
     expect(await screen.findByText("من سورة الملك ٦٧:٣ إلى سورة القلم ٦٨:١")).toBeTruthy();
     expect(screen.getByText("ثالث رابع خامس سادس (٣)")).toBeTruthy();
@@ -146,7 +125,6 @@ describe("the next sabaq preview (SOC-03)", () => {
 
     type("562", "5", "5");
     expect(await screen.findByText("Al-Mulk 67:2 to 67:3")).toBeTruthy();
-    // Line 5 opens with the end of 67:2, shown as its number.
     expect(screen.getByText("تاسع (٢) عاشر حادي ثاني")).toBeTruthy();
     expect(screen.getByText(interpolate(strings.en.teacherAssignMidStart, { line: "5" }))).toBeTruthy();
     expect(screen.getByText(interpolate(strings.en.teacherAssignMidEnd, { line: "5" }))).toBeTruthy();
@@ -174,7 +152,6 @@ describe("the next sabaq preview (SOC-03)", () => {
     save();
     expect(await screen.findByRole("alert")).toHaveTextContent(strings.en.teacherAssignNoAyat);
     expect(onSave).not.toHaveBeenCalled();
-    // Changing a number clears the refusal.
     fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignTo), "3");
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -203,7 +180,6 @@ describe("the next sabaq preview (SOC-03)", () => {
     fireEvent.changeText(screen.getByLabelText(strings.en.teacherAssignTo), "4");
     const save = screen.getByRole("button", { name: strings.en.teacherAssignSave });
     fireEvent.press(save);
-    // While the first press checks the range, another press and an edit change nothing.
     fireEvent.press(save);
     expect(screen.getByLabelText(strings.en.teacherAssignPage).props.editable).toBe(false);
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));

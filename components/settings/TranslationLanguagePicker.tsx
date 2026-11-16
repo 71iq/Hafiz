@@ -77,8 +77,6 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
   const handleSelect = async (code: string) => {
     const current = lifetime.current;
     if (!visible || !current?.active || current.id !== visibleGeneration) return;
-    // Built-in English reads its own bundled table, so it stays usable while another language imports;
-    // choosing it supersedes that import, which then cannot replace it.
     if (current.busy && code !== DEFAULT_LANGUAGE) return;
     current.busy = true;
     current.attempt?.retire("normal");
@@ -90,7 +88,6 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
     setError(null);
     setFailedCode(null);
     try {
-      // Closing the sheet before the import replaces the active rows cancels the selection.
       await setTranslationLanguage(code, { isCurrent: ownsUI });
       if (ownsUI()) handleClose();
       attempt.finish();
@@ -117,7 +114,6 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
     { key: "device", title: s.translationPickerOnDevice, languages: matching.filter(isOnDevice) },
     {
       key: "available",
-      // Native builds carry every translation in the app, so nothing is downloaded there.
       title: Platform.OS === "web" ? s.translationPickerAvailable : s.translationPickerAvailableBundled,
       languages: matching.filter((lang) => !isOnDevice(lang)),
     },
@@ -128,7 +124,6 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
     const isSelected = lang.code === translationLanguage;
     const isPressed = pressedCode === lang.code;
     const isSelecting = selectingCode === lang.code;
-    // English stays usable while another language imports.
     const disabled = !!selectingCode && lang.code !== DEFAULT_LANGUAGE;
     const primaryName = uiLanguage === "ar" ? lang.nameArabic : lang.nameEnglish;
 

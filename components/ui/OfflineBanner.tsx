@@ -9,7 +9,6 @@ import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { textStartStyle } from "@/lib/ui/direction";
 import { warningColors } from "@/lib/ui/theme-icons";
 
-/** Confirmed unreachable internet (for example a captive portal) must last this long to count. */
 export const OFFLINE_UNREACHABLE_DELAY_MS = 3000;
 export const OFFLINE_FADE_MS = 200;
 
@@ -18,10 +17,6 @@ type ConnectivitySnapshot = {
   isInternetReachable?: boolean | null;
 };
 
-/**
- * Offline means no network (`isConnected === false`, shown at once) or internet confirmed unreachable
- * for three continuous seconds. Unknown values (`null`/`undefined`) never count as offline.
- */
 export function useOfflineState(connectivity: ConnectivitySnapshot): boolean {
   const disconnected = connectivity.isConnected === false;
   const unreachable = !disconnected && connectivity.isInternetReachable === false;
@@ -43,11 +38,6 @@ type Props = {
   uiLanguage: "en" | "ar";
 };
 
-/**
- * Offline notice above the tab content. It takes layout space while shown, so it never covers a
- * screen header, and fades in briefly in place (instantly under reduced motion). Local reading and
- * study keep working; this only explains that changes stay on the device.
- */
 export function OfflineBanner({ uiLanguage }: Props) {
   const { effectiveTheme } = useSettings();
   const netInfo = useNetInfo();

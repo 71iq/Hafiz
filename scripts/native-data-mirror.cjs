@@ -1,10 +1,3 @@
-// Mirror assets/data/**/*.json into assets/native-data/**/*.hafizdata for native bundles (RF188).
-//
-// Metro decides a file is an asset by its extension, so a required .json file is compiled into the
-// JavaScript bundle; the datasets made a 530 MB bundle and a 660 MB APK. The native loaders require
-// the .hafizdata mirror instead, which Metro ships as a plain asset that the app reads at runtime.
-// The mirror is hard links (a copy where links are unsupported), so it costs no disk space and the
-// protected source files are never modified. It is generated and ignored by Git.
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -31,8 +24,6 @@ function mirrorNativeData(root) {
       } catch {}
       if (toStat && toStat.ino === fromStat.ino && toStat.dev === fromStat.dev) continue;
       fs.mkdirSync(path.dirname(to), { recursive: true });
-      // Relink whenever the inode differs. A size and mtime check cannot tell a replaced source
-      // from the old one when both land in the same clock tick, so it only guards the copy fallback.
       const pending = `${to}.tmp-${process.pid}`;
       fs.rmSync(pending, { force: true });
       try {

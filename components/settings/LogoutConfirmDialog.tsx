@@ -7,7 +7,6 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 
-/** The pending-change line: the actual count, a checking state, or that it could not be checked. Never a guessed zero. */
 export type PendingCountState = { kind: "checking" } | { kind: "known"; count: number } | { kind: "unknown" };
 
 export function logoutConfirmMessage(pending: PendingCountState, s: UIStrings, language: "en" | "ar"): string {
@@ -23,18 +22,12 @@ export function logoutConfirmMessage(pending: PendingCountState, s: UIStrings, l
 type Props = {
   visible: boolean;
   db: DatabaseExecutor;
-  /** The signed-in account as the person knows it (email, else username). */
   accountName: string;
   loading: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 };
 
-/**
- * Log out confirmation. It names the account and reads the account sync queue each time it opens.
- * Sign-out keeps the existing cleanup policy: local study data stays on this device, and the copy does
- * not promise that pending changes are backed up.
- */
 export function LogoutConfirmDialog({ visible, db, accountName, loading, onCancel, onConfirm }: Props) {
   const s = useStrings();
   const { isDark, isRTL, uiLanguage } = useSettings();

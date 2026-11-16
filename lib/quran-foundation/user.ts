@@ -11,9 +11,6 @@ import type {
 } from "./user-types";
 import { QF_OAUTH_PROVIDER, QF_OAUTH_SCOPES } from "./user-types";
 
-// Edge-function replies are checked before use. Success payloads for bookmarks and notes are
-// validated in user-payloads.ts; the error body and the connection replies are checked here, and
-// a malformed one becomes the same "unavailable" error as a failed call (RF193).
 const UNAVAILABLE: QfUserError = {
   ok: false,
   code: "upstream",

@@ -43,18 +43,12 @@ import { accentIconColor, mutedIconColor } from "@/lib/ui/theme-icons";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/**
- * Semantic navigation tokens. Active items use gold text on primary-soft (7.1:1). Inactive items use
- * one solid color, never a second opacity layer: the theme's muted text on surfaces (6:1 or more)
- * and a light teal on the primary sidebar (8.6:1).
- */
 const NAV_TOKENS = {
   activeBackground: "#1B4D4F",
   activeText: "#FDDC91",
   inactiveOnPrimary: "#C7D3D1",
 } as const;
 const PANEL_WIDTH = 248;
-/** Below 768px the floating bar shows these four tabs, in this order. */
 export const PHONE_TAB_ROUTES = ["home", "mushaf", "progress", "settings"] as const;
 const SIDEBAR_PRIMARY_ROUTES = [
   "home",
@@ -82,12 +76,10 @@ function getRouteItems(
   });
 }
 
-/** Another modal surface (an open overlay) owns Escape while it is on top. */
 function hasOpenModalSurface() {
   return typeof document !== "undefined" && document.querySelector('[aria-modal="true"]') !== null;
 }
 
-// ─── Bottom Tab Bar (mobile) ─────────────────────────────────
 
 function BottomTabItem({
   route,
@@ -105,10 +97,8 @@ function BottomTabItem({
   isFocused: boolean;
   onPress: () => void;
   onLongPress: () => void;
-  /** Inactive labels use the theme's solid secondary text colour, 4.5:1 or more on the bar. */
   inactiveColor: string;
   compact: boolean;
-  /** The largest system text scale at which all four labels still fit this bar. */
   labelScaleCap: number;
   isRTL?: boolean;
 }) {
@@ -144,12 +134,10 @@ function BottomTabItem({
       accessibilityState={isFocused ? { selected: true } : {}}
       style={[animatedStyle, styles.bottomTabSlot]}
     >
-      {/* The pill hugs the label; the press target is the item's whole share of the bar. */}
       <View
         style={[styles.bottomTabItem, compact && styles.bottomTabItemCompact, isFocused && styles.bottomTabItemActive]}
       >
         {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
-        {/* Arabic labels keep their natural line height so marks above and below are not clipped. */}
         <Text
           numberOfLines={1}
           maxFontSizeMultiplier={labelScaleCap}
@@ -238,7 +226,6 @@ function BottomBar(props: BottomTabBarProps & { isRTL?: boolean }) {
             onLongPress={onLongPress}
             inactiveColor={inactiveTabColor}
             compact={compact}
-            // Four 11px labels fit 320px at standard size, 360px up to about 1.15x and 390px up to 1.3x.
             labelScaleCap={width < 360 ? 1 : width < 390 ? 1.15 : 1.3}
             isRTL={isRTL}
           />
@@ -248,7 +235,6 @@ function BottomBar(props: BottomTabBarProps & { isRTL?: boolean }) {
   );
 }
 
-// ─── Panel and sidebar (768px and wider) ─────────────────────
 
 function SidebarRow({
   label,
@@ -275,7 +261,6 @@ function SidebarRow({
     : isPersistent
       ? NAV_TOKENS.inactiveOnPrimary
       : mutedIconColor(theme);
-  // Hover and keyboard focus show a primary-soft background; the active item keeps it solid.
   const highlight = isPersistent
     ? NAV_TOKENS.activeBackground
     : withThemeOpacity(NAV_TOKENS.activeBackground, isDarkSurface ? 0.6 : 0.12);
@@ -334,13 +319,6 @@ function SidebarSeparator({ isDark, isPersistent }: { isDark: boolean; isPersist
   );
 }
 
-/**
- * The profile entry. Signed out it shows Guest with an optional Log in action; while the session
- * restores it shows Signing in; while account data loads it shows a neutral Profile name, and a
- * fallback profile shows Hafiz user until the real one loads. No part of the email address is shown.
- * Only a confirmed session end (not a connectivity error) adds the log-in-again line; local progress
- * stays. The sync state sits at the end of the card.
- */
 function SidebarProfileCard({
   isDark,
   isRTL,
@@ -418,7 +396,6 @@ function SidebarProfileCard({
             <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, color: nameColor }}>{s.navigationLogIn}</Text>
           </Pressable>
         ) : null}
-        {/* The sync state opens its details (last success, pending changes, guarded retry) in Settings > Account. */}
         {user && syncStatus !== "idle" && syncStatus !== "synced" ? (
           <Pressable
             onPress={openSyncDetails}
@@ -464,7 +441,6 @@ function SidebarContent({
   isRTL?: boolean;
   isPersistent?: boolean;
   onNavigate?: () => void;
-  /** Floating panels show a labeled Close button. */
   onClose?: () => void;
 }) {
   const s = useStrings();
@@ -564,12 +540,6 @@ function SidebarContent({
   );
 }
 
-/**
- * Edge-triggered panel for 768-1023px and for Mushaf at every width from 768px. It opens only by
- * click, tap or keyboard on the visible trigger. While open, a capturing outside layer dismisses it
- * on the first outside press without activating what is underneath; Close, Escape and Android Back
- * also dismiss it and focus returns to the trigger.
- */
 function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { isRTL } = props;
   const s = useStrings();
@@ -596,8 +566,6 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
     if (!chromeVisible) setOpen(false);
   }, [chromeVisible]);
 
-  // Destinations mount while open and through the closing fade, so a closed panel has nothing in the
-  // keyboard order.
   const [contentMounted, setContentMounted] = useState(false);
   useEffect(() => {
     if (open) {
@@ -675,7 +643,6 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
         />
       ) : null}
 
-      {/* A 44px target in the reserved gutter; the visible tab hugs the screen edge. */}
       <Pressable
         ref={triggerRef}
         onPress={togglePanel}
@@ -750,7 +717,6 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   );
 }
 
-/** The persistent desktop sidebar stays nonmodal: no outside layer, the page keeps working beside it. */
 function PersistentSidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { isRTL } = props;
   const insets = useSafeAreaInsets();
@@ -778,13 +744,7 @@ function PersistentSidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
   );
 }
 
-// ─── Responsive wrapper ─────────────────────────────────────
 
-/**
- * Below 768px: the four-tab floating bar. From 768px: every destination plus Search in the edge
- * panel, which becomes the persistent sidebar from 1024px except on Mushaf, where the reader keeps
- * the full width and the edge panel serves instead. Switching presentation never remounts the tabs.
- */
 export function AppNavigation(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { width } = useWindowDimensions();
   const hasPersistentSidebar = width >= PERSISTENT_SIDEBAR_BREAKPOINT;
@@ -800,10 +760,8 @@ export function AppNavigation(props: BottomTabBarProps & { isRTL?: boolean }) {
   return <BottomBar {...props} />;
 }
 
-// ─── Styles ─────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  // Bottom bar
   bottomContainer: {
     position: "absolute",
     left: 12,
@@ -820,11 +778,9 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 8,
   },
-  // Below 360 px the bar and pills tighten so every tab keeps its whole label and a 44 px target.
   bottomContainerCompact: {
     paddingHorizontal: 4,
   },
-  // Each tab is as wide as its label and pill, at least 44 px, and shares what is left of the bar.
   bottomTabSlot: {
     flexGrow: 1,
     flexShrink: 1,

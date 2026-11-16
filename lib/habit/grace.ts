@@ -8,10 +8,6 @@ const GRACE_MAX_HELD = 2;
 
 const EARNS_GRACE: ReadonlySet<DayStatus> = new Set<DayStatus>(["done", "made_up", "earned_back"]);
 
-/**
- * STR-14: grace days are earned free, one after the 3rd wird day and then one every 7 wird days,
- * holding at most 2. Feed day statuses in date order; a grace day spends one.
- */
 export class GraceCounter {
   private earnedRun = 0;
   private firstAwarded = false;
@@ -33,7 +29,6 @@ export class GraceCounter {
   }
 }
 
-/** The grace balance held before `before`, derived from history and never stored (DB-06). */
 export function graceBalance(days: DayMap, before: LocalDate): number {
   const counter = new GraceCounter();
   for (const date of [...days.keys()].filter((date) => date < before).sort()) counter.add(days.get(date)!.status);

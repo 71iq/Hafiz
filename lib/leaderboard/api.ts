@@ -3,11 +3,6 @@ import { parseAchievementUnlockRows, parsePublicProfileRow, parseSurahProgressRo
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { AchievementUnlock } from "@/lib/achievements/types";
 
-/**
- * Profile reads for other people. Since the learning-and-consistency migration only identity is
- * public; streak and juz completions come from get_profile_summary (lib/profile/privacy.ts) when the
- * person shared them. Totals, scores and the public leaderboards were retired (spec 5.6, SOC-01).
- */
 export type PublicProfile = {
   id: string;
   username: string;
@@ -25,7 +20,6 @@ export type PublicSurahProgressRow = {
 
 const PROFILE_COLUMNS = "id, username, display_name, avatar_url, bio, country";
 
-/** Public identity for a profile page. */
 export async function fetchPublicProfile(userId: string): Promise<PublicProfile | null> {
   if (!isSupabaseConfigured()) return null;
 
@@ -46,10 +40,6 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
   return parsePublicProfileRow(data);
 }
 
-/**
- * Badges this viewer may read: the owner's own, or another person's juz completions when a shared
- * halaqa has them. Row-level security filters the rest.
- */
 export async function fetchPublicAchievementUnlocks(userId: string): Promise<AchievementUnlock[]> {
   if (!isSupabaseConfigured() || !userId) return [];
 
@@ -69,7 +59,6 @@ export async function fetchPublicAchievementUnlocks(userId: string): Promise<Ach
   }));
 }
 
-/** The signed-in owner's server copy of their surah progress. Nobody else can read it. */
 export async function fetchPublicSurahProgress(userId: string): Promise<PublicSurahProgressRow[]> {
   if (!isSupabaseConfigured() || !userId) return [];
 

@@ -112,7 +112,6 @@ export function useOperationNotice(): (message: string) => void {
   return value.showNotice;
 }
 
-/** Like useOperationNotice, but a no-op outside the provider, for shared editors rendered in isolation. */
 export function useOptionalOperationNotice(): (message: string) => void {
   return useContext(NoticeContext)?.showNotice ?? ignoreNotice;
 }
@@ -125,7 +124,6 @@ export function useInlineOperationNotice(): () => InlineNoticeAttempt {
   return value.createInlineAttempt;
 }
 
-/** Present above the clipped content in the existing modal window. */
 export function OperationNoticeOverlay({ overlayId, open }: { overlayId: string; open: boolean }) {
   const value = useContext(NoticeContext);
   const registerOverlay = value?.registerOverlay;

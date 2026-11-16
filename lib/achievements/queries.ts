@@ -44,7 +44,6 @@ export function subscribeAchievementUnlocks(listener: AchievementUnlockListener)
   return () => listeners.delete(listener);
 }
 
-/** Unlocks committed by one transaction, published to listeners only after it commits. */
 type UnlockSink = AchievementUnlock[] | null;
 
 function publishUnlocks(unlocks: AchievementUnlock[]): void {
@@ -53,10 +52,6 @@ function publishUnlocks(unlocks: AchievementUnlock[]): void {
   }
 }
 
-/**
- * Record an event's progress and unlocks. Each unlock and its queued upload commit together, and
- * listeners hear about unlocks only after the transaction commits.
- */
 export async function recordAchievementEvent(db: AppDatabase, event: AchievementEvent): Promise<void> {
   const unlocks: AchievementUnlock[] = [];
   await db.withTransactionAsync((tx) => applyAchievementEvent(tx, event, unlocks));
@@ -99,7 +94,6 @@ async function applyAchievementEvent(db: DatabaseExecutor, event: AchievementEve
   }
 }
 
-/** Derive unlocks from local data in one transaction; optionally publish new unlocks after commit. */
 export async function backfillAchievements(
   db: AppDatabase,
   options: { notify?: boolean } = {}
@@ -172,7 +166,6 @@ export async function getRecentUnlocks(
     .map(rowToUnlock);
 }
 
-/** Unseen unlocks of active achievements, newest first (at most ten), for Home's notice queue. */
 export async function getUnseenUnlocks(db: DatabaseExecutor): Promise<AchievementUnlock[]> {
   const activeIds = new Set(ACHIEVEMENTS.filter((achievement) => achievement.active).map((achievement) => achievement.id));
   const rows = await db.getAllAsync<UnlockRow>(

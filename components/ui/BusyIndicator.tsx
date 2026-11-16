@@ -4,7 +4,6 @@ import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
 type Props = { size: number | "small"; color: string };
 
-/** Keep busy feedback visible when the system disables motion. */
 export function BusyIndicator({ size, color }: Props) {
   const reduceMotion = useReducedMotionPreference();
   if (!reduceMotion) return <ActivityIndicator size={size} color={color} />;

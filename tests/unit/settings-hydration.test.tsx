@@ -379,7 +379,6 @@ describe("W14 settings write feedback and translation choice", () => {
     });
     expect(result.current.pageScroll).toBe("vertical");
     expect(failures).toEqual(["page_scroll"]);
-    // The setter keeps its identity across value changes.
     expect(result.current.setPageScroll).toBe(setter);
     unsubscribe();
   });
@@ -422,7 +421,6 @@ describe("W14 settings write feedback and translation choice", () => {
       finishImport();
       await importing;
     });
-    // The finished import records its rows but cannot take the selection back.
     expect(result.current.translationLanguage).toBe("en");
     expect(fixture.settings.get("translation_language")).toBe("en");
     expect(fixture.settings.get("translation_active_lang")).toBe("fr");

@@ -1,5 +1,3 @@
--- Keep public profile review activity in sync with private study_log.
--- Public profile surfaces must not depend on stale client-only daily_scores.
 
 CREATE SCHEMA IF NOT EXISTS private;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;

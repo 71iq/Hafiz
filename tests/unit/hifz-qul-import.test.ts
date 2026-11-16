@@ -1,6 +1,5 @@
 import { importQulPhrases } from "@/lib/hifz/qul-import";
 
-// A hand-written fixture in the QUL export format (4.7.1 D-3); no QUL data is copied here.
 const fixture = {
   "7": {
     surahs: 2,

@@ -2,13 +2,7 @@ import { Platform } from "react-native";
 import { readBundledJson } from "./bundled-json";
 import type { TafsirSourceId } from "@/lib/tafsir/sources";
 
-// ─── Platform-aware data loading ─────────────────────────────
-// On web: fetch from /data/ (static files served from public/)
-// On native: require() the assets/native-data mirror, which Metro ships as assets rather than
-// JavaScript, and read each file at runtime (RF188; see scripts/native-data-mirror.cjs)
 
-// Native-only require map — these are stripped from the web bundle
-// because the loadData() web path uses fetch() instead.
 export const nativeRequires: Record<string, () => any> =
   Platform.OS !== "web"
     ? {
@@ -46,7 +40,6 @@ export const nativeTafseerRequires: Record<number, () => any> =
         Array.from({ length: 114 }, (_, i) => i + 1).map((n) => [
           n,
           () => {
-            // Metro needs static string literals — we use a switch
             return tafseerRequireStatic(n);
           },
         ]),
@@ -908,8 +901,6 @@ export const nativeAlBahrAlMadidRequires: Record<number, () => any> =
     : {};
 
 function tafseerRequireStatic(n: number): any {
-  // Metro bundler requires static string literals for require() calls.
-  // This function is only called on native, never on web.
   switch (n) {
     case 1:
       return readBundledJson(require("../../assets/native-data/tafseer/1.hafizdata"));

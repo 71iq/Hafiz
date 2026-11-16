@@ -31,7 +31,6 @@ function token(ayah: number, wordPos: number): PageToken {
   return { glyph: `g${ayah}-${wordPos}`, surah: 2, ayah, wordPos, isMarker: false, firstLetter: "ب" };
 }
 
-/** A 15-line page, one ayah per line, two words each. */
 const page: RecitationPage = {
   page: 5,
   lines: Array.from(
@@ -127,7 +126,6 @@ describe("half pages and seams from a page grade", () => {
   it("grades a page recited in halves once, proposing the lower half's grade and relearning the half that held the errors (UNIT-02)", async () => {
     const cards = await loadPageCards(store.db, { today: TODAY, plan });
     const card = cards.find((candidate) => candidate.page === 5)!;
-    // The first half is clean at hidden text; the second needed Show me at first letters.
     const a: Attempt = emptyAttempt(4);
     const b: Attempt = { ...emptyAttempt(1), shown: [wordOn(12)], slips: 1 };
     expect(proposedHalvesRating({ a, b })).toBe(Rating.Again);
@@ -146,7 +144,6 @@ describe("half pages and seams from a page grade", () => {
       page,
     });
     expect(result.remediation).toEqual({ half: "b", seam: null });
-    // One review of the page, at the lower half's level, with the lower half's proposal.
     expect(store.sql.prepare("SELECT card_id, rating, support_level, proposed_rating, error_count FROM study_log").all()).toEqual([
       { card_id: card.row.id, rating: Rating.Again, support_level: 1, proposed_rating: Rating.Again, error_count: 2 },
     ]);
@@ -195,7 +192,6 @@ describe("half pages and seams from a page grade", () => {
     const stumbled = await gradePage({ ...emptyAttempt(4), seam: { clean: false, ...seam } }, Rating.Again, later);
     expect(stumbled.remediation.seam).toBe("lapsed");
     expect(await ids(new Date(later.getTime() + 10 * MINUTE))).toEqual(["seam:madani15:5"]);
-    // The stumble is logged on the page but relearns as the seam, not as an ayah drill.
     expect(store.sql.prepare("SELECT type FROM recitation_errors").all()).toEqual([{ type: "seam" }]);
     expect(await countMistakeInbox(store.db, TODAY)).toBe(0);
   });
@@ -205,7 +201,6 @@ describe("half pages and seams from a page grade", () => {
     await gradePage({ ...emptyAttempt(4), seam: { clean: false, ...seam } }, Rating.Again);
     const later = new Date(start.getTime() + 11 * MINUTE);
     await gradePage({ ...emptyAttempt(4), seam: { clean: true, ...seam } }, Rating.Good, later);
-    // The clean continuation counts as the 10-minute step; the seam still comes back the next day.
     expect(await ids(new Date(later.getTime() + 60 * MINUTE))).toEqual([]);
     expect(await ids(new Date(later.getTime() + 24 * 60 * MINUTE + MINUTE))).toEqual(["seam:madani15:5"]);
   });
@@ -379,7 +374,6 @@ describe("weak spots (ERR-06)", () => {
     const counts: string[] = [];
     const now = atLocalTime(addDays(TODAY, 3), 700);
     await store.db.withTransactionAsync(async (tx) => {
-      // Record each read of the error log made through this executor.
       const counting = new Proxy(tx, {
         get(target, key) {
           const value = Reflect.get(target, key);

@@ -1,5 +1,3 @@
-// Auto-generated: QPC V2 per-page font require map
-// Each require() returns an asset ID/URL — binary loaded on demand by Font.loadAsync
 
 export const QPC_V2_FONTS: Record<number, any> = {
   1: require("../../assets/fonts/QPC_V2/p1.ttf"),

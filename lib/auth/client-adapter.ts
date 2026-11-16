@@ -100,11 +100,9 @@ export function createOwnedAuthClient(options: Options) {
           return;
       }
       if (!authorized()) return;
-      // Start credential propagation while the matching storage transaction still owns the lock.
       if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN")
         pending.push(client.realtime.setAuth(session?.access_token));
       else if (event === "SIGNED_OUT") {
-        // Supabase uses the public key while anonymous. Avoid a second, stale async session lookup.
         pending.push(client.realtime.setAuth(options.anonKey));
       }
       if (authorized() && publish && (session === null || sessionIdentity(session) !== null))
@@ -162,8 +160,6 @@ export function createOwnedAuthClient(options: Options) {
   function commandClient(): Promise<Auth> {
     if (!ready) {
       ready = (async () => {
-        // Initialize SDK subscriptions against empty private storage. Real session reads start only
-        // after the bridge is ready and run() has activated the command ownership scope.
         let bootstrapped = false;
         const bootstrap = new Map<string, string>();
         const commandStorage: Backing = {
@@ -177,8 +173,6 @@ export function createOwnedAuthClient(options: Options) {
             bootstrap.delete(name);
           },
         };
-        // Command operations need the auth SDK only. A second Supabase realtime client would
-        // turn rejected-recovery SIGNED_OUT cleanup into unsolicited reads/refreshes of prior A.
         const baseUrl = options.url.trim();
         const auth = new AuthClient({
           url: new URL("auth/v1", baseUrl.endsWith("/") ? baseUrl : baseUrl + "/").href,
@@ -206,7 +200,6 @@ export function createOwnedAuthClient(options: Options) {
           if (commandActive && noticeEvent(event))
             return deliver(event, session, true, owned.capturePublication(session));
         });
-        // Drain SDK initial-session reads before activating a command ownership scope.
         await new Promise<void>((resolve) => {
           const barrier = auth.onAuthStateChange((event) => {
             if (event === "INITIAL_SESSION") {
@@ -230,9 +223,6 @@ export function createOwnedAuthClient(options: Options) {
     mode: "owned" | "recovery" | "replacement" = "owned",
     expectedUserId?: string,
   ): Promise<T> {
-    // OAuth's returned QF reader can outlive the coordinator reservation. Queue the
-    // entire private operation before activating its single storage/publication guard.
-    // Admission still validates the captured owner after all earlier work settles.
     const result = commandTail.then(async () => {
       const auth = await commandClient();
       const execute = async () => {
@@ -283,8 +273,6 @@ export function createOwnedAuthClient(options: Options) {
           const result = await options.lock("lock:" + options.storageKey, -1, () =>
             auth.signInWithPassword(credentials),
           );
-          // A suppressed notice cannot authorize fallback publication of this reply.
-          // Preserve an original SDK error, including invalid candidate identity.
           if (!result.error) await owned.storage.getItem(commandKey);
           return result;
         },
@@ -303,7 +291,6 @@ export function createOwnedAuthClient(options: Options) {
       ),
     prepareLink: (owner: AuthOwner, session: Session | null, credentials: SignInWithOAuthCredentials) =>
       run(owner, session, (auth) =>
-        // Installed linkIdentityOAuth uses _useSession without acquiring the SDK lock.
         options.lock("lock:" + options.storageKey, -1, () => auth.linkIdentity(credentials)),
       ),
     updatePassword: (owner: AuthOwner, session: Session | null, password: string) =>

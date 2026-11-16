@@ -17,7 +17,6 @@ function escapeText(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
-/** RFC 5545 3.1: fold lines longer than 75 octets, without splitting a UTF-8 character. */
 export function foldLine(line: string): string {
   const encoder = new TextEncoder();
   const parts: string[] = [];
@@ -46,10 +45,6 @@ function utcStamp(at: Date): string {
   return at.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
-/**
- * AMB-05: one daily repeating event with a reminder at its start. The time is floating (no zone),
- * so it stays at the same wall-clock time wherever the calendar is.
- */
 export function buildWirdCalendar(input: {
   date: LocalDate;
   minutes: number;
@@ -87,10 +82,6 @@ export function buildWirdCalendar(input: {
   return `${lines.map(foldLine).join("\r\n")}\r\n`;
 }
 
-/**
- * The calendar file for the user's reminder time. A prayer anchor uses today's time, rounded to 5
- * minutes, and the description says that prayer times move through the year.
- */
 async function buildWirdCalendarForUser(
   db: DatabaseExecutor,
   { now = new Date(), language, clock = deviceClock }: { now?: Date; language?: Language; clock?: DayClock } = {},
@@ -120,12 +111,10 @@ async function buildWirdCalendarForUser(
     title: strings.notifCalendarEventTitle,
     description,
     now,
-    // A stable UID lets a calendar update the event when the file is added again.
     uid: "daily-wird@hafizquran.app",
   });
 }
 
-/** Build the file and hand it to the platform: a download on web, the share sheet on native. */
 export async function exportWirdCalendar(
   db: DatabaseExecutor,
   options: { now?: Date; language?: Language } = {},

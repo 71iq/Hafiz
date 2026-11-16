@@ -2,13 +2,10 @@ import type { DatabaseExecutor } from "@/lib/database/types";
 import { deleteStudyCardRow, insertNewStudyCard, restoreDeletedStudyCard } from "@/lib/fsrs/queries";
 import { HIFZ_PAGES_DECK_ID } from "@/lib/hifz/units";
 
-/** ERR-06: a location wrong in this many separate sessions is a weak spot. */
 export const WEAK_SPOT_SESSIONS = 3;
 
-/** The errors that count toward a weak spot: clear errors, not tajweed, hesitation or caught slips. */
 export const WEAK_SPOT_ERROR_SQL = "deleted_at IS NULL AND type NOT IN ('tajweed', 'hesitation') AND corrected != 'self'";
 
-/** ERR-06, 4.5 "Fill the gap": one card per weak word, the ayah shown with that word hidden. */
 export function clozeCardId(surah: number, ayah: number, word: number): string {
   return `cloze:${surah}:${ayah}:${word}`;
 }
@@ -20,11 +17,9 @@ export function parseClozeCardId(id: string): { surah: number; ayah: number; wor
   return surah >= 1 && surah <= 114 && ayah >= 1 && word >= 1 ? { surah, ayah, word } : null;
 }
 
-/** Where an error was logged; errors.ts imports this module, so the shape is declared here. */
 type ErrorLocation = Readonly<{ surah: number; ayah: number | null; word: number | null }>;
 type WordLocation = Readonly<{ id: string; surah: number; ayah: number; word: number }>;
 
-/** Each word location once, in first-seen order. Ayah-level errors have no word and no cloze card. */
 function wordLocations(errors: readonly ErrorLocation[]): WordLocation[] {
   const locations = new Map<string, WordLocation>();
   for (const { surah, ayah, word } of errors) {
@@ -35,7 +30,6 @@ function wordLocations(errors: readonly ErrorLocation[]): WordLocation[] {
   return [...locations.values()];
 }
 
-/** Keeps each query well under SQLite's bound-parameter limit when a sync pull passes many locations. */
 const LOCATIONS_PER_QUERY = 200;
 
 function batches<T>(items: readonly T[]): T[][] {
@@ -44,7 +38,6 @@ function batches<T>(items: readonly T[]): T[][] {
   return result;
 }
 
-/** The ids of the cloze cards that exist and are not deleted, among `ids`. */
 async function liveClozeIds(db: DatabaseExecutor, ids: readonly string[]): Promise<Set<string>> {
   const live = new Set<string>();
   for (const batch of batches(ids)) {
@@ -57,13 +50,8 @@ async function liveClozeIds(db: DatabaseExecutor, ids: readonly string[]): Promi
   return live;
 }
 
-/** WEAK_SPOT_ERROR_SQL with dismissed errors counted too: what a location held before its dismissals. */
 const WEAK_SPOT_ERROR_WITH_DISMISSED_SQL = "type NOT IN ('tajweed', 'hesitation') AND corrected != 'self'";
 
-/**
- * The cloze ids of the locations wrong in WEAK_SPOT_SESSIONS or more sessions, in one grouped query
- * per batch. With `includeDismissed`, dismissed errors count as well.
- */
 async function weakLocationIds(
   db: DatabaseExecutor,
   locations: readonly WordLocation[],
@@ -84,16 +72,6 @@ async function weakLocationIds(
   return weak;
 }
 
-/**
- * Give each word location among `errors` that is now a weak spot (wrong in 3 or more sessions) its
- * cloze card: a new card due now, or a deleted one restored with its schedule and history. Locations
- * that already have a live card are skipped before any counting. Returns how many cards were created
- * or restored. Pass a transaction: each card queues its upload.
- *
- * Runs inside the grade transaction with the grade's errors. Call it after a sync pull too, with the
- * pulled recitation_errors rows, so a weak spot whose sessions came from more than one device gets
- * its card.
- */
 export async function createWeakSpotCards(db: DatabaseExecutor, errors: readonly ErrorLocation[], now: Date): Promise<number> {
   const locations = wordLocations(errors);
   if (locations.length === 0) return 0;
@@ -104,25 +82,17 @@ export async function createWeakSpotCards(db: DatabaseExecutor, errors: readonly
   let created = 0;
   for (const location of missing) {
     if (!weak.has(location.id)) continue;
-    // A card deleted here or on another device comes back as it was, training kept: a deletion made
-    // from a device missing some of this word's errors must not cost the reviews already done.
     if (await restoreDeletedStudyCard(db, location.id, now)) created += 1;
     else if (await insertNewStudyCard(db, { id: location.id, deckId: HIFZ_PAGES_DECK_ID, due: now, now: now.toISOString() })) created += 1;
   }
   return created;
 }
 
-/** The cloze ids of the word locations among `errors` that are weak spots now. */
 export async function weakSpotIds(db: DatabaseExecutor, errors: readonly ErrorLocation[]): Promise<Set<string>> {
   const locations = wordLocations(errors);
   return locations.length === 0 ? new Set() : weakLocationIds(db, locations);
 }
 
-/**
- * Soft-delete the cloze card of each word location among `errors` that is no longer a weak spot,
- * for example after an error there was dismissed as logged by mistake. Each delete queues its
- * upload, so pass the transaction that removed the error. Returns how many cards were deleted.
- */
 export async function removeClearedWeakSpotCards(db: DatabaseExecutor, errors: readonly ErrorLocation[]): Promise<number> {
   const locations = wordLocations(errors);
   if (locations.length === 0) return 0;
@@ -139,12 +109,6 @@ export async function removeClearedWeakSpotCards(db: DatabaseExecutor, errors: r
   return removed;
 }
 
-/**
- * After a full restore: soft-delete the cloze card of each location among `errors` whose dismissals
- * took it below 3 sessions, that is wrong in 3 or more sessions counting dismissed errors and in
- * fewer counting only live ones. A location that merely lacks errors another device has not uploaded
- * yet keeps its card, since it never reached 3 here. Pass the restored dismissed errors.
- */
 export async function removeDismissedWeakSpotCards(db: DatabaseExecutor, errors: readonly ErrorLocation[]): Promise<number> {
   const locations = wordLocations(errors);
   if (locations.length === 0) return 0;

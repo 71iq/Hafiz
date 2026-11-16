@@ -40,8 +40,6 @@ const Context = createContext<{
 } | null>(null);
 const isResetPath = (path: string) => path.replace(/\/+$/, "") === "/auth/reset-password";
 
-// Keep recovery above the database/audio Stack replacement. The form can remount without
-// replaying credentials or losing the synchronous submission guard.
 export function PasswordRecoveryProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const params = useGlobalSearchParams();
@@ -92,8 +90,6 @@ export function PasswordRecoveryProvider({ children }: { children: ReactNode }) 
     if (!configured || !isResetPath(pathname)) return;
     const inputHash = Platform.OS === "web" ? window.location.hash : "";
     if (Platform.OS === "web" && inputHash) {
-      // Updating only browser history lets Router restore its original fragment. Updating
-      // location.hash dispatches popstate and replaces the root, so update both states directly.
       window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
       router.setParams({ "#": "" });
     }
@@ -174,7 +170,6 @@ export function PasswordRecoveryProvider({ children }: { children: ReactNode }) 
         const signout = await finishPasswordRecovery(owner);
         if (isActive(current) && signout.status === "completed" && owner.isCurrent()) {
           setState({ kind: "finished" });
-          // The route is replaced, so Login shows the saved-password notice itself.
           setAuthHandoffNotice("password-updated");
           router.replace("/auth/login");
         }

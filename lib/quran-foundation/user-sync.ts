@@ -450,7 +450,6 @@ async function pullQfRemoteChanges(owner: QfSyncOwner, db: AppDatabase): Promise
 
   let pulled = 0;
   await db.withTransactionAsync(async (tx) => {
-    // The owned reservation admits this merge as one transaction.
     if (!owner.isCurrent()) return;
     for (const bookmark of bookmarks) {
       if (await mergeRemoteBookmark(tx, bookmark)) pulled += 1;

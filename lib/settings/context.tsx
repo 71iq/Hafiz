@@ -25,19 +25,13 @@ import { setHapticsEnabled } from "@/lib/haptics";
 import { getResolvedUiBootstrap, writeUiBootstrap } from "@/lib/settings/ui-bootstrap";
 import { emitSettingSaveFailed } from "@/lib/settings/save-feedback";
 
-// Desktop / large-viewport scale. Also the canonical length (10 levels) used
-// by UI controls like the font size picker.
 export const FONT_SIZE_STEPS = [22, 26, 30, 34, 38, 42, 46, 50, 54, 58] as const;
 export const FONT_SIZE_LINE_HEIGHTS = [48, 56, 64, 72, 80, 88, 96, 104, 112, 120] as const;
 
-// Mobile scale — roughly 65–70% of desktop at each step. Ten levels aligned
-// 1-to-1 with FONT_SIZE_STEPS so the saved fontSizeIndex is portable.
 export const FONT_SIZE_STEPS_MOBILE = [14, 17, 20, 23, 26, 29, 32, 35, 38, 41] as const;
 export const FONT_SIZE_LINE_HEIGHTS_MOBILE = [32, 38, 44, 50, 56, 62, 68, 74, 80, 86] as const;
 
-export const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 20px (verse view)
-// Viewports narrower than the shared sidebar breakpoint use the mobile scale. Wider web viewports and
-// native tablets (768px and above) use the desktop reader scale with the same saved index.
+export const DEFAULT_FONT_SIZE_INDEX = 2;
 
 export const DEFAULT_DAILY_REVIEW_LIMIT = 20;
 export const MIN_DAILY_REVIEW_LIMIT = 10;
@@ -51,7 +45,6 @@ export const MIN_HIFZ_AUTO_DELAY_MS = 250;
 export const MAX_HIFZ_AUTO_DELAY_MS = 5000;
 export const HIFZ_AUTO_DELAY_STEP_MS = 250;
 
-// Device-only preferences (C05). These names stay outside every syncable key and prefix.
 export const DEVICE_SETTING_KEYS = {
   accountPromoDismissedAt: "device_account_promo_dismissed_at",
   bookmarksOrder: "device_bookmarks_order",
@@ -70,7 +63,6 @@ export const DEFAULT_AUDIO_DELAY_SECONDS = 1;
 export const ACCOUNT_PROMO_DISMISS_MS = 14 * 24 * 60 * 60 * 1000;
 export type BookmarksOrder = "recent" | "quran";
 
-/** Strict integer decode: rejects signs, fractions, blanks and out-of-range values. */
 export function decodeBoundedInt(raw: string | null | undefined, min: number, max: number): number | null {
   if (raw == null || !/^\d+$/.test(raw)) return null;
   const value = Number(raw);
@@ -85,10 +77,6 @@ export function decodeBookmarksOrder(raw: string | null | undefined): BookmarksO
   return raw === "recent" || raw === "quran" ? raw : null;
 }
 
-/**
- * The account promotion stays hidden for 14 days after a dismissal. Invalid or future timestamps do
- * not hide it indefinitely.
- */
 export function isAccountPromoDismissed(raw: string | null | undefined, now = Date.now()): boolean {
   if (!raw) return false;
   const dismissedAt = Date.parse(raw);
@@ -207,19 +195,12 @@ type SettingsContextType = {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   quranFontStyle: QuranFontStyle;
-  /**
-   * The page font style to draw with. The V4 fonts are colour fonts whose base glyphs carry a fixed
-   * black palette entry, which Android draws regardless of text colour, so in dark themes native
-   * draws V4 choices with the QCF2 font instead of black text on a dark page. Web recolours the
-   * palette and keeps the choice. Settings pickers show quranFontStyle, the user's choice.
-   */
   quranRenderFontStyle: QuranFontStyle;
   setQuranFontStyle: (style: QuranFontStyle) => void;
   quranMarkerStyle: QuranMarkerStyle;
   setQuranMarkerStyle: (style: QuranMarkerStyle) => void;
   showAyahMarkers: boolean;
   setShowAyahMarkers: (show: boolean) => void;
-  /** MUT-02: mark ayat whose similar verse is memorized. On by default. */
   markSimilarVerses: boolean;
   setMarkSimilarVerses: (mark: boolean) => void;
   pageScroll: PageScroll;
@@ -229,11 +210,6 @@ type SettingsContextType = {
   showTafseer: boolean;
   setShowTafseer: (show: boolean) => void;
   translationLanguage: string;
-  /**
-   * Select a translation. Built-in English applies at once; another language is imported first. The
-   * previous choice stays selected if the import fails. `isCurrent` lets the picker cancel before the
-   * import replaces the active rows; a newer selection always wins over an older import.
-   */
   setTranslationLanguage: (code: string, options?: { isCurrent?: () => boolean }) => Promise<void>;
   isTranslationLoading: boolean;
   tafseerSource: TafseerSource;
@@ -250,12 +226,10 @@ type SettingsContextType = {
   setHifzAutoDelayMs: (delayMs: number) => void;
   hifzAutoAdvancePage: boolean;
   setHifzAutoAdvancePage: (enabled: boolean) => void;
-  /** Device-only: Home and Progress share one account-promotion dismissal (C05). */
   accountPromoDismissed: boolean;
   dismissAccountPromo: () => void;
   bookmarksOrder: BookmarksOrder;
   setBookmarksOrder: (order: BookmarksOrder) => void;
-  /** Device-only Follow recitation preference. Temporary suspension is the audio owner's state. */
   audioFollow: boolean;
   setAudioFollow: (follow: boolean) => void;
   audioRepeatRange: number;
@@ -361,8 +335,6 @@ const THEME_PALETTES: Record<
       "--color-warm-100": "249 243 235",
       "--color-warm-200": "232 225 218",
       "--color-warm-300": "223 217 209",
-      // Beige secondary text: these steps are text colours only, so they read at 4.6:1 or more on
-      // the beige surfaces (muted and caption text use warm-400).
       "--color-warm-400": "133 105 79",
       "--color-warm-500": "122 99 77",
       "--color-warm-600": "110 90 71",
@@ -497,7 +469,6 @@ function readCachedThemeMode(): ThemeMode {
 }
 
 function warnInvalidSetting(key: string) {
-  // Log only the key: saved values can be personal.
   if (typeof __DEV__ !== "undefined" && __DEV__) console.warn(`[Settings] Ignoring invalid saved value for ${key}`);
 }
 
@@ -549,10 +520,6 @@ async function writeSetting(db: AppDatabase | null, key: string, value: string):
   await writeUserSetting(db, key, value);
 }
 
-// The root layout owns the only provider. It mounts before the database is ready so routes never
-// remount it, and it keeps the last loaded values while a database connection is replaced, so the
-// language, direction and theme do not reset to defaults when a route opens or the connection
-// restarts. isLoaded is true only once the current connection's settings have been read.
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { db: connectedDb, isReady } = useDatabaseStatus();
   const db = isReady ? connectedDb : null;
@@ -590,17 +557,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [audioDelaySeconds, setAudioDelaySecondsState] = useState(DEFAULT_AUDIO_DELAY_SECONDS);
   const [hapticsEnabled, setHapticsEnabledState] = useState(true);
   const [loadedDb, setLoadedDb] = useState<AppDatabase | null>(null);
-  // Per-key write generations: a failed write reverts only if no newer choice was made since (C03).
   const writeGenerations = useRef(new Map<string, number>());
   const writesInFlight = useRef(new Map<string, number>());
-  // How to show each key's last committed value again; set when a write starts with none in flight
-  // and replaced by every successful write.
   const committedRestore = useRef(new Map<string, () => void>());
   const committedLanguage = useRef<UILanguage>(uiLanguage);
   const committedTheme = useRef<ThemeMode>(theme);
   const isLoaded = db !== null && loadedDb === db;
 
-  // Load settings from SQLite once each database connection is ready
   useEffect(() => {
     if (!db) return;
     let cancelled = false;
@@ -705,7 +668,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           setUiLanguageState(savedUiLang);
           cacheUiLanguage(savedUiLang);
           committedLanguage.current = savedUiLang;
-          // Reconcile the native startup mirror with SQLite, which stays authoritative.
           const mirror = getResolvedUiBootstrap();
           const nextTheme = normalizedTheme ?? committedTheme.current;
           if (Platform.OS !== "web" && (mirror?.language !== savedUiLang || mirror?.theme !== nextTheme)) {
@@ -831,11 +793,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setHapticsEnabled(hapticsEnabled);
   }, [hapticsEnabled]);
 
-  /**
-   * Saves one setting. The caller has already applied the optimistic value; if the write fails and
-   * no newer write for the same key has started, onFailure restores the last committed value.
-   */
-  // The values a failed write reverts to. Setters read them here so their identity stays stable.
   const latestValues = useRef({
     fontSizeIndex,
     viewMode,
@@ -870,11 +827,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     ) => {
       const generation = (writeGenerations.current.get(key) ?? 0) + 1;
       writeGenerations.current.set(key, generation);
-      // Before the database is ready (public pages, startup) keep the in-memory choice and web cache
-      // instead of reverting a deliberate change.
       if (!db) return;
-      // C03: a failure reverts to the last committed value. With no write in flight, the value shown
-      // before this one is the committed one; a later successful write becomes the new baseline.
       const inFlight = writesInFlight.current.get(key) ?? 0;
       if (inFlight === 0 && onFailure) committedRestore.current.set(key, onFailure);
       writesInFlight.current.set(key, inFlight + 1);
@@ -1044,7 +997,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (!db) throw new Error("Database not initialized");
       const request = ++translationRequest.current;
       if (code === DEFAULT_LANGUAGE) {
-        // English reads its own bundled table, so it never waits for an import in progress.
         setIsTranslationLoading(false);
         setTranslationLanguageState(code);
         await writeSetting(db, "translation_language", code);
@@ -1056,14 +1008,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         await importTranslation(db, code, {
           shouldContinue: () => isLatest() && (options.isCurrent?.() ?? true),
         });
-        // The rows are committed now, so record them even if a newer choice was made meanwhile.
         await writeSetting(db, "translation_active_lang", code);
         if (!isLatest()) return;
         setTranslationLanguageState(code);
         await writeSetting(db, "translation_language", code);
       } catch (e) {
-        // The previous translation stays selected. A failed or cancelled import rolled back or never
-        // started its transaction, so the active rows still belong to the previous choice.
         if (!(e instanceof TranslationImportCancelled)) console.warn("[Settings] Failed to import translation:", e);
         throw e;
       } finally {

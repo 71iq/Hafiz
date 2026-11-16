@@ -3,7 +3,6 @@ type SyncCompletedSummary = {
   pulled: number;
   accountRestored?: boolean;
   localDataReplaced?: boolean;
-  /** This sync finished the account's restore on this device, with or without remote data. */
   restoreCompleted?: boolean;
 };
 
@@ -25,7 +24,6 @@ export function subscribeSyncCompleted(listener: Listener) {
 type QueuedListener = () => void;
 const queuedListeners = new Set<QueuedListener>();
 
-/** A local change was queued for sync; the sync hook pushes it shortly after. */
 export function emitSyncQueued() {
   for (const listener of queuedListeners) listener();
 }

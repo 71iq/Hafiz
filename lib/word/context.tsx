@@ -25,7 +25,6 @@ type WordInteractionContextType = {
   clearTooltipDelayed: () => void;
   cancelTooltipClear: () => void;
   navigateToAyah: (surah: number, ayah: number, wordPos?: number) => void;
-  /** True inside the reader, where navigateToAyah moves the open Mushaf. */
   hasReaderNavigation: boolean;
   setNavigateToAyah: (fn: (surah: number, ayah: number, wordPos?: number) => void) => void;
 };
@@ -56,13 +55,11 @@ export function WordInteractionProvider({ children }: { children: React.ReactNod
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setTooltipWord = useCallback((word: WordRef | null, position?: TooltipPosition) => {
-    // Cancel any pending delayed clear when showing a new tooltip
     if (clearTimerRef.current) {
       clearTimeout(clearTimerRef.current);
       clearTimerRef.current = null;
     }
     setTooltipWordState((prev) => {
-      // Toggle off if same word tapped again
       if (
         prev &&
         word &&
@@ -120,7 +117,6 @@ export function WordInteractionProvider({ children }: { children: React.ReactNod
     navigateRef.current = fn;
   }, []);
 
-  // Memoized so word tokens re-render only when tooltip or detail state actually changes.
   const value = useMemo(
     () => ({
       tooltipWord,

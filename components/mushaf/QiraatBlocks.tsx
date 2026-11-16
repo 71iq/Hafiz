@@ -3,7 +3,6 @@ import type { QiraatBlock } from "@/lib/qiraat/parse";
 
 type Props = { blocks: readonly QiraatBlock[] };
 
-/** Each reading stands apart: 12px of space and a hairline between blocks, none after the last. */
 export function QiraatBlocks({ blocks }: Props) {
   return (
     <>

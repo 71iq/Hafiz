@@ -52,7 +52,6 @@ const probe = String.raw`
       const original = Array.prototype.indexOf;
       let scanned = 0;
       try {
-        // Count the real resolver's membership work, avoiding wall-clock assertions.
         Array.prototype.indexOf = function (key, ...args) {
           if (typeof key === "string" && key.startsWith("__rf092_")) scanned += this.length;
           return Reflect.apply(original, this, [key, ...args]);

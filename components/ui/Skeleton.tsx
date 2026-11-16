@@ -4,9 +4,6 @@ import { useSettings } from "@/lib/settings/context";
 import { cn } from "@/lib/utils";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
-// ---------------------------------------------------------------------------
-// Shared pulse animation hook
-// ---------------------------------------------------------------------------
 
 function usePulse(duration = 1200): Animated.Value {
   const reduceMotion = useReducedMotionPreference();
@@ -39,18 +36,11 @@ function usePulse(duration = 1200): Animated.Value {
   return opacity;
 }
 
-// ---------------------------------------------------------------------------
-// Base Skeleton
-// ---------------------------------------------------------------------------
 
 type SkeletonProps = ViewProps & {
-  /** Override dark mode detection when not using SettingsProvider */
   isDark?: boolean;
-  /** Width — number (px) or percentage string ("100%") */
   width?: DimensionValue;
-  /** Height — number (px) or percentage string */
   height?: DimensionValue;
-  /** Border radius — number (px). Defaults to 8 */
   borderRadius?: number;
 };
 
@@ -85,15 +75,10 @@ export const Skeleton = React.memo(function Skeleton({
   );
 });
 
-// ---------------------------------------------------------------------------
-// SkeletonText — single text line placeholder
-// ---------------------------------------------------------------------------
 
 type SkeletonTextProps = ViewProps & {
   isDark?: boolean;
-  /** Width of the line. Defaults to "100%" */
   width?: DimensionValue;
-  /** Line height in px. Defaults to 14 */
   lineHeight?: number;
 };
 
@@ -139,19 +124,11 @@ const SkeletonCircle = React.memo(function SkeletonCircle({
   );
 });
 
-// ---------------------------------------------------------------------------
-// Pre-composed: LeaderboardSkeleton
-// 5 rows — rank circle | avatar circle | name line + score line
-// ---------------------------------------------------------------------------
 
 type ComposedSkeletonProps = ViewProps & {
   isDark?: boolean;
 };
 
-// ---------------------------------------------------------------------------
-// Pre-composed: ReflectionsSkeleton
-// 3 reflection card placeholders
-// ---------------------------------------------------------------------------
 
 export const ReflectionsSkeleton = React.memo(function ReflectionsSkeleton({
   isDark = false,
@@ -173,19 +150,16 @@ export const ReflectionsSkeleton = React.memo(function ReflectionsSkeleton({
             gap: 10,
           }}
         >
-          {/* Author row: avatar + name + timestamp */}
           <View className="flex-row items-center" style={{ gap: 10 }}>
             <SkeletonCircle isDark={isDark} size={32} />
             <SkeletonText isDark={isDark} width={80} lineHeight={12} />
             <View className="flex-1" />
             <SkeletonText isDark={isDark} width={40} lineHeight={10} />
           </View>
-          {/* Body text lines */}
           <View style={{ gap: 4 }}>
             <SkeletonText isDark={isDark} width="100%" lineHeight={12} />
             <SkeletonText isDark={isDark} width={widths[i]} lineHeight={12} />
           </View>
-          {/* Action row: like + comment */}
           <View className="flex-row items-center" style={{ gap: 16 }}>
             <Skeleton
               isDark={isDark}
@@ -206,10 +180,6 @@ export const ReflectionsSkeleton = React.memo(function ReflectionsSkeleton({
   );
 });
 
-// ---------------------------------------------------------------------------
-// Pre-composed: SearchResultsSkeleton
-// 2 surah groups, each with header + 3 ayah result lines
-// ---------------------------------------------------------------------------
 
 export const SearchResultsSkeleton = React.memo(function SearchResultsSkeleton({
   isDark = false,
@@ -220,7 +190,6 @@ export const SearchResultsSkeleton = React.memo(function SearchResultsSkeleton({
     <View className={cn("px-4 pt-4", className)} style={{ gap: 20 }} {...props}>
       {Array.from({ length: 2 }).map((_, groupIdx) => (
         <View key={groupIdx} style={{ gap: 10 }}>
-          {/* Surah header */}
           <View className="flex-row items-center" style={{ gap: 8 }}>
             <Skeleton
               isDark={isDark}
@@ -237,7 +206,6 @@ export const SearchResultsSkeleton = React.memo(function SearchResultsSkeleton({
               borderRadius={9}
             />
           </View>
-          {/* Ayah result lines */}
           {Array.from({ length: 3 }).map((_, lineIdx) => (
             <View
               key={lineIdx}

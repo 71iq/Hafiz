@@ -18,7 +18,6 @@ const mockApplication = {
   nativeBuildVersion: "3",
   nativeApplicationVersion: "1.0.2",
 };
-// Getters read the current values; the mock factory runs before this module's constants exist.
 jest.mock("expo-application", () => ({
   get applicationId() {
     return mockApplication.applicationId;
@@ -139,7 +138,6 @@ describe("Settings > About release rows (W14)", () => {
     await waitFor(() => expect(result.current[0].description).toBe("Web build 0123456"));
     expect(result.current.map((row) => row.key)).toEqual(["web-version", "apk"]);
     expect(result.current[0].title).toBe("Version 1.0.1");
-    // The version line is information, not a button; the APK row opens the download.
     expect(result.current[0].onPress).toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalledWith(ANDROID_RELEASE_MANIFEST_URL, expect.anything());
   });

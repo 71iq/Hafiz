@@ -1,10 +1,6 @@
 import type { SQLiteBindParams } from "expo-sqlite";
 import type { TransactionDatabase } from "@/lib/database/types";
 
-// Every executeAsync is one native call, which made the first-run import mostly call overhead
-// (RF195). An INSERT with one `VALUES (?, ...)` tuple is sent as multi-row statements instead. Rows
-// in one statement apply in order, so OR REPLACE and OR IGNORE keep their per-row results. 999 bound
-// values is SQLite's lowest compiled limit. Other statements, such as UPDATE, run row by row.
 const MAX_BOUND_VALUES = 999;
 const SINGLE_TUPLE = /^(\s*INSERT\b[\s\S]*?\bVALUES\s*)(\(\s*\?(?:\s*,\s*\?)*\s*\))\s*;?\s*$/i;
 

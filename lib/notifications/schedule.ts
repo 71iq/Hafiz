@@ -61,16 +61,10 @@ import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID } from "@/lib/hifz/units";
 import { WIRD_TYPES, type NotificationLogRow, type PlannedSlot, type ReminderPrefs } from "@/lib/notifications/types";
 
 const DAY_MS = 86_400_000;
-/** Encouragement batches older than this are dropped unannounced; the halaqa screen still lists them. */
 const GROUP_BATCH_RETENTION_MS = 7 * DAY_MS;
-/**
- * A reminder due this soon may fire while the run is in progress. It is left as it is while the plan
- * still has it, because replacing it could show it twice.
- */
 const NEAR_FIRE_MS = 2 * 60_000;
 const REMIND_LATER_DELAY_MS = 60 * 60_000;
 
-/** Halaqa batches still waiting (delivered ones retired) and the one this plan places. */
 export type GroupBatches = Readonly<{ batches: GroupBatch[]; planned: GroupBatch | null; changed: boolean }>;
 
 export type ReminderContext = Readonly<{
@@ -78,9 +72,7 @@ export type ReminderContext = Readonly<{
   input: PlannerInput;
   log: NotificationLogRow[];
   sessionStarts: string[];
-  /** NOT-09: reminders ignored since the latest session, with the last log row already counted. */
   ignored: IgnoredTally;
-  /** Log ids the OS still holds, when this run listed them. */
   stillScheduled: ReadonlySet<string> | undefined;
   group: GroupBatches;
   language: Language;
@@ -89,21 +81,12 @@ export type ReminderContext = Readonly<{
 
 let reminderAccount: () => string | null = () => null;
 
-/**
- * The signed-in account. Only its halaqa batches reach the OS or stay shown (5.8.2), so one account's
- * encouragement is never announced to another. lib/notifications/use-reminder-scheduling.ts sets it;
- * until then no batch is scheduled and none stays shown.
- */
 export function setReminderAccountSource(source: () => string | null): void {
   reminderAccount = source;
 }
 
 const SURAH_CARD = /^(\d{1,3}):\d{1,3}$/;
 
-/**
- * The most overdue ayah card's surah for each date, so copy can name it (NOT-14). Hifz decks hold no
- * ayah cards, and their old page and chunk due dates would crowd the ayah cards out of the window.
- */
 async function readDueSurahs(db: DatabaseExecutor, through: Date): Promise<{ surah: number; due: string }[]> {
   const rows = await db.getAllAsync<{ id: string; due: string }>(
     `SELECT id, due FROM study_cards
@@ -142,12 +125,6 @@ function byFirstReceived(a: GroupBatch, b: GroupBatch): number {
   return Date.parse(a.first_received_at) - Date.parse(b.first_received_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
-/**
- * Retires each batch whose own notification fired, forgets a notification that was cancelled,
- * replaced or hidden as it arrived so the batch is planned again, drops batches older than a week,
- * and picks the signed-in account's oldest batch to plan. Arrivals after a batch's notification went
- * out are in a later batch (notifyGroupEncouragement), so retiring one never drops them.
- */
 function settleGroupBatches(
   stored: readonly GroupBatch[],
   log: readonly NotificationLogRow[],
@@ -174,11 +151,6 @@ function settleGroupBatches(
   return { batches, planned: own[0] ?? null, changed };
 }
 
-/**
- * Everything the planner needs, read from the local database. A run passes the log ids the OS still
- * has scheduled: a reminder past its time that the OS still holds is late, not delivered (NOT-07,
- * NOT-09). Previews leave it out and treat every past reminder as fired.
- */
 export async function loadReminderContext(
   db: DatabaseExecutor,
   {
@@ -206,7 +178,6 @@ export async function loadReminderContext(
       readLatestSessionAt(db),
       readLocalSetting(db, LOCAL_KEYS.backoff, backoffSchema),
     ]);
-  // NOT-09 counts from the latest session, not from the rows this run reads for templates and caps.
   const previous: IgnoredTally | null =
     storedBackoff && storedBackoff.since !== undefined
       ? { count: storedBackoff.consecutive_ignored, since: storedBackoff.since, cursor: storedBackoff.cursor ?? null }
@@ -242,7 +213,6 @@ export async function loadReminderContext(
     )
     .map(asDelivered);
   const group = settleGroupBatches(groupPending?.batches ?? [], log, now, stillScheduled, reminderAccount());
-  // Upcoming reminders keep their template, so an unchanged reminder keeps its OS notification.
   const preferredTemplates = new Map(
     log
       .filter((row) => row.cancelled_at === null && Date.parse(row.scheduled_for) > now.getTime())
@@ -270,7 +240,6 @@ export async function loadReminderContext(
   return { prefs, input, log, sessionStarts, ignored, stillScheduled, group, language: lang, surahNames };
 }
 
-/** A short stable hash, so an unchanged reminder keeps its OS notification. */
 function contentKeyOf(parts: readonly (string | number | boolean)[]): string {
   let hash = 5381;
   for (const char of parts.join("␟")) hash = ((hash * 33) ^ char.charCodeAt(0)) >>> 0;
@@ -285,7 +254,6 @@ export type DesiredReminder = Readonly<{
   contentKey: string;
 }>;
 
-/** Match what is scheduled against what should be: unchanged reminders stay, the rest is replaced. */
 export function diffReminders(
   scheduled: readonly ScheduledReminder[],
   desired: readonly DesiredReminder[],
@@ -303,14 +271,6 @@ export function diffReminders(
   return { keep, cancel, create };
 }
 
-/**
- * The run's reconcile step. A reminder due within NEAR_FIRE_MS, or past its time while the OS still
- * holds it (a late alarm), may be showing right now, so it is never replaced. It stays while the plan
- * still has its type on its date, and that planned slot is dropped. A late one also stays when the
- * plan skipped that slot only because its time has passed. The planner reports "past" only for a
- * slot that is otherwise still due, so a late alarm for a day since covered is cancelled, as is any
- * other. Everything later is matched by content.
- */
 export function reconcileReminders(
   scheduled: readonly ScheduledReminder[],
   desired: readonly DesiredReminder[],
@@ -323,8 +283,6 @@ export function reconcileReminders(
   const later: ScheduledReminder[] = [];
   const sameSlot = (item: ScheduledReminder) => (slot: Pick<PlannedSlot, "type" | "localDate">) =>
     slot.type === item.data.type && slot.localDate === item.data.localDate;
-  // A slot the plan keeps only if it is already set (PlannedSlot.existingOnly) keeps the reminder of
-  // its type and date as it is, whatever its wording, and is never created.
   const existingOnly = desired.filter((wanted) => wanted.slot.existingOnly);
   const remaining = desired.filter((wanted) => !wanted.slot.existingOnly);
   const pending: ScheduledReminder[] = [];
@@ -356,12 +314,6 @@ export function reconcileReminders(
   return { keep: [...keep, ...rest.keep], cancel: [...cancel, ...rest.cancel], create: rest.create };
 }
 
-/**
- * Log rows for cancelled reminders. A row for a reminder that was never close to firing goes, as it
- * carries no signal. One cancelled within NEAR_FIRE_MS of its time, or after its time while the OS
- * still held it, is kept as cancelled, so it never counts as delivered. A row the OS had already shown
- * keeps its delivery.
- */
 async function recordCancelled(db: DatabaseExecutor, cancelled: readonly ScheduledReminder[], now: Date): Promise<void> {
   const nearFireBy = now.getTime() + NEAR_FIRE_MS;
   await deleteLogRows(
@@ -379,7 +331,6 @@ function renderDesired(context: ReminderContext, slots: readonly PlannedSlot[]):
   const { prefs, input, language, surahNames } = context;
   return slots.map((slot) => {
     const { title, body } = renderNotification(slot, language, surahNames);
-    // The follow-up action appears only where an hour later is still outside quiet hours (NOT-08).
     const times = buildDayTimes(
       {
         clock: input.clock,
@@ -435,11 +386,6 @@ async function recordOutcomes(db: DatabaseExecutor, context: ReminderContext, no
   await pruneLog(db, now);
 }
 
-/**
- * Drops the follow-up this run read once the plan no longer holds it. Only that one: a newer request
- * written since the run read its context is left for the next run (requestRemindLater also writes
- * through the same queue, so this is a second guard).
- */
 async function clearSpentRemindLater(db: DatabaseExecutor, context: ReminderContext, plan: PlanResult): Promise<void> {
   const spent = context.input.remindLater;
   if (spent && !plan.slots.some((slot) => slot.type === "remind_later")) {
@@ -453,34 +399,16 @@ async function saveGroupBatches(db: DatabaseExecutor, batches: readonly GroupBat
   await writeLocalSetting(db, LOCAL_KEYS.groupPending, batches.length > 0 ? { batches } : null);
 }
 
-/**
- * A halaqa encouragement for an account that is not the signed-in one, or with no recorded owner,
- * which may be another account's. It names that account's private group activity, so it never shows
- * while the app is open, and the run that follows a sign-out or another sign-in cancels it and
- * removes it from the tray (5.8.2). One hidden as it arrived is not delivered, so its batch waits for
- * its owner (recordHidden).
- */
 function isForeignEncouragement(data: ReminderData, account: string | null): boolean {
   return data.type === "group_encouragement" && (account === null || data.accountId !== account);
 }
 
-/** Whether a reminder that arrives while the app is open may show: never another account's encouragement. */
 export function shouldPresentReminder(data: ReminderData): boolean {
   return !isForeignEncouragement(data, reminderAccount());
 }
 
-/**
- * Log ids of reminders the foreground handler hid, until a run records them. The OS let go of each
- * one without showing it, so the run records it as cancelled rather than inferring a delivery. A
- * halaqa batch whose notification was hidden then goes back to waiting, and its owner gets it after
- * signing in again (5.8.2).
- */
 const hiddenReminders = new Set<string>();
 
-/**
- * Channel, category and the foreground handler, which asks shouldPresentReminder and keeps what it
- * hid for the next run. Safe to call repeatedly.
- */
 export function configureReminderPlatform(labels: Readonly<{ channelName: string; remindLaterAction: string }>): Promise<void> {
   return reminderPlatform.configure({
     ...labels,
@@ -489,7 +417,6 @@ export function configureReminderPlatform(labels: Readonly<{ channelName: string
   });
 }
 
-/** Records the reminders hidden so far as cancelled, so none counts as delivered. */
 async function recordHidden(db: DatabaseExecutor, now: Date): Promise<void> {
   const ids = [...hiddenReminders];
   if (ids.length === 0) return;
@@ -497,7 +424,6 @@ async function recordHidden(db: DatabaseExecutor, now: Date): Promise<void> {
   for (const id of ids) hiddenReminders.delete(id);
 }
 
-/** Dismisses foreign encouragement whatever the reminder settings, and returns what is left shown. */
 async function dismissForeignEncouragement(
   presented: readonly PresentedReminder[],
   account: string | null,
@@ -507,11 +433,6 @@ async function dismissForeignEncouragement(
   return presented.filter((item) => !foreign.includes(item));
 }
 
-/** Remove reminders for past dates (NOT-06) and today's wird reminders once the day is covered (NOT-05). */
-/**
- * Today's wird reminders leave the tray once today is covered. Yesterday's make-up reminder stays
- * while the make-up is still open: a day already done does not close it (STR-07).
- */
 async function dismissStale(
   presented: readonly PresentedReminder[],
   context: ReminderContext,
@@ -548,9 +469,6 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
     return { status: "unsupported", ...empty };
   }
 
-  // Another account's encouragement is cancelled before the tray is read, whatever the settings.
-  // Cancelling stops the alarm but leaves a notification it already showed, so one that fires before
-  // the cancel is in the tray listing that follows and is dismissed there (5.8.2).
   const account = reminderAccount();
   const listed = await reminderPlatform.listScheduled();
   const foreign = listed.filter((item) => isForeignEncouragement(item.data, account));
@@ -558,11 +476,6 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   const scheduled = listed.filter((item) => !foreign.includes(item));
   const presented = await reminderPlatform.listPresented();
 
-  // A reminder was delivered when the OS showed it, or when its time passed and the OS no longer
-  // holds it. One past its time that the OS still holds is late and still pending. Either delivery is
-  // recorded by the first run that learns of it, and its response window ends 2 hours after that (8.11).
-  // The alarms just cancelled count as held, so they are recorded as cancelled, not delivered. One the
-  // foreground handler hid is recorded as cancelled first, so its absence is not taken for a delivery.
   const stillScheduled = new Set(listed.map((item) => item.data.logId));
   await markDelivered(
     db,
@@ -580,14 +493,10 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   const permission = await reminderPlatform.getPermission();
   const permitted = permission.status === "granted";
   const today = context.input.clock.dateOf(now);
-  // The same rule as the planner: an open earn-back or make-up leads the headline even on a day
-  // that is already done, so the headline alone does not say whether today is covered.
   const snapshot = projectHabit(context.input, today, now).snapshot;
   const covered = isCoveredToday(snapshot);
   const makeUpOpen = snapshot.headline.kind === "make_up_open";
   await updateBadge(context, permitted, covered);
-  // Expired and covered reminders leave the tray whatever the settings (NOT-06): turning reminders
-  // off or losing permission must not leave yesterday's notification behind.
   await dismissStale(shown, context, now, covered, makeUpOpen);
   if (!permitted || !context.prefs.enabled) {
     const cancelled = foreign.length + (await cancelEverything(db, scheduled, now));
@@ -598,8 +507,6 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   const plan = planNotifications(context.input);
   await clearSpentRemindLater(db, context, plan);
   const desired = renderDesired(context, plan.slots);
-  // Only the planned batch's own notification may stay. Another account's left at the start, so any
-  // other halaqa notification belongs to a batch already retired.
   const planned = group.planned;
   const isForeignGroup = (item: ScheduledReminder) =>
     item.data.type === "group_encouragement" && (planned === null || item.data.logId !== planned.log_id);
@@ -628,7 +535,6 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   let created = 0;
   let failed = 0;
   for (const item of create) {
-    // The batch reaches the OS only while its account is the signed-in one.
     if (item.slot.type === "group_encouragement" && (planned === null || reminderAccount() !== planned.account_id)) continue;
     const logId = createId("notif");
     const data: ReminderData = {
@@ -681,18 +587,12 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
 let queued: Promise<RescheduleResult> | null = null;
 let chain: Promise<unknown> = Promise.resolve();
 
-/** Runs `work` after every run and change already queued, never alongside one. */
 function serialized<T>(work: () => Promise<T>): Promise<T> {
   const run = chain.then(work);
   chain = run.catch(() => undefined);
   return run;
 }
 
-/**
- * Replan and reschedule the next 7 days (NOT-04). Idempotent: unchanged reminders stay scheduled,
- * changed ones are replaced and stale ones cancelled. Calls made while one run waits share it, and
- * runs never overlap. On web it only records reminder outcomes; the banner reads state directly.
- */
 export function rescheduleReminders(
   db: AppDatabase,
   options: { now?: Date; language?: Language } = {},
@@ -708,11 +608,9 @@ export function rescheduleReminders(
 
 export type ReminderPreview = Readonly<{
   next: PlannedSlot | null;
-  /** The chosen time falls in quiet hours, so the daily reminder is not sent (NOT-08). */
   prayerTimesSet: boolean;
 }>;
 
-/** For the settings screen: the next reminder and whether the chosen time can be used. */
 export async function previewReminders(
   db: DatabaseExecutor,
   { now = new Date(), language }: { now?: Date; language?: Language } = {},
@@ -730,23 +628,15 @@ export async function previewReminders(
   };
 }
 
-/** A tap opened Hafiz from a reminder: record it (7.2 opened_at). */
 export async function recordReminderOpened(db: DatabaseExecutor, data: ReminderData, now = new Date()): Promise<void> {
   await markOpened(db, data.logId, now);
 }
 
-/**
- * "Remind me in 1 hour" (5.8.2, NOT-05b). The follow-up is for the same local date only, never in
- * quiet hours, and is dropped at replan time when the day is done or the streak state changed. It
- * counts toward the daily cap (NOT-07). Returns false when no follow-up was scheduled.
- */
 export async function requestRemindLater(
   db: AppDatabase,
   response: ReminderResponse,
   { now = new Date(), clock = deviceClock }: { now?: Date; clock?: DayClock } = {},
 ): Promise<boolean> {
-  // Written in the reschedule queue, never alongside a run: a run that read the previous follow-up
-  // and is about to drop it as spent would otherwise erase this one.
   const recorded = await serialized(async () => {
     const context = await loadReminderContext(db, { now, clock });
     if (!context.prefs.enabled || !context.prefs.types.remind_later) return false;
@@ -769,11 +659,8 @@ export async function requestRemindLater(
     return true;
   });
   if (!recorded) return false;
-  // Any run queued before the write has started by now, so this is a new run that reads it.
   const result = await rescheduleReminders(db, { now });
   const planned = result.plan?.slots.some((slot) => slot.type === "remind_later") ?? false;
-  // The plan can hold the follow-up while the system refused to schedule it, so what counts is a
-  // follow-up the system now holds for that day. A failed read counts as none.
   const date = response.data.localDate;
   const scheduled =
     planned &&
@@ -781,25 +668,12 @@ export async function requestRemindLater(
       .listScheduled()
       .then((items) => items.some((item) => item.data.type === "remind_later" && item.data.localDate === date))
       .catch(() => false));
-  // NOT-05b: the follow-up replaces the reminder it was asked from. Android keeps a notification in the
-  // tray when one of its action buttons is pressed (iOS removes it), and a later swipe there is never
-  // reported to the app, so the original is taken out here: the follow-up never outlives an original
-  // the person cleared. Without a follow-up (over the daily cap, or not scheduled) it stays.
   if (scheduled && response.osId) await reminderPlatform.dismiss([response.osId]).catch(() => undefined);
   return scheduled;
 }
 
-/** The account an encouragement arrival belongs to, and whether it is still the signed-in one. */
 export type ReminderAccount = Readonly<{ userId: string; isCurrent: () => boolean }>;
 
-/**
- * The trigger the halaqa feature calls when encouragement arrives (5.8.2). Arrivals join the
- * account's latest batch while that batch's notification is not about to show or shown; otherwise
- * they start a new batch, so a delivered notification never takes later arrivals with it. Each batch
- * becomes at most one notification a day, which counts toward the daily cap. Nothing is recorded once
- * `account` is no longer signed in. Returns whether the arrivals were recorded; scheduling them is
- * retried by every later run if this one fails.
- */
 export async function notifyGroupEncouragement(
   db: AppDatabase,
   { account, now = new Date(), count = 1 }: { account: ReminderAccount; now?: Date; count?: number },

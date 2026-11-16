@@ -13,7 +13,6 @@ import { interpolate } from "@/lib/i18n/useStrings";
 
 type Props = {
   pair: SimilarPair;
-  /** Which verse of the pair the prompt asks for. */
   target: "self" | "sibling";
   dir: "ltr" | "rtl";
   s: UIStrings;
@@ -21,33 +20,21 @@ type Props = {
   accentText: string;
   busy: boolean;
   error: string | null;
-  /** MUT-05: verse meanings keyed 's:a', shown once a verse is chosen so they never give the answer away. */
   meanings: ReadonlyMap<string, string>;
   onNext: () => void;
 };
 
-/** The review column's width, so the two verses stay near each other on a wide window. */
 const OPTIONS_MAX_WIDTH = 624;
 
 function sameVerse(a: SimilarRef, b: SimilarRef): boolean {
   return a.surah === b.surah && a.ayah === b.ayah;
 }
 
-/**
- * The "Which one" prompt, after a drift (MUT-04) or interleaved in a wird review (MUT-03): both verses
- * of the pair with their shared wording marked and their references hidden, and the reference of one
- * of them. Verses that read the same also show the neighbouring words that tell them apart. Choosing
- * shows both references, each verse's meaning (MUT-05), the words that differ, which one was asked for
- * and which one was chosen, described neutrally (ERR-07). Nothing is graded; the next item follows.
- * The feedback and Next sit in a fixed footer, so a long pair never hides them.
- */
 export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy, error, meanings, onNext }: Props) {
   const isRTL = dir === "rtl";
   const [chosen, setChosen] = useState<SimilarRef | null>(null);
   const answer = target === "self" ? pair.self : pair.sibling;
-  // Mushaf order, so the right answer's position follows the verses, not the prompt.
   const options = [pair.self, pair.sibling].sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
-  // The Arabic surah name is isolated in English, so the digits after it keep their order.
   const answerRef = `${answer.surahName}${isRTL ? "" : "\u200E"} ${formatAyahRef(isRTL, answer.surah, answer.ayah)}`;
   const meaningOf = (ref: SimilarRef) => {
     const text = chosen === null ? undefined : meanings.get(meaningKey(ref));
@@ -71,7 +58,6 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
           <Text dir={dir} align="center" variant="body">
             {s.hifzPairPrompt}
           </Text>
-          {/* The reference sits on its own line, so the Arabic surah name never reorders an English sentence. */}
           <Text
             dir={dir}
             align="center"
@@ -87,7 +73,6 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
             const isAnswer = sameVerse(option, answer);
             const picked = chosen !== null && sameVerse(option, chosen);
             const other = options.find((candidate) => !sameVerse(candidate, option)) ?? null;
-            // Two pixels in every state, so the text never shifts when the answer is marked.
             const border =
               chosen === null
                 ? "border-2 border-warm-300 dark:border-neutral-700"
@@ -114,7 +99,6 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
                 disabled={chosen !== null}
                 onPress={() => {
                   setChosen(option);
-                  // VoiceOver has no polite live region, so the feedback is announced in both systems.
                   AccessibilityInfo.announceForAccessibility(
                     sameVerse(option, answer) ? s.hifzPairRight : s.hifzPairOther,
                   );
@@ -124,7 +108,6 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
                   <SimilarVerseLine
                     reference={option}
                     isRTL={isRTL}
-                    // The verse text takes the text-safe accent (4.5:1 on cards); the check keeps the bright one.
                     accent={accentText}
                     pageTemplate={s.hifzPageN}
                     showReference={chosen !== null}
@@ -141,7 +124,6 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
       <View className="px-5 pt-3 pb-4 border-t border-surface-high dark:border-surface-dark-high items-center">
         <View style={{ width: "100%", maxWidth: 384, gap: 10 }}>
           {chosen !== null ? (
-            // Both references are shown now, so the feedback names neither and stays in one direction.
             <Text dir={dir} align="center" variant="body" accessibilityLiveRegion="polite">
               {right ? s.hifzPairRight : s.hifzPairOther}
             </Text>

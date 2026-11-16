@@ -29,7 +29,6 @@ type PageRow = {
   ayah_end: number;
 };
 
-/** Snapshot loaded once and cached so the indicator does not re-query SQLite per scroll tick. */
 export type MushafIndex = {
   juzRows: JuzRow[];
   hizbRows: HizbRow[];
@@ -66,17 +65,13 @@ export async function loadMushafIndex(db: DatabaseExecutor): Promise<MushafIndex
   return cachedIndex;
 }
 
-/** Return the first inclusive match in the supplied order. Callers own fallback policy. */
 export function findJuzRangeForAyah(ranges: readonly JuzRow[], surah: number, ayah: number): JuzRow | undefined {
   return ranges.find((range) => range.surah === surah && ayah >= range.ayah_start && ayah <= range.ayah_end);
 }
 
 export function findJuzForAyah(index: MushafIndex, surah: number, ayah: number): number {
-  // juzRows are ordered by juz then surah/ayah_start. A juz is the row where
-  // surah matches and ayah is in [start, end].
   const range = findJuzRangeForAyah(index.juzRows, surah, ayah);
   if (range) return range.juz;
-  // Fallback: pick the latest juz whose first row precedes (surah, ayah).
   let best = 1;
   for (const r of index.juzRows) {
     if (r.surah < surah || (r.surah === surah && r.ayah_start <= ayah)) {
@@ -109,7 +104,6 @@ export function topmostAyahForPage(index: MushafIndex, page: number): { surah: n
   return { surah: row.surah_start, ayah: row.ayah_start };
 }
 
-/** The page an ayah sits on (the first one, when an ayah spans two pages), or null. */
 export function pageForAyah(index: MushafIndex, surah: number, ayah: number): number | null {
   const target = surah * 1000 + ayah;
   for (const row of index.pageByNumber.values()) {
@@ -120,7 +114,6 @@ export function pageForAyah(index: MushafIndex, surah: number, ayah: number): nu
   return null;
 }
 
-/** The first page of each juz (30 pages), from the existing juz and page mappings. */
 export function juzStartPages(index: MushafIndex): Set<number> {
   const firstByJuz = new Map<number, { surah: number; ayah: number }>();
   for (const row of index.juzRows) {
@@ -139,10 +132,6 @@ export function juzStartPages(index: MushafIndex): Set<number> {
 
 export type ReaderPositionLike = { mode: "page"; page: number } | { mode: "verse"; surah: number; ayah: number };
 
-/**
- * Converts a saved position to another view: a saved page opens verse view at that page's first
- * ayah, and a saved ayah opens page view at its page. Null when the mapping has no answer.
- */
 export function positionForMode(
   index: MushafIndex,
   position: ReaderPositionLike,
@@ -165,11 +154,6 @@ type PageLineForEstimate = {
   surah_number: number | null;
 };
 
-/**
- * Estimates where an ayah starts on its page as a fraction of the page's lines (0 = top), from the
- * page's line layout. A surah's first ayah is placed at its surah header line, so the header shows
- * above it. Falls back to the share of glyphs before the ayah when the layout cannot place it.
- */
 export function estimateAyahLineFraction(
   ayahs: readonly { surah: number; ayah: number; glyphCount: number }[],
   target: { surah: number; ayah: number },

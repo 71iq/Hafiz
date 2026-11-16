@@ -4,10 +4,6 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings, type PageScroll } from "@/lib/settings/context";
 
-/**
- * The one Page layout option list (Scroll / Swipe). The wide toolbar's direction chevron and the
- * shared More menu both render these items, so both use the same direction state and handler.
- */
 export function pageLayoutMenuItems(
   s: Pick<UIStrings, "pageScrollVertical" | "pageScrollHorizontal" | "pageLayoutGroup">,
   pageScroll: PageScroll,
@@ -33,7 +29,6 @@ export function pageLayoutMenuItems(
   ];
 }
 
-/** The separate 44px direction chevron, shown at 768px and above while the full toolbar fits. */
 export function PageLayoutMenu() {
   const s = useStrings();
   const { pageScroll, setPageScroll, isRTL } = useSettings();

@@ -2,11 +2,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
-/**
- * Native startup mirror of the explicit UI language and theme. SQLite stays authoritative: this
- * small copy only lets the loading screen and first frames use the saved language and theme before
- * the database is ready. Web keeps its existing synchronous localStorage keys instead.
- */
 export const UI_BOOTSTRAP_KEY = "hafiz_ui_bootstrap_v1";
 
 export type BootstrapLanguage = "en" | "ar";
@@ -42,7 +37,6 @@ function publish(next: BootstrapState) {
   listeners.forEach((listener) => listener());
 }
 
-/** Reads the native mirror once per process. A failed or malformed read resolves to null. */
 export function loadUiBootstrap(): Promise<UiBootstrap | null> {
   if (state.resolved) return Promise.resolve(state.value);
   if (!loading) {
@@ -57,7 +51,6 @@ export function loadUiBootstrap(): Promise<UiBootstrap | null> {
   return loading;
 }
 
-/** undefined while the native read is pending; null when there is no valid mirror. */
 export function getResolvedUiBootstrap(): UiBootstrap | null | undefined {
   return state.resolved ? state.value : undefined;
 }
@@ -77,7 +70,6 @@ export function useUiBootstrap(): BootstrapState {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/** Mirrors a committed language and theme. Native only; failures are ignored. */
 export async function writeUiBootstrap(language: BootstrapLanguage, theme: BootstrapTheme): Promise<void> {
   if (Platform.OS === "web") return;
   const value: UiBootstrap = { version: 1, language, theme };
@@ -85,11 +77,9 @@ export async function writeUiBootstrap(language: BootstrapLanguage, theme: Boots
   try {
     await AsyncStorage.setItem(UI_BOOTSTRAP_KEY, JSON.stringify(value));
   } catch {
-    // The mirror is a startup convenience. SQLite remains the source of truth.
   }
 }
 
-/** Test helper: forget the in-memory mirror state. */
 export function resetUiBootstrapForTests(next?: UiBootstrap | null) {
   loading = null;
   state =

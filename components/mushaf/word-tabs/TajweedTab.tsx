@@ -23,7 +23,6 @@ type ResolvedRule = {
   ruleId: string;
   color: string;
   name: string;
-  /** The Arabic term, shown under the English name in the English interface. */
   arabicTerm: string | null;
   short: string;
   description: string;
@@ -36,7 +35,6 @@ export function TajweedTab({ surah, ayah, wordPos }: Props) {
   const s = useStrings();
   const { uiLanguage, effectiveTheme, isRTL } = useSettings();
   const isArabicMode = uiLanguage === "ar";
-  // Web draws the active page palette; native keeps the Classic colours its fallback font uses.
   const tajweedColorTheme = Platform.OS === "web" ? effectiveTheme : "white";
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -123,7 +121,6 @@ export function TajweedTab({ surah, ayah, wordPos }: Props) {
     );
   }
 
-  // Missing annotations say only that none are recorded, never that no rule applies.
   if (current.rules.length === 0) {
     return (
       <View className="py-6 items-center">

@@ -337,7 +337,6 @@ it("actual reset route retains active errors without signing out", async () => {
   await act(async () => {
     pending.reject(new Error("active-route-error"));
   });
-  // Provider details stay out of the notice; the localized generic error shows instead.
   expect(screen.getByText(strings.en.authErrorGeneric)).toBeTruthy();
   expect(mockSignOut).not.toHaveBeenCalled();
   expect(mockReplace).not.toHaveBeenCalled();

@@ -4,14 +4,6 @@ import { setPendingDeepLink } from "@/lib/deep-link";
 import { returnToTabs, type RootStackState } from "@/lib/navigation/return-to-tabs";
 import { isValidAyah } from "@/lib/search/reference";
 
-/**
- * One allowlisted place to return to after login, signup or a provider sign-in.
- *
- * A target names a known internal context and carries only validated reference parameters. It never
- * carries guest text, a pending action or a URL, so completing a login can reopen a surface but
- * cannot publish, save or replay anything. Anything else, including protocols, protocol-relative
- * strings, external hosts, auth/reset routes and unknown routes, falls back to Home.
- */
 export type AuthReturnTarget =
   | { route: "home" }
   | { route: "progress" }
@@ -26,10 +18,8 @@ export type AuthReturnTarget =
 
 export type AuthReturnRoute = AuthReturnTarget["route"];
 
-/** What a caller passes to captureAuthReturn: a route name and untrusted parameters. */
 export type AuthReturnInput = { route: string; params?: Record<string, unknown> | null };
 
-/** A surface the destination should reopen once, holding only its safe target reference. */
 export type AuthReopenRequest =
   | { kind: "reflection-editor"; surah: number; ayahStart: number; ayahEnd: number }
   | { kind: "comments"; reflectionId: string; surface: "mushaf" | "feed" };
@@ -50,7 +40,6 @@ function uuid(value: unknown): string | null {
   return typeof value === "string" && UUID.test(value) ? value.toLowerCase() : null;
 }
 
-/** Validates an untrusted route name and parameters. Returns null for anything not allowlisted. */
 export function parseAuthReturn(input: unknown): AuthReturnTarget | null {
   if (!input || typeof input !== "object") return null;
   const { route, params: rawParams } = input as { route?: unknown; params?: unknown };
@@ -94,14 +83,9 @@ export function parseAuthReturn(input: unknown): AuthReturnTarget | null {
   }
 }
 
-/**
- * Maps an untrusted internal path, such as a web pathname, to a target. Only same-app absolute
- * paths are considered; protocols, `//host`, backslashes, auth routes and unknown routes return null.
- */
 export function parseAuthReturnPath(path: unknown): AuthReturnTarget | null {
   if (typeof path !== "string" || path.length > 512) return null;
   if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return null;
-  // Control characters and whitespace can disguise a host or a protocol after decoding.
   if (/[\u0000- \u007f]/.test(path)) return null;
   let url: URL;
   try {
@@ -127,11 +111,6 @@ export function parseAuthReturnPath(path: unknown): AuthReturnTarget | null {
 type RouteState = { name: string; params?: Record<string, unknown>; state?: RouteStackState };
 type RouteStackState = { index?: number; routes?: readonly RouteState[] };
 
-/**
- * Derives the initiating context from the screen directly below an auth screen. Used when a caller
- * opened Login without capturing a target. Tabs give their tab context; profile screens give their
- * validated profile; anything else returns null so the caller falls back to Home.
- */
 export function deriveAuthReturnFromStack(state: RouteStackState | undefined): AuthReturnTarget | null {
   const routes = state?.routes;
   if (!routes?.length) return null;
@@ -168,7 +147,6 @@ let pending: Pending | null = null;
 let reopen: AuthReopenRequest | null = null;
 const reopenListeners = new Set<() => void>();
 
-/** Notified when a sign-in return sets a surface to reopen, so a mounted destination can open it. */
 export function subscribeAuthReopen(listener: () => void): () => void {
   reopenListeners.add(listener);
   return () => {
@@ -182,7 +160,6 @@ function notifyReopen() {
 let redirectRestored = false;
 let awaitingRedirect = false;
 
-// Accepts either the input form ({ route, params }) or a flat target ({ route, ...params }).
 function parseTargetLike(value: unknown): AuthReturnTarget | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
@@ -202,12 +179,9 @@ function clearRedirectCopy(): void {
   try {
     sessionStore()?.removeItem(REDIRECT_STORAGE_KEY);
   } catch {
-    // Storage can throw in private windows; the in-memory slot remains authoritative.
   }
 }
 
-// A web provider sign-in leaves the page. Its validated target comes back from this tab's session
-// storage once, is validated again, and is removed whether or not it is still valid.
 function restoreRedirectCopy(): void {
   if (redirectRestored) return;
   redirectRestored = true;
@@ -225,7 +199,6 @@ function restoreRedirectCopy(): void {
       awaitingRedirect = true;
     }
   } catch {
-    // Malformed or unavailable storage falls back Home.
   }
 }
 
@@ -235,11 +208,6 @@ function current(): Pending | null {
   return pending;
 }
 
-/**
- * Records where to return after authentication. Call it immediately before opening Login or
- * Signup. Returns the accepted target, or null when the input is not allowlisted (Home is used).
- * Extra fields, such as draft text or an action name, are dropped.
- */
 export function captureAuthReturn(input: AuthReturnInput | AuthReturnTarget): AuthReturnTarget | null {
   restoreRedirectCopy();
   const target = parseTargetLike(input);
@@ -249,7 +217,6 @@ export function captureAuthReturn(input: AuthReturnInput | AuthReturnTarget): Au
   return target;
 }
 
-/** Keeps an explicit capture, or adopts the derived initiating context when none is pending. */
 export function adoptAuthReturn(derived: AuthReturnTarget | null): void {
   if (current() || !derived) return;
   pending = { target: derived, capturedAt: Date.now() };
@@ -259,7 +226,6 @@ export function peekAuthReturn(): AuthReturnTarget | null {
   return current()?.target ?? null;
 }
 
-/** Returns the pending target once and clears it. Falls back to Home. */
 export function consumeAuthReturn(): AuthReturnTarget {
   const target = current()?.target ?? HOME_RETURN;
   pending = null;
@@ -268,10 +234,6 @@ export function consumeAuthReturn(): AuthReturnTarget {
   return target;
 }
 
-/**
- * Drops a capture that never completed, without touching a reopen request that a completed sign-in
- * already set. Used when an auth screen is left by any route other than switching Login/Sign up.
- */
 export function abandonPendingAuthReturn(): void {
   pending = null;
   awaitingRedirect = false;
@@ -285,10 +247,6 @@ export function clearAuthReturn(): void {
   clearRedirectCopy();
 }
 
-/**
- * Web only: copies the validated target to this tab's session storage before a provider redirect.
- * Returns a cancel function for a sign-in that failed before leaving the page.
- */
 export function persistAuthReturnForRedirect(): () => void {
   const storage = sessionStore();
   if (!storage) return () => {};
@@ -296,18 +254,15 @@ export function persistAuthReturnForRedirect(): () => void {
   try {
     storage.setItem(REDIRECT_STORAGE_KEY, JSON.stringify(value));
   } catch {
-    // Without storage the provider return lands Home.
   }
   return clearRedirectCopy;
 }
 
-/** True when this page load came back from a web provider redirect with a stored target. */
 export function isAwaitingRedirectReturn(): boolean {
   current();
   return awaitingRedirect && pending !== null;
 }
 
-/** Drops a stored provider return whose sign-in never produced a session. */
 export function abandonRedirectReturn(): void {
   if (!awaitingRedirect) return;
   pending = null;
@@ -315,10 +270,6 @@ export function abandonRedirectReturn(): void {
   clearRedirectCopy();
 }
 
-/**
- * Returns a reopen request once when it matches `kind`. The destination surface opens empty for
- * that reference; it never receives guest text or performs the original action.
- */
 export function consumeAuthReopen<K extends AuthReopenRequest["kind"]>(
   kind: K,
 ): Extract<AuthReopenRequest, { kind: K }> | null {
@@ -336,7 +287,6 @@ function reopenFor(target: AuthReturnTarget): AuthReopenRequest | null {
   if (target.route === "reflection-editor")
     return { kind: "reflection-editor", surah: target.surah, ayahStart: target.ayahStart, ayahEnd: target.ayahEnd };
   if (target.route === "comments") {
-    // The same destination resolveAuthReturn navigates to: the ayah in the Mushaf, or the feed.
     const surface = target.surah !== undefined && target.ayah !== undefined ? "mushaf" : "feed";
     return { kind: "comments", reflectionId: target.reflectionId, surface };
   }
@@ -347,7 +297,6 @@ export type AuthReturnNavigation =
   | { kind: "tabs"; href: Href; deepLink?: { surah: number; ayah: number } }
   | { kind: "stack"; href: Href };
 
-/** The navigation a target resolves to. Pure, so it can be tested without a router. */
 export function resolveAuthReturn(target: AuthReturnTarget): AuthReturnNavigation {
   switch (target.route) {
     case "home":
@@ -379,11 +328,6 @@ export function resolveAuthReturn(target: AuthReturnTarget): AuthReturnNavigatio
   }
 }
 
-/**
- * Leaves the auth screen for the captured target after a verified session. Auth history is
- * replaced through the shared return-to-tabs helper, so Back does not reopen Login and no second
- * tab tree is stacked. Call only after the session result is current for this screen.
- */
 export function completeAuthReturn(state: RootStackState): AuthReturnTarget {
   const target = consumeAuthReturn();
   reopen = reopenFor(target);
@@ -392,10 +336,6 @@ export function completeAuthReturn(state: RootStackState): AuthReturnTarget {
   return target;
 }
 
-/**
- * Leaves an auth screen without a session when it has no history to go back to (a direct link):
- * goes to the captured context or Home, and never reopens an editor or comments.
- */
 export function leaveAuthWithoutSession(state: RootStackState): AuthReturnTarget {
   const target = consumeAuthReturn();
   reopen = null;
@@ -403,10 +343,6 @@ export function leaveAuthWithoutSession(state: RootStackState): AuthReturnTarget
   return target;
 }
 
-/**
- * Web provider return: the page reloaded at the app root with a verified session. There is no auth
- * screen to replace, so tab targets switch tab and stack targets open above the tabs.
- */
 export function completeRedirectReturn(): AuthReturnTarget {
   const target = consumeAuthReturn();
   reopen = reopenFor(target);
@@ -431,7 +367,6 @@ function navigateTo(state: RootStackState, target: AuthReturnTarget): void {
   }
 }
 
-/** Test seam: resets module state between cases. */
 export function resetAuthReturnForTests(): void {
   pending = null;
   reopen = null;

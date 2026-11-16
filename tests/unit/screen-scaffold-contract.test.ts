@@ -17,7 +17,6 @@ describe("screen scaffold contract", () => {
 
   it("keeps main non-reader tab routes on the shared screen shell", () => {
     const tabRoutes = ["app/(tabs)/home.tsx", "app/(tabs)/progress.tsx", "app/(tabs)/settings.tsx"];
-    // Halaqa and Board use SocialScreen, which is the shared shell with a title rail.
     const socialRoutes = ["app/(tabs)/halaqa.tsx", "app/(tabs)/leaderboard.tsx"];
 
     for (const route of [...tabRoutes, "components/social/SocialScreen.tsx", ...socialRoutes]) {

@@ -10,24 +10,15 @@ import { textStartStyle } from "@/lib/ui/direction";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 type Props = {
-  /** The screen showing the promotion. Log In and Create Account return here after sign-in (W13). */
   surface: AccountPromoSurface;
   title?: string;
   message: string;
   logInLabel: string;
-  /** Adds an outline Create Account action after Log In. */
   signUpLabel?: string;
   onDismiss: () => void;
   className?: string;
 };
 
-/**
- * The one guest promotion for optional account sync, shared by Home and Progress. A light teal card
- * with an outline Log In button keeps it secondary to study. Callers gate it with useAccountPromo,
- * which hides it when accounts are not configured. Opening Login or Signup first records this
- * screen as the allowlisted return target. The close control has its own 44 px target beside the
- * text, not over it, while its icon stays small.
- */
 export function AccountPromoCard({
   surface,
   title,
@@ -114,7 +105,6 @@ export function AccountPromoCard({
           onPress={onDismiss}
           accessibilityRole="button"
           accessibilityLabel={s.homeDismiss}
-          // The row is mirrored by hand under a pinned LTR direction, so the outset names a physical side.
           className={`-mt-2 h-11 w-11 items-center justify-center rounded-full ${isRTL ? "-ml-2" : "-mr-2"}`}
         >
           <XIcon size={14} color={mutedIconColor(effectiveTheme)} />

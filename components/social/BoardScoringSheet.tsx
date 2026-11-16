@@ -4,10 +4,6 @@ import { Text } from "@/components/ui/Text";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 
-/**
- * The Board's current weekly rules: how points come from wird days, who appears, and what others
- * see. Read-only; it describes the server's scoring without excuses or any global ranking.
- */
 export function BoardScoringSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const s = useStrings();
   const { isRTL } = useSettings();

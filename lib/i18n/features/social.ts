@@ -1,10 +1,3 @@
-/**
- * Halaqa and board strings, spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity. The
- * Arabic is a draft for native review (spec 9).
- *
- * Copy rules (spec 9, ETH-03, ETH-08): warm and calm, no guilt or urgency, no hasanat or reward claims,
- * neutral units. Only the verified texts in spec 9.3 are quoted.
- */
 export const socialStrings = {
   en: {
     tabHalaqa: "Halaqa",

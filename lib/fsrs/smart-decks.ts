@@ -224,7 +224,6 @@ export async function writeSmartDeckFilter(
   await writeUserSetting(db, smartDeckFilterKey(deckId), JSON.stringify(normalized));
 }
 
-/** writeSmartDeckFilter inside the caller's transaction, so the filter commits with the deck's other settings. */
 export async function putSmartDeckFilter(
   tx: DatabaseExecutor,
   deckId: SmartDeckId,
@@ -243,11 +242,9 @@ export async function writeAllDecksFilter(
   db: AppDatabase,
   filter: BuiltInDeckFilter
 ): Promise<void> {
-  // Every deck filter and its queued upload commit together, so no deck keeps a stale filter.
   await db.withTransactionAsync((tx) => putAllDecksFilter(tx, filter));
 }
 
-/** writeAllDecksFilter inside the caller's transaction, so the filters commit with its other writes. */
 export async function putAllDecksFilter(
   tx: DatabaseExecutor,
   filter: BuiltInDeckFilter
@@ -259,10 +256,6 @@ export async function putAllDecksFilter(
   }
 }
 
-/**
- * The default surah filter chooses which memorized ayahs the ayah decks study. A word saved to the
- * meanings deck is the user's own pick from any surah, so the filter never hides it.
- */
 export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string; deck_id: string }>(
   db: DatabaseExecutor,
   rows: T[]
@@ -291,10 +284,6 @@ export async function migrateLegacyRetentionDecks(db: AppDatabase): Promise<numb
   return promise;
 }
 
-/**
- * Move legacy retention cards into the smart deck and drop legacy deck settings. Every local change
- * and its queued upload commit in one transaction, so a queue failure leaves the legacy rows for retry.
- */
 async function runLegacyRetentionDeckMigration(database: AppDatabase): Promise<number> {
   let migrated = 0;
   await database.withTransactionAsync(async (tx) => {
@@ -598,7 +587,6 @@ export async function getSmartDeckStats(
   const now = new Date().toISOString();
   const dueCutoff = reviewDueCutoff();
   const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
-  // A candidate live in another deck is that deck's card; materialization skips it, so it is not new here.
   const missing = ids.filter((id) => !live.has(id)).length;
   return {
     total: ids.length,
@@ -714,11 +702,8 @@ export async function materializeSmartDeckCards(
 
   let insertedCount = 0;
   await db.withTransactionAsync(async (tx) => {
-    // A card id is global. Skip ids that are live in any deck now, including rows a sync pull wrote
-    // after the deck-scoped read above; queueing an empty card for them would overwrite real progress.
     const live = await getLiveStudyCardIds(tx, createdRows.map((row) => row.id));
     const fresh = createdRows.filter((row) => !live.has(row.id));
-    // A card created again over a deletion is stamped later than that deletion.
     const overDeleted = await stampsOverDeletedCards(tx, fresh.map((row) => row.id), new Date(nowIso));
     const insertedRows = fresh.map((row) => {
       const stamp = overDeleted.get(row.id);
@@ -777,7 +762,6 @@ export async function materializeSmartDeckCards(
         params
       );
     }
-    // New cards and their queued uploads commit together or not at all.
     for (const row of insertedRows) {
       await enqueueSync(tx, "study_cards", "INSERT", row.id, row);
     }
@@ -1185,12 +1169,6 @@ function buildSegmentedMutashabihatPrompt(
   };
 }
 
-/**
- * Where the similar words end in the ayah, matched word for word against its Uthmani text. The bundled
- * segments are built from the Uthmani text, whose spelling the plain text does not always share
- * ("أَزْوَٰجًا", "أَزْوَاجًا"), so this is tried when the plain text does not hold them. Similar words
- * that cross an ayah end are only partly in the ayah (crossingSimilarEnd).
- */
 function uthmaniSegmentEnd(ref: SmartDeckRef): number {
   const keys = (text: string) => splitQuranWords(text).map((word) => normalizeArabicWords(word).join(""));
   const ayahWords = keys(ref.textUthmani);
@@ -1201,13 +1179,6 @@ function uthmaniSegmentEnd(ref: SmartDeckRef): number {
   );
 }
 
-/**
- * The prompt end for similar words that cross an ayah end, or 0: ones that start in the ayah and run
- * on into the next (101:6's "فَأَمَّا مَن ثَقُلَتْ مَوَٰزِينُهُۥ" into 101:7) end with the ayah; ones that
- * run in from the ayah before end at their last word here. The longest overlap counts, and it takes
- * two words, so a word that merely recurs does not (a one-word ayah such as "طسٓمٓ" keeps the prompt
- * buildMutashabihatPrompt gives it).
- */
 function crossingSimilarEnd(ayahWords: string[], similarWords: string[]): number {
   for (let overlap = Math.min(ayahWords.length, similarWords.length - 1); overlap >= 2; overlap--) {
     const tail = ayahWords.slice(ayahWords.length - overlap);

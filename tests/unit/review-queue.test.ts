@@ -63,7 +63,6 @@ describe("review queue shared by Home and sessions", () => {
         deleted_at TEXT
       );
     `);
-    // Only this test boundary adapts Expo's wider native API to real in-memory SQLite.
     const adapter = {
       getAllAsync: async (query: string, params: (string | number | null)[] = []) => sql.prepare(query).all(...params),
       getFirstAsync: async (query: string, params: (string | number | null)[] = []) =>
@@ -170,7 +169,6 @@ describe("review queue shared by Home and sessions", () => {
   it("counts new cards introduced earlier today against the deck's daily new-card limit", async () => {
     for (const ayah of [1, 2, 3, 4, 5]) qiraatCandidate(1, ayah);
     await writeDeckReviewSettings(db, QIRAAT, { newCardsLimit: 3 });
-    // An earlier session today introduced two new cards; they are now on a later learning step.
     for (const id of ["qiraat:1:1", "qiraat:1:2"]) {
       insert(id, QIRAAT, { state: State.Learning, reps: 1, due: minutesFromNow(24 * 60) });
       sql.prepare("INSERT INTO study_log (card_id, state, reviewed_at) VALUES (?, 0, ?)").run(id, minutesFromNow(-30));

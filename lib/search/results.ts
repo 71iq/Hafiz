@@ -5,7 +5,6 @@ export type TextResult = {
   text_en: string | null;
   name_arabic: string;
   name_english: string;
-  /** The ayah's canonical Mushaf page; older fixtures may omit it. */
   v2_page?: number | null;
 };
 

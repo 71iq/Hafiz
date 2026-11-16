@@ -11,17 +11,8 @@ import { useSettings } from "@/lib/settings/context";
 import { SocialErrorText, SocialToggleRow, socialRowStyle } from "./SocialControls";
 
 export type ProfileVisibility = Pick<ProfilePrivacy, "showStreak" | "showJuzCompletions" | "isMinor">;
-/** The profile choices to save, with the minority the sheet loaded, which the server compares. */
 export type ProfileVisibilityChange = ProfileVisibility & { expectedMinor: boolean };
 
-/**
- * Sharing choices (SOC-01, SOC-03, ETH-07): what this halaqa's members and teachers see, and what the
- * public profile shows. Mount it with a key per open so the drafts start from the saved values. Pass
- * `privacy` only from a read that completed while the sheet is open: saving a stale copy is refused by
- * the server. Without it the profile choices are not shown or saved, and `privacyNotice` says why.
- * When `privacy` arrives or its stored values change, only the profile choices start again from it;
- * the halaqa choices the person already changed stay.
- */
 export function HalaqaSharingSheet({
   open,
   sharing,
@@ -35,7 +26,6 @@ export function HalaqaSharingSheet({
   open: boolean;
   sharing: HalaqaSharing;
   privacy: ProfileVisibility | null;
-  /** Why the profile choices are not shown: loading (placeholder rows), or a message with an optional retry. */
   privacyNotice?: { message: string; onRetry?: () => void; loading?: boolean } | null;
   pending: boolean;
   error: string | null;
@@ -45,8 +35,6 @@ export function HalaqaSharingSheet({
   const s = useStrings();
   const { isRTL } = useSettings();
   const [draft, setDraft] = useState(sharing);
-  // The profile choices start from the stored values they were loaded from, which the save sends as
-  // the expected minority, and start again only when those stored values change.
   const privacyKey = privacy ? `${privacy.isMinor}:${privacy.showStreak}:${privacy.showJuzCompletions}` : null;
   const [profile, setProfile] = useState({ key: privacyKey, loaded: privacy, visibility: privacy });
   if (profile.key !== privacyKey) setProfile({ key: privacyKey, loaded: privacy, visibility: privacy });
@@ -121,7 +109,6 @@ export function HalaqaSharingSheet({
               {s.profileVisibilityTitle}
             </Text>
             {privacyNotice.loading ? (
-              // Placeholder rows where the three choices will be, so the sheet does not jump when they load.
               <View accessible accessibilityLabel={privacyNotice.message} accessibilityState={{ busy: true }} className="gap-3 pt-1">
                 {[0, 1, 2].map((index) => (
                   <View key={index} className="items-center justify-between gap-3 py-2" style={socialRowStyle(isRTL)}>
@@ -152,7 +139,6 @@ export function HalaqaSharingSheet({
         ) : null}
       </OverlayBody>
       <OverlayFooter isRTL={isRTL} className="px-5 pb-5">
-        {/* A save error shows here, by the button the person pressed, not at the end of the scroll. */}
         {error ? (
           <View className="mb-3">
             <SocialErrorText message={error} />

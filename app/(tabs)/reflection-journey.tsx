@@ -58,7 +58,6 @@ import { PERSISTENT_SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 import { accentIconColor, errorIconColor, mutedIconColor } from "@/lib/ui/theme-icons";
 
-/** Lesson text keeps a comfortable line length on wide screens. */
 const CONTENT_MAX_WIDTH = 720;
 const SIDE_LIST_WIDTH = 280;
 const COLUMN_GAP = 16;
@@ -88,7 +87,6 @@ function ReflectionJourneyInner() {
   const latestLoad = useRef(0);
   const ownerRef = useRef(userId);
   const [selectedLevelId, setSelectedLevelId] = useState<string | null>(null);
-  // Only typed text lives here; without an edit the field shows the saved response.
   const [edit, setEdit] = useState<{ levelId: string; text: string } | null>(null);
   const [error, setError] = useState<{ levelId: string; kind: SaveKind } | null>(null);
   const [pending, setPending] = useState<SaveKind | null>(null);
@@ -119,8 +117,6 @@ function ReflectionJourneyInner() {
   const columnStyle = { width: "100%" as const, maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" as const };
   const rowStyle = { direction: "ltr" as const, flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const) };
 
-  // Only the latest request for the current account may publish; a failure keeps the levels shown.
-  // The first successful load pins the shared default, so saving never moves the user elsewhere.
   const loadLevels = useCallback(async (): Promise<boolean> => {
     const request = ++latestLoad.current;
     const owner = ownerRef.current;
@@ -145,8 +141,6 @@ function ReflectionJourneyInner() {
   }, [db]);
 
 
-  // An account or session change clears private text and cached responses at once, without a
-  // prompt, and loads the new owner's Journey.
   useEffect(() => {
     if (ownerRef.current === userId) return;
     ownerRef.current = userId;
@@ -187,8 +181,6 @@ function ReflectionJourneyInner() {
 
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty && pending === null;
-  // Focus reloads the levels; while focused, Android Back asks before dropping unsaved text and
-  // otherwise keeps its usual behavior.
   useFocusEffect(
     useCallback(() => {
       void loadLevels();
@@ -219,8 +211,6 @@ function ReflectionJourneyInner() {
       setPending(kind);
       setError(null);
       try {
-        // Editing a completed level saves through the completion path, which keeps its completion
-        // record and timestamp. Saving never publishes the response.
         const entry =
           kind === "draft"
             ? await saveReflectionJourneyDraft(db, levelId, text)
@@ -462,7 +452,6 @@ function ReflectionJourneyInner() {
           textAlignVertical="top"
           className="rounded-3xl bg-surface dark:bg-surface-dark px-4 py-3.5 text-charcoal dark:text-neutral-100"
           style={{
-            // Grows with the text up to 60% of the screen, so the buttons stay in reach on small phones.
             height: Math.min(inputHeight, Math.max(RESPONSE_MIN_HEIGHT, Math.round(height * 0.6))),
             fontFamily: "Manrope_400Regular",
             fontSize: 14,
@@ -687,11 +676,6 @@ function ReflectionJourneyInner() {
   );
 }
 
-/**
- * The horizontal level strip below 1024px. The selected pill scrolls to the center on open and on
- * every selection, and a fade on the trailing edge shows that more levels continue off screen.
- * Arabic lays the row out from the right while keeping level 1 first for keyboard and readers.
- */
 function LevelStrip({
   levels,
   selectedId,
@@ -711,7 +695,6 @@ function LevelStrip({
   const [offset, setOffset] = useState(0);
   const [layoutVersion, setLayoutVersion] = useState(0);
 
-  // Scrolling to the measured selection synchronizes the native scroll view.
   useEffect(() => {
     const frame = selectedId ? pillFrames.current.get(selectedId) : undefined;
     if (!frame || viewportWidth === 0) return;
@@ -839,7 +822,6 @@ function LevelPill({
   );
 }
 
-/** Draft and Completed are the only status badges; Next is a separate recommendation marker. */
 function StatusBadge({ status, isNext }: { status: ReflectionJourneyLevelListItem["status"]; isNext: boolean }) {
   const s = useStrings();
   if (status === "completed") {
@@ -883,7 +865,6 @@ function LevelNavButton({
 }) {
   const { isRTL, effectiveTheme } = useSettings();
   const color = disabled ? mutedIconColor(effectiveTheme) : accentIconColor(effectiveTheme);
-  // Previous points toward the reading start, Next toward the reading end.
   const Icon = (direction === "previous") === !isRTL ? ChevronLeft : ChevronRight;
   const iconFirst = direction === "previous";
   return (

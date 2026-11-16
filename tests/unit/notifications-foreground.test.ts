@@ -6,8 +6,6 @@ import {
   shouldPresentReminder,
 } from "@/lib/notifications/schedule";
 
-// Fourth review, finding 3: expo-notifications asks the app's handler whether a notification that
-// arrives while the app is open shows. Another account's encouragement, or one with no owner, must not.
 
 type Behavior = { shouldShowBanner: boolean; shouldShowList: boolean };
 type Handler = { handleNotification: (notification: { request: { content: { data: unknown } } }) => Promise<Behavior> };
@@ -25,7 +23,6 @@ jest.mock("expo-notifications", () => ({
   DEFAULT_ACTION_IDENTIFIER: "expo.modules.notifications.actions.DEFAULT",
   SchedulableTriggerInputTypes: { DATE: "date" },
 }));
-// The native adapter, whatever platform Jest resolves.
 jest.mock("@/lib/notifications/platform", () => jest.requireActual("@/lib/notifications/platform.native"));
 
 const LABELS = { channelName: "Reminders", remindLaterAction: "Remind me in 1 hour" };
@@ -46,7 +43,6 @@ function reminder(type: ReminderData["type"], accountId?: string): ReminderData 
   };
 }
 
-/** Whether the notification shows when it arrives with the app open. */
 async function arrives(data: unknown): Promise<boolean> {
   const handler = mockHandlers.at(-1);
   if (!handler) throw new Error("No notification handler installed");
@@ -81,8 +77,6 @@ describe("reminders that arrive while the app is open (5.8.2)", () => {
     expect(await arrives({ source: "hafiz-reminder", type: "group_encouragement" })).toBe(false);
   });
 
-  // Fifth review, finding N5: the OS lets go of an alarm the handler hides, so the next run took it for
-  // delivered. The handler reports what it hides, and the run records it as cancelled instead.
   it("reports each reminder it hides, and none it shows", async () => {
     const onHidden = jest.fn();
     await reminderPlatform.configure({ ...LABELS, shouldPresent: shouldPresentReminder, onHidden });
@@ -91,7 +85,6 @@ describe("reminders that arrive while the app is open (5.8.2)", () => {
       expect(await arrives(foreign)).toBe(false);
       expect(await arrives(reminder("group_encouragement", ACCOUNT_A))).toBe(true);
       expect(await arrives(reminder("wird_reminder"))).toBe(true);
-      // Without a log id there is nothing to record.
       expect(await arrives({ source: "hafiz-reminder", type: "group_encouragement" })).toBe(false);
       expect(onHidden.mock.calls).toEqual([[foreign]]);
     } finally {

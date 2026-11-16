@@ -23,7 +23,6 @@ type Props = {
   onClose: () => void;
 };
 
-/** The loading row appears only when the list takes longer than this to arrive. */
 const SLOW_FETCH_MS = 500;
 
 export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props) {
@@ -38,7 +37,6 @@ export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props)
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
 
-  // Cached list first, then at most one background refresh a week; the bundled list covers failures.
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
@@ -63,7 +61,6 @@ export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props)
     };
   }, [uiLanguage, visible]);
 
-  // A preview this picker started ends when it closes or unmounts.
   const stopPreview = audio?.stopPreview;
   useEffect(() => {
     if (visible) return;

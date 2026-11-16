@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Compile the configured Android debug ABIs within the local Ralph memory limit."""
 import os
 from pathlib import Path
 

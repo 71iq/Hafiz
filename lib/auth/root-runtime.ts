@@ -60,8 +60,6 @@ export function createRootAuthRuntime(options: Options) {
     }
   }
   const supportsOwnedCommands = !options.isWeb || !!channel;
-  // The reset route installs its tokens through the guarded recovery command.
-  // Other web callback routes keep the SDK's existing URL detection.
   const resetRoute =
     options.isWeb &&
     typeof window !== "undefined" &&
@@ -101,9 +99,6 @@ export function createRootAuthRuntime(options: Options) {
       requireOwnership();
       return runtime.restoreSession(owner, session, tokens, isActive, expectedUserId);
     },
-    // Preserve email login on existing memory and browser fallbacks. The private
-    // replacement still guards this runtime and persisted base; cross-tab lifetime
-    // notices require the channel above, as for the main SDK's existing fallback.
     signInWithPassword: (owner: AuthOwner, session: Session | null, credentials: SignInWithPasswordCredentials) =>
       runtime.signInWithPassword(owner, session, credentials),
     signUp: (owner: AuthOwner, session: Session | null, credentials: SignUpWithPasswordCredentials) =>

@@ -1,7 +1,4 @@
 #!/bin/bash
-# Copy data files to public/ for web static serving.
-# On web, these are fetched at runtime via fetch() instead of being
-# bundled into the JS bundle via require().
 
 set -e
 
@@ -13,7 +10,6 @@ fi
 
 mkdir -p public/data/translations public/data/layout public/data/mutashabihat public/data/tafsir-sources
 
-# Runtime JSON that is still intentionally lazy on web.
 cp assets/data/surah-info.json public/data/
 cp assets/data/wbw-arabic-meanings.json public/data/
 cp assets/data/irab-per-word.json public/data/
@@ -21,7 +17,6 @@ cp assets/data/tajweed-rules-ar.json public/data/
 cp assets/data/tajweed-rules-en.json public/data/
 cp assets/data/al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json public/data/
 cp assets/data/asbab-al-nuzul.json public/data/
-# The generated similar-verse rows; the raw NourQuran JSON is a build input only.
 cp assets/data/mutashabihat/nourquran_hafiz_rows.json public/data/mutashabihat/
 cp assets/data/layout/page-words.json public/data/layout/
 cp assets/data/layout/page-lines.json public/data/layout/

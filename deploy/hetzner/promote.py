@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-"""Validate and atomically install a static release, with health rollback."""
 import fcntl
 import gzip
 import hashlib
@@ -131,8 +130,6 @@ def main():
             raise ValueError("Less than 5 GiB free; refusing deployment")
         temporary = Path(tempfile.mkdtemp(prefix=".incoming-", dir=ROOT / "releases"))
         try:
-            # Copy to a root-owned file so the deploy user cannot change the input
-            # after validation or grow it while decompression runs.
             with tempfile.TemporaryFile() as snapshot, tempfile.TemporaryFile() as expanded:
                 while chunk := source.read(1024 * 1024):
                     if snapshot.tell() + len(chunk) > MAX_ARCHIVE:
@@ -161,7 +158,6 @@ def main():
                 current.unlink()
             raise
         print("Promoted " + sha)
-        # Keep five releases, including the previous version.
         retained = sorted((item for item in (ROOT / "releases").iterdir()
                            if re.fullmatch("[a-f0-9]{40}", item.name) and item.is_dir() and not item.is_symlink()),
                           key=lambda item: item.stat().st_mtime, reverse=True)

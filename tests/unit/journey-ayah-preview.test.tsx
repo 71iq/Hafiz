@@ -148,7 +148,6 @@ function expectTarget(
   expect(detail().initialTab).toBe(tab);
   act(() => detail().onClose());
   expect(detail().target).toBeNull();
-  // The separate book action opens the Mushaf at the same ayah through the shared helper.
   fireEvent.press(
     view.getByLabelText(strings[mockSettings.uiLanguage].journeyOpenInMushaf.replace("{{ref}}", reference)),
   );

@@ -27,11 +27,6 @@ export function clampMaximumInterval(value: number): number {
 
 export type LimitTextResult = { ok: true; value: number } | { ok: false };
 
-/**
- * A typed daily limit: a whole number in Western or Arabic-Indic digits, at least `min`, with no
- * upper cap beyond what the stepper already allows. Signs, fractions and other characters are
- * rejected rather than clamped.
- */
 export function validateLimitText(text: string, min: number): LimitTextResult {
   const normalized = normalizeDateDigits(text.trim());
   if (!/^\d+$/.test(normalized)) return { ok: false };

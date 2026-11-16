@@ -32,7 +32,6 @@ let authInitialization: Promise<void> | undefined;
 let cancelAuthListener: (() => void) | undefined;
 let loadingOwner: object | null = null;
 
-// Busy state belongs to the action that set it, independently of auth authority.
 function beginAuthLoading(clearError = true) {
   const token = {};
   loadingOwner = token;
@@ -47,8 +46,6 @@ function beginAuthLoading(clearError = true) {
   };
 }
 
-// Reads and the two profile writers share one publication boundary. Obsolete
-// owners cannot keep a replacement session's reads behind an old request.
 const pendingProfileWrites = new Set<{ userId: string; owner: AuthOwner }>();
 
 function hasPendingProfileWrite(userId: string): boolean {
@@ -87,11 +84,6 @@ function publishProfileRead(
   return incoming;
 }
 
-/**
- * The profile shown while the real row cannot be read. It never derives a name from the email:
- * the username stays empty, so screens show the neutral "Hafiz user" until the real profile loads.
- * A display name the person chose at signup is kept. The next sync retries the read.
- */
 export function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
   const metadata = user.user_metadata ?? {};
   const displayName = typeof metadata.display_name === "string" ? metadata.display_name.trim() : "";
@@ -107,7 +99,6 @@ export function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Prof
   };
 }
 
-/** A valid username for a missing profile row: a provider handle or user_<id>, never the email. */
 export function buildInsertUsername(user: NonNullable<AuthState["user"]>): string {
   const metadata = user.user_metadata ?? {};
   const providerName = metadata.username || metadata.preferred_username || metadata.user_name;
@@ -146,8 +137,6 @@ function getEmailRedirectTo(): string | undefined {
   return globalThis.location?.origin;
 }
 
-// Native has no recovery deep link, so its reset email opens the public web reset page,
-// where the password is changed for the same account before the user signs in on the app.
 const PUBLIC_WEB_ORIGIN = "https://hafizquran.app";
 
 export function getPasswordResetRedirectTo(): string {
@@ -159,16 +148,12 @@ function setSessionIdentity({ session, user }: Pick<AuthState, "session" | "user
     session,
     user,
     profile: user && state.user?.id === user.id && state.profile?.id === user.id ? state.profile : null,
-    // A new signed-in session clears an earlier "session ended" notice.
     sessionEnded: sessionEnded ?? (user ? false : state.sessionEnded),
   }));
 }
 
-// Sign-outs started on this device are deliberate, so their SIGNED_OUT is not reported as expiry.
 let deliberateSignOuts = 0;
 
-// SDK notifications can renew credentials while the provider response is pending.
-// Keep the current matching session rather than republishing the callback snapshot.
 function publishOAuthSession(session: NonNullable<AuthState["session"]>): void {
   const current = useAuthStore.getState();
   const before = getAuthSessionIdentity(current.session);
@@ -274,7 +259,6 @@ export function finishPasswordRecovery(owner: AuthOwner) {
   return authCommands.owned(
     owner,
     async () => {
-      // Leaving a recovery session is deliberate; Login shows the saved-password notice instead.
       deliberateSignOuts += 1;
       try {
         const { error } = await signOutOwnedSession(owner, useAuthStore.getState().session);
@@ -288,7 +272,6 @@ export function finishPasswordRecovery(owner: AuthOwner) {
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
-  // ─── State ──────────────────────────────────────────────────
   session: null,
   user: null,
   profile: null,
@@ -297,7 +280,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   sessionEnded: false,
   error: null,
 
-  // ─── Actions ────────────────────────────────────────────────
 
   initialize: () => {
     if (authInitialization) return authInitialization;
@@ -311,8 +293,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         }
         const loading = beginAuthLoading(false);
         try {
-          // The singleton store owns its listener across root remounts.
-          // A new initialization retires any queued callback from its old listener.
           cancelAuthListener?.();
           let active = true;
           let acceptsStartupSession = true;
@@ -327,10 +307,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             } else {
               acceptsStartupSession = false;
             }
-            // The SDK publishes SIGNED_OUT when it removes a stored session it could not renew at
-            // startup, or a signed-in session ends (renewal rejected, or another tab signed out).
-            // Transient network failures keep the session and publish nothing. Sign-outs started on
-            // this device, and a guest's own sign-up or sign-in commands, are not reported.
             const ended = _event === "SIGNED_OUT" && deliberateSignOuts === 0 && (get().user !== null || duringStartup);
             setSessionIdentity({ session, user: session?.user ?? null }, _event === "SIGNED_OUT" ? ended : undefined);
             if (session?.user) {
@@ -344,13 +320,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             active = false;
             subscription.unsubscribe();
           };
-          // A published SDK notification takes precedence over the pending startup snapshot.
-          // Same-session refreshes preserve command ownership but still replace older credentials.
           const {
             data: { session },
             error,
           } = await supabase.auth.getSession();
-          // A rejected refresh token confirms expiry; a retryable fetch error is only connectivity.
           if (error?.name === "AuthApiError" && !get().sessionEnded && !get().session) set({ sessionEnded: true });
           if (error) throw error;
           if (session && acceptsStartupSession && canRestoreAuthSession(readOwner, session)) {
@@ -423,7 +396,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   signUp: (email: string, password: string, username: string, displayName: string) =>
     startEmailCommand<SignUpResult>(async (owner, session) => {
       if (!isEmailAuthFlowsEnabled()) throw new Error("Signup is temporarily unavailable.");
-      // Metadata feeds the existing SECURITY DEFINER profile trigger.
       const { data, error } = await signUpOwnedPassword(owner, session, {
         email: email.trim().toLowerCase(),
         password,
@@ -631,22 +603,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
-// This observer shares the singleton store lifetime. It never writes state or
-// registers another Supabase auth listener.
 useAuthStore.subscribe((state, previous) => {
   observeAuthSession(state.session);
   if (state.user?.id !== previous.user?.id || state.session !== previous.session) {
     profileOwnerGeneration += 1;
   }
   if (state.user?.id !== previous.user?.id) {
-    // Typed auth form values belong to the identity they were typed for.
     clearAuthHandoff();
-    // A sign-out or account switch abandons a pending return; a guest's first sign-in consumes it.
     if (previous.user) clearAuthReturn();
   }
 });
 
-// A fallback profile is replaced by the real row on the next sync, without a remount.
 let fallbackRetry: Promise<unknown> | null = null;
 function retryFallbackProfile(): void {
   const { user, profile } = useAuthStore.getState();

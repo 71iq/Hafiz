@@ -73,7 +73,6 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   hideMode?: boolean;
-  /** Hide mode only: the reader keeps revealed ayahs, so recycling a block never re-hides one. */
   revealed?: boolean;
   onRevealChange?: (surah: number, ayah: number, revealed: boolean, v2Page: number) => void;
   highlighted?: boolean;
@@ -112,20 +111,15 @@ function AyahBlockInner({
   const s = useStrings();
   const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
   const isWeakSpot = useWeakSpotMarker();
-  // MUT-02: the page's marks are read once for every block on that page, once the setting is known.
   const similarMarked = useSimilarMarks(db, v2Page, settingsLoaded && markSimilarVerses).has(`${surah}:${ayah}`);
   const { getAyahState, toggleAyah } = useAyahAudio();
 
   const fontVisible = useQuranPageFontReady(quranFontStyle, v2Page);
-  // FlashList reuses a block for another ayah; recycling state resets with the ayah, so an open
-  // detail sheet does not carry over to the verse that reuses it.
   const [detailOpen, setDetailOpen] = useRecyclingState(false, [surah, ayah]);
   const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("hadith");
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
 
-  // C07 arrival wash: a semantic background behind the target that fades in briefly (instantly with
-  // reduced motion). The reader clears it after three seconds or the next deliberate tap.
   const reduceMotion = useReducedMotionPreference();
   const washOpacity = useRef(new RNAnimated.Value(highlighted ? 1 : 0)).current;
   useEffect(() => {
@@ -141,7 +135,6 @@ function AyahBlockInner({
     RNAnimated.timing(washOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
   }, [highlighted, reduceMotion, washOpacity]);
   const arrivalWashColor = isDark ? "rgba(45, 212, 191, 0.15)" : "rgba(13, 148, 136, 0.15)";
-  // A long press on the end marker selects the ayah; the release must not also open its details.
   const skipMarkerPressRef = useRef(false);
 
   const wordTokens = useMemo(() => {
@@ -178,8 +171,6 @@ function AyahBlockInner({
   const bookmarked = isBookmarked(surah, ayah);
   const highlightColor = getHighlightColor(surah, ayah);
   const qcf2LineHeight = Math.ceil(lineHeight + Math.max(6, fontSize * 0.16));
-  // The hidden placeholder takes about the height the ayah's words will need, so revealing it does
-  // not shift the list. Words wrap like the rendered row: roughly 1.7em per page-font word.
   const hiddenAyahHeight = useMemo(() => {
     const textWidth = Math.max(120, Math.min(width - 24, 840) - 38);
     const rowGap = Math.max(4, fontSize * 0.12);
@@ -242,9 +233,6 @@ function AyahBlockInner({
     },
   };
 
-  // Native opens the system share sheet. Web uses Web Share where the browser offers it and
-  // otherwise copies, and the control is labeled for what it does. A dismissed share sheet or a
-  // failed copy is never announced as a success.
   const webCanShare = Platform.OS === "web" && typeof navigator !== "undefined" && typeof navigator.share === "function";
   const shareLabel = Platform.OS !== "web" || webCanShare ? s.readerShareAyah : s.readerCopyAyah;
   const handleShare = useCallback(async () => {
@@ -286,8 +274,6 @@ function AyahBlockInner({
   const audioIconColor = audioState.active ? "#0d9488" : iconColor;
 
   return (
-    // Ayahs are separated by a hairline: the block shares the page color, so padding alone read as
-    // stray empty space between verses.
     <View
       className="bg-surface dark:bg-surface-dark px-4 pt-2 pb-3 border-b border-warm-200 dark:border-neutral-800"
       style={{
@@ -297,7 +283,6 @@ function AyahBlockInner({
         overflow: "visible",
       }}
     >
-      {/* Arrival wash behind the target; glyph, Tajweed and highlight colors stay untouched. */}
       {highlighted && (
         <RNAnimated.View
           pointerEvents="none"
@@ -315,8 +300,6 @@ function AyahBlockInner({
       )}
       <View
         className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}
-        // Hand-mirrored rows pin LTR coordinates; under the reader's RTL root row-reverse flipped twice
-        // and put the ayah reference on the left in Arabic.
         style={{
           direction: "ltr",
           paddingTop: isPhone ? 2 : 6,
@@ -388,7 +371,6 @@ function AyahBlockInner({
         </View>
       </View>
 
-      {/* Arabic text (QCF2) — interactive word tokens */}
       {isBlurred ? (
         <Pressable
           onPress={handleReveal}
@@ -410,7 +392,6 @@ function AyahBlockInner({
           </View>
         </Pressable>
       ) : !fontVisible ? (
-        // Glyphs mounted before their page font exists render and measure in the system font.
         <View className={isPhone ? "pt-3 pb-1" : "pt-5 pb-1"} style={{ minHeight: qcf2LineHeight }} />
       ) : (
         <View
@@ -418,8 +399,6 @@ function AyahBlockInner({
           style={{ direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
         >
           {Platform.OS === "android" ? (
-            // Android clips each separate Text to its own box, which cut page-font word glyphs that draw
-            // outside their advance. One Text per ayah with nested word spans draws every word fully.
             <AyahWordText
               words={wordTokens.words}
               marker={
@@ -499,7 +478,6 @@ function AyahBlockInner({
                   />
                 );
               })}
-              {/* Ayah end marker */}
               {showAyahMarkers && wordTokens.marker && (
                 <Text
                   onPress={handleMarkerPress}
@@ -565,16 +543,12 @@ function AyahBlockInner({
       )}
 
       <View className="pt-2">
-        {/* The row runs to the block edges so pills that do not fit are cut at the edge, like any
-            swipeable row, rather than mid-word inside the padding. */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           bounces={false}
           style={{ marginHorizontal: -16 }}
           {...readerControlProps}
-          // Direction alone mirrors the row (and starts the scroll at the right in Arabic); adding
-          // row-reverse flipped it back.
           contentContainerStyle={{
             direction: isRTL ? "rtl" : "ltr",
             flexDirection: "row",
@@ -602,7 +576,6 @@ function AyahBlockInner({
               isRTL={isRTL}
             />
           )}
-          {/* Shown when the ayah has Qira'at data, or when that could not be read (the tab reports it). */}
           {hasQiraat !== false ? (
             <ActionPill
               label={s.wordTabQiraat}
@@ -643,7 +616,6 @@ function ActionIcon({
 }) {
   const { isDark } = useSettings();
   const [tooltip, setTooltip] = useState(false);
-  // Web shows the icon's name on hover or keyboard focus, as the reader toolbar does.
   const webTooltipProps =
     Platform.OS === "web" && accessibilityLabel
       ? ({

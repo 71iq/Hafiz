@@ -1,9 +1,3 @@
-/**
- * Colors for small floating labels (word gloss, rail preview, toolbar tooltips) drawn over the
- * reader. Light themes use the deep teal brand surface with white text; Dark and Tahajjud use a pale
- * teal surface with deep teal text, so the label stays distinct from a near-black page. Notices use
- * Toast's own per-theme inverse colors.
- */
 export type InverseSurfaceColors = {
   background: string;
   text: string;

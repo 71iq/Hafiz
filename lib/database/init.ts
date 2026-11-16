@@ -15,12 +15,7 @@ import { TAFSIR_SOURCES, type TafsirSourceConfig, type TafsirSourceId } from "@/
 import surahEnglishNameRows from "../../assets/data/surah-english-names.json";
 import { nativeRequires, nativeTafseerRequires, nativeTafsirSourceLoader } from "./native-loaders";
 
-// Platform-specific native asset loaders live in native-loaders.*.
 
-// ─── Fetch cache ────────────────────────────────────────────
-// Many importers load the same JSON (quran-data.json is used 4x). Caching
-// the in-flight promise dedupes fetches AND lets us pre-warm loads in
-// parallel while serialized SQLite inserts run. Cleared on importFinished().
 const loadCache = new Map<string, Promise<any>>();
 const tafseerCache = new Map<number, Promise<any>>();
 
@@ -84,7 +79,6 @@ async function doLoadTafsirSourceFile(source: TafsirSourceId, surahNumber: numbe
   return loader ? loader() : null;
 }
 
-// ─── Types & helpers ─────────────────────────────────────────
 
 export type ImportProgress = {
   step: string;
@@ -95,15 +89,12 @@ export type ImportProgress = {
 
 type ProgressCallback = (progress: ImportProgress) => void;
 
-// Bump this whenever a new import step is added so the progress bar caps at
-// 100% and the step counter shows accurate "N / total" labels.
 const TOTAL_STEPS = 22;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
 }
 
-/** Strip Arabic diacritics (tashkeel) for search-friendly text */
 const ARABIC_DIACRITICS = /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
 function stripDiacritics(text: string): string {
   return text.replace(ARABIC_DIACRITICS, "");
@@ -144,12 +135,8 @@ async function isPopulated(db: DatabaseExecutor): Promise<boolean> {
   }
 }
 
-// Written only after a full first-launch import. Content tables alone cannot tell a finished import
-// from one that Android killed halfway, because surahs are imported first.
 const CONTENT_IMPORT_MARKER = "content_import_complete_v1";
 
-// Tables filled by the first-launch import with plain INSERTs or partial rows. A resumed import
-// clears them first so it cannot duplicate rows. User-owned tables are never listed here.
 const FIRST_LAUNCH_CONTENT_TABLES = [
   "quran_text",
   "juz_map",
@@ -174,11 +161,6 @@ async function countRows(db: DatabaseExecutor, sql: string): Promise<number> {
   }
 }
 
-/**
- * Decides whether the bundled Quran content must be imported. Installs from before the marker
- * existed count as complete when their core tables are full; anything else with surahs present
- * was interrupted and resumes.
- */
 export async function resolveContentImportState(db: DatabaseExecutor): Promise<ContentImportState> {
   if (!(await isPopulated(db))) return "fresh";
   if ((await readSetting(db, CONTENT_IMPORT_MARKER).catch(() => null)) === "1") return "complete";
@@ -215,12 +197,6 @@ function dropFirstWords(text: string, count: number): string {
   return text.split(" ").slice(count).join(" ");
 }
 
-/**
- * The bundled plain text once prefixed ayah 1 of every surah except Al-Fatiha and At-Tawba with the
- * Basmala, so copying, searching or reviewing 2:1 gave "بسم الله الرحمن الرحيم الم". The Basmala
- * opens the surah but is not part of that ayah (Al-Fatiha 1:1 is the exception). The bundled data is
- * corrected; this removes the prefix from databases imported before the correction.
- */
 export async function removeBasmalaPrefixFromFirstAyahs(db: AppDatabase): Promise<number> {
   const probe = await db.getFirstAsync<{ text_search: string }>(
     "SELECT text_search FROM quran_text WHERE surah = 2 AND ayah = 1",
@@ -285,7 +261,6 @@ async function ensureDefaultSurahEnglishNames(db: AppDatabase): Promise<void> {
   );
 }
 
-// ─── Import functions ────────────────────────────────────────
 
 async function importSurahs(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const quranData = await loadData("quran-data.json");
@@ -336,7 +311,6 @@ async function importQuranText(db: AppDatabase, onProgress: ProgressCallback): P
   onProgress({ step: "Quran Text", current: 2, total: TOTAL_STEPS, detail: `${texts.length} ayahs` });
   console.log(`[Import] Importing ${texts.length} quran_text rows...`);
 
-  // Build QCF2 lookup: "surah:ayah" -> { code_v2, v2_page }
   const qcf2Map = new Map<string, { code_v2: string; v2_page: number }>();
   for (const v of qcf2Data) {
     qcf2Map.set(v.verse_key, { code_v2: v.code_v2, v2_page: v.v2_page });
@@ -405,7 +379,6 @@ async function importTafseer(db: AppDatabase, onProgress: ProgressCallback): Pro
   onProgress({ step: "Tafsir", current: 5, total: TOTAL_STEPS, detail: "Al-Muyassar (114 files)" });
   console.log(`[Import] Importing tafseer (muyassar) from 114 files...`);
 
-  // Fetch all 114 files in parallel instead of sequentially.
   const tafseerResults = await Promise.all(Array.from({ length: 114 }, (_, i) => loadTafseerFile(i + 1)));
 
   let totalRows = 0;
@@ -518,7 +491,6 @@ async function importTranslations(db: AppDatabase, onProgress: ProgressCallback)
 
   const translationData = await loadData("translation-sahih.json");
   const allRows: any[][] = [];
-  // translation-sahih.json is an array of 114 surah objects
   for (const surah of translationData) {
     for (const verse of surah.verses) {
       allRows.push([surah.id, verse.id, verse.translation]);
@@ -558,9 +530,9 @@ async function importWordTranslations(db: AppDatabase, onProgress: ProgressCallb
     w.surah_number,
     w.ayah_number,
     w.word_number,
-    null, // word_arabic (not in this dataset, will come from word_roots)
+    null,
     stripHtml(w.text),
-    null, // transliteration (not in this dataset)
+    null,
   ]);
   await batchInsert(
     db,
@@ -582,9 +554,9 @@ async function importWordIrab(db: AppDatabase, onProgress: ProgressCallback): Pr
     m.arabic_word ?? null,
     m.morphological_tag ?? null,
     m.syntactic_function ?? null,
-    null, // root (not in aggregated MASAQ)
-    null, // lemma
-    null, // pattern
+    null,
+    null,
+    null,
   ]);
   await batchInsert(
     db,
@@ -638,7 +610,6 @@ async function importTajweed(db: AppDatabase, onProgress: ProgressCallback): Pro
   console.log(`[Import] Tajweed done: ${allRows.length} rows`);
 }
 
-// ─── New tab dataset importers ───────────────────────────────
 
 async function importWordMeaningsAr(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("wbw-arabic-meanings.json");
@@ -729,7 +700,6 @@ async function importQiraatEncyclopedia(db: AppDatabase, onProgress: ProgressCal
   onProgress({ step: "Qiraʾat", current: 18, total: TOTAL_STEPS, detail: "…" });
   console.log(`[Import] Building qiraat_encyclopedia rows...`);
 
-  // Two pass: first collect object entries (with text). Second pass: resolve string refs.
   type Entry = { text: string; group: string[] };
   const objects = new Map<string, Entry>();
   const refs: Array<[string, string]> = [];
@@ -745,7 +715,6 @@ async function importQiraatEncyclopedia(db: AppDatabase, onProgress: ProgressCal
     }
   }
 
-  // Rows for object entries — insert one row per key in ayah_keys (or just the entry key if no group)
   const rowsByKey = new Map<string, [number, number, string, string]>();
   for (const [key, entry] of objects) {
     const { text, group } = entry;
@@ -756,14 +725,12 @@ async function importQiraatEncyclopedia(db: AppDatabase, onProgress: ProgressCal
         rowsByKey.set(k, [s, a, text, groupJson]);
       }
     }
-    // Also make sure the primary key itself is present even if ayah_keys was empty
     const [sk, ak] = key.split(":").map((n) => parseInt(n, 10));
     if (Number.isFinite(sk) && Number.isFinite(ak) && !rowsByKey.has(key)) {
       rowsByKey.set(key, [sk, ak, text, groupJson]);
     }
   }
 
-  // String refs: resolve to the target's text + group
   for (const [key, target] of refs) {
     const resolved = rowsByKey.get(target);
     if (!resolved) continue;
@@ -816,8 +783,6 @@ async function importAsbabAlNuzul(db: AppDatabase, onProgress: ProgressCallback)
 }
 
 async function importReflectionJourneyLevels(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
-  // Ayah counts come from the surahs table: parsing the 8 MB quran-data.json for them on every
-  // native launch delayed startup.
   const [seedData, surahRows, storedFingerprint, existingCountRow] = await Promise.all([
     loadData("reflection-journey.json"),
     db.getAllAsync<{ number: number; ayah_count: number }>("SELECT number, ayah_count FROM surahs"),
@@ -879,9 +844,6 @@ async function importReflectionJourneyLevels(db: AppDatabase, onProgress: Progre
 }
 
 async function runNewTabImports(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
-  // Idempotent: only import tables that are empty. Safe to call on fresh
-  // installs and existing installs alike. Wrap each in try/catch so a
-  // single bad dataset doesn't block the rest.
   const tableExists = async (table: string): Promise<boolean> => {
     try {
       await db.getFirstAsync(`SELECT 1 FROM ${table} LIMIT 1`);
@@ -927,9 +889,6 @@ async function runNewTabImports(db: AppDatabase, onProgress: ProgressCallback): 
     await safeImport("word_meanings_ar", () => importWordMeaningsAr(db, onProgress));
   }
 
-  // Detect old Da'as data. Earlier imports copied source positions directly,
-  // so grouped Fatiha rows made 1:2 word 1 point at "اسْمَ" instead of
-  // "الْحَمْدُ". Rebuild with canonical MASAQ word positions.
   if (await tableExists("word_irab_daas")) {
     const staleFatihaRow = await db.getFirstAsync<{ word: string | null }>(
       "SELECT word FROM word_irab_daas WHERE surah = 1 AND ayah = 2 AND word_pos = 1",
@@ -962,8 +921,6 @@ async function runNewTabImports(db: AppDatabase, onProgress: ProgressCallback): 
   if ((await safeCount("asbab_al_nuzul")) === 0) {
     await safeImport("asbab_al_nuzul", () => importAsbabAlNuzul(db, onProgress));
   }
-  // The similar-verse rows come only from the generated rows file, never the raw NourQuran JSON,
-  // whose passages are not aligned with the Quran text (lib/database/mutashabihat-rows.ts).
   await safeImport("mutashabihat", async () => {
     const refresh = await refreshMutashabihatRows(db, () => loadData(MUTASHABIHAT_ROWS_FILE));
     if (refresh.replaced || refresh.retiredCards.length > 0) {
@@ -1062,7 +1019,6 @@ async function ensureQfUserSyncSchema(db: DatabaseExecutor): Promise<void> {
   `);
 }
 
-// ─── Main initialization ─────────────────────────────────────
 
 export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   console.log("[Import] Creating schema...");
@@ -1079,14 +1035,12 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
   if (importState === "complete") {
     await ensureDefaultSurahEnglishNames(db);
 
-    // Check if page_lines needs migration (added after initial import)
     const plCount = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM page_lines");
     if ((plCount?.count ?? 0) === 0) {
       console.log("[Import] Migrating: importing page_lines...");
       await importPageLines(db, onProgress);
     }
 
-    // Ensure QCF2 columns exist (added after initial import)
     try {
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_qcf2 TEXT NOT NULL DEFAULT ''");
     } catch {}
@@ -1094,19 +1048,16 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN v2_page INTEGER NOT NULL DEFAULT 0");
     } catch {}
 
-    // Check if QCF2 data needs populating or updating (word grouping fix)
     const qcf2Check = await db.getFirstAsync<{ cnt: number }>(
       "SELECT COUNT(*) as cnt FROM quran_text WHERE text_qcf2 != ''",
     );
-    // Detect old char-level splitting: verse 66:1 has 17 individual PUA chars
-    // but should have 15 word groups (2 words use 2 PUA chars each).
     const needsQcf2Rewrite =
       (qcf2Check?.cnt ?? 0) > 0
         ? await db
             .getFirstAsync<{ text_qcf2: string }>("SELECT text_qcf2 FROM quran_text WHERE surah = 66 AND ayah = 1")
             .then((row) => {
               const tokens = (row?.text_qcf2 ?? "").split(/\s+/).filter(Boolean).length;
-              return tokens === 17; // old data has 17 individual chars; correct data has 15 word groups
+              return tokens === 17;
             })
         : false;
 
@@ -1130,9 +1081,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       console.log(`[Import] QCF2 migration done: ${updateRows.length} rows updated`);
     }
 
-    // Migrate tafseer table to multi-source schema if needed
     try {
-      // Check if source column exists by trying to select it
       let hasSource = false;
       try {
         await db.getFirstAsync("SELECT source FROM tafseer LIMIT 1");
@@ -1162,7 +1111,6 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       console.warn("[Import] Tafsir migration check:", e);
     }
 
-    // Import zilal if not yet imported
     const zilalCount = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM tafseer WHERE source = 'zilal'",
     );
@@ -1171,7 +1119,6 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       await importZilal(db, onProgress);
     }
 
-    // Add text_search column for diacritics-stripped search (Phase 4 migration)
     try {
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_search TEXT NOT NULL DEFAULT ''");
     } catch {}
@@ -1188,13 +1135,11 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       console.log(`[Import] text_search migration done: ${updateRows.length} rows`);
     }
 
-    // Create text_search index (must happen after column migration)
     await createTextSearchIndex(db);
 
     const basmalaFixed = await removeBasmalaPrefixFromFirstAyahs(db);
     if (basmalaFixed > 0) console.log(`[Import] Removed the Basmala prefix from ${basmalaFixed} first ayahs`);
 
-    // Migrate sync_queue table to add row_id, status, synced_at columns (Phase 6)
     try {
       await db.getFirstAsync("SELECT row_id FROM sync_queue LIMIT 1");
     } catch {
@@ -1220,7 +1165,6 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       }
     }
 
-    // Import new tab datasets if their tables are empty (migration for existing installs).
     await runNewTabImports(db, onProgress);
     const surahInfoCount = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM surah_info");
     if ((surahInfoCount?.count ?? 0) < 228) {
@@ -1236,10 +1180,6 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
   console.log("[Import] Starting first-launch data import...");
   const startTime = Date.now();
 
-  // Pre-warm: kick off every network fetch in parallel (web only — native
-  // uses require() which is synchronous). Each call primes loadCache so
-  // importers await already-in-flight promises instead of triggering fresh
-  // sequential downloads.
   if (Platform.OS === "web") {
     void loadData("quran-data.json");
     void loadData("quran-qcf2.json");
@@ -1277,11 +1217,8 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
   await runNewTabImports(db, onProgress);
   await importSurahInfo(db, onProgress);
 
-  // Create tafseer source index (not in schema.ts to avoid error on old tables without source column)
   await db.execAsync("CREATE INDEX IF NOT EXISTS idx_tafseer_source ON tafseer(source)");
 
-  // Free the fetch cache — the parsed JSON (~50MB) has been inserted into
-  // SQLite and is no longer needed in memory.
   clearImportCaches();
   await writeSetting(db, CONTENT_IMPORT_MARKER, "1");
 

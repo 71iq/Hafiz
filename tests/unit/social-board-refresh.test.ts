@@ -15,7 +15,6 @@ import { bearerSubject, signedIn, signedOut, type FakeAuthState } from "./social
 
 const USER = "00000000-0000-4000-8000-00000000000a";
 const OTHER = "00000000-0000-4000-8000-00000000000b";
-/** Used only by the tests that note a membership, which the module keeps for the day. */
 const JOINER = "00000000-0000-4000-8000-00000000000c";
 
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
@@ -90,7 +89,6 @@ describe("board band refresh (8.13)", () => {
       ["hafiz", "2026-11-13"],
       ["hafiz", "2026-11-14"],
     ]);
-    // The account's board choice is read once a day, not on every refresh.
     expect(calls("get_profile_privacy")).toHaveLength(2);
   });
 
@@ -110,7 +108,6 @@ describe("board band refresh (8.13)", () => {
   });
 
   it("derives nothing until this account's restore has finished on the device", async () => {
-    // B signed in, but the local plan and cards may still be A's until B's restore completes.
     Object.assign(mockAuth, signedIn(OTHER));
     jest.mocked(hasCompletedAccountRestore).mockResolvedValue(false);
     await expect(refreshBoardBands(mockDb, OTHER, "en", MORNING)).resolves.toEqual({ status: "restoring" });
@@ -135,7 +132,6 @@ describe("board band refresh (8.13)", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(calls("refresh_board_bands")).toHaveLength(1);
 
-    // A review lands while the first report waits for the server.
     jest.mocked(readLocalBoardInputs).mockResolvedValue(hafiz);
     const second = refreshBoardBands(mockDb, USER, "en", MORNING);
     const third = refreshBoardBands(mockDb, USER, "en", MORNING);

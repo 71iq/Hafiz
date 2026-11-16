@@ -19,7 +19,6 @@ function day(localDate: string, status: DayStatus = "done", fullMet = false): Ha
   return { localDate, status, fullMet };
 }
 
-/** Consecutive days ending on `last`, all with the given status. */
 function run(last: string, length: number, status: DayStatus = "done"): HabitDay[] {
   return Array.from({ length }, (_, i) => day(addDays(last, -(length - 1 - i)), status));
 }
@@ -74,10 +73,8 @@ describe("streak (STR-03)", () => {
     const graced = [...run(addDays(TODAY, -2), 3), day(addDays(TODAY, -1), "grace")];
     expect(computeStreak(toDayMap(graced), TODAY, { makeUpOpen: true })).toMatchObject({ length: 4, makeUpPending: true, atRisk: true });
     expect(computeStreak(toDayMap(graced), TODAY, { makeUpOpen: false })).toMatchObject({ length: 4, makeUpPending: false });
-    // Today's own wird does not count the run twice.
     const doneToday = toDayMap([...graced, day(TODAY)]);
     expect(computeStreak(doneToday, TODAY, { makeUpOpen: true })).toMatchObject({ length: 5, makeUpPending: true, doneToday: true });
-    // An excuse or a pause already covers the day, so there is nothing to make up.
     for (const status of ["excused", "paused"] as const) {
       const covered = toDayMap([...run(addDays(TODAY, -2), 3), day(addDays(TODAY, -1), status)]);
       expect(computeStreak(covered, TODAY, { makeUpOpen: true }).makeUpPending).toBe(false);
@@ -261,7 +258,6 @@ describe("settle pass (8.4)", () => {
 });
 
 describe("earn-back (STR-17)", () => {
-  // A 10-day streak ended 3 days ago; the day after it was missed.
   const lastDay = addDays(TODAY, -3);
   const broken = run(lastDay, 10);
 
@@ -287,9 +283,7 @@ describe("earn-back (STR-17)", () => {
   it("is not offered for short streaks, closed windows or windows that can no longer succeed", () => {
     expect(findEarnBack(toDayMap(run(lastDay, 6)), addDays(lastDay, 2), { makeUpOpen: false })).toBeNull();
     expect(findEarnBack(toDayMap(broken), addDays(lastDay, 5), { makeUpOpen: false })).toBeNull();
-    // One window day missed: the full wird on the last 2 days can still restore it.
     expect(findEarnBack(toDayMap(broken), addDays(lastDay, 3), { makeUpOpen: false })).toMatchObject({ succeeded: false });
-    // Two window days missed and none full: neither path can finish.
     expect(findEarnBack(toDayMap(broken), addDays(lastDay, 4), { makeUpOpen: false })).toBeNull();
   });
 
@@ -342,7 +336,6 @@ describe("habit day merge (DB-02)", () => {
     });
     const olderWithdrawal = excuse(null, "2026-11-13T07:00:00.000Z");
     expect(mergeHabitDays(excused, olderWithdrawal)).toMatchObject({ status: "excused", reason: "travel" });
-    // The same instant spelled two ways resolves by reason, as the server merge does.
     const sameInstantWithdrawal = excuse(null, "2026-11-13T12:00:00Z");
     const sameInstantIllness = excuse("illness", "2026-11-13T12:00:00.000Z");
     expect(mergeHabitDays(sameInstantWithdrawal, sameInstantIllness)).toMatchObject({ reason: "illness" });
@@ -414,15 +407,11 @@ describe("minimum wird (STR-01)", () => {
 
   it("counts a page card or a finished sabaq chunk on its own", () => {
     expect(meetsMinimum(tallyReviews([{ cardId: "page:madani15:582", durationMs: 0 }], { studyCounts: false }), minimum)).toBe(true);
-    // A sabaq chunk counts by its share of the page's 15 lines (STR-01): a short second look on 4 lines
-    // is not a page, while a chunk that covers the whole page is.
     expect(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(PAGE_UNITS * 4 / 15);
     expect(tallyReviews([{ cardId: "chunk:madani15:582:1-15", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(PAGE_UNITS);
-    // Chunks that together cover a page are exactly one page, whatever their sizes.
     const coverPage = ["1-4", "5-8", "9-12", "13-15"].map((lines) => ({ cardId: `chunk:madani15:582:${lines}`, durationMs: 30_000 }));
     expect(tallyReviews(coverPage, { studyCounts: false }).pageUnits).toBe(PAGE_UNITS);
     expect(meetsMinimum(tallyReviews(coverPage, { studyCounts: false }), minimum)).toBe(true);
-    // Halves, seam quarters and ayah tenths stay whole too.
     expect(tallyReviews([{ cardId: "seam:madani15:582", durationMs: 0 }], { studyCounts: false }).pageUnits * 4).toBe(PAGE_UNITS);
     expect(tallyReviews([{ cardId: "2:255", durationMs: 0 }], { studyCounts: false }).pageUnits * 10).toBe(PAGE_UNITS);
     expect(meetsMinimum(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 120_000 }], { studyCounts: false }), minimum)).toBe(false);
@@ -454,7 +443,6 @@ describe("habit snapshot headlines", () => {
   });
 
   it("shows yesterday's makeable grace day ahead of today's finished wird while its window is open (STR-07)", () => {
-    // Another device with an earlier cutoff settled yesterday as grace and recorded today's wird.
     const days = [...run(addDays(TODAY, -2), 3), day(addDays(TODAY, -1), "grace"), day(TODAY)];
     expect(buildHabitSnapshot(input(days, morning)).headline).toMatchObject({ kind: "make_up_open", length: 5 });
     expect(buildHabitSnapshot(input(days)).headline).toEqual({ kind: "done_today", length: 5 });
@@ -496,7 +484,6 @@ describe("user state (6.1)", () => {
 
 describe("steady weeks (STR-27)", () => {
   it("counts ended weeks whose 7 days were recited or excused, never grace", () => {
-    // 2026-11-07 is a Saturday.
     const full = run("2026-11-13", 7);
     expect(countSteadyWeeks(toDayMap(full), "2026-11-13", 6)).toBe(1);
     expect(countSteadyWeeks(toDayMap(full), "2026-11-12", 6)).toBe(0);

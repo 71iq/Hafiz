@@ -103,7 +103,6 @@ jest.mock("@/lib/fsrs/queries", () => ({
   getTotalAyahCardCount: jest.fn(),
 }));
 
-// The wird streak comes from the habit overview, tested in habit-ui and habit-core.
 jest.mock("@/lib/habit/use-habit-overview", () => ({
   useHabitOverview: () => ({ overview: null, failed: false, refresh: async () => {} }),
 }));
@@ -244,7 +243,6 @@ describe("ProgressScreen RTL behavior", () => {
     expect(arabicButtonChildren[1]).toEqual(
       expect.objectContaining({ props: expect.objectContaining({ children: "تسجيل الدخول" }) }),
     );
-    // The shared promotion keeps Progress's light teal card and outline Log In button.
     expect(arabicCard.props.className).toContain("px-5 py-4");
     expect(arabicCard.props.className).toContain("rounded-4xl overflow-hidden");
     expect(arabicCard.props.className).toContain("bg-primary-accent/10");
@@ -254,14 +252,12 @@ describe("ProgressScreen RTL behavior", () => {
       minHeight: 44,
     });
     expect(flattenStyle(arabicButtonText.props.style)).toMatchObject({ color: "#0f766e" });
-    // The close control is labeled and keeps its own 44 px target.
     const arabicDismiss = arabic.getByRole("button", { name: "إغلاق" });
     expect(arabicDismiss.props.className).toContain("h-11 w-11");
 
     await fireEvent.press(arabicButton);
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
-    // The return to Progress is captured through the allowlisted origin, not a URL parameter.
     expect(peekAuthReturn()).toEqual({ route: "progress" });
 
     arabic.unmount();
@@ -314,7 +310,6 @@ describe("ProgressScreen RTL behavior", () => {
     await fireEvent.press(englishButton);
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
-    // The return to Progress is captured through the allowlisted origin, not a URL parameter.
     expect(peekAuthReturn()).toEqual({ route: "progress" });
   });
 
@@ -355,7 +350,6 @@ describe("ProgressScreen RTL behavior", () => {
   });
 
   it("writes tile numbers in the interface's digits whatever the device locale", async () => {
-    // 4 of 10 cards memorized, 2 reviews on 1 day, 2 of 2 achievements.
     const arabic = renderProgress();
 
     await waitFor(() => expect(arabic.getByText("٤٠٪")).toBeTruthy());
@@ -378,7 +372,6 @@ describe("ProgressScreen RTL behavior", () => {
     for (const label of ["Longest consistency", "Average reviews per active day", "Steady weeks", "Active days"]) {
       expect(english.getByText(label)).toBeTruthy();
     }
-    // Pressing a figure explains what it counts.
     fireEvent.press(english.getByLabelText("Memorized share: 40%"));
     expect(english.getByText(`Memorized share: ${strings.en.progressHelpMemorizedShare}`)).toBeTruthy();
   });

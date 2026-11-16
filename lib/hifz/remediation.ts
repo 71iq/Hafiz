@@ -9,23 +9,17 @@ import { parseClozeCardId } from "@/lib/hifz/weak-spots";
 
 export type Half = "a" | "b";
 
-/**
- * The units reviewed on their own after the pages: half pages (SCH-08) and seams (SCH-06) while they
- * relearn, and weak-spot cloze cards (ERR-06) whenever they are due.
- */
 export type RemediationUnit =
   | { kind: "half"; row: StudyCardRow; page: number; half: Half }
   | { kind: "seam"; row: StudyCardRow; page: number }
   | { kind: "cloze"; row: StudyCardRow; surah: number; ayah: number; word: number };
 
-/** Ten minutes, then the next day, then FSRS (SCH-08). Seams relearn the same way. */
 const REMEDIATION_STEPS: SchedulerStep[] = ["10m", "1d"];
 
 export function remediationPolicy(base: DeckReviewSettings): DeckReviewSettings {
   return { ...base, learningSteps: REMEDIATION_STEPS, relearningSteps: REMEDIATION_STEPS };
 }
 
-/** A page's lines in reading order, split in two; the first half takes the extra line of an odd count. */
 export function halfLineNumbers(page: RecitationPage, half: Half): Set<number> {
   const numbers = page.lines.map((line) => line.lineNumber).sort((a, b) => a - b);
   const split = Math.ceil(numbers.length / 2);
@@ -44,10 +38,6 @@ function lineOf(page: RecitationPage, token: PageToken): number | null {
   return null;
 }
 
-/**
- * SCH-08: the half of the page that holds every error of an attempt, or null when there are none or
- * they fall in both halves. A page with errors everywhere is the page's problem, not a half's.
- */
 export function errorHalf(page: RecitationPage, errorTokens: readonly PageToken[]): Half | null {
   if (errorTokens.length === 0) return null;
   const first = halfLineNumbers(page, "a");
@@ -66,11 +56,6 @@ async function readCard(db: DatabaseExecutor, id: string): Promise<StudyCardRow 
   return db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [id]);
 }
 
-/**
- * Apply a rating to a half-page or seam card that the page review already showed, without a review
- * log row: the recitation was logged once, as the page, and counts toward the wird once. Creates the
- * card on first use. Runs inside the page's grade transaction.
- */
 async function rateDerivedUnit(db: DatabaseExecutor, id: string, rating: Grade, now: Date): Promise<StudyCardRow> {
   const at = now.toISOString();
   let card = await readCard(db, id);
@@ -80,38 +65,24 @@ async function rateDerivedUnit(db: DatabaseExecutor, id: string, rating: Grade, 
     if (!card) throw new Error(`Could not create ${id}`);
   }
   const base = remediationPolicy(await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID));
-  // A clean first review of a new seam needs no learning steps, so a seam that never lapsed never
-  // surfaces on its own. A seam already learning or relearning keeps its 10m and 1d steps, so a
-  // clean continuation after a stumble does not skip the next-day check.
   const policy = rating !== Rating.Again && card.state === State.New ? { ...base, learningSteps: [] } : base;
   const { updatedCard } = calculateReviewTransition({ card, rating, reviewedAt: now, reviewPolicy: policy });
   await putCardRow(db, updatedCard);
   return updatedCard;
 }
 
-/** SCH-08: the half failed with the page, so it relearns: due in 10 minutes, then the next day. */
 export async function remediateHalf(db: DatabaseExecutor, { page, half, now }: { page: number; half: Half; now: Date }): Promise<StudyCardRow> {
   return rateDerivedUnit(db, halfCardId(page, half), Rating.Again, now);
 }
 
-/**
- * SCH-06: reciting into the next page reviews the seam. A clean transition after a Good or Easy page
- * is a Good review; a stumble is a lapse whatever the page's grade, so the seam surfaces on its own.
- */
 export async function reviewSeam(db: DatabaseExecutor, { page, clean, now }: { page: number; clean: boolean; now: Date }): Promise<StudyCardRow> {
   return rateDerivedUnit(db, seamCardId(page), clean ? Rating.Good : Rating.Again, now);
 }
 
-/** The seam after page n leads into page n+1, so the last page has none. */
 export function hasSeamAfter(page: number): boolean {
   return isValidPage(page) && isValidPage(page + 1);
 }
 
-/**
- * Half pages and seams surface on their own only while they work through their steps (10 minutes,
- * then the next day) and are due. FSRS marks the next-day step as a review card that is still on a
- * step, so both conditions count. Once they graduate, the page's own reviews cover them (SCH-06, SCH-08).
- */
 export async function loadDueRemediation(db: DatabaseExecutor, now: Date): Promise<RemediationUnit[]> {
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT * FROM study_cards
@@ -139,10 +110,6 @@ export async function countDueRemediation(db: DatabaseExecutor, now: Date): Prom
   return (await loadDueRemediation(db, now)).length;
 }
 
-/**
- * When the next remediation unit comes due after `now` (a half page or seam on its 10-minute step, or
- * a cloze card), or null when none waits. Home refreshes then, so the unit shows as work left.
- */
 export async function nextRemediationAt(db: DatabaseExecutor, now: Date): Promise<Date | null> {
   const row = await db.getFirstAsync<{ due: string }>(
     `SELECT due FROM study_cards

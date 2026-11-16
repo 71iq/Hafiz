@@ -11,23 +11,12 @@ type Props = {
   actionLabel?: string;
   onAction?: () => void;
   isDark: boolean;
-  /**
-   * "success" marks something just done: the icon takes the accent on a tinted disc. "error" colors
-   * the icon with the theme's error token so a failure does not read as an empty list.
-   */
   tone?: "neutral" | "success" | "error";
-  /** "display" sets the title in the serif heading of a session's end, for an end state in a session flow. */
   titleStyle?: "default" | "display";
 };
 
-/**
- * Reusable empty-state component with icon, title, subtitle, and optional action.
- * Follows "The Serene Path" design system: warm neutrals, teal accent, pill buttons. Text colors come
- * from the theme tokens, so they follow the active theme, and read at 4.5:1 or more.
- */
 export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction, isDark, tone = "neutral", titleStyle = "default" }: Props) {
   const { themeColors, effectiveTheme } = useSettings();
-  // Theme tokens, not fixed hex: the palette prop wins over isDark when the provider knows it.
   const palette = effectiveTheme ?? (isDark ? "dark" : "beige");
   const success = tone === "success";
   const accentColor = accentIconColor(palette);

@@ -27,7 +27,6 @@ const NOTES_SEARCH_DEBOUNCE_MS = 180;
 
 export type NotesSort = "recent" | "surah";
 
-/** Recently edited first, or Quran order (surah, then first ayah); ties keep the newer edit first. */
 export function sortNotes(notes: PrivateNoteSearchResult[], sort: NotesSort): PrivateNoteSearchResult[] {
   const byRecent = (a: PrivateNoteSearchResult, b: PrivateNoteSearchResult) => b.updatedAt.localeCompare(a.updatedAt);
   return [...notes].sort((a, b) =>
@@ -35,7 +34,6 @@ export function sortNotes(notes: PrivateNoteSearchResult[], sort: NotesSort): Pr
   );
 }
 
-/** Where an edit or delete started, so closing it returns to that list with its search intact. */
 type NoteActionOrigin = "preview" | "all";
 
 export function ProfileNotesManager() {
@@ -52,7 +50,6 @@ export function ProfileNotesManager() {
   const [editingNote, setEditingNote] = useState<PrivateNoteSearchResult | null>(null);
   const [deletingNote, setDeletingNote] = useState<PrivateNoteSearchResult | null>(null);
   const [allNotesOpen, setAllNotesOpen] = useState(false);
-  // The one notes search: the all-notes sheet's query and sort, kept while an edit is open.
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<NotesSort>("recent");
   const [results, setResults] = useState<PrivateNoteSearchResult[] | null>(null);
@@ -94,7 +91,6 @@ export function ProfileNotesManager() {
     };
   }, [db, reloadToken]);
 
-  // The sheet's query goes through the same local search as the rest of the app (lib/notes/queries).
   const trimmedQuery = query.trim();
   useEffect(() => {
     if (!trimmedQuery) {
@@ -144,7 +140,6 @@ export function ProfileNotesManager() {
       refreshNotes();
       reopenListIfStarted();
     } catch (e) {
-      // The dialog stays open with the note and the error; its button becomes Try again.
       console.warn("[ProfileNotesManager] note delete failed:", e);
       setDeleteError(s.notesDeleteFailed);
     } finally {
@@ -383,7 +378,6 @@ export function ProfileNotesManager() {
         open={!!editingNote}
         onClose={() => {
           setEditingNote(null);
-          // A successful edit started from the all-notes list returns to it, search and sort intact.
           if (editSaved.current) reopenListIfStarted();
           else origin.current = "preview";
           editSaved.current = false;
@@ -501,7 +495,6 @@ function NoteCard({
             </View>
           </View>
           <View className="mt-1.5">
-            {/* An unclamped hidden copy tells whether the note needs Show more. */}
             <Text
               aria-hidden
               accessibilityElementsHidden

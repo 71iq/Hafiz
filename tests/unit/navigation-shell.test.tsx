@@ -16,7 +16,6 @@ import {
 } from "@/lib/navigation/search-launcher";
 
 const mockReplace = jest.fn();
-// Native scheduling boundary only, as in the other navigation tests.
 jest.mock("react-native-reanimated", () => {
   const RN = require("react-native");
   const { ReduceMotion } = jest.requireActual("react-native-reanimated/src/commonTypes");

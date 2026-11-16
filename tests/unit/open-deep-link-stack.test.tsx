@@ -17,7 +17,6 @@ function OpenAyahButton({ label }: { label: string }) {
   );
 }
 
-// Stands in for the review session's Done and close actions, which leave through returnToTabs.
 function SessionScreen() {
   const navigation = useNavigation();
   return (
@@ -29,7 +28,6 @@ function SessionScreen() {
 
 type RouteState = { name: string; state?: RouteState; routes?: RouteState[] };
 
-// Routes of the app's root Stack (inside expo-router's own __root container).
 function rootRouteNames(app: ReturnType<typeof renderRouter>) {
   const container = app.getRouterState() as unknown as RouteState;
   const stack = container.routes?.[0]?.state;

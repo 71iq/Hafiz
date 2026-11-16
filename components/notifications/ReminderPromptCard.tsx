@@ -14,7 +14,6 @@ import { readReminderPrefs } from "@/lib/notifications/settings";
 import { prayerLabel } from "@/lib/notifications/templates";
 import type { ReminderAnchor } from "@/lib/notifications/types";
 
-/** Whether the session end may ask for notification permission now (ONB-02, ONB-03), with the reminder time. */
 export function useReminderOffer(db: AppDatabase): ReminderAnchor | null {
   const [anchor, setAnchor] = useState<ReminderAnchor | null>(null);
   useEffect(() => {
@@ -31,10 +30,6 @@ export function useReminderOffer(db: AppDatabase): ReminderAnchor | null {
   return anchor;
 }
 
-/**
- * The contextual permission card (5.8.2, ONB-02): says when the reminder comes before the system
- * prompt appears. Allow and Not now each count as one of the 4 prompts.
- */
 export function ReminderPromptCard({
   db,
   anchor,
@@ -78,7 +73,6 @@ export function ReminderPromptCard({
       <Text dir={dir} variant="body-sm" className="mt-1.5 text-warm-700 dark:text-neutral-300">
         {reason}
       </Text>
-      {/* Outline, so the session's own filled commit button stays the one primary action on screen. */}
       <View className="mt-3" style={{ gap: 6 }}>
         <Button
           variant="outline"

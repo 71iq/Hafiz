@@ -14,7 +14,6 @@ permissions:
 
 jobs:
   deploy:
-    # Playwright 1.60 cannot install Chromium on Ubuntu 26.04, which ubuntu-latest now uses.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -26,11 +25,11 @@ jobs:
       EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED: ${{ vars.EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED }}
       EXPO_PUBLIC_SOCIAL_AUTH_ENABLED: ${{ vars.EXPO_PUBLIC_SOCIAL_AUTH_ENABLED }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: main
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "24"
           cache: npm
@@ -39,8 +38,6 @@ jobs:
           set -euo pipefail
           test -n "$EXPO_PUBLIC_SUPABASE_URL"
           test -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY"
-          # Dependency install scripts only fetch tools the deploy does not use (the Supabase CLI
-          # download has failed with GitHub 504s); run the project's own postinstall for patches.
           npm ci --ignore-scripts
           npm run postinstall
           npm run typecheck

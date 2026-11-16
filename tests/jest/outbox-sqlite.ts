@@ -3,15 +3,9 @@ import { createConnectionOwner } from "@/lib/database/connection-owner";
 import { createSchema, migrateUserSchema } from "@/lib/database/schema";
 import type { AppDatabase } from "@/lib/database/types";
 
-/**
- * Real app schema behind the production connection owner, backed by node:sqlite.
- * The owner serializes transactions like the app does, so a write made on the outer database
- * inside a transaction callback hangs instead of silently passing.
- */
 export type OutboxDatabase = {
   db: AppDatabase;
   sql: DatabaseSync;
-  /** Make the nth matching queue INSERT throw, counting from 1 after this call. */
   failQueueInsert(nth: number, table?: "sync_queue" | "qf_sync_queue"): void;
   queueInsertAttempts(): number;
   close(): Promise<void>;

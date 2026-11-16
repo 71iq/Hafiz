@@ -19,7 +19,6 @@ const mockRouter = {
   dismissTo: jest.fn(),
   canGoBack: () => true,
 };
-// The auth screen sits on top of a cold stack, so a verified session replaces it.
 const mockNavigation = {
   getState: () => ({ index: 0, routes: [{ name: "auth/login" }] }),
   canGoBack: () => false,
@@ -34,7 +33,6 @@ jest.mock("expo-router", () => ({
   useRouter: () => mockRouter,
   useNavigation: () => mockNavigation,
   useFocusEffect: () => {},
-  // Read lazily: the module factory runs before the test's constants are initialized.
   get router() {
     return mockRouter;
   },
@@ -145,7 +143,6 @@ jest.mock("@/components/ui/FormTextField", () => {
             />
           )}
         />
-        {/* Field errors render under their field, as in the real component. */}
         {error ? <Text testID={`${name}-error`}>{error}</Text> : null}
       </>
     ),
@@ -324,7 +321,6 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
     });
 
     it.each([
-      // Registered and new emails get the same neutral result, so the form reveals no account.
       ["alreadyRegistered", strings[locale].authSignupConfirmEmail, false],
       ["needsEmailConfirmation", strings[locale].authSignupConfirmEmail, false],
       ["signedIn", null, true],
@@ -362,7 +358,6 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
       fireEvent.press(invalid.getByTestId("email-submit"));
       await flush();
       expect(mockSignUp).not.toHaveBeenCalled();
-      // The error shows only under its field, not repeated in the form banner.
       expect(invalid.getByTestId("email-error").props.children).toBe(strings[locale].authValidationInvalidEmail);
       expect(invalid.getAllByText(strings[locale].authValidationInvalidEmail)).toHaveLength(1);
     });
@@ -470,7 +465,6 @@ describe("login and carried email", () => {
 
     const signup = render(<SignupScreen />);
     expect(signup.getByLabelText(strings.en.authEmail).props.value).toBe("QA@Example.Invalid");
-    // No navigation argument carries the email or any part of it.
     for (const args of routerArgs()) {
       expect(args).not.toContain("@");
       expect(args.toLowerCase()).not.toContain("example");
@@ -514,7 +508,6 @@ describe("forgot password", () => {
       });
       await flush();
       expect(mockSendReset).toHaveBeenCalledWith("qa@example.invalid");
-      // Neutral: the same words whether or not the address has an account.
       expect(view.getByText(new RegExp("^If qa@example\\.invalid has a Hafiz account"))).toBeTruthy();
       fireEvent.press(view.getByText("Send again in 60 s"));
       expect(mockSendReset).toHaveBeenCalledTimes(1);

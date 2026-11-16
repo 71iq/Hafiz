@@ -13,7 +13,6 @@ import {
   VIEWPORT_BREAKPOINTS,
 } from "@/lib/ui/viewport";
 
-/** Phone content gutters (below 768px). */
 export const PHONE_CONTENT_GUTTER = 16;
 
 export const TAB_SCREEN_BOTTOM_INSET = 100;
@@ -64,10 +63,7 @@ export function useScreenContentLayout({
   const { isRTL } = useSettings();
   const hasPersistentSidebar = width >= PERSISTENT_SIDEBAR_BREAKPOINT;
   const hasEdgeTrigger = !hasPersistentSidebar && width >= SIDEBAR_BREAKPOINT;
-  // Below the 360px compact step the phone gutter tightens to 12px.
   const phoneSide = width < VIEWPORT_BREAKPOINTS.phoneCompact ? Math.min(phoneGutter, 12) : phoneGutter;
-  // The rail is centered in the space beside the navigation: the persistent sidebar's side reserves
-  // its width, and from 768px the edge trigger's side keeps its 44px target clear of content.
   const sideWithSidebar = hasPersistentSidebar
     ? PERSISTENT_SIDEBAR_WIDTH + desktopGutter
     : hasEdgeTrigger

@@ -14,10 +14,6 @@ import type {
   SchedulerStep,
 } from "@/lib/fsrs/types";
 
-/**
- * What the deck settings editors hold while the user edits the shared scheduler options. Typed
- * fields stay as text so an invalid entry is shown back with its error instead of being clamped.
- */
 export type SchedulerDraft = {
   dailyLimitText: string;
   newCardsLimit: number;
@@ -70,7 +66,6 @@ export function schedulerDraftFromSettings(settings: DeckReviewSettings, isRTL: 
   };
 }
 
-/** Apply an edit, keeping stepper values inside the domains the settings owner already enforces. */
 export function applySchedulerDraftPatch(draft: SchedulerDraft, patch: Partial<SchedulerDraft>): SchedulerDraft {
   const next = { ...draft, ...patch };
   return {
@@ -88,7 +83,6 @@ export function validateSchedulerDraft(draft: SchedulerDraft): SchedulerDraftVal
   return { dailyLimit, learningSteps, relearningSteps, ok: dailyLimit.ok && learningSteps.ok && relearningSteps.ok };
 }
 
-/** The scheduler fields a valid draft saves, or null while any typed field is invalid. */
 export function schedulerFieldsFromDraft(draft: SchedulerDraft): SchedulerFields | null {
   const { dailyLimit, learningSteps, relearningSteps } = validateSchedulerDraft(draft);
   if (!dailyLimit.ok || !learningSteps.ok || !relearningSteps.ok) return null;
@@ -107,7 +101,6 @@ export function schedulerFieldsFromDraft(draft: SchedulerDraft): SchedulerFields
   };
 }
 
-/** "1.50h" and "1.5h" are the same step. */
 function stepKey(step: SchedulerStep): string {
   return `${parseFloat(step)}${step.slice(-1)}`;
 }
@@ -116,10 +109,6 @@ function sameSteps(a: readonly SchedulerStep[], b: readonly SchedulerStep[]): bo
   return a.length === b.length && a.every((step, index) => stepKey(step) === stepKey(b[index]));
 }
 
-/**
- * Dirty means the values the draft would save differ from the loaded settings. Reformatted text
- * ("1m 10m" for "1m, 10m") is not a change; an invalid typed field is.
- */
 export function isSchedulerDraftChanged(draft: SchedulerDraft, baseline: DeckReviewSettings): boolean {
   const fields = schedulerFieldsFromDraft(draft);
   if (!fields) return true;

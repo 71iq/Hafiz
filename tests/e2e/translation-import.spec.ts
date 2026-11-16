@@ -98,7 +98,6 @@ for (const language of ["en", "ar"] as const) {
         expect(
           await databaseSql(page, "getFirst", "SELECT value FROM user_settings WHERE key='translation_active_lang'"),
         ).toEqual(active);
-        // A fresh SQLite connection has no former connection's TEMP trigger.
         expect(
           await databaseSql(
             page,

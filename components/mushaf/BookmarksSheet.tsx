@@ -27,14 +27,12 @@ type Props = {
 type SurahNames = { db: unknown; byNumber: MushafIndex["surahByNumber"] };
 type BookmarksOrder = "recent" | "quran";
 
-/** The search field appears for more than this many bookmarks, whatever the viewport. */
 export const BOOKMARK_SEARCH_THRESHOLD = 10;
 
 export function shouldShowBookmarkSearch(count: number): boolean {
   return count > BOOKMARK_SEARCH_THRESHOLD;
 }
 
-/** Recent keeps the stored newest-first order; Quran order sorts by surah, then ayah. */
 export function orderBookmarks<T extends Pick<BookmarkEntry, "surah" | "ayah">>(rows: readonly T[], order: BookmarksOrder): T[] {
   if (order === "recent") return rows.slice();
   return rows.slice().sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
@@ -59,7 +57,6 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 640);
   const showSearch = shouldShowBookmarkSearch(bookmarksList.length);
 
-  // Rows come straight from the bookmarks list; only the surah names load, once per database.
   const namesByNumber = surahNames?.db === db ? surahNames.byNumber : null;
   const needsNames = visible && bookmarksList.length > 0 && !namesByNumber;
   useEffect(() => {
@@ -80,7 +77,6 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
     };
   }, [db, needsNames, namesAttempt]);
 
-  // Opening words are a convenience: rows render without them and fill in when they arrive.
   const bookmarkKeys = bookmarksList.map((b) => `${b.surah}:${b.ayah}`).join(",");
   useEffect(() => {
     if (!visible || bookmarksList.length === 0) return;
@@ -93,7 +89,6 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
     return () => {
       cancelled = true;
     };
-    // The key list stands for the bookmarks themselves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, visible, bookmarkKeys]);
 
@@ -144,7 +139,6 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
       setPendingRemoval(null);
       showToast(s.bookmarkRemoved);
     } catch (e) {
-      // The row and the dialog stay, with the error beside the action.
       console.warn("[BookmarksSheet] Failed to remove bookmark:", e);
       setRemoveError(s.bookmarkActionFailed);
     } finally {
@@ -154,7 +148,6 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
 
   const handleTap = useCallback(
     (surah: number, ayah: number) => {
-      // The reader captures the target (and the return position) before the list closes.
       onNavigate(surah, ayah);
       onClose();
     },

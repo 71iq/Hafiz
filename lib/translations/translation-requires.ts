@@ -1,6 +1,3 @@
-// Platform-aware translation loader.
-// On native: static require() map (Metro needs static string literals).
-// On web: fetch() from /data/translations/ at runtime.
 
 import { Platform } from "react-native";
 import { readBundledJson } from "@/lib/database/bundled-json";
@@ -42,7 +39,6 @@ export async function loadTranslation(langCode: string): Promise<any> {
   return loader();
 }
 
-// Backwards-compatible sync export for code that checks langCode membership
 export const translationRequires: Record<string, true> = {
   "en-bridges": true,
   id: true, bn: true, ur: true, fa: true, hi: true, tr: true, ha: true,

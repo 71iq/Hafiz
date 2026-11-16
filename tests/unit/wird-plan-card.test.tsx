@@ -7,7 +7,6 @@ import { interpolate } from "@/lib/i18n/useStrings";
 
 const s = strings.en;
 
-/** Only the fields the card reads. */
 function wird(
   overrides: { backlog?: boolean; newLines?: number; linesToday?: number; todo?: number; unit?: "page" | "ayah" } = {},
 ): TodayWird {

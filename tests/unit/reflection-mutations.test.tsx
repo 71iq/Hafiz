@@ -34,7 +34,6 @@ import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 
 let mockLocale: "en" | "ar" = "en";
-// Comment like counts use the interface's digits (Arabic-Indic in Arabic).
 const commentCount = (value: number) => (mockLocale === "ar" ? toArabicNumber(value) : String(value));
 const firstDb = {} as SQLiteDatabase,
   secondDb = {} as SQLiteDatabase;
@@ -83,7 +82,6 @@ jest.mock("@/components/ui/ResponsiveOverlay", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   const { View, Pressable, Text } = jest.requireActual<typeof import("react-native")>("react-native");
   return {
-    // The discard dialog renders through the real modal pieces.
     ...jest.requireActual("@/components/ui/ResponsiveOverlay"),
     ResponsiveSheet: ({ open, children }: { open: boolean; children: ReactNode }) =>
       open ? <View>{children}</View> : null,
@@ -218,7 +216,6 @@ beforeEach(() => {
   mockDb = firstDb;
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   jest.spyOn(RN, "useWindowDimensions").mockReturnValue({ width: 390, height: 844, scale: 1, fontScale: 1 });
-  // The shared menu opens once its trigger is measured.
   jest
     .spyOn(RN.View.prototype, "measureInWindow")
     .mockImplementation((callback: (x: number, y: number, width: number, height: number) => void) =>
@@ -364,7 +361,6 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     await flush();
     expect(view.getByText(commentCount(17))).toBeTruthy();
     expect(view.getByText(strings[locale].reflectionLikeFailed)).toBeTruthy();
-    // The like error shows above the input, below the comments, where the person is looking.
     const tree = JSON.stringify(view.toJSON());
     const likeError = tree.indexOf(strings[locale].reflectionLikeFailed);
     expect(likeError).toBeGreaterThan(tree.indexOf("Synthetic second"));
@@ -434,7 +430,6 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     await flush();
     expect(createReflection).toHaveBeenCalledWith(user(1).id, 2, 1, 2, 3, 3, "A private thought", true, expect.any(Function));
     expect(view.getByText(strings[locale].reflectionPrivacyChanged).props.accessibilityRole).toBe("alert");
-    // The private note would contradict the message, so it waits while the message shows.
     expect(view.queryByText(strings[locale].reflectionMinorPrivate)).toBeNull();
     expect(client.getQueryState(privacyKey)?.isInvalidated).toBe(true);
     expect(view.getByDisplayValue("A private thought")).toBeTruthy();
@@ -455,7 +450,6 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     fireEvent(input, "submitEditing");
     await flush();
     expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "A private comment", true);
-    // Shown above the input, where the person is looking, in place of the private note.
     expect(view.getByText(strings[locale].commentPrivacyChanged).props.accessibilityRole).toBe("alert");
     expect(view.queryByText(strings[locale].reflectionMinorPrivate)).toBeNull();
     expect(view.queryByText(strings[locale].commentPostFailed)).toBeNull();
@@ -530,7 +524,6 @@ it.each(["account", "ABA", "target", "close", "database", "unmount"] as const)(
     }
     if (retirement === "target") view.rerender(screen(2));
     if (retirement === "close") {
-      // The typed draft asks before closing; Discard completes the close and retires the post.
       fireEvent.press(view.getByTestId("close-sheet"));
       fireEvent.press(view.getByText(strings.en.discardChangesConfirm));
       view.rerender(screen(1, false));
@@ -568,7 +561,6 @@ it("public-post failure retains its draft, enables editing and retries with the 
   expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.editable).toBe(false);
   pending.reject(new Error("synthetic post rejected"));
   await flush();
-  // Server details go to the log; the person sees the plain message with Try again.
   expect(view.getByText(strings.ar.reflectionPostFailed)).toBeTruthy();
   expect(view.queryByText("synthetic post rejected")).toBeNull();
   expect(view.getByText(strings.ar.sharedTryAgain)).toBeTruthy();
@@ -740,7 +732,6 @@ it("confirmed unlike updates only the affected ayahs and feed caches", async () 
   expect(client.getQueryState(publicCount)?.isInvalidated).toBe(false);
 });
 
-/** Opens the card's shared More options menu and picks an item (the menu runs it on the next frame). */
 async function pickMenuItem(view: ReturnType<typeof render>, label: string, trigger = 0) {
   fireEvent.press(view.UNSAFE_getAllByType(MoreHorizontal)[trigger]);
   fireEvent.press(view.getByText(label));
@@ -807,7 +798,6 @@ it("an owned reflection offers Delete with cascade copy and removes it from cach
   twice(view.getByText(strings.en.reflectionDeleteConfirm));
   expect(deleteReflection).toHaveBeenCalledTimes(1);
   expect(deleteReflection).toHaveBeenCalledWith(user(1).id, "post");
-  // Nothing is discarded before the server answers.
   expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toHaveLength(2);
   pending.resolve(true);
   await flush();
@@ -909,9 +899,7 @@ it("an own comment offers Delete through the comment RPC; another's offers Repor
     { wrapper },
   );
   await waitFor(() => expect(view.getByText("Synthetic theirs")).toBeTruthy());
-  // After a confirmed delete the server no longer returns it.
   jest.mocked(fetchComments).mockResolvedValue({ data: [comment("theirs")], hasMore: false });
-  // Triggers: the card's menu first, then one per comment in order.
   await pickMenuItem(view, strings.en.reflectionReportAction, 2);
   expect(view.getByText(interpolate(strings.en.reflectionReportFromCommentBody, { reference: "Al-Baqarah 2:1-2" }))).toBeTruthy();
   fireEvent.press(view.getByText(strings.en.reflectionReportConfirm));
@@ -1027,7 +1015,6 @@ it("comment pagination admits one pending page and retains rows through error an
   pending.reject(new Error("synthetic page rejected"));
   await waitFor(() => expect(view.getByText(strings.en.commentLoadFailed)).toBeTruthy());
   expect(view.getByText("Synthetic comment")).toBeTruthy();
-  // A failed page shows beside "Load more", not above the list the person scrolled past.
   const tree = JSON.stringify(view.toJSON());
   expect(tree.indexOf(strings.en.commentLoadFailed)).toBeGreaterThan(tree.indexOf(strings.en.reflectionLoadMore));
   expect(tree.indexOf(strings.en.commentLoadFailed)).toBeGreaterThan(tree.indexOf("Synthetic comment"));
@@ -1049,7 +1036,6 @@ it("asks before closing a typed comment and shows the counter near the limit", a
   fireEvent.changeText(input, "x".repeat(1801));
   expect(view.getByText("1,801 / 2,000")).toBeTruthy();
   fireEvent.press(view.getByTestId("close-sheet"));
-  // The mocked header omits titles; the dialog's actions show it asked.
   expect(view.getByText(strings.en.discardChangesKeepEditing)).toBeTruthy();
   expect(close).not.toHaveBeenCalled();
   fireEvent.press(view.getByText(strings.en.discardChangesConfirm));

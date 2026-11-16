@@ -11,7 +11,6 @@ import { useSettings } from "@/lib/settings/context";
 import { ENCOURAGEMENT_STRING_KEYS } from "@/lib/social/encouragements";
 import { SocialErrorText, socialRowStyle, useSocialAccent } from "./SocialControls";
 
-/** SOC-06: one tap sends a fixed encouragement; invite halaqas may also send a short note. */
 export function EncouragementSheet({
   recipientName,
   allowFreeText,

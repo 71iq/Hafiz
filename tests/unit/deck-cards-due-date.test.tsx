@@ -22,10 +22,6 @@ import { State } from "@/lib/fsrs/scheduler";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { expectTextAlignStart, expectWritingDirection, flattenStyle } from "../rtl/rtl-test-utils";
 
-/**
- * The dialog's own buttons. The sheet behind it is in the same modal tree, and its header's Close
- * button is a button too, so it is left out here.
- */
 function dialogButtons(modal: Parameters<typeof within>[0]) {
   const close = new Set([strings.en.genericClose, strings.ar.genericClose]);
   return within(modal)
@@ -58,7 +54,6 @@ const originalWindowDimensions = ReactNative.Dimensions.get("window");
 const originalScreenDimensions = ReactNative.Dimensions.get("screen");
 const NativeModal = ReactNative.Modal;
 
-// Open in Mushaf navigates through the router, which this characterization does not mount.
 jest.mock("@/lib/navigation/open-mushaf", () => ({ useOpenMushaf: () => jest.fn() }));
 jest.mock("@/lib/database/provider", () => ({
   useDatabase: () => mockDatabase,
@@ -270,7 +265,6 @@ describe("DeckCardsSheet due-date editor characterization", () => {
     mockSettings.themeSurface = "#FFF8F1";
     mockSettings.uiLanguage = "ar";
     jest.resetAllMocks();
-    // Restore the React Native preset clock cleared by the fixture mock reset.
     jest.mocked(performance.now).mockImplementation(Date.now);
     mockMeasureInWindow.mockImplementation((callback) => {
       callback(24, 120, 32, 32);

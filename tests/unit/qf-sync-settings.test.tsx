@@ -78,7 +78,6 @@ jest.mock("@/components/profile/ProfileIdentity", () => ({ ProfileIdentity: () =
 jest.mock("@/components/settings/TafsirSourcePicker", () => ({ TafsirSourcePicker: () => null }));
 jest.mock("@/components/settings/TranslationLanguagePicker", () => ({ TranslationLanguagePicker: () => null }));
 jest.mock("@/components/settings/ReciterPicker", () => ({ ReciterPicker: () => null }));
-// The account sync card has its own tests; here only the dormant QF card's controls are queried.
 jest.mock("@/components/settings/AccountSyncCard", () => ({ AccountSyncCard: () => null, lastSyncedLabel: () => "" }));
 jest.mock("@/lib/fonts/loader", () => ({
   isQuranPageFontLoaded: () => true,

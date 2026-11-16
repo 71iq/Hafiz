@@ -52,7 +52,6 @@ export { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
 
 type SettingInfo = { title: string; body: string };
 
-/** A number for an editable field: interface digits without grouping separators. */
 function plainDigits(n: number, language: "en" | "ar"): string {
   return language === "ar" ? toArabicNumber(n) : String(n);
 }
@@ -62,14 +61,9 @@ type Props = {
   deckId: string | null;
   deckTitle: string;
   onClose: () => void;
-  /** Called after an explicit, committed save with the notice that names the deck. */
   onSaved: (notice: string) => void;
 };
 
-/**
- * Review settings for the Vocabulary Review deck: which word sides to ask and the shared scheduler
- * options. Ayah test modes stored on the same settings are kept as they are, not edited here.
- */
 export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, onClose, onSaved }: Props) {
   const db = useDatabase();
   const s = useStrings();
@@ -77,7 +71,6 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, onClose, o
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const compact = width >= SIDEBAR_BREAKPOINT;
-  /** The settings as loaded; null until loaded, so a failed load can never save defaults over them. */
   const [baseline, setBaseline] = useState<DeckReviewSettings | null>(null);
   const [draft, setDraft] = useState<SchedulerDraft | null>(null);
   const [wordTestModes, setWordTestModes] = useState<WordTestMode[]>([]);
@@ -144,7 +137,6 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, onClose, o
     setSaveError(null);
     setWordTestModes((prev) => {
       const next = prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value];
-      // The last side cannot be turned off; say why instead of silently ignoring the tap.
       setKeepOneSide(next.length === 0);
       return next.length > 0 ? next : prev;
     });
@@ -158,7 +150,6 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, onClose, o
     setSaveError(null);
     setSaving(true);
     try {
-      // One write: the scheduler options, the word sides and the untouched ayah test modes together.
       await writeDeckReviewSettings(db, deckId, { ...baseline, ...fields, wordTestModes });
       onSaved(interpolate(s.deckSettingsSavedNamed, { deck: deckTitle }));
       onClose();
@@ -222,7 +213,6 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, onClose, o
         <OverlayFooter isRTL={isRTL}>
           <View className="w-full gap-3">
             {saveError ? <InlineMessage text={saveError} isRTL={isRTL} tone="error" /> : null}
-            {/* Dimmed while there is nothing new to save or a typed field is invalid. */}
             <Button onPress={handleSave} disabled={!canSave} className="w-full">
               {saving ? (
                 <ActivityIndicator color="#fff" size="small" />
@@ -305,11 +295,6 @@ type SchedulerOptionsPanelProps = {
   isRTL: boolean;
 };
 
-/**
- * The scheduler options shared by every deck's settings. Daily limits stay open; FSRS, learning steps
- * and display order sit under Advanced, closed by default, and open by themselves while a step field
- * is invalid so its error is never hidden behind a disabled Save.
- */
 export function SchedulerOptionsPanel({
   draft,
   onChange,
@@ -340,7 +325,6 @@ export function SchedulerOptionsPanel({
     created: s.flashcardsNewSortCreated,
     random: s.flashcardsSortRandom,
   };
-  // The steppers move from the last valid typed value, or the default while the field is invalid.
   const dailyLimit = validation.dailyLimit.ok ? validation.dailyLimit.value : DEFAULT_DECK_DAILY_REVIEW_LIMIT;
   const stepDailyLimit = (delta: number) =>
     onChange({ dailyLimitText: plainDigits(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, dailyLimit + delta), language) });
@@ -623,7 +607,6 @@ function SettingsRow({
   info?: string;
   onInfoPress?: (title: string, body: string) => void;
   children: ReactNode;
-  /** A field message under the whole row, such as a validation error. */
   footer?: ReactNode;
   compact: boolean;
   isDark: boolean;
@@ -640,8 +623,6 @@ function SettingsRow({
           justifyContent: "space-between",
         }}
       >
-        {/* flex-1 only beside the control: in the stacked layout a zero flex basis collapsed the label's
-            height and the control drew over it. */}
         <View className={compact ? "min-w-0 flex-1" : "min-w-0"}>
           <SettingTitle title={title} info={info} onInfoPress={onInfoPress} isDark={isDark} isRTL={isRTL} fontSize={15} />
           <Text
@@ -727,7 +708,6 @@ function StepInputRow({
 }) {
   const s = useStrings();
   const language = isRTL ? "ar" : "en";
-  // What Save will store, so a token is never dropped without the user seeing it.
   const message = !result.ok
     ? s.deckStepsInvalid
     : result.steps.length === 0
@@ -882,7 +862,6 @@ function ReviewStepper({
   isDark,
   isRTL,
 }: {
-  /** The shown value, or a labeled input for a field that also takes typed entry. */
   value: ReactNode;
   decrementLabel: string;
   incrementLabel: string;
@@ -1061,7 +1040,6 @@ function SettingInfoButton({
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
-      // The 24px icon gets a 44px tap area.
       hitSlop={10}
       onPress={onPress}
       className="h-6 w-6 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10"

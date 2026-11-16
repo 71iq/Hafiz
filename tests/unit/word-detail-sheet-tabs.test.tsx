@@ -94,7 +94,6 @@ describe("WordDetailSheet tabs", () => {
     fireEvent.press(view.getByRole("button", { name: "Root أله, show occurrences" }));
     expect(view.getByText("occurrences-panel")).toBeTruthy();
 
-    // An occurrence jump closes the sheet from the reader, not through the sheet's own close button.
     mockDetailWord = null;
     view.rerender(<WordDetailSheet />);
     mockDetailWord = { ...word, wordPos: 4 };

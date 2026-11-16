@@ -32,7 +32,6 @@ const ICONS: Record<AchievementDefinition["icon"], LucideIcon> = {
   trophy: Trophy,
 };
 
-// Every unlocked badge uses the one teal accent; rarity is named in a text chip instead of a color code.
 const RARITY_LABEL_KEY = {
   common: "achievementRarity.common",
   uncommon: "achievementRarity.uncommon",
@@ -116,7 +115,6 @@ export function AchievementBadge({ item, compact = false }: Props) {
             className="mt-1.5 text-warm-700 dark:text-neutral-400"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 10, ...textStartStyle(isRTL)}}
           >
-            {/* A bidi isolate keeps "2 / 100" in order inside Arabic text. */}
             {`\u2066${interpolate(s.achievementProgressCount, {
               current: String(Math.min(currentValue, targetValue)),
               target: String(targetValue),

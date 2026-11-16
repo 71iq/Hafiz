@@ -58,7 +58,6 @@ jest.mock("@/lib/settings/context", () => ({
   SettingsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 jest.mock("@/lib/fonts/ui-fonts", () => ({ UI_FONTS: {}, loadUiFontsWeb: async () => undefined }));
-// Reminder scheduling needs the database and settings; this suite covers auth cache binding only.
 jest.mock("@/lib/notifications/use-reminder-scheduling", () => ({
   useReminderScheduling: () => undefined,
   useReminderResponses: () => undefined,
@@ -84,7 +83,6 @@ const scopedRoots = [
   "reflectionFeed",
   "reflections",
   "reflectionComments",
-  // A count includes the viewer's own private reflections (ETH-07), so it goes with the account.
   "reflectionCount",
   "currentUserPublicAchievementUnlocks",
 ] as const;
@@ -1311,7 +1309,6 @@ it("clears all detached results and propagates a listener error before a conserv
     expect(() => setIdentity(sessionFor(userB))).toThrow(error);
     expect(old.map((query) => query.state.data)).toEqual([undefined, undefined]);
     expect(c.getQueryData(second)).toBe("fresh B");
-    // A failed pass remains incomplete; a later store notification retries conservatively.
     useAuthStore.setState({ isLoading: true });
     expect(c.getQueryData(second)).toBeUndefined();
   } finally {

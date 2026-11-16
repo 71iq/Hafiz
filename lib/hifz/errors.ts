@@ -5,7 +5,6 @@ import { similarPair, type SimilarPair } from "@/lib/hifz/similar";
 import { removeClearedWeakSpotCards, WEAK_SPOT_ERROR_SQL, WEAK_SPOT_SESSIONS } from "@/lib/hifz/weak-spots";
 import { createId } from "@/lib/id";
 
-/** ERR-01 error types. */
 const ERROR_TYPES = [
   "skip_word",
   "wrong_word",
@@ -24,19 +23,16 @@ const CORRECTIONS = ["self", "tanbih", "fath", "none"] as const;
 export type Correction = (typeof CORRECTIONS)[number];
 export type Severity = "jali" | "khafi";
 
-/** Tajweed errors (lahn khafi) are a separate track and never affect hifz scheduling (4.2.1). */
 function severityOf(type: RecitationErrorType): Severity {
   return type === "tajweed" ? "khafi" : "jali";
 }
 
 export type VerseKey = Readonly<{ surah: number; ayah: number }>;
 
-/** ERR-01 `sibling_ref`: the verse a drift went into, as 's:a'. */
 export function verseRef({ surah, ayah }: VerseKey): string {
   return `${surah}:${ayah}`;
 }
 
-/** Read a stored `sibling_ref`. It syncs as free text, so anything other than 's:a' reads as none. */
 export function parseVerseRef(ref: string | null): VerseKey | null {
   const match = ref ? /^(\d+):(\d+)$/.exec(ref) : null;
   return match ? { surah: Number(match[1]), ayah: Number(match[2]) } : null;
@@ -71,20 +67,12 @@ export type RecitationErrorRow = {
   deleted_at: string | null;
 };
 
-/** ERR-03: items leave the inbox after this many clean recitations on different days. */
 const INBOX_CLEAN_DAYS_TO_RESOLVE = 2;
-/** ERR-03: items expire after 28 days, Duolingo's window for path mistakes. */
 const INBOX_EXPIRY_DAYS = 28;
-/** ERR-04: at most this many inbox items join one wird review. */
 export const INBOX_ITEMS_PER_REVIEW = 6;
 
-/**
- * ERR-03: the inbox holds uncorrected clear errors and every error that needed a peek or the text.
- * Self-corrected slips, hesitations and tajweed notes are logged but stay out of it.
- */
 function belongsInInbox(type: RecitationErrorType, corrected: Correction): boolean {
   if (type === "tajweed" || type === "hesitation") return false;
-  // A stumble between pages relearns as its seam card (SCH-06), not as an ayah drill.
   if (type === "seam") return false;
   return corrected !== "self";
 }
@@ -122,7 +110,6 @@ async function writeError(db: DatabaseExecutor, row: RecitationErrorRow): Promis
   await enqueueSync(db, "recitation_errors", "UPDATE", row.id, errorSyncData(row));
 }
 
-/** Log the errors of one graded attempt, inside the grade transaction (DB-01). */
 export async function insertRecitationErrors(
   db: DatabaseExecutor,
   {
@@ -156,10 +143,6 @@ export async function insertRecitationErrors(
   return rows;
 }
 
-/**
- * ERR-03: a clean recall of a card (Good or Easy at the hidden level, with no new errors) counts
- * once per day toward resolving that card's open inbox items. The second clean day resolves them.
- */
 export async function recordCleanRecitation(
   db: DatabaseExecutor,
   { cardId, at, localDate }: { cardId: string; at: string; localDate: LocalDate },
@@ -199,7 +182,6 @@ export type InboxItem = Readonly<{
   cleanCount: number;
 }>;
 
-/** Open inbox items, oldest first, that have not expired (ERR-03, ERR-04). */
 export async function readMistakeInbox(db: DatabaseExecutor, today: LocalDate, limit?: number): Promise<InboxItem[]> {
   const rows = await db.getAllAsync<RecitationErrorRow>(
     `SELECT ${ERROR_COLUMNS} FROM recitation_errors
@@ -221,22 +203,10 @@ export async function readMistakeInbox(db: DatabaseExecutor, today: LocalDate, l
   }));
 }
 
-/** MUT-04: a drift's pair is drilled in this many sessions after it; SCH-07: its sibling page in the first. */
 export const DRIFT_FOLLOW_UP_SESSIONS = 3;
 
-/**
- * A logged drift into a known sibling whose follow-up sessions are not used up. `sessionsSince`
- * counts the review sessions that build a drill list (wird, mistakes, welcome back), on any device,
- * started after the drift was logged. A session has a row once it grades something, so one opened and
- * left without a grade does not use up a follow-up.
- */
 export type DriftFollowUp = Readonly<{ id: string; surah: number; ayah: number; sibling: VerseKey; sessionsSince: number }>;
 
-/**
- * MUT-04, SCH-07: the drifts the next sessions still drill, oldest first. A drift dismissed as not a
- * mistake has none, and one older than the inbox window (ERR-03) has expired. Whether its inbox item is
- * still open does not matter: the pair is drilled for its three sessions either way.
- */
 export async function readDriftFollowUps(db: DatabaseExecutor, today: LocalDate): Promise<DriftFollowUp[]> {
   const rows = await db.getAllAsync<{ id: string; surah: number; ayah: number; sibling_ref: string; local_date: LocalDate; created_at: string }>(
     `SELECT id, surah, ayah, sibling_ref, local_date, created_at FROM recitation_errors
@@ -244,17 +214,11 @@ export async function readDriftFollowUps(db: DatabaseExecutor, today: LocalDate)
         AND deleted_at IS NULL AND local_date >= ?`,
     [addDays(today, -INBOX_EXPIRY_DAYS)],
   );
-  // Oldest first by instant, since synced rows can carry an offset instead of Z ("10:00+02:00" is
-  // before "08:30Z"); the id settles a tie.
   const drifts = rows
     .map((row) => ({ row, at: Date.parse(row.created_at) }))
     .filter((drift) => Number.isFinite(drift.at))
     .sort((a, b) => a.at - b.at || (a.row.id < b.row.id ? -1 : a.row.id > b.row.id ? 1 : 0));
   if (drifts.length === 0) return [];
-  // A drift is done once DRIFT_FOLLOW_UP_SESSIONS sessions started after it, so only the latest that
-  // many session starts matter: the sessions after a drift are always among the latest. They are read
-  // once, through the local_date index, from the day before the oldest drift's (another device's
-  // local day can differ by one).
   const earliestDay = drifts.reduce((day, drift) => (drift.row.local_date < day ? drift.row.local_date : day), drifts[0].row.local_date);
   const sessions = await db.getAllAsync<{ started_at: string }>(
     `SELECT started_at FROM review_sessions
@@ -274,26 +238,14 @@ export async function readDriftFollowUps(db: DatabaseExecutor, today: LocalDate)
   });
 }
 
-/** What one drift adds to the next session's drill list (SCH-07, MUT-04). */
 export type DriftDrill = Readonly<{
   errorId: string;
-  /**
-   * Every live drift into the pair, oldest first, `errorId` last. The drill stays while any of them
-   * does, so dismissing the latest as not a mistake keeps an older one's prompt.
-   */
   errorIds: readonly string[];
   pair: SimilarPair;
-  /** SCH-07: the sibling's page, in the first session after the drift only. */
   siblingPage: number | null;
-  /** Sessions since the latest drift into this pair: 0 for the first after it, up to 2. */
   sessionsSince: number;
 }>;
 
-/**
- * SCH-07, MUT-04: the drill list a new session adds for recent drifts, oldest first: each pair's
- * discrimination prompt for 3 sessions, and the sibling's page in the first. Drifts into the same pair
- * share one prompt, taken from the latest of them, which has had the fewest sessions since.
- */
 export async function loadDriftDrills(db: DatabaseExecutor, today: LocalDate): Promise<DriftDrill[]> {
   const drills = new Map<string, DriftDrill>();
   for (const followUp of await readDriftFollowUps(db, today)) {
@@ -328,11 +280,6 @@ export async function readWeakSpots(db: DatabaseExecutor): Promise<WeakSpot[]> {
   );
 }
 
-/**
- * Remove one inbox item by hand, for an error logged by mistake. When that leaves its word wrong in
- * fewer than 3 sessions, the weak spot's cloze card is deleted in the same transaction (ERR-06).
- * Callers refresh the reader's weak-spot markers afterwards.
- */
 export async function dismissInboxItem(database: AppDatabase, { id, now = new Date() }: { id: string; now?: Date }): Promise<void> {
   const at = now.toISOString();
   await database.withTransactionAsync(async (db) => {
@@ -343,10 +290,6 @@ export async function dismissInboxItem(database: AppDatabase, { id, now = new Da
   });
 }
 
-/**
- * ERR-02, ERR-05: the result of a quick drill of one inbox item. A clean recall counts once per day
- * toward resolving it (two clean days resolve it); a miss keeps it open.
- */
 export async function recordDrillResult(
   database: AppDatabase,
   { id, clean, now = new Date() }: { id: string; clean: boolean; now?: Date },

@@ -22,12 +22,6 @@ import { formatSocialDate } from "@/lib/social/text";
 import { useIsOffline, useSocialQuery } from "@/lib/social/use-social-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
-/**
- * Board tab (spec 5.7.2): an opt-in weekly cohort ranked by consistency points the server computes.
- * Opening the tab places a joined user in this week's cohort, which starts on the user's own week
- * start (BRD-01, STR-28). Offline it shows the last saved standings with their date (SB-01). Every
- * request runs as the account this screen belongs to (lib/social/owner.ts).
- */
 export default function BoardScreen() {
   const s = useStrings();
   const user = useAuthStore((state) => state.user);
@@ -62,14 +56,11 @@ function BoardContent({ userId }: { userId: string }) {
   const language = uiLanguage === "ar" ? "ar" : "en";
   const queryClient = useQueryClient();
   const offline = useIsOffline();
-  // Moves on at local midnight, so a tab left open overnight asks for the new day (BRD-01).
   const today = useLocalToday();
   const [joinError, setJoinError] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Bands come from the local plan and memorized cards (8.13), and the week start from the wird
-  // settings; the server picks the cohort.
   const inputs = useQuery({
     queryKey: ["boardInputs", userId, today, language],
     queryFn: () => readLocalBoardInputs(db, language),
@@ -90,7 +81,6 @@ function BoardContent({ userId }: { userId: string }) {
   const join = useMutation({
     mutationFn: async (choice: BoardJoinChoice) => {
       if (!inputs.data) throw new Error("Board inputs are not ready");
-      // ETH-07: the server says whether joining as a minor left a matched halaqa, so the screen can.
       const { leftMatched } = await joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
       return { leavesMatched: leftMatched };
     },
@@ -99,13 +89,11 @@ function BoardContent({ userId }: { userId: string }) {
       await Promise.all([
         refresh(),
         reloadPrivacy(),
-        // ETH-07: joining as a minor clears the photo on the server, so the signed-in profile reloads.
         choice.isMinor ? useAuthStore.getState().fetchProfile() : null,
       ]);
     },
     onError: (error) => {
       if (error instanceof ProfilePrivacyChangedError) {
-        // Another device changed the age setting. The form reloads from the stored choice.
         setJoinError(s.socialErrorPrivacyChanged);
         void reloadPrivacy();
         return;
@@ -134,7 +122,6 @@ function BoardContent({ userId }: { userId: string }) {
           refreshing={board.isRefetching}
           onRefresh={() => {
             void refresh();
-            // The stored age choice is read again with the rest of the screen.
             if (view?.status === "not_joined") void reloadPrivacy();
           }}
         />
@@ -149,7 +136,6 @@ function BoardContent({ userId }: { userId: string }) {
       {loading ? (
         <StandingsSkeleton label={s.loading} />
       ) : !view ? (
-        // Nothing private is shown without a current read; local study is unaffected.
         <SocialNotice
           icon={offline ? CloudOff : undefined}
           message={
@@ -164,7 +150,6 @@ function BoardContent({ userId }: { userId: string }) {
         offline ? (
           <SocialNotice icon={CloudOff} message={s.socialOfflineEmpty} />
         ) : (
-          // Mounted afresh on each reconnect, so it reads the stored choice again.
           <BoardJoinSection
             userId={userId}
             pending={join.isPending || !inputs.data}
@@ -191,12 +176,6 @@ function BoardContent({ userId }: { userId: string }) {
 
 type BoardJoinChoice = { nickname: string | null; isMinor: boolean; expectedMinor: boolean };
 
-/**
- * ETH-07: the join form starts from the account's stored age choice and sends it back as the value it
- * loaded, which the server compares. A cached copy can predate another device recording minority, so
- * the form appears only after a read that completed while this section is mounted, and gives way to
- * the skeleton while a read runs and to a retry after one fails.
- */
 function BoardJoinSection({
   userId,
   pending,
@@ -214,14 +193,9 @@ function BoardJoinSection({
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(userId)),
     retry: false,
     networkMode: "always",
-    // Read again each time the section opens, even with a fresh cached copy.
     refetchOnMount: "always",
   });
 
-  // ETH-07: the form starts only from a read that succeeded since the section opened, never from a
-  // cached copy. After that it stays through later refetches and their failures, so a typed nickname
-  // is kept: joining sends the minority the form loaded, and the server refuses it if that changed
-  // since (privacy_changed). New stored values restart the form through its key.
   const [verified, setVerified] = useState(false);
   const readSinceOpen = privacy.isFetchedAfterMount && privacy.isSuccess && !privacy.isFetching;
   if (readSinceOpen && !verified) setVerified(true);
@@ -240,7 +214,6 @@ function BoardJoinSection({
   }
   return (
     <BoardJoin
-      // A change to the stored choices starts the form again from them.
       key={`${stored.isMinor}:${stored.boardNickname ?? ""}`}
       initialNickname={stored.boardNickname}
       initialIsMinor={stored.isMinor}

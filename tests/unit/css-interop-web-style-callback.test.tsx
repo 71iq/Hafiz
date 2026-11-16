@@ -3,8 +3,6 @@
  */
 import type React from "react";
 
-// The web runtime of react-native-css-interop, as Expo web bundles it (it reads the browser
-// document at load, hence the jsdom environment).
 type Interop = { render: (props: Record<string, unknown>, ref: unknown) => unknown };
 const { cssInterop } = require("react-native-css-interop/dist/runtime/web/api") as {
   cssInterop: (component: React.ComponentType<any>, mapping: Record<string, unknown>) => Interop;
@@ -23,8 +21,6 @@ const renderWith = (props: Record<string, unknown>) => {
 };
 
 describe("RF-199 web style callbacks with className", () => {
-  // React Native Web turns $$css entries into class names and the rest into inline styles, so the
-  // callback's styles win over the classes as inline styles always do; the order matches objects.
   it("keeps a style callback and resolves it with the className styles", () => {
     const callback = ({ pressed }: { pressed: boolean }) => ({
       direction: "ltr",

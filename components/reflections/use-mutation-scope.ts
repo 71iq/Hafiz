@@ -17,7 +17,6 @@ type Scope = {
   pending: Map<string, object>;
 };
 
-// Community writes and manual pages share admission, but each operation owns its busy state.
 export function useReflectionMutationScope(key: string, viewerId?: string, database?: unknown) {
   const session = useAuthStore((state) => sessionKey(state.session));
   const committed = useRef<Scope | null>(null);

@@ -2,10 +2,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { fetchQfReciters, type QfContentReciter } from "@/lib/quran-foundation/content";
 import { RECITERS, getReciterById, type QfReciter } from "@/lib/quran-foundation/recitations";
 
-/**
- * Device cache of the last good remote reciter list, one per UI language. It holds names and styles
- * only, never account data or audio. The bundled list always stays available underneath it.
- */
 export const RECITER_CATALOG_KEY_PREFIX = "hafiz_reciters_v1_";
 export const RECITER_CATALOG_REFRESH_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_RECITERS = 500;
@@ -30,7 +26,6 @@ function parseReciter(value: unknown): QfReciter | null {
   return { id, nameEn, nameAr, styleEn, styleAr };
 }
 
-/** A stored catalog, or null when it is missing, malformed, from the future or has a bad entry. */
 export function parseReciterCatalog(raw: string | null | undefined, now = Date.now()): ReciterCatalog | null {
   if (!raw) return null;
   let value: unknown;
@@ -75,14 +70,9 @@ async function writeReciterCatalog(language: Language, catalog: ReciterCatalog):
       JSON.stringify({ version: 1, fetchedAt: catalog.fetchedAt, reciters: catalog.reciters }),
     );
   } catch {
-    // A full or unavailable store only loses the copy; the fresh list is still shown.
   }
 }
 
-/**
- * Fetches the remote list and keeps it when every entry is valid. Returns null when the service is
- * off, unreachable or answers with anything unusable, so the cached or bundled list stays in use.
- */
 export async function refreshReciterCatalog(language: Language, now = Date.now()): Promise<ReciterCatalog | null> {
   try {
     const response = await fetchQfReciters(language);
@@ -119,10 +109,6 @@ function localizeRecitationStyle(style: string): string {
   return style;
 }
 
-/**
- * The picker's list: remote entries over the bundled ones, the selected reciter kept even when
- * neither list knows it, sorted by the name in the UI language and then its style.
- */
 export function buildReciterList(remote: QfReciter[] | null, selectedId: number, language: Language): QfReciter[] {
   const byId = new Map<number, QfReciter>();
   RECITERS.forEach((reciter) => byId.set(reciter.id, reciter));
@@ -146,7 +132,6 @@ function searchable(text: string): string {
     .toLowerCase();
 }
 
-/** Matches either language's name or style, ignoring case and Arabic diacritics. */
 export function filterReciters(reciters: QfReciter[], query: string): QfReciter[] {
   const needle = searchable(query.trim());
   if (!needle) return reciters;

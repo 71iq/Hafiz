@@ -17,7 +17,7 @@ jest.mock("@/components/mushaf/useWordTap", () => ({
   }),
 }));
 
-const RAHMAN = "ﱃ"; // Page 1 word whose ink reaches 1.58 em past its line-end edge.
+const RAHMAN = "ﱃ";
 
 function renderWord(props: Partial<React.ComponentProps<typeof WordToken>> = {}) {
   return render(
@@ -50,13 +50,9 @@ describe("RF-189 page-view word ink on Android", () => {
     const view = renderWord({ highlightColor: "#0d9488" });
 
     const [sizing, ink] = view.getAllByText(RAHMAN, { includeHiddenElements: true });
-    // Screen readers hear the word once.
     expect(view.getAllByText(RAHMAN)).toHaveLength(1);
-    // The sizing text keeps the original box, highlight and taps, but draws no ink.
     expect(flat(sizing)).toMatchObject({ color: "transparent", backgroundColor: "#0d948820" });
     expect(flat(sizing).position).toBeUndefined();
-    // The ink layer has room on both sides, keeps the glyph's right edge on the box's, and its View
-    // ignores touches (Android ignores pointerEvents on Text).
     let layer = ink.parent;
     while (layer && String(layer.type) !== "View") layer = layer.parent;
     if (!layer) throw new Error("ink layer View not found");
@@ -71,8 +67,6 @@ describe("RF-189 page-view word ink on Android", () => {
     const view = renderWord({ compactLayout: false });
 
     const [sizing, ink] = view.getAllByText(RAHMAN, { includeHiddenElements: true });
-    // The ink layer is offset from the Pressable's edge, which sits 1 px outside the word Text's
-    // 1 px padding, so its padding grows by both.
     expect(flat(sizing).paddingHorizontal).toBe(1);
     expect(flat(ink).paddingRight).toBe(62);
     expect(ink.props.className).toBe(sizing.props.className);
@@ -83,7 +77,6 @@ describe("RF-189 page-view word ink on Android", () => {
     const view = renderWord({ hidden: true });
 
     expect(view.getAllByText(RAHMAN, { includeHiddenElements: true })).toHaveLength(1);
-    // Colour-font palette layers ignore a transparent colour; only opacity hides them.
     expect(flat(view.getByText(RAHMAN, { includeHiddenElements: true })).opacity).toBe(0);
   });
 

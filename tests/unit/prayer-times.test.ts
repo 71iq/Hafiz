@@ -19,10 +19,8 @@ describe("prayer times", () => {
     const times = computePrayerTimes(MAKKAH, "2026-11-12")!;
     const order = [times.fajr, times.sunrise, times.dhuhr, times.asr, times.maghrib, times.isha].map((at) => at.getTime());
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    // Makkah is UTC+3 with Dhuhr near 12:10 local in November.
     expect(utcMinutes(times.dhuhr)).toBeGreaterThanOrEqual(9 * 60);
     expect(utcMinutes(times.dhuhr)).toBeLessThanOrEqual(9 * 60 + 25);
-    // Umm al-Qura sets Isha 90 minutes after Maghrib.
     expect((times.isha.getTime() - times.maghrib.getTime()) / 60_000).toBe(90);
   });
 
@@ -61,7 +59,6 @@ describe("prayer times", () => {
 
 describe("Ramadan detection", () => {
   it("reads the Umm al-Qura month from Intl", () => {
-    // 1 Ramadan 1447 is 18 February 2026 in Umm al-Qura.
     expect(hijriDateOf("2026-02-18")).toEqual({ year: 1447, month: 9, day: 1 });
     expect(isRamadan("2026-03-01")).toBe(true);
     expect(isRamadan("2026-11-12")).toBe(false);

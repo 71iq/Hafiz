@@ -47,7 +47,6 @@ describe("RF-179 card identity during creation", () => {
         .prepare("INSERT INTO qiraat_encyclopedia (surah, ayah, text) VALUES (2, ?, 'synthetic qiraat')")
         .run(ayah);
     }
-    // For example, a row a sync pull committed in another deck after the deck-scoped read.
     seedLiveCard("qiraat:2:1", "synthetic-other-deck");
 
     await expect(materializeSmartDeckCards(store.db, SMART_DECK_IDS.qiraat, 3, 3)).resolves.toBe(2);
@@ -97,7 +96,6 @@ describe("RF-182 smart-deck stats count only reachable cards", () => {
         .prepare("INSERT INTO qiraat_encyclopedia (surah, ayah, text) VALUES (2, ?, 'synthetic qiraat')")
         .run(ayah);
     }
-    // The session never shows this id from the smart deck: materialization skips a card live elsewhere.
     seedLiveCard("qiraat:2:1", "synthetic-other-deck");
   });
 

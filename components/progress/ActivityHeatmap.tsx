@@ -19,12 +19,7 @@ type Props = {
   totalReviews?: number;
   showSummaryStats?: boolean;
   size?: "compact" | "expanded";
-  /**
-   * STR-26: the owner's wird status per local date. Each status has its own style; excused days are
-   * passed only on the owner's own Progress screen and never on a public profile.
-   */
   dayStatuses?: ReadonlyMap<string, DayStatus>;
-  /** First day of each column, 0 is Sunday. The owner's Progress screen passes the effective week start. */
   weekStart?: number;
 };
 
@@ -47,11 +42,6 @@ function statusLabel(status: DayStatus, s: UIStrings): string {
   }
 }
 
-/**
- * Calm, distinct styles: recited days stay teal, protected days take muted tones with a 1 px edge.
- * A protected day must not outshine a recited one, so in dark mode its fill stays darker than the
- * lowest teal step and the edge carries the hue.
- */
 function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
   const recitedFill = count > 0 ? undefined : isDark ? "#0f766e" : "#99f6e4";
   switch (status) {
@@ -66,7 +56,6 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
         ? { backgroundColor: "#713f12", borderWidth: 1, borderColor: "#a16207" }
         : { backgroundColor: "#fcd34d", borderWidth: 1, borderColor: "#d97706" };
     case "paused":
-      // A dashed edge, since a plain grey fill would read as an empty day.
       return isDark
         ? { backgroundColor: "#3f3f46", borderWidth: 1, borderColor: "#71717a", borderStyle: "dashed" as const }
         : { backgroundColor: "#d4d4d8", borderWidth: 1, borderColor: "#a1a1aa", borderStyle: "dashed" as const };
@@ -78,15 +67,11 @@ function statusCellStyle(status: DayStatus, count: number, isDark: boolean) {
 }
 
 const BASE_CELL_SIZE = 13;
-/** Month and weekday labels share one readable tone at 10 px: about 7:1 in dark and 6:1 in light. */
 const LABEL_COLOR = (isDark: boolean) => (isDark ? "#a3a3a3" : "#6E5A47");
-/** The theme's gold token for today's ring: gold on the dark themes, gold-dark on the light ones. */
 const TODAY_RING = (isDark: boolean) => (isDark ? "#FDDC91" : "#785F22");
-/** Space between the weekday labels and the grid. */
 const DAY_LABEL_GAP = 6;
 const TOTAL_WEEKS = 13;
 const SUMMARY_BREAKPOINT = 560;
-/** Intensity steps: 0, 1-10, 11-25 and 26 or more reviews. */
 const INTENSITY_STEPS = [
   { sample: 0, from: 0, to: 0 },
   { sample: 5, from: 1, to: 10 },
@@ -110,7 +95,6 @@ const WEEKDAYS = {
   ar: ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"],
 };
 
-/** English abbreviates to three letters; Arabic day and month names have no customary short form. */
 function shortName(name: string, language: "en" | "ar"): string {
   return language === "en" ? name.slice(0, 3) : name;
 }
@@ -120,7 +104,6 @@ function parseDateKey(dateKey: string): Date {
   return new Date(year, month - 1, day);
 }
 
-/** "Tue, 3 Nov" or "الثلاثاء ٣ نوفمبر", in the interface's digits. */
 export function formatHeatmapDayShort(dateKey: string, language: "en" | "ar"): string {
   const date = parseDateKey(dateKey);
   const weekday = shortName(WEEKDAYS[language][date.getDay()], language);
@@ -129,7 +112,6 @@ export function formatHeatmapDayShort(dateKey: string, language: "en" | "ar"): s
   return language === "en" ? `${weekday}, ${day} ${month}` : `${weekday} ${day} ${month}`;
 }
 
-/** "Tuesday, 3 November 2026" or "الثلاثاء ٣ نوفمبر ٢٠٢٦" for accessible names. */
 export function formatHeatmapDayFull(dateKey: string, language: "en" | "ar"): string {
   const date = parseDateKey(dateKey);
   const weekday = WEEKDAYS[language][date.getDay()];
@@ -192,8 +174,6 @@ export function ActivityHeatmap({
         : showSummary
           ? 15
           : BASE_CELL_SIZE;
-  // The weekday column reserves the widest measured label plus its gap from the grid, with an
-  // estimate until the labels have been measured.
   const estimatedLabelWidth = isArabic ? (showSummary ? 50 : 44) : (showSummary ? 40 : 34);
   const DAY_LABEL_WIDTH = Math.max(estimatedLabelWidth, measuredLabelWidth ? measuredLabelWidth + DAY_LABEL_GAP : 0);
   const reservedSummaryWidth = showSummary ? (isSidebarWidth ? 200 : 150) : 0;
@@ -202,7 +182,6 @@ export function ActivityHeatmap({
   const maxHeatmapWidth = Math.max(150, availableWidth - DAY_LABEL_WIDTH - reservedSummaryWidth - reservedSummaryGap);
   const CELL_SIZE = Math.max(8, Math.min(maxCellSize, Math.floor((maxHeatmapWidth - CELL_GAP * (TOTAL_WEEKS - 1)) / TOTAL_WEEKS)));
 
-  // Build date lookup
   const countMap = new Map<string, number>();
   for (const d of data) countMap.set(d.date, d.count);
 
@@ -212,7 +191,6 @@ export function ActivityHeatmap({
 
   const startRaw = new Date(today);
   startRaw.setDate(startRaw.getDate() - (TOTAL_WEEKS - 1) * 7);
-  // Back up to the week start, so each column is one of the user's weeks and today sits in the last.
   startRaw.setDate(startRaw.getDate() - ((startRaw.getDay() - weekStart + 7) % 7));
   const firstKey = formatDateKey(startRaw);
 
@@ -235,14 +213,12 @@ export function ActivityHeatmap({
   }
   const renderedWeeks = isRTL ? [...weeks].reverse() : weeks;
 
-  // One selected day drives the cells' roving focus and the labeled day selector below the grid.
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const selected = selectedDate < firstKey || selectedDate > todayKey ? todayKey : selectedDate;
   const cellRefs = useRef(new Map<string, FocusableCell | null>());
   const focusAfterMove = useRef(false);
 
-  // Keyboard moves hand focus to the newly selected cell (roving focus).
   useEffect(() => {
     if (!focusAfterMove.current) return;
     focusAfterMove.current = false;
@@ -253,7 +229,6 @@ export function ActivityHeatmap({
   const moveSelection = (days: number) => setSelectedDate(clampKey(addDaysToKey(selected, days)));
 
   const onGridKeyDown = (event: { key: string; preventDefault?: () => void }) => {
-    // Columns are weeks running toward the reading end: right in English, left in Arabic.
     const later = isRTL ? "ArrowLeft" : "ArrowRight";
     const earlier = isRTL ? "ArrowRight" : "ArrowLeft";
     let next: string | null = null;
@@ -274,8 +249,6 @@ export function ActivityHeatmap({
     setSelectedDate(clampKey(next));
   };
 
-  // Month labels at each month's first week in reading order: from the left in English, from the
-  // right in Arabic, where the weeks run right to left and the oldest week is on the right.
   const monthLabels: { label: string; full: string; weekIndex: number }[] = [];
   let lastMonth = -1;
   for (let step = 0; step < renderedWeeks.length; step++) {
@@ -290,7 +263,6 @@ export function ActivityHeatmap({
   }
 
   const spacedMonthLabels = useMemo(() => {
-    // `offset` is from the reading start: the left edge in English, the right edge in Arabic.
     const result: { label: string; full: string; offset: number }[] = [];
     const candidates = monthLabels
       .map((m) => {
@@ -298,12 +270,10 @@ export function ActivityHeatmap({
         return { label: m.label, full: m.full, offset: fromStart * (CELL_SIZE + CELL_GAP) };
       })
       .sort((a, b) => a.offset - b.offset);
-    // A label needs its own width before the next: Arabic month names run about 35 px at this size.
     const minGap = isArabic ? 44 : 22;
     for (const candidate of candidates) {
       const last = result[result.length - 1];
       if (last && candidate.offset - last.offset < minGap) {
-        // The first label marks a month only partly shown at the edge; the next month's is worth more.
         if (result.length === 1) result[0] = candidate;
         continue;
       }
@@ -341,7 +311,6 @@ export function ActivityHeatmap({
   const PreviousIcon = isRTL ? ChevronRight : ChevronLeft;
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
   const weekdayKeys = Array.from({ length: 7 }, (_, i) => (weekStart + i) % 7);
-  // Mon, Wed and Fri are labelled on whichever rows they fall; they are never on adjacent rows.
   const labelledDays = new Set([1, 3, 5]);
   const webKeyProps = Platform.OS === "web" ? ({ onKeyDown: onGridKeyDown } as object) : {};
 
@@ -353,7 +322,6 @@ export function ActivityHeatmap({
       }}
       style={{ direction: "ltr", alignItems: showSummary ? "stretch" : "center", width: "100%" }}
     >
-      {/* Measures the weekday labels so their column never clips a long name. */}
       <View style={{ position: "absolute", opacity: 0, pointerEvents: "none", flexDirection: "row" }} aria-hidden>
         {[1, 3, 5].map((day) => (
           <Text
@@ -378,7 +346,6 @@ export function ActivityHeatmap({
         }}
       >
       <View style={{ width: contentWidth }}>
-        {/* Month labels row */}
         <View
           style={{
             width: heatmapWidth,
@@ -410,9 +377,7 @@ export function ActivityHeatmap({
 
         <View style={{ height: 14 }} />
 
-        {/* Grid */}
         <View style={{ flexDirection: isRTL ? "row-reverse" : "row", width: contentWidth, direction: "ltr" }}>
-          {/* Day labels */}
           <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start", alignItems: isRTL ? "flex-start" : "flex-end" }}>
             {weekdayKeys.map((day, i) => {
               const full = WEEKDAYS[language][day];
@@ -430,12 +395,9 @@ export function ActivityHeatmap({
                       accessibilityLabel={full}
                       numberOfLines={1}
                       style={{
-                        // The rows follow the chosen week start, so these labels must be easy to read.
                         fontFamily: "Manrope_500Medium",
                         fontSize: 10,
                         color: labelColor,
-                        // Toward the grid: the end of the label column. The grid row is laid out
-                        // left to right in both languages, so the gap is a physical side.
                         ...textEndStyle(isRTL),
                         ...(isRTL ? { paddingLeft: DAY_LABEL_GAP } : { paddingRight: DAY_LABEL_GAP }),
                         writingDirection: isRTL ? "rtl" : "ltr",
@@ -450,8 +412,6 @@ export function ActivityHeatmap({
             })}
           </View>
 
-          {/* Week columns. The tiny cells are a visual overview without enlarged hit areas; the day
-              selector below gives every day a full-size control. */}
           <View
             accessibilityLabel={s.heatmapCalendarLabel}
             style={{ flexDirection: "row", gap: CELL_GAP, width: heatmapWidth }}
@@ -496,9 +456,6 @@ export function ActivityHeatmap({
                         borderStyle: statusStyle?.borderStyle ?? "solid",
                       }}
                     >
-                      {/* Today keeps a 2 px gold ring, dashed while another day is selected; the selected
-                          day has a solid text-colored ring. Rings sit outside the cell with a 1 px gap,
-                          so the cell keeps its own status border. */}
                       {ringColor ? (
                         <View
                           style={{
@@ -520,7 +477,6 @@ export function ActivityHeatmap({
           </View>
         </View>
 
-        {/* Day selector: previous/next and a details action, each a 44 px target, for touch and readers. */}
         <View className="mt-3 items-center gap-1" style={{ ...rowDirection, width: contentWidth }}>
           <Pressable
             accessibilityRole="button"
@@ -602,7 +558,6 @@ export function ActivityHeatmap({
           </View>
         )}
 
-        {/* Legend: Less, the four intensity steps with their ranges, More; then wird statuses. */}
         <View
           style={{
             marginTop: 12,
@@ -636,7 +591,6 @@ export function ActivityHeatmap({
             <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 10, color: labelColor }}>{s.heatmapMore}</Text>
           </View>
           {dayStatuses ? (
-            // flex: 1 bounds the legend to the grid width, so it wraps instead of clipping its last items.
             <View style={{ flex: 1, minWidth: 0, flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 6 }}>
               {STATUS_ORDER.map((status) => {
                 const style = statusCellStyle(status, 0, isDark);

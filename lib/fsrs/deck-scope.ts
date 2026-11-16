@@ -13,7 +13,6 @@ export type RangeTextResult =
   | { ok: true; ayahStart: number; ayahEnd: number }
   | { ok: false; reason: "invalid" | "order" };
 
-/** A typed ayah range for one surah: whole numbers inside the surah, start not after end. */
 export function validateRangeText(range: RangeText, ayahCount: number): RangeTextResult {
   const from = normalizeDateDigits(range.from.trim());
   const to = normalizeDateDigits(range.to.trim());
@@ -34,24 +33,19 @@ export function surahDisplayName(surah: ScopeSurah, language: Language): string 
   return language === "ar" ? surah.name_arabic : surah.name_english;
 }
 
-/** "Full surah" is left to the caller; this is the "5-20" part of a partial range. */
 export function formatAyahSpan(start: number, end: number, language: Language): string {
   return start === end ? digits(start, language) : `${digits(start, language)}-${digits(end, language)}`;
 }
 
 export type ScopeSummary = {
-  /** Up to four names with partial ranges ("Al-Baqarah 1-50, Yasin"). */
   names: string;
-  /** How many names were left out of `names`, for the "+{n} more" suffix. */
   moreCount: number;
-  /** "3 surahs · 214 ayahs", from canonical ayah counts and the exact ranges. */
   size: string;
   ayahCount: number;
 };
 
 const SUMMARY_NAME_LIMIT = 4;
 
-/** A readable summary of exact surah ranges. A range covering the whole surah shows the name alone. */
 export function summarizeScopeRanges(
   ranges: readonly ScopeRange[],
   surahs: readonly ScopeSurah[],
@@ -67,7 +61,6 @@ export function summarizeScopeRanges(
   });
   const ayahCount = ranges.reduce((sum, range) => sum + Math.max(0, range.ayahEnd - range.ayahStart + 1), 0);
   const surahCount = new Set(ranges.map((range) => range.surah)).size;
-  // A middle dot reads as the Arabic zero beside Arabic-Indic digits, so Arabic uses its comma.
   const separator = language === "ar" ? "، " : " · ";
   return {
     names: labels.slice(0, SUMMARY_NAME_LIMIT).join(language === "ar" ? "، " : ", "),
@@ -77,10 +70,6 @@ export function summarizeScopeRanges(
   };
 }
 
-/**
- * The exact ayah ranges per surah that the chosen juz cover, from the juz map. Adjacent or
- * overlapping pieces of one surah are joined, so two juz that split a surah read as one range.
- */
 export function juzScopeRanges(rows: readonly JuzMapRow[], juzNumbers: ReadonlySet<number>): ScopeRange[] {
   const pieces = rows
     .filter((row) => juzNumbers.has(row.juz))

@@ -1,6 +1,3 @@
-// Regenerates the native app icons and splash logo from the website logo (public/icon.png), so the
-// installed app and hafizquran.app share one mark. Run with `node scripts/generate-icons.mjs`.
-// app.json and android/app/src/main/res/values/colors.xml keep the white icon and splash background.
 import sharp from "sharp";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -10,12 +7,10 @@ const IMAGES = path.join(ROOT, "assets", "images");
 const RES = path.join(ROOT, "android", "app", "src", "main", "res");
 const SOURCE = path.join(ROOT, "public", "icon.png");
 
-// The logo is drawn in two inks on white; each pixel is un-mixed from white against the nearer ink.
 const INKS = [
-  [13, 66, 82], // navy
-  [195, 165, 111], // gold
+  [13, 66, 82],
+  [195, 165, 111],
 ];
-// The adaptive icon mask always shows the 66dp circle of the 108dp layer; the logo's diagonal fills it.
 const SAFE_DIAGONAL = 0.61;
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 
@@ -47,7 +42,6 @@ async function transparentLogo() {
 const logo = await transparentLogo();
 const { width: logoWidth, height: logoHeight } = logo.info;
 
-/** The logo centered on a transparent square, scaled by its diagonal or its longer side. */
 async function placed(size, { diagonal, longSide }) {
   const scale = diagonal ? (diagonal * size) / Math.hypot(logoWidth, logoHeight) : (longSide * size) / Math.max(logoWidth, logoHeight);
   const width = Math.round(logoWidth * scale);
@@ -60,7 +54,6 @@ async function placed(size, { diagonal, longSide }) {
 }
 
 const onWhite = (png) => sharp(png).flatten({ background: "#FFFFFF" });
-// Android tints the monochrome layer from its alpha, so the logo becomes a white silhouette.
 const monochrome = async (png) => {
   const { width, height } = await sharp(png).metadata();
   const alpha = await sharp(png).extractChannel(3).toBuffer();
@@ -81,7 +74,6 @@ for (const [density, factor] of Object.entries(DENSITIES)) {
   await sharp(fg).webp({ lossless: true }).toFile(path.join(RES, `mipmap-${density}`, "ic_launcher_foreground.webp"));
   await (await monochrome(fg)).webp({ lossless: true }).toFile(path.join(RES, `mipmap-${density}`, "ic_launcher_monochrome.webp"));
 
-  // Launchers before Android 8 use the square and round bitmaps.
   const legacy = Math.round(48 * factor);
   const square = await onWhite(await placed(legacy * 4, { longSide: 0.72 })).resize(legacy, legacy).png().toBuffer();
   await sharp(square).webp({ lossless: true }).toFile(path.join(RES, `mipmap-${density}`, "ic_launcher.webp"));
@@ -91,7 +83,6 @@ for (const [density, factor] of Object.entries(DENSITIES)) {
     .webp({ lossless: true })
     .toFile(path.join(RES, `mipmap-${density}`, "ic_launcher_round.webp"));
 
-  // Android 12+ splash: a 288dp canvas whose visible circle is 192dp.
   const splash = Math.round(288 * factor);
   await sharp(await placed(splash, { longSide: 0.42 })).toFile(path.join(RES, `drawable-${density}`, "splashscreen_logo.png"));
 }

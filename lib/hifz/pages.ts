@@ -12,7 +12,6 @@ import { tierFor, type GradeEvent, type PageHistory, type Tier } from "@/lib/hif
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import { chunkCardPrefix, HIFZ_PAGES_DECK_ID, isValidPage, pageCardId, parsePageUnit } from "@/lib/hifz/units";
 
-/** PLN-05 seeds: 30 minutes per new page and 3 per review page, then learned per user. */
 const SEED_MINUTES_PER_NEW_PAGE = 30;
 const SEED_MINUTES_PER_REVIEW_PAGE = 3;
 const T_NEW_KEY = "hifz_t_new";
@@ -36,21 +35,9 @@ async function readPageRows(db: DatabaseExecutor): Promise<StudyCardRow[]> {
   );
 }
 
-/** Passing chunk grades by page, each page's keyed by the grade's instant, with its stored local date. */
 type SabaqPasses = ReadonlyMap<number, ReadonlyMap<number, LocalDate>>;
 
-/**
- * The passing chunk grades of the given pages, or of every page. A page was memorized through sabaq
- * in the app only when one of these grades created its page card: the chunk that completed the page
- * passed, and the page card was created in that grade's transaction with the same instant (SBQ-02).
- * Every other page card was declared, in setup or My memorization, even when some of its lines have
- * chunk cards: a failed chunk, or a passing chunk that did not complete the page, is no fluent check
- * of the page. The grade's stored local date is the page's fluent date, so later travel does not
- * move it.
- */
 async function readSabaqPasses(db: DatabaseExecutor, onlyPages?: readonly number[]): Promise<SabaqPasses> {
-  // A grade reads only its own pages' chunk logs, through the card id index; the full scan is for
-  // loading every page. Each page's chunk ids sort between its prefix and the prefix with ':' raised to ';'.
   const ranges = onlyPages?.map((page) => {
     const prefix = chunkCardPrefix(page);
     return [prefix, `${prefix.slice(0, -1)};`] as const;
@@ -81,16 +68,11 @@ async function readPageGrades(db: DatabaseExecutor): Promise<Map<string, GradeEv
   );
 }
 
-/**
- * Each card's grades in the order they happened. Stored timestamps can carry different offsets after
- * sync, so the order is by instant, never by the text: "10:00+02:00" comes before "08:10Z".
- */
 function gradesByCard(
   rows: readonly { card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }[],
 ): Map<string, GradeEvent[]> {
   const ordered = rows
     .map((row) => ({ row, at: Date.parse(row.reviewed_at) }))
-    // Millisecond order first; equal or unparsable instants fall back to the exact comparison.
     .sort((a, b) => a.at - b.at || compareSyncTimestamps(a.row.reviewed_at, b.row.reviewed_at));
   const grades = new Map<string, GradeEvent[]>();
   for (const { row } of ordered) {
@@ -102,10 +84,6 @@ function gradesByCard(
   return grades;
 }
 
-/**
- * The derived tier of a few page cards (TIER-01), reading only their own history. For checks that
- * run inside a grade, where loading every page would cost a read of the whole review log.
- */
 export async function derivePageTiers(
   db: DatabaseExecutor,
   cardIds: readonly string[],
@@ -131,7 +109,6 @@ export async function derivePageTiers(
   return tiers;
 }
 
-/** The page numbers of page card ids. */
 function pagesOf(cardIds: readonly string[]): number[] {
   const pages = new Set<number>();
   for (const id of cardIds) {
@@ -141,24 +118,14 @@ function pagesOf(cardIds: readonly string[]): number[] {
   return [...pages];
 }
 
-/**
- * A page card's history. It came from sabaq only when a passing chunk grade of its page has the
- * card's creation instant (see readSabaqPasses); otherwise it was declared and stays declared.
- */
 function pageHistory(row: StudyCardRow, page: number, sabaq: SabaqPasses, grades: Map<string, GradeEvent[]>): PageHistory {
   const created = Date.parse(row.created_at);
   const firstFluentDate = Number.isFinite(created) ? (sabaq.get(page)?.get(created) ?? null) : null;
   const own = grades.get(row.id) ?? [];
-  // UNIT-02: a card with a last review but no grades of its own started from its reviewed ayah cards.
   const fromAyahReviews = firstFluentDate === null && own.length === 0 && row.last_review !== null;
   return { declared: firstFluentDate === null && !fromAyahReviews, firstFluentDate, fromAyahReviews, grades: own };
 }
 
-/**
- * One page card as it is now, with its history and derived tier (TIER-01), read with the caller's
- * executor. A grade reads it inside its own transaction, since sync can merge reviews from another
- * device after the screen loaded the page. Null when the card is gone.
- */
 export async function loadPageCard(
   db: DatabaseExecutor,
   cardId: string,
@@ -179,7 +146,6 @@ export async function loadPageCard(
   return { row, page: unit.page, history, tier: tierFor(history, today, plan) };
 }
 
-/** Every page card with its derived tier (TIER-01). The tier is recomputed from history, never read from the cache. */
 export async function loadPageCards(db: DatabaseExecutor, { today, plan }: { today: LocalDate; plan: HifzPlan }): Promise<PageCard[]> {
   const [rows, sabaq, grades] = await Promise.all([readPageRows(db), readSabaqPasses(db), readPageGrades(db)]);
   const cards: PageCard[] = [];
@@ -216,24 +182,15 @@ function retrievability(row: StudyCardRow, now: Date): number | null {
   }
 }
 
-/**
- * MST-01: a page counts as memorized when it is sabqi or manzil and its last graded review was Good
- * or better. Declared pages count once their first check passes. Home, Progress and the board use
- * this one definition.
- */
 export function isMemorized(card: PageCard): boolean {
   if (card.tier === "sabaq" || card.tier === "manzil.unverified") return false;
   const last = card.history.grades[card.history.grades.length - 1];
-  // Until the page's own first grade decides, the graded recitation that made the page counts: the
-  // passing chunk grade that completed it in sabaq, or the reviewed ayah cards it was made from.
   if (last === undefined) return card.history.fromAyahReviews === true || card.history.firstFluentDate !== null;
   return last.rating >= 3;
 }
 
 export function toPlanPage(card: PageCard, today: LocalDate, now: Date): PlanPage {
   const before = card.history.grades.filter((grade) => grade.date < today);
-  // UNIT-02: a page made from its reviewed ayah cards was last reviewed with them, so its manzil floor
-  // counts from that date instead of treating it as never reviewed.
   const ayahReviewed =
     before.length === 0 && card.history.fromAyahReviews && card.row.last_review ? localDateOf(new Date(card.row.last_review)) : null;
   return {
@@ -260,11 +217,6 @@ async function readMinutesPerPage(db: DatabaseExecutor): Promise<{ newPage: numb
   };
 }
 
-/**
- * A page card on a learning or relearning step that is due now, within the learn-ahead window the
- * session requeue and the flashcard queues use (REVIEW_LEARN_AHEAD_MS). A page graded Again today is
- * on such a step (10 minutes for sabqi and manzil), so it comes back the same day.
- */
 function learningStepDue(row: StudyCardRow, now: Date): boolean {
   return (
     (row.state === State.Learning || row.state === State.Relearning) &&
@@ -274,7 +226,6 @@ function learningStepDue(row: StudyCardRow, now: Date): boolean {
 
 const TODAY_PLAN_KEY = "device_hifz_today_plan";
 
-/** Today's page list as first built on this device, for the recitation unit it was built under. */
 type TodaySnapshot = { date: LocalDate; ids: string[]; newLines: number; unit: HifzPlan["unit"] | null };
 
 function parseSnapshot(value: string | undefined): TodaySnapshot | null {
@@ -293,10 +244,6 @@ function parseSnapshot(value: string | undefined): TodaySnapshot | null {
   }
 }
 
-/**
- * The lines covered by passed chunks, counting each page line once. Two devices can pass
- * overlapping chunks of a page, such as lines 1-4 and 1-6, which cover 6 lines, not 10.
- */
 export function passedLineCount(chunkIds: readonly string[]): number {
   const lines = new Set<string>();
   for (const id of chunkIds) {
@@ -310,44 +257,24 @@ export function passedLineCount(chunkIds: readonly string[]): number {
 export type TodayWird = Readonly<{
   plan: HifzPlan;
   daily: DailyPlan;
-  /**
-   * Pages still to review today, in order: the day's planned pages not reviewed yet, then pages
-   * reviewed today whose learning or relearning step is due (see learningStepDue). Those stay in done.
-   */
   todo: readonly PlanPage[];
-  /** Pages reviewed today. A page stays here while a learning step brings it back into todo. */
   done: readonly PlanPage[];
-  /** Pages in today's wird, each counted once: done, plus planned pages not reviewed yet. */
   total: number;
-  /** When the next learning step of a page reviewed today comes due later today, or null. */
   nextStepAt: Date | null;
   newLines: number;
   remainingMinutes: number;
   minutesPerReviewPage: number;
   minutesPerNewPage: number;
   memorizedPages: number;
-  /** Lines whose fluent check passed today. */
   sabaqLinesToday: number;
-  /** Every page card with its tier, so callers do not read the review history again. */
   cards: readonly PageCard[];
-  /** Today's new memorization is done: the lines passed today reach the day's allocation. */
   sabaqDoneToday: boolean;
 }>;
 
-/**
- * PLN-02: new memorization is open today only on a day with new lines and without a review backlog.
- * Home offers "Memorize new lines" and the sabaq screen offers a new chunk by this one rule; a
- * second look from earlier today is offered either way.
- */
 export function newMemorizationOpen(wird: Pick<TodayWird, "newLines" | "daily">): boolean {
   return wird.newLines > 0 && !wird.daily.backlog;
 }
 
-/**
- * GOAL-04: review still due today, which holds back "Wird done" on Home's streak line: the pages left
- * and the half pages or seams due, or in ayah review (UNIT-02), whose list has no pages, the ayah
- * cards due. New lines and new cards stay on offer as extra (ETH-05), as on the wird card.
- */
 export function reviewLeftToday(
   wird: Pick<TodayWird, "todo"> & { plan: Pick<HifzPlan, "unit"> },
   { remediationDue, ayahReviewsDue }: { remediationDue: number; ayahReviewsDue: number },
@@ -355,11 +282,6 @@ export function reviewLeftToday(
   return wird.todo.length + remediationDue + (wird.plan.unit === "ayah" ? ayahReviewsDue : 0) > 0;
 }
 
-/**
- * Today's wird (4.3). The page list is fixed the first time it is built each day, on this device,
- * so it does not reshuffle as pages are reviewed; a plan change applies from the next day (PLAN-01).
- * Returns null when no plan is set up.
- */
 export async function loadTodayWird(database: AppDatabase, now = new Date()): Promise<TodayWird | null> {
   const plan = await readHifzPlan(database);
   if (!plan) return null;
@@ -373,8 +295,6 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
       [today],
     ),
   ]);
-  // UNIT-02: ayah review has no page tasks. A switch sets every page card aside, but a page card
-  // still live (synced from a device that had not switched yet) stays out of the day's list too.
   const pages = plan.unit === "ayah" ? [] : cards.map((card) => toPlanPage(card, today, now));
   const daily = buildDailyPlan({
     pages,
@@ -386,8 +306,6 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
   });
 
   let snapshot = parseSnapshot(snapshotRow?.value);
-  // A switch of recitation unit changes which cards are active (lib/hifz/unit-switch), so a list
-  // built under another unit is built again; otherwise the list holds for the day (PLAN-01).
   if (snapshot?.date !== today || snapshot.unit !== plan.unit) {
     snapshot = { date: today, ids: daily.review.map((page) => page.cardId), newLines: daily.newLines, unit: plan.unit };
     await database.runAsync(
@@ -401,8 +319,6 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
     const page = byId.get(id);
     return page && !page.reviewedToday ? [page] : [];
   });
-  // Coverage and pending steps are separate: a page reviewed today stays done for the day's share,
-  // and a learning step that comes due brings it back after the planned pages, soonest due first.
   const steps = cards
     .filter((card) => learningStepDue(card.row, now))
     .sort((a, b) => Date.parse(a.row.due) - Date.parse(b.row.due) || a.page - b.page)
@@ -411,11 +327,8 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
       return page?.reviewedToday ? [page] : [];
     });
   const todo = [...planned, ...steps];
-  // The day's list counts only its own pages: a page reviewed outside it, such as the sibling page a
-  // drift adds (SCH-07), keeps its credit and history but does not change the list's done count.
   const listed = new Set(snapshot.ids);
   const done = pages.filter((page) => page.reviewedToday && listed.has(page.cardId));
-  // A step not due yet brings its page back later today; Home refreshes then (useTodayWird).
   const reviewedToday = new Set(pages.filter((page) => page.reviewedToday).map((page) => page.cardId));
   const nextStepAt =
     cards
@@ -442,16 +355,10 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
     memorizedPages: cards.filter(isMemorized).length,
     cards,
     sabaqLinesToday: linesToday,
-    // Today's new memorization is done once the lines passed today reach the day's allocation.
     sabaqDoneToday: snapshot.newLines > 0 ? linesToday >= snapshot.newLines : linesToday > 0,
   };
 }
 
-/**
- * ONB-04, SCH-04: declare pages already memorized. Each becomes a manzil page, unverified until its
- * first graded review, with first checks spread evenly over the first cycle (oldest declared first),
- * so nothing has to be tested all at once on day 1. Pages that already have a card are left alone.
- */
 export async function declareMemorizedPages(
   database: AppDatabase,
   { pages, cycleDays, now = new Date() }: { pages: readonly number[]; cycleDays: number; now?: Date },
@@ -469,20 +376,13 @@ export async function declareMemorizedPages(
         created += 1;
       }
     }
-    // MST-04: the first manzil cycle starts on the day pages are first declared, stored as a calendar
-    // date so later travel does not move it.
     if (created > 0) await ensureManzilCycleStart(db, today);
   });
   return created;
 }
 
-/** MST-04: the synced calendar date the current manzil cycle started on. */
 export const MANZIL_CYCLE_START_KEY = "hifz_manzil_cycle_start";
 
-/**
- * The stored manzil cycle start, or `fallback` stored as the start when none is stored yet. Pass a
- * transaction so the setting and its queued upload commit with the caller's other writes.
- */
 export async function ensureManzilCycleStart(db: DatabaseExecutor, fallback: LocalDate): Promise<LocalDate> {
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = ? AND deleted_at IS NULL",
@@ -493,12 +393,6 @@ export async function ensureManzilCycleStart(db: DatabaseExecutor, fallback: Loc
   return fallback;
 }
 
-/**
- * The pages the person knows, for the similar verses (MUT-01 to MUT-04): those with a live page card,
- * and in ayah review those whose page card a unit switch set aside (UNIT-02). The switch marks its
- * suspension with the Unix epoch (UNIT_SWITCH_SUSPENDED_AT in lib/hifz/unit-switch, which imports
- * this module); a page the person suspended by hand stays out.
- */
 export async function readMemorizedPageNumbers(db: DatabaseExecutor): Promise<Set<number>> {
   const rows = await db.getAllAsync<{ id: string; suspended_at: string | null }>(
     `SELECT id, suspended_at FROM study_cards

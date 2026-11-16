@@ -81,22 +81,15 @@ const REMOTE_RESTORE_TABLES = [
 type RemoteAccountRows = { [K in SyncTable]: SyncRows[K][] };
 type AccountRestoreResult = {
   pulled: number;
-  /** Data came down from the account and replaced what this device held. */
   accountRestored: boolean;
   localDataReplaced: boolean;
-  /**
-   * This sync finished the account's restore on this device, with or without remote data. From then
-   * on the local data belongs to this account, so features that waited for it (board reporting) start.
-   */
   restoreCompleted?: boolean;
 };
 
 type SyncCounts = AccountRestoreResult & { pushed: number };
 
-/** A stored restore pause. Either value stops every sync until the account owner retries. */
 export type RestorePauseState = "pending_consent" | "cancelled";
 
-/** Study categories named in the restore confirmation. */
 export type RestoreCategory =
   | "studyCards"
   | "reviewHistory"
@@ -116,10 +109,6 @@ export type RestoreConsentSummary = Readonly<{
   pendingChanges: number;
 }>;
 
-/**
- * What the confirmation shows. The token is opaque and only means something to acceptRestoreConsent
- * in this process; the snapshot and local fingerprint it stands for never leave this module.
- */
 export type RestoreConsentRequest = Readonly<{
   token: string;
   userId: string;
@@ -131,13 +120,9 @@ export type RestoreConsentRequest = Readonly<{
 
 export type SyncResult =
   | (SyncCounts & { status: "synced" | "partial" | "failed" | "not_connected" })
-  /** Replacing local data needs the owner's consent. Nothing was cleared, pushed or pulled. */
   | (SyncCounts & { status: "needs_restore_consent"; request: RestoreConsentRequest })
-  /** A stored pause stopped this run before any remote request. */
   | (SyncCounts & { status: "sync_paused"; pause: RestorePauseState })
-  /** Local data changed after consent was prepared. Nothing was cleared; prepare consent again. */
   | (SyncCounts & { status: "restore_consent_stale" })
-  /** The token was expired, used, cancelled or belonged to another account or session. */
   | (SyncCounts & { status: "restore_consent_invalid" });
 
 type PushResult = { pushed: number; failed: number; hadSuccessfulEntry: boolean };
@@ -153,10 +138,6 @@ function highlightSyncId(row: {
   return `highlight:${row.surah}:${row.ayah}:${row.word_start ?? "ayah"}:${row.word_end ?? "ayah"}:${row.color}`;
 }
 
-/**
- * Process the local sync queue — push pending changes to Supabase.
- * Retains group acknowledgement counts and whether any entry completed before a failure.
- */
 async function pushSyncQueue(db: AppDatabase, owner: SyncOwner): Promise<PushResult> {
   const empty = { pushed: 0, failed: 0, hadSuccessfulEntry: false };
   if (!isSupabaseConfigured()) return empty;
@@ -175,7 +156,6 @@ async function pushSyncQueue(db: AppDatabase, owner: SyncOwner): Promise<PushRes
   owner.requireCurrent();
   if (entries.length === 0) return empty;
 
-  // Group entries by table for batch operations
   const groups = groupByTable(entries);
   const syncedIds: number[] = [];
   const failedIds: number[] = [];
@@ -197,29 +177,22 @@ async function pushSyncQueue(db: AppDatabase, owner: SyncOwner): Promise<PushRes
   }
 
   owner.requireCurrent();
-  // Mark results
   if (syncedIds.length > 0) await markSynced(db, syncedIds);
   owner.requireCurrent();
   if (failedIds.length > 0) await markFailed(db, failedIds);
   owner.requireCurrent();
 
-  // Clean up old synced entries periodically
   await cleanSyncedEntries(db);
 
   return { pushed: syncedIds.length, failed: failedIds.length, hadSuccessfulEntry };
 }
 
-/**
- * Pull remote changes from Supabase to local SQLite.
- * For multi-device support: fetches data updated after last sync.
- */
 async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<PullResult> {
   if (!isSupabaseConfigured()) return { pulled: 0, complete: false };
 
   owner.requireCurrent();
   const { userId } = owner;
 
-  // Get last sync timestamp
   const lastSyncRow = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = 'last_pull_at'",
   );
@@ -235,10 +208,8 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
   let wordMeaningsComplete = true;
 
   try {
-    // Pull syncable deck/review settings before cards so decks exist when rows arrive.
     await pullTable(db, "user_settings", userId, lastPullAt, upsertUserSetting, owner, onPageApplied);
 
-    // Pull user-supplied word meanings before cards so vocabulary previews resolve.
     try {
       await pullTable(db, "user_word_meanings", userId, lastPullAt, upsertUserWordMeaning, owner, onPageApplied);
     } catch (err) {
@@ -247,8 +218,6 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       console.warn("[Sync] Pull user_word_meanings skipped:", errorMessage(err));
     }
 
-    // Pull study_cards. A cloze card deleted on another device is checked again once the errors are
-    // in: a device missing some of a weak spot's errors can delete a card that should stay.
     const deletedClozeLocations: { surah: number; ayah: number; word: number }[] = [];
     await pullTable(
       db,
@@ -264,19 +233,11 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       onPageApplied,
     );
 
-    // Wird days come before the review log, so reconciling pulled reviews sees the merged days.
-    // Wird days merge by status precedence; sessions and errors keep the newer row. These tables are
-    // newer than the shared cursor, so each account pulls them in full once: rows another device
-    // uploaded before this device's last pull would otherwise never arrive.
     const habitTablesPulled = await isBackfillComplete(db, habitPullKey(userId));
     owner.requireCurrent();
     const habitSince = habitTablesPulled ? lastPullAt : PULL_EPOCH;
     await pullTable(db, "habit_days", userId, habitSince, upsertHabitDay, owner, onPageApplied);
     await pullTable(db, "review_sessions", userId, habitSince, upsertReviewSession, owner, onPageApplied);
-    // ERR-06: errors from other devices can make a weak spot here, so their locations get cloze
-    // cards, and a dismissal from another device can end one. Each page settles its own locations in
-    // its transaction. A card is deleted only when a pulled dismissal ends a weak spot this device
-    // held, never because this device has fewer of its errors than the device that made the card.
     let pageErrorLocations: ErrorLocationRow[] = [];
     let pageEndedWeakSpots: ErrorLocationRow[] = [];
     await pullTable(
@@ -310,8 +271,6 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       });
     }
 
-    // Pull study_log. Pulled reviews can complete a day's minimum together with this device's own
-    // (or come from an older app version without wird days), so their days are reconciled after.
     const pulledReviewDates = new Set<LocalDate>();
     await pullTable(
       db,
@@ -327,16 +286,12 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       onPageApplied,
     );
 
-    // Pull bookmarks
     await pullTable(db, "bookmarks", userId, lastPullAt, upsertBookmark, owner, onPageApplied);
 
-    // Pull highlights
     await pullTable(db, "highlights", userId, lastPullAt, upsertHighlight, owner, onPageApplied);
 
-    // Pull private notes
     await pullTable(db, "private_notes", userId, lastPullAt, upsertPrivateNote, owner, onPageApplied);
 
-    // Pull Reflection Journey entries
     await pullTable(
       db,
       "reflection_journey_entries",
@@ -347,7 +302,6 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       onPageApplied,
     );
 
-    // Pull public badge unlocks. Pulled badges are already seen locally.
     await pullTable(db, "achievement_unlocks", userId, lastPullAt, upsertAchievementUnlock, owner, onPageApplied);
 
     if (pulledReviewDates.size > 0) {
@@ -358,7 +312,6 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       });
     }
 
-    // 7.6: a plan saved on another device with the other kind of review brings the cards here in line.
     owner.requireCurrent();
     if (await unitReconcileNeeded(db)) {
       await db.withTransactionAsync(async (tx) => {
@@ -371,7 +324,6 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     await backfillAchievements(db, { notify: false });
     owner.requireCurrent();
 
-    // Keep the old cursor if any table was incomplete, so its unseen rows remain eligible for retry.
     owner.requireCurrent();
     if (wordMeaningsComplete) {
       await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('last_pull_at', ?)", [
@@ -392,13 +344,6 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
 
 const NO_COUNTS: SyncCounts = { pushed: 0, pulled: 0, accountRestored: false, localDataReplaced: false };
 
-/**
- * Full sync: restore account state before any upload, then run normal queue sync.
- *
- * A stored restore pause returns before any remote request unless `resume` is set, which only the
- * owner's explicit Resume sync passes. A first restore that would replace local study data returns
- * `needs_restore_consent` before replacement, push or pull.
- */
 export async function fullSync(db: AppDatabase, options: { resume?: boolean } = {}): Promise<SyncResult> {
   const empty: SyncResult = { status: "not_connected", ...NO_COUNTS };
   if (!isSupabaseConfigured()) return empty;
@@ -414,7 +359,6 @@ export async function fullSync(db: AppDatabase, options: { resume?: boolean } = 
   return runOrdinarySync(db, owner, restored);
 }
 
-/** Push, pull and report, after the account restore has completed for this owner. */
 async function runOrdinarySync(db: AppDatabase, owner: SyncOwner, restored: AccountRestoreResult): Promise<SyncResult> {
   const pushed = await pushSyncQueue(db, owner);
   owner.requireCurrent();
@@ -436,7 +380,6 @@ async function runOrdinarySync(db: AppDatabase, owner: SyncOwner, restored: Acco
   };
 }
 
-// ─── Internal helpers ──────────────────────────────────────────
 
 function accountRestoreKey(userId: string): string {
   return `sync_account_restore_${userId}_${ACCOUNT_RESTORE_VERSION}`;
@@ -479,7 +422,6 @@ async function markAccountRestoreComplete(
     [snapshotStartedAt, now],
   );
   owner.requireCurrent();
-  // The restore snapshot covered the wird tables, so they need no separate full pull.
   await markBackfillComplete(db, habitPullKey(userId));
   owner.requireCurrent();
   if (!restoredFromRemote) return;
@@ -514,19 +456,16 @@ async function restoreAccountDataIfNeeded(
   const completed = await hasCompletedAccountRestore(db, userId);
   owner.requireCurrent();
   if (completed) {
-    // Another tab may have finished this account's restore while this one was paused.
     if (hadPause) await clearRestorePause(db, userId);
     owner.requireCurrent();
     return { pulled: 0, accountRestored: false, localDataReplaced: false };
   }
 
-  // The whole snapshot is fetched and decoded before anything local changes. A failed page throws.
   const snapshotStartedAt = new Date().toISOString();
   const remoteRows = await fetchRemoteAccountRows(userId, owner);
   owner.requireCurrent();
   const remoteRowCount = countRemoteRows(remoteRows);
   if (remoteRowCount === 0) {
-    // Unchanged remote-empty behavior: local rows stay and ordinary sync uploads them.
     await markAccountRestoreComplete(db, userId, false, snapshotStartedAt, owner);
     owner.requireCurrent();
     if (hadPause) await clearRestorePause(db, userId);
@@ -539,8 +478,6 @@ async function restoreAccountDataIfNeeded(
     let replaced = false;
     await db.withTransactionAsync(async (tx) => {
       owner.requireCurrent();
-      // The same trigger again, inside the transaction that would clear: a change admitted since the
-      // first check turns this into a consent request instead of a silent replacement.
       if (await requiresRestoreConsent(tx)) return;
       owner.requireCurrent();
       await replaceLocalAccountData(tx, remoteRows, owner, snapshotStartedAt);
@@ -559,10 +496,6 @@ function countRemoteRows(rows: RemoteAccountRows): number {
   return REMOTE_RESTORE_TABLES.reduce((sum, tableName) => sum + rows[tableName].length, 0);
 }
 
-/**
- * Clear the replaced local scope and apply the account snapshot, with the existing reconciliation and
- * restore markers. Runs only inside a transaction, so a failure or owner change rolls all of it back.
- */
 async function replaceLocalAccountData(
   tx: DatabaseExecutor,
   remoteRows: RemoteAccountRows,
@@ -571,7 +504,6 @@ async function replaceLocalAccountData(
 ): Promise<void> {
   const { userId } = owner;
   owner.requireCurrent();
-  // A device that finished onboarding stays past it even when the account predates the synced flag.
   const onboarded =
     (await tx.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'onboarding_completed'"))
       ?.value === "true";
@@ -582,14 +514,10 @@ async function replaceLocalAccountData(
   owner.requireCurrent();
   if (onboarded) await putUserSetting(tx, "onboarding_completed", "true");
   owner.requireCurrent();
-  // Reviews from app versions before wird days were synced still count for their days.
   await reconcileHabitDaysFromLogs(tx, { now: new Date() });
   owner.requireCurrent();
-  // The restored cards are as the restored plan left them.
   await markUnitAppliedFromPlan(tx, new Date());
   owner.requireCurrent();
-  // ERR-06: weak spots that formed across devices get their cloze card from the restored errors,
-  // and a card whose weak spot restored dismissals ended goes.
   const restoredErrors = remoteRows.recitation_errors.map((row) => ({
     location: { surah: row.surah, ayah: row.ayah ?? null, word: row.word ?? null },
     dismissed: row.deleted_at != null,
@@ -650,12 +578,6 @@ async function fetchRemoteRows<K extends SyncTable>(
 
 const ONBOARDING_SETTING = "onboarding_completed";
 
-/**
- * Whether replacing local data with a nonempty account snapshot needs the owner's consent: any
- * replaced study row, any syncable setting, or any sync_queue row (the replacement clears the queue). Completed onboarding alone
- * does not count, because the restore keeps it. Derived/internal settings and qf_sync_queue alone
- * never prompt, though they are still replaced and still part of the exact fingerprint.
- */
 async function requiresRestoreConsent(db: DatabaseExecutor): Promise<boolean> {
   const [
     settings,
@@ -712,11 +634,6 @@ async function requiresRestoreConsent(db: DatabaseExecutor): Promise<boolean> {
   );
 }
 
-/**
- * The tables an account restore replaces, in full, each with the key that orders its rows. This list
- * and isReplacedUserSetting are the one definition of replaced state: clearLocalSyncableData deletes
- * exactly this scope and the consent fingerprint reads exactly this scope.
- */
 const REPLACED_LOCAL_TABLES: readonly Readonly<{ table: string; orderBy: string; category?: RestoreCategory }>[] = [
   { table: "study_cards", orderBy: "id", category: "studyCards" },
   { table: "study_log", orderBy: "id", category: "reviewHistory" },
@@ -733,7 +650,6 @@ const REPLACED_LOCAL_TABLES: readonly Readonly<{ table: string; orderBy: string;
   { table: "qf_sync_queue", orderBy: "id" },
 ];
 
-/** Settings an account restore replaces: syncable, sync-internal and account-derived device keys. */
 function isReplacedUserSetting(key: string): boolean {
   return isSyncableUserSetting(key) || isSyncInternalSetting(key) || isAccountDerivedDeviceSetting(key);
 }
@@ -749,7 +665,6 @@ async function clearLocalSyncableData(db: DatabaseExecutor): Promise<void> {
 
 type ReplacedLocalState = { fingerprint: string; summary: RestoreConsentSummary };
 
-/** One stored value with its storage type, so 1, "1", null and an empty string all differ. */
 function canonicalValue(value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (typeof value === "number") return ["n", Object.is(value, -0) ? "-0" : String(value)];
@@ -776,11 +691,6 @@ function isUnsentUserChange(row: Record<string, unknown>): boolean {
   );
 }
 
-/**
- * Read the whole replaced scope once: the exact canonical fingerprint (every column of every row, in
- * key order) and the counts the confirmation shows. The fingerprint holds private data; it stays in
- * memory and is never logged or returned to UI.
- */
 async function readReplacedLocalState(db: DatabaseExecutor): Promise<ReplacedLocalState> {
   const parts: unknown[] = [];
   const categories: { key: RestoreCategory; count: number }[] = [];
@@ -805,14 +715,6 @@ async function readReplacedLocalState(db: DatabaseExecutor): Promise<ReplacedLoc
   return { fingerprint: JSON.stringify(parts), summary: { categories, pendingChanges } };
 }
 
-/**
- * Device-only state built from the replaced account's data: today's hifz page list, the monthly
- * check, today's extras and pending reminder follow-ups. Rebuilt from the restored account.
- *
- * Pending halaqa encouragement batches (notif_group_pending) stay: each batch names its account and
- * only the signed-in account's batches are scheduled, while each account's acknowledged ids stay
- * under its own key. Dropping the batches would leave those ids acknowledged and never announced.
- */
 const ACCOUNT_DERIVED_DEVICE_KEYS = new Set([
   "device_hifz_today_plan",
   "device_monthly_check",
@@ -825,14 +727,11 @@ function isAccountDerivedDeviceSetting(key: string): boolean {
   return ACCOUNT_DERIVED_DEVICE_KEYS.has(key);
 }
 
-// ─── Restore pause and consent ─────────────────────────────────
 
 const RESTORE_PAUSE_VERSION = 1;
 const RESTORE_PAUSE_STATES: ReadonlySet<string> = new Set<RestorePauseState>(["pending_consent", "cancelled"]);
-/** How long a prepared consent request stays valid. */
 export const RESTORE_CONSENT_TTL_MS = 5 * 60_000;
 
-/** Device-only and outside every syncable prefix, so the pause never uploads or restores. */
 export function restorePauseKey(userId: string): string {
   return `device_sync_restore_pause_${userId}`;
 }
@@ -850,7 +749,6 @@ function decodeRestorePause(value: string | null | undefined): RestorePauseState
   }
 }
 
-/** This account's stored pause on this device. A pause for another account never applies. */
 export async function readRestorePause(db: DatabaseExecutor, userId: string): Promise<RestorePauseState | null> {
   const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [
     restorePauseKey(userId),
@@ -881,7 +779,6 @@ type PreparedConsent = {
   consumed: boolean;
 };
 
-/** At most one request exists, in memory only. A new preparation, cancel or account change retires it. */
 let preparedConsent: PreparedConsent | null = null;
 
 function newConsentToken(): string {
@@ -897,8 +794,6 @@ async function prepareRestoreConsent(
 ): Promise<RestoreConsentRequest> {
   preparedConsent = null;
   const captured: { state?: ReplacedLocalState } = {};
-  // The pause is written first, then the fingerprint is read, in one short serialized transaction that
-  // closes before any UI is shown.
   await db.withTransactionAsync(async (tx) => {
     owner.requireCurrent();
     await writeRestorePause(tx, owner.userId, "pending_consent");
@@ -939,12 +834,6 @@ function isOwnerCurrent(owner: SyncOwner): boolean {
   }
 }
 
-/**
- * Replace local data with the prepared account snapshot after the owner's explicit consent. Inside one
- * serialized transaction this rechecks the owner and token, recomputes the exact local fingerprint and
- * clears/applies only if it is unchanged. No network request runs inside it. On success the pause is
- * cleared with the restore markers and ordinary sync runs under the same owner.
- */
 export async function acceptRestoreConsent(db: AppDatabase, token: string): Promise<SyncResult> {
   const invalid: SyncResult = { status: "restore_consent_invalid", ...NO_COUNTS };
   const prepared = preparedConsent;
@@ -970,7 +859,6 @@ export async function acceptRestoreConsent(db: AppDatabase, token: string): Prom
       outcome = "replaced";
     });
   } finally {
-    // One use: replaced, stale, rolled back or thrown, this token never authorizes again.
     prepared.consumed = true;
     if (preparedConsent === prepared) preparedConsent = null;
   }
@@ -984,10 +872,6 @@ export async function acceptRestoreConsent(db: AppDatabase, token: string): Prom
   });
 }
 
-/**
- * Cancel sync: retire the in-memory request and store `cancelled` for the current account. Local rows,
- * both queues and the restore markers stay as they are. Only an explicit Resume sync runs again.
- */
 export async function cancelRestoreConsent(db: AppDatabase): Promise<boolean> {
   preparedConsent = null;
   const owner = captureSyncOwner();
@@ -996,7 +880,6 @@ export async function cancelRestoreConsent(db: AppDatabase): Promise<boolean> {
   return isOwnerCurrent(owner);
 }
 
-/** Forget any prepared request. Called on every account or session transition. */
 export function clearRestoreConsentRequests(): void {
   preparedConsent = null;
 }
@@ -1035,7 +918,6 @@ async function pushTableEntries(
   userId: string,
   onEntryCompleted: () => void,
 ): Promise<void> {
-  // Validate the entire group before its first remote write. Never ACK stripped future fields.
   const decoded = entries.map((entry) => decodeSyncQueueEntry(entry, userId));
   for (const entry of decoded) {
     if (entry.operation === "DELETE") {
@@ -1051,7 +933,6 @@ async function pushUpsert(tableName: SyncTable, data: Record<string, any>, userI
   const syncedAt = new Date().toISOString();
   const row = normalizeRemoteRow(tableName, { ...data, user_id: userId, synced_at: syncedAt });
 
-  // Determine conflict columns based on table
   let onConflict: string;
   switch (tableName) {
     case "user_settings":
@@ -1088,7 +969,6 @@ async function pushUpsert(tableName: SyncTable, data: Record<string, any>, userI
       onConflict = "user_id,id";
   }
 
-  // Habit days merge on the server (private.merge_habit_day), so an older upload still contributes.
   if (tableName !== "habit_days" && (await remoteIsNewer(tableName, row, userId))) return;
 
   const { error } = await supabase.from(tableName).upsert(row, { onConflict });
@@ -1120,8 +1000,6 @@ function normalizeRemoteRow(tableName: SyncTable, row: Record<string, any>): Rec
   if (tableName === "highlights" && row.sync_id) {
     delete row.id;
   }
-  // Legacy local highlights can carry an empty updated_at. The server column is TIMESTAMPTZ and the
-  // freshness check needs a real instant, so use the row's own deletion or creation time.
   if (tableName === "highlights" && row.updated_at === "") {
     row.updated_at = row.deleted_at || row.created_at;
   }
@@ -1190,8 +1068,6 @@ async function remoteIsNewer(tableName: SyncTable, row: Record<string, any>, use
   const { data, error } = await query;
   if (error) throw error;
   if (tableName === "study_cards") {
-    // A card written later remotely still takes this upload's schedule when this device reviewed it
-    // later (private.study_cards_merge_schedule), so only an upload reviewed no later is skipped.
     const remote = decodeStudyCardFreshness(data, userId);
     if (!remote || compareSyncTimestamps(remote.at, localTimestamp) <= 0) return false;
     return !reviewedLater(row.last_review ?? null, remote.lastReview);
@@ -1207,8 +1083,6 @@ async function pushDelete(
   queuedAt: string,
   data: Record<string, any> = {},
 ): Promise<void> {
-  // A legacy entry without deleted_at was deleted no later than it was queued. Stamping the push time
-  // instead would let a stale delete beat a newer edit from another device.
   const deletedAt = data.deleted_at ?? queuedAt;
   if (tableName === "user_settings") {
     await pushUpsert(
@@ -1261,10 +1135,6 @@ async function pushDelete(
     return;
   }
 
-  // rowId format depends on table:
-  // study_cards: "surah:ayah"
-  // bookmarks: "surah:ayah"
-  // highlights: numeric id
   let query = supabase.from(tableName).delete().eq("user_id", userId);
 
   switch (tableName) {
@@ -1297,10 +1167,6 @@ async function pushDelete(
       query = query.eq("id", rowId);
   }
 
-  // With an explicit deletion time the freshness condition is part of the DELETE itself, so a newer row
-  // written by another device between queueing and pushing survives. Equal times delete, matching the
-  // upload rule. Legacy entries without deleted_at keep the unrestricted delete: their rows could carry a
-  // server-default time later than the queue time, and a conditional delete would bring them back.
   if (data.deleted_at) {
     if (tableName === "highlights") {
       query = query.or(`updated_at.is.null,updated_at.lte."${data.deleted_at}"`);
@@ -1313,7 +1179,6 @@ async function pushDelete(
   if (error) throw error;
 }
 
-// ─── Pull helpers (remote → local SQLite) ──────────────────────
 
 async function pullTable<K extends SyncTable>(
   db: AppDatabase,
@@ -1323,7 +1188,6 @@ async function pullTable<K extends SyncTable>(
   upsertFn: (db: DatabaseExecutor, row: SyncRows[K]) => Promise<void>,
   owner: SyncOwner,
   onPageApplied: (count: number) => void,
-  /** Runs in each page's transaction after its rows, so derived state commits with them. */
   afterPage?: (db: DatabaseExecutor) => Promise<void>,
 ): Promise<void> {
   const timeCol = "synced_at";
@@ -1418,7 +1282,6 @@ async function upsertUserWordMeaning(db: DatabaseExecutor, row: SyncRows["user_w
   );
 }
 
-/** Columns that come from the version reviewed later. */
 const CARD_SCHEDULE_COLUMNS = [
   "due",
   "stability",
@@ -1431,7 +1294,6 @@ const CARD_SCHEDULE_COLUMNS = [
   "state",
   "last_review",
 ] as const;
-/** Columns that come, with updated_at and deleted_at, from the version written later. */
 const CARD_STATUS_COLUMNS = [
   "deck_id",
   "suspended_at",
@@ -1450,22 +1312,6 @@ const NULLABLE_CARD_COLUMNS: ReadonlySet<string> = new Set([
   "tier_changed_at",
 ]);
 
-/**
- * A pulled card merges with this device's copy in two groups, as private.study_cards_merge_schedule
- * does on the server. The schedule comes from the version reviewed later, so a suspension, bury, mark,
- * due-date change or unit switch made on a device holding an older schedule never replaces a review
- * made since on another device. Every other column comes with updated_at from the version written
- * later, as before. Equal review times, both null included, keep whole-row last write wins, and no
- * review counts as the earliest.
- *
- * A deletion is one of the other columns: a card deleted on a device behind on reviews is deleted
- * here with this device's later schedule, which is what comes back if the card is restored (a cloze
- * card whose word is still weak here, lib/hifz/weak-spots.ts). A partial tombstone's omitted fields
- * keep this device's values.
- *
- * The merge is not queued for upload: the server already holds the pulled version and merges this
- * device's pending upload the same way.
- */
 async function mergeStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"]): Promise<void> {
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
   if (!remoteUpdatedAt) throw new Error("Invalid synced study_cards payload");
@@ -1501,19 +1347,11 @@ async function mergeStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"]
   await db.runAsync(`UPDATE study_cards SET ${assignments.join(", ")} WHERE id = ?`, [...values, row.id]);
 }
 
-/**
- * A card from the account, restored or pulled, merged with this device's copy (mergeStudyCard). A
- * card of a retired similar-verse slot (lib/database/mutashabihat-rows.ts) that arrives live, made on
- * the old rows before this device refreshed or by a device still on them, is deleted in the same
- * transaction with its upload queued. A pull never makes a deleted card live again, so it stays
- * deleted here.
- */
 async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"]): Promise<void> {
   await mergeStudyCard(db, row);
   if (isRetiredSimilarCard(row.id)) await retireSimilarCards(db, [row.id]);
 }
 
-/** A pulled card this device does not hold yet. */
 async function insertRemoteStudyCard(
   db: DatabaseExecutor,
   row: SyncRows["study_cards"],
@@ -1550,7 +1388,6 @@ async function insertRemoteStudyCard(
     return;
   }
 
-  // The cached page tier travels with the card, so a restored device knows its manzil pages.
   await db.runAsync(
     `INSERT INTO study_cards
      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
@@ -1590,7 +1427,6 @@ async function upsertStudyLog(
   const seenRestoreKeys = restoreKeysByCard?.get(row.card_id);
   if (restoreKey !== null && seenRestoreKeys?.has(restoreKey)) return;
 
-  // Preserve the literal lookup as the fast path for incremental pulls and restore.
   const existing = await db.getFirstAsync<{ id: number }>(
     "SELECT id FROM study_log WHERE card_id = ? AND reviewed_at = ?",
     [row.card_id, row.reviewed_at],
@@ -1615,8 +1451,6 @@ async function upsertStudyLog(
     if (sameCardRows.some((local) => syncTimestampKey(local.reviewed_at) === incomingKey)) return;
   }
 
-  // A review from an app version before local dates were recorded takes this device's date for its
-  // instant, as the old streak did.
   const reviewedAt = new Date(row.reviewed_at);
   await db.runAsync(
     `INSERT INTO study_log
@@ -1651,7 +1485,6 @@ function syncFlag(value: boolean | 0 | 1 | null | undefined): number {
   return value === true || value === 1 ? 1 : 0;
 }
 
-/** DB-02: a pulled wird day merges with the local one by status precedence. */
 async function upsertHabitDay(db: DatabaseExecutor, row: SyncRows["habit_days"]): Promise<void> {
   const remote: HabitDayRow = {
     local_date: row.local_date,
@@ -1671,7 +1504,6 @@ async function upsertHabitDay(db: DatabaseExecutor, row: SyncRows["habit_days"])
   await applyRemoteHabitDay(db, remote);
 }
 
-/** DB-03: sessions keep the newer row by updated_at. */
 async function upsertReviewSession(db: DatabaseExecutor, row: SyncRows["review_sessions"]): Promise<void> {
   const local = await db.getFirstAsync<{ updated_at: string }>("SELECT updated_at FROM review_sessions WHERE id = ?", [
     row.id,
@@ -1708,7 +1540,6 @@ async function upsertReviewSession(db: DatabaseExecutor, row: SyncRows["review_s
 
 type ErrorLocationRow = { surah: number; ayah: number | null; word: number | null };
 
-/** Whether `remote` is a later review than `local`; a review beats none. */
 function reviewedLater(remote: string | null, local: string | null): boolean {
   if (!remote) return false;
   if (!local) return true;
@@ -1719,7 +1550,6 @@ async function isLiveRecitationError(db: DatabaseExecutor, id: string): Promise<
   return (await db.getFirstAsync("SELECT 1 FROM recitation_errors WHERE id = ? AND deleted_at IS NULL", [id])) != null;
 }
 
-/** DB-03: recitation errors keep the newer row by updated_at, so inbox progress converges. */
 async function upsertRecitationError(db: DatabaseExecutor, row: SyncRows["recitation_errors"]): Promise<void> {
   const local = await db.getFirstAsync<{ updated_at: string }>("SELECT updated_at FROM recitation_errors WHERE id = ?", [
     row.id,
@@ -1811,8 +1641,6 @@ async function upsertHighlight(db: DatabaseExecutor, row: SyncRows["highlights"]
   }
   if (typeof row.created_at !== "string" || remoteUpdatedAt == null)
     throw new Error("Invalid synced highlights payload");
-  // An empty updated_at is only a deletion contract. A live row falls back to its creation time so the
-  // freshness check still applies and no empty timestamp is stored.
   const liveUpdatedAt = remoteUpdatedAt || row.created_at;
   const existing = await db.getFirstAsync<{ id: number; updated_at: string | null }>(
     `SELECT id, updated_at FROM highlights
@@ -1931,10 +1759,6 @@ function safeJson(value: unknown): unknown {
   }
 }
 
-/**
- * Queue every local row once per account. The queue rows and completion markers commit together,
- * so a failed queue write leaves the backfill incomplete and the next sync retries it in full.
- */
 async function enqueueInitialLocalDataForSync(database: AppDatabase, userId: string): Promise<void> {
   const backfillKey = `sync_initial_backfill_${userId}_${INITIAL_BACKFILL_VERSION}`;
   const settingsBackfillKey = userSettingsBackfillKey(userId);
@@ -1947,7 +1771,6 @@ async function enqueueInitialLocalRows(
   backfillKey: string,
   settingsBackfillKey: string,
 ): Promise<void> {
-  // Another tab sharing this database may have completed the backfill while this one waited.
   if (await isBackfillComplete(db, backfillKey)) return;
   const [settings, cards, logs, bookmarks, highlights, privateNotes, journeyEntries, achievements, userWordMeanings] =
     await Promise.all([
@@ -2050,11 +1873,6 @@ function habitBackfillKey(userId: string): string {
   return `sync_habit_backfill_${userId}_${HABIT_BACKFILL_VERSION}`;
 }
 
-/**
- * Queue wird days, sessions and recitation errors once per account, for local rows written before
- * sign-in or before these tables were synced. Restored accounts mark this done because their rows
- * came from the server.
- */
 async function enqueueHabitDataForSync(database: AppDatabase, userId: string): Promise<void> {
   const backfillKey = habitBackfillKey(userId);
   if (await isBackfillComplete(database, backfillKey)) return;

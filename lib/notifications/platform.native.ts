@@ -8,15 +8,6 @@ import {
   type ReminderResponse,
 } from "@/lib/notifications/platform-types";
 
-/**
- * Native reminders through expo-notifications (NOT-01). Each reminder is one dated local
- * notification (NOT-04).
- *
- * Android exactness (NOT-02): expo-notifications 55 chooses per device, not per notification. It
- * uses an exact alarm when the app may schedule exact alarms and an inexact one otherwise. The app
- * does not declare SCHEDULE_EXACT_ALARM, so on Android 12 and later every reminder, the late one
- * included, is inexact. See the report for the trade-off.
- */
 const CHANNEL_ID = "wird-reminders";
 const CATEGORY_ID = "wird-reminder";
 const REMIND_LATER_ACTION = "remind_later";
@@ -25,12 +16,6 @@ let handlerInstalled = false;
 let shouldPresent: (data: ReminderData) => boolean = () => true;
 let onHidden: (data: ReminderData) => void = () => {};
 
-/**
- * Whether a notification that arrives while the app is open shows. Hafiz posts only its own
- * reminders; one it cannot read shows as before, unless it claims to be a halaqa encouragement,
- * which may belong to another account (5.8.2). A reminder it hides is reported, so the next run does
- * not count the alarm the OS let go of as delivered.
- */
 function presentable(data: unknown): boolean {
   if (isReminderData(data)) {
     if (shouldPresent(data)) return true;
@@ -72,7 +57,6 @@ export const reminderPlatform: ReminderPlatform = {
   async configure({ channelName, remindLaterAction, shouldPresent: check, onHidden: report }) {
     shouldPresent = check;
     onHidden = report;
-    // Until this runs, expo-notifications shows nothing that arrives while the app is open.
     if (!handlerInstalled) {
       Notifications.setNotificationHandler({
         handleNotification: async (notification) => {
@@ -88,9 +72,6 @@ export const reminderPlatform: ReminderPlatform = {
         importance: Notifications.AndroidImportance.DEFAULT,
       });
     }
-    // "Remind me in 1 hour" opens the app: its handler (useReminderResponses) needs the database, and
-    // no background task is registered, so an action that stays in the background is lost when
-    // Android has ended the app's process. The launch response carries the action into the handler.
     await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
       { identifier: REMIND_LATER_ACTION, buttonTitle: remindLaterAction, options: { opensAppToForeground: true } },
     ]);
@@ -146,7 +127,6 @@ export const reminderPlatform: ReminderPlatform = {
       const parsed = toResponse(response);
       if (!parsed) return;
       listener(parsed);
-      // Expo keeps the last response for the next launch; this one is handled, so it must not replay.
       Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
     });
     return () => subscription.remove();

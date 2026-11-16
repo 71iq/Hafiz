@@ -32,13 +32,8 @@ const GRADE_KEYS: Readonly<Record<number, keyof UIStrings>> = {
   4: "teacherViewGradeEasy",
 };
 
-/** Ayah-based card ids: "2:255", or a prefixed form such as "qiraat:2:255" or "word:2:255:3". */
 const AYAH_CARD_PATTERN = /^(?:[a-z-]+:)?(\d{1,3}):(\d{1,3})(?::\d+)?$/;
 
-/**
- * A recent grade's card in words: "Page 582", "Page 582, first half", "Page 582 into 583",
- * "Surah 2, ayah 255". Card ids are storage keys and are never shown as written.
- */
 export function teacherCardLabel(cardId: string, language: Language, s: UIStrings): string {
   const unit = parsePageUnit(cardId);
   if (unit) {
@@ -71,22 +66,15 @@ export function teacherCardLabel(cardId: string, language: Language, s: UIString
   return s.teacherViewUnitOther;
 }
 
-/** The screen's side of setting a member's next sabaq (SOC-03). */
 export type TeacherAssignControls = Readonly<{
   pending: boolean;
   error: string | null;
   saved: string | null;
-  /** Offline: nothing can be sent. */
   disabled: boolean;
   onSave: (range: AssignedSabaq) => void;
   onClear: () => void;
 }>;
 
-/**
- * SOC-03: what a member chose to share with this halaqa's teachers. Sections the member did not share
- * say so; mistakes themselves and recordings are never part of it. With the plan shared, the teacher
- * can also set the member's next sabaq.
- */
 export function TeacherViewSheet({
   memberName,
   view,
@@ -128,7 +116,6 @@ export function TeacherViewSheet({
               {view.plan === null ? (
                 <>
                   <Text variant="body-sm">{s.teacherViewNotShared}</Text>
-                  {/* SOC-03: why there is no next-sabaq form here. */}
                   {assign ? <Text variant="caption">{s.teacherAssignNeedsPlan}</Text> : null}
                 </>
               ) : (
@@ -158,7 +145,6 @@ export function TeacherViewSheet({
                   ))}
                   {assign ? (
                     <TeacherSabaqAssignment
-                      // A new member or a new assignment starts the form from what is set now.
                       key={`${name}-${view.plan.sabaqAssignment?.assignedAt ?? "none"}`}
                       memberName={name}
                       current={view.plan.sabaqAssignment}

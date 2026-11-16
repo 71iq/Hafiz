@@ -12,10 +12,8 @@ import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   unlock: AchievementUnlock;
-  /** Further unseen unlocks waiting behind this one. */
   moreCount?: number;
   onDismiss: () => void;
-  /** Opens the achievements list; the close button alone marks this unlock seen. */
   onOpen?: () => void;
 };
 
@@ -37,7 +35,6 @@ export function AchievementUnlockToast({ unlock, moreCount = 0, onDismiss, onOpe
 
   return (
     <Card elevation="low" className="mb-6 p-4">
-      {/* Hand-mirrored row pins LTR coordinates; under the RTL tab root row-reverse flipped twice. */}
       <View
         className={`mb-2 flex-row items-center justify-between gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
         style={{ direction: "ltr" }}

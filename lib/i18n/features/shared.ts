@@ -1,6 +1,3 @@
-/**
- * W03 shared overlays, menus, notices, detail sheets and source pickers. Spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity.
- */
 export const sharedStrings = {
   en: {
     discardChangesTitle: "Discard changes?",

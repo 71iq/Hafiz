@@ -2,7 +2,6 @@ import React from "react";
 import { render, screen } from "@testing-library/react-native";
 import { IrabTab } from "@/components/mushaf/word-tabs/IrabTab";
 
-// 17:106 stores the phrase "على الناس" once per word with the same text and analysis.
 const rows = [
   { surah: 17, ayah: 106, word_pos: 3, word: "لتقرأه", irab: "اللام لام التعليل" },
   { surah: 17, ayah: 106, word_pos: 4, word: "على الناس", irab: "متعلقان بتقرأه" },

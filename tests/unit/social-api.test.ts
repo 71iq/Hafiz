@@ -41,12 +41,10 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
 const mockHeaders: Record<string, string> = {};
 let mockConfigured = true;
-// The avatars bucket: stored paths, and every list or remove call with the bearer it was sent with.
 const mockAvatarFiles = new Set<string>();
 const mockStorageCalls: { op: "list" | "remove"; bucket: string; auth: string | undefined; folder?: string }[] = [];
 let mockRemoveRefused = false;
 let mockOnRemove: () => void = () => undefined;
-// The store and the shared client's session are separate, as in the app: a switch can reach one first.
 let mockAuth: FakeAuthState;
 let mockClientSession: FakeAuthState["session"];
 jest.mock("@/lib/supabase", () => ({
@@ -65,8 +63,6 @@ jest.mock("@/lib/supabase", () => ({
             headers[name] = value;
             return files;
           },
-          // As Storage lists: the folder's own files with ids, nested folders once each with a null id,
-          // by name, a page at a time.
           list: async (folder: string, options: { limit: number; offset?: number }) => {
             mockStorageCalls.push({ op: "list", bucket, auth: headers.Authorization, folder });
             const entries = new Map<string, string | null>();
@@ -310,7 +306,6 @@ describe("profile summary (SOC-01)", () => {
 
   it("runs a signed-out request with the public key, not a session the client picked up", async () => {
     signIn(signedOut());
-    // The shared client already holds a sign-in the store has not seen yet.
     mockClientSession = signedIn(USER).session;
     mockRpc.mockResolvedValue({ data: { streak: 3, juz_completed: null }, error: null });
     await expect(fetchProfileSummary(OTHER)).resolves.toEqual({ streak: 3, juzCompleted: null });
@@ -343,13 +338,11 @@ describe("a minor's photo (ETH-07)", () => {
   it("deletes the account's own photo files before it records minority, as that account", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/2.png`).add(`${OTHER}/3.jpg`);
     mockRpc.mockImplementation(async () => {
-      // Third review, finding 1: by the time minority is recorded, nothing is left to publish.
       expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
       return privacy(true);
     });
     await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
     expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
-    // The pass before the save, and the one after it, which finds nothing left with one request.
     expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "remove", "list"]);
     expect(mockStorageCalls.every((call) => call.bucket === "avatars" && bearerSubject(call.auth) === USER)).toBe(true);
   });
@@ -399,7 +392,6 @@ describe("a minor's photo (ETH-07)", () => {
   it("removes a photo uploaded while minority was being recorded, once it is recorded", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
     mockRpc.mockImplementation(async () => {
-      // Another device uploads before the server starts refusing this account's uploads.
       mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
       return privacy(true);
     });
@@ -428,7 +420,6 @@ describe("a minor's photo (ETH-07)", () => {
   it("sends the minority the form loaded and reports a refusal for a changed setting as its own error", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
     mockRpc.mockResolvedValue({ data: null, error: { message: "privacy_changed", code: "P0001" } });
-    // The form still shows a minor, but another device withdrew it: the adult's photo is not deleted.
     await expect(
       saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: true }, owner()),
     ).rejects.toBeInstanceOf(ProfilePrivacyChangedError);
@@ -454,7 +445,6 @@ describe("a minor's photo (ETH-07)", () => {
   it("deletes them before joining the board as a minor, and once more after", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
     mockRpc.mockImplementation(async (fn: string) => {
-      // The pass after joining reads the account's privacy before it deletes what it found.
       if (fn === "get_profile_privacy") return privacy(true);
       expect(mockAvatarFiles.size).toBe(0);
       mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
@@ -468,7 +458,6 @@ describe("a minor's photo (ETH-07)", () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
     mockRpc.mockImplementation(async (fn: string) => {
       if (fn === "get_profile_privacy") return privacy(false);
-      // Meanwhile another device withdrew minority and uploaded a photo.
       mockAvatarFiles.add(`${USER}/adult-elsewhere.jpg`);
       return gathering;
     });
@@ -597,7 +586,6 @@ describe("account binding (requests belong to the account that started them)", (
 
   it("stops a two-step save before its second write once the account changed", async () => {
     mockRpc.mockImplementation(async (fn) => {
-      // The account switches while the first write is in flight.
       if (fn === "set_halaqa_sharing") signIn(signedIn(OTHER));
       return { data: { ...detailPayload.group }, error: null };
     });
@@ -716,7 +704,6 @@ describe("a teacher's next sabaq (SOC-03)", () => {
     mockRpc.mockResolvedValue({ data: stored, error: null });
     await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
     expect(mockRpc).toHaveBeenCalledWith("get_my_sabaq_assignment", {});
-    // Offline, and when the request cannot reach the server or fails, the saved copy decides.
     mockRpc.mockReset();
     await expect(loadMySabaqAssignment(USER, true)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
     expect(mockRpc).not.toHaveBeenCalled();
@@ -724,11 +711,9 @@ describe("a teacher's next sabaq (SOC-03)", () => {
     await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
     mockRpc.mockResolvedValue({ data: null, error: { message: "upstream exploded" } });
     await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
-    // A cleared assignment replaces the copy.
     mockRpc.mockResolvedValue({ data: null, error: null });
     await expect(loadMySabaqAssignment(USER, false)).resolves.toBeNull();
     await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
-    // Signed out, or another account: nothing.
     await expect(loadMySabaqAssignment(null, false)).resolves.toBeNull();
     signIn(signedIn(OTHER));
     mockRpc.mockResolvedValue({ data: stored, error: null });
@@ -762,7 +747,6 @@ describe("a teacher's next sabaq (SOC-03)", () => {
     const inFlight = loadMySabaqAssignment(USER, false);
     await forgetMySabaqAssignment(USER);
     answer({ data: stored, error: null });
-    // The read started before sharing was withdrawn: its answer is not kept, and the lesson gets none.
     await expect(inFlight).resolves.toBeNull();
     await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
   });
@@ -770,11 +754,9 @@ describe("a teacher's next sabaq (SOC-03)", () => {
   it("returns nothing from a load a forget overtook, offline or online", async () => {
     mockRpc.mockResolvedValueOnce({ data: stored, error: null });
     await loadMySabaqAssignment(USER, false);
-    // Offline: the copy is read before the forget finishes, but the lesson must not use it.
     const offlineLoad = loadMySabaqAssignment(USER, true);
     await forgetMySabaqAssignment(USER);
     await expect(offlineLoad).resolves.toBeNull();
-    // Online: the answer arrives after the forget began.
     let answer: (value: { data: unknown; error: unknown }) => void = () => undefined;
     mockRpc.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
     const onlineLoad = loadMySabaqAssignment(USER, false);
@@ -788,7 +770,6 @@ describe("a teacher's next sabaq (SOC-03)", () => {
     let older: (value: { data: unknown; error: unknown }) => void = () => undefined;
     mockRpc.mockReturnValueOnce(new Promise((resolve) => (older = resolve)));
     const first = loadMySabaqAssignment(USER, false);
-    // The teacher clears it; a newer read sees that first.
     mockRpc.mockResolvedValueOnce({ data: null, error: null });
     await expect(loadMySabaqAssignment(USER, false)).resolves.toBeNull();
     older({ data: stored, error: null });
@@ -834,7 +815,6 @@ describe("received encouragements (5.8.2)", () => {
     });
   });
 
-  // Third review, finding 5: more arrivals than one page are all listed, oldest included.
   const encouragementId = (n: number) => `00000000-0000-4000-8e00-${String(n).padStart(12, "0")}`;
   const createdAt = (n: number) => `2026-11-13T08:00:00.${String(n).padStart(6, "0")}+00:00`;
   const page = (from: number, to: number, more: boolean, checkedAt: string) => ({
@@ -862,7 +842,6 @@ describe("received encouragements (5.8.2)", () => {
     expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
   });
 
-  /** A server that pages `total` items in order, 100 at a time, by the cursor it is sent. */
   function pagedInbox(total: number) {
     mockRpc.mockImplementation(async (_fn, args) => {
       const after = args.p_after_id ? Number(String(args.p_after_id).slice(-12)) : 0;
@@ -871,7 +850,6 @@ describe("received encouragements (5.8.2)", () => {
     });
   }
 
-  // Fourth review, finding 4: leaving and joining halaqas can fill seven days with more than 50 pages.
   it("reads every page of a long history while each page moves forward", async () => {
     pagedInbox(5_940);
     const result = await fetchReceivedEncouragements(owner());
@@ -909,9 +887,7 @@ describe("received encouragements (5.8.2)", () => {
     });
     mockRpc
       .mockResolvedValueOnce(pageOf([[encouragementId(9), "2026-11-13T08:00:00.123456+00:00"]], true))
-      // Same millisecond, later microsecond, smaller id: still forward.
       .mockResolvedValueOnce(pageOf([[encouragementId(1), "2026-11-13T08:00:00.1235+00:00"]], true))
-      // Same time, larger id: forward.
       .mockResolvedValueOnce(pageOf([[encouragementId(2), "2026-11-13T08:00:00.1235+00:00"]], true))
       .mockResolvedValueOnce(pageOf([[encouragementId(3), "2026-11-13T08:00:01+00:00"]], false));
     const result = await fetchReceivedEncouragements(owner());

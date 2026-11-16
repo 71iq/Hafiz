@@ -12,7 +12,6 @@ import { useDelayedLoading } from "./use-delayed-loading";
 type Props = {
   surah: number;
   ayah: number;
-  /** Shows the source as a heading. Without it the source appears as a footnote at the end. */
   showHeader?: boolean;
 };
 
@@ -34,7 +33,6 @@ function parseGroup(raw: string | null | undefined): { surah: number; ayah: numb
   }
 }
 
-/** "Covers ayahs 2:5-2:7" for a run within one surah, otherwise "Covers ayahs: 2:5, 2:9". */
 export function formatQiraatCovers(
   group: readonly { surah: number; ayah: number }[],
   isArabic: boolean,
@@ -87,7 +85,6 @@ export function QiraatTab({ surah, ayah, showHeader = true }: Props) {
     );
   }
 
-  // A failed read is an error with Retry, never the "no data" message.
   if ("failed" in current) {
     return (
       <View className="py-6 items-center gap-3 px-4">

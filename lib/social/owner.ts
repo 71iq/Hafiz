@@ -49,18 +49,12 @@ export function captureSocialOwner(userId: string): SocialOwner | null {
   };
 }
 
-/** The owner for a request that must run as this signed-in account, or an "account_changed" failure. */
 export function requireSocialOwner(userId: string): SocialOwner {
   const owner = captureSocialOwner(userId);
   if (!owner) throw socialError({ kind: "account_changed" });
   return owner;
 }
 
-/**
- * A signed-out viewer. Its requests send the public key, never a session the shared client may pick
- * up from a sign-in in the meantime, and their results are refused once anyone signs in or another
- * auth command runs, as an owner's are.
- */
 export function captureSignedOutViewer(): SocialViewer | null {
   const { user, session } = useAuthStore.getState();
   if (user || session) return null;
@@ -82,7 +76,6 @@ export function captureSignedOutViewer(): SocialViewer | null {
   };
 }
 
-/** The viewer for a request that must run signed out, or an "account_changed" failure. */
 export function requireSignedOutViewer(): SocialViewer {
   const viewer = captureSignedOutViewer();
   if (!viewer) throw socialError({ kind: "account_changed" });

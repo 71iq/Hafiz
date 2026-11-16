@@ -86,7 +86,6 @@ export default function ReflectionFeedScreen() {
   const [filterKind, setFilterKind] = useState<FilterKind>("none");
   const [selectedSurah, setSelectedSurah] = useState<number | null>(null);
   const [selectedJuz, setSelectedJuz] = useState<number | null>(null);
-  // Only Newest and Popular exist; any older saved value ("oldest", "less") reads as Newest.
   const [sortState, setSortState] = useState<ReflectionFeedSort>("newest");
   const sort = normalizeFeedSort(sortState);
   const setSort = (value: unknown) => setSortState(normalizeFeedSort(value));
@@ -209,7 +208,6 @@ export default function ReflectionFeedScreen() {
     staleTime: 1000 * 60 * 2,
   });
 
-  // Query's update counter also distinguishes successful structurally identical replies.
   const feedRevision = queryClient.getQueryState(feedKey)?.dataUpdateCount ?? 0;
   const rawReflections = useMemo(() => feedQuery.data?.pages.flatMap((page) => page.data) ?? [], [feedQuery.data]);
   useLayoutEffect(() => {
@@ -293,8 +291,6 @@ export default function ReflectionFeedScreen() {
     sortOptions.find((option) => option.value === sort)?.label ?? s.reflectionFeedSortNewest
   }`;
 
-  // C06: one target through the shared open-Mushaf helper, which only switches tab from here (pushing
-  // would stack another tab root). The feed stays mounted, so its scroll is where the reader left it.
   const handleReferencePress = useCallback(
     (reflection: Reflection) => {
       openMushaf({ surah: reflection.surah, ayah: reflection.ayah_start });
@@ -302,7 +298,6 @@ export default function ReflectionFeedScreen() {
     [openMushaf],
   );
 
-  // The count changes in place; the feed is only marked stale, so the post does not move or reload.
   const adjustCommentCount = useCallback(
     (reflectionId: string, step: 1 | -1) => {
       const base = rawReflections.find((row) => row.id === reflectionId)?.comments_count;
@@ -344,7 +339,6 @@ export default function ReflectionFeedScreen() {
     setToast(s.reflectionFeedAuthRequired);
   }, [s.reflectionFeedAuthRequired]);
 
-  // Reference digits follow the interface language; the numeric token stays left to right.
   const formatReference = useCallback(
     (reflection: Reflection) => {
       const surah = surahByNumber.get(reflection.surah);
@@ -424,8 +418,6 @@ export default function ReflectionFeedScreen() {
       <View style={{ height: 36 }} />
     );
 
-  // Posts already loaded for this account stay through a failed refresh or lost connection, with a
-  // notice. The query key carries the viewer, so another account never sees them.
   const staleNotice =
     configured && reflections.length > 0 && !feedQuery.isFetching
       ? offline
@@ -506,7 +498,6 @@ export default function ReflectionFeedScreen() {
             </View>
           ) : null}
           {!configured ? (
-            // The service is not set up in this build: say so rather than calling it offline.
             <View className="flex-1 items-center justify-center">
               <EmptyState
                 icon={MessageSquare}
@@ -657,8 +648,6 @@ function ReflectionFeedSearch({
   const iconColor = isDark ? "#737373" : "#8B8178";
 
   return (
-    // Hand-mirrored row pins LTR coordinates; inside the RTL search wrapper row-reverse flipped twice
-    // and put the search icon on the left and the clear button on the right in Arabic.
     <View
       className="min-h-11 items-center gap-2 rounded-2xl bg-surface-low px-4 dark:bg-surface-dark-low"
       style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
@@ -795,7 +784,6 @@ function FilterPicker({
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxHeight = Math.min(height - (isPhone ? 16 : 48), 680);
   const digits = (n: number) => (uiLanguage === "ar" ? toArabicNumber(n) : String(n));
-  // The Location sheet opens on the section that is in use; its tabs only change what is listed.
   const [section, setSection] = useState<FilterKind>(filterKind);
   const [surahQuery, setSurahQuery] = useState("");
   const [openedFor, setOpenedFor] = useState<PickerMode>(null);
@@ -817,7 +805,6 @@ function FilterPicker({
           : null
       : null;
   if (mode !== "location") scrolledFor.current = null;
-  // Opens scrolled to the active surah or juz, once per opening.
   const revealActive = (key: string, y: number) => {
     if (key !== activeKey || scrolledFor.current === key) return;
     scrolledFor.current = key;

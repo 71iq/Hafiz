@@ -11,8 +11,6 @@ import { strings } from "@/lib/i18n/strings";
 import { SettingsProvider } from "@/lib/settings/context";
 import { DirectionProvider } from "@/lib/ui/direction";
 
-// MUT-02: the reader marks an ayah whose similar verse is memorized, in page and verse view, and the
-// mark opens the comparison in the ayah detail sheet. All text below is synthetic, never Quran data.
 
 type Language = "en" | "ar";
 type Fixture = {
@@ -26,7 +24,6 @@ const PLAIN = { surah: 2, ayah: 6 };
 const SIBLING = { surah: 31, ayah: 5 };
 const PAGE = 2;
 const SIBLING_PAGE = 412;
-// Two words and a marker for the marked ayah, one word and a marker for the plain one.
 const MARKED_GLYPHS = ["G-a", "G-b", "G-m5"];
 const PLAIN_GLYPHS = ["G-c", "G-m6"];
 const refRows = [
@@ -198,7 +195,6 @@ jest.mock("@/lib/selection/queries", () => ({
   fetchSurahName: async () => "",
   fetchUthmaniRange: async () => "",
 }));
-// Sheets and switches settle at once, so no animation frame updates them after a test step.
 jest.mock("@/lib/ui/reduced-motion", () => ({ useReducedMotionPreference: () => true }));
 jest.mock("@/lib/quran-foundation/config", () => ({
   isQfContentEnabled: () => false,
@@ -257,7 +253,6 @@ function toArabicDigits(value: number) {
   return String(value).replace(/\d/g, (digit) => "٠١٢٣٤٥٦٧٨٩"[Number(digit)]);
 }
 
-/** Lets the settings load, the page data load and the similar-verse reads settle. */
 async function settle() {
   for (let step = 0; step < 6; step += 1) {
     await act(async () => {
@@ -266,7 +261,6 @@ async function settle() {
   }
 }
 
-/** The reader, optionally with its settings sheet open beside it, as the reader shows it. */
 function renderPageView(language: Language, { withSettings = false } = {}) {
   return render(
     <Providers language={language}>
@@ -292,8 +286,6 @@ async function toggleMarkSetting(language: Language) {
 }
 
 async function expectComparisonOpen(language: Language) {
-  // Both verses of the group, and the marked ayah's meaning in the interface language (MUT-05). How
-  // the comparison shows a sibling's meaning is SimilarVerseComparison's own behavior.
   expect(await screen.findByText(verseText(refRows[0]))).toBeTruthy();
   expect(screen.getByText(verseText(refRows[1]))).toBeTruthy();
   expect(await screen.findByText(meaning(language, MARKED.surah, MARKED.ayah))).toBeTruthy();
@@ -337,7 +329,6 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
     const marker = await screen.findByLabelText(markerLabel(language, MARKED));
     expect(screen.queryByLabelText(markerLabel(language, PLAIN))).toBeNull();
     expect(screen.getAllByTestId("similar-verse-marker")).toHaveLength(1);
-    // One read for the page's groups and one for the memorized pages, however many ayat it holds.
     expect(reads.filter((read) => read.startsWith("similar:"))).toEqual([`similar:${PAGE}`]);
     expect(reads.filter((read) => read === "memorized")).toHaveLength(1);
 
@@ -359,7 +350,6 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
     await settle();
     expect(await screen.findByLabelText(markerLabel(language, MARKED))).toBeTruthy();
     first.unmount();
-    // While no reader is open, the sibling's page stops being memorized (a sync, a deletion).
     fixture.memorizedPages = [PAGE];
     renderPageView(language);
     await settle();
@@ -422,7 +412,6 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
 
     const marker = await screen.findByLabelText(markerLabel(language, MARKED));
     expect(screen.queryByLabelText(markerLabel(language, PLAIN))).toBeNull();
-    // Two blocks on one page share a single read of that page.
     expect(reads.filter((read) => read.startsWith("similar:"))).toEqual([`similar:${PAGE}`]);
 
     fireEvent.press(marker);

@@ -1,5 +1,3 @@
-// Auto-generated: QPC V4 Tajweed per-page font require map
-// Each require() returns an asset ID/URL loaded on demand by the shared font loader
 
 export const QPC_V4_TAJWEED_FONTS: Record<number, any> = {
   1: require("../../assets/fonts/QPC_V4_TAJWEED/p1.ttf"),

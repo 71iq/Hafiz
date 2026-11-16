@@ -14,11 +14,6 @@ type DatabaseContextType = {
   isReady: boolean;
   progress: ImportProgress | null;
   error: string | null;
-  /**
-   * Runs preparation again after a failure. It reuses the same idempotent startup path: schema
-   * creation and migrations are additive, an interrupted content import clears only bundled content
-   * tables, and user tables are never reset. A connection whose close is uncertain stays failed.
-   */
   retry: () => void;
 };
 
@@ -123,7 +118,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         channel.postMessage(message);
         return true;
       } catch {
-        // A host result may settle after its channel has closed.
         return false;
       }
     }
@@ -266,7 +260,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           await Promise.allSettled([...resource.operations]);
           if (resource.cleanupFailure) throw resource.cleanupFailure;
           if (resource.owner) {
-            // Keep the host lock if private handle close is uncertain.
             await resource.owner.close();
             resource.owner = null;
             resource.db = null;
@@ -467,7 +460,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       const oldAttempt = attempt;
       host = null;
       if (oldHost?.ready) postMessage({ type: "host-closing", version: DB_BRIDGE_VERSION, tabId: oldHost.id });
-      // Release held protocol callbacks before waiting for initialization or RPCs.
       for (const resource of new Set([...(oldAttempt?.resources ?? []), ...(oldHost ? [oldHost] : [])]))
         retireResource(resource, reason);
       if (remote) retireRemote(remote, reason, false, publish);
@@ -503,7 +495,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     lifecycleWindow?.addEventListener("pagehide", handlePageHide);
     lifecycleWindow?.addEventListener("pageshow", handlePageShow);
     retryRef.current = () => {
-      // Only a settled failure retries; a running attempt or a live connection is left alone.
       if (cancelled || hidden || currentDb || attempt) return;
       void runInit();
     };
@@ -513,7 +504,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       lifecycleWindow?.removeEventListener("pagehide", handlePageHide);
       lifecycleWindow?.removeEventListener("pageshow", handlePageShow);
       hidden = true;
-      // Send remote reservation cancellation while the channel is still usable.
       retire(new Error("Database provider closed"), false);
       cancelled = true;
       channel?.close();

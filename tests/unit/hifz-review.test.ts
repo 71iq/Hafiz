@@ -130,7 +130,6 @@ describe("saving a page grade", () => {
     const yesterday = addDays(TODAY, -1);
     await declareMemorizedPages(store.db, { pages: [5], cycleDays: 30, now: atLocalTime(yesterday, 500) });
     const loaded = await card(5, atLocalTime(TODAY, 540));
-    // Sync then merges another device's Again from yesterday: its card row and its review log.
     const synced = calculateReviewTransition({ card: loaded.row, rating: Rating.Again, reviewedAt: atLocalTime(yesterday, 600) }).updatedCard;
     store.sql
       .prepare("UPDATE study_cards SET due = ?, stability = ?, difficulty = ?, reps = ?, lapses = ?, state = ?, last_review = ?, updated_at = ? WHERE id = ?")
@@ -157,7 +156,6 @@ describe("saving a page grade", () => {
       reps: synced.reps + 1,
       lapses: synced.lapses,
     });
-    // After an Again, one Good grade is not yet two in a row, so the page still needs work.
     expect(result.tier).toBe("manzil.needs_work");
     expect(store.sql.prepare("SELECT tier FROM study_cards WHERE id = ?").get(synced.id)).toEqual({ tier: "manzil.needs_work" });
     expect(result.transition.updatedCard.reps).toBe(synced.reps + 1);
@@ -225,13 +223,11 @@ describe("saving a page grade", () => {
     });
   }
   const cycleStart = () => store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(MANZIL_CYCLE_START_KEY);
-  /** A zone further east puts the cards' creation instant on the next local day; a fallback start would move with it. */
   const travelEast = () =>
     store.sql.prepare("UPDATE study_cards SET created_at = ? WHERE id LIKE 'page:%'").run(atLocalTime(addDays(TODAY, 1), 30).toISOString());
 
   it("counts a manzil page toward the cycle when its synced cached tier is stale (MST-04)", async () => {
     await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now: atLocalTime(TODAY, 600) });
-    // Another device's older row left page 8 cached as sabaq, while its merged history makes it manzil.
     store.sql.prepare("UPDATE study_cards SET tier = 'sabaq' WHERE id = ?").run(pageCardId(8));
     await gradeGood(7, atLocalTime(TODAY, 601));
     expect((await readHabitDayRow(store.db, TODAY))?.manzil_cycle_completed).toBe(0);
@@ -253,7 +249,6 @@ describe("saving a page grade", () => {
 
   it("stores the first cycle's start the first time it is needed when none was stored (MST-04)", async () => {
     await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now: atLocalTime(TODAY, 600) });
-    // As for pages that reached manzil through sabqi, with no declaration to store a start.
     store.sql.prepare("DELETE FROM user_settings WHERE key = ?").run(MANZIL_CYCLE_START_KEY);
     await gradeGood(8, atLocalTime(TODAY, 601));
     expect(cycleStart()).toEqual({ value: TODAY });
@@ -315,7 +310,6 @@ describe("page history from the review log", () => {
   it("orders grades by instant when synced timestamps carry different offsets", async () => {
     await declareMemorizedPages(store.db, { pages: [5], cycleDays: 30, now: atLocalTime(addDays(TODAY, -3), 600) });
     const id = pageCardId(5);
-    // 10:00+02:00 is 08:00Z: the lapse came first, then two clean reviews.
     insertLog(id, Rating.Again, `${addDays(TODAY, -1)}T10:00:00.000+02:00`, addDays(TODAY, -1));
     insertLog(id, Rating.Good, `${addDays(TODAY, -1)}T08:10:00.000Z`, addDays(TODAY, -1));
     insertLog(id, Rating.Good, `${addDays(TODAY, -1)}T08:20:00.000Z`, addDays(TODAY, -1));

@@ -18,7 +18,6 @@ describe("the end-of-session commitment (STR-20)", () => {
   it("names the prayer the reminder follows", async () => {
     withAnchor({ kind: "prayer", prayer: "fajr", offsetMinutes: 20 });
     const { result } = renderHook(() => useCommitmentLabel(db, strings.en, "en"));
-    // Plain until the anchor is read.
     expect(result.current).toBe(strings.en.habitCommitTomorrow);
     await waitFor(() => expect(result.current).toBe("I'll be back tomorrow after Fajr"));
   });

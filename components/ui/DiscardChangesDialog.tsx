@@ -3,11 +3,6 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 
-/**
- * C02 dirty-exit contract. Dirty means the normalized editable values differ from the loaded
- * baseline; a failed save keeps the old baseline. Compare with normalizeEditableText or a
- * field-by-field equivalent.
- */
 export function normalizeEditableText(value: string | null | undefined): string {
   return (value ?? "").replace(/\r\n?/g, "\n").trim();
 }
@@ -17,13 +12,7 @@ export function isEditableTextDirty(current: string | null | undefined, baseline
 }
 
 export type DiscardGuard = {
-  /**
-   * Runs proceed at once when clean. When dirty it opens the discard dialog and runs proceed only
-   * after the user chooses Discard. Use it for close, Cancel, Back, Escape, backdrop and target
-   * switches. Account/session transitions clear drafts directly instead of asking.
-   */
   guard: (proceed: () => void) => void;
-  /** True while the discard dialog is open. */
   confirming: boolean;
   dialogProps: { visible: boolean; onKeepEditing: () => void; onDiscard: () => void };
 };
@@ -70,7 +59,6 @@ export function DiscardChangesDialog({
   visible: boolean;
   onKeepEditing: () => void;
   onDiscard: () => void;
-  /** Names what is discarded, such as "Discard this note?". Defaults to "Discard changes?". */
   title?: string;
 }) {
   const s = useStrings();

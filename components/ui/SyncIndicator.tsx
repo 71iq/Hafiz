@@ -10,9 +10,7 @@ import type { UIStringKey } from "@/lib/i18n/strings";
 type Props = {
   status: SyncStatus;
   isDark?: boolean;
-  /** Hides the success state; a finished sync is reported as "Last synced" in account settings. */
   hideSuccess?: boolean;
-  /** Icon colors on the dark persistent sidebar. */
   onPrimary?: boolean;
 };
 
@@ -23,10 +21,6 @@ export const SYNC_STATUS_LABEL_KEYS: Record<Exclude<SyncStatus, "idle">, UIStrin
   error: "syncStateError",
 };
 
-/**
- * What the one sync runner reports. `failure` names why the last run did not finish cleanly;
- * `lastSyncedAt` is the last complete sync for this account; `syncNow` is the guarded manual run.
- */
 export type SyncStatusDetails = Readonly<{
   status: SyncStatus;
   pendingCount: number;
@@ -43,10 +37,6 @@ const IDLE_DETAILS: SyncStatusDetails = {
   syncNow: async () => {},
 };
 
-/**
- * The tab layout owns the one sync runner (useSync). Navigation surfaces and Settings read its status
- * here instead of mounting another runner, which would change which view owns sync.
- */
 const SyncStatusContext = createContext<SyncStatusDetails>(IDLE_DETAILS);
 export const SyncStatusProvider = SyncStatusContext.Provider;
 export function useSyncStatusView(): SyncStatus {
@@ -56,10 +46,6 @@ export function useSyncStatusDetails(): SyncStatusDetails {
   return useContext(SyncStatusContext);
 }
 
-/**
- * Small cloud icon showing sync status, labelled for screen readers. It sits on the profile card and
- * account row instead of floating over screens.
- */
 export function SyncIndicator({ status, isDark, hideSuccess = false, onPrimary = false }: Props) {
   const s = useStrings();
   if (status === "idle" || (hideSuccess && status === "synced")) return null;

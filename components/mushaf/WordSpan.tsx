@@ -25,16 +25,10 @@ type Props = {
   lineHeight: number;
   highlightColor?: string;
   arrivalWash?: string;
-  /** ERR-06: nested text cannot hold a separate mark, so a weak spot is a solid underline. */
   weakSpot?: boolean;
   onPressIn?: (wordPos: number) => void;
 };
 
-/**
- * One tappable word nested inside an ayah's single Text. On Android each separate Text is clipped
- * to its own box, which cut page-font word glyphs that draw outside their advance; a nested span
- * shares the ayah's text layout and draws completely. The tooltip anchors to the touch point.
- */
 function WordSpanInner({
   glyph,
   surah,
@@ -110,16 +104,11 @@ type AyahWordTextProps = {
   wordHighlightColor: (wordPos: number) => string | undefined;
   wordArrivalWash?: (wordPos: number) => string | undefined;
   wordWeakSpot?: (wordPos: number) => boolean;
-  /** Long press on the nested end marker selects the ayah (Android delivers it to the ayah Text). */
   onMarkerLongPress?: () => void;
 };
 
 const MARKER = "marker" as const;
 
-/**
- * One Text for a whole ayah with nested word spans. Android does not deliver long presses to nested
- * spans, so each span records the word under the finger and the ayah Text opens its detail sheet.
- */
 export function AyahWordText({
   words,
   marker,
@@ -156,8 +145,6 @@ export function AyahWordText({
     }
     openDetail({ surah, ayah, wordPos, v2Page });
   }, [markActivity, onMarkerLongPress, openDetail, surah, ayah, v2Page]);
-  // A touch that ends without a long press forgets its word, so a later long press on a gap or
-  // the marker never opens a stale word.
   const forgetWord = useCallback(() => {
     pressedWordRef.current = null;
   }, []);

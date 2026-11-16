@@ -31,7 +31,6 @@ import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import type { DeepLinkTarget } from "@/lib/deep-link";
 
-/** The ayah an ayah or word card studies, for Open in Mushaf; ids are "2:255" or "word:2:255:4". */
 export function deckCardMushafTarget(card: Pick<DeckCardListItem, "id" | "kind">): DeepLinkTarget | null {
   const match =
     card.kind === "ayah"
@@ -67,21 +66,17 @@ type Filter =
 
 const DECK_CARDS_PAGE = 100;
 
-/** One filter is selected at a time; the two groups are only a visual arrangement. */
 const STATE_FILTERS: Filter[] = ["all", "due", "scheduled", "new", "learning", "review", "relearning"];
 const FLAG_FILTERS: Filter[] = ["marked", "suspended", "buried"];
 
-/** A listed row was live when loaded, so acting on it must not revive it; a virtual card may be created. */
 function liveIf(card: DeckCardListItem) {
   return { requireLive: !card.isVirtual };
 }
 
-/** The same normalization as Home search: no tashkeel or tatweel, case-insensitive. */
 function searchKey(text: string): string {
   return stripArabicDiacritics(text).toLowerCase();
 }
 
-/** The card as a confirmation names it: "Al-Baqarah 2:255", a saved word, or the reference alone. */
 export function deckCardName(card: DeckCardListItem, isRTL: boolean): string {
   if (card.kind === "word") return isRTL ? card.titleAr : card.title;
   if (card.kind === "smart") return isRTL ? `${card.subtitleAr} ${card.titleAr}`.trim() : card.title;
@@ -97,7 +92,6 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
   const openMushaf = useOpenMushaf();
   const language = isRTL ? "ar" : "en";
   const { width } = useWindowDimensions();
-  // Phones list each card as a two-line row instead of table columns.
   const stacked = width <= VIEWPORT_BREAKPOINTS.phoneLarge;
   const [cards, setCards] = useState<DeckCardListItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -107,14 +101,12 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
   const [filter, setFilter] = useState<Filter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** The row whose last action failed, with that action, for its inline Try again. */
   const [failed, setFailed] = useState<{ cardId: string; retry: () => void } | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: "delete" | "reset"; card: DeckCardListItem } | null>(null);
   const [dueTarget, setDueTarget] = useState<DeckCardListItem | null>(null);
   const [dueDateText, setDueDateText] = useState("");
   const [dueDateError, setDueDateError] = useState<string | null>(null);
 
-  /** Reload the list; false when it failed and its own error is showing. */
   const loadCards = useCallback(async () => {
     if (!visible || !deckId) return true;
     setLoading(true);
@@ -159,8 +151,6 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
     });
   }, [cards, filter, query]);
 
-  // A deck can hold 6,236 cards; rendering every row at once stalled the sheet on phones. Rows are
-  // shown a page at a time, and a new deck, search or filter starts again from the first page.
   const pageKey = `${deckId}|${filter}|${query}`;
   const [paging, setPaging] = useState({ key: pageKey, count: DECK_CARDS_PAGE });
   const shownCount = paging.key === pageKey ? paging.count : DECK_CARDS_PAGE;
@@ -285,7 +275,6 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
               />
             </View>
 
-            {/* Two rows of one choice: scheduling states, then flags. */}
             <View className="gap-2" accessibilityRole="radiogroup">
               <View
                 className="flex-row flex-wrap gap-2"
@@ -326,7 +315,6 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
               >
                 <View
                   className="rounded-2xl border border-warm-200 dark:border-neutral-800 overflow-hidden"
-                  // Columns flex to fit; the minimum only scrolls on screens narrower than the four columns.
                   style={{ minWidth: 320, width: "100%" }}
                 >
                   <DeckCardsHeader isRTL={isRTL} s={s} rowFlexStyle={rowFlexStyle} />
@@ -383,7 +371,6 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
         onConfirm={() => {
           if (!confirmAction) return;
           const { card, type } = confirmAction;
-          // A generated card has no Delete; the guard stays in case one is listed mid-change.
           if (type === "delete" && card.isVirtual) {
             setConfirmAction(null);
             return;
@@ -506,10 +493,6 @@ function HeaderCell({ label, flex, isRTL }: { label: string; flex: number; isRTL
   );
 }
 
-/**
- * Open in Mushaf first, then Mark, Suspend, Bury, Set Due Date, then (after a divider) Reset and the
- * destructive Delete; generated cards have no Delete.
- */
 export function deckCardMenuItems(
   card: Pick<DeckCardListItem, "marked_at" | "suspended_at" | "buried_until" | "isVirtual">,
   s: UIStrings,
@@ -564,7 +547,6 @@ export function deckCardMenuItems(
       label: s.cardResetProgress,
       icon: (color) => <RotateCcw size={15} color={color} />,
       onPress: handlers.onReset,
-      // Reset and Delete change the card's history, so a divider sets them apart.
       separatorBefore: true,
     },
     ...(card.isVirtual
@@ -601,7 +583,6 @@ function DeckCardRow({
   card: DeckCardListItem;
   stacked: boolean;
   busy: boolean;
-  /** Retry for this row's failed action, shown as a red line and a Try again link. */
   failed: (() => void) | null;
   isRTL: boolean;
   isDark: boolean;

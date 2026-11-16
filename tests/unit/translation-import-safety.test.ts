@@ -103,7 +103,6 @@ beforeEach(() => {
             getAllAsync: async <T>() => statement.all(...values) as T[],
           };
         },
-        // Node owns StatementSync finalization. Actual SDK behavior is covered separately.
         async finalizeAsync() {},
       };
     },

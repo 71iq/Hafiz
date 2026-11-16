@@ -20,20 +20,12 @@ import { formatNumber } from "@/lib/i18n/count";
 import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 
-/** A verse reference as English shows it: the Arabic surah name isolated so the digits keep their order. */
 const refLabel = (surahName: string, ref: string) => `${surahName}\u200E ${ref}`;
-/** An option's reference once shown: with its page, MUT-01's context cue. */
 const optionLabel = (surahName: string, ref: string, page: number) => `${refLabel(surahName, ref)} · Page ${page}`;
 
-/**
- * SCH-07 and MUT-04 on the review screen: a drift's sibling page, then the "Which one" prompt for the
- * pair, which leave the session when the drift is dismissed. MUT-03: a reviewed page with a memorized
- * similar verse brings the prompt two pages later. MUT-05: the prompt shows meanings once answered.
- */
 
 type GradingProps = React.ComponentProps<typeof GradingButtons>;
 
-/** MUT-05: the meanings the screen reads for its pair prompts, copied from the bundled database. */
 const MEANINGS = [
   {
     surah: 2,
@@ -202,7 +194,6 @@ function drift(sessionsSince: number): DriftDrill {
   return { errorId: "err-drift", errorIds: ["err-drift"], pair, siblingPage: sessionsSince === 0 ? 411 : null, sessionsSince };
 }
 
-/** The drift's own inbox item, which the session drills before the drift's follow-ups. */
 function driftInbox(id: string): InboxItem {
   return {
     id,
@@ -230,7 +221,6 @@ function planCard(page: number): PageCard {
   return { row: card, page, tier: "manzil", history: { declared: true, firstFluentDate: null, grades: [] } };
 }
 
-/** Today's wird of the given pages, in order. */
 function planOf(pages: readonly number[]) {
   const cards = pages.map(planCard);
   jest.mocked(loadTodayWird).mockResolvedValue({
@@ -247,7 +237,6 @@ function group(self: SimilarRef, siblings: SimilarRef[], groupId = "g1"): Simila
   return { groupId, kind: "similar", self, siblings };
 }
 
-/** Recite the page on screen and grade it Good. */
 async function gradePage(language: "en" | "ar" = "en") {
   fireEvent.press(screen.getByRole("button", { name: strings[language].hifzDone }));
   await act(async () => {
@@ -297,7 +286,6 @@ describe("drift follow-ups on the review screen", () => {
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
 
-    // The sibling page; the prompt after it is not counted.
     expect(screen.getByText("1 / 1")).toBeTruthy();
     expect(screen.getByText(s.hifzSimilarTitle)).toBeTruthy();
     expect(screen.getByText(interpolate(s.hifzDriftPage, { sibling: "31:5", ref: "2:5" }))).toBeTruthy();
@@ -308,23 +296,19 @@ describe("drift follow-ups on the review screen", () => {
     await flush();
     expect(jest.mocked(savePageGrade).mock.calls[0][1].card).toBe(row);
 
-    // The first session after the drift asks for the verse that was being recited.
     expect(screen.getByText("1 / 1")).toBeTruthy();
     expect(screen.getByText(s.hifzPairTitle)).toBeTruthy();
     expect(screen.getByText(s.hifzPairPrompt)).toBeTruthy();
     expect(screen.getByText(refLabel("البقرة", "2:5"))).toBeTruthy();
-    // The options hide their references until one is chosen, keeping their place.
     expect(screen.queryByText(optionLabel("لقمان", "31:5", 411))).toBeNull();
     const options = screen.getAllByRole("radio");
     expect(options).toHaveLength(2);
-    // Next waits in the footer for a choice.
     expect(screen.getByRole("button", { name: s.hifzSabaqNext })).toBeDisabled();
 
     fireEvent.press(options[1]);
     expect(screen.getByText(s.hifzPairOther)).toBeTruthy();
     expect(screen.getByText(optionLabel("لقمان", "31:5", 411))).toBeTruthy();
     expect(screen.getByText(optionLabel("البقرة", "2:5", 2))).toBeTruthy();
-    // The wrong choice is named, and the verse asked for is marked.
     expect(within(options[1]).getByText(s.hifzPairYourChoice)).toBeTruthy();
     expect(within(options[0]).getByLabelText(s.hifzPairAnswer)).toBeTruthy();
     expect(screen.getByRole("button", { name: s.hifzSabaqNext })).toBeEnabled();
@@ -340,14 +324,12 @@ describe("drift follow-ups on the review screen", () => {
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
 
-    // One item: the pair prompt, with no sibling page after the first session.
     expect(screen.getByText("١ / ١")).toBeTruthy();
     expect(screen.getByText(s.hifzPairTitle)).toBeTruthy();
     expect(screen.getByText(s.hifzPairPrompt)).toBeTruthy();
     expect(screen.getByText("لقمان ٣١:٥")).toBeTruthy();
     fireEvent.press(screen.getAllByRole("radio")[1]);
     expect(screen.getByText(s.hifzPairRight)).toBeTruthy();
-    // With its page, joined by an Arabic comma.
     expect(screen.getByText("البقرة ٢:٥، صفحة ٢")).toBeTruthy();
     expect(screen.getByRole("button", { name: s.hifzSabaqNext })).toBeTruthy();
   });
@@ -369,12 +351,10 @@ describe("a drift dismissed as not a mistake", () => {
     jest.mocked(loadDriftDrills).mockResolvedValue([drift(0)]);
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
-    // The drill, then the sibling page and the prompt the drift added, which is not counted.
     expect(screen.getByText("1 / 2")).toBeTruthy();
     await dismissDrill();
 
     expect(dismissInboxItem).toHaveBeenCalledWith(mockDatabase, { id: "err-drift" });
-    // Nothing the drift brought is left, so the session ends there.
     expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
     expect(screen.queryByText(s.hifzPairTitle)).toBeNull();
     expect(savePageGrade).not.toHaveBeenCalled();
@@ -382,14 +362,12 @@ describe("a drift dismissed as not a mistake", () => {
 
   it("keeps the pair's drills while an older drift into the same pair is live", async () => {
     jest.mocked(readMistakeInbox).mockResolvedValue([driftInbox("err-drift")]);
-    // Two drifts into the same pair: an older one, and the newer one the inbox drills here.
     jest.mocked(loadDriftDrills).mockResolvedValue([{ ...drift(0), errorIds: ["err-older", "err-drift"] }]);
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
     expect(screen.getByText("1 / 2")).toBeTruthy();
     await dismissDrill();
     expect(dismissInboxItem).toHaveBeenCalledWith(mockDatabase, { id: "err-drift" });
-    // The older drift still needs the sibling page and the prompt.
     expect(screen.queryByText(s.hifzSummaryTitle)).toBeNull();
     expect(screen.getByText("2 / 2")).toBeTruthy();
   });
@@ -404,12 +382,10 @@ describe("a drift dismissed as not a mistake", () => {
     jest.mocked(savePageGrade).mockResolvedValue(saved);
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
-    // Both drifts share page 411, so it is queued once, with a prompt for each (not counted).
     expect(screen.getByText("1 / 2")).toBeTruthy();
     await dismissDrill();
 
     expect(screen.getByText("2 / 2")).toBeTruthy();
-    // The page now explains the drift that still needs it.
     expect(screen.getByText(interpolate(s.hifzDriftPage, { sibling: "31:3", ref: "7:52" }))).toBeTruthy();
     await gradePage();
     expect(jest.mocked(savePageGrade).mock.calls[0][1].card).toBe(row);
@@ -432,11 +408,8 @@ describe("interleaved similar-verse prompts (MUT-03)", () => {
       planOf([2, 3, 4, 5]);
       jest.mocked(readMemorizedPageNumbers).mockResolvedValue(new Set([2, 3, 4, 5, 411]));
       jest.mocked(similarGroupsOnPages).mockResolvedValue([
-        // Page 2 holds 2:5, whose sibling 31:5 is on memorized page 411.
         group(pair.self, [pair.sibling]),
-        // Page 3 holds another verse of the same group: the group is asked about once.
         group(ref(2, 25, "البقرة", 3), [pair.sibling]),
-        // Page 4's sibling is not memorized, so it brings no prompt.
         group(ref(2, 40, "البقرة", 4), [ref(40, 9, "غافر", 468)], "g3"),
       ]);
       jest.mocked(similarPair).mockResolvedValue(pair);
@@ -446,22 +419,18 @@ describe("interleaved similar-verse prompts (MUT-03)", () => {
       expect(screen.getByText(`${n(1)} / ${n(4)}`)).toBeTruthy();
 
       await gradePage(language);
-      // The prompt joins the session once page 2 is reviewed, and the count does not change.
       expect(screen.getByText(`${n(2)} / ${n(4)}`)).toBeTruthy();
       expect(similarPair).toHaveBeenCalledWith(mockDatabase, pair.self, pair.sibling);
       await gradePage(language);
       expect(screen.getByText(`${n(3)} / ${n(4)}`)).toBeTruthy();
       await gradePage(language);
 
-      // After two other pages, it asks for the verse of the page reviewed, with no meaning yet.
       expect(screen.getByText(`${n(3)} / ${n(4)}`)).toBeTruthy();
       expect(screen.getByText(s.hifzPairTitle)).toBeTruthy();
-      // In English the Arabic surah name is isolated, so the digits after it keep their order.
       expect(screen.getByText(language === "ar" ? "البقرة ٢:٥" : "البقرة\u200E 2:5")).toBeTruthy();
       expect(screen.queryByText(MEANINGS[0][language])).toBeNull();
       fireEvent.press(screen.getAllByRole("radio")[0]);
       expect(screen.getByText(s.hifzPairRight)).toBeTruthy();
-      // MUT-05: once answered, each verse shows its meaning in the interface language.
       expect(screen.getByText(MEANINGS[0][language])).toBeTruthy();
       expect(screen.getByText(MEANINGS[1][language])).toBeTruthy();
       fireEvent.press(screen.getByRole("button", { name: s.hifzSabaqNext }));
@@ -470,7 +439,6 @@ describe("interleaved similar-verse prompts (MUT-03)", () => {
       expect(screen.getByText(`${n(4)} / ${n(4)}`)).toBeTruthy();
       await gradePage(language);
       expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
-      // The prompt is not a review: four grades, four pages of the plan, four pages for the pace.
       expect(savePageGrade).toHaveBeenCalledTimes(4);
       expect(screen.getByText(interpolate(s.hifzSummaryPlan, { done: n(4), total: n(4) }))).toBeTruthy();
       expect(jest.mocked(recordReviewPace).mock.calls[0][1]).toMatchObject({ pages: 4 });
@@ -504,7 +472,6 @@ describe("interleaved similar-verse prompts (MUT-03)", () => {
     await flush();
     expect(screen.getByText("1 / 3")).toBeTruthy();
     await gradePage();
-    // Only the drift's prompt, at the end, not counted.
     expect(screen.getByText("2 / 3")).toBeTruthy();
     expect(similarPair).not.toHaveBeenCalled();
   });
@@ -525,7 +492,6 @@ describe("interleaved similar-verse prompts (MUT-03)", () => {
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
     for (let graded = 0; graded < pages.length; graded += 1) {
-      // Answer any prompt on the way to the next page.
       while (screen.queryByText(strings.en.hifzPairTitle)) {
         fireEvent.press(screen.getAllByRole("radio")[0]);
         fireEvent.press(screen.getByRole("button", { name: strings.en.hifzSabaqNext }));

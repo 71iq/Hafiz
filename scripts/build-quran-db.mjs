@@ -342,19 +342,6 @@ function buildQiraatRows(data) {
   return Array.from(rowsByKey.values());
 }
 
-/**
- * The NourQuran similar-verse groups, as the rows of mutashabihat_groups and mutashabihat_refs. Each
- * similar-kind ref's pre, similar and post segments are rebuilt from the Uthmani text around its ayah
- * (scripts/mutashabihat-align.mjs). Study card ids are built from a group's id and a ref's sort
- * order (lib/fsrs/smart-decks.ts), so a ref that changes ayah must not keep its sort order:
- * - a ref whose text, or whose words in common with its group, are another ayah's is relabelled to
- *   that ayah and takes the next free sort order after the group's source refs, in source order;
- * - it is left out instead when that ayah is already in its group;
- * - the other refs keep their source sort orders, gaps included.
- * The build refuses a ref the rule cannot align, or one left without similar words. Tail-only groups
- * carry no segments. `sourceSlots` are the card ids of the source sort orders with their source ayat,
- * the slots of the rows before any relabelling (retiredSimilarCards).
- */
 function buildMutashabihatRows(data, quran) {
   const groupRows = [];
   const refRows = [];
@@ -457,25 +444,15 @@ function buildMutashabihatRows(data, quran) {
   return { groupRows, refRows, sourceSlots, tally };
 }
 
-/** A ref's study card id, as lib/fsrs/smart-decks.ts builds it. */
 function similarCardId(kind, groupId, sortOrder) {
   return `${kind === "tail" ? "similar-tail" : "mutashabihat"}:${groupId}:${sortOrder}`;
 }
 
-/** Each slot's card id with the ayah it holds ("surah:ayah"), from groups and refs rows. */
 function slotsOf(groupRows, refRows) {
   const kinds = new Map(groupRows.map((row) => [row[0], row[1]]));
   return new Map(refRows.map((row) => [similarCardId(kinds.get(row[0]), row[0], row[1]), `${row[2]}:${row[3]}`]));
 }
 
-/**
- * The study card ids of the slots (a group id and a sort order) that held a verse and hold none now.
- * The app deletes their cards wherever they come from (lib/database/mutashabihat-rows.ts), so a slot
- * listed here must never hold a ref again. The list only grows: it keeps the ids already written and
- * adds the source sort orders (every build's slots before relabelling) and the previous rows file's
- * slots that hold no ref now. Read before the rows file is rewritten. A slot that would show another
- * verse than it did, or a listed slot that holds a ref again, stops the build.
- */
 function retiredSimilarCards(mutashabihat) {
   const live = slotsOf(mutashabihat.groupRows, mutashabihat.refRows);
   const before = new Map(mutashabihat.sourceSlots);
@@ -503,11 +480,6 @@ function writeRetiredSimilarCardsFile(cards) {
   fs.writeFileSync(path.join(DATA_DIR, MUTASHABIHAT_RETIRED_FILE), text);
 }
 
-/**
- * The similar-verse rows as the app reads them when its database lacks them or holds an older
- * version (lib/database/mutashabihat-rows.ts): exactly the rows written to quran.db, one per line,
- * with a version that changes whenever they do.
- */
 function writeMutashabihatRowsFile(mutashabihat) {
   const rows = { groups: mutashabihat.groupRows, refs: mutashabihat.refRows };
   const version = createHash("sha256").update(JSON.stringify(rows)).digest("hex").slice(0, 16);
@@ -526,7 +498,6 @@ function writeMutashabihatRowsFile(mutashabihat) {
   return version;
 }
 
-/** The Uthmani words of every ayah, for rebuilding the similar-verse segments. */
 function quranWords(quranTextRows) {
   const words = new Map();
   const counts = new Map();

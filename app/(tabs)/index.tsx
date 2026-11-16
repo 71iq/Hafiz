@@ -18,7 +18,6 @@ export default function IndexRedirect() {
       }
       setChecked(true);
     }).catch(() => {
-      // If query fails, skip onboarding
       router.replace("/(tabs)/home");
       setChecked(true);
     });
@@ -26,7 +25,5 @@ export default function IndexRedirect() {
 
   if (checked) return null;
 
-  // The logo stays during the onboarding lookup, without the preparation bar, until Home or
-  // onboarding appears.
   return <LoadingScreen progress={null} showProgress={false} />;
 }

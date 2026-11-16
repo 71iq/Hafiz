@@ -3,11 +3,6 @@ import { putCardRow } from "@/lib/fsrs/queries";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { ayahSpanIn, continuesIn, endsAs, foundIn, runsOnIn, wordKey } from "@/lib/hifz/word-diff";
 
-/**
- * What tells two verses of a pair apart when their wording is the same and a prompt hides their
- * references (MUT-04): the end of the preceding ayah, else the start of the following one, else,
- * when even those match, the surah name.
- */
 export type PairContext = Readonly<{ before: string | null; after: string | null; surahName: boolean }>;
 
 export type SimilarRef = Readonly<{
@@ -18,19 +13,8 @@ export type SimilarRef = Readonly<{
   similar: string;
   post: string;
   page: number;
-  /** Set by similarPair only when the pair reads the same. */
   context?: PairContext;
-  /**
-   * Where an ayah ends inside the passage, which the bundled text runs across ayat: after the word at
-   * `after` (counting the words of pre, similar and post together) ends ayah `ayah`. Only where the
-   * ayah's own words are found with certainty (ayahSpanIn); otherwise none.
-   */
   ayahEnds?: readonly { after: number; ayah: number }[];
-  /**
-   * Where the passage leaves words of the Quran out: after the word at each position (counted as for
-   * `ayahEnds`), the next segment does not follow on in the Quran. Only where that is certain
-   * (continuesIn); otherwise none.
-   */
   gaps?: readonly number[];
 }>;
 
@@ -39,9 +23,7 @@ type VerseKey = Readonly<{ surah: number; ayah: number }>;
 export type SimilarGroup = Readonly<{
   groupId: string;
   kind: "similar" | "tail";
-  /** The ayah the user is memorizing or reciting. */
   self: SimilarRef;
-  /** Its siblings elsewhere in the Quran. */
   siblings: readonly SimilarRef[];
 }>;
 
@@ -57,20 +39,15 @@ type RefRow = {
   post_text: string | null;
   v2_page: number;
   text_uthmani: string;
-  /** The ayah before it in its surah, null for an ayah 1. */
   previous_text: string | null;
-  /** The ayah after it in its surah, null for a surah's last ayah. */
   next_text: string | null;
 };
 
 const REF_COLUMNS =
   "r.group_id, g.kind, r.sort_order, r.surah, r.ayah, r.surah_name_ar, r.pre_text, r.similar_text, r.post_text, q.v2_page, q.text_uthmani, prev.text_uthmani AS previous_text, nxt.text_uthmani AS next_text";
-/** The ayah before each ref, for the ayah end before it (ayahEndsIn) and the joins in its passage (toRef). */
 const PREVIOUS_JOIN = "LEFT JOIN quran_text prev ON prev.surah = r.surah AND prev.ayah = r.ayah - 1";
-/** The ayah after each ref, for the joins in its passage and the data's ayah end marks (toRef). */
 const NEXT_JOIN = "LEFT JOIN quran_text nxt ON nxt.surah = r.surah AND nxt.ayah = r.ayah + 1";
 
-/** Harakat, Quranic annotation marks and tatweel, which do not change which word it is. */
 const MARKS = /[ؐ-ًؚ-ٰٟۖ-ۭـ]/g;
 const LETTER_FORMS: Record<string, string> = {
   "ٱ": "ا",
@@ -83,7 +60,6 @@ const LETTER_FORMS: Record<string, string> = {
   "ئ": "ء",
 };
 
-/** A word's letters only, so the same word compares equal across spellings of its marks. */
 function letters(word: string): string {
   return word.replace(MARKS, "").replace(/[ٱأإآىةؤئ]/g, (form) => LETTER_FORMS[form]);
 }
@@ -92,7 +68,6 @@ function words(text: string): string[] {
   return text.split(/\s+/).filter((word) => letters(word) !== "");
 }
 
-/** How many words two verses share at their end. */
 function sharedEnding(a: readonly string[], b: readonly string[]): number {
   let shared = 0;
   while (shared < a.length && shared < b.length && letters(a[a.length - 1 - shared]) === letters(b[b.length - 1 - shared])) {
@@ -105,25 +80,15 @@ function hasSegments(row: RefRow): boolean {
   return [row.pre_text, row.similar_text, row.post_text].some((segment) => segment !== null && segment.trim() !== "");
 }
 
-/** "﴿12﴾": an ayah end that some refs in the bundled data mark inside the Quran text, in any digits. */
 const DATA_AYAH_END = /﴿\s*(\p{Nd}+)\s*﴾/gu;
 
-/** A data ayah end mark after the word at `after` of its segment (-1 before its first word). */
 type DataMark = { after: number; ayah: number | null };
 
-/** The number in a mark, from Western, Arabic-Indic or Persian digits, whose code points end in their value in hex. */
 function markNumber(digits: string): number | null {
   if (!/^(?:[0-9]+|[٠-٩]+|[۰-۹]+)$/.test(digits)) return null;
   return Number([...digits].map((digit) => digit.charCodeAt(0) % 16).join(""));
 }
 
-/**
- * A segment as shown, word by word. Some refs in the bundled data carry marks inside the Quran text
- * that the verse never has: a Latin full stop, a stray "*", or the data's own ayah end such as
- * "﴿12﴾", which would sit beside the app's number. They are dropped here (the data itself is
- * protected and left as it is); where an ayah end mark was is kept, so the Quran text can confirm it
- * (withDataEnds).
- */
 function displaySegment(text: string | null): { words: string[]; marks: DataMark[] } {
   const words: string[] = [];
   const marks: DataMark[] = [];
@@ -135,13 +100,6 @@ function displaySegment(text: string | null): { words: string[]; marks: DataMark
   return { words, marks };
 }
 
-/**
- * How many words at the start of `post` repeat the end of the passage before it where the Quran does
- * not: the bundled text sometimes starts the words after the passage over from its last words
- * ("لعلكم ترحمون" twice in 3:132, "عليها" in 11:82). Only when the Quran does not repeat them there
- * ("خلق خلق" in 86:5-6 stays) and runs on, word for word, from `before` into the rest of `post`, or,
- * when nothing is left, is certain to go on with other words.
- */
 function repeatedWords(before: readonly string[], post: readonly string[], quran: readonly string[]): number {
   if (runsOnIn(before, post, quran)) return 0;
   for (let count = Math.min(before.length, post.length); count > 0; count -= 1) {
@@ -154,12 +112,6 @@ function repeatedWords(before: readonly string[], post: readonly string[], quran
   return 0;
 }
 
-/**
- * The ayah ends of a passage with the data's own marks added where the Quran text confirms them: a
- * mark for the ayah before the ref's, its own or the one after, where the words before it end as
- * that ayah does and words of another ayah follow, as for its own end (ayahEndsIn). A mark at a
- * place or for an ayah already numbered adds nothing.
- */
 function withDataEnds(
   passage: readonly string[],
   marks: readonly DataMark[],
@@ -181,19 +133,6 @@ function withDataEnds(
   return all.sort((a, b) => a.after - b.after);
 }
 
-/**
- * The ayah ends inside a passage that runs into the ayah before or after the ref's own, only where
- * they are certain, since a wrong number in Quran text misleads:
- * - its own end, when its last word is in the passage and words of another ayah follow;
- * - the previous ayah's end, when its own first word is in the passage and the words before it are
- *   the end of the previous ayah of its surah (the bundled text can carry another surah's ayah there);
- * - the next ayah's end, when its own end is in the passage and the words after it are the whole next
- *   ayah of its surah, followed by more words. Passages rebuilt from the Uthmani text carry no ayah
- *   marks of their own (withDataEnds), so this is where that end comes from.
- * Words with no letters, such as ۞ or a pause mark, never count as an ayah's text. The passage's
- * words are split as SimilarVerseLine splits them. `followed` says that more words of the shown
- * passage follow these, past a gap.
- */
 function ayahEndsIn(passage: readonly string[], row: RefRow, followed = false): { after: number; ayah: number }[] {
   const span = ayahSpanIn(passage, row.text_uthmani.split(/\s+/).filter(Boolean));
   if (!span) return [];
@@ -215,10 +154,6 @@ function ayahEndsIn(passage: readonly string[], row: RefRow, followed = false): 
   return ends;
 }
 
-/**
- * How many of `words` (wordKey keys) an ayah's whole text takes at their start, when more words follow
- * it; null when they do not start with it. One mismatch is allowed in six or more, as in endsWith.
- */
 function wholeAyahAt(ayahText: string, words: readonly string[]): number | null {
   const own = ayahText
     .split(/\s+/)
@@ -229,7 +164,6 @@ function wholeAyahAt(ayahText: string, words: readonly string[]): number | null 
   return mismatches <= (own.length >= 6 ? 1 : 0) ? own.length : null;
 }
 
-/** Whether an ayah's text ends with these words, compared by wordKey, one mismatch allowed in six or more. */
 function endsWith(ayahText: string, tail: readonly string[]): boolean {
   const own = ayahText.split(/\s+/).map(wordKey).filter((key) => key !== "");
   if (tail.length > own.length) return false;
@@ -238,13 +172,6 @@ function endsWith(ayahText: string, tail: readonly string[]): boolean {
   return mismatches <= (tail.length >= 6 ? 1 : 0);
 }
 
-/**
- * One ref for display. Tail-only groups (the "similar endings" groups) carry no segments, so the verse
- * falls back to its Unicode Quran text, with the ending it shares with `others` marked: the longest
- * ending shared with any of them. Never the page-font glyphs (AGENTS.md). A ref with segments shows
- * them as displaySegment cleans them, without words its `post` repeats (repeatedWords), with a gap
- * where a segment does not follow on in the Quran and the ayah ends that are certain.
- */
 function toRef(row: RefRow, others: readonly RefRow[]): SimilarRef {
   const base = { surah: row.surah, ayah: row.ayah, surahName: row.surah_name_ar ?? "", page: row.v2_page };
   if (hasSegments(row)) {
@@ -253,8 +180,6 @@ function toRef(row: RefRow, others: readonly RefRow[]): SimilarRef {
       .filter((text): text is string => typeof text === "string")
       .join(" ")
       .split(/\s+/);
-    // The joins are judged only when the passage is found around its own ayah; some refs carry the
-    // text of another ayah, and there nothing about its joins is certain.
     const placed = foundIn(similar.words, quran);
     const repeated = placed ? repeatedWords([...pre.words, ...similar.words], post.words, quran) : 0;
     const segments = [pre.words, similar.words, post.words.slice(repeated)];
@@ -264,7 +189,6 @@ function toRef(row: RefRow, others: readonly RefRow[]): SimilarRef {
       .filter((index) => placed && segments[index - 1].length > 0 && segments[index].length > 0)
       .filter((index) => continuesIn(passage.slice(0, starts[index]), passage.slice(starts[index]), quran) === false)
       .map((index) => starts[index] - 1);
-    // Each mark counted across the passage; one inside the repeated words dropped from `post` goes with them.
     const marks = [
       pre.marks,
       similar.marks,
@@ -272,8 +196,6 @@ function toRef(row: RefRow, others: readonly RefRow[]): SimilarRef {
     ].flatMap((list, index) =>
       list.filter((mark) => mark.after >= -1).map((mark) => ({ ...mark, after: starts[index] + mark.after })),
     );
-    // The ayah's own words are placed in the run around the similar words: past a gap the words come
-    // from elsewhere in the Quran, and would hide where its cut-off end meets the gap (ayahSpanIn).
     const runStart = gaps.includes(starts[1] - 1) ? starts[1] : 0;
     const runEnd = gaps.includes(starts[2] - 1) ? starts[2] : passage.length;
     const followed = passage.slice(runEnd).some((word) => wordKey(word) !== "");
@@ -299,7 +221,6 @@ function sameAyah(a: { surah: number; ayah: number }, b: { surah: number; ayah: 
   return a.surah === b.surah && a.ayah === b.ayah;
 }
 
-/** Each group of `rows` once per ref that `isSelf` picks, with that ref's siblings. */
 function groupsOf(rows: readonly RefRow[], isSelf: (row: RefRow) => boolean): SimilarGroup[] {
   const byGroup = new Map<string, RefRow[]>();
   for (const row of rows) {
@@ -338,10 +259,6 @@ async function readRefRows(db: DatabaseExecutor, ayahs: readonly VerseKey[]): Pr
   );
 }
 
-/**
- * The similar-verse groups (4.7) that include any of the given ayat, from the bundled NourQuran
- * groups. The text segments come from the canonical data and are only displayed (ETH-12).
- */
 export async function similarGroupsForAyahs(
   db: DatabaseExecutor,
   ayahs: readonly { surah: number; ayah: number }[],
@@ -352,7 +269,6 @@ export async function similarGroupsForAyahs(
   return groupsOf(rows, (row) => wanted.has(`${row.surah}:${row.ayah}`));
 }
 
-/** MUT-03: the similar-verse groups with a member on any of the given pages, one per member there. */
 export async function similarGroupsOnPages(db: DatabaseExecutor, pages: readonly number[]): Promise<SimilarGroup[]> {
   const unique = [...new Set(pages)];
   if (unique.length === 0) return [];
@@ -374,20 +290,12 @@ export async function similarGroupsOnPages(db: DatabaseExecutor, pages: readonly
   return groupsOf(rows, (row) => wanted.has(row.v2_page));
 }
 
-/** MUT-01: keep only siblings on pages the user already has memorized. */
 export function withMemorizedSiblings(groups: readonly SimilarGroup[], memorizedPages: ReadonlySet<number>): SimilarGroup[] {
   return groups
     .map((group) => ({ ...group, siblings: group.siblings.filter((sibling) => memorizedPages.has(sibling.page)) }))
     .filter((group) => group.siblings.length > 0);
 }
 
-/**
- * SCH-07: the sibling a drift most likely went into, from the groups of the drifted ayah. A drift goes
- * into a verse the reciter knows, so siblings on memorized pages come first, and among several the one
- * on the most firmly held page (highest stability) wins, since the stronger memory is the one that
- * takes over a recitation. Ties keep the dataset's order. With nothing memorized, an ayah with a single
- * sibling still names it; with several, the drift is left without one rather than guessed.
- */
 export function pickDriftSibling(
   groups: readonly SimilarGroup[],
   memorizedPages: ReadonlySet<number>,
@@ -400,15 +308,12 @@ export function pickDriftSibling(
   return memorized.reduce((best, ref) => ((pageStability.get(ref.page) ?? 0) > (pageStability.get(best.page) ?? 0) ? ref : best));
 }
 
-/** MUT-04: a drifted ayah and the sibling it went into, as one similar-verse pair. */
 export type SimilarPair = Readonly<{ groupId: string; self: SimilarRef; sibling: SimilarRef }>;
 
-/** One key for a pair of verses in either order, for telling whether a session already asks about it. */
 export function pairKey(a: VerseKey, b: VerseKey): string {
   return [`${a.surah}:${a.ayah}`, `${b.surah}:${b.ayah}`].sort().join("|");
 }
 
-/** At least this many words of a neighbouring ayah are shown, and more when they are needed to differ. */
 const CONTEXT_WORDS = 4;
 
 function wording(text: string): string {
@@ -419,11 +324,6 @@ function readsSame(a: SimilarRef, b: SimilarRef): boolean {
   return wording(`${a.pre} ${a.similar} ${a.post}`) === wording(`${b.pre} ${b.similar} ${b.post}`);
 }
 
-/**
- * The ends (or starts) of two neighbouring ayat, long enough to differ, or null when they read the
- * same or either is missing. A missing neighbour is the start or end of a surah; the next level of
- * context is tried instead.
- */
 function differingParts(a: string | null, b: string | null, side: "end" | "start"): [string, string] | null {
   if (a === null || b === null || wording(a) === wording(b)) return null;
   const aWords = words(a);
@@ -435,12 +335,6 @@ function differingParts(a: string | null, b: string | null, side: "end" | "start
   return [part(aWords), part(bWords)];
 }
 
-/**
- * A pair whose two verses read the same could only be told apart by the references a prompt hides,
- * so each verse gets the end of the ayah before it, or, when those match too, the start of the ayah
- * after it. A few pairs in the bundled groups read the same. Where the neighbouring ayat match on both
- * sides as well, as for 23:7 and 70:31, the verses show their surah names.
- */
 async function withContext(db: DatabaseExecutor, pair: SimilarPair): Promise<SimilarPair> {
   const neighbours = [pair.self, pair.sibling].flatMap((ref) => [
     { surah: ref.surah, ayah: ref.ayah - 1 },
@@ -461,11 +355,6 @@ async function withContext(db: DatabaseExecutor, pair: SimilarPair): Promise<Sim
   return { ...pair, self: { ...pair.self, context: contextOf(0) }, sibling: { ...pair.sibling, context: contextOf(1) } };
 }
 
-/**
- * The pair of `self` and `sibling` from a group holding both, or null when no group does. A tail-only
- * verse marks the ending it shares with this sibling. When the two read the same, each carries the
- * context that tells them apart (PairContext).
- */
 export async function similarPair(db: DatabaseExecutor, self: VerseKey, sibling: VerseKey): Promise<SimilarPair | null> {
   if (sameAyah(self, sibling)) return null;
   const rows = await readRefRows(db, [self]);
@@ -482,11 +371,6 @@ export async function similarPair(db: DatabaseExecutor, self: VerseKey, sibling:
 
 const DAY_MS = 86_400_000;
 
-/**
- * SCH-07: after the reciter drifted into a similar verse, bring that verse's similar-verse cards due
- * within a day, so the pair is drilled soon. Cards that do not exist yet are left for the smart deck
- * to create. Runs inside the grade transaction.
- */
 export async function bringSimilarCardsForward(db: DatabaseExecutor, { surah, ayah, now }: { surah: number; ayah: number; now: Date }): Promise<number> {
   const refs = await db.getAllAsync<{ group_id: string; sort_order: number; kind: string }>(
     `SELECT r.group_id, r.sort_order, g.kind FROM mutashabihat_refs r JOIN mutashabihat_groups g ON g.id = r.group_id

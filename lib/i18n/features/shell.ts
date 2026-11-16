@@ -1,10 +1,6 @@
-/**
- * W02 startup, navigation shell, offline and error recovery. Spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity.
- */
 export const shellStrings = {
   en: {
     navigationSyncDetails: "Sync details",
-    // Startup and database preparation
     databaseRetry: "Try again",
     databaseShowDetails: "Show details",
     databaseHideDetails: "Hide details",
@@ -18,13 +14,11 @@ export const shellStrings = {
     databaseStageTajweed: "Preparing tajweed notes",
     databaseStageExtras: "Preparing study resources",
     databaseStageFinish: "Finishing up",
-    // Browser tab titles
     documentTitleFormat: "{{page}} | {{app}}",
     documentTitleAbout: "About Hafiz",
     documentTitleCredits: "Credits & Sources",
     documentTitlePrivacy: "Privacy Policy",
     documentTitleTerms: "Terms of Service",
-    // Navigation
     navigationClose: "Close navigation",
     navigationSecondaryTitle: "Community and reflection",
     navigationHalaqaHint: "Your private study circle",
@@ -34,12 +28,10 @@ export const shellStrings = {
     navigationLogIn: "Log in",
     navigationSigningIn: "Signing in...",
     navigationHafizUser: "Hafiz user",
-    // Sync states
     syncStateSyncing: "Syncing",
     syncStateSynced: "Synced",
     syncStateOffline: "Offline",
     syncStateError: "Sync failed",
-    // Error fallback
     errorGoHome: "Go to Home",
     errorReportProblem: "If this keeps happening, report a problem",
     errorSectionTitle: "This section could not load",

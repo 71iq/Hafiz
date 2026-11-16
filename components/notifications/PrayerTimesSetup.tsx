@@ -41,13 +41,8 @@ export const CALCULATION_METHOD_LABEL_KEYS: Readonly<Record<CalculationMethodKey
   Turkey: "notifMethodTurkey",
 };
 
-/** Outline buttons and the coordinate fields need a visible edge on the light card. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
-/**
- * Where a message shows: under "Use my location", or under "Save coordinates" for typed coordinates.
- * The second spot sits low on the card, so only messages about typed coordinates go there.
- */
 type StatusPlace = "location" | "coordinates";
 type Status =
   | { kind: "idle" }
@@ -57,18 +52,11 @@ type Status =
 const STATUS_TEXT = "text-warm-700 dark:text-neutral-300";
 
 export type PrayerTimesSetupProps = {
-  /** Called after the location is saved or removed. */
   onChange?: (location: PrayerLocation | null) => void;
-  /** Shows "Not now". Onboarding step 7 passes it; settings leaves it out. */
   onSkip?: () => void;
-  /** Shows "Done" once a location is saved. */
   onDone?: () => void;
 };
 
-/**
- * Prayer-time location and method (5.1 step 7, ETH-11). The device location is requested only when
- * the user taps "Use my location"; coordinates can also be typed. Everything stays on this device.
- */
 export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupProps) {
   const db = useDatabase();
   const s = useStrings();
@@ -99,10 +87,6 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
     };
   }, [db]);
 
-  /**
-   * Saves the location. `announce` shows "Location saved" where the user acted; a method or Asr change
-   * shows nothing, since the times preview already reflects it and the message would land elsewhere.
-   */
   const save = useCallback(
     async (next: PrayerLocation | null, place: StatusPlace = "location", announce = true) => {
       try {
@@ -110,7 +94,6 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
         setLocation(next);
         onChange?.(next);
         setStatus(next && announce ? { kind: "message", text: s.notifLocationSaved, tone: "info", place } : { kind: "idle" });
-        // Dhuhr moves the make-up cutoff (STR-07), so open streak views reload too.
         emitHabitChanged();
         rescheduleReminders(db).catch(() => {});
       } catch {
@@ -129,7 +112,6 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
       const result = await requestDeviceCoordinates();
       if (result.kind === "ok") await saveCoordinates(result.coordinates, "device");
       else {
-        // The message asks for coordinates, so the fields open with it.
         setCoordinatesOpen(true);
         setStatus({
           kind: "message",

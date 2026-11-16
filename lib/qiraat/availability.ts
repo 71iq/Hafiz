@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DatabaseExecutor } from "@/lib/database/types";
 
-/**
- * Which ayahs have Qira'at data, read once per database connection. A failed read is not proof that
- * an ayah has none: callers treat `null` (unknown) as "show the entry" so the detail tab can report
- * the error instead.
- */
 const cache = new WeakMap<object, Promise<Set<string> | null>>();
 
 function loadAvailability(db: DatabaseExecutor): Promise<Set<string> | null> {
@@ -23,7 +18,6 @@ function loadAvailability(db: DatabaseExecutor): Promise<Set<string> | null> {
   return pending;
 }
 
-/** true / false when known; null while loading or after a failed read. */
 export function useHasQiraat(db: DatabaseExecutor | null, surah: number, ayah: number): boolean | null {
   const [state, setState] = useState<{ key: string; value: boolean | null } | null>(null);
   const key = `${surah}:${ayah}`;

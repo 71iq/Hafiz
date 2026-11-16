@@ -2,12 +2,9 @@ export type TranslationLanguage = {
   code: string;
   nameEnglish: string;
   nameNative: string;
-  /** The language's name in Arabic, for the Arabic interface. */
   nameArabic: string;
-  /** Short translator or source name shown beside the language, e.g. "English - Bridges". */
   sourceLabel?: string;
   direction: "ltr" | "rtl";
-  /** Whose translation this is, shown under the text when the bundled source names it. */
   attribution?: string;
 };
 
@@ -65,13 +62,11 @@ export function getLanguageByCode(code: string): TranslationLanguage | undefined
   return TRANSLATION_LANGUAGES.find((l) => l.code === code);
 }
 
-/** "English - Bridges" / "الإنجليزية - Bridges": the language in the interface language, then its source. */
 export function translationDisplayName(language: TranslationLanguage, uiLanguage: "en" | "ar"): string {
   const name = uiLanguage === "ar" ? language.nameArabic : language.nameEnglish.replace(/\s*\([^)]*\)$/, "");
   return language.sourceLabel ? `${name} - ${language.sourceLabel}` : name;
 }
 
-/** Matches the English, native or Arabic language name, ignoring case. */
 export function matchesTranslationQuery(language: TranslationLanguage, query: string): boolean {
   const needle = query.trim().toLocaleLowerCase();
   if (!needle) return true;

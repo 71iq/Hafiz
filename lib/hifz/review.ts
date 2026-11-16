@@ -26,20 +26,14 @@ import { errorHalf, hasSeamAfter, remediateHalf, remediationPolicy, reviewSeam, 
 import { HIFZ_PAGES_DECK_ID, pageCardId, parsePageUnit } from "@/lib/hifz/units";
 import { bringSimilarCardsForward, pickDriftSibling, similarGroupsForAyahs } from "@/lib/hifz/similar";
 
-/** One location in a recitation attempt, as the user marked or revealed it. */
 export type AttemptMark = Readonly<{ token: PageToken; type: RecitationErrorType }>;
 
-/** Everything that happened while reciting one page (GRD-01). */
 export type Attempt = Readonly<{
   level: SupportLevel;
-  /** Peek: words revealed one at a time to notice an error (tanbih). */
   peeked: readonly PageToken[];
-  /** Show me: the first word of each reveal of the rest of a line (fath). */
   shown: readonly PageToken[];
   slips: number;
-  /** Mistakes the user marked on words after Done, keyed by token key. */
   marks: ReadonlyMap<string, AttemptMark>;
-  /** SCH-06: how the recitation continued into the next page's first ayah, when the user checked it. */
   seam: SeamResult | null;
 }>;
 
@@ -49,12 +43,10 @@ export function emptyAttempt(level: SupportLevel): Attempt {
   return { level, peeked: [], shown: [], slips: 0, marks: new Map(), seam: null };
 }
 
-/** The words an attempt went wrong on: marked, peeked at, or shown (SCH-08 uses their lines). */
 function errorTokens(attempt: Attempt): PageToken[] {
   return [...[...attempt.marks.values()].map((mark) => mark.token), ...attempt.peeked, ...attempt.shown];
 }
 
-/** The index of the next hidden word at or after `from`, skipping ayah markers, or -1. */
 export function nextHiddenWord(tokens: readonly PageToken[], from: number): number {
   for (let index = Math.max(0, from); index < tokens.length; index += 1) {
     if (!tokens[index].isMarker) return index;
@@ -62,7 +54,6 @@ export function nextHiddenWord(tokens: readonly PageToken[], from: number): numb
   return -1;
 }
 
-/** One past the last token of the line holding token `index`, in a flattened list of lines. */
 export function endOfLineAt(lines: readonly PageLine[], index: number): number {
   let start = 0;
   for (const line of lines) {
@@ -92,17 +83,8 @@ export function proposedRating(attempt: Attempt): 0 | Rating {
   return proposeRating(attemptEvents(attempt), attempt.level, { fluent: false });
 }
 
-/**
- * UNIT-02 half-page review: one page recited as its first half, then its second, each revealed and
- * checked on its own. The page is still the card that is graded and logged, once.
- */
 export type HalfAttempts = Readonly<{ a: Attempt; b: Attempt }>;
 
-/**
- * The page's attempt from its two halves: every error of either half, at the lower support level of
- * the two, since a lower level caps the grade (GRD-03). The seam is checked after the second half.
- * Mark keys name the word's position, so the halves' marks never collide.
- */
 export function combineHalves({ a, b }: HalfAttempts): Attempt {
   return {
     level: Math.min(a.level, b.level) as SupportLevel,
@@ -114,7 +96,6 @@ export function combineHalves({ a, b }: HalfAttempts): Attempt {
   };
 }
 
-/** A page recited in halves proposes the lower of its halves' grades, and none when either half was not gradable. */
 export function proposedHalvesRating(halves: HalfAttempts): 0 | Rating {
   const a = proposedRating(halves.a);
   const b = proposedRating(halves.b);
@@ -125,10 +106,6 @@ function location(token: PageToken): Pick<RecitationErrorInput, "surah" | "ayah"
   return { surah: token.surah, ayah: token.ayah, word: token.wordPos };
 }
 
-/**
- * ERR-01: the errors to log for an attempt. Slips have no word position; they use the page's first ayah.
- * A drift carries the sibling it went into, from `driftSiblings` keyed by the drifted ayah's 's:a'.
- */
 export function attemptErrors(
   attempt: Attempt,
   firstToken: PageToken,
@@ -152,7 +129,6 @@ export function attemptErrors(
   return errors;
 }
 
-/** The ayat an attempt drifted from into a similar verse, by 's:a'. */
 function driftedAyahs(attempt: Attempt): Map<string, VerseKey> {
   const drifted = new Map<string, VerseKey>();
   for (const mark of attempt.marks.values()) {
@@ -175,11 +151,6 @@ async function readPageStability(db: DatabaseExecutor, pages: readonly number[])
   );
 }
 
-/**
- * SCH-07, ERR-01: the sibling each drifted ayah went into, keyed by the drifted ayah's 's:a'. The mark
- * names only the word, so the sibling comes from the similar-verse groups (pickDriftSibling). Read
- * before the grade's transaction; the errors that carry it are written inside it.
- */
 async function resolveDriftSiblings(db: DatabaseExecutor, attempt: Attempt): Promise<Map<string, string>> {
   const siblings = new Map<string, string>();
   const drifted = driftedAyahs(attempt);
@@ -194,22 +165,12 @@ async function resolveDriftSiblings(db: DatabaseExecutor, attempt: Attempt): Pro
   return siblings;
 }
 
-/** SCH-07: each drift brings its similar-verse cards due within a day, inside the grade's transaction. */
 async function bringDriftCardsForward(tx: DatabaseExecutor, attempt: Attempt, now: Date): Promise<void> {
   for (const ayah of driftedAyahs(attempt).values()) await bringSimilarCardsForward(tx, { ...ayah, now });
 }
 
 export { MANZIL_CYCLE_START_KEY };
 
-/**
- * MST-04: a manzil cycle completes on the day every manzil page has a graded review dated on or
- * after the cycle start. That day's wird is marked (it feeds board points) and the next cycle starts
- * tomorrow. Runs inside the grade transaction. A cached manzil tier is trusted, since a page stays
- * manzil once it gets there. Every other page card is derived from its history, because a sabqi page
- * can graduate by time alone and a synced cached tier can be older than the merged history. Review
- * days are the stored local dates, and the cycle start is a stored calendar date, so travel moves
- * neither.
- */
 async function completeManzilCycleIfDone(
   db: DatabaseExecutor,
   now: Date,
@@ -232,8 +193,6 @@ async function completeManzilCycleIfDone(
     return tier !== null && tier !== undefined && tier.startsWith("manzil");
   });
   if (manzil.length === 0) return false;
-  // Without a stored start (pages that reached manzil through sabqi), the first cycle starts on the
-  // day the earliest manzil page was created, fixed as a calendar date the first time it is needed.
   const start = await ensureManzilCycleStart(db, manzil.map((page) => localDateOf(new Date(page.created_at))).sort()[0]);
   if (start > today) return false;
   const last = new Map(lastReviews.map((row) => [row.card_id, row.last]));
@@ -262,61 +221,44 @@ async function completeManzilCycleIfDone(
   return true;
 }
 
-/** How the page was recited: whole, or in two halves (UNIT-02), whose combined attempt is graded. */
 type PageRecitation =
   | Readonly<{ attempt: Attempt; halves?: undefined }>
   | Readonly<{ halves: HalfAttempts; attempt?: undefined }>;
 
 export type PageGradeInput = PageRecitation & Readonly<{
-  /** The page as the screen loaded it. The grade reads the current card and history in its transaction. */
   card: StudyCardRow;
   history: PageHistory;
   plan: HifzPlan;
   rating: Grade;
   firstToken: PageToken;
   session: ReviewSessionRef | null;
-  /**
-   * False when the session already graded this page, as when a relearning step brought it back. The
-   * review is logged and counts like any other; the session's page counts take each page once.
-   */
   firstGradeInSession?: boolean;
   durationMs: number;
   grader?: "self" | "salah" | "teacher";
   now?: Date;
   dhuhr?: DhuhrResolver;
-  /** The page as recited, to find which half held the errors (SCH-08). */
   page?: RecitationPage | null;
 }>;
 
-/** What a page grade called up on its own: a half page to relearn (SCH-08) and the seam's review (SCH-06). */
 export type PageRemediation = Readonly<{ half: Half | null; seam: "clean" | "lapsed" | null }>;
 
-/**
- * Save one page grade (DB-01): the FSRS step under the page's tier policy, the review log with its
- * support level and the rubric's proposal, the attempt's errors, the new cached tier, a manzil cycle
- * completing, and the day's wird, in one transaction.
- */
 export async function savePageGrade(
   db: AppDatabase,
   input: PageGradeInput,
 ): Promise<ReviewSaveResult & { tier: Tier; remediation: PageRemediation }> {
   const now = input.now ?? new Date();
   const today: LocalDate = localDateOf(now);
-  // Errors marked in either half count as the page's, for the log, SCH-08 and SCH-06 alike.
   const attempt = input.halves ? combineHalves(input.halves) : input.attempt;
   const level = attempt.level;
   const rating = input.grader === "salah" ? input.rating : (capRating(input.rating as Rating, level) as Grade);
   const base = await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID);
-  /** The page's tier after this grade, derived inside the transaction from its current history. */
   let after = null as Tier | null;
   const proposed =
     input.grader === "salah" ? null : input.halves ? proposedHalvesRating(input.halves) : proposedRating(attempt);
   const recited = input.grader !== "salah";
   const page = parsePageUnit(input.card.id);
   const pageNumber = page?.kind === "page" ? page.page : null;
-  // SCH-08: an Again with every error in one half relearns that half from 10 minutes.
   const half = recited && rating === 1 && input.page ? errorHalf(input.page, errorTokens(attempt)) : null;
-  // SCH-06: a clean continuation counts for the seam after a Good or Easy page; a stumble always does.
   const seamStumbled = attempt.seam?.clean === false || [...attempt.marks.values()].some((mark) => mark.type === "seam");
   const seam: PageRemediation["seam"] =
     !recited || pageNumber === null || !hasSeamAfter(pageNumber)
@@ -330,9 +272,6 @@ export async function savePageGrade(
   const result = await persistReviewTransition({
     db,
     cardId: input.card.id,
-    // The queued page can be stale: sync may have merged another device's review of it since the
-    // queue was loaded. Read the card and its history and calculate inside the grade's transaction,
-    // so the newer schedule and tier are built on rather than overwritten.
     transition: async (tx) => {
       const current = await loadPageCard(tx, input.card.id, { today, plan: input.plan });
       const card = current?.row ?? input.card;
@@ -359,7 +298,6 @@ export async function savePageGrade(
       supportLevel: input.grader === "salah" ? null : level,
       proposedRating: proposed === 0 ? null : proposed,
       grader: input.grader ?? "self",
-      // A drift's error names the sibling it went into, so the next sessions drill the pair (MUT-04).
       errors: input.grader === "salah" ? [] : attemptErrors(attempt, input.firstToken, driftSiblings),
       dhuhr: input.dhuhr,
     },
@@ -367,7 +305,6 @@ export async function savePageGrade(
       if (after !== null && isManzil(after)) await completeManzilCycleIfDone(tx, now, input.plan);
       if (half && pageNumber !== null) await remediateHalf(tx, { page: pageNumber, half, now });
       if (seam && pageNumber !== null) await reviewSeam(tx, { page: pageNumber, clean: seam === "clean", now });
-      // SCH-07, MUT-04: a drift into a similar verse brings that pair's cards due within a day.
       if (recited) await bringDriftCardsForward(tx, attempt, now);
     },
   });
@@ -387,24 +324,16 @@ export type RemediationGradeInput = Readonly<{
   dhuhr?: DhuhrResolver;
 }>;
 
-/**
- * Grade a half page or seam that surfaced on its own (SCH-06, SCH-08). It is real recitation, so it
- * logs a review and counts toward the wird like any card.
- */
 export async function saveRemediationGrade(db: AppDatabase, input: RemediationGradeInput): Promise<ReviewSaveResult> {
   const now = input.now ?? new Date();
   const level = input.attempt.level;
   const rating = capRating(input.rating as Rating, level) as Grade;
   const base = await readDeckReviewSettings(db, HIFZ_PAGES_DECK_ID);
   const proposed = proposedRating(input.attempt);
-  // A half page is part of a page, so a drift marked on it is handled as on the page (SCH-07).
   const driftSiblings = await resolveDriftSiblings(db, input.attempt);
   return persistReviewTransition({
     db,
     cardId: input.card.id,
-    // The queued row can be stale: a page grade earlier in the session, or another grade still in the
-    // connection's queue, may have reviewed this seam or half since the queue was built. Read and
-    // calculate inside the grade's own transaction, so nothing can change the card in between.
     transition: async (tx) => {
       const current =
         (await tx.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [input.card.id])) ??
@@ -425,7 +354,6 @@ export async function saveRemediationGrade(db: AppDatabase, input: RemediationGr
   });
 }
 
-/** PLN-05: minutes per review page learned as an exponential moving average, alpha 0.2. */
 export async function recordReviewPace(db: AppDatabase, { minutes, pages, current }: { minutes: number; pages: number; current: number }): Promise<void> {
   if (pages <= 0 || !Number.isFinite(minutes) || minutes <= 0) return;
   const measured = Math.min(30, Math.max(0.5, minutes / pages));

@@ -180,7 +180,6 @@ beforeEach(() => {
             getAllAsync: async <T>() => statement.all(...values) as T[],
           };
         },
-        // Node's statement lifecycle is automatic; this is not native-finalizer evidence.
         finalizeAsync: async () => {},
       };
     },
@@ -374,7 +373,6 @@ describe("RF104 atomic tafsir replacement", () => {
     "restores retained content after SQLite rejects %s",
     async (failedText) => {
       selectNativeFiles(syntheticFiles(6234));
-      // The trigger text is a fixed synthetic fixture value, bound through a one-row guard table.
       sql.exec("CREATE TEMP TABLE rejected_text (value TEXT)");
       sql.prepare("INSERT INTO rejected_text VALUES (?)").run(failedText);
       sql.exec(`CREATE TEMP TRIGGER fail_tafsir_insert BEFORE INSERT ON tafseer
@@ -509,7 +507,6 @@ describe("RF104 concurrent source generations", () => {
         await firstInsert.waitForStart();
         ordinary = db.runAsync("INSERT INTO user_settings VALUES (?, ?)", "ordinary-write", "retained");
         bFinal.release();
-        // Both candidates are staged while the first actual INSERT is held.
         for (let index = 0; index < 80; index++) await Promise.resolve();
       } finally {
         aFinal.release();

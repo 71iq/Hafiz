@@ -7,7 +7,6 @@ export const authCommands = createAuthCoordinator(null);
 
 export function observeAuthSession(session: Session | null): void {
   const identity = getAuthSessionIdentity(session);
-  // Unidentified sessions cannot dispatch account-bound commands.
   authCommands.observeIdentity(identity.kind === "identified" ? JSON.stringify(identity) : null);
 }
 

@@ -222,7 +222,6 @@ describe("WirdExtras", () => {
     fireEvent.press(view.getByText(s.habitExtraSalah));
     expect(onConnect).toHaveBeenCalledTimes(1);
     expect(onStrengthen).not.toHaveBeenCalled();
-    // One row button (connect) and one hide button per extra.
     expect(view.getAllByRole("button")).toHaveLength(3);
   });
 });

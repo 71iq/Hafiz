@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// Remote profile rows. Nulls keep their existing fallbacks, but a wrong type is rejected so the screen
-// shows its error state instead of undefined or NaN.
 const count = z
   .number()
   .finite()

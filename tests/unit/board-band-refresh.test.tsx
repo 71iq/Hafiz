@@ -11,7 +11,6 @@ import { emitSyncCompleted } from "@/lib/sync/events";
 import { bearerSubject, signedIn, signedOut, type FakeAuthState } from "./social-test-auth";
 
 const USER = "00000000-0000-4000-8000-00000000000a";
-/** Used only by the test that notes a membership, which the module keeps for the day. */
 const JOINER = "00000000-0000-4000-8000-00000000000c";
 
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
@@ -90,7 +89,6 @@ afterEach(() => {
 
 describe("useBoardBandRefresh (8.13)", () => {
   it("waits for the account's restore, reports once the sync finishes it, and again after changes are pulled", async () => {
-    // Signed in, but this account's restore has not finished: the local rows may be another account's.
     jest.mocked(hasCompletedAccountRestore).mockResolvedValue(false);
     renderProbe();
     await waitFor(() => expect(hasCompletedAccountRestore).toHaveBeenCalledWith(mockDb, USER));
@@ -103,8 +101,6 @@ describe("useBoardBandRefresh (8.13)", () => {
     await waitFor(() => expect(sentLevels()).toEqual(["juz_amma"]));
     expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
 
-    // A later sync settles like activity: its pulled rows are often this device's own changes coming
-    // back, so the bands are compared once, after the settle time.
     jest.useFakeTimers();
     jest.mocked(readLocalBoardInputs).mockResolvedValue(hafiz);
     const derivations = jest.mocked(readLocalBoardInputs).mock.calls.length;
@@ -168,7 +164,6 @@ describe("useBoardBandRefresh (8.13)", () => {
     expect(readLocalBoardInputs).not.toHaveBeenCalled();
     expect(calls("get_profile_privacy")).toHaveLength(1);
 
-    // The user joins in the Board tab, whose fresh view shows the account placed.
     await act(async () => {
       client.setQueryData([...boardKeys.all(JOINER), "2026-11-14", "online"], {
         data: { status: "gathering", weekStart: "2026-11-14", memberCount: 1, minMembers: 5 },

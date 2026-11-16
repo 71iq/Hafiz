@@ -9,15 +9,8 @@ import { useAppLanguage } from "@/lib/i18n/useStrings";
 import type { RootStackState } from "@/lib/navigation/return-to-tabs";
 import { AuthFormNotice, AuthScreenShell, AuthTextLink, useAuthIconColors } from "@/components/auth/AuthScreenShell";
 
-/** How long the callback waits for the SDK to publish a session after startup finishes. */
 const CALLBACK_SESSION_WAIT_MS = 10_000;
 
-/**
- * A provider return that reaches the router. It waits for a verified session, never for redirect
- * parameters alone, then replaces itself with the captured context or Home. If no session arrives,
- * it explains that and links back to Login. Native warm callbacks stay with the open browser flow
- * (app/+native-intent.ts), and native cold callbacks open Home there.
- */
 export default function OAuthCallbackScreen() {
   const router = useRouter();
   const navigation = useNavigation();

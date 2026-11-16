@@ -229,7 +229,6 @@ beforeEach(async () => {
       }
     },
   };
-  // This adapter supplies only the Expo operations used by sync, against real isolated SQLite.
   db = adapter as unknown as AppDatabase;
   await createSchema(db);
   sql.prepare("INSERT INTO user_settings (key,value) VALUES ('qf_initial_local_enqueue_done','true')").run();
@@ -772,7 +771,6 @@ it("preserves rollback and the original error for an ordinary merge SQL failure"
 it("uses renewed matching SDK credentials when the store token has expired", async () => {
   switchSession({ ...session(), expires_at: 1 });
   const fresh = session(USER_A, SESSION_A, 42);
-  // SDK renewal may return before the store observes its same-session notification.
   authSession.mockResolvedValue({ data: { session: fresh }, error: null });
   await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced" });
   expect(authSession).toHaveBeenCalled();
@@ -889,7 +887,6 @@ it("waits for an issued Supabase enqueue and retires before QF queue acknowledge
     expect(queueState()).toEqual(before);
     expect(sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get()).toEqual({ count: 1 });
     expect(requests.some((request) => request.action.startsWith("list-"))).toBe(false);
-    // The prior local attachment and already-issued SQL are not claimed to be cancelled.
   } finally {
     gate.release.resolve();
     await run;

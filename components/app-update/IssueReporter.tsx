@@ -12,10 +12,6 @@ import { textStartStyle } from "@/lib/ui/direction";
 
 type AyahContext = IssueReportContext["ayah"];
 
-/**
- * Report an issue: opens the GitHub composer with public technical context only, on a deliberate tap.
- * If the link cannot open, a dialog shows the same URL to copy. Nothing is ever submitted by the app.
- */
 export function useIssueReporter(onNotice: (message: string) => void) {
   const { uiLanguage } = useSettings();
   const revision = useWebRevision();

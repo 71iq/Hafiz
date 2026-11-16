@@ -1,10 +1,8 @@
 export type AuthOwner = {
   isCurrent: () => boolean;
   cancel: () => void;
-  // Only already-issued SDK work may settle after its screen cancels.
   canSettleSameLifetime?: () => boolean;
   canCompleteRecovery?: (identity: string | null) => boolean;
-  // Called only after the owned adapter verifies its own session-removal receipt.
   adoptOwnSignOut?: () => boolean;
 };
 export type AuthCommandResult<T> = { status: "completed"; value: T; owner: AuthOwner } | { status: "superseded" };
@@ -12,7 +10,6 @@ export type AuthCommandResult<T> = { status: "completed"; value: T; owner: AuthO
 type Ticket = { epoch: number; intent: number; cancelled: boolean; key: string | null };
 type Pending = { kind: "replacement"; intent: number } | { kind: "owned"; owner: AuthOwner };
 
-// Identity resolution and SDK notification attribution remain in their adapters.
 export function createAuthCoordinator(initialIdentity: string | null) {
   let identity = initialIdentity;
   let epoch = 0;
@@ -43,8 +40,6 @@ export function createAuthCoordinator(initialIdentity: string | null) {
         epoch += 1;
         ticket.epoch = epoch;
         ticket.key = null;
-        // A successful terminal logout keeps its result authority. Cleanup from another
-        // issued SDK operation may publish null, but cannot revive that command's result.
         if (active?.owner === owner && active.allowSignOut) active.allowSignOut = false;
         else ticket.cancelled = true;
         return true;
@@ -61,8 +56,6 @@ export function createAuthCoordinator(initialIdentity: string | null) {
     identity = next;
     epoch += 1;
   }
-  // A read begun without a session may observe its own one-step SDK restore.
-  // A changed signed-in owner or any intervening A-B-A sequence stays obsolete.
   function canRestore(owner: AuthOwner, next: string | null): boolean {
     if (current(owner)) return identity === null || identity === next;
     const ticket = tickets.get(owner);
@@ -126,7 +119,6 @@ export function createAuthCoordinator(initialIdentity: string | null) {
   function replace<T>(work: (isCurrent: () => boolean) => Promise<T>): Promise<AuthCommandResult<T>> {
     return reservation(work, false).result;
   }
-  // Startup reads share ordering without impersonating a newer explicit auth intent.
   function bootstrap<T>(work: () => Promise<T>): Promise<T> {
     return enqueue(work);
   }
@@ -134,8 +126,6 @@ export function createAuthCoordinator(initialIdentity: string | null) {
     const captured = intent;
     return () => intent === captured;
   }
-  // Legacy session-changing callers still receive their original values/errors.
-  // Only account-bound owned commands have a superseded result contract.
   function transition<T>(work: () => Promise<T>): Promise<T> {
     const ownIntent = ++intent;
     const id = ++nextId;

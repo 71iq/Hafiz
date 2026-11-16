@@ -54,10 +54,8 @@ const TYPE_LABELS: Readonly<Record<NotificationType, readonly [UIStringKey, UISt
 
 const OFFSET_STEP = 5;
 const CLOCK_STEP = 15;
-/** "Morning" in the plan anchor list (3.3). */
 const DEFAULT_CLOCK_MINUTES = 6 * 60;
 type RamadanChoice = RamadanAnchor | "usual";
-/** Outline buttons need a visible edge; the shared outline variant is transparent only. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
 type ReminderSwitchRowProps = {
@@ -68,7 +66,6 @@ type ReminderSwitchRowProps = {
   disabled?: boolean;
 };
 
-/** The whole row is the 44 pt target and the accessible switch; the visual switch is decorative. */
 function ReminderSwitchRow({ label, hint, value, onValueChange, disabled }: ReminderSwitchRowProps) {
   return (
     <SwitchRow
@@ -101,7 +98,6 @@ type StepperProps = {
   iconColor: string;
 };
 
-/** Minus stays on the left and plus on the right in both languages, like a number line. */
 function Stepper({ value, decreaseLabel, increaseLabel, onDecrease, onIncrease, canDecrease, canIncrease, iconColor }: StepperProps) {
   return (
     <View style={{ direction: "ltr", flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -132,12 +128,6 @@ function Stepper({ value, decreaseLabel, increaseLabel, onDecrease, onIncrease, 
   );
 }
 
-/**
- * Reminder settings (5.8, NOT-11): a master switch, a switch per type that never touches the
- * others, the reminder time after a prayer or at a clock time, the Ramadan time, prayer-time
- * location, the app-icon badge and the calendar file. Every change replans reminders (NOT-04).
- * The screen supplies the section heading (notifSettingsTitle).
- */
 export function ReminderSettingsSection() {
   const db = useDatabase();
   const s = useStrings();
@@ -166,7 +156,6 @@ export function ReminderSettingsSection() {
 
   useEffect(() => {
     refresh().catch(() => setError(s.notifSaveFailed));
-    // Permission can change in system settings while Hafiz is in the background.
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") refresh().catch(() => {});
     });

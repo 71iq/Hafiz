@@ -8,11 +8,6 @@ import { ANDROID_LATEST_APK_URL, androidReleaseApkUrl } from "@/lib/app-update/r
 import { useAndroidUpdate } from "@/lib/app-update/use-android-update";
 import { textStartStyle } from "@/lib/ui/direction";
 
-/**
- * Home card for the sideloaded Android app: on the web it offers the APK download, and in the
- * Android app it appears only when a newer release is published. Opening the APK URL hands the
- * download to the browser, whose prompt installs it over the current app.
- */
 export function AppReleaseCard() {
   const s = useStrings();
   const { isDark, isRTL } = useSettings();

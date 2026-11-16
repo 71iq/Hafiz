@@ -51,13 +51,9 @@ import { normalizeReferenceInput, SURAH_AYAH_COUNTS } from "@/lib/search/referen
 import { surahTransliteration, type SurahSearchFields } from "@/lib/search/surah-match";
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 
-// An expanded lemma renders inside one list item, so a common lemma shows its occurrences in pages.
 const LEMMA_OCCURRENCES_PAGE = 30;
-// Root results this small open every group; larger ones open the most common form first.
 const OPEN_ALL_ROOT_GROUPS_AT = 30;
-// The text query's existing cap. A full page means there may be more.
 const TEXT_RESULT_LIMIT = 200;
-// Fast local searches finish before this, so the skeleton never flashes.
 const BUSY_DELAY_MS = 200;
 
 type ResultTarget = { surah: number; ayah: number; wordPos?: number };
@@ -69,7 +65,6 @@ function defaultExpansion(groups: readonly LemmaGroup[], total: number): Readonl
   return new Map([[groups[0].lemma, LEMMA_OCCURRENCES_PAGE]]);
 }
 
-/** A visible keyboard focus ring on web rows (React Native Web reports `focused`). */
 function focusRing(state: PressableStateCallbackType, color: string) {
   const focused = (state as PressableStateCallbackType & { focused?: boolean }).focused;
   return Platform.OS === "web" && focused
@@ -77,12 +72,10 @@ function focusRing(state: PressableStateCallbackType, color: string) {
     : null;
 }
 
-// ─── Main Component ───
 interface SearchCommandProps {
   visible: boolean;
   onClose: () => void;
   onNavigateToAyah?: (surah: number, ayah: number, wordPos?: number) => void;
-  /** Fills the field and searches when Search opens, e.g. from the legacy /search?q= link. */
   initialQuery?: string;
 }
 
@@ -100,7 +93,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
   const [mode, setMode] = useState<SearchMode>("text");
   const [textResults, setTextResults] = useState<TextResult[]>([]);
   const [rootRows, setRootRows] = useState<RootOccurrence[]>([]);
-  /** The query the shown results answer; highlights and history use it, not the live field. */
   const [resultQuery, setResultQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [busyVisible, setBusyVisible] = useState(false);
@@ -108,15 +100,12 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
   const [searchError, setSearchError] = useState<string | null>(null);
   const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
   const [surahs, setSurahs] = useState<SurahSearchFields[]>([]);
-  /** One root picked from several; null shows all of them. */
   const [rootFilter, setRootFilter] = useState<string | null>(null);
-  // Expanded lemma -> how many of its occurrences are shown; null keeps the default for these results.
   const [expansion, setExpansion] = useState<ReadonlyMap<string, number> | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
   const searchGenerationRef = useRef(0);
-  /** Changes on every open and close, so work from an earlier opening cannot fill this one. */
   const sessionRef = useRef(0);
   const surahsRef = useRef<SurahSearchFields[]>([]);
   surahsRef.current = surahs;
@@ -127,8 +116,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
       debounceRef.current = null;
     }
   }, []);
-  // Cache of diacritic-stripped lemma/word_text → root, for resolving a typed
-  // word like "جاء" to canonical root "جيأ" in root-mode search.
   const rootIndexRef = useRef<{
     lemmaMap: Map<string, Set<string>>;
     wordMap: Map<string, Set<string>>;
@@ -167,19 +154,15 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     } catch {}
   }, [db]);
 
-  // Auto-focus input when opened
   useEffect(() => {
     sessionRef.current += 1;
     const session = sessionRef.current;
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
     if (visible) {
-      // Dismiss any lingering Mushaf word tooltip/detail modal — otherwise
-      // they float above the search modal.
       clearTooltip();
       closeDetail();
       focusTimer = setTimeout(() => inputRef.current?.focus(), 120);
       loadHistory();
-      // Surah names let "Al-Kahf" or "الكهف" offer Go to; numeric references work without them.
       if (surahsRef.current.length === 0) {
         db.getAllAsync<SurahSearchFields>("SELECT number, name_arabic, name_english FROM surahs ORDER BY number")
           .then((rows) => {
@@ -188,7 +171,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
           .catch(() => {});
       }
     } else {
-      // Reset state when closed
       setSearching(false);
       setQuery("");
       setTextResults([]);
@@ -205,7 +187,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     };
   }, [visible, clearTooltip, closeDetail, cancelPendingSearch, loadHistory, db]);
 
-  // The skeleton appears only when a search is still running after BUSY_DELAY_MS.
   useEffect(() => {
     if (!searching) {
       setBusyVisible(false);
@@ -215,7 +196,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     return () => clearTimeout(timer);
   }, [searching]);
 
-  /** History records deliberate searches only: the search key, or a chosen result. */
   const recordHistory = useCallback(
     (term: string, searchMode: SearchMode) => {
       const trimmed = term.trim();
@@ -286,9 +266,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
           setTextResults(rows);
           setRootRows([]);
         } else {
-          // Users typically type a word (e.g. "جاء"), not a canonical root
-          // (e.g. "جيأ"). Resolve the input to matching root(s) by checking
-          // direct root match + diacritic-stripped lemma/word_text lookups.
           const index = await loadRootIndex();
           if (!isCurrentSearch()) return;
           const candidateList = resolveRootCandidates({ trimmedTerm: trimmed, strippedTerm: stripped, index });
@@ -337,7 +314,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     [mode, performSearch, cancelPendingSearch]
   );
 
-  // A query handed over on open runs once for that opening.
   const appliedInitialQueryRef = useRef<string | null>(null);
   useEffect(() => {
     if (!visible) {
@@ -349,7 +325,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     handleQueryChange(initialQuery);
   }, [visible, initialQuery, handleQueryChange]);
 
-  /** Text and root modes share one query; switching keeps it and searches again. */
   const handleModeChange = useCallback(
     (newMode: SearchMode) => {
       setMode(newMode);
@@ -366,8 +341,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     inputRef.current?.focus();
   }, [cancelPendingSearch, resetResults]);
 
-  // C06: a result closes Search first; the target is submitted once the sheet has closed (or this
-  // component unmounted), never after a guessed delay.
   const pendingResultRef = useRef<ResultTarget | null>(null);
   const submitPendingResult = useCallback(() => {
     const target = pendingResultRef.current;
@@ -475,7 +448,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
         closeWithTarget({ surah: row.surah, ayah: row.ayah });
         return;
       }
-      // A page opens at its first ayah, through the existing page mapping.
       const session = sessionRef.current;
       try {
         const first = topmostAyahForPage(await loadMushafIndex(db), row.page);
@@ -487,7 +459,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     [closeWithTarget, db, mode, query, recordHistory],
   );
 
-  /** The search key: open a single numeric reference, otherwise search now and remember the query. */
   const handleSubmit = useCallback(() => {
     if (!plan.runSearch && goToRows.length === 1) {
       void openGoTo(goToRows[0]);
@@ -554,7 +525,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     backgroundColor: isDark ? "rgba(13,148,136,0.25)" : "rgba(13,148,136,0.15)",
     color: isDark ? "#2dd4bf" : "#0f766e",
     fontFamily: "Manrope_600SemiBold",
-    // An underline keeps a match visible where the tint alone is low contrast.
     textDecorationLine: "underline" as const,
   };
   const renderSegments = (segments: HighlightSegment[]) =>
@@ -569,8 +539,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
     );
   const LemmaDisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
   const isPhone = width < SIDEBAR_BREAKPOINT;
-  // The overlay pads its window below the status bar, so a phone sheet must leave insets.top free
-  // or its fixed height pushes the header under the status bar.
   const modalHeight = isPhone ? Math.min(height - insets.top - 8, 900) : Math.min(height - 48, 760);
   const rowDirection = { direction: "ltr" as const, flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const) };
   const resultsEmpty = mode === "text" ? textResults.length === 0 : rootRows.length === 0;
@@ -697,7 +665,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
 
                 {group.results.map((r) => {
                   const arabic = snippetSegments(r.text_uthmani, arabicMatchRanges(r.text_uthmani, resultQuery));
-                  // A translation is wordier than the Arabic it renders, so its window is longer.
                   const english = r.text_en ? snippetSegments(r.text_en, plainMatchRanges(r.text_en, resultQuery), 25) : [];
                   const reference = formatAyahRef(isRTL, r.surah, r.ayah);
                   const page = r.v2_page ? interpolate(s.pageN, { n: formatNumber(r.v2_page, language) }) : null;
@@ -1018,12 +985,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
       maxHeight={modalHeight}
     >
       <View className="flex-1" style={{ height: modalHeight, maxHeight: modalHeight }}>
-        {/* The Cancel button below is the one close control, so the header carries only the title. */}
         <OverlayHeader title={s.searchTitle} isRTL={isRTL} />
 
-        {/* Search bar */}
         <View className="px-5 pt-4 pb-3 items-center gap-2" style={rowDirection}>
-          {/* Mirrored by hand, so pinned LTR: an inherited RTL direction would flip it back. */}
           <View
             className={`${isRTL ? "flex-row-reverse" : "flex-row"} flex-1 items-center gap-2.5 bg-surface-low dark:bg-surface-dark-low rounded-full ${isRTL ? "pl-1 pr-4" : "pl-4 pr-1"} min-h-[44px]`}
             style={{ direction: "ltr" }}
@@ -1079,7 +1043,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
           </Pressable>
         </View>
 
-        {/* Mode toggle */}
         <View className="px-5 pb-3">
           <ToggleGroup<SearchMode>
             value={mode}
@@ -1093,7 +1056,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
           />
         </View>
 
-        {/* Content area */}
         <OverlayBody scrollEnabled={false} className="px-0">
           {searchError ? (
             <View className="flex-1 items-center justify-center">

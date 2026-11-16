@@ -1,11 +1,6 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 
-/**
- * The similar-verse alignment rule (scripts/mutashabihat-align.mjs) on refs from the NourQuran source
- * and on made-up ones, with the bundled Uthmani text. The module is a build script, so it runs in Node
- * itself; the rule's results come back as JSON.
- */
 const ROOT = path.join(__dirname, "../..");
 
 type Rebuilt = {
@@ -56,7 +51,6 @@ function rebuild(cases: unknown[]): (Rebuilt & { words: Record<string, string> |
 
 describe("the similar-verse alignment rule", () => {
   const results = rebuild([
-    // 45:30: the source skips 6 words of 45:29 and 8 of 45:30, both filled.
     {
       source: ["nq-sim-052faae2cfb3fd", 1],
       expect: {
@@ -67,12 +61,10 @@ describe("the similar-verse alignment rule", () => {
         ],
       },
     },
-    // 2:217: the source jumps from its similar words to the start of 2:218, past 51 words.
     {
       source: ["nq-sim-9da9670d95133e", 2],
       expect: { pre: [["2:216", -5]], similar: [["2:217", 0, 6]], post: [["2:218", 0, 6]] },
     },
-    // A made-up post that skips 16 words of 2:255 inside it: it ends at the skip.
     {
       made: {
         surah: 2,
@@ -88,20 +80,15 @@ describe("the similar-verse alignment rule", () => {
       },
       expect: { post: [["2:255", 4, 9]] },
     },
-    // 5:41: "عظيم", from elsewhere, ends the post; the rest of 5:41 is longer than 12 words.
     { source: ["nq-sim-f7544313788ff1", 1], expect: { similar: [["5:41", 0, 8]], post: [["5:41", 8, 16]] } },
-    // 2:264 holds the text of 2:265.
     {
       source: ["nq-sim-6b0cb090bae7db", 1],
       expect: { pre: [["2:264", 18]], similar: [["2:265", 0, 4]], post: [["2:265", 4, 13]] },
     },
-    // 101:7's similar words run from 101:6 into 101:7, and the ones its siblings 7:8 and 23:102 share
-    // ("ثَقُلَتْ مَوَٰزِينُهُۥ") are all 101:6's.
     {
       source: ["nq-sim-7d0576c830de2e", 2],
       expect: { pre: [["101:5"]], similar: [["101:6"], ["101:7"]], post: [["101:8"], ["101:9"]] },
     },
-    // 26:1's similar words run from طسٓمٓ into 26:2, but طسٓمٓ itself is shared with 28:1.
     { source: ["nq-sim-8e5f9a9baad24c", 0], expect: { similar: [["26:1"], ["26:2"]] } },
   ]);
 

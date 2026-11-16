@@ -4,10 +4,6 @@ import type { Reflection, ReflectionComment } from "./types";
 
 type Page<T> = { data: T[]; hasMore: boolean };
 
-/**
- * Drops matching rows from a cached page or infinite list, keeping page count and order so the
- * feed keeps its pagination and scroll position. Unknown shapes pass through untouched.
- */
 function withoutRows<T extends { id: string }>(value: unknown, keep: (row: T) => boolean): unknown {
   if (!value || typeof value !== "object") return value;
   if ("pages" in value && Array.isArray((value as InfiniteData<Page<T>>).pages)) {
@@ -36,11 +32,6 @@ function ayahsOf(reflection: Pick<Reflection, "surah" | "ayah_start" | "ayah_end
   return ayahs;
 }
 
-/**
- * After the server confirmed deleting a reflection: remove it from every cached feed and ayah list
- * and forget its comments, then refetch the affected lists and counts in place. Call only with a
- * confirmed `true` result for the current owner; a `false` result uses refreshReflectionQueries.
- */
 export function removeDeletedReflection(queryClient: QueryClient, reflection: Reflection): void {
   const keep = (row: Reflection) => row.id !== reflection.id;
   queryClient.setQueriesData({ queryKey: reflectionQueryKeys.feed.all }, (value: unknown) => withoutRows(value, keep));
@@ -51,10 +42,6 @@ export function removeDeletedReflection(queryClient: QueryClient, reflection: Re
   refreshReflectionQueries(queryClient, reflection);
 }
 
-/**
- * Refreshes the lists and counts that can show this reflection. Infinite lists refetch the pages
- * already loaded, so pagination is not reset.
- */
 export function refreshReflectionQueries(queryClient: QueryClient, reflection: Reflection): void {
   void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
   for (const ayah of ayahsOf(reflection)) {
@@ -66,11 +53,6 @@ export function refreshReflectionQueries(queryClient: QueryClient, reflection: R
   void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflection.id) });
 }
 
-/**
- * After the server confirmed deleting a comment: drop it from that reflection's cached comment
- * lists, then refresh them and mark lists that show the parent's comment count stale. The feed is
- * not refetched now, so a post does not move under the reader; the caller adjusts the count shown.
- */
 export function removeDeletedComment(
   queryClient: QueryClient,
   comment: Pick<ReflectionComment, "id" | "reflection_id">,
@@ -81,7 +63,6 @@ export function removeDeletedComment(
   markCommentCountStale(queryClient, comment.reflection_id);
 }
 
-/** Refetches the reflection's comments and marks cached counts stale without moving the feed. */
 export function markCommentCountStale(queryClient: QueryClient, reflectionId: string) {
   void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflectionId) });
   void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all, refetchType: "none" });

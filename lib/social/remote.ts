@@ -1,11 +1,6 @@
 import { z } from "zod";
 import { isSupabaseConfigured, supabase, supabaseAnonKey } from "@/lib/supabase";
 
-/**
- * Halaqa and board are online features (SB-01). Each failure keeps its cause so the UI can tell
- * missing configuration, offline state, a server refusal and an invalid response apart
- * (CONVENTIONS.md, DEL-08).
- */
 const SOCIAL_REJECTION_CODES = [
   "not_authenticated",
   "invalid_local_date",
@@ -30,22 +25,12 @@ const SOCIAL_REJECTION_CODES = [
   "plan_not_shared",
   "invalid_assignment",
 ] as const;
-/**
- * Who a request runs as. The Supabase client is shared, so a request started for one viewer could
- * otherwise run with another account's credentials after a sign-in or switch, cache that account's
- * data under the first viewer's key, or apply an old draft to it. Each request sends the viewer's own
- * bearer token, and its result is used only while the same viewer is still current. Built on the
- * auth coordinator's owner tickets, as sync is (lib/social/owner.ts).
- */
 export type SocialViewer = Readonly<{
   isCurrent: () => boolean;
-  /** Throws an "account_changed" failure once another account or session has taken over. */
   requireCurrent: () => void;
-  /** The bearer token: the owner's session token, or the public key for a signed-out viewer. */
   accessToken: () => Promise<string>;
 }>;
 
-/** A signed-in account a halaqa or board request belongs to. */
 export type SocialOwner = SocialViewer & Readonly<{ userId: string }>;
 
 export type SocialRejectionCode = (typeof SOCIAL_REJECTION_CODES)[number];
@@ -53,7 +38,6 @@ export type SocialRejectionCode = (typeof SOCIAL_REJECTION_CODES)[number];
 export type SocialFailure =
   | { kind: "unconfigured" }
   | { kind: "offline" }
-  // The account that started the request is no longer the signed-in one.
   | { kind: "account_changed" }
   | { kind: "rejected"; code: SocialRejectionCode }
   | { kind: "invalid_response" }
@@ -77,7 +61,6 @@ export function socialFailureOf(error: unknown): SocialFailure {
 const remoteError = z.object({ message: z.string().optional(), code: z.string().optional() }).passthrough();
 const rejectionCode = z.enum(SOCIAL_REJECTION_CODES);
 
-/** Maps a PostgREST or fetch error to its cause. Server refusals carry their code as the message. */
 export function classifyRemoteError(error: unknown): SocialFailure {
   const parsed = remoteError.safeParse(error);
   const message = parsed.success ? (parsed.data.message ?? "") : error instanceof Error ? error.message : String(error);
@@ -89,23 +72,13 @@ export function classifyRemoteError(error: unknown): SocialFailure {
   return { kind: "failed", message: message || "Request failed" };
 }
 
-/** A remote read: the RPC, its arguments and the schema its result must pass. */
 export type SocialRead<T> = Readonly<{ fn: string; args: Record<string, unknown>; schema: z.ZodType<T> }>;
 
-/**
- * The project's public (anon) key, from the app configuration. A request that sends it as its
- * bearer runs as anon, whatever session the shared client holds.
- */
 export function publicApiKey(): string {
   if (!isSupabaseConfigured()) throw socialError({ kind: "unconfigured" });
   return supabaseAnonKey();
 }
 
-/**
- * Calls a SECURITY DEFINER RPC and returns its unvalidated payload. Callers must parse it. With a
- * viewer, the request carries that viewer's token rather than whatever session the shared client
- * holds at dispatch, and its result is refused once that viewer is no longer current.
- */
 export async function callSocialRpcRaw(
   fn: string,
   args: Record<string, unknown>,
@@ -131,7 +104,6 @@ export function parseSocialPayload<T>(schema: z.ZodType<T>, payload: unknown): T
   return parsed.data;
 }
 
-/** Calls a SECURITY DEFINER RPC and validates its result before any caller sees it. */
 export async function callSocialRpc<T>(
   fn: string,
   args: Record<string, unknown>,

@@ -4,7 +4,6 @@ import { act, cleanup, render, renderHook } from "@testing-library/react-native"
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { Skeleton, SkeletonText, SearchResultsSkeleton } from "@/components/ui/Skeleton";
 
-// The installed server renderer has no declaration package in this RN workspace.
 const { renderToString } = jest.requireActual<{ renderToString: (element: React.ReactNode) => string }>(
   "react-dom/server",
 );

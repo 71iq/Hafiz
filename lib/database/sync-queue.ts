@@ -1,16 +1,12 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { emitSyncQueued } from "@/lib/sync/events";
 
-/**
- * Enqueue a sync operation. Called after every write to a syncable table.
- */
 export async function enqueueSync(
   db: DatabaseExecutor,
   tableName: string,
   operation: "INSERT" | "UPDATE" | "DELETE",
   rowId: string,
   data: Record<string, any>,
-  /** The queue time. A deletion passes its own deletion time so the entry and payload agree. */
   queuedAt: string = new Date().toISOString()
 ): Promise<void> {
   await db.runAsync(
@@ -21,7 +17,6 @@ export async function enqueueSync(
   emitSyncQueued();
 }
 
-/** Get count of pending sync entries */
 export async function getPendingSyncCount(db: DatabaseExecutor): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM sync_queue WHERE status IN ('pending', 'failed')"
@@ -29,7 +24,6 @@ export async function getPendingSyncCount(db: DatabaseExecutor): Promise<number>
   return row?.count ?? 0;
 }
 
-/** Get pending sync entries (oldest first) */
 export async function getPendingSyncEntries(
   db: DatabaseExecutor,
   limit: number = 50
@@ -40,7 +34,6 @@ export async function getPendingSyncEntries(
   );
 }
 
-/** Mark entries as synced */
 export async function markSynced(
   db: DatabaseExecutor,
   ids: number[]
@@ -57,7 +50,6 @@ export async function markSynced(
   }
 }
 
-/** Mark entries as failed */
 export async function markFailed(
   db: DatabaseExecutor,
   ids: number[]
@@ -73,7 +65,6 @@ export async function markFailed(
   }
 }
 
-/** Clean up old synced entries (keep last 7 days) */
 export async function cleanSyncedEntries(db: DatabaseExecutor): Promise<void> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);

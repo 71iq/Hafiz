@@ -24,13 +24,13 @@ export type BookmarkEntry = {
 };
 
 export const HIGHLIGHT_COLORS = [
-  "#FBBF24", // Amber
-  "#34D399", // Green
-  "#60A5FA", // Blue
-  "#F472B6", // Pink
-  "#A78BFA", // Violet
-  "#FB7185", // Rose
-  "#38BDF8", // Sky
+  "#FBBF24",
+  "#34D399",
+  "#60A5FA",
+  "#F472B6",
+  "#A78BFA",
+  "#FB7185",
+  "#38BDF8",
 ] as const;
 
 export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number];
@@ -47,7 +47,6 @@ const HIGHLIGHT_COLOR_NAME_KEYS = {
 
 export type HighlightColorNameKey = (typeof HIGHLIGHT_COLOR_NAME_KEYS)[HighlightColor];
 
-/** The localized name key for a palette color (both ayah actions and the web selection menu use it). */
 export function highlightColorNameKey(color: HighlightColor): HighlightColorNameKey {
   return HIGHLIGHT_COLOR_NAME_KEYS[color];
 }

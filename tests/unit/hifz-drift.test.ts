@@ -10,13 +10,11 @@ import { emptyAttempt, savePageGrade, type Attempt } from "@/lib/hifz/review";
 import { pickDriftSibling, similarGroupsForAyahs } from "@/lib/hifz/similar";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
-/** SCH-07 and MUT-04: a drift into a similar verse, logged with its sibling and drilled in the next sessions. */
 
 const TODAY = "2026-11-13";
 const plan = { ...DEFAULT_HIFZ_PLAN, cycleDays: 30 };
 let store: OutboxDatabase;
 
-/** One group, 2:5 on page 2 and 31:5 on page 411, plus 2:6 alone on page 2 for a drift with no group. */
 function seedSimilarVerses() {
   store.sql.exec(
     "INSERT INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES ('g1', 'similar', 'cue', 'test', 0)",
@@ -65,7 +63,6 @@ async function gradeDrift(now: Date, attempt = driftAttempt()) {
   });
 }
 
-/** A later review session of `kind` that graded a card, so it has a row, as on any device. */
 async function sessionAt(at: Date, kind: "wird" | "mistakes" | "sabaq" = "wird") {
   await store.db.withTransactionAsync(async (tx) => {
     await recordSessionProgress(tx, startReviewSession(kind, { now: at }), { cards: 1 }, at);
@@ -96,7 +93,6 @@ describe("drift into a similar verse (SCH-07, MUT-04)", () => {
     await gradeDrift(now);
 
     expect(siblingRefs()).toEqual([{ sibling_ref: "31:5" }]);
-    // What already worked stays: the pair's card comes due within a day, and the ayah keeps its drill.
     const due = String(store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(card.id)?.due);
     expect(new Date(due).getTime()).toBeLessThanOrEqual(now.getTime() + 86_400_000);
     expect(await readMistakeInbox(store.db, TODAY)).toMatchObject([
@@ -109,7 +105,6 @@ describe("drift into a similar verse (SCH-07, MUT-04)", () => {
     expect(first[0].pair.self).toMatchObject({ surah: 2, ayah: 5, page: 2 });
     expect(first[0].pair.sibling).toMatchObject({ surah: 31, ayah: 5, page: 411, similar: "عَلَىٰ هُدًى" });
 
-    // A sabaq session builds no drill list, so it uses up no follow-up.
     await sessionAt(new Date(now.getTime() + 30 * 60_000), "sabaq");
     expect(await loadDriftDrills(store.db, TODAY)).toMatchObject([{ siblingPage: 411, sessionsSince: 0 }]);
 
@@ -117,21 +112,17 @@ describe("drift into a similar verse (SCH-07, MUT-04)", () => {
       await sessionAt(new Date(now.getTime() + session * 3_600_000), session === 2 ? "mistakes" : "wird");
       const drills = await loadDriftDrills(store.db, TODAY);
       if (session < DRIFT_FOLLOW_UP_SESSIONS) {
-        // The sibling page was the first session's; the pair prompt stays for sessions 2 and 3.
         expect(drills).toMatchObject([{ siblingPage: null, sessionsSince: session }]);
       } else {
-        // The fourth session adds neither.
         expect(drills).toEqual([]);
       }
     }
-    // The ayah's own drill is untouched by the follow-ups ending.
     expect(await readMistakeInbox(store.db, TODAY)).toHaveLength(1);
   });
 
   it("keeps the day's list count when a sibling page outside it is reviewed (SCH-07)", async () => {
     await writeHifzPlan(store.db, plan);
     const now = atLocalTime(TODAY, 600);
-    // Today's list holds page 2 only.
     store.sql
       .prepare("INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES ('device_hifz_today_plan', ?, ?, NULL)")
       .run(JSON.stringify({ date: TODAY, ids: ["page:madani15:2"], newLines: 0, unit: "page" }), now.toISOString());
@@ -157,7 +148,6 @@ describe("drift into a similar verse (SCH-07, MUT-04)", () => {
     await gradeDrift(new Date("2026-11-13T08:00:00.000Z"));
     await sessionAt(new Date("2026-11-13T08:10:00.000Z"));
     await gradeDrift(new Date("2026-11-13T08:30:00.000Z"));
-    // Synced with another offset, the older drift's text sorts after the newer one's.
     const ids = store.sql.prepare("SELECT id FROM recitation_errors WHERE type = 'mutashabih_drift' ORDER BY created_at").all() as { id: string }[];
     expect(ids).toHaveLength(2);
     store.sql.prepare("UPDATE recitation_errors SET created_at = ? WHERE id = ?").run("2026-11-13T10:00:00.000+02:00", ids[0].id);
@@ -168,8 +158,6 @@ describe("drift into a similar verse (SCH-07, MUT-04)", () => {
 
   it("commits the sibling with the grade, so a failed grade leaves no sibling and no drills", async () => {
     const now = atLocalTime(TODAY, 600);
-    // Count the grade's queued uploads on a twin database, then fail the last of them: it comes after
-    // the error row's, so the error was written inside the transaction before the failure.
     const twin = store;
     store = await openOutboxDatabase();
     seedSimilarVerses();
@@ -261,7 +249,6 @@ describe("choosing the sibling a drift went into", () => {
   it("names a lone sibling even when unmemorized, and none of several unmemorized ones", async () => {
     const lone = await similarGroupsForAyahs(store.db, [{ surah: 2, ayah: 5 }]);
     expect(pickDriftSibling(lone, new Set(), new Map())).toMatchObject({ surah: 31, ayah: 5 });
-    // The same sibling in two groups is still one sibling.
     expect(
       pickDriftSibling([group("a", [ref(31, 5, 411)]), group("b", [ref(31, 5, 411)])], new Set(), new Map()),
     ).toMatchObject({ surah: 31 });

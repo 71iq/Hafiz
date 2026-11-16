@@ -54,7 +54,6 @@ export async function fetchAllBookmarks(db: DatabaseExecutor): Promise<BookmarkE
   );
 }
 
-/** Bookmark an ayah. The local row and both upload queue entries commit together or not at all. */
 export async function addBookmark(database: AppDatabase, surah: number, ayah: number): Promise<void> {
   await database.withTransactionAsync((db) => addBookmarkRows(db, surah, ayah));
 }
@@ -77,7 +76,6 @@ async function addBookmarkRows(db: DatabaseExecutor, surah: number, ayah: number
   await enqueueQfSync(db, "bookmark", "UPSERT", `${surah}:${ayah}`, { surah, ayah });
 }
 
-/** Remove a bookmark. The tombstone and both upload queue entries commit together or not at all. */
 export async function removeBookmark(database: AppDatabase, surah: number, ayah: number): Promise<void> {
   await database.withTransactionAsync((db) => removeBookmarkRows(db, surah, ayah));
 }
@@ -160,7 +158,6 @@ async function insertHighlightRow(
   return result.lastInsertRowId;
 }
 
-/** Highlight every range of a text selection, or none of them. */
 export async function addHighlightsForSelectionRefs(
   database: AppDatabase,
   refs: QuranSelectionWordRef[],
@@ -184,18 +181,10 @@ export async function addHighlightsForSelectionRefs(
   return ids;
 }
 
-/**
- * Remove an ayah's whole-ayah highlight. Word-range highlights made from a text selection stay. The
- * physical delete and its queued deletions commit together.
- */
 export async function removeHighlightsForAyah(database: AppDatabase, surah: number, ayah: number): Promise<void> {
   await database.withTransactionAsync((db) => deleteAyahLevelHighlightRows(db, surah, ayah));
 }
 
-/**
- * Replace an ayah's whole-ayah highlight with one in the new color, in a single transaction.
- * Word-range highlights on the same ayah are unrelated annotations and keep their rows.
- */
 export async function replaceAyahHighlight(
   database: AppDatabase,
   surah: number,
@@ -210,7 +199,6 @@ export async function replaceAyahHighlight(
   return id;
 }
 
-/** Remove exactly these highlight rows (by local id), queueing a deletion for each. */
 export async function removeHighlightsByIds(database: AppDatabase, ids: readonly number[]): Promise<void> {
   const unique = Array.from(new Set(ids.filter((id) => Number.isInteger(id))));
   if (unique.length === 0) return;
@@ -335,11 +323,6 @@ export async function fetchSurahNames(
   return { arabic: row?.name_arabic ?? "", english: row?.name_english ?? "" };
 }
 
-/**
- * Copy/share text for whole ayahs through the shared format: Unicode `text_uthmani` with each
- * ayah's number, the reference in the UI language and the canonical link. Null when the text is
- * missing, so a caller never announces an empty copy as a success.
- */
 export async function buildAyahCopyText(
   db: DatabaseExecutor,
   surah: number,
@@ -366,7 +349,6 @@ export async function buildAyahCopyText(
   });
 }
 
-/** Opening Unicode words of each ayah, keyed "surah:ayah", for bookmark rows. */
 export async function fetchAyahOpenings(
   db: DatabaseExecutor,
   refs: readonly { surah: number; ayah: number }[],

@@ -7,8 +7,6 @@ import { toArabicNumber } from "@/lib/arabic";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 
-// White labels read at 4.5:1 or more on every fill. Hard and Good keep their light fills in dark themes,
-// since the brighter amber and green fall to about 3.2:1.
 const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
   { rating: Rating.Again, bgLight: "#b91c1c", bgDark: "#dc2626" },
   { rating: Rating.Hard, bgLight: "#b45309", bgDark: "#b45309" },
@@ -16,12 +14,6 @@ const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
   { rating: Rating.Easy, bgLight: "#1d4ed8", bgDark: "#2563eb" },
 ];
 
-/**
- * The four FSRS grades with their next-review previews. A recitation can pass the rubric's proposal
- * (GRD-02), shown as a ring the user can override with one tap, and the support level's cap
- * (GRD-03): grades above it are disabled. A caption above the row names the suggestion and the cap,
- * so a muted grade always has its reason in view. Without either, the row is the plain flashcard row.
- */
 export function GradingButtons({
   onGrade,
   previews,
@@ -40,12 +32,7 @@ export function GradingButtons({
   disabled?: boolean;
   proposed?: Grade | null;
   maxRating?: Grade;
-  /** Direction of the caption. */
   dir?: "ltr" | "rtl";
-  /**
-   * Run the row Again to Easy from the start of the reading direction, so Arabic reads it from the
-   * right. Only the visual order moves: each button keeps its grade, and keys 1 to 4 keep theirs.
-   */
   mirrorInRTL?: boolean;
 }) {
   const labels: Record<number, string> = {
@@ -55,7 +42,6 @@ export function GradingButtons({
     [Rating.Easy]: s.flashcardsEasy,
   };
   const capped = maxRating < Rating.Easy;
-  // Every button gets the same ring space when a suggestion is shown, so no label shifts.
   const ringSpace = proposed !== null ? 3 : 0;
   const ringColor = isDark ? "#FDDC91" : "#2D2D2D";
   const captions = [
@@ -108,19 +94,16 @@ export function GradingButtons({
                   className="items-center justify-center px-1.5 py-2.5"
                   style={{ backgroundColor: isCapped ? undefined : isDark ? bgDark : bgLight, minHeight: 58 }}
                 >
-                  {/* Long labels wrap and the button grows instead of shrinking the type. */}
                   <Text
                     className={isCapped ? "text-warm-500 dark:text-neutral-500" : undefined}
                     style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: "center", color: isCapped ? undefined : "#fff" }}
                   >
                     {labels[rating]}
                   </Text>
-                  {/* A capped grade cannot be chosen, so it shows no next-review interval. */}
                   {previews[rating] && !isCapped ? (
                     <Text
                       style={{
                         textAlign: "center",
-                        // Solid white at 11 px reads at 4.5:1 or more on every fill.
                         color: "#fff",
                         fontFamily: "Manrope_600SemiBold",
                         fontSize: 11,
@@ -157,7 +140,6 @@ export function getGradeSchedulePreviews(
     });
     const stepLabel = getLearningStepPreview(transition.updatedCard, settings, isRTL);
     const returnLabel = formatReturnDelay(new Date(transition.updatedCard.due), now, isRTL);
-    // A middle dot reads as the Arabic zero (٠) beside Arabic-Indic digits, so Arabic uses its comma.
     previews[rating] = stepLabel ? `${stepLabel}${isRTL ? "، " : " · "}${returnLabel}` : returnLabel;
   }
 
@@ -183,7 +165,6 @@ function getLearningStepPreview(
 
 function formatReturnDelay(due: Date, now: Date, isRTL: boolean): string {
   const minutes = Math.ceil(Math.max(0, due.getTime() - now.getTime()) / 60000);
-  // Arabic unit letters sit after a no-break space so they do not run into the digits.
   const units = isRTL
     ? { minute: "\u00A0د", hour: "\u00A0س", day: "\u00A0ي", month: "\u00A0ش", year: "\u00A0سنة" }
     : { minute: "m", hour: "h", day: "d", month: "mo", year: "y" };

@@ -16,10 +16,6 @@ import { socialRowStyle, useSocialAccent } from "./SocialControls";
 type Language = "en" | "ar";
 type JoinedView = Exclude<BoardView, { status: "not_joined" }>;
 
-/**
- * BRD-05 and BRD-08: this week's cohort. Standings show only once the group has enough people; each
- * row is a name or nickname, weekly consistency points and streak. Leaving is one tap (BRD-04).
- */
 export function BoardStandings({
   view,
   leaving,

@@ -36,7 +36,6 @@ describe("Home's teacher sabaq (SOC-03)", () => {
     jest.mocked(assignedSabaqOpen).mockResolvedValue(false);
     rerender({ key: 2 });
     await waitFor(() => expect(result.current).toBeNull());
-    // A minute has not passed, so the server is not asked again; only the lines are checked.
     expect(loadMySabaqAssignment).toHaveBeenCalledTimes(1);
     expect(assignedSabaqOpen).toHaveBeenCalledTimes(2);
   });
@@ -79,7 +78,6 @@ describe("Home's teacher sabaq (SOC-03)", () => {
     await waitFor(() => expect(result.current).toEqual(ASSIGNED));
     let older: (value: typeof ASSIGNED | null) => void = () => undefined;
     jest.mocked(loadMySabaqAssignment).mockReturnValueOnce(new Promise((resolve) => (older = resolve)));
-    // A read starts (the freshness window was cleared), then a forget arrives before it answers.
     act(() => mockListeners.forEach((listener) => listener()));
     expect(result.current).toBeNull();
     jest.mocked(loadMySabaqAssignment).mockResolvedValue(null);

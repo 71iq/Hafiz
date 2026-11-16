@@ -74,16 +74,12 @@ export function WordDetailSheet() {
     previous: null,
     next: null,
   });
-  // The colour tajweed font draws black base glyphs on Android in dark themes, as in the reader, so
-  // those themes show the header word in the classic font there.
   const headerFontStyle = Platform.OS !== "web" && isDark ? "qcf2" : WORD_HEADER_FONT_STYLE;
   const wordHeaderFontReady = useQuranPageFontReady(headerFontStyle, detailWord?.v2Page);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>(EMPTY_META);
   const contentScrollRef = useRef<ScrollView>(null);
   const keyScopeRef = useRef<View>(null);
 
-  // Every close path (close button, Back, Escape, backdrop, an occurrence or ayah jump that closes
-  // the sheet from the reader) leaves no word open, so the next word always starts on Meaning.
   if (!detailWord && (activeTab !== "meaning" || ayahModalOpen)) {
     setActiveTab("meaning");
     setAyahModalOpen(false);
@@ -221,7 +217,6 @@ export function WordDetailSheet() {
     return () => cancelAnimationFrame(frame);
   }, [activeTab, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
 
-  // Copies the Unicode Uthmani word, never the page-font glyph code points shown above.
   const copyWord = useCallback(async () => {
     const text = headerMeta.wordText?.trim();
     if (!text) return;
@@ -309,7 +304,6 @@ export function WordDetailSheet() {
 
           <View className="flex-1 min-h-0">
             <View className={`px-4 py-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
-              {/* Glyphs mounted before their page font exists render and measure in the system font. */}
               {wordHeaderFontReady ? (
                 <Pressable
                   onLongPress={copyWord}
@@ -341,7 +335,6 @@ export function WordDetailSheet() {
                     fontFamily: "Manrope_500Medium",
                     fontSize: 14,
                     lineHeight: 22,
-                    // The gloss follows its own language, English in English and Arabic in Arabic.
                     writingDirection: isArabicMode ? "rtl" : "ltr",
                     ...textStartStyle(isRTL),
                   }}

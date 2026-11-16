@@ -4,19 +4,12 @@ import { useDatabaseStatus } from "@/lib/database/provider";
 import { strings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 
-/**
- * Playwright/web QA probe route.
- * Use this page as a deterministic gate before screenshot flows:
- * - wait for "QA_READY" text
- * - then navigate to target routes in the same tab/session.
- */
 export default function QaReadyScreen() {
   const { isReady, error } = useDatabaseStatus();
   const s = strings[getStartupLanguage()];
 
   return (
     <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
-      {/* A test probe, not a page for search engines. The QA_* tokens below stay in English for tooling. */}
       <Head>
         <meta name="robots" content="noindex, nofollow" />
       </Head>

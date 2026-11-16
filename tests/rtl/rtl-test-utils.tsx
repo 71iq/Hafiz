@@ -26,10 +26,6 @@ export function expectWritingDirection(node: RtlTestNode, dir: Direction) {
   expect(getStyleValue(node, "writingDirection")).toBe(dir);
 }
 
-/**
- * Start alignment as the shared direction helpers express it: web keeps the physical side, while
- * native pins the text's own direction and aligns "left", which React Native treats as the start.
- */
 export function expectTextAlignStart(node: RtlTestNode, dir: Direction) {
   if (Platform.OS === "web") {
     expect(getStyleValue(node, "textAlign")).toBe(dir === "rtl" ? "right" : "left");
@@ -39,7 +35,6 @@ export function expectTextAlignStart(node: RtlTestNode, dir: Direction) {
   expect(getStyleValue(node, "direction")).toBe(dir);
 }
 
-/** A TextInput maps textAlign to physical sides on native, so inputs align to the physical start side. */
 export function expectInputTextAlignStart(node: RtlTestNode, dir: Direction) {
   expect(getStyleValue(node, "textAlign")).toBe(dir === "rtl" ? "right" : "left");
   expect(getStyleValue(node, "writingDirection")).toBe(dir);

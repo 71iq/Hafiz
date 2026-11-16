@@ -1,10 +1,6 @@
-/**
- * W08 deck settings, card management and review. Spread into lib/i18n/strings.ts. Keep English and Arabic keys in parity.
- */
 export const decksStrings = {
   en: {
     decksTryAgain: "Try again",
-    // Deck settings
     deckReviewSettingsSubtitle: "Review settings",
     deckLeftToday: "{{n}} left today",
     deckSettingsSavedNamed: "{{deck}} settings saved",
@@ -19,7 +15,6 @@ export const decksStrings = {
     deckKeepOneSide: "Keep at least one side on",
     deckWordSideArabicDesc: "Shows the word and asks for its Arabic meaning.",
     deckWordSideTranslationDesc: "Shows the word and asks for its translation.",
-    // Deck scope
     deckScopeAll: "All",
     deckScopeBySurah: "By surah",
     deckScopeByJuz: "By juz",
@@ -37,7 +32,6 @@ export const decksStrings = {
     deckScopeSelectSurah: "Select at least one surah",
     deckScopeSelectJuz: "Select at least one juz",
     deckScopeJuzLabel: "Juz {{n}}",
-    // Card list
     deckCardsSubtitle: "{{deck}} · {{cards}}",
     deckCardsShowing: "Showing {{shown}} of {{total}}",
     deckCardsNoCardsYet: "This deck has no cards yet",
@@ -47,7 +41,6 @@ export const decksStrings = {
     cardDeleteNamed: "Delete {{card}}?",
     cardResetNamed: "Reset {{card}}?",
     cardOpenInReader: "Open in reader",
-    // Review session
     sessionEndReview: "End review",
     sessionContextShown: "({{ayahs}} shown for context)",
     sessionNextSide: "Next ({{current}}/{{total}})",

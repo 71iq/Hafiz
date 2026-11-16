@@ -128,7 +128,6 @@ test("front-card action failure stays visible above Reveal", async ({ browser, b
       }),
     ).toBe(true);
     expect(actionWarnings).toHaveLength(1);
-    // This installed SQLite web driver replaces the trigger reason while finalizing the failed statement.
     expect(actionWarnings[0]).toContain("Error finalizing statement");
     expect(
       await fixtureQuery(
@@ -469,7 +468,6 @@ test("deck date-save failure stays inside the active date editor", async ({ brow
     await expect(page.getByRole("radio", { name: "Dark", exact: true })).toBeChecked();
     await page.goto("/home", { waitUntil: "domcontentloaded" });
     await expect(page.locator("html")).toHaveClass(/dark/);
-    // Home renders Retention first in its fixed smart-deck definition order.
     await page.getByRole("button", { name: "Deck Cards", exact: true }).first().click();
     const deck = page.getByRole("dialog").filter({ has: page.getByPlaceholder("Search cards...", { exact: true }) });
     await expect(deck).toBeVisible();
@@ -603,7 +601,6 @@ test("deck delete failure stays inside the active confirmation dialog", async ({
     await expect(page.getByRole("radio", { name: "Dark", exact: true })).toBeChecked();
     await page.goto("/home", { waitUntil: "domcontentloaded" });
     await expect(page.locator("html")).toHaveClass(/dark/);
-    // Home renders Retention first in its fixed smart-deck definition order.
     await page.getByRole("button", { name: "Deck Cards", exact: true }).first().click();
     const deck = page.getByRole("dialog").filter({ has: page.getByPlaceholder("Search cards...", { exact: true }) });
     await expect(deck).toBeVisible();

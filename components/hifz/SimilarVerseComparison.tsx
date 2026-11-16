@@ -22,20 +22,12 @@ type Props = {
   width: number;
 };
 
-/** Siblings shown at first in a group; a group can hold up to 29, so the rest wait behind a button. */
 const SIBLINGS_SHOWN = 3;
 
 function verseKey(ref: SimilarRef): string {
   return `${ref.surah}:${ref.ayah}`;
 }
 
-/**
- * MUT-01, MUT-05: the sabaq step that compares each chunk ayah with the similar verses already
- * memorized, one card per group. The verse being memorized shows its meaning in the interface
- * language; each sibling's waits behind "Show translation", and a group shows its first three
- * siblings, then "Show n more", so a page with many similar verses stays short. The meanings are read
- * once for the step, not on each render.
- */
 export function SimilarVerseComparison({ db, groups, language, isRTL, accent, s, width }: Props) {
   const meanings = useVerseMeanings(
     db,
@@ -64,8 +56,6 @@ export function SimilarVerseComparison({ db, groups, language, isRTL, accent, s,
         const hidden = group.siblings.length - shown.length;
         return (
           <Card key={groupKey} elevation="low" className="p-4" style={{ gap: 12 }}>
-            {/* The verse being memorized against each sibling, and each sibling against it: the words that
-                differ, in order, are underlined (MUT-01). */}
             <SimilarVerseLine
               reference={group.self}
               isRTL={isRTL}
@@ -78,7 +68,6 @@ export function SimilarVerseComparison({ db, groups, language, isRTL, accent, s,
               const key = `${groupKey}-${verseKey(sibling)}`;
               const meaning = meaningOf(sibling);
               return (
-                // A rule above each sibling, so a meaning reads with the verse above it, not the next.
                 <View key={key} className="pt-3 border-t border-warm-200 dark:border-neutral-800" style={{ gap: 4 }}>
                   <SimilarVerseLine
                     reference={sibling}

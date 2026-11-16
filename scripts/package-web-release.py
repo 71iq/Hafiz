@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Package the Expo export without source, credentials or native build files."""
 import hashlib
 import io
 import json

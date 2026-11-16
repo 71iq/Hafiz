@@ -94,12 +94,10 @@ describe("tiers (3.2, 8.6)", () => {
 
   it("graduates a page by time before its next grade, so later Again grades do not send it back (TIER-01)", () => {
     const memorized = (grades: GradeEvent[]) => tierFor({ declared: false, firstFluentDate: addDays(TODAY, -30), grades }, TODAY, plan);
-    // Three Good grades early in sabqi, then no grade until well past sabqi_days: manzil by time alone.
     const early = [grade(29, 3), grade(28, 3), grade(27, 3)];
     expect(memorized(early)).toBe("manzil");
     expect(memorized([...early, grade(5, 1)])).toBe("manzil.needs_work");
     expect(memorized([...early, grade(5, 1), grade(4, 1)])).toBe("manzil.needs_work");
-    // Before sabqi_days have passed, two Again grades in a row still send the page back.
     expect(memorized([...early, grade(26, 1), grade(25, 1)])).toBe("sabaq");
   });
 
@@ -146,7 +144,6 @@ const input = (pages: PlanPage[], overrides: Partial<Parameters<typeof buildDail
 describe("daily plan (4.3.1)", () => {
   it("takes ceil(O / C) of the oldest manzil pages plus every overdue page, sabqi first", () => {
     const manzil = Array.from({ length: 40 }, (_, i) => page(i + 1, { lastReviewDate: addDays(TODAY, -(i % 25) - 1) }));
-    // Past its floor date, so its recall is the lowest of the slice.
     const overdue = page(100, { lastReviewDate: addDays(TODAY, -33), retrievability: 0.6 });
     const sabqi = page(200, { tier: "sabqi", lastReviewDate: addDays(TODAY, -1) });
     const result = buildDailyPlan(input([...manzil, overdue, sabqi]));
@@ -172,7 +169,6 @@ describe("daily plan (4.3.1)", () => {
     const unchecked = page(3, { tier: "manzil.unverified", lastReviewDate: null, retrievability: null });
     const others = Array.from({ length: 60 }, (_, i) => page(10 + i, { lastReviewDate: addDays(TODAY, -(i % 20) - 1) }));
     const result = buildDailyPlan(input([strong, weak, unchecked, ...others]));
-    // The floor still takes the oldest reviews; within it the weaker page comes first.
     expect(result.floor.slice(0, 3).map((item) => item.page)).toEqual([3, 2, 1]);
   });
 
@@ -184,7 +180,6 @@ describe("daily plan (4.3.1)", () => {
   });
 
   it("waits for a new sabqi page's first due date before its first review", () => {
-    // Completed through sabaq today: no page review yet, due tomorrow at local midnight.
     const fresh = page(200, { tier: "sabqi", lastReviewDate: null, dueDate: addDays(TODAY, 1), retrievability: null });
     expect(buildDailyPlan(input([fresh])).sabqi).toEqual([]);
     const dueToday = { ...fresh, dueDate: TODAY };
@@ -194,7 +189,6 @@ describe("daily plan (4.3.1)", () => {
   it("adds manzil pages FSRS wants sooner and pages that need work, needs-work first", () => {
     const weak = page(5, { retrievability: 0.8 });
     const work = page(6, { tier: "manzil.needs_work" });
-    // The strong page is the oldest, so it fills the one floor place.
     const strong = page(7, { retrievability: 0.99, lastReviewDate: addDays(TODAY, -20) });
     const result = buildDailyPlan(input([weak, work, strong], { plan: { ...plan, cycleDays: 1000, dailyBudgetMin: 60 } }));
     expect(result.extra.map((p) => p.page)).toEqual([6, 5]);
@@ -262,7 +256,6 @@ describe("plan setting", () => {
         newPerDay: 1,
         sabaqRepetitions: { listen: 3, looking: 10, cleanInARow: 3 },
       });
-      // A partly saved set keeps the counts it has and takes the default for the rest.
       expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: { looking: 20 } }))?.sabaqRepetitions).toEqual({
         listen: 3,
         looking: 20,
@@ -354,7 +347,6 @@ describe("memorized pages and today's wird (ONB-04, PLAN-01)", () => {
     expect(first.todo.length).toBe(2);
     const target = first.todo[0];
     const card = store.sql.prepare("SELECT * FROM study_cards WHERE id = ?").get(target.cardId) as never;
-    // The page's own policy: a declared page has no learning steps, so Good schedules it days out.
     const reviewPolicy = pagePolicy("manzil.unverified", { ...plan, cycleDays: 10 }, DEFAULT_DECK_REVIEW_SETTINGS);
     const transition = calculateReviewTransition({ card, rating: Rating.Good, reviewedAt: atLocalTime(TODAY, 610), reviewPolicy });
     await persistReviewTransition({ db: store.db, cardId: target.cardId, transition });
@@ -383,23 +375,19 @@ describe("memorized pages and today's wird (ONB-04, PLAN-01)", () => {
         now: at,
       });
     };
-    // Page 1 was checked 12 days ago, so like page 2 it is past its 10-day floor today.
     await gradePage(1, Rating.Good, atLocalTime(start, 610));
     const morning = (await loadTodayWird(store.db, atLocalTime(TODAY, 600)))!;
     expect(morning.todo.map((p) => p.page).sort()).toEqual([1, 2]);
 
     const again = await gradePage(1, Rating.Again, atLocalTime(TODAY, 610));
     expect(again.transition.updatedCard.state).toBe(State.Relearning);
-    // 10:30: the 10-minute step is due. The page is pending again after the planned page, and still done.
     const due = (await loadTodayWird(store.db, atLocalTime(TODAY, 630)))!;
     expect(due.todo.map((p) => p.cardId)).toEqual([pageCardId(2), pageCardId(1)]);
     expect(due.done.map((p) => p.cardId)).toEqual([pageCardId(1)]);
     expect(due.total).toBe(2);
     expect(due.remainingMinutes).toBe(2 * due.minutesPerReviewPage);
-    // The day's floor share still counts the page once, as reviewed today.
     expect(due.daily.done.map((p) => p.cardId)).toEqual([pageCardId(1)]);
 
-    // Good moves it to the next-day step: it leaves pending and keeps its one place in done.
     const good = await gradePage(1, Rating.Good, atLocalTime(TODAY, 631));
     expect(localDateOf(new Date(good.transition.updatedCard.due)) > TODAY).toBe(true);
     const after = (await loadTodayWird(store.db, atLocalTime(TODAY, 640)))!;
@@ -430,7 +418,6 @@ describe("memorized pages and today's wird (ONB-04, PLAN-01)", () => {
     await gradePage(Rating.Good, atLocalTime(start, 610));
     const again = await gradePage(Rating.Again, atLocalTime(TODAY, 600));
     expect(again.transition.updatedCard.state).toBe(State.Relearning);
-    // A step longer than the learn-ahead window, as the sabaq tier's 1-hour step.
     store.sql.prepare("UPDATE study_cards SET due = ? WHERE id = ?").run(atLocalTime(TODAY, 780).toISOString(), pageCardId(1));
     const waiting = (await loadTodayWird(store.db, atLocalTime(TODAY, 610)))!;
     expect(waiting.todo).toEqual([]);

@@ -15,10 +15,6 @@ import {
   type ReminderPrefs,
 } from "@/lib/notifications/types";
 
-/**
- * Synced preferences live under `notif_pref_` (spec 7.6), which is on the sync allowlist.
- * Everything else here is device-local: permission prompts, back-off and pending follow-ups.
- */
 const PREF_PREFIX = "notif_pref_";
 const PREF_KEYS = {
   enabled: "notif_pref_enabled",
@@ -31,7 +27,6 @@ export function typePrefKey(type: NotificationType): string {
   return `${PREF_PREFIX}${type}`;
 }
 
-/** Device-local keys. None starts with `notif_pref_`, so none is uploaded. */
 export const LOCAL_KEYS = {
   optInPrompts: "notif_optin_prompts",
   backoff: "notif_backoff",
@@ -88,7 +83,6 @@ async function readSettings(db: DatabaseExecutor, where: string, params: string[
   return new Map(rows.map((row) => [row.key, row.value]));
 }
 
-/** The hifz plan's "when" (3.3) is the reminder time, so the two can never disagree. */
 function anchorFromPlan(anchor: HifzPlan["anchor"]): ReminderAnchor {
   return anchor.kind === "prayer"
     ? { kind: "prayer", prayer: anchor.prayer, offsetMinutes: Math.min(anchor.offsetMin, MAX_PRAYER_OFFSET_MINUTES) }
@@ -104,11 +98,9 @@ function anchorToPlan(anchor: ReminderAnchor): HifzPlan["anchor"] {
 export async function readReminderPrefs(db: DatabaseExecutor): Promise<ReminderPrefs> {
   const [values, plan] = await Promise.all([readSettings(db, "key LIKE ?", [`${PREF_PREFIX}%`]), readHifzPlan(db)]);
   const prefs = parseReminderPrefs(values);
-  // Without a hifz plan (the ayah review without setup), the reminder keeps its own anchor.
   return plan ? { ...prefs, anchor: anchorFromPlan(plan.anchor) } : prefs;
 }
 
-/** Each change writes one key, so turning one type off never touches the others (NOT-11). */
 export type ReminderPrefChange =
   | { kind: "enabled"; value: boolean }
   | { kind: "type"; type: NotificationType; value: boolean }
@@ -145,7 +137,6 @@ export async function writeLocalSetting(db: DatabaseExecutor, key: string, value
   else await putUserSetting(db, key, JSON.stringify(value));
 }
 
-/** The UI language stored by the settings provider. */
 export async function readUiLanguage(db: DatabaseExecutor): Promise<"en" | "ar"> {
   const values = await readSettings(db, "key = ?", ["ui_language"]);
   return values.get("ui_language") === "ar" ? "ar" : "en";
@@ -158,36 +149,22 @@ export const optInPromptsSchema = z.object({
 export type OptInPrompts = z.infer<typeof optInPromptsSchema>;
 
 export const backoffSchema = z.object({
-  /**
-   * Reminders ignored since `since`, kept as a running total: log rows older than 90 days are pruned,
-   * but the reminders they record stay ignored until the next session.
-   */
   consecutive_ignored: z.number().int().min(0),
   level: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-  /** The latest session when the count was taken, null before any session. A new one resets it. */
   since: z.string().nullable().optional(),
-  /** The last log row already counted, so a run adds only rows after it (lib/notifications/log.ts). */
   cursor: z.object({ at: z.string(), id: z.string() }).nullable().optional(),
 });
 export type BackoffState = z.infer<typeof backoffSchema>;
 
 const localDate = z.string().refine(isLocalDate);
 
-/** A "Remind me in 1 hour" follow-up waiting to fire (NOT-05b). */
 export const remindLaterSchema = z.object({
   at: z.string(),
   local_date: localDate,
-  /** The streak state when it was scheduled. A different state skips the follow-up. */
   fingerprint: z.string(),
 });
 export type RemindLaterPending = z.infer<typeof remindLaterSchema>;
 
-/**
- * Encouragements received and not yet notified (5.8.2). Each batch belongs to the account that
- * received it and becomes at most one notification; only the signed-in account's batches are
- * scheduled. A batch records the log row of the notification that carries it, so that notification's
- * delivery retires that batch alone, and arrivals after it start a new batch.
- */
 const groupBatchSchema = z.object({
   id: z.string(),
   account_id: z.string(),
@@ -198,7 +175,6 @@ const groupBatchSchema = z.object({
 export type GroupBatch = z.infer<typeof groupBatchSchema>;
 export const groupPendingSchema = z.object({ batches: z.array(groupBatchSchema) });
 
-/** The batch the planner places: when its first encouragement arrived and how many it holds. */
 export type GroupPending = Readonly<Pick<GroupBatch, "first_received_at" | "count">>;
 
 export const ramadanOfferSchema = z.object({ hijri_year: z.number().int() });

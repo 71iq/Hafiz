@@ -48,7 +48,6 @@ describe("smart-deck and review queue SQLite contracts", () => {
       deleted_at TEXT
     );
     `);
-    // Only this test boundary adapts Expo's wider native API to real in-memory SQLite.
     const adapter = {
       getAllAsync: jest.fn(async (query: string, params: (string | number | null)[] = []) =>
         sql.prepare(query).all(...params),

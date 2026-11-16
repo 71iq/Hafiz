@@ -1,10 +1,6 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 
-// Spec 7.6: plan, habit and personal-weight settings sync. Hifz plan keys are listed one by one
-// because hifz_auto_delay_ms and hifz_auto_advance_page are reader preferences that stay on the device.
-// Device-only keys use "device_" or "notif_" names outside these lists (the prayer location never
-// leaves the device).
 const SYNCABLE_SETTING_PREFIXES = [
   "deck_",
   "review_settings_",
@@ -24,7 +20,6 @@ const SYNCABLE_SETTING_KEYS = new Set([
   "hifz_t_new",
   "hifz_t_rev",
   "hifz_manzil_cycle_start",
-  // UNIT-02: the ayah deck's new-card limit before a switch to page review, restored on switching back.
   "hifz_ayah_new_cards_limit",
 ]);
 
@@ -48,10 +43,6 @@ export function userSettingToSyncData(row: UserSettingRow): Record<string, strin
   };
 }
 
-/**
- * Write one setting with the given executor. A syncable key also queues its upload, so pass a
- * transaction when the two writes must commit together.
- */
 export async function putUserSetting(db: DatabaseExecutor, key: string, value: string): Promise<void> {
   const updatedAt = new Date().toISOString();
   await db.runAsync(
@@ -67,7 +58,6 @@ export async function putUserSetting(db: DatabaseExecutor, key: string, value: s
   });
 }
 
-/** Delete one setting with the given executor, queueing a syncable key's tombstone. */
 export async function removeUserSetting(db: DatabaseExecutor, key: string): Promise<void> {
   const deletedAt = new Date().toISOString();
   await db.runAsync("DELETE FROM user_settings WHERE key = ?", [key]);
@@ -80,13 +70,11 @@ export async function removeUserSetting(db: DatabaseExecutor, key: string): Prom
   });
 }
 
-/** Save a setting. A syncable key and its queued upload commit together or not at all. */
 export async function writeUserSetting(db: AppDatabase, key: string, value: string): Promise<void> {
   if (!isSyncableUserSetting(key)) return putUserSetting(db, key, value);
   await db.withTransactionAsync((tx) => putUserSetting(tx, key, value));
 }
 
-/** Delete a setting. A syncable key and its queued tombstone commit together or not at all. */
 export async function deleteUserSetting(db: AppDatabase, key: string): Promise<void> {
   if (!isSyncableUserSetting(key)) return removeUserSetting(db, key);
   await db.withTransactionAsync((tx) => removeUserSetting(tx, key));

@@ -134,7 +134,6 @@ jest.mock("@/components/flashcards/SmartDeckFilterSheet", () => ({
   },
 }));
 jest.mock("@/components/SearchCommand", () => ({ SearchCommand: () => null }));
-// The wird card and break sheet have their own tests; this file covers the deck rows.
 jest.mock("@/lib/habit/use-habit-overview", () => ({
   useHabitOverview: () => ({ overview: null, failed: false, refresh: async () => {} }),
 }));
@@ -163,7 +162,6 @@ function card(view: ReturnType<typeof render>, title: string) {
   if (!node) throw new Error("Missing real deck card");
   return node;
 }
-/** The deck's start target: a sibling behind the content, labeled with the deck title. */
 function startTarget(view: ReturnType<typeof render>, title: string) {
   return within(card(view, title)).getByLabelText(title);
 }
@@ -190,7 +188,6 @@ beforeEach(() => {
     .mocked(getDeckTodayStats)
     .mockImplementation(async (_db, id) => ({ ...(id === MEANINGS_DECK_ID ? vocabStats : smartStats) }));
   jest.mocked(readSmartDeckFilter).mockResolvedValue({ type: "all" });
-  // Home passes this untouched to the mocked stats adapter; scheduling is outside these tests.
   jest
     .mocked(readDeckReviewSettings)
     .mockImplementation(
@@ -213,7 +210,6 @@ afterEach(() => {
 });
 
 describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %s", (language) => {
-  // Arabic shows Arabic-Indic digits, matching the reader.
   const num = (value: number | string) => (language === "ar" ? toArabicNumber(Number(value)) : String(value));
   beforeEach(() => {
     Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar" });
@@ -271,7 +267,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
         flexDirection: language === "ar" ? "row-reverse" : "row",
       });
       expect(scope.getByText(num(stats.total))).toBeTruthy();
-      // New and Due are colored only above zero; a zero stays muted.
       const newNodes = scope.getAllByText(num(stats.newCount));
       const dueNodes = scope.getAllByText(num(stats.dueCount));
       expect(newNodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? "#4ade80" : "#16a34a"))).toBe(
@@ -280,19 +275,16 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
       expect(dueNodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? "#f87171" : "#dc2626"))).toBe(
         stats.dueCount > 0,
       );
-      // Without cards for today the caption says so instead of "0 left today".
       if (stats.newCount + stats.dueCount === 0) expect(scope.getByText(s.homeDeckNothingDue, { includeHiddenElements: true })).toBeTruthy();
       const start = startTarget(view, title);
       expect(start.props.accessibilityRole).toBe("button");
       expect(StyleSheet.flatten(start.props.style)).toMatchObject({ position: "absolute", backgroundColor: "transparent" });
-      // The card-list control is a sibling of the start target, never a button nested inside it.
       let parent = scope.getByLabelText(s.deckCardsTitle).parent;
       while (parent && parent !== node) {
         expect(parent).not.toBe(start);
         parent = parent.parent;
       }
     }
-    // Both settings controls are labeled buttons.
     const smartControl = within(smart).getByLabelText(s.smartDeckFilterTitle);
     expect(smartControl.props.accessibilityRole).toBe("button");
     const stop = jest.fn();
@@ -328,7 +320,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(filter().visible).toBe(false);
     expect(mockRouterPush).not.toHaveBeenCalled();
     act(() => review().onClose());
-    // All four handlers also accept an event without stopPropagation.
     fireEvent.press(within(smart).getByLabelText(s.deckCardsTitle), {});
     expect(cards().deckId).toBe(SMART_DECK_IDS.retention);
     act(() => cards().onClose());
@@ -342,7 +333,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(review().deckId).toBe(MEANINGS_DECK_ID);
     act(() => review().onClose());
     expect(mockRouterPush).not.toHaveBeenCalled();
-    // A deck with only future cards opens its card list instead of an empty session.
     fireEvent.press(startTarget(view, s.smartDeckRetentionTitle));
     expect(cards()).toMatchObject({ visible: true, deckId: SMART_DECK_IDS.retention });
     act(() => cards().onClose());
@@ -373,7 +363,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
       );
     const view = await home();
     const s = strings[language];
-    // Five smart decks offer 4 new and 2 due each; the vocabulary deck offers 7 new and 11 due.
     expect(view.getByText(num(48))).toBeTruthy();
     fireEvent.press(view.getByText(s.flashcardsStartReview));
     expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/flashcards/session", params: {} });
@@ -394,7 +383,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     {
       name: "surah range",
       value: { type: "surah", surahs: [7], ranges: [{ surah: 7, ayahStart: 3, ayahEnd: 5 }] },
-      // English uses the transliterated surah name; the "Surah:" prefix is gone.
       tail: () => (language === "ar" ? "اسم تجريبي" : "Al-Araf") + ` ${num(3)}-${num(5)}`,
     },
     {
@@ -422,7 +410,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     {
       name: "juz",
       value: { type: "juz", juzNumbers: [2, 5] },
-      // Arabic digits and comma in Arabic.
       tail: () => (language === "ar" ? `الجزء ${num(2)}، ${num(5)}` : "Juz 2, 5"),
     },
   ] satisfies { name: string; value: BuiltInDeckFilter; tail: (s: UIStrings) => string }[])(

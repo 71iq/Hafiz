@@ -73,9 +73,7 @@ describe("public page content contracts", () => {
       expect(content.title.trim()).toBeTruthy();
       expect(content.description.trim()).toBeTruthy();
       expect(content.sections.length).toBeGreaterThanOrEqual(minimumSectionCounts[pageKey]);
-      // Section anchors are unique so the table of contents can link to each one.
       expect(new Set(content.sections.map((section) => section.id)).size).toBe(content.sections.length);
-      // Unrendered action lists are gone.
       expect("actions" in content).toBe(false);
 
       for (const section of content.sections) {

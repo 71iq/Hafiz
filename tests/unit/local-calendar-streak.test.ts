@@ -3,8 +3,6 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { dayIndexFromLocalDateKey, dayIndexFromUtcDateKey } from "@/lib/date";
 import { getReviewStats } from "@/lib/fsrs/queries";
 
-// Review stats never read the network; the public streak board and daily_scores were retired. The wird
-// streak itself lives in lib/habit and is tested in habit-core and habit-wird-progress.
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
   supabase: {
@@ -65,8 +63,6 @@ describe.each([
     const adapter = {
       getAllAsync: async (query: string) => sql.prepare(query).all(),
     };
-    // Match the established Node SQLite fixture pattern. Only getAllAsync is
-    // implemented; an unexpected native method fails instead of being faked.
     db = adapter as unknown as SQLiteDatabase;
   });
 

@@ -15,7 +15,6 @@ const mockFiles = new Map<string, string>();
 const mockDeleted: string[] = [];
 const CACHE = "file:///data/user/0/synthetic/cache/";
 
-// Like expo-asset: one Asset object per module, and downloadAsync is a no-op once downloaded.
 function mockAsset(id: number, name: string, source: string, cacheUri: string | null) {
   const asset: MockAsset = {
     name,
@@ -144,7 +143,6 @@ describe("RF-188 bundled native datasets", () => {
       expect(fs.existsSync(path.join(root, "assets/native-data/readme.hafizdata"))).toBe(false);
       expect(mirrorNativeData(root)).toBe(0);
 
-      // A checkout replaces the file with a new inode; the mirror must follow it.
       fs.rmSync(path.join(root, "assets/data/tafseer/1.json"));
       fs.writeFileSync(path.join(root, "assets/data/tafseer/1.json"), '{"a":2}');
       expect(mirrorNativeData(root)).toBe(1);

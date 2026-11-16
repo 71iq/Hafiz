@@ -1,10 +1,5 @@
 import { State } from "@/lib/fsrs/scheduler";
 
-/**
- * Semantic colors for card states and review sides, one set for the light palettes (White, Beige)
- * and one for the dark ones (Dark, AMOLED); System follows whichever is active. White text reads at
- * 4.5:1 or more on every fill, and each `text` color reads at 4.5:1 or more on its themes' surfaces.
- */
 export type ReviewColorToken = { fill: string; onFill: string; text: string };
 
 const LIGHT_STATES: Record<number, ReviewColorToken> = {

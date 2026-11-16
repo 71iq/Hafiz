@@ -49,7 +49,6 @@ export function WebSelectionMenu() {
   const [menuHeight, setMenuHeight] = useState(MENU_COLLAPSED_HEIGHT);
   const latestMenuRef = useRef<MenuState | null>(null);
   const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Where keyboard focus was when the menu opened, so closing returns it to the reader.
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const busy = busyAction !== null;
   const shareSupported = canWebShare();
@@ -193,8 +192,6 @@ export function WebSelectionMenu() {
       scheduleSelectionMenu();
     };
 
-    // C02/C07: the menu is the topmost surface while open, so Escape closes it (and clears the
-    // selection) before any reader shortcut. Shift+F10 or the context-menu key opens it.
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.isComposing) return;
       if (event.key === "Escape" && latestMenuRef.current) {
@@ -307,8 +304,6 @@ export function WebSelectionMenu() {
     }
   }, [buildCopyText, busy, closeMenu, menu, s.copied, s.copyFailed, showToast]);
 
-  // Web Share runs only from this press (a user action) and carries the same text as Copy. A
-  // dismissed share sheet is not a failure and is not announced as a success either.
   const handleShare = useCallback(async () => {
     if (!menu || busy || !canWebShare()) return;
     setBusyAction("share");
@@ -382,7 +377,6 @@ export function WebSelectionMenu() {
   const menuButtonProps = { onMouseDown: (event: any) => event.preventDefault() } as any;
   const selectionHighlighted = highlightIdsForRefs(menu.refs).length > 0;
   const menuWidth = Math.min(MENU_WIDTH, window.innerWidth - VIEWPORT_GUTTER * 2);
-  // The measured height keeps the menu inside the viewport when its labels wrap.
   const top = Math.max(VIEWPORT_GUTTER, Math.min(menu.y, window.innerHeight - menuHeight - VIEWPORT_GUTTER));
 
   const actionButton = (

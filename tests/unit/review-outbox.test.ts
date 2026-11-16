@@ -27,7 +27,6 @@ function card(): StudyCardRow | undefined {
   return store.sql.prepare("SELECT * FROM study_cards WHERE id = ?").get(CARD) as StudyCardRow | undefined;
 }
 
-/** Wait for detached post-commit work, such as achievement events, to leave the owner queue. */
 async function settle() {
   await store.db.getFirstAsync("SELECT 1");
 }
@@ -50,7 +49,6 @@ describe("RF-177 reviews, card actions and their upload queue", () => {
     const heard = jest.fn();
     const unsubscribe = subscribeReviewActivity(heard);
     const transition = calculateReviewTransition({ card: original, rating: Rating.Good, reviewedAt: new Date() });
-    // The card update queues first; fail the review log's queue write that follows.
     store.failQueueInsert(2);
 
     await expect(persistReviewTransition({ db: store.db, cardId: CARD, transition })).rejects.toThrow(
@@ -73,7 +71,6 @@ describe("RF-177 reviews, card actions and their upload queue", () => {
 
   it("does not revive a card that was deleted while it was being graded (RF-181)", async () => {
     const loaded = await setStudyCardMarked(store.db, DECK, CARD, false);
-    // For example, a sync pull or another tab deletes the card during the session.
     await deleteStudyCard(store.db, DECK, CARD);
     const queuedBefore = count("sync_queue");
     const transition = calculateReviewTransition({ card: loaded, rating: Rating.Good, reviewedAt: new Date() });
@@ -127,7 +124,6 @@ describe("RF-177 reviews, card actions and their upload queue", () => {
   });
 
   it("creates no card when a first card action cannot be queued", async () => {
-    // A first action creates the card row, then updates it; fail the update's queue write.
     store.failQueueInsert(2);
 
     await expect(setStudyCardSuspended(store.db, DECK, CARD, true)).rejects.toThrow(
@@ -158,7 +154,6 @@ describe("RF-177 reviews, card actions and their upload queue", () => {
   });
 
   it("saves neither the meanings deck nor its card when the card cannot be queued", async () => {
-    // The new meanings deck setting queues first; fail the card's queue write that follows.
     store.failQueueInsert(2);
 
     await expect(addMeaningCard(store.db, 2, 255, 1)).rejects.toThrow("Synthetic sync_queue write failure");

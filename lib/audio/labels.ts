@@ -3,7 +3,6 @@ import type { AudioFailure } from "@/lib/audio/ayah-audio";
 
 export type SurahNames = { en: string; ar: string };
 
-/** "Al-Baqarah 2:255" in English, "البقرة ٢:٢٥٥" in Arabic; just the reference while the name loads. */
 export function formatAudioReference(
   language: "en" | "ar",
   names: SurahNames | null,
@@ -21,7 +20,6 @@ type FailureStrings = {
   audioPlaybackFailed: string;
 };
 
-/** One message per failure kind, so offline, a missing source and a failed player read differently. */
 export function audioFailureMessage(failure: AudioFailure, s: FailureStrings): string {
   if (failure === "offline") return s.audioNeedsInternet;
   if (failure === "unavailable") return s.audioSourceUnavailable;

@@ -2,7 +2,6 @@ const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const sharp = require("sharp");
 
-// Exercise SVG decoding and PNG encoding in memory. Never import generate-icons.mjs.
 test("converts a synthetic SVG to PNG with the expected dimensions and pixels", async () => {
   const input = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="3"><rect width="2" height="3" fill="#ff0000"/></svg>',

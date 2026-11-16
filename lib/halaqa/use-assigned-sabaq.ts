@@ -4,18 +4,8 @@ import { loadMySabaqAssignment, subscribeSabaqAssignmentChanges } from "@/lib/ha
 import { assignedSabaqOpen, type AssignedSabaq } from "@/lib/hifz/sabaq";
 import { useIsOffline } from "@/lib/social/use-social-query";
 
-/** How long Home keeps an answer before it asks the server again. */
 const FRESH_MS = 60_000;
 
-/**
- * SOC-03: the signed-in member's next sabaq from a teacher while its lines still wait to be memorized,
- * for Home. Offline it is the saved copy (loadMySabaqAssignment), which also never fails. `refreshKey`
- * is anything that changes when memorized lines may have changed, such as today's wird: each change
- * checks the lines again, and asks the server again once the last answer is a minute old or was read
- * offline. Withdrawn sharing or leaving a halaqa on this device reads it again at once
- * (forgetMySabaqAssignment). What it shows belongs to one account, so another account never sees it,
- * even while its own read is still loading.
- */
 export function useAssignedSabaq(
   db: DatabaseExecutor,
   userId: string | null,
@@ -26,7 +16,6 @@ export function useAssignedSabaq(
     null,
   );
   const [changes, setChanges] = useState(0);
-  /** Raised at once by a forget, so a read that started before it is dropped even in the same render. */
   const revision = useRef(0);
   const [open, setOpen] = useState<{ userId: string | null; value: AssignedSabaq | null }>({
     userId: null,

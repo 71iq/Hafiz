@@ -5,10 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import React, { act, type ReactNode } from "react";
 
-// Renders through React Native Web into a DOM, as the web export does, because React Native Web
-// 0.21 ignores accessibilityState and gives every Pressable its own tab stop.
 jest.mock("react-native", () => jest.requireActual("react-native-web"));
-// jsdom resolves the icon package's browser build, which is ESM; none of these rows draw icons.
 jest.mock("lucide-react-native", () => new Proxy({}, { get: () => () => null }));
 jest.mock("@/lib/ui/reduced-motion", () => ({ useReducedMotionPreference: () => true }));
 
@@ -72,7 +69,6 @@ jest.mock("@/lib/settings/use-tafsir-source-selection", () => ({
 }));
 
 type Root = { render: (node: ReactNode) => void; unmount: () => void };
-// The installed DOM client has no declaration package in this React Native workspace.
 const { createRoot } = jest.requireActual<{ createRoot: (container: Element) => Root }>("react-dom/client");
 const { Switch } = require("@/components/ui/Switch") as typeof import("@/components/ui/Switch");
 const { ReminderSettingsSection } =
@@ -114,7 +110,6 @@ function switchNamed(name: string): HTMLElement {
   return found[0];
 }
 
-/** Sends a key the way a browser does and reports whether the page's default (scrolling) was cancelled. */
 function press(target: HTMLElement, key: string): boolean {
   let prevented = false;
   act(() => {
@@ -124,7 +119,6 @@ function press(target: HTMLElement, key: string): boolean {
   return prevented;
 }
 
-/** The row is the only tab stop, and its decorative track has no role, name, focus or touch. */
 function expectOneTabStop(row: HTMLElement) {
   expect(row.getAttribute("tabindex")).toBe("0");
   expect(row.querySelectorAll("[role], [aria-label], [tabindex]")).toHaveLength(0);
@@ -137,7 +131,6 @@ describe("switch rows on web", () => {
   it("gives each of the ten web reminder rows its state and a single tab stop", async () => {
     await show(<ReminderSettingsSection />);
     const rows = [...host.querySelectorAll<HTMLElement>('[role="switch"]')];
-    // The master switch and every type except remind_later, which web cannot offer.
     expect(rows).toHaveLength(10);
 
     expect(switchNamed(en.notifMasterLabel).getAttribute("aria-checked")).toBe("true");
@@ -232,7 +225,6 @@ describe("switch row ownership", () => {
     });
   }
 
-  // A hand-built switch row loses aria-checked, Space and the single tab stop on web.
   it("builds every switch row with the shared SwitchRow", () => {
     const owners = ["app", "components"]
       .flatMap((directory) => sourceFiles(path.join(root, directory)))
@@ -242,7 +234,6 @@ describe("switch row ownership", () => {
     expect(owners).toEqual(["components/ui/Switch.tsx"]);
   });
 
-  // A standalone Switch beside its label text is read as "switch, off" with no name unless it has one.
   it("names every standalone switch", () => {
     const unnamed = ["app", "components"]
       .flatMap((directory) => sourceFiles(path.join(root, directory)))

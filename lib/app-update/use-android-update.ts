@@ -5,8 +5,6 @@ import { fetchAndroidRelease, newerAndroidRelease, type AndroidRelease } from ".
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
-// One shared check for every screen that shows the update, refreshed at most every six hours
-// unless the user asks again. Failures (offline, server down) leave the last known release.
 let lastCheck: { at: number; release: AndroidRelease } | null = null;
 let pending: Promise<AndroidRelease> | null = null;
 
@@ -24,13 +22,11 @@ function loadRelease(force: boolean): Promise<AndroidRelease> {
   return pending;
 }
 
-/** Test seam: forget the shared release check. */
 export function resetAndroidReleaseCheck() {
   lastCheck = null;
   pending = null;
 }
 
-/** Installed Android version code, or null off Android and for the side-by-side QA build. */
 export function installedAndroidVersionCode(): number | null {
   if (Platform.OS !== "android") return null;
   if (Application.applicationId?.endsWith(".qa")) return null;
@@ -38,7 +34,6 @@ export function installedAndroidVersionCode(): number | null {
   return Number.isInteger(code) ? code : null;
 }
 
-/** The newer published release, plus a way to check again now. */
 export function useAndroidRelease(): { update: AndroidRelease | null; checkAgain: () => void } {
   const installed = installedAndroidVersionCode();
   const [release, setRelease] = useState<AndroidRelease | null>(lastCheck?.release ?? null);
@@ -71,7 +66,6 @@ export function useAndroidRelease(): { update: AndroidRelease | null; checkAgain
   };
 }
 
-/** The published Android release when it is newer than this install; null otherwise or offline. */
 export function useAndroidUpdate(): AndroidRelease | null {
   return useAndroidRelease().update;
 }

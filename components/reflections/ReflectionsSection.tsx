@@ -26,7 +26,6 @@ type Props = {
   ayah: number;
   initiallyExpanded?: boolean;
   showHeader?: boolean;
-  /** Called before the section navigates away, so the sheet that shows it can close first. */
   onNavigate?: () => void;
 };
 
@@ -62,7 +61,6 @@ function ReflectionsSectionContent({
 
   const chevronColor = isDark ? "#525252" : "#DFD9D1";
 
-  // Fetch count (always, for badge)
   const { data: count = 0 } = useQuery({
     queryKey: reflectionQueryKeys.count({ surah, ayah, viewerId: user?.id }),
     queryFn: () => fetchReflectionCount(surah, ayah),
@@ -70,7 +68,6 @@ function ReflectionsSectionContent({
     staleTime: 1000 * 60 * 5,
   });
 
-  // Fetch first page when expanded
   const {
     data: firstPage,
     isLoading,
@@ -167,7 +164,6 @@ function ReflectionsSectionContent({
     (reflectionId: string) => adjustCommentCount(reflectionId, -1),
     [adjustCommentCount],
   );
-  // After the author's delete settles the row leaves this list; the shared caches refetch it.
   const handleReflectionGone = useCallback(
     (gone: Reflection) => {
       setAllReflections((prev) => (prev ?? firstPage?.data ?? []).filter((row) => row.id !== gone.id));
@@ -213,7 +209,6 @@ function ReflectionsSectionContent({
         </Pressable>
       )}
 
-      {/* Expanded content */}
       {expanded && (
         <View className="pb-3 pt-3">
           <Text
@@ -229,7 +224,6 @@ function ReflectionsSectionContent({
             {s.reflectionsDisclaimer}
           </Text>
           {reflectionsError && allReflections.length > 0 ? (
-            // A failed refresh keeps the last page on screen and says it may be out of date.
             <Text
               accessibilityLiveRegion="polite"
               className="mb-2 text-red-600 dark:text-red-400"
@@ -257,7 +251,6 @@ function ReflectionsSectionContent({
                 reflection={r}
                 onLikeToggled={handleLikeToggled}
                 onCommentsPress={setCommentsReflectionId}
-                // Guests stay in the sheet and get the feed's polite sign-in notice.
                 onAuthRequired={() => showNotice(s.reflectionFeedAuthRequired)}
                 onNavigate={onNavigate}
                 onGone={handleReflectionGone}
@@ -265,7 +258,6 @@ function ReflectionsSectionContent({
             ))
           )}
 
-          {/* Load more */}
           {hasMore && (
             <Pressable
               onPress={handleLoadMore}
@@ -335,7 +327,6 @@ function ReflectionsSectionContent({
         </View>
       )}
 
-      {/* Comments sub-sheet */}
       <CommentsSheet
         reflectionId={commentsReflectionId}
         authReturn={{ surface: "ayah", surah, ayah }}
@@ -345,7 +336,6 @@ function ReflectionsSectionContent({
         onCommentRemoved={handleCommentRemoved}
       />
 
-      {/* Write reflection sheet */}
       <WriteReflectionSheet
         open={writeOpen}
         onClose={() => setWriteOpen(false)}

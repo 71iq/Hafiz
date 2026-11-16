@@ -318,7 +318,6 @@ describe.each(cases)("ayah detail $language/$width", ({ language, width }) => {
     expect(mockRouterNavigate).not.toHaveBeenCalled();
     fireEvent.press(view.getByText(s.ayahDetailGoToAyah));
     expect(onClose).toHaveBeenCalledTimes(1);
-    // Outside the reader the target goes to the Mushaf tab through the pending deep link.
     expect(mockRouterNavigate).toHaveBeenCalledWith("/(tabs)/mushaf");
   });
 });

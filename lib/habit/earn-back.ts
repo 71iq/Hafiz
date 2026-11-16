@@ -7,35 +7,18 @@ const EARN_BACK_DAYS_NEEDED = 3;
 const EARN_BACK_FULL_DAYS_NEEDED = 2;
 
 export type EarnBack = Readonly<{
-  /** Length of the streak that broke. */
   brokenLength: number;
-  /** Last covered day of the broken streak. */
   lastDay: LocalDate;
   windowStart: LocalDate;
   windowEnd: LocalDate;
-  /** Recited days inside the window so far. */
   daysDone: number;
-  /** Days inside the window with the full wird. */
   fullDone: number;
   succeeded: boolean;
-  /** Missed days to mark earned_back on success. */
   restoreDays: readonly LocalDate[];
 }>;
 
-/**
- * STR-17: a streak of 7 or more days that broke can be earned back. The window opens the day after
- * the missed day's make-up cutoff, the last covered day + 2, and lasts 3 days. Reciting the minimum
- * wird on all 3 days, or the full wird on 2 of them, restores it, and the missed days become
- * earned_back so the old and new runs join (Duolingo repair: new length = previous + current).
- *
- * Returns null when there is nothing to earn back: no break, a short streak, a closed window, or a
- * window that can no longer succeed.
- */
 export function findEarnBack(days: DayMap, today: LocalDate, options: { makeUpOpen: boolean }): EarnBack | null {
   if (computeStreak(days, today, options).makeUpPending) return null;
-  // The break is found from the window, not from the latest run: a missed day inside the window
-  // ends a short run but must not hide the original break. Look back over every last covered day
-  // whose window could include today (or has just succeeded), latest first.
   for (let offset = 2; offset <= 2 * EARN_BACK_WINDOW_DAYS + 1; offset += 1) {
     const lastDay = addDays(today, -offset);
     if (!days.has(lastDay) || days.has(addDays(lastDay, 1))) continue;

@@ -1,10 +1,5 @@
 import { normalizeArabicCore, normalizeArabicWord } from "../arabic";
 
-/**
- * Common Latin transliterations, indexed by surah number - 1. The local database stores the
- * English meaning ("The Cave") in surahs.name_english, but people usually type the transliterated
- * name ("Kahf", "Yaseen"), so surah filters match against both.
- */
 const SURAH_TRANSLITERATIONS: readonly string[] = [
   "Al-Fatiha", "Al-Baqara", "Aal-Imran", "An-Nisaa", "Al-Maida", "Al-Anam", "Al-Araf", "Al-Anfal",
   "At-Tawba", "Yunus", "Hud", "Yusuf", "Ar-Rad", "Ibrahim", "Al-Hijr", "An-Nahl", "Al-Israa",
@@ -27,7 +22,6 @@ export function surahTransliteration(surahNumber: number): string | null {
   return SURAH_TRANSLITERATIONS[surahNumber - 1] ?? null;
 }
 
-/** Folds spelling variants so "Yaseen", "Ya-Sin" and "yasin" compare equal. */
 function foldLatin(text: string): string {
   return text
     .normalize("NFD")
@@ -43,7 +37,6 @@ function foldLatin(text: string): string {
     .replace(/(.{4,})h$/, "$1");
 }
 
-/** Drops a leading Arabic article ("Al-", "An-", "Ash-"...) from a transliteration. */
 function withoutArticle(name: string): string {
   return name.replace(/^(aal|a[lnrstdz]|ash|adh)[-\s]/i, "");
 }
@@ -54,7 +47,6 @@ export type SurahSearchFields = {
   name_english: string;
 };
 
-/** Shared surah filter: number prefix, Arabic name, English meaning or transliteration. */
 export function matchesSurahQuery(surah: SurahSearchFields, rawQuery: string): boolean {
   const query = rawQuery.trim();
   if (!query) return true;
@@ -80,11 +72,6 @@ function foldArabicSurahName(text: string): string {
   return normalizeArabicWord(text.replace(/^\s*سورة\s+/u, ""));
 }
 
-/**
- * Exact alias matching for the shared reference parser (C06): the full English meaning, the
- * transliteration with or without its article, or the Arabic name with or without "سورة". Returns
- * every matching surah number so callers can offer choices when a name is ambiguous.
- */
 export function exactSurahAliasMatches(surahs: readonly SurahSearchFields[], rawQuery: string): number[] {
   const query = rawQuery.trim().replace(/^(surah|sura|surat)\s+/i, "");
   if (!query) return [];

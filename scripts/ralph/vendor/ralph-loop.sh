@@ -2,22 +2,6 @@
 # Copyright (c) 2026 César Gallego Rodríguez
 # SPDX-License-Identifier: Apache-2.0
 
-# Configuration
-# -------------
-# All configuration lives in .ralph/.env (relative to the invocation directory).
-# It is the only configuration source: the shell environment is never consulted
-# for RALPH_* settings. The file is created with defaults on first run if it does
-# not exist (write_default_env_file).
-#
-# The file is sourced before every iteration (load_env_file) and the config is
-# then recomputed (resolve_config), so editing it mid-run takes effect on the
-# next iteration.
-#   - It is sourced without "set -a", so RALPH_* become plain shell variables,
-#     not exported environment variables. RALPH_LOCAL_DIR is the only exported
-#     variable (the script-managed .ralph directory).
-#   - Plain "KEY=value" lines work; quote values that contain spaces.
-#   - An invalid value is reported and the previous good config is kept, so a
-#     typo will not abort the loop.
 
 set -u
 
@@ -157,10 +141,6 @@ normalize_bool() {
 }
 
 normalize_memory_max() {
-  # Accept an empty value (limit disabled), "infinity", an integer count of
-  # bytes, an integer with a systemd unit suffix (K/M/G/T/P/E, base-1024), or an
-  # integer percentage. Anything else is rejected so a typo cannot silently
-  # disable the limit or be passed verbatim to systemd-run.
   local value=${1:-}
 
   case "$value" in
@@ -229,8 +209,6 @@ effort_level() {
   local capability=$1
   local thinking=$2
 
-  # Codex exposes web_search in some environments, and the API rejects that
-  # tool set with reasoning.effort=minimal. Use low as the floor.
   if [ "$thinking" = false ]; then
     printf '%s\n' low
     return 0
@@ -264,15 +242,10 @@ gemini_thinking_budget() {
 }
 
 build_mem_limit_prefix() {
-  # Set the global array mem_limit_prefix to the command wrapper that enforces
-  # the hard RAM limit, or to an empty array when no limit applies. The wrapper
-  # is a transient systemd user scope: the kernel OOM-kills the agent if it
-  # exceeds MemoryMax, and MemorySwapMax=0 keeps the cap on RAM rather than swap.
   mem_limit_prefix=()
 
   [ -z "$ralph_memory_max" ] && return 0
 
-  # Probe systemd-run --user scopes once and cache the result across iterations.
   if [ -z "${mem_limit_supported:-}" ]; then
     if command -v systemd-run >/dev/null 2>&1 \
       && systemd-run --user --scope -q true >/dev/null 2>&1; then
@@ -351,9 +324,6 @@ run_tool() {
       return "$run_exit_code"
       ;;
     devin)
-      # Devin reads the prompt from --prompt-file, not stdin (piping the prompt
-      # makes it drop into REPL mode and panic). It has no reasoning/thinking
-      # knob, so the capability tier only selects the model. -p is print mode.
       ${mem_limit_prefix[@]:+"${mem_limit_prefix[@]}"} "$tool_command" "${tool_flags[@]}" \
         --model "$tool_model" --prompt-file "$prompt_path" -p
       ;;
@@ -361,9 +331,6 @@ run_tool() {
 }
 
 next_tool_in_rotation() {
-  # Fixed rotation: codex -> claude -> gemini -> devin -> codex. The next tool is
-  # always distinct from the current one. It acts both as the token-exhaustion
-  # detector and as the agent we switch to.
   case "$1" in
     codex) printf '%s\n' claude ;;
     claude) printf '%s\n' gemini ;;
@@ -427,8 +394,6 @@ run_detector() {
   # shellcheck disable=SC2207
   flags=($(flags_for_tool "$detector_tool"))
 
-  # The detector always runs at low capability with thinking disabled: it is a
-  # cheap yes/no classification. Output (stdout+stderr) is returned to caller.
   case "$detector_tool" in
     codex)
       "$cmd" exec "${flags[@]}" -m "$model" \
@@ -465,10 +430,6 @@ update_env_tool() {
 }
 
 handle_token_exhaustion() {
-  # On a non-zero run, ask the next tool in the rotation whether the failure was
-  # token/quota exhaustion of the failed tool. If so, rewrite RALPH_TOOL in
-  # .ralph/.env so the next iteration picks up the new agent on reload. The
-  # current iteration is not retried.
   local failed_tool=$1
   local log=$2
   local detector_tool detector_cmd detector_prompt_path detector_output
@@ -513,23 +474,13 @@ handle_token_exhaustion() {
 
 write_default_env_file() {
   cat >"$ralph_env_file" <<'EOF'
-# Ralph configuration. Edit this file to reconfigure the loop; changes are
-# picked up before each iteration. This is the only configuration source.
 
 RALPH_TOOL=codex
 RALPH_MODEL_CAPABILITY=med
 RALPH_THINKING=false
 
-# When an iteration exits non-zero, ask the next tool in the rotation
-# (codex -> claude -> gemini -> devin -> codex) whether the failure was
-# token/quota exhaustion. If so, RALPH_TOOL is rewritten here so the next
-# iteration switches.
 RALPH_SWITCH_ON_EXHAUSTION=true
 
-# Hard RAM limit for the agent process, enforced by the kernel via a transient
-# systemd user scope (the agent is OOM-killed if it exceeds this). Accepts a
-# systemd memory value (8G, 512M, raw bytes, or a percentage). Leave empty to
-# disable.
 RALPH_MEMORY_MAX=8G
 
 RALPH_CODEX_COMMAND=codex
@@ -550,30 +501,20 @@ RALPH_GEMINI_MODEL_LOW=gemini-2.5-flash-lite
 RALPH_GEMINI_MODEL_MED=gemini-2.5-flash
 RALPH_GEMINI_MODEL_HIGH=gemini-2.5-pro
 
-# Devin has no reasoning/thinking knob, so RALPH_THINKING is ignored for it and
-# the capability tier only selects the model. Model names are Devin's identifiers
-# (run `devin --model x` to see the valid list). On the Devin Free tier override
-# all three with swe-1.6-slow, the only model that plan can access.
 RALPH_DEVIN_COMMAND=devin
 RALPH_DEVIN_FLAGS="--permission-mode dangerous"
 RALPH_DEVIN_MODEL_LOW=claude-haiku-4.5
 RALPH_DEVIN_MODEL_MED=claude-sonnet-4.6
 RALPH_DEVIN_MODEL_HIGH=claude-opus-4.8
 
-# Logs to retain in .ralph/logs. Default: min(MAX_ITERATIONS, 50).
-# RALPH_LOOP_MAX_LOGS=50
+
 EOF
 }
 
 load_env_file() {
-  # The file is the only configuration source. It is sourced without "set -a",
-  # so RALPH_* become plain shell variables, not exported environment variables;
-  # the shell environment is never a configuration channel. The file always
-  # exists (created at startup), so no existence check is needed here.
   # shellcheck disable=SC1090
   . "$ralph_env_file"
 
-  # The only exported variable: the script-managed local dir.
   export RALPH_LOCAL_DIR="$initial_cwd/.ralph"
 }
 
@@ -596,7 +537,6 @@ resolve_config() {
     return 1
   fi
 
-  # Default only when unset, so RALPH_MEMORY_MAX= (empty) explicitly disables it.
   if ! memory_max=$(normalize_memory_max "${RALPH_MEMORY_MAX-8G}"); then
     echo "Error: RALPH_MEMORY_MAX must be empty, infinity, a byte count, a value with a K/M/G/T/P/E suffix, or a percentage." >&2
     return 1
@@ -645,8 +585,6 @@ resolve_config() {
       thinking_budget=$(gemini_thinking_budget "$model" "$capability" "$thinking")
       ;;
     devin)
-      # Devin exposes no reasoning-effort or thinking-budget knob; the capability
-      # tier only selects the model, so RALPH_THINKING is a best-effort no-op.
       reasoning_effort=
       thinking_budget=
       ;;
@@ -664,8 +602,6 @@ resolve_config() {
     logs=50
   fi
 
-  # Commit to globals only after every value is validated, so a bad reload
-  # mid-loop leaves the previous good configuration in place.
   ralph_model_capability=$capability
   ralph_thinking=$thinking
   ralph_switch_on_exhaustion=$switch_on_exhaustion

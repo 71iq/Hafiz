@@ -38,7 +38,6 @@ describe("higher-level RTL source contracts", () => {
   });
 
   it("keeps RTL page rows from double-reversing under web ambient direction", () => {
-    // ReflectionCard row directions are exercised by reflection-mutations.test.tsx.
 
     expectSourceContainsAll("components/progress/DefaultDeckProgressChart.tsx", [
       "const rowFlexStyle = {",
@@ -68,7 +67,6 @@ describe("higher-level RTL source contracts", () => {
       "style={mirroredRowStyle}",
     ]);
 
-    // Halaqa and Board rows share one mirrored row style.
     expectSourceContainsAll("components/social/SocialControls.tsx", [
       "export function socialRowStyle(isRTL: boolean): ViewStyle {",
       'return { direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" };',

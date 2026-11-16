@@ -6,26 +6,15 @@ import type { RamadanAnchor, ReminderAnchor } from "@/lib/notifications/types";
 
 const MINUTE = 60_000;
 
-/** Every reminder time for one local date, as instants. */
 export type ReminderDayTimes = Readonly<{
   date: LocalDate;
-  /** The wird reminder time (ANC-01). */
   anchorAt: Date;
-  /** The anchor is a Ramadan time the user chose (NOT-10), which may fall in quiet hours. */
   ramadanAnchor: boolean;
-  /**
-   * 5.8.2: 3 hours before midnight, or after Isha when prayer times are set. After Isha it lands 20
-   * minutes in, before quiet hours start, and it stays 30 minutes ahead of the late reminder.
-   */
   atRiskAt: Date;
-  /** 5.8.2: 23:15 local. */
   lateAt: Date;
-  /** Friday al-Kahf: 09:00, or 10:00 when the wird reminder is near 09:00. */
   kahfAt: Date;
-  /** NOT-08: quiet hours end this morning and start again this evening. */
   quietEndsAt: Date;
   quietStartsAt: Date;
-  /** Local midnight that ends the date (NOT-06). */
   endsAt: Date;
   prayerTimesSet: boolean;
 }>;
@@ -38,15 +27,12 @@ export type DayTimesInput = Readonly<{
   isRamadan: (date: LocalDate) => boolean;
 }>;
 
-/** 3 hours before local midnight, used without prayer times. */
 const AT_RISK_MINUTES = 21 * 60;
 const AT_RISK_AFTER_ISHA_MINUTES = 20;
 const AT_RISK_LATEST_MINUTES = 22 * 60 + 45;
 export const LATE_REMINDER_MINUTES = 23 * 60 + 15;
-/** NOT-08 with prayer times: quiet from Isha + 1 hour until 30 minutes before Fajr. */
 const QUIET_AFTER_ISHA_MINUTES = 60;
 const QUIET_BEFORE_FAJR_MINUTES = 30;
-/** NOT-08 without prayer times. */
 const QUIET_START_MINUTES = 23 * 60;
 const QUIET_END_MINUTES = 5 * 60;
 const KAHF_MINUTES = 9 * 60;
@@ -77,11 +63,6 @@ function anchorTime(input: DayTimesInput, date: LocalDate): { at: Date; ramadan:
   return { at: plus(prayerAt(input, date, anchor.prayer), anchor.offsetMinutes), ramadan: false };
 }
 
-/**
- * NOT-08: no reminder between Isha + 1 hour and 30 minutes before Fajr. The clock times in the rule,
- * 23:00 and 05:00, apply only when prayer times are not set. With prayer times the at-risk reminder
- * (5.8.2) follows Isha so it is sent before quiet hours start, even in winter when Isha is early.
- */
 export function buildDayTimes(input: DayTimesInput, date: LocalDate): ReminderDayTimes {
   const { clock } = input;
   const prayers = input.prayers(date);
@@ -120,7 +101,6 @@ export function isQuietAt(times: ReminderDayTimes, at: Date): boolean {
   return at.getTime() < times.quietEndsAt.getTime() || at.getTime() >= times.quietStartsAt.getTime();
 }
 
-/** STR-07 with the planner's clock: Dhuhr the next day, or 12:30. */
 export function makeUpCutoff(input: Pick<DayTimesInput, "clock" | "prayers">, missedDay: LocalDate): Date {
   const nextDay = addDays(missedDay, 1);
   return input.prayers(nextDay)?.dhuhr ?? input.clock.at(nextDay, DEFAULT_MAKE_UP_CUTOFF_MINUTES);

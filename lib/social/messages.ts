@@ -16,7 +16,6 @@ const REJECTION_MESSAGES: Partial<Record<SocialRejectionCode, keyof UIStrings>> 
   invalid_assignment: "teacherAssignInvalid",
 };
 
-/** The user-facing message for a failed halaqa or board request, by cause (DEL-08). */
 export function socialFailureMessage(error: unknown, s: UIStrings): string {
   const failure = socialFailureOf(error);
   switch (failure.kind) {

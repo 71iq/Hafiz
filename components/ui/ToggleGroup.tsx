@@ -7,14 +7,9 @@ type ToggleGroupProps<T extends string> = ViewProps & {
   onValueChange: (value: T) => void;
   items: { value: T; label: string; icon?: React.ReactNode }[];
   dir?: Direction;
-  /** Overrides item layout classes, e.g. "flex-auto px-2" to size items from their labels. */
   itemClassName?: string;
 };
 
-/**
- * Segmented toggle group with pill selection indicator.
- * Uses tonal shift for active state
- */
 export function ToggleGroup<T extends string>({
   value,
   onValueChange,

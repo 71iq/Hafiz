@@ -78,7 +78,6 @@ const PROFILE_COUNTRY_MAX_LENGTH = 80;
 const EDIT_PROFILE_MODAL_MAX_WIDTH = 780;
 const EDIT_PROFILE_AVATAR_SIZE = 118;
 const EDIT_PROFILE_AVATAR_SIZE_PHONE = 88;
-/** The profile shows the most recent badges; View all opens the full list. */
 const PROFILE_BADGE_PREVIEW_LIMIT = 12;
 const PROFILE_SURAH_PREVIEW_LIMIT = 8;
 
@@ -203,12 +202,9 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const requestedUserId = userId || user?.id || "";
   const isOwnProfile = !!user && (!userId || userId === user.id);
   const isSignedOutOwnProfile = !user && !userId;
-  // The owner (or a guest on their own device) sees this device's figures; others see shared ones.
   const showsLocalFigures = isOwnProfile || isSignedOutOwnProfile;
-  // W07: while a restore waits for consent, local figures are this device's, not synced progress.
   const restorePause = useSyncRestorePause(isOwnProfile ? (user?.id ?? null) : null);
   const awaitingSync = isOwnProfile && restorePause.pause !== null;
-  // A link to a malformed id named no account; every public query for it was rejected by the server.
   const hasValidRequestedUserId = isAccountId(requestedUserId);
   const identity = getAuthSessionIdentity(session);
   const editIdentity = identity.kind === "identified" && identity.userId === user?.id.toLowerCase()
@@ -272,7 +268,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     staleTime: 1000 * 60 * 2,
   });
 
-  // Signed-in viewers see only the juz completions a shared halaqa has; signed-out viewers see none.
   const publicBadgesQuery = useQuery({
     queryKey: ["publicAchievementUnlocks", user?.id ?? "signed-out", requestedUserId],
     queryFn: () => fetchPublicAchievementUnlocks(requestedUserId),
@@ -287,18 +282,14 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     staleTime: 1000 * 60,
   });
 
-  // Another person's streak and juz completions, only where they shared them (SOC-01).
   const profileSummaryQuery = useQuery({
     queryKey: profilePrivacyKeys.summary(user?.id ?? null, requestedUserId),
-    // Bound to the viewer, so a summary read during an account switch is not shown to the next account.
     queryFn: () => fetchProfileSummary(requestedUserId, user?.id ?? null),
     enabled: hasValidRequestedUserId && !isOwnProfile && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
-    // A read cut short by a sign-in or sign-out is retried for the new viewer, not shown as an error.
     retry: (count, error) => socialFailureOf(error).kind === "account_changed" && count < 2,
   });
 
-  // ETH-07: a person who said they are under 18 has no profile photo, and the server refuses uploads.
   const ownPrivacyQuery = useQuery({
     queryKey: profilePrivacyKeys.mine(user?.id ?? null),
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
@@ -331,7 +322,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
         }
       : null
     : publicProfile;
-  // A username made from the account's email prefix is never shown as the owner's identity.
   const ownNeutral = isOwnProfile && neutralProfileName(visibleProfile, user?.email ?? null);
   const displayName =
     visibleProfile?.display_name ||
@@ -365,15 +355,10 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     ? themeColors.surfaceHigh
     : isDark ? "#0f766e" : "#0d9488";
   const localStatsSnapshot = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0 };
-  // Activity and progress are private (SOC-01): the owner sees this device's history, others see only
-  // the streak and juz completions the person chose to share. Figures come from this device's
-  // records for the current owner; they are never combined with server totals (no max(local, server)).
   const review = localReview;
   const surahProgress = showsLocalFigures ? localSurahProgress : [];
   const surahSummary = summarizeSurahProgress(surahProgress);
   const sharedSummary = profileSummaryQuery.data ?? null;
-  // The four profile figures share Progress's definitions (lib/progress/metrics.ts): memorized ayah
-  // cards, the habit streak Home and Progress show, and review-log active days and totals.
   const stats: { label: string; value: number | string }[] = showsLocalFigures
     ? [
         { label: s.progressTotalMemorized, value: review.memorizedAyahCards },
@@ -408,8 +393,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
   const loadLocalOverview = useCallback(async () => {
     if (!showsLocalFigures) return;
-    // The wird streak is the same one Home and Progress show (lib/habit), not a count of review days.
-    // Total memorized, active days and total reviews come from the shared Progress definitions.
     const [habit, cardsReviewedRow, metrics] = await Promise.all([
       loadHabitOverview(db),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
@@ -450,7 +433,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     }
   }, [queryClient]);
 
-  // updateProfileStats keeps its central restore/pause/owner guard and skips unchanged uploads.
   useEffect(() => {
     if (!showsLocalFigures) return;
     loadLocalOverview().catch(console.warn);
@@ -498,7 +480,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       if (!isCurrentSave()) return;
       invalidateProfileSurfaces(isCurrentSave);
       if (!isCurrentSave()) return;
-      // Saved: the editor closes and a notice confirms it. The draft stays until this point.
       editScope.busy = false;
       setProfileSaving(false);
       closeEdit();
@@ -540,7 +521,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       if (!isCurrentPicker()) return;
       const asset = result.canceled ? null : result.assets[0];
       if (!asset) return;
-      // Checked before any upload; a rejected image leaves the previous draft as it was.
       const problem = validateAvatarAsset(asset);
       if (problem) {
         setProfileStatus(`photo-${problem}`);
@@ -567,7 +547,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     setAvatarRemovalDraft(!!profile?.avatar_url);
   }, [avatarDraft, profile?.avatar_url, editScope, isCurrentEdit]);
 
-  // Closing the editor with changes asks first; an account change still clears it directly.
   const { guard: guardEditClose, dialogProps: discardDialogProps } = useDiscardGuard(profileDirty && !profileSaving);
   const requestCloseEdit = useCallback(() => guardEditClose(closeEdit), [guardEditClose, closeEdit]);
   const [badgesOpen, setBadgesOpen] = useState(false);
@@ -629,7 +608,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           {isSignedOutOwnProfile ? (
             <View className="gap-6">
               <SignedOutProfile isDark={isDark} isRTL={isRTL} onClose={close} />
-              {/* A guest's own activity on this device stays useful offline, below the sign-in prompt. */}
               <ProfileOverview
                 bio=""
                 country=""
@@ -819,7 +797,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                   accessibilityLabel={s.authDisplayName}
                   maxLength={60}
                   dir={isRTL ? "rtl" : "ltr"}
-                  // A visible border so the name reads as an editable field.
                   className="min-h-12 rounded-2xl border border-warm-300 bg-surface-bright px-4 py-2 dark:border-neutral-700 dark:bg-surface-dark"
                   style={{
                     fontFamily: "Manrope_700Bold",
@@ -1096,7 +1073,6 @@ function CountryCommandSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const { width } = useWindowDimensions();
-  // On phones the list opens in a sheet that avoids the keyboard, so results stay visible.
   const inSheet = width < SIDEBAR_BREAKPOINT;
   const options = useMemo(() => buildCountryOptions(language), [language]);
   const selectedOption = useMemo(() => findCountryOptionByValue(value, options), [options, value]);
@@ -1350,9 +1326,7 @@ function ProfileOverview({
   publicBadges: any[];
   numberLocale: string;
   isOwnProfile: boolean;
-  /** W07: sync is paused for restore consent, so figures are labeled as this device's. */
   awaitingSync?: boolean;
-  /** Replaces the activity heading, such as "On this device" for a guest. */
   localTitle?: string;
   sharedSummaryLoading: boolean;
   onViewAllBadges: () => void;
@@ -1374,7 +1348,6 @@ function ProfileOverview({
 
   return (
     <View className="gap-5">
-      {/* Country and bio sit with the identity at the top rather than in cards of their own. */}
       {country || bio ? (
         <View className="gap-2">
           {country ? (
@@ -1424,7 +1397,6 @@ function ProfileOverview({
         </Card>
       ) : null}
 
-      {/* W07: while sync waits for restore consent these are this device's figures, said plainly. */}
       {awaitingSync ? (
         <View className="gap-1 rounded-2xl bg-surface-high px-4 py-3 dark:bg-surface-dark-high">
           <Text
@@ -1579,7 +1551,6 @@ function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: 
   return (
     <View className="gap-4">
       <EmptyState icon={UserRound} title={s.profileSignedOutTitle} subtitle={s.profileSignedOutSubtitle} isDark={isDark} />
-      {/* Accounts not configured on this build: no entry point that would only reach the unavailable card. */}
       {isSupabaseConfigured() ? (
       <View className="gap-2">
         <Button

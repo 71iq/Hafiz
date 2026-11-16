@@ -85,7 +85,6 @@ def reconcile_status(backlog):
 
 
 def select_task(tasks):
-    # Recover the same unfinished task before considering another task.
     active = [t for t in tasks if t['status'] in ('running', 'retry')]
     if active:
         return active[0]
@@ -241,7 +240,6 @@ def account_tokens(logfile):
                 batch['tokens'] += sum(counts)
                 recorded = True
     if not recorded or incomplete or pending_turn:
-        # Missing usage is recorded without inventing a total or blocking work.
         batch['usage_unknown'] = True
     write_json(STATE / 'batch.json', batch)
 
@@ -293,7 +291,6 @@ def agent(prompt, schema, directory, role, config, readonly=False):
             raise BatchLimit(f'{role} stopped at account usage limit; see {directory.relative_to(ROOT)}/{role}.jsonl')
         raise RuntimeError(f'{role} exited {code}; see {directory.relative_to(ROOT)}/{role}.jsonl')
     result = read_json(result_path)
-    # Fail closed even if the CLI did not enforce its output schema.
     for key in schema['required']:
         if key not in result:
             raise RuntimeError(f'{role} response omitted {key}')
@@ -370,7 +367,7 @@ def generator_prompt(task):
 
 
 def iteration():
-    sys.stdin.read()  # Upstream supplies PROMPT.md; task prompts are constructed below.
+    sys.stdin.read()
     config = read_json(CONFIG)
     if os.environ.get('HAFIZ_RALPH_SMOKE') == '1':
         directory = STATE / 'smoke' / str(time.time_ns())
@@ -484,7 +481,6 @@ def iteration():
         task['summary'] = result['summary']
         write_json(BACKLOG, backlog)
         document_progress(task, result['summary'] + f' Evidence `{task["evidence"]}`.')
-        # All touched paths were checked above. Stage exactly this task and controller progress.
         subprocess.run(['git', 'add', '--', *edits, *state_owned], cwd=ROOT, check=True)
         staged = set(git('diff', '--cached', '--name-only', '--no-renames').splitlines())
         if staged != set(edits + state_owned):
@@ -518,7 +514,6 @@ def iteration():
         document_progress(task, str(error))
         log_event('failed', task=task['id'], reason=str(error), status=task['status'])
         if task['status'] == 'blocked':
-            # Preserve failed work. Never reset a task or let it contaminate a different task.
             stop(f'{task["id"]} blocked: {error}')
         raise
 
@@ -546,7 +541,6 @@ def launch(mode, iterations):
             if any(t['status'] == 'blocked' and changed_paths() for t in tasks):
                 raise RuntimeError('Blocked task has preserved changes. Diagnose and reopen it before resuming.')
         write_json(STATE / 'batch.json', {'pid': os.getpid(), 'id': uuid.uuid4().hex, 'started': now(), 'started_epoch': time.time(), 'tokens': 0, 'mode': mode})
-        # Upstream only reads .ralph/.env. Never use its unrestricted default flags or tool rotation.
         (STATE / '.env').write_text('\n'.join([
             'RALPH_TOOL=codex', 'RALPH_MODEL_CAPABILITY=high', 'RALPH_THINKING=true',
             'RALPH_SWITCH_ON_EXHAUSTION=false', f'RALPH_MEMORY_MAX={config["memory_max"]}',
@@ -567,7 +561,6 @@ def launch(mode, iterations):
         batch['log'] = str(run_log.relative_to(ROOT))
         write_json(STATE / 'batch.json', batch)
         print(run_log.read_text())
-        # Upstream reports failed iterations in its summary but may exit zero.
         if code or 'failed=0 ' not in run_log.read_text():
             raise RuntimeError(f'Batch contains failures; inspect {run_log.relative_to(ROOT)}')
 

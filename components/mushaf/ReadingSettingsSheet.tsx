@@ -266,7 +266,6 @@ export function ReadingSettingsSheet({
               compact={compactRows}
             />
             <Divider />
-            {/* The whole row is the switch, so its target is the row, not the 24 px track. */}
             <SwitchRow
               label={s.hifzSimilarMarkSetting}
               hint={s.hifzSimilarMarkSettingHint}
@@ -283,7 +282,6 @@ export function ReadingSettingsSheet({
             </SwitchRow>
           </View>
 
-          {/* Page reveal mode: the auto reveal pace and whether a revealed page moves on by itself. */}
           <SettingsSectionLabel label={s.hifzAutoReveal} isRTL={isRTL} />
           <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
             <SettingsActionRow
@@ -652,7 +650,6 @@ function ChoiceDialog<T extends string>({
   );
 }
 
-/** One row per color the Tajweed font draws, in the current theme's render palette. */
 const TAJWEED_LEGEND_RULES = [
   "ghunnah",
   "ikhfaa",
@@ -688,7 +685,6 @@ function TajweedLegendSheet({
 }) {
   const s = useStrings();
   if (!visible) return null;
-  // Loaded on first open: the rule table builds its palette colors when the module loads.
   const { getTajweedRule } = require("@/lib/word/tajweed-labels") as typeof import("@/lib/word/tajweed-labels");
   return (
     <ResponsiveOverlay open={visible} onClose={onClose} phonePresentation="sheet" desktopPresentation="dialog" maxWidth={480}>

@@ -396,7 +396,6 @@ it.each(["same", "ABA", "logout"] as const)(
     const old = begin("signIn", "held@example.invalid");
     await f.entered.promise;
     if (variant === "logout") {
-      // Another context's logout notice does not share this process's SDK lock.
       f.values.delete(f.key);
       useAuthStore.setState({ session: null, user: null, profile: null });
     } else {

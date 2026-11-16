@@ -97,7 +97,6 @@ jest.mock("@/lib/profile/avatar", () => ({
   ...jest.requireActual("@/lib/profile/avatar"),
   uploadProfileAvatar: (id: string, asset: unknown) => mockUpload(id, asset),
 }));
-// A successful save closes the editor and confirms it through the shared notice.
 const mockNotice = jest.fn();
 jest.mock("@/components/ui/OperationNoticeProvider", () => ({ useOptionalOperationNotice: () => mockNotice }));
 let mockRestorePause: "pending_consent" | "cancelled" | null = null;
@@ -140,7 +139,6 @@ jest.mock("@/components/ui/ResponsiveOverlay", () => {
       mockRootClose = onClose;
       return <View>{children}</View>;
     },
-    // The edit dialog is the modal that avoids the keyboard; the discard prompt and lists are others.
     ResponsiveModal: ({
       children,
       open,
@@ -758,7 +756,6 @@ it("rejects an unsupported or undecoded photo before upload and keeps the previo
   fireEvent.press(screen.getByText(strings.en.profileChangePhoto));
   await flush();
   expect(screen.getByText(strings.en.profilePhotoTooLarge)).toBeTruthy();
-  // Nothing was taken as a draft, so Save stays unavailable and nothing uploads.
   expect(screen.getByTestId("save").props.accessibilityState?.disabled ?? screen.getByTestId("save").props.disabled).toBe(true);
   expect(mockUpload).not.toHaveBeenCalled();
 });

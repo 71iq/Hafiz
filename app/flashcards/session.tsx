@@ -89,19 +89,16 @@ import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
 import { formatAyahs, formatDays, formatNumber } from "@/lib/i18n/count";
 import { formatAyahRef } from "@/lib/arabic";
 
-/** Focused controls keep Space/Enter for themselves; review shortcuts skip them. */
 const FOCUSED_CONTROL_SELECTOR = ["button", "a", ...["button", "link", "menuitem", "switch", "checkbox", "radio", "tab"].map(
   (name) => `[role="${name}"]`,
 )].join(", ");
 
-// ─── Types ───────────────────────────────────────────────────
 
 type SessionPhase = "loading" | "error" | "front" | "side" | "grading" | "summary";
 
 type CardData = {
   kind: "ayah" | "word" | SmartCardKind;
   card: StudyCardRow;
-  /** The review settings of the card's own deck, also in Review all. */
   settings: DeckReviewSettings;
   surah: number;
   ayah: number;
@@ -143,7 +140,6 @@ type CardData = {
 };
 
 type SessionSummary = {
-  /** The queue was empty when the session opened: there was nothing to review. */
   emptyQueue?: boolean;
   total: number;
   newCount: number;
@@ -154,11 +150,8 @@ type SessionSummary = {
   habit: SessionHabitInput;
 };
 
-/** What follows a saved grade or card action. The change is committed by then, so neither part can report it unsaved. */
 type SavedChange = {
-  /** Bookkeeping for the saved change. It runs even when a held leave goes ahead. */
   record?: () => void;
-  /** Show what follows: the next card, the updated card or the summary. A held leave skips it. */
   advance: () => Promise<void> | void;
 };
 
@@ -170,7 +163,6 @@ function emptySummary(): SessionSummary {
 
 type SmartTestMode = "smartRefs" | "qiraatReading" | "asbabReading";
 type ReviewMode = TestMode | WordTestMode | SmartTestMode;
-/** Each side's semantic tone; the colors per theme come from review-colors. */
 const REVIEW_MODE_TONES: Record<ReviewMode, ReviewSideTone> = {
   nextAyah: "blue",
   previousAyah: "violet",
@@ -194,7 +186,6 @@ const GRADE_KEYS: Record<string, Grade> = {
   "٤": Rating.Easy,
 };
 const CARD_ANSWER_SETTING_PREFIX = "card_answer_";
-/** The Arabic reading face on web; native keeps the system Arabic face rather than the Latin UI font. */
 const ARABIC_READING_FONT = Platform.OS === "web" ? "IBMPlexSansArabic, NotoSansArabic, system-ui" : undefined;
 const EDITABLE_ANSWER_MODES: ReviewMode[] = [
   "previousAyah",
@@ -209,9 +200,7 @@ const EDITABLE_ANSWER_MODES: ReviewMode[] = [
   "asbabReading",
 ];
 
-// ─── Main Component ──────────────────────────────────────────
 
-/** Session cards are loaded as live rows, so an action must not recreate or revive a deleted one. */
 const LIVE_CARD = { requireLive: true } as const;
 
 export default function FlashcardSessionScreenWrapper() {
@@ -249,24 +238,16 @@ function FlashcardSessionScreen() {
   const [sessionCardTotal, setSessionCardTotal] = useState(0);
   const [currentSideIndex, setCurrentSideIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  // W03 note entry point: the card back offers Add note for the ayah under review.
   const [noteOpen, setNoteOpen] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
-  /** The queue could not load: an error with Try again, never an empty completion. */
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  /** The grade whose save failed, repeated as is by Try again. */
   const [failedGrade, setFailedGrade] = useState<Grade | null>(null);
-  /** A short confirmation such as "Card moved to 19 Nov". */
   const [actionNotice, setActionNotice] = useState<string | null>(null);
-  /** The rendered copy of mutationLockRef: grades, card actions and the card menu are disabled while it is held. */
   const [mutationBusy, setMutationBusy] = useState(false);
-  /** A card action (not a grade) is saving: only then does the card menu dim, so it does not blink on every grade. */
   const [cardActionBusy, setCardActionBusy] = useState(false);
-  // Session and card times count only while the session is on screen with the app active.
   const sessionClock = useActiveClock();
-  // The review session row is written on the first grade, so an empty session leaves nothing behind.
   const sessionRef = useRef<ReviewSessionRef | null>(null);
   const cardClock = useActiveClock();
   const wirdEventRef = useRef<SessionHabitInput["event"]>(null);
@@ -274,26 +255,12 @@ function FlashcardSessionScreen() {
   const [wirdNotice, setWirdNotice] = useState<string | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const reviewedCountsRef = useRef({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 });
-  // A learning card can come back several times in one session; the summary counts each card once, by
-  // the state it had when first graded, so "cards reviewed" is not the number of grades.
   const reviewedCardIdsRef = useRef(new Set<string>());
-  /** The rendered copy of a non-empty reviewedCardIdsRef, so the remove guard below updates with it. */
   const [hasReviewed, setHasReviewed] = useState(false);
-  /**
-   * One lock for every change to the current card, a grade or a card action, taken synchronously on the
-   * press. Two changes that each advance from the same card would otherwise skip a card or step past the list.
-   */
   const mutationLockRef = useRef(false);
-  /**
-   * Close, a back press or a gesture came while a grade or card action was unresolved. The screen leaves
-   * once it is saved, or stays on the card to show a failed save, which would otherwise reach a departed screen.
-   */
   const leaveWhenSettledRef = useRef(false);
-  /** Set once the screen leaves on purpose, so the remove guard below lets that navigation through. */
   const exitingRef = useRef(false);
-  /** A back press or gesture held for the leave confirmation or a grade; leaving carries it out. */
   const pendingBackRef = useRef<NavigationAction | null>(null);
-  /** The rendered copy of leaveWhenSettledRef, so Close shows that its press is waiting for the change. */
   const [leavePending, setLeavePending] = useState(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
@@ -333,7 +300,6 @@ function FlashcardSessionScreen() {
     setAnswerEditText("");
   }, []);
 
-  // Load due cards and pre-fetch all card data
   useEffect(() => {
     if (!settingsLoaded) return;
 
@@ -348,7 +314,6 @@ function FlashcardSessionScreen() {
         const queue = await loadReviewQueue(db, normalizedDeckId);
         if (cancelled) return;
         if (queue.length === 0) {
-          // Nothing to review: say when the next card is due instead of a summary of zeros.
           const nextReviewDate = await getNextEligibleReviewDate(db).catch(() => null);
           if (cancelled) return;
           resetSessionProgress();
@@ -513,7 +478,6 @@ function FlashcardSessionScreen() {
         if (cancelled) return;
         console.warn("[FlashcardSession] Failed to load session:", e);
         resetSessionProgress();
-        // A failed load is an error with Try again, never a completed session.
         setLoadError(s.sessionLoadFailed);
         setPhase("error");
       }
@@ -539,9 +503,6 @@ function FlashcardSessionScreen() {
   ]);
 
   const currentCard = cards[currentIndex] ?? null;
-  // Time on a card runs from when its front is shown to its grade (study_log.duration_ms), counting
-  // only while it is on screen. A card removed unrevealed (buried, suspended) leaves the index where
-  // it was, so the next card's id starts its own time too.
   const currentCardId = currentCard?.card.id ?? null;
   useEffect(() => {
     if (phase === "front") cardClock.reset();
@@ -581,7 +542,6 @@ function FlashcardSessionScreen() {
   const isLastSide = currentSideIndex >= activeModes.length - 1;
 
   const animateFlip = useCallback(() => {
-    // With reduced motion the answer shows at once, without the spring.
     if (reduceMotion) {
       flipAnim.setValue(1);
       return;
@@ -612,10 +572,6 @@ function FlashcardSessionScreen() {
     animateFlip();
   };
 
-  /**
-   * The summary follows saved grades, so it must not fail: a part that cannot be loaded is left out.
-   * A failure here once reported the last, already saved, grade as unsaved and offered it again.
-   */
   const buildSummary = useCallback(async (): Promise<SessionSummary> => {
     const session = sessionRef.current;
     const [nextReviewDate, overview] = await Promise.all([
@@ -649,9 +605,6 @@ function FlashcardSessionScreen() {
 
   const advanceAfterRemovingCurrentCard = useCallback(async () => {
     setSessionError(null);
-    // Graded cards stay in the list before currentIndex, so removing the last card ends the session
-    // instead of stepping back onto a card that was already reviewed. The card stays in the list
-    // until the summary replaces it, so the index never points past the list meanwhile.
     if (currentIndex >= cards.length - 1) {
       await finishSessionWithSummary();
       return;
@@ -679,22 +632,13 @@ function FlashcardSessionScreen() {
     reviewedCountsRef.current = next;
   }, []);
 
-  /** The current card was deleted elsewhere after the session loaded it: move past it and say so. */
   const skipDeletedCurrentCard = useCallback(async () => {
     setConfirmCardAction(null);
     setDueDateOpen(false);
     await advanceAfterRemovingCurrentCard();
-    // Set after advancing, which clears the error; the summary also shows it when this was the last card.
     setSessionError(s.cardDeletedSkipped);
   }, [advanceAfterRemovingCurrentCard, s.cardDeletedSkipped]);
 
-  /**
-   * Run one change to the current card, a grade or a card action, under mutationLockRef. Only a failed
-   * `save` is reported, and it keeps the card open for a retry. Once `save` resolves the change is
-   * committed and the card consumed, so what follows (bookkeeping, the next card or the summary) can
-   * neither present it as unsaved nor offer it again. Close or a back press during the change waits
-   * for it: the screen leaves once it is saved, or stays to show its failure.
-   */
   const runCardMutation = async (
     failureLog: string,
     failureMessage: string,
@@ -712,7 +656,6 @@ function FlashcardSessionScreen() {
         change = await save();
       } catch (e) {
         console.warn(failureLog, e);
-        // The held leave is dropped: the card stays open with its error, and a retry does not leave.
         leaveWhenSettledRef.current = false;
         pendingBackRef.current = null;
         setLeavePending(false);
@@ -728,9 +671,7 @@ function FlashcardSessionScreen() {
       } catch (e) {
         console.warn("[FlashcardSession] Failed to record a saved change:", e);
       }
-      // A leave held for this change goes ahead now that it is saved, without showing the next card.
       if (!leaveWhenSettledRef.current) await change.advance();
-      // Also covers a leave that came while the summary was being prepared.
       if (leaveWhenSettledRef.current) {
         leaveWhenSettledRef.current = false;
         leaveSession();
@@ -742,7 +683,6 @@ function FlashcardSessionScreen() {
   };
 
   const runCardAction = async (save: () => Promise<SavedChange>) => {
-    // A refused second press must not clear the dim of the action still saving.
     if (mutationLockRef.current) return;
     setCardActionBusy(true);
     try {
@@ -752,7 +692,6 @@ function FlashcardSessionScreen() {
     }
   };
 
-  // Direct actions keep the sheet open until they are saved, so a failure shows above its rows.
   const handleSuspendCard = () => {
     if (!currentCard) return;
     const { card } = currentCard;
@@ -773,7 +712,6 @@ function FlashcardSessionScreen() {
     const { card } = currentCard;
     void runCardAction(async () => {
       hapticMedium();
-      // Buried until the scheduler's next-day cutoff, as setStudyCardBuried defines it.
       await setStudyCardBuried(db, card.deck_id, card.id, true, LIVE_CARD);
       return {
         advance: async () => {
@@ -799,7 +737,6 @@ function FlashcardSessionScreen() {
     });
   };
 
-  /** Opens the Mushaf at this card's ayah. Every grade is already saved, so the session ends here. */
   const handleOpenInReader = () => {
     if (!currentCard || mutationLockRef.current) return;
     const target = { surah: currentCard.surah, ayah: currentCard.ayah, ...(currentCard.wordPos ? { wordPos: currentCard.wordPos } : {}) };
@@ -913,7 +850,6 @@ function FlashcardSessionScreen() {
     exitingRef.current = true;
     const session = sessionRef.current;
     if (session && phase !== "summary") endReviewSession(db, { session }).catch(console.warn);
-    // A held back press goes where it was going; Close returns to the tabs.
     const back = pendingBackRef.current;
     pendingBackRef.current = null;
     resetSessionProgress();
@@ -923,7 +859,6 @@ function FlashcardSessionScreen() {
     else returnToTabs(navigation.getState(), "/(tabs)/home");
   };
 
-  /** Leave now, or once the grade or card action being saved settles (see leaveWhenSettledRef). */
   const leave = () => {
     if (mutationLockRef.current) {
       leaveWhenSettledRef.current = true;
@@ -931,7 +866,6 @@ function FlashcardSessionScreen() {
     } else leaveSession();
   };
 
-  /** A saved grade would be left behind mid-session. Read from the ref, which a saved grade updates at once. */
   const hasReviewedProgress = () => phase !== "summary" && reviewedCardIdsRef.current.size > 0;
 
   const handleGrade = (rating: Grade) => {
@@ -943,8 +877,6 @@ function FlashcardSessionScreen() {
       const saved = await persistReviewTransition({
         db,
         cardId: item.card.id,
-        // The queued row can be older than the card: sync may have applied another device's review
-        // since the queue loaded. Calculate from the card as it is inside the grade's transaction.
         transition: async (tx) =>
           calculateReviewTransition({
             card: (await readCurrentCard(tx, item.card.id)) ?? item.card,
@@ -962,8 +894,6 @@ function FlashcardSessionScreen() {
           errors: [],
         },
       });
-      // The grade is saved. The same-day requeue carries the row that was saved, not one calculated
-      // from the queued copy.
       const { transition } = saved;
       const requeuedCard = transition.shouldRequeueInSession ? { ...item, card: transition.updatedCard } : null;
       return {
@@ -1001,7 +931,6 @@ function FlashcardSessionScreen() {
     }, () => setFailedGrade(rating));
   };
 
-  // SES-02: leaving mid-session asks once. Every grade is already saved, so this only confirms.
   const handleEndSession = () => {
     if (hasReviewedProgress()) {
       setExitConfirmOpen(true);
@@ -1010,7 +939,6 @@ function FlashcardSessionScreen() {
     leave();
   };
 
-  // Leaving by any route that ends the screen without leaveSession still ends the session.
   useEffect(
     () => () => {
       const session = sessionRef.current;
@@ -1019,13 +947,7 @@ function FlashcardSessionScreen() {
     [db],
   );
 
-  // Back presses, gestures and the iOS swipe behave like Close: with saved grades they ask first, and
-  // during an unresolved grade or card action they wait for it. usePreventRemove, unlike a bare
-  // beforeRemove listener, also tells native-stack to block the native dismissal. `mutationBusy` is the
-  // rendered copy of the lock.
   usePreventRemove(mutationBusy || (phase !== "summary" && hasReviewed), ({ data }) => {
-    // The screen's own leave goes on, as does a back press this render has not caught up with; React
-    // Navigation marks the action as already checked for this screen.
     if (exitingRef.current) navigation.dispatch(data.action);
     else if (hasReviewedProgress()) {
       pendingBackRef.current = data.action;
@@ -1037,8 +959,6 @@ function FlashcardSessionScreen() {
     } else navigation.dispatch(data.action);
   });
 
-  // No path should leave the index past the cards, but if one does the session finishes to the summary
-  // instead of rendering nothing: a blank screen has no Close. Every card change is saved by then.
   const cardMissing = phase !== "loading" && phase !== "summary" && phase !== "error" && !currentCard;
   useEffect(() => {
     if (!cardMissing || mutationBusy) return;
@@ -1055,13 +975,9 @@ function FlashcardSessionScreen() {
 
   const overlayOpen = cardMenuOpen || !!confirmCardAction || dueDateOpen || answerEditOpen || exitConfirmOpen || noteOpen;
   const gradingVisible = (phase === "side" && revealed && isLastSide) || phase === "grading";
-  // The latest handlers and state for the key and Back listeners, which are registered once.
   const inputRef = useRef({ phase, revealed, isLastSide, gradingVisible, overlayOpen, revealFirstSide, handleNext, handleGrade, handleEndSession });
   inputRef.current = { phase, revealed, isLastSide, gradingVisible, overlayOpen, revealFirstSide, handleNext, handleGrade, handleEndSession };
 
-  // Keyboard on web: Space or Enter reveals and steps through sides; 1 to 4 grade Again, Hard, Good and
-  // Easy by meaning, whatever the visual order. Only the topmost surface owns keys, so text entry, IME
-  // composition, an open sheet or dialog, a held key and a focused control are left alone.
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1073,7 +989,6 @@ function FlashcardSessionScreen() {
       if (target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return;
       const advanceKey = event.key === " " || event.key === "Enter";
       if (advanceKey) {
-        // A focused control handles its own Space and Enter.
         if (target?.closest?.(FOCUSED_CONTROL_SELECTOR)) return;
         if (state.phase === "front") {
           event.preventDefault();
@@ -1095,8 +1010,6 @@ function FlashcardSessionScreen() {
     return () => doc.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Android Back runs the same end-review path as the labeled X. An open sheet or dialog takes Back
-  // first through its own modal, so this only sees presses on the review itself.
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -1107,7 +1020,6 @@ function FlashcardSessionScreen() {
     return () => subscription.remove();
   }, []);
 
-  // ─── Render ────────────────────────────────────────────────
 
   if (phase === "summary") {
     return (
@@ -1177,7 +1089,6 @@ function FlashcardSessionScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      {/* Header */}
       <View className="px-6 pt-3 pb-2 items-center">
         <View style={{ width: "100%", maxWidth }}>
           <View
@@ -1190,14 +1101,12 @@ function FlashcardSessionScreen() {
               accessibilityRole="button"
               accessibilityLabel={s.sessionEndReview}
               accessibilityState={{ disabled: leavePending }}
-              // Dimmed while Close waits for the grade or card action it was pressed during.
               className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${leavePending ? "opacity-50" : ""}`}
             >
               <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             </Pressable>
 
             <View className="min-w-0 flex-1 items-center px-2">
-              {/* Review all mixes decks, so the current card's deck is named above the counter. */}
               {!normalizedDeckId ? (
                 <Text
                   className="text-warm-500 dark:text-neutral-400"
@@ -1222,8 +1131,6 @@ function FlashcardSessionScreen() {
               <CardStateBadge state={currentCard.card.state} isDark={isDark} s={s} />
               <Pressable
                 onPress={() => setCardMenuOpen(true)}
-                // Disabled while any change to the card saves; dimmed only for a card action, so it does
-                // not blink on every grade.
                 className={`w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center ${cardActionBusy ? "opacity-50" : ""}`}
                 accessibilityRole="button"
                 accessibilityLabel={s.cardActionsTitle}
@@ -1259,7 +1166,6 @@ function FlashcardSessionScreen() {
         contentContainerStyle={{ alignItems: "center", paddingHorizontal: 24, paddingBottom: 140 }}
       >
         <View style={{ width: "100%", maxWidth }}>
-          {/* Front of card */}
           {phase === "front" && (
             <Card elevation="low" className="p-6 mb-6 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
               {isSmartReviewCard(currentCard) ? (
@@ -1300,7 +1206,6 @@ function FlashcardSessionScreen() {
             </Card>
           )}
 
-          {/* Side (test mode) */}
           {phase === "side" && currentMode && (
             <View>
               <Card elevation="low" className="p-5 mb-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
@@ -1325,7 +1230,6 @@ function FlashcardSessionScreen() {
             </View>
           )}
 
-          {/* Grading phase */}
           {phase === "grading" && (
             <Card elevation="low" className="p-6 mb-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
               {currentCard.textQcf2 && currentCard.v2Page ? (
@@ -1372,7 +1276,6 @@ function FlashcardSessionScreen() {
         />
       ) : null}
 
-      {/* Bottom action area */}
       <View
         className="px-6 pb-6 pt-4 items-center"
         style={{ backgroundColor: withThemeOpacity(themeSurface, 0.95) }}
@@ -1386,7 +1289,6 @@ function FlashcardSessionScreen() {
               >
                 {sessionError}
               </Text>
-              {/* The same grade again, through the same atomic save: one attempt, one review log. */}
               {failedGrade !== null ? (
                 <Pressable
                   onPress={() => handleGrade(failedGrade)}
@@ -1427,7 +1329,6 @@ function FlashcardSessionScreen() {
             </Button>
           )}
 
-          {/* Grading: show directly after last side is revealed, or in grading phase */}
           {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
             <GradingButtons
               onGrade={handleGrade}
@@ -1598,7 +1499,6 @@ function containsArabic(value: string): boolean {
   return /[\u0600-\u06FF]/.test(value);
 }
 
-/** Card-list order (Mark, Suspend, Bury, Set Due Date), then this session's extras, then Reset and Delete after a divider. */
 function CardActionsSheet({
   visible,
   card,
@@ -1623,7 +1523,6 @@ function CardActionsSheet({
   isDark: boolean;
   isRTL: boolean;
   busy: boolean;
-  /** A failed action keeps the sheet open with its error above the rows. */
   error: string | null;
   s: UIStrings;
   onClose: () => void;
@@ -1756,9 +1655,7 @@ function AnswerEditSheet({
 }: {
   visible: boolean;
   value: string;
-  /** The standard answer, shown for reference; a personal answer never replaces it in the data. */
   defaultValue: string;
-  /** What the field held when it opened, for the discard check. */
   baseline: string;
   error: string | null;
   busy: boolean;
@@ -1771,7 +1668,6 @@ function AnswerEditSheet({
 }) {
   const answerIsRTL = isRTL || containsArabic(value);
   const { guard, dialogProps } = useDiscardGuard(visible && isEditableTextDirty(value, baseline));
-  // Close, Cancel, Back, Escape and the backdrop all ask before dropping an edit.
   const requestClose = () => {
     if (!busy) guard(onClose);
   };
@@ -1861,7 +1757,6 @@ function AnswerEditSheet({
   );
 }
 
-// ─── Test Mode Components ────────────────────────────────────
 
 function ModeTagsRow({
   activeModes,
@@ -1897,7 +1792,6 @@ function ModeTagsRow({
                 flexDirection: isRTL ? "row-reverse" : "row",
               }}
             >
-              {/* A finished side keeps full contrast and gains a check instead of fading. */}
               {isDone ? <Check size={12} color={color.text} /> : null}
               <Text
                 style={{
@@ -1982,7 +1876,6 @@ function TestModeAnswer({
         <View>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            // English translation stays LTR in either interface language.
             style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 24, ...textStartStyle(false), writingDirection: "ltr" }}
           >
             {card.translation}
@@ -2036,7 +1929,6 @@ function TestModeAnswer({
   }
 }
 
-/** The answer's source, small and muted under translation and tafsir answers. */
 function SourceLine({ text, isRTL }: { text: string; isRTL: boolean }) {
   return (
     <Text
@@ -2048,10 +1940,6 @@ function SourceLine({ text, isRTL }: { text: string; isRTL: boolean }) {
   );
 }
 
-/**
- * A personal answer, labeled as the user's own so it is never read as the standard text. Line
- * breaks are kept; Arabic uses the reader's Arabic face instead of the Latin UI font.
- */
 function CustomAnswerText({ text, fontSize, label, isRTL }: { text: string; fontSize: number; label: string; isRTL: boolean }) {
   const answerIsRTL = containsArabic(text);
   return (
@@ -2371,9 +2259,7 @@ function AsbabAnswer({ card, s, isRTL }: { card: CardData; s: UIStrings; isRTL: 
   );
 }
 
-// ─── Grading ─────────────────────────────────────────────────
 
-// ─── Card State Badge ────────────────────────────────────────
 
 function CardStateBadge({ state, isDark, s }: { state: number; isDark: boolean; s: UIStrings }) {
   const labels: Record<number, string> = {
@@ -2390,7 +2276,6 @@ function CardStateBadge({ state, isDark, s }: { state: number; isDark: boolean; 
   );
 }
 
-// ─── Session Summary ─────────────────────────────────────────
 
 function SessionSummaryView({
   summary,
@@ -2410,9 +2295,7 @@ function SessionSummaryView({
   error?: string | null;
   db: AppDatabase;
   language: "en" | "ar";
-  /** STR-20's commitment, read when the session opened (useCommitmentLabel). */
   commitLabel: string;
-  /** The signed-in account, if any: only its confirmed sync may say Synced. */
   ownerId: string | null;
 }) {
   const { width, height } = useWindowDimensions();
@@ -2420,7 +2303,6 @@ function SessionSummaryView({
   const synced = useConfirmedSync(db, ownerId, summary.total > 0);
   const n = (value: number) => formatNumber(value, language);
   const seconds = Math.round(summary.durationMs / 1000);
-  // Under a minute reads in seconds instead of rounding up to 1 min.
   const duration =
     seconds < 60
       ? interpolate(s.sessionSeconds, { n: n(Math.max(seconds, summary.total > 0 ? 1 : 0)) })
@@ -2437,7 +2319,6 @@ function SessionSummaryView({
           className="text-center text-charcoal dark:text-neutral-100"
           style={{ fontFamily: "NotoSerif_700Bold", fontSize: compact ? 21 : 24, marginBottom: 12 }}
         >
-          {/* Cards exist but none were due: say so with the next due time. No cards at all: nothing to review. */}
           {nextReview ? s.sessionNothingWasDue : s.sessionNothingToReview}
         </Text>
         {nextReview ? (
@@ -2457,7 +2338,6 @@ function SessionSummaryView({
 
   const states = { new: cardStateColor(State.New, isDark), review: cardStateColor(State.Review, isDark), relearning: cardStateColor(State.Relearning, isDark) };
 
-  // Scrolls so the habit cards never push the Done button off a small screen.
   return (
     <ScrollView
       className="flex-1"
@@ -2505,7 +2385,6 @@ function SessionSummaryView({
           <SummaryCard label={s.flashcardsSummaryRelearning} value={n(summary.relearningCount)} color={states.relearning.text} compact={compact} />
         </View>
         <SummaryRow label={s.flashcardsSummaryDuration} value={duration} compact={compact} />
-        {/* No date (none scheduled, or it could not load) leaves the row out rather than a lone dash. */}
         {nextReview ? <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} compact={compact} /> : null}
       </View>
 
@@ -2515,7 +2394,6 @@ function SessionSummaryView({
         </View>
       ) : null}
 
-      {/* Done never waits for the network: grades are already saved here. */}
       <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
         <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 15 : 16, color: "#fff" }}>
           {showsCommitment(summary.habit) ? commitLabel : s.flashcardsSummaryDone}
@@ -2534,10 +2412,6 @@ function SessionSummaryView({
   );
 }
 
-/**
- * True once a sync for the current account has finished with nothing left to upload. It never
- * blocks Done, and an account change or a pending upload keeps it at "Saved on this device".
- */
 function useConfirmedSync(db: AppDatabase, ownerId: string | null, enabled: boolean): boolean {
   const [synced, setSynced] = useState(false);
   useEffect(() => {
@@ -2600,7 +2474,6 @@ function formatNextReviewDate(value: string | null, s: UIStrings, language: "en"
   return date <= new Date(localEndOfTodayIso()) ? s.flashcardsToday : formatLongCardDate(date, language);
 }
 
-// ─── Helpers ─────────────────────────────────────────────────
 
 function getModeName(mode: ReviewMode, s: UIStrings): string {
   const map: Record<ReviewMode, string> = {
@@ -2618,7 +2491,6 @@ function getModeName(mode: ReviewMode, s: UIStrings): string {
   return map[mode] ?? mode;
 }
 
-/** The deck a card belongs to, named during Review all. */
 function deckTitleFor(deckId: string, s: UIStrings): string {
   if (deckId === MEANINGS_DECK_ID) return s.vocabDeckTitle;
   if (deckId === SMART_DECK_IDS.retention) return s.smartDeckRetentionTitle;
@@ -2635,7 +2507,6 @@ function tafseerSourceLabel(sourceId: string, s: UIStrings): string | null {
   return label ?? null;
 }
 
-/** "Al-Baqara 2:255" / "البقرة ٢:٢٥٥", or the saved word, for a confirmation title. */
 function sessionCardName(card: CardData | null, language: "en" | "ar"): string {
   if (!card) return "";
   if (card.isWordCard && card.wordText) return card.wordText;

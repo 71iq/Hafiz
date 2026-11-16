@@ -52,16 +52,10 @@ type ResponsiveOverlayProps = {
   dismissOnEscape?: boolean;
   maxWidth?: number;
   maxHeight?: OverlayMaxHeight;
-  /**
-   * Phone sheets take their content height up to maxHeight ("content", the default). "max" keeps
-   * the sheet at maxHeight, for bodies laid out with flex: 1 (tabbed detail, pinned composers),
-   * which collapse to nothing in a content-sized native container.
-   */
   phoneSheetHeight?: "content" | "max";
   surfaceColor?: string;
   dir?: Direction;
   avoidKeyboard?: boolean;
-  /** Focus target on open. Without one, focus moves to the header title so it is announced. */
   initialFocusRef?: RefObject<{ focus?: () => void } | null>;
   restoreFocusRef?: RefObject<{ focus?: () => void } | null>;
   children: React.ReactNode;
@@ -69,13 +63,11 @@ type ResponsiveOverlayProps = {
 
 type OverlayHeaderProps = {
   title?: string;
-  /** Truncates the title to this many lines, for headers that share their row with several actions. */
   titleNumberOfLines?: number;
   subtitle?: string;
   leading?: React.ReactNode;
   actions?: React.ReactNode;
   onClose?: () => void;
-  /** Retired: the grab handle looked draggable but was not. Kept so callers still compile. */
   showHandle?: boolean;
   dir?: Direction;
   isRTL?: boolean;
@@ -88,7 +80,6 @@ type OverlayBodyProps = {
   className?: string;
   contentContainerClassName?: string;
   contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
-  /** Direct children that stay pinned to the top while the body scrolls. */
   stickyHeaderIndices?: number[];
 };
 
@@ -97,16 +88,10 @@ type OverlayFooterProps = {
   dir?: Direction;
   isRTL?: boolean;
   className?: string;
-  /**
-   * Forces the stacked layout. Footers also stack below 360px and when an OverlayFooterLabel wraps.
-   * Stacked actions keep their order reversed, so the main action (last child) sits on top.
-   */
   stacked?: boolean;
 };
 
-/** Footers narrower than this stack their actions vertically. */
 export const OVERLAY_FOOTER_STACK_WIDTH = 360;
-/** Gap kept between a focused field and the top of the on-screen keyboard. */
 const KEYBOARD_FIELD_GAP = 16;
 
 let bodyScrollLockCount = 0;
@@ -119,7 +104,6 @@ function lockBodyScroll() {
   if (Platform.OS !== "web" || typeof document === "undefined") return;
   if (bodyScrollLockCount === 0) {
     const body = document.body;
-    // Hiding overflow removes a desktop scrollbar; pad by its width so the page does not shift.
     const viewportWidth = document.documentElement.clientWidth;
     const scrollbarWidth =
       typeof window === "undefined" || viewportWidth <= 0 ? 0 : Math.max(0, window.innerWidth - viewportWidth);
@@ -147,10 +131,6 @@ function unlockBodyScroll() {
   }
 }
 
-/**
- * Registers a surface (overlay or menu) in the shared keyboard stack. Only the topmost surface
- * handles Escape and other surface keys. Returns the matching unregister function.
- */
 export function registerOverlayLayer(id: string): () => void {
   const existing = overlayStack.indexOf(id);
   if (existing >= 0) overlayStack.splice(existing, 1);
@@ -165,7 +145,6 @@ export function isTopOverlayLayer(id: string): boolean {
   return overlayStack[overlayStack.length - 1] === id;
 }
 
-/** True while any overlay or menu is open, for global shortcuts that must yield to it (C07). */
 export function hasOpenOverlay(): boolean {
   return overlayStack.length > 0;
 }
@@ -174,7 +153,6 @@ function createOverlayId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
-/** Stable id for a surface that registers itself with registerOverlayLayer. */
 export function useOverlayLayerId(prefix = "overlay"): string {
   return useRef(createOverlayId(prefix)).current;
 }
@@ -199,7 +177,6 @@ function useWebKeyboardInset(enabled: boolean) {
   useEffect(() => {
     if (!enabled || Platform.OS !== "web" || typeof window === "undefined" || !window.visualViewport) return;
     const viewport = window.visualViewport;
-    // Mobile browsers overlay the keyboard on the layout viewport; the visual viewport shrinks.
     const update = () => setInset(Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)));
     update();
     viewport.addEventListener("resize", update);
@@ -268,9 +245,6 @@ export function ResponsiveOverlay({
     }).start();
   }, [animation, open, reduceMotion]);
 
-  // Escape belongs to the topmost surface only. It is consumed even when this overlay does not
-  // dismiss on Escape, so it cannot reach a lower sheet or the reader. The Modal's own focus trap
-  // (react-native-web) keeps Tab and Shift+Tab cycling inside the topmost overlay.
   useEffect(() => {
     if (!open || Platform.OS !== "web" || typeof window === "undefined") return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -291,8 +265,6 @@ export function ResponsiveOverlay({
         initialFocusRef.current.focus();
         return;
       }
-      // Web: move focus to the title so screen readers announce what opened, or to the surface
-      // itself when there is no title.
       if (Platform.OS === "web" && !focusWebElement(titleRef.current)) focusWebElement(contentRef.current);
     });
     return () => {
@@ -308,9 +280,6 @@ export function ResponsiveOverlay({
     };
   }, [initialFocusRef, open, restoreFocusRef]);
 
-  // Edge-to-edge Android ignores adjustResize, and KeyboardAvoidingView kept a navigation-bar-sized
-  // padding after the keyboard hid, leaving every sheet lifted off the bottom. Android pads from the
-  // keyboard events directly and clears the padding when the keyboard hides.
   const androidAvoidsKeyboard = Platform.OS === "android" && avoidKeyboard && open;
   const [androidKeyboardInset, setAndroidKeyboardInset] = useState(0);
   const containerHeightRef = useRef(0);
@@ -329,7 +298,6 @@ export function ResponsiveOverlay({
     };
   }, [androidAvoidsKeyboard]);
 
-  // Mobile web: shrink the sheet to the visual viewport and keep the focused field above the keyboard.
   const webKeyboardInset = useWebKeyboardInset(Platform.OS === "web" && avoidKeyboard && open);
   useEffect(() => {
     if (webKeyboardInset <= 0 || typeof document === "undefined") return;
@@ -349,7 +317,6 @@ export function ResponsiveOverlay({
   const computedMaxHeight = useMemo(() => {
     if (maxHeight != null) return maxHeight;
     if (activePresentation === "fullscreen") return "100%" as const;
-    // The modal draws under the translucent status bar, so phone sheets stop below its inset.
     return Math.min(height - (isPhone ? insets.top + 8 : 48), isPhone ? height * 0.92 : 720);
   }, [activePresentation, height, insets.top, isPhone, maxHeight]);
 
@@ -366,11 +333,7 @@ export function ResponsiveOverlay({
       width: contentWidth,
       maxWidth: activePresentation === "sheet" ? "100%" : contentWidth,
       maxHeight: computedMaxHeight,
-      // Short phone sheets fit their content up to maxHeight; long bodies scroll between a fixed
-      // header and footer. "max" keeps the former fixed height for flex-laid-out bodies.
       height: isPhoneSheet && phoneSheetHeight === "max" ? computedMaxHeight : undefined,
-      // Lets a phone sheet shrink above the keyboard instead of being pushed off screen.
-      // Content-sized dialogs and panels must not shrink: their flex-1 bodies would collapse to zero.
       ...(isPhoneSheet ? { flexShrink: 1, minHeight: 0 } : null),
       backgroundColor: resolvedSurfaceColor,
       borderTopLeftRadius: 28,
@@ -404,9 +367,6 @@ export function ResponsiveOverlay({
 
   const overlayAlignment = activePresentation === "sheet" ? "items-stretch justify-end" : "items-center justify-center";
   const Container = avoidKeyboard && Platform.OS === "ios" ? KeyboardAvoidingView : View;
-  // Android Back reaches only the topmost modal, even while its keyboard is open; the first press
-  // only hides the keyboard, as elsewhere in Android, so a typed query or note is not closed with
-  // it. The next press goes to onClose, which editors guard with the discard prompt.
   const handleRequestClose = () => {
     if (Platform.OS === "android" && Keyboard.isVisible()) {
       Keyboard.dismiss();
@@ -423,8 +383,6 @@ export function ResponsiveOverlay({
         onLayout={(event) => {
           containerHeightRef.current = event.nativeEvent.layout.height;
         }}
-        // The modal covers the translucent status bar; a sheet that shrinks above the keyboard must
-        // still stop below it.
         style={{
           backgroundColor: "rgba(0,0,0,0.55)",
           direction: dir,
@@ -446,7 +404,6 @@ export function ResponsiveOverlay({
           style={[contentStyle, { direction: dir }]}
         >
           <OverlayChromeContext.Provider value={chrome}>
-            {/* A crashing sheet shows the fallback inside the sheet; backdrop, Back and Escape still close it. */}
             <ErrorBoundary section="overlay" variant="section" showHome={false}>
               {children}
             </ErrorBoundary>
@@ -555,9 +512,6 @@ export function OverlayHeader({
   );
 }
 
-// The body starts from its content height and grows or shrinks from there. With flex: 1 (basis 0)
-// it filled fixed-height sheets but collapsed to nothing in content-sized dialogs on native, where
-// Reading Settings showed only its header; web sized it from content and hid the bug.
 const OVERLAY_BODY_FLEX = { flexGrow: 1, flexShrink: 1, flexBasis: "auto" } as const;
 
 function assignRef<T>(target: Ref<T> | undefined, value: T | null) {
@@ -584,7 +538,6 @@ export function OverlayBody({
     [scrollRef],
   );
 
-  // Native: once the keyboard is up, scroll the focused field to sit 16px above it.
   useEffect(() => {
     if (!scrollEnabled || Platform.OS === "web") return;
     const subscription = Keyboard.addListener("keyboardDidShow", () => {
@@ -595,7 +548,6 @@ export function OverlayBody({
         try {
           scroll.scrollResponderScrollNativeHandleToKeyboard(focused, KEYBOARD_FIELD_GAP, true);
         } catch {
-          // The field may belong to another scroll container; leaving the position is harmless.
         }
       });
     });
@@ -603,12 +555,10 @@ export function OverlayBody({
   }, [scrollEnabled]);
 
   if (!scrollEnabled) {
-    // The content container's padding applies here too; dropping it left fixed bodies edge to edge.
     const hasContentContainer = contentContainerClassName != null || contentContainerStyle != null;
     return (
       <View className={cn("min-h-0", className)} style={OVERLAY_BODY_FLEX}>
         {hasContentContainer ? (
-          // Basis auto, not flex-1: a content-sized sheet would otherwise collapse this container.
           <View className={cn("min-h-0", contentContainerClassName)} style={[OVERLAY_BODY_FLEX, contentContainerStyle]}>
             {children}
           </View>
@@ -624,19 +574,15 @@ export function OverlayBody({
       ref={attachScroll}
       className={cn("min-h-0", className)}
       style={OVERLAY_BODY_FLEX}
-      // Web shows its scrollbar so a long sheet reads as scrollable.
       showsVerticalScrollIndicator={Platform.OS === "web"}
-      // The first tap on a button must act, not only dismiss the keyboard.
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={contentContainerStyle}
       contentContainerClassName={contentContainerClassName}
       stickyHeaderIndices={stickyHeaderIndices}
     >
-      {/* A crash in the body keeps the overlay header and its Close button. */}
       <ErrorBoundary section="overlay-body" variant="section" showHome={false}>
         {children}
       </ErrorBoundary>
-      {/* Keeps the last lines above the Android navigation bar without overriding sheet padding. */}
       {insets.bottom > 0 ? <View style={{ height: insets.bottom }} /> : null}
     </ScrollView>
   );
@@ -645,10 +591,6 @@ export function OverlayBody({
 type FooterLayout = { reportWrapped: () => void };
 const OverlayFooterContext = createContext<FooterLayout | null>(null);
 
-/**
- * A footer action label that reports when it wraps, so the footer stacks its actions full width
- * instead of squeezing them (common with Arabic labels).
- */
 export function OverlayFooterLabel({ onLayout, style, ...props }: TextProps) {
   const footer = useContext(OverlayFooterContext);
   const lineHeight = 20;
@@ -675,8 +617,6 @@ export function OverlayFooter({
   const dir = useUIDirection(explicitDir);
   const isRTL = explicitIsRTL ?? dir === "rtl";
   const [rowWidth, setRowWidth] = useState(0);
-  // The widest row at which a side-by-side label wrapped. Stacking gives labels room so they stop
-  // wrapping; keeping the threshold avoids flipping back and forth. A wider footer tries the row again.
   const [wrapThreshold, setWrapThreshold] = useState(0);
   const rowWidthRef = useRef(0);
   const stackedRef = useRef(false);
@@ -720,8 +660,6 @@ export function OverlayFooter({
     >
       <OverlayFooterContext.Provider value={footerLayout}>
         {stacked ? (
-          // Each action sits in its own full-width row, so a flex-1 button fills the width instead of
-          // collapsing in the column. Reversed, the main (last) action comes first.
           <View className="w-full gap-3" style={{ flexDirection: "column-reverse" }} onLayout={handleRowLayout}>
             {Children.toArray(children).map((child, index) => (
               <View key={index} className="w-full" style={{ flexDirection: "row", direction: "ltr" }}>

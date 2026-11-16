@@ -29,7 +29,6 @@ import { textStartStyle } from "@/lib/ui/direction";
 export const REFLECTION_MIN_LENGTH = 10;
 export const REFLECTION_MAX_LENGTH = 5000;
 const INPUT_MIN_HEIGHT = 132;
-/** The reflection input grows with its text up to this share of the sheet height. */
 const INPUT_MAX_SHARE = 0.5;
 
 type Props = {
@@ -38,9 +37,8 @@ type Props = {
   surah: number;
   ayahStart: number;
   ayahEnd: number;
-  ayahPreview?: string; // text reference like "Al-Baqarah 2:255"
+  ayahPreview?: string;
   onSuccess?: () => void;
-  /** Called after this sheet closes for a navigation, so a sheet that contains it can close too. */
   onNavigate?: () => void;
 };
 
@@ -61,9 +59,6 @@ export function WriteReflectionSheet({
   const showNotice = useOptionalOperationNotice();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
-  // ETH-07: a stated minor's reflections and comments are visible only to them. The account's own
-  // privacy comes from the cache the app-wide minor check keeps (useMinorPhotoCleanup). The post
-  // carries what this screen showed, so a copy made stale by another device cannot publish it.
   const ownPrivacy = useQuery({
     queryKey: profilePrivacyKeys.mine(user?.id ?? null),
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
@@ -80,8 +75,6 @@ export function WriteReflectionSheet({
     db,
   );
   const submitting = pending.has("submit");
-  // A new target, account or database starts empty. An account change clears the draft without
-  // asking, so a guest or another account never inherits it.
   useLayoutEffect(() => {
     setContent("");
     setError(null);
@@ -94,7 +87,6 @@ export function WriteReflectionSheet({
   const mutedColor = isDark ? "#737373" : "#A39B93";
   const helperColor = isDark ? "#a3a3a3" : "#6E5A47";
   const errorColor = isDark ? "#f87171" : "#dc2626";
-  // Counted as posted: surrounding whitespace is trimmed before saving.
   const charCount = content.trim().length;
   const isValid = charCount >= REFLECTION_MIN_LENGTH && charCount <= REFLECTION_MAX_LENGTH;
   const dirty = isEditableTextDirty(content, "");
@@ -107,7 +99,6 @@ export function WriteReflectionSheet({
     if (!lease) return;
     setError(null);
     const finishPosted = () => {
-      // Invalidate reflection queries for this ayah range
       for (let a = ayahStart; a <= ayahEnd; a++) {
         queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.ayah({ surah, ayah: a }) });
         queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.countAyah({ surah, ayah: a }) });
@@ -146,12 +137,9 @@ export function WriteReflectionSheet({
       finishPosted();
     } catch (error) {
       const privacyChanged = error instanceof ReflectionPrivacyChangedError;
-      // The account is no longer a minor on the server: reload its privacy so this screen stops
-      // promising privacy, and post nothing until the person submits again.
       if (privacyChanged) void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user.id) });
       if (!lease.isCurrent()) return;
       if (error instanceof SavedRowUnreadableError) {
-        // Posted, but the reply could not be read: refresh instead of offering a duplicate retry.
         finishPosted();
         return;
       }
@@ -159,7 +147,6 @@ export function WriteReflectionSheet({
         setError(s.reflectionPrivacyChanged);
         return;
       }
-      // Server details stay in the log; the person sees a plain message beside Try again.
       console.warn("[WriteReflection] Failed to post:", error);
       setError(s.reflectionPostFailed);
     } finally {
@@ -196,7 +183,6 @@ export function WriteReflectionSheet({
   const handleClose = useCallback(() => guard(closeNow), [closeNow, guard]);
 
   const handleLogin = useCallback(() => {
-    // The return target holds only the ayah range; the guest's text is not carried into the account.
     captureAuthReturn({ route: "reflection-editor", params: { surah, ayahStart, ayahEnd } });
     closeNow();
     onNavigate?.();
@@ -204,7 +190,6 @@ export function WriteReflectionSheet({
   }, [ayahEnd, ayahStart, closeNow, onNavigate, surah]);
 
   const privateNoteSaved = useCallback(() => {
-    // The note was the chosen destination: the reflection draft is done, and nothing was posted.
     setPrivateNoteOpen(false);
     closeNow();
   }, [closeNow]);
@@ -349,16 +334,12 @@ export function WriteReflectionSheet({
                 </View>
               ) : null}
 
-              {/* Who sees this post, beside the action that publishes it. The minor-private promise
-                  waits while a "privacy changed" message would contradict it. */}
               {error !== s.reflectionPrivacyChanged ? (
                 <Text
                   style={{
                     fontFamily: "Manrope_400Regular",
                     fontSize: 12,
                     lineHeight: 18,
-                    // A readable tone (about 6:1 and 7:1), not the placeholder's: this line tells the
-                    // writer who can see what they write.
                     color: helperColor,
                     marginBottom: 8,
                     ...textStartStyle(isRTL),
@@ -389,7 +370,6 @@ export function WriteReflectionSheet({
         </OverlayBody>
       </ResponsiveSheet>
       <DiscardChangesDialog {...dialogProps} title={s.reflectionDiscardTitle} />
-      {/* Saving privately is an explicit choice; it never publishes and the draft is copied, not posted. */}
       <PrivateNoteSheet
         open={open && privateNoteOpen}
         onClose={() => setPrivateNoteOpen(false)}

@@ -10,7 +10,6 @@ jest.mock("@/lib/settings/context", () => {
   return { ...actual, useSettings: () => ({ themeColors: { surfaceHigh: "#eeeeee", surfaceMid: "#f4f4f4" } }) };
 });
 
-// Saturday 14 November 2026, midday local time.
 const NOW = new Date(2026, 10, 14, 12);
 
 function dateKey(date: Date): string {
@@ -24,7 +23,6 @@ function weekdayOf(key: string): number {
   return new Date(year, month - 1, day).getDay();
 }
 
-/** Every one of the last 120 days is done, so each past cell carries a dated accessibility label. */
 function doneDays(): Map<string, DayStatus> {
   const map = new Map<string, DayStatus>();
   for (let back = 0; back < 120; back++) {
@@ -64,12 +62,10 @@ describe("ActivityHeatmap week start", () => {
     const view = renderHeatmap(weekStart);
     const dates = cellDates(view);
 
-    // Columns run oldest first; the first cell of every column is the week start, today is in the last.
     for (let index = 0; index < dates.length; index += 7) expect(weekdayOf(dates[index])).toBe(weekStart);
     expect(dates[dates.length - 1]).toBe(dateKey(NOW));
     expect(dates.length).toBe(12 * 7 + ((NOW.getDay() - weekStart + 7) % 7) + 1);
 
-    // Short visible names carry full accessible names.
     expect(view.getAllByLabelText(/^(Monday|Wednesday|Friday)$/).map((node) => node.props.children)).toEqual(
       labelOrder,
     );
@@ -109,13 +105,11 @@ describe("ActivityHeatmap day access", () => {
     expect(view.getByText("Friday, 13 November 2026")).toBeTruthy();
     expect(view.getByText("3 reviews · Wird")).toBeTruthy();
 
-    // Cells carry localized dates rather than raw keys; only the selected cell takes Tab focus.
     const cell = view.getByTestId("heatmap-day-2026-11-13");
     expect(cell.props.accessibilityLabel).toBe("Friday, 13 November 2026: 3 reviews, Wird");
     expect(view.getByTestId("heatmap-day-2026-11-12").props.accessibilityLabel).toBe(
       "Thursday, 12 November 2026: 0 reviews",
     );
-    // The tiny cells have no enlarged hit area that could overlap a neighbor.
     expect(cell.props.hitSlop).toBeUndefined();
   });
 

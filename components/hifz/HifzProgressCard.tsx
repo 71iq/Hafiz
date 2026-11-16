@@ -9,7 +9,6 @@ import { interpolate } from "@/lib/i18n/useStrings";
 
 type Props = { progress: HifzProgress; language: "en" | "ar"; isDark: boolean; s: UIStrings };
 
-/** MST-02, MST-03: memorized pages by strength in calm colors, and completed juz. No broken visuals. */
 export function HifzProgressCard({ progress, language, isDark, s }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const total = Math.max(1, progress.bands.steady + progress.bands.fair + progress.bands.needsReview);

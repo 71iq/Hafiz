@@ -10,21 +10,16 @@ import type { GroupPending, RemindLaterPending } from "@/lib/notifications/setti
 import { chooseTemplate, type TemplateUse, type TemplateVars } from "@/lib/notifications/templates";
 import { COUNTED_FOR_BACKOFF, type NotificationType, type PlannedSlot, type ReminderPrefs, type ReminderRoute } from "@/lib/notifications/types";
 
-/** NOT-04: individual dated notifications for the next 7 days. */
 export const PLAN_HORIZON_DAYS = 7;
-/** NOT-07: 2 a day, or 3 on an at-risk day with the late reminder enabled. */
 const DAILY_CAP = 2;
 const LATE_DAY_CAP = 3;
-/** 6.3: dormant users get one message a week for 4 weeks, then monthly until 6 months. */
 const DORMANT_WEEKLY_DAYS: readonly number[] = [30, 37, 44, 51];
 const DORMANT_MONTHLY_UNTIL_DAYS = 183;
 const MAKE_UP_LEAD_MINUTES = 90;
 const GROUP_BATCH_MINUTES = 30;
 const MINUTE = 60_000;
-/** A Monday. Every-other-day back-off counts from here, so the days stay put across replans. */
 const BACKOFF_EPOCH: LocalDate = "2026-01-05";
 
-/** NOT-09, spec 8.11. */
 export type BackoffLevel = 0 | 1 | 2;
 
 export function backoffLevel(consecutiveIgnored: number): BackoffLevel {
@@ -33,7 +28,6 @@ export function backoffLevel(consecutiveIgnored: number): BackoffLevel {
 
 export type HabitInput = Readonly<{ days: readonly HabitDay[]; pause: HabitPause | null }>;
 
-/** Values the copy can mention for a date. The hifz plan can fill pages, minutes, range and manzil later. */
 export type ReminderFactValues = Readonly<{
   surah?: number;
   pages?: number;
@@ -42,7 +36,6 @@ export type ReminderFactValues = Readonly<{
   manzil?: number;
 }>;
 
-/** A notification that already fired on this device. Cancelled ones are never included. */
 export type DeliveredReminder = Readonly<{ type: string; templateId: string; localDate: LocalDate; at: Date }>;
 
 export type PlannerInput = Readonly<{
@@ -51,31 +44,17 @@ export type PlannerInput = Readonly<{
   prefs: ReminderPrefs;
   prayers: (date: LocalDate) => DayPrayerTimes | null;
   isRamadan: (date: LocalDate) => boolean;
-  /** The first day of Ramadan, for the one dormant-user invitation (6.3). */
   isRamadanStart: (date: LocalDate) => boolean;
   habit: HabitInput;
-  /** The user's minimum wird, so "one page is enough" copy stays true. */
   minimum: Readonly<{ pages: number; minutes: number }>;
-  /** 0 is Sunday. Weekly back-off reminds on this day. */
   weekStart: number;
   backoff: BackoffLevel;
-  /**
-   * The ignored reminders in a row behind `backoff` (NOT-09). With it, the plan projects the tally
-   * through the batch: each planned reminder that counts toward back-off is taken as ignored before
-   * the next one, since any session reschedules with the tally reset. Without it, `backoff` holds
-   * for every day.
-   */
   ignoredCount?: number;
   delivered: readonly DeliveredReminder[];
-  /**
-   * Reminders whose time passed that the OS still holds. They are not delivered yet, but will show, so
-   * they count toward their day's cap (NOT-07).
-   */
   late?: readonly DeliveredReminder[];
   remindLater: RemindLaterPending | null;
   groupPending: GroupPending | null;
   facts: (date: LocalDate) => ReminderFactValues;
-  /** Templates already chosen for a `type|localDate`, kept when still eligible so replans are stable. */
   preferredTemplates?: ReadonlyMap<string, string>;
   random?: () => number;
   horizonDays?: number;
@@ -99,35 +78,24 @@ type Candidate = {
   at: Date;
   vars: TemplateVars;
   route: ReminderRoute;
-  /** Lower keeps its place first when the daily cap is reached. */
   priority: number;
   exemptQuiet: boolean;
   backoff: boolean;
   late: boolean;
   times: ReminderDayTimes;
-  /** See PlannedSlot.existingOnly. */
   existingOnly?: boolean;
 };
 
-/** NOT-05b: the streak state a remind-later follow-up was scheduled under. */
 export function streakFingerprint(snapshot: HabitSnapshot): string {
   return `${snapshot.streak.length}|${snapshot.graceHeld}|${snapshot.headline.kind}`;
 }
 
 const COVERED_TODAY = new Set(["done_today", "excused_today", "paused"]);
 
-/**
- * Today already has its wird, an excuse or a pause. The headline alone is not enough: an open
- * earn-back leads the headline even on a day that is already done.
- */
 export function isCoveredToday(snapshot: HabitSnapshot): boolean {
   return snapshot.streak.todayStatus !== null || COVERED_TODAY.has(snapshot.headline.kind);
 }
 
-/**
- * Today is excused or paused: the user set the day aside, so nothing presses them to recite. A day
- * already done is not set aside; yesterday's open make-up can still be reminded then (STR-07).
- */
 function isSetAsideToday(snapshot: HabitSnapshot, pause: HabitPause | null, date: LocalDate): boolean {
   const status = snapshot.streak.todayStatus;
   return status === "excused" || status === "paused" || (pause !== null && pause.start <= date && date <= pause.end);
@@ -147,15 +115,6 @@ function minutesBefore(at: Date, minutes: number): Date {
   return new Date(at.getTime() - minutes * MINUTE);
 }
 
-/**
- * Spec 8.9. Plans every reminder for the next 7 local days from habit state, preferences and what
- * already fired. Pure: the platform adapter schedules the result.
- *
- * Rules: nothing on a day already done, excused or paused (NOT-05); quiet hours except the opt-in
- * late reminder and a Ramadan anchor the user chose (NOT-08, NOT-10); every slot inside its own
- * date (NOT-06); back-off (NOT-09); the daily cap with follow-ups and group messages counted
- * (NOT-07); follow-up skip rules (NOT-05b); random template choice without repeats (NOT-12).
- */
 export function planNotifications(input: PlannerInput): PlanResult {
   const { now, clock, prefs } = input;
   if (!prefs.enabled) return { slots: [], skipped: [] };
@@ -173,7 +132,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
     if (!timesCache.has(date)) timesCache.set(date, buildDayTimes(dayTimesInput, date));
     return timesCache.get(date)!;
   };
-  // The history is settled once; every slot below projects from that summary.
   const project = createHabitProjector(input, today);
   const sharedVars = (date: LocalDate): TemplateVars => {
     const facts = input.facts(date);
@@ -197,7 +155,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
     const base = sharedVars(date);
     const add = (candidate: Omit<Candidate, "localDate" | "times">) => candidates.push({ ...candidate, localDate: date, times });
 
-    // Morning slot: one of make-up, earn-back, grace note, wird reminder or comeback.
     const morning = project(date, times.anchorAt);
     const headline = morning.snapshot.headline;
     const length = morning.snapshot.streak.length;
@@ -208,9 +165,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
       next: length >= 1 ? length + 1 : undefined,
       prayer: prayerVar,
     };
-    // Slots at the anchor come at the time the user chose for reminders (3.3), so quiet hours, which
-    // keep unasked-for messages out of the night, do not apply to them. Otherwise an anchor such as
-    // 90 minutes after Isha could never fire.
     const wirdCandidate = () =>
       add({
         type: "wird_reminder",
@@ -223,18 +177,11 @@ export function planNotifications(input: PlannerInput): PlanResult {
         late: false,
       });
 
-    // 8.9: the make-up reminder comes at the anchor, or 90 minutes before the cutoff when that is earlier.
     const cutoffAt = makeUpCutoff(input, addDays(date, -1));
     const leadAt = minutesBefore(cutoffAt, MAKE_UP_LEAD_MINUTES);
     const makeUpAt = leadAt.getTime() < times.anchorAt.getTime() ? leadAt : times.anchorAt;
     const makeUp = project(date, makeUpAt).snapshot;
 
-    // Home shows yesterday's open make-up even on an excused or paused day, but a reminder to recite
-    // today would press on a day the user set aside, so it is not sent then. A day already done is
-    // not set aside: another device may have recorded it while yesterday is still makeable here.
-    // Once the cutoff has passed nothing can be made up, so a make-up alarm the OS delivers late is
-    // not kept as a slot whose time merely passed (reconcileReminders); the projection at the slot's
-    // own time still shows the window open.
     if (
       makeUp.headline.kind === "make_up_open" &&
       input.now.getTime() < cutoffAt.getTime() &&
@@ -306,7 +253,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
       }
     }
 
-    // Evening: streak at risk (5.8.2), only with a streak of 2 or more and no wird yet.
     if (prefs.types.streak_at_risk) {
       const evening = project(date, times.atRiskAt).snapshot;
       if (evening.headline.kind === "at_risk" && evening.streak.length >= 2) {
@@ -323,8 +269,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
       }
     }
 
-    // Late reminder: opt-in and exempt from quiet hours. Planning at 23:00 or later schedules no new
-    // one for today, but keeps one already set, so a replan late in the evening does not cancel it.
     if (prefs.types.late_reminder) {
       const lateDay = project(date, times.lateAt).snapshot;
       if (lateDay.headline.kind === "at_risk" && lateDay.streak.length >= 2) {
@@ -347,7 +291,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
       }
     }
 
-    // Friday al-Kahf: opt-in, independent of the wird, stopped only by a pause (STR-13).
     if (prefs.types.friday_kahf && weekday === 5 && project(date, times.kahfAt).snapshot.headline.kind !== "paused") {
       add({
         type: "friday_kahf",
@@ -367,14 +310,9 @@ export function planNotifications(input: PlannerInput): PlanResult {
   const group = groupCandidate(input, timesFor, today, horizon);
   if (group) candidates.push(group);
 
-  // Timing filters. A reminder that already fired is not sent again that day, even at a new time;
-  // each "Remind me in 1 hour" request is its own follow-up.
   const sent = (candidate: Candidate) =>
     candidate.type !== "remind_later" &&
     input.delivered.some((item) => item.type === candidate.type && item.localDate === candidate.localDate);
-  // NOT-07 caps per date, counting everything that already fired that day, follow-ups and group
-  // messages included. A follow-up ranks first, so it takes the place of the lowest-ranked later
-  // reminder of its day only when the cap would otherwise be exceeded.
   const capDate = (date: LocalDate, list: readonly Candidate[]) => {
     const kept: Candidate[] = [];
     const dropped: Candidate[] = [];
@@ -397,10 +335,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
     return { kept, dropped };
   };
 
-  // Day by day in date order: the timing filters, then the cap. A reminder sent and left unanswered
-  // until a session, which replans, counts as ignored for the reminders after it (NOT-09), but only
-  // one the cap keeps is sent. So within a day the timing runs again counting only the reminders the
-  // first pass kept, and the next day starts from the kept ones.
   const accepted: Candidate[] = [];
   let projectedIgnored = input.ignoredCount ?? null;
   const byDate = new Map<LocalDate, Candidate[]>();
@@ -434,7 +368,6 @@ export function planNotifications(input: PlannerInput): PlanResult {
     if (dayStart !== null) projectedIgnored = dayStart + final.kept.filter((candidate) => COUNTED_FOR_BACKOFF.has(candidate.type)).length;
   }
 
-  // Templates, in time order so earlier slots count toward later no-repeat and citation checks.
   const random = input.random ?? Math.random;
   const history: TemplateUse[] = input.delivered.map((item) => ({ templateId: item.templateId, at: item.at }));
   const slots: PlannedSlot[] = [];
@@ -484,11 +417,6 @@ function timingProblem(
   return null;
 }
 
-/**
- * 6.3 cadence for a user without a live streak. At-risk weekly: daily. At-risk monthly: Fridays,
- * Mondays and the 1st of the month (fresh starts). Dormant: weekly for 4 weeks, then the 1st of
- * each month until 6 months, then stop, except one invitation on the first day of Ramadan.
- */
 export function comebackCadence(
   days: readonly HabitDay[],
   date: LocalDate,
@@ -535,9 +463,6 @@ function remindLaterCandidate(
     return null;
   };
   if (date < today || input.clock.dateOf(at) !== date) return skip("expired");
-  // Coverage and the streak state come before "past": a follow-up past its time that the OS still
-  // holds is kept only while it is still due (reconcileReminders), so a day completed, excused or
-  // paused since then cancels it.
   const state = project(date, at).snapshot;
   if (isCoveredToday(state)) return skip("state_changed");
   if (streakFingerprint(project(today, input.now).snapshot) !== pending.fingerprint) return skip("state_changed");

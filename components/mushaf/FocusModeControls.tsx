@@ -13,7 +13,6 @@ import { toArabicNumber } from "@/lib/arabic";
 import { hasOpenOverlay } from "@/components/ui/ResponsiveOverlay";
 import { useFocusKeepAwake } from "./focus-keep-awake";
 
-/** At speed 1 one page scrolls by in this many seconds; PageMushaf scales its pace by the speed. */
 export const FOCUS_BASE_SECONDS_PER_PAGE = 90;
 const SPEED_STEP = 0.1;
 
@@ -23,9 +22,7 @@ type Props = {
   onPlayPause: () => void;
   onSpeedChange: (speed: number) => void;
   onExit: () => void;
-  /** Focus mode is on. The controls, the keyboard keys and the screen-awake lease follow it. */
   visible: boolean;
-  /** Idle while playing: the bar shrinks to one Pause pill. */
   collapsed?: boolean;
 };
 
@@ -35,7 +32,6 @@ function stopTouch(event: { stopPropagation?: () => void }) {
 
 const NATIVE_STOP_TOUCH = { onTouchStart: stopTouch, onTouchMove: stopTouch, onTouchEnd: stopTouch };
 
-/** "1.5" in English, "١٫٥" in Arabic. */
 function formatDecimal(value: number, isRTL: boolean): string {
   const text = String(Math.round(value * 10) / 10);
   return isRTL ? toArabicNumber(Number(text.split(".")[0])) + (text.includes(".") ? `٫${toArabicNumber(Number(text.split(".")[1]))}` : "") : text;
@@ -56,10 +52,6 @@ function isActivatableTarget(target: EventTarget | null): boolean {
   return tag === "button" || tag === "a" || role === "button" || role === "switch" || role === "slider" || role === "link";
 }
 
-/**
- * While focus mode is on and no overlay or text field has the keys, Space plays or pauses the
- * scrolling and Escape leaves focus mode (web).
- */
 function useFocusModeKeys(active: boolean, onPlayPause: () => void, onExit: () => void) {
   const handlersRef = useRef({ onPlayPause, onExit });
   handlersRef.current = { onPlayPause, onExit };
@@ -110,7 +102,6 @@ export function FocusModeControls({
   const commitSpeedFromX = useCallback(
     (x: number) => {
       if (trackWidth <= 0) return;
-      // The fast end sits at the row's end: the right in English, the left in Arabic.
       const position = Math.max(0, Math.min(1, x / trackWidth));
       const ratio = isRTL ? 1 - position : position;
       const next = FOCUS_SCROLL_SPEED_MIN + ratio * (FOCUS_SCROLL_SPEED_MAX - FOCUS_SCROLL_SPEED_MIN);
@@ -157,7 +148,6 @@ export function FocusModeControls({
       }}
     >
       {collapsed && playing ? (
-        // Idle while scrolling: one persistent Pause pill, so pausing is always one tap away.
         <Pressable
           {...stopProps}
           onPress={onPlayPause}
@@ -169,14 +159,11 @@ export function FocusModeControls({
         </Pressable>
       ) : (
         <View
-          // The reader's tap layer pauses focus mode on touch end. On web it skips this bar by its data
-          // attribute; native touches bubbled up and paused right after Play resumed, so they stop here.
           {...stopProps}
           className="rounded-full border border-white/15 px-3 py-2"
           style={{
             width: "100%",
             maxWidth: 520,
-            // Hand-mirrored row: pin LTR so the RTL reader root does not flip it back.
             direction: "ltr",
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center",

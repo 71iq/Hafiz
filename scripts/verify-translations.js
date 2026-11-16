@@ -1,29 +1,22 @@
 #!/usr/bin/env node
 
-/**
- * Verify bundled translations against quran.com API.
- * For each language, fetches 5 specific verses from the API and compares
- * with our bundled JSON to ensure correct surah/ayah mapping and text.
- */
 
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
 
-// Language code -> API resource_id mapping
 const LANGUAGES = {
   en: 20, id: 33, bn: 213, ur: 54, fa: 29, hi: 122, tr: 77,
   ha: 32, fr: 31, ps: 118, sd: 238, ru: 45, ku: 81, uz: 55,
   sw: 231, om: 111, am: 87, so: 46, az: 75, kk: 222, ber: 236,
 };
 
-// 5 well-known verses to check (spread across the Quran)
 const TEST_VERSES = [
-  { surah: 1, ayah: 1 },   // Al-Fatiha opening
-  { surah: 2, ayah: 255 },  // Ayat al-Kursi
-  { surah: 36, ayah: 1 },   // Ya-Sin opening
-  { surah: 112, ayah: 1 },  // Al-Ikhlas
-  { surah: 114, ayah: 6 },  // An-Nas last verse
+  { surah: 1, ayah: 1 },
+  { surah: 2, ayah: 255 },
+  { surah: 36, ayah: 1 },
+  { surah: 112, ayah: 1 },
+  { surah: 114, ayah: 6 },
 ];
 
 const TRANSLATIONS_DIR = path.join(__dirname, "..", "assets", "data", "translations");
@@ -69,7 +62,6 @@ function getLocalVerse(code, surah, ayah) {
 }
 
 async function fetchApiVerse(resourceId, surah, ayah) {
-  // Use per-verse endpoint
   const url = `https://api.quran.com/api/v4/quran/translations/${resourceId}?verse_key=${surah}:${ayah}`;
   const raw = await fetch(url);
   const json = JSON.parse(raw);
@@ -136,7 +128,6 @@ async function main() {
       summary[code] = { pass: false, error: e.message };
     }
 
-    // Rate limit
     await new Promise(r => setTimeout(r, 300));
   }
 

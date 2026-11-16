@@ -9,7 +9,6 @@ import { ChromeProvider, useChrome } from "@/lib/ui/chrome";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
 let mockValues: { initial: number; shared: { value: number } }[];
-// Native scheduling boundary only. Browser gates use the installed real Reanimated runtime.
 jest.mock("react-native-reanimated", () => {
   const React = require("react");
   const RN = require("react-native");

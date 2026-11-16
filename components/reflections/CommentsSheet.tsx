@@ -39,24 +39,15 @@ type Props = {
   onLikeToggled?: (reflectionId: string, liked: boolean, delta: number) => void;
   onAuthRequired?: () => void;
   onClose: () => void;
-  /** Called after this sheet closes for a navigation, so a sheet that contains it can close too. */
   onNavigate?: () => void;
   onCommentAdded: (reflectionId: string) => void;
-  /** After the server confirmed deleting one of the viewer's comments, so the count shown drops by one. */
   onCommentRemoved?: (reflectionId: string) => void;
-  /** After the author's delete of the shown reflection settled; the sheet has already closed. */
   onReflectionGone?: (reflection: Reflection) => void;
-  /**
-   * Where a guest returns after signing in from this sheet: the ayah it was opened from (ayah
-   * detail) or the feed. Defaults to the feed.
-   */
   authReturn?: { surface: "ayah"; surah: number; ayah: number } | { surface: "feed" };
 };
 
-/** The composer shows its counter from this length. */
 export const COMMENT_COUNTER_THRESHOLD = 1800;
 export const COMMENT_MAX_LENGTH = 2000;
-/** Long comments start clamped to this many lines, with Show more. */
 const COMMENT_CLAMP_LINES = 6;
 const COMMENT_LINE_HEIGHT = 20;
 function sortComments(comments: ReflectionComment[], sort: ReflectionCommentSort): ReflectionComment[] {
@@ -90,9 +81,6 @@ export function CommentsSheet({
   const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
-  // ETH-07: a stated minor's comments are visible only to them, read from the cache the app-wide
-  // minor check keeps (useMinorPhotoCleanup). A comment carries what this screen showed, so a copy
-  // made stale by another device cannot publish it.
   const ownPrivacy = useQuery({
     queryKey: profilePrivacyKeys.mine(user?.id ?? null),
     queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
@@ -109,8 +97,6 @@ export function CommentsSheet({
   const [commentLikeOverrides, setCommentLikeOverrides] = useState<
     Record<string, { source: ReflectionComment; lease: ReflectionMutationLease; liked: boolean; likesCount: number }>
   >({});
-  // Each failure shows where the person acted: the first load at the top, loading more beside its
-  // button, and posting or liking above the input.
   const [failure, setFailure] = useState<"load" | "more" | "post" | "privacy" | "like" | "auth" | null>(null);
   const error =
     failure === "load" || failure === "more"
@@ -124,14 +110,12 @@ export function CommentsSheet({
             : failure === "auth"
               ? s.reflectionFeedAuthRequired
               : null;
-  // Expanded long comments and the comment whose full date is showing, per reflection.
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [clampedIds, setClampedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [dateRevealId, setDateRevealId] = useState<string | null>(null);
   const closeNow = useCallback(() => {
     if (retire()) onClose();
   }, [retire, onClose]);
-  // Comments have no report of their own: "Report reflection" reports the parent, and says so.
   const parentReport = useReportReflection(reflection ?? null);
   const removeLocalComment = useCallback(
     (removed: ReflectionComment, deleted: boolean) => {
@@ -141,10 +125,8 @@ export function CommentsSheet({
     [onCommentRemoved],
   );
   const commentRemoval = useDeleteComment(reflectionId, removeLocalComment);
-  // A typed comment asks before any intentional close or switch away from this reflection.
   const { guard, dialogProps } = useDiscardGuard(isEditableTextDirty(text, ""));
   const handleClose = useCallback(() => guard(closeNow), [closeNow, guard]);
-  // Without a caller-provided sign-in path, a guest's like tap explains itself instead of doing nothing.
   const requireAuth = useCallback(() => {
     if (onAuthRequired) onAuthRequired();
     else setFailure("auth");
@@ -182,7 +164,6 @@ export function CommentsSheet({
   useLayoutEffect(() => {
     currentComments.current = sourceComments;
   }, [sourceComments]);
-  // Currentness can change without a new query row, including a same-user session replacement.
   const comments = sortComments(
     sourceComments.map((comment) => {
       const override = commentLikeOverrides[comment.id];
@@ -204,8 +185,6 @@ export function CommentsSheet({
     setDateRevealId(null);
   }, [reflectionId, user?.id]);
 
-  // fetchNextPage reports a failed page through the query's error, not by throwing, so the kind
-  // comes from the query: a failed next page shows beside "Load more", anything else at the top.
   useEffect(() => {
     if (commentsQuery.error) {
       const more = commentsQuery.isFetchNextPageError;
@@ -232,11 +211,8 @@ export function CommentsSheet({
       finishPosted();
     } catch (error) {
       const privacyChanged = error instanceof ReflectionPrivacyChangedError;
-      // The account is no longer a minor on the server: reload its privacy so the note goes away, and
-      // post nothing until the person sends again.
       if (privacyChanged) void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user.id) });
       if (!lease.isCurrent()) return;
-      // Posted, but the reply could not be read: the refetch shows it instead of a duplicate retry.
       if (error instanceof SavedRowUnreadableError) {
         finishPosted();
         return;
@@ -260,7 +236,6 @@ export function CommentsSheet({
     try {
       await commentsQuery.fetchNextPage({ cancelRefetch: false });
     } catch {
-      // Not reached by default: a failed page sets the query's error, handled above.
       if (lease.isCurrent()) setFailure("more");
     } finally {
       lease.release();
@@ -329,9 +304,6 @@ export function CommentsSheet({
   );
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
-  // Android keeps this screen and its Modal window mounted under a pushed route, so the sheet
-  // has to close before navigating or the next screen opens behind it.
-  // A navigation is an intentional exit, so a typed comment asks first.
   const closeForNavigation = useCallback(
     (navigate?: () => void) => {
       guard(() => {
@@ -370,7 +342,6 @@ export function CommentsSheet({
         open={!!reflectionId}
         onClose={handleClose}
         maxWidth={760}
-        // The list scrolls between the header and the pinned composer, so the sheet keeps its height.
         phoneSheetHeight="max"
         dir={isRTL ? "rtl" : "ltr"}
         avoidKeyboard
@@ -390,7 +361,6 @@ export function CommentsSheet({
                 showReference={showReference}
                 referenceLabel={referenceLabel}
                 onReferencePress={handleReferencePress}
-                // The card pushes its route right after this call, so it cannot wait for a prompt.
                 onNavigate={() => {
                   closeNow();
                   onNavigate?.();
@@ -399,7 +369,6 @@ export function CommentsSheet({
                 onLikeToggled={onLikeToggled ?? (() => {})}
                 onAuthRequired={requireAuth}
                 onGone={(gone) => {
-                  // The post is gone, so a typed comment has nowhere to go: close without asking.
                   closeNow();
                   onReflectionGone?.(gone);
                 }}
@@ -484,7 +453,6 @@ export function CommentsSheet({
               ) : null}
             </View>
 
-            {/* Only the first load fails here; other failures show where the person acted. */}
             {error && failure === "load" ? (
               <View className="mb-3 gap-2">
                 <Text
@@ -584,7 +552,6 @@ export function CommentsSheet({
                       ) : null}
                     </View>
                     <View>
-                      {/* An unclamped hidden copy tells whether the comment needs Show more. */}
                       <Text
                         aria-hidden
                         accessibilityElementsHidden
@@ -784,7 +751,6 @@ export function CommentsSheet({
                 disabled={submitting || !text.trim()}
                 accessibilityRole="button"
                 accessibilityLabel={s.reflectionSend}
-                // A 44 px target around the 18 px icon.
                 className="-my-2 h-11 w-11 items-center justify-center"
                 style={({ pressed }) => ({
                   opacity: pressed || submitting || !text.trim() ? 0.4 : 1,
@@ -828,7 +794,6 @@ export function CommentsSheet({
               <Pressable
                 onPress={() =>
                   closeForNavigation(() => {
-                    // Only the reflection reference returns after sign-in; no comment or like is replayed.
                     if (reflectionId) {
                       captureAuthReturn({
                         route: "comments",
@@ -842,7 +807,6 @@ export function CommentsSheet({
                   })
                 }
                 accessibilityRole="button"
-                // White on teal-700 in light (5.4:1); dark teal text on the bright accent in dark.
                 className="mt-3 min-h-[44px] justify-center self-start rounded-full bg-primary-muted px-4 py-2 dark:bg-primary-bright"
                 style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, alignSelf: isRTL ? "flex-end" : "flex-start" })}
               >

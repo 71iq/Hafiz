@@ -1,5 +1,3 @@
--- Serialize each account's public aggregate refreshes across concurrent clients.
--- Preserve existing trigger functions, permissions and historical rows.
 
 CREATE OR REPLACE FUNCTION private.refresh_public_surah_progress_for_user(target_user_id uuid)
  RETURNS void

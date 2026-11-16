@@ -77,10 +77,6 @@ export type ReflectionJourneyEntry = {
   completedAt: string | null;
 };
 
-/**
- * Every level is open in its suggested order. "available" means no saved entry yet; it has no badge.
- * Completion records stay independent: finishing a later level never completes an earlier one.
- */
 export type ReflectionJourneyLevelStatus = "available" | "draft" | "completed";
 
 export type ReflectionJourneyLevel = {

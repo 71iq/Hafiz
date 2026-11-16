@@ -9,7 +9,6 @@ import { declareMemorizedPages } from "@/lib/hifz/pages";
 import { pairKey, similarGroupsOnPages, type SimilarGroup, type SimilarRef } from "@/lib/hifz/similar";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
-/** MUT-03: which similar-verse groups a reviewed page brings a "Which one" prompt for, and where it goes. */
 
 const ref = (surah: number, ayah: number, page: number): SimilarRef => ({
   surah,
@@ -34,7 +33,6 @@ describe("choosing a prompt", () => {
     const g2 = group("g2", ref(2, 6, 2), [ref(7, 52, 157), ref(31, 6, 411)]);
     expect(pickInterleavePair([g1, g2], NONE, 0)).toMatchObject({ groupId: "g1", sibling: { surah: 31, ayah: 5 } });
     expect(pickInterleavePair([g1, g2], { groups: new Set(["g1"]), pairs: new Set() }, 0)?.groupId).toBe("g2");
-    // A drift prompt for 2:6 and 7:52 leaves the group's other sibling.
     const asked = { groups: new Set(["g1"]), pairs: new Set([pairKey({ surah: 7, ayah: 52 }, { surah: 2, ayah: 6 })]) };
     expect(pickInterleavePair([g1, g2], asked, 0)?.sibling).toMatchObject({ surah: 31, ayah: 6 });
   });

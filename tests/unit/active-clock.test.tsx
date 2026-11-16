@@ -2,7 +2,6 @@ import { act, renderHook } from "@testing-library/react-native";
 import { AppState, type AppStateStatus } from "react-native";
 import { createActiveClock, useActiveClock } from "@/lib/habit/use-active-clock";
 
-/** Screen focus for useIsFocused; a test takes it away and gives it back like a screen pushed on top. */
 const mockFocus = { focused: true, listeners: new Set<() => void>() };
 jest.mock("@react-navigation/native", () => {
   const React = jest.requireActual<typeof import("react")>("react");
@@ -53,7 +52,6 @@ describe("createActiveClock", () => {
     clock.pause();
     clock.resume();
     time += MINUTE;
-    // A second resume would restart the running segment and lose the minute before it.
     clock.resume();
     time += MINUTE;
     expect(clock.elapsedMs()).toBe(3 * MINUTE);
@@ -99,7 +97,6 @@ describe("createActiveClock", () => {
     const reviewedAt = time + 2 * MINUTE;
     time = reviewedAt + 500;
     expect(clock.elapsedMs(reviewedAt)).toBe(3 * MINUTE);
-    // An instant before the running segment began adds nothing to it.
     expect(clock.elapsedMs(reviewedAt - 10 * MINUTE)).toBe(MINUTE);
   });
 
@@ -127,17 +124,14 @@ describe("createActiveClock", () => {
 
 describe("useActiveClock", () => {
   const appStateListeners = new Set<(state: AppStateStatus) => void>();
-  // React Native's Jest mock leaves currentState as a function; the hook reads it as a state.
   const appState = AppState as { currentState: unknown };
   const mockedCurrentState = appState.currentState;
-  // The same mock serves every test, so each test puts its default subscription back.
   const addListener = jest.mocked(AppState.addEventListener);
   const mockedAddListener = addListener.getMockImplementation();
   let time = 0;
   let nowSpy: jest.SpyInstance;
   let removals = 0;
 
-  /** Change AppState as the platform does: the current state first, then the change event. */
   function setAppState(state: AppStateStatus) {
     appState.currentState = state;
     for (const listener of [...appStateListeners]) listener(state);
@@ -195,7 +189,6 @@ describe("useActiveClock", () => {
     time += MINUTE;
     act(() => setFocused(false));
     time += 2 * MINUTE;
-    // An app resume while blurred does not start a screen that is not in front.
     act(() => setAppState("background"));
     act(() => setAppState("active"));
     time += 4 * MINUTE;

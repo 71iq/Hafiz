@@ -14,7 +14,6 @@ import { countSecondLooks } from "@/lib/hifz/sabaq";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { readDhuhrResolver } from "@/lib/prayer/settings";
 
-/** Focus for useFocusEffect, which the test can take away and give back like a screen pushed on top. */
 const mockFocus = { focused: true, listeners: new Set<(focused: boolean) => void>() };
 jest.mock("@react-navigation/native", () => {
   const React = jest.requireActual<typeof import("react")>("react");
@@ -39,7 +38,6 @@ jest.mock("@react-navigation/native", () => {
     },
   };
 });
-/** The device's zone; a test changes it the way travel or a settings change does. */
 let mockZone = "Asia/Amman|-180";
 jest.mock("@/lib/habit/dates", () => ({
   ...jest.requireActual<typeof import("@/lib/habit/dates")>("@/lib/habit/dates"),
@@ -56,16 +54,13 @@ jest.mock("@/lib/hifz/sabaq", () => ({ countSecondLooks: jest.fn() }));
 const db = {} as AppDatabase;
 const NO_PRAYER_TIMES: DhuhrResolver = () => null;
 
-/** 21:00 on 14 November, local time: today's wird is done and the app is on Home. */
 const EVENING = new Date(2026, 10, 14, 21, 0);
 const at = (day: number, hours: number, minutes = 0) => new Date(2026, 10, day, hours, minutes);
 
 const appStateListeners = new Set<(state: AppStateStatus) => void>();
 let appStateRemovals = 0;
-// React Native's Jest mock leaves currentState as a function; the hook reads it as a state.
 const appState = AppState as { currentState: unknown };
 const mockedCurrentState = appState.currentState;
-/** Change AppState as the platform does: the current state first, then the change event. */
 function setAppState(state: AppStateStatus) {
   appState.currentState = state;
   for (const listener of [...appStateListeners]) listener(state);
@@ -76,7 +71,6 @@ function setFocused(focused: boolean) {
   for (const listener of [...mockFocus.listeners]) listener(focused);
 }
 
-/** Let the hook's chained loads settle. */
 async function flush() {
   await act(async () => {
     for (let tick = 0; tick < 20; tick += 1) await Promise.resolve();
@@ -90,17 +84,14 @@ async function advanceTo(time: Date) {
   await flush();
 }
 
-/** The app goes to the background, the device sleeps until `time`, and the app comes back. */
 async function resumeAt(time: Date, { timersRun }: { timersRun: boolean }) {
   await act(async () => setAppState("background"));
-  // Native suspends JS timers in the background; a web tab keeps them running, throttled.
   if (timersRun) await advanceTo(time);
   else jest.setSystemTime(time);
   await act(async () => setAppState("active"));
   await flush();
 }
 
-/** The renderer leaves an immediate timer behind; past it, any timer left is the hook's boundary timer. */
 function expectNoBoundaryTimer() {
   act(() => {
     jest.advanceTimersByTime(1);
@@ -132,7 +123,6 @@ beforeEach(() => {
   });
   jest.mocked(readDhuhrResolver).mockResolvedValue(NO_PRAYER_TIMES);
   jest.mocked(settleHabitDays).mockResolvedValue([]);
-  // The overview stands in for "done today": it names the local day it was loaded for.
   jest
     .mocked(loadHabitOverview)
     .mockImplementation(async (_db, options) => ({ loadedFor: localDateOf(options?.now ?? new Date()) }) as never);
@@ -217,7 +207,6 @@ describe("useHabitOverview across a day boundary", () => {
     renderHook(() => useHabitOverview(db));
     await flush();
     const before = overviewLoads();
-    // A minute with the same zone reloads nothing.
     await advanceTo(new Date(EVENING.getTime() + 60_000));
     expect(overviewLoads()).toBe(before);
     mockZone = "Asia/Tokyo|-540";

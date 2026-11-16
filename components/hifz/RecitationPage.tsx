@@ -7,15 +7,11 @@ import type { SupportLevel } from "@/lib/hifz/grading";
 import { useSettings } from "@/lib/settings/context";
 
 const BASMALA = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
-/** Page-font glyphs fill a line at about this many font sizes (the reader's MUSHAF_LINE_WIDTH_SCALE). */
 const LINE_WIDTH_SCALE = 19.5;
 
 export type RevealState = Readonly<{
-  /** Every word shows: the self-check after Done, or full-text practice. */
   all: boolean;
-  /** Words shown in reading order from the start of the page (Peek, Show me, Next line). */
   count: number;
-  /** L3: lines the finger has passed over. */
   touchedLines: ReadonlySet<number>;
 }>;
 
@@ -25,12 +21,10 @@ function tokenKey(token: Pick<PageToken, "surah" | "ayah" | "wordPos" | "glyph">
   return `${token.surah}:${token.ayah}:${token.wordPos ?? "m"}:${index}`;
 }
 
-/** Ayah lines in reading order, limited to the given line numbers (a half page). */
 export function visibleLines(page: PageData, lineNumbers: ReadonlySet<number> | null): PageLine[] {
   return page.lines.filter((line) => lineNumbers === null || lineNumbers.has(line.lineNumber));
 }
 
-/** The reading-order tokens of the shown lines, markers included. */
 export function orderedTokens(lines: readonly PageLine[]): PageToken[] {
   return lines.flatMap((line) => line.tokens);
 }
@@ -39,12 +33,9 @@ type Props = {
   page: PageData;
   level: SupportLevel;
   reveal: RevealState;
-  /** Line numbers to show, for a half page; null shows the whole page. */
   lineNumbers?: ReadonlySet<number> | null;
-  /** ERR-06 "Fill the gap": this one word stays hidden until the check, whatever the level. */
   cloze?: Readonly<{ surah: number; ayah: number; wordPos: number }> | null;
   surahNames: ReadonlyMap<number, string>;
-  /** Marked mistakes by token key, shown highlighted during the self-check. */
   marked?: ReadonlySet<string>;
   onWordPress?: (token: PageToken, key: string) => void;
   onTouchLine?: (lineNumber: number) => void;
@@ -53,12 +44,6 @@ type Props = {
   wordLabel: (token: PageToken) => string;
 };
 
-/**
- * One mushaf page for recitation (4.5.1), drawn from the canonical page-font glyphs with the
- * reader's line breaks, so the page looks like the one the user memorized. Hidden words keep their
- * place (drawn transparent) and ayah markers stay visible. L1 draws each word's first letter, which
- * is rendered from the canonical text and never stored (ETH-12).
- */
 export function RecitationPage({
   page,
   level,
@@ -82,7 +67,6 @@ export function RecitationPage({
   const fontSize = Math.max(14, Math.min(30, Math.floor((width - 24) / LINE_WIDTH_SCALE)));
   const lineHeight = Math.round(fontSize * 1.9);
 
-  // L3: a sideways swipe reveals the lines under the finger; vertical moves still scroll the page.
   const panResponder = useMemo(() => {
     const touchAt = (screenY: number) => {
       if (!onTouchLine) return;
@@ -95,7 +79,6 @@ export function RecitationPage({
     return PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_event, gesture) => active && Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 4,
-      // The page scrolls, so measure where it is now before mapping the finger to a line.
       onPanResponderGrant: (_event, gesture) => {
         const y0 = gesture.y0;
         containerRef.current?.measureInWindow((_x, top) => {
@@ -188,7 +171,6 @@ export function RecitationPage({
                         style={{
                           ...(token.isMarker ? markerPalette : null),
                           color,
-                          // The gap keeps its place and shows as a soft box, so the reciter knows where it is.
                           backgroundColor: isMarked ? markedBackground : isGap && !visible ? gapBackground : undefined,
                           ...(isGap && !visible ? { borderRadius: 6 } : null),
                         }}

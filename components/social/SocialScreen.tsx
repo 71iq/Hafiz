@@ -4,7 +4,6 @@ import { Screen, ScreenScrollView, TAB_SCREEN_BOTTOM_INSET } from "@/components/
 import { Text } from "@/components/ui/Text";
 import { LEADERBOARD_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 
-/** The Halaqa and Board tab shell: a titled, scrollable rail with optional pull to refresh. */
 export function SocialScreen({
   title,
   subtitle,
