@@ -66,7 +66,7 @@ def changed_paths():
 
 
 def controller_snapshot():
-    paths = [BACKLOG, CONFIG, ROOT / 'docs/refactoring/PROGRESS.md', STATE / '.env',
+    paths = [BACKLOG, CONFIG, STATE / 'progress.log', STATE / '.env',
              STATE / 'generation-checkpoint.json']
     paths.extend((ROOT / 'scripts/ralph').rglob('*'))
     return {str(p): p.read_bytes() for p in paths if p.is_file() and '__pycache__' not in p.parts}
@@ -113,7 +113,7 @@ def path_allowed(path, task):
 def generation_identity(task):
     runtime = {'status', 'attempts', 'resource_timeouts', 'started_at', 'completed_at', 'failure', 'evidence', 'summary'}
     specification = {k: v for k, v in task.items() if k not in runtime}
-    owned = {'docs/refactoring/backlog.json', 'docs/refactoring/PROGRESS.md'}
+    owned = {'docs/refactoring/backlog.json'}
     paths = [p for p in changed_paths() if p not in owned]
     if not paths or any(not path_allowed(p, task) for p in paths):
         return None
@@ -314,7 +314,7 @@ REVIEW_SCHEMA = {'type': 'object', 'properties': {
 
 
 def document_progress(task, message):
-    with (ROOT / 'docs/refactoring/PROGRESS.md').open('a') as stream:
+    with (STATE / 'progress.log').open('a') as stream:
         stream.write(f'\n- {now()} `{task["id"]}` {task["status"]}. {message}\n')
 
 
@@ -353,7 +353,7 @@ def generator_prompt(task):
         prompt = ('You are the bounded implementation worker for exactly this approved Hafiz task. '
                       'You are not alone in the codebase. Preserve other edits.\n'
                       'Do not spawn subagents or reviewers. The controller starts the separate stronger evaluator.\n'
-                      'Read AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md.\n'
+                      'Read AGENTS.md and the task-specific source and contracts.\n'
                       'Inspect callers and tests, record reuse choices in your response, implement the smallest coherent change.\n'
                       'Only edit task allowed_paths. Do not edit the backlog, progress, runner, agents, protected data or infrastructure.\n'
                       'Do not commit, push, merge, deploy, call live services or install packages. The controller verifies and commits.\n'
@@ -416,7 +416,7 @@ def iteration():
         stop(f'{task["id"]} exhausted retries. Inspect the saved diff and evidence before reopening.')
         return
     dirty = changed_paths()
-    state_owned = ['docs/refactoring/backlog.json', 'docs/refactoring/PROGRESS.md']
+    state_owned = ['docs/refactoring/backlog.json']
     if any(p not in state_owned and not path_allowed(p, task) for p in dirty):
         raise RuntimeError(f'Unexpected checkout changes; refusing to proceed: {dirty}')
     if dirty and task['status'] not in ('running', 'retry'):
@@ -556,7 +556,10 @@ def launch(mode, iterations):
         env = dict(os.environ, HAFIZ_RALPH_SMOKE='1' if mode == 'smoke' else '0',
                    HAFIZ_RALPH_BATCH_ID=read_json(STATE / 'batch.json')['id'])
         run_log = STATE / f'batch-{time.time_ns()}.log'
-        code = run_process(['bash', 'scripts/ralph/vendor/ralph-loop.sh', str(iterations), 'scripts/ralph/PROMPT.md'],
+        prompt_file = STATE / 'prompt.txt'
+        prompt_file.write_text('Execute exactly one controller-selected Hafiz task. Read AGENTS.md. '
+                               'The controller owns task state, verification and commits.\n')
+        code = run_process(['bash', 'scripts/ralph/vendor/ralph-loop.sh', str(iterations), str(prompt_file)],
                            run_log, config['batch_seconds'] + 30, env=env)
         batch = read_json(STATE / 'batch.json')
         batch['finished'] = now()

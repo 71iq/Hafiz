@@ -68,6 +68,7 @@ class GeneratorPromptTests(unittest.TestCase):
         self.assertIn('Inspect callers and tests', prompt)
         self.assertIn('adaptive-coding engineering guided', prompt)
         self.assertIn('fixture-verification-sentinel', prompt)
+        self.assertNotIn('docs/refactoring/', prompt)
         self.assertNotIn('Frozen artifact copy-only handoff', prompt)
 
     def test_copy_only_prompt_delegates_checks_without_engineering_guided_work(self):
@@ -107,7 +108,7 @@ class IterationTests(unittest.TestCase):
         self.config.write_text(json.dumps({'max_attempts': 2, 'batch_seconds': 30, 'session_seconds': 5}))
         (self.root / '.gitignore').write_text('.ralph/\nstop.md\n')
         (self.root / 'fixture.txt').write_text('before\n')
-        (self.docs / 'PROGRESS.md').write_text('# Progress\n')
+        (self.state / 'progress.log').write_text('')
         self.backlog.write_text(json.dumps({'tasks': [task()]}))
         self.git('init', '-q')
         self.git('config', 'user.name', 'Fixture')
@@ -170,6 +171,8 @@ class IterationTests(unittest.TestCase):
         self.assertEqual(self.current_task()['status'], 'verified')
         self.assertTrue(self.git('log', '-1', '--format=%s').startswith('T1:'))
         self.assertEqual(self.git('status', '--porcelain'), '')
+        self.assertIn('T1', (self.state / 'progress.log').read_text())
+        self.assertNotIn('progress.log', self.git('ls-files'))
         evidence = self.root / self.current_task()['evidence']
         self.assertEqual(control.read_json(evidence / 'verification.json')[0]['exit'], 0)
 
@@ -539,7 +542,7 @@ class IterationTests(unittest.TestCase):
 
     def test_failed_verification_cannot_hide_controller_mutation(self):
         def fail_verification(*_args):
-            (self.docs / 'PROGRESS.md').write_text('tampered')
+            (self.state / 'progress.log').write_text('tampered')
             raise RuntimeError('command failed')
         with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=self.generate), patch.object(control, 'verify_commands', side_effect=fail_verification):
             with self.assertRaisesRegex(control.InvariantError, 'Verification changed controller'):

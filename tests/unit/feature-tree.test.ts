@@ -13,7 +13,7 @@ type FeatureNode = {
 
 const root = path.resolve(__dirname, "../..");
 const tree = JSON.parse(fs.readFileSync(path.join(root, "docs/feature-tree.json"), "utf8")) as FeatureNode;
-const userCases = fs.readFileSync(path.join(root, "user cases.md"), "utf8");
+const userCases = fs.readFileSync(path.join(root, "docs/user-cases.md"), "utf8");
 
 function flatten(node: FeatureNode): FeatureNode[] {
   return [node, ...node.children.flatMap(flatten)];
