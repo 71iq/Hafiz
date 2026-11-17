@@ -410,12 +410,6 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Tooltip chrome mirrors while token text keeps natural direction.",
   ),
   entry(
-    "components/mushaf/ayah-tabs/HadithTab.tsx",
-    "tab-segmented",
-    "source",
-    "Ayah tab content mirrors list rows and keeps sourced text natural.",
-  ),
-  entry(
     "components/mushaf/word-tabs/IrabTab.tsx",
     "tab-segmented",
     "source",

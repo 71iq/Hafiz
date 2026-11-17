@@ -129,13 +129,6 @@ export const strings = {
     surahInfoSource: "Source",
     // AyahBlock
     tafseer: "Tafsir",
-    ayahTabHadith: "Hadith",
-    hadithLoading: "Loading hadith references...",
-    hadithEmpty: "No hadith references found for this ayah",
-    hadithOffline: "Hadith references are unavailable. Check your connection and cloud content setup.",
-    hadithRetry: "Retry",
-    hadithLoadMore: "Load more",
-    hadithSource: "Source",
     audioUnavailable: "Audio is unavailable",
     audioLoading: "Loading audio",
     audioPlay: "Play ayah audio",
@@ -356,8 +349,8 @@ export const strings = {
     // Progress page
     progressTitle: "Progress",
     progressDailyReminder: "Daily Reminder",
-    progressHadith: "\"خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ\"",
-    progressHadithTranslation: "\"The best among you are those who learn the Quran and teach it.\"",
+    progressHadith: '"خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ"',
+    progressHadithTranslation: '"The best among you are those who learn the Quran and teach it."',
     progressTotalMemorized: "Total memorized",
     progressRetention: "Memorized share",
     progressAvgDaily: "Average reviews per active day",
@@ -592,7 +585,8 @@ export const strings = {
     cardDueDateInvalid: "Enter a valid date in YYYY-MM-DD format",
     cardDueDatePast: "Choose today or a future date",
     cardDeleteConfirm: "This removes the card and its schedule from this deck. It will no longer appear in reviews.",
-    cardResetConfirm: "This clears the card's scheduling history: its due date, intervals, review count and lapses start over as a new card. It stays in this deck.",
+    cardResetConfirm:
+      "This clears the card's scheduling history: its due date, intervals, review count and lapses start over as a new card. It stays in this deck.",
     flashcardsStreak: "Wird",
     flashcardsLastReview: "Last Review",
     flashcardsNever: "Never",
@@ -665,34 +659,43 @@ export const strings = {
     wordFlashcardsTestModes: "Word Review Sides",
     flashcardsDailyLimit: "Daily Review Limit",
     flashcardsDailyLimitDesc: "Max cards per session",
-    flashcardsDailyLimitInfo: "Caps how many review cards this deck can show in one session. Lower it to keep sessions short; raise it when you want to clear more due cards.",
+    flashcardsDailyLimitInfo:
+      "Caps how many review cards this deck can show in one session. Lower it to keep sessions short; raise it when you want to clear more due cards.",
     flashcardsDailyLimits: "Daily Limits",
     flashcardsNewLimit: "New Cards / Day",
     flashcardsNewLimitDesc: "Set to 0 to review only cards you have already seen",
-    flashcardsNewLimitInfo: "Controls how many unseen cards from this deck can enter today's queue. New cards create future reviews, so increase this gradually.",
+    flashcardsNewLimitInfo:
+      "Controls how many unseen cards from this deck can enter today's queue. New cards create future reviews, so increase this gradually.",
     flashcardsFsrsSection: "FSRS",
     flashcardsDesiredRetention: "Desired Retention",
     flashcardsDesiredRetentionDesc: "Higher retention means shorter intervals and more reviews",
-    flashcardsDesiredRetentionInfo: "FSRS targets this recall probability when scheduling reviews. Higher values create shorter intervals and more reviews; 90-95% is a common range.",
+    flashcardsDesiredRetentionInfo:
+      "FSRS targets this recall probability when scheduling reviews. Higher values create shorter intervals and more reviews; 90-95% is a common range.",
     flashcardsMaximumInterval: "Longest gap between reviews",
     flashcardsMaximumIntervalDesc: "However well you know a card, it comes back within this time",
-    flashcardsMaximumIntervalInfo: "Prevents FSRS from scheduling any card farther than this many days out, even when the card is very stable.",
+    flashcardsMaximumIntervalInfo:
+      "Prevents FSRS from scheduling any card farther than this many days out, even when the card is very stable.",
     flashcardsEnableFuzz: "Spread due dates",
     flashcardsEnableFuzzDesc: "Spread due dates slightly to avoid review spikes",
-    flashcardsEnableFuzzInfo: "Adds a small random spread to due dates so many cards do not land on the same day. It does not change your target retention.",
+    flashcardsEnableFuzzInfo:
+      "Adds a small random spread to due dates so many cards do not land on the same day. It does not change your target retention.",
     flashcardsEnableShortTerm: "Short-term steps",
     flashcardsEnableShortTermDesc: "Use learning and relearning steps before long-term scheduling",
-    flashcardsEnableShortTermInfo: "Uses the learning and relearning steps below before cards move into long-term FSRS scheduling.",
+    flashcardsEnableShortTermInfo:
+      "Uses the learning and relearning steps below before cards move into long-term FSRS scheduling.",
     flashcardsLearningSection: "Learning & Lapses",
     flashcardsLearningSteps: "Learning steps",
     flashcardsLearningStepsDesc: "Comma-separated steps like 1m, 10m, 1d",
-    flashcardsLearningStepsInfo: "New cards pass through these short delays before graduating. Accepted syntax: comma-separated steps like 1m, 10m, 1h, 1d. Use m for minutes, h for hours, and d for days; Arabic forms like ١ دقيقة، ١٠ دقائق also work.",
+    flashcardsLearningStepsInfo:
+      "New cards pass through these short delays before graduating. Accepted syntax: comma-separated steps like 1m, 10m, 1h, 1d. Use m for minutes, h for hours, and d for days; Arabic forms like ١ دقيقة، ١٠ دقائق also work.",
     flashcardsRelearningSteps: "Relearning steps",
     flashcardsRelearningStepsDesc: "Steps used after Again on review cards",
-    flashcardsRelearningStepsInfo: "Review cards sent back by Again follow these delays before returning to normal review scheduling. Accepted syntax: comma-separated steps like 10m, 1h, 1d. Use m for minutes, h for hours, and d for days; Arabic forms like ١٠ دقائق also work.",
+    flashcardsRelearningStepsInfo:
+      "Review cards sent back by Again follow these delays before returning to normal review scheduling. Accepted syntax: comma-separated steps like 10m, 1h, 1d. Use m for minutes, h for hours, and d for days; Arabic forms like ١٠ دقائق also work.",
     flashcardsDisplayOrderSection: "Display Order",
     flashcardsNewReviewOrder: "New/review order",
-    flashcardsNewReviewOrderInfo: "Controls whether today's due reviews, new cards, or a mix are shown first during a session.",
+    flashcardsNewReviewOrderInfo:
+      "Controls whether today's due reviews, new cards, or a mix are shown first during a session.",
     flashcardsReviewSortOrder: "Review sort",
     flashcardsReviewSortOrderInfo: "Controls the order of due review cards within the review queue.",
     flashcardsNewCardSortOrder: "New card sort",
@@ -755,11 +758,14 @@ export const strings = {
     profileNoActivitySubtitle: "Review sessions will appear here after progress is synced.",
     authNotConfigured: "Cloud sync unavailable",
     authUnavailableTitle: "Accounts are unavailable",
-    authUnavailableSubtitle: "Cloud accounts are temporarily unavailable on this build. You can keep using Hafiz offline; your local progress stays on this device.",
+    authUnavailableSubtitle:
+      "Cloud accounts are temporarily unavailable on this build. You can keep using Hafiz offline; your local progress stays on this device.",
     authInvalidCredentials: "Invalid login. Check your email, password, and email confirmation status, then try again.",
-    authSignupConfirmEmail: "Check your email to continue. If you already have an account, log in or reset your password instead.",
+    authSignupConfirmEmail:
+      "Check your email to continue. If you already have an account, log in or reset your password instead.",
     authResendConfirmation: "Resend confirmation email",
-    authConfirmationResent: "If this email is waiting for confirmation, we sent a new link. Check your inbox and spam folder.",
+    authConfirmationResent:
+      "If this email is waiting for confirmation, we sent a new link. Check your inbox and spam folder.",
     authForgotPassword: "Forgot password?",
     authForgotPasswordTitle: "Forgot your password?",
     authForgotPasswordSubtitle: "Enter your email and we'll send you a link to set a new password.",
@@ -807,8 +813,6 @@ export const strings = {
     qfManualSync: "Sync now",
     qfSyncComplete: "Quran Foundation sync complete",
     qfSyncFailed: "Quran Foundation sync failed",
-    qfContentUnavailable: "Quran Foundation content is temporarily unavailable.",
-    qfContentMisconfigured: "Quran Foundation content is not configured.",
     qfAuthCallbackLoading: "Completing Quran Foundation connection...",
     qfAuthCallbackFailed: "Quran Foundation connection failed",
     // Leaderboard
@@ -899,7 +903,8 @@ export const strings = {
     // Offline
     offlineBanner: "Offline. Your study is saved on this device.",
     // Empty states
-    emptyBookmarksSubtitle: "In verse view, tap the bookmark icon on an ayah. In page view, long-press an ayah number, then choose Bookmark.",
+    emptyBookmarksSubtitle:
+      "In verse view, tap the bookmark icon on an ayah. In page view, long-press an ayah number, then choose Bookmark.",
     emptyDecksSubtitle: "Use the retention deck to review ayahs with spaced repetition",
     emptyLeaderboardSubtitle: "Complete flashcard reviews to earn points and appear on the leaderboard",
     emptySearchTextSubtitle: "Search ignores diacritics. Try another word.",
@@ -1032,13 +1037,6 @@ export const strings = {
     surahInfoUnavailable: "معلومات السورة غير متاحة.",
     surahInfoSource: "المصدر",
     tafseer: "التفسير",
-    ayahTabHadith: "الحديث",
-    hadithLoading: "جارٍ تحميل الأحاديث المرتبطة...",
-    hadithEmpty: "لا توجد أحاديث مرتبطة بهذه الآية",
-    hadithOffline: "الأحاديث المرتبطة غير متاحة. تحقق من الاتصال وإعداد المحتوى السحابي.",
-    hadithRetry: "حاول مجددًا",
-    hadithLoadMore: "عرض المزيد",
-    hadithSource: "المصدر",
     audioUnavailable: "الصوت غير متاح",
     audioLoading: "جارٍ تحميل الصوت",
     audioPlay: "تشغيل صوت الآية",
@@ -1220,8 +1218,8 @@ export const strings = {
     wirdDays: "{{n}} يوم",
     progressTitle: "التقدم",
     progressDailyReminder: "تذكير يومي",
-    progressHadith: "\"خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ\"",
-    progressHadithTranslation: "\"خيركم من تعلم القرآن وعلمه\"",
+    progressHadith: '"خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ"',
+    progressHadithTranslation: '"خيركم من تعلم القرآن وعلمه"',
     progressTotalMemorized: "إجمالي الحفظ",
     progressRetention: "نسبة المحفوظ",
     progressAvgDaily: "متوسط المراجعات في أيام النشاط",
@@ -1450,7 +1448,8 @@ export const strings = {
     cardDueDateInvalid: "أدخل تاريخًا صالحًا بصيغة YYYY-MM-DD",
     cardDueDatePast: "اختر اليوم أو تاريخًا لاحقًا",
     cardDeleteConfirm: "سيؤدي هذا إلى إزالة البطاقة وجدولتها من هذه المجموعة، ولن تظهر في المراجعات بعد الآن.",
-    cardResetConfirm: "سيؤدي هذا إلى مسح سجل جدولة البطاقة: يبدأ موعدها وفتراتها وعدد مراجعاتها وهفواتها من جديد كبطاقة جديدة، وتبقى في هذه المجموعة.",
+    cardResetConfirm:
+      "سيؤدي هذا إلى مسح سجل جدولة البطاقة: يبدأ موعدها وفتراتها وعدد مراجعاتها وهفواتها من جديد كبطاقة جديدة، وتبقى في هذه المجموعة.",
     flashcardsStreak: "الورد",
     flashcardsLastReview: "آخر مراجعة",
     flashcardsNever: "لم تتم بعد",
@@ -1523,31 +1522,39 @@ export const strings = {
     wordFlashcardsTestModes: "أوجه مراجعة المعاني",
     flashcardsDailyLimit: "حد المراجعة اليومي",
     flashcardsDailyLimitDesc: "أقصى عدد بطاقات في الجلسة",
-    flashcardsDailyLimitInfo: "يحدد عدد بطاقات المراجعة التي يمكن أن تظهر من هذه المجموعة في جلسة واحدة. قلله للجلسات القصيرة وارفعه عند رغبتك في إنهاء بطاقات مستحقة أكثر.",
+    flashcardsDailyLimitInfo:
+      "يحدد عدد بطاقات المراجعة التي يمكن أن تظهر من هذه المجموعة في جلسة واحدة. قلله للجلسات القصيرة وارفعه عند رغبتك في إنهاء بطاقات مستحقة أكثر.",
     flashcardsDailyLimits: "الحدود اليومية",
     flashcardsNewLimit: "البطاقات الجديدة يوميًا",
     flashcardsNewLimitDesc: "اجعله ٠ لمراجعة البطاقات التي رأيتها فقط",
-    flashcardsNewLimitInfo: "يتحكم في عدد البطاقات غير المرئية التي تدخل قائمة اليوم من هذه المجموعة. البطاقات الجديدة تصنع مراجعات مستقبلية، لذلك زد العدد تدريجيًا.",
+    flashcardsNewLimitInfo:
+      "يتحكم في عدد البطاقات غير المرئية التي تدخل قائمة اليوم من هذه المجموعة. البطاقات الجديدة تصنع مراجعات مستقبلية، لذلك زد العدد تدريجيًا.",
     flashcardsFsrsSection: "خوارزمية FSRS",
     flashcardsDesiredRetention: "نسبة التذكر المطلوبة",
     flashcardsDesiredRetentionDesc: "النسبة الأعلى تعني فواصل أقصر ومراجعات أكثر",
-    flashcardsDesiredRetentionInfo: "تستهدف FSRS هذه النسبة لاحتمال التذكر عند جدولة المراجعات. القيم الأعلى تعطي فواصل أقصر ومراجعات أكثر، وغالبًا يكون ٩٠-٩٥٪ نطاقًا مناسبًا.",
+    flashcardsDesiredRetentionInfo:
+      "تستهدف FSRS هذه النسبة لاحتمال التذكر عند جدولة المراجعات. القيم الأعلى تعطي فواصل أقصر ومراجعات أكثر، وغالبًا يكون ٩٠-٩٥٪ نطاقًا مناسبًا.",
     flashcardsMaximumInterval: "أطول فاصل بين المراجعات",
     flashcardsMaximumIntervalDesc: "مهما أتقنت البطاقة تعود خلال هذه المدة",
-    flashcardsMaximumIntervalInfo: "يمنع FSRS من جدولة أي بطاقة بعد مدة أطول من هذا العدد من الأيام، حتى لو كانت البطاقة مستقرة جدًا.",
+    flashcardsMaximumIntervalInfo:
+      "يمنع FSRS من جدولة أي بطاقة بعد مدة أطول من هذا العدد من الأيام، حتى لو كانت البطاقة مستقرة جدًا.",
     flashcardsEnableFuzz: "توزيع المواعيد",
     flashcardsEnableFuzzDesc: "يوزع المواعيد قليلًا لتجنب تراكم المراجعات",
-    flashcardsEnableFuzzInfo: "يضيف توزيعًا عشوائيًا بسيطًا لمواعيد الاستحقاق حتى لا تتجمع بطاقات كثيرة في يوم واحد. لا يغير نسبة التذكر المستهدفة.",
+    flashcardsEnableFuzzInfo:
+      "يضيف توزيعًا عشوائيًا بسيطًا لمواعيد الاستحقاق حتى لا تتجمع بطاقات كثيرة في يوم واحد. لا يغير نسبة التذكر المستهدفة.",
     flashcardsEnableShortTerm: "خطوات التعلم القصيرة",
     flashcardsEnableShortTermDesc: "استخدم خطوات التعلم وإعادة التعلم قبل الجدولة الطويلة",
-    flashcardsEnableShortTermInfo: "يستخدم خطوات التعلم وإعادة التعلم أدناه قبل انتقال البطاقات إلى جدولة FSRS الطويلة.",
+    flashcardsEnableShortTermInfo:
+      "يستخدم خطوات التعلم وإعادة التعلم أدناه قبل انتقال البطاقات إلى جدولة FSRS الطويلة.",
     flashcardsLearningSection: "التعلم والإخفاقات",
     flashcardsLearningSteps: "خطوات التعلم",
     flashcardsLearningStepsDesc: "خطوات مفصولة بفواصل مثل ١ دقيقة، ١٠ دقائق، ١ يوم",
-    flashcardsLearningStepsInfo: "تمر البطاقات الجديدة بهذه التأخيرات القصيرة قبل تخرجها إلى المراجعة. الصيغة المقبولة: خطوات مفصولة بفواصل مثل 1m, 10m, 1h, 1d أو ١ دقيقة، ١٠ دقائق، ١ ساعة، ١ يوم. m للدقائق و h للساعات و d للأيام.",
+    flashcardsLearningStepsInfo:
+      "تمر البطاقات الجديدة بهذه التأخيرات القصيرة قبل تخرجها إلى المراجعة. الصيغة المقبولة: خطوات مفصولة بفواصل مثل 1m, 10m, 1h, 1d أو ١ دقيقة، ١٠ دقائق، ١ ساعة، ١ يوم. m للدقائق و h للساعات و d للأيام.",
     flashcardsRelearningSteps: "خطوات إعادة التعلم",
     flashcardsRelearningStepsDesc: "خطوات تستخدم بعد اختيار مجددًا في بطاقات المراجعة",
-    flashcardsRelearningStepsInfo: "بطاقات المراجعة التي تعود بسبب اختيار مجددًا تتبع هذه التأخيرات قبل رجوعها إلى الجدولة العادية. الصيغة المقبولة: خطوات مفصولة بفواصل مثل 10m, 1h, 1d أو ١٠ دقائق، ١ ساعة، ١ يوم. m للدقائق و h للساعات و d للأيام.",
+    flashcardsRelearningStepsInfo:
+      "بطاقات المراجعة التي تعود بسبب اختيار مجددًا تتبع هذه التأخيرات قبل رجوعها إلى الجدولة العادية. الصيغة المقبولة: خطوات مفصولة بفواصل مثل 10m, 1h, 1d أو ١٠ دقائق، ١ ساعة، ١ يوم. m للدقائق و h للساعات و d للأيام.",
     flashcardsDisplayOrderSection: "ترتيب العرض",
     flashcardsNewReviewOrder: "ترتيب الجديد والمراجعة",
     flashcardsNewReviewOrderInfo: "يتحكم في ظهور مراجعات اليوم أو البطاقات الجديدة أو مزيج منهما أولًا أثناء الجلسة.",
@@ -1613,11 +1620,14 @@ export const strings = {
     profileNoActivitySubtitle: "ستظهر جلسات المراجعة هنا بعد مزامنة التقدم.",
     authNotConfigured: "المزامنة السحابية غير متاحة",
     authUnavailableTitle: "الحسابات غير متاحة",
-    authUnavailableSubtitle: "الحسابات السحابية غير متاحة مؤقتًا في هذا الإصدار. يمكنك متابعة استخدام حافظ دون اتصال، وسيبقى تقدمك المحلي على هذا الجهاز.",
+    authUnavailableSubtitle:
+      "الحسابات السحابية غير متاحة مؤقتًا في هذا الإصدار. يمكنك متابعة استخدام حافظ دون اتصال، وسيبقى تقدمك المحلي على هذا الجهاز.",
     authInvalidCredentials: "بيانات الدخول غير صحيحة. تحقق من البريد وكلمة المرور وحالة تأكيد البريد ثم حاول مرة أخرى.",
-    authSignupConfirmEmail: "تحقق من بريدك الإلكتروني للمتابعة. إذا كان لديك حساب بالفعل، فسجّل الدخول أو أعد تعيين كلمة المرور.",
+    authSignupConfirmEmail:
+      "تحقق من بريدك الإلكتروني للمتابعة. إذا كان لديك حساب بالفعل، فسجّل الدخول أو أعد تعيين كلمة المرور.",
     authResendConfirmation: "إعادة إرسال رسالة التأكيد",
-    authConfirmationResent: "إذا كان هذا البريد بانتظار التأكيد، فقد أرسلنا رابطًا جديدًا. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.",
+    authConfirmationResent:
+      "إذا كان هذا البريد بانتظار التأكيد، فقد أرسلنا رابطًا جديدًا. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.",
     authForgotPassword: "نسيت كلمة المرور؟",
     authForgotPasswordTitle: "نسيت كلمة المرور؟",
     authForgotPasswordSubtitle: "أدخل بريدك الإلكتروني وسنرسل لك رابطًا لتعيين كلمة مرور جديدة.",
@@ -1665,8 +1675,6 @@ export const strings = {
     qfManualSync: "زامن الآن",
     qfSyncComplete: "اكتملت مزامنة Quran Foundation",
     qfSyncFailed: "فشلت مزامنة Quran Foundation",
-    qfContentUnavailable: "محتوى Quran Foundation غير متاح مؤقتًا.",
-    qfContentMisconfigured: "محتوى Quran Foundation غير مهيأ.",
     qfAuthCallbackLoading: "جارٍ إكمال اتصال Quran Foundation...",
     qfAuthCallbackFailed: "فشل اتصال Quran Foundation",
     // Leaderboard
@@ -1783,7 +1791,8 @@ export const strings = {
     // Offline
     offlineBanner: "غير متصل. دراستك محفوظة على هذا الجهاز.",
     // Empty states
-    emptyBookmarksSubtitle: "في عرض الآيات، اضغط أيقونة الإشارة على الآية. وفي عرض الصفحات، اضغط مطولًا على رقم الآية ثم اختر «إشارة مرجعية».",
+    emptyBookmarksSubtitle:
+      "في عرض الآيات، اضغط أيقونة الإشارة على الآية. وفي عرض الصفحات، اضغط مطولًا على رقم الآية ثم اختر «إشارة مرجعية».",
     emptyDecksSubtitle: "استخدم مجموعة التثبيت لمراجعة الآيات بالتكرار المتباعد",
     emptyLeaderboardSubtitle: "أكمل مراجعات البطاقات لكسب النقاط والظهور في لوحة المتصدرين",
     emptySearchTextSubtitle: "البحث يتجاهل التشكيل. جرّب كلمة أخرى.",
