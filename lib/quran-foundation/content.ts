@@ -28,42 +28,6 @@ export type QfAudioResponse = {
   fetchedAt: string;
 };
 
-type QfHadithGrade = {
-  graded_by?: string;
-  grade?: string;
-};
-
-type QfHadithText = {
-  lang?: string;
-  chapterNumber?: string;
-  chapterTitle?: string;
-  body?: string;
-  urn?: number;
-  grades?: QfHadithGrade[];
-};
-
-export type QfHadith = {
-  urn?: number;
-  collection?: string;
-  bookNumber?: string;
-  chapterId?: string;
-  hadithNumber?: string;
-  name?: string;
-  hadith?: QfHadithText[];
-};
-
-export type QfHadithResponse = {
-  ok: true;
-  verseKey: string;
-  language: "en" | "ar";
-  direction: "ltr" | "rtl" | string;
-  page: number;
-  limit: number;
-  hasMore: boolean;
-  hadiths: QfHadith[];
-  fetchedAt: string;
-};
-
 export type QfContentReciter = {
   id: number;
   reciterName: string;
@@ -79,22 +43,13 @@ export type QfRecitersResponse = {
   fetchedAt: string;
 };
 
-type QfContentResponse = QfAudioResponse | QfHadithResponse | QfRecitersResponse | QfContentError;
+type QfContentResponse = QfAudioResponse | QfRecitersResponse | QfContentError;
 
 type AudioRequest = {
   action: "audio-ayah";
   surah: number;
   ayah: number;
   recitationId?: number;
-};
-
-type HadithRequest = {
-  action: "hadith-ayah";
-  surah: number;
-  ayah: number;
-  language: "en" | "ar";
-  page?: number;
-  limit?: number;
 };
 
 type RecitersRequest = {
@@ -131,23 +86,6 @@ export async function fetchQfAyahAudio(
   });
 }
 
-export async function fetchQfAyahHadiths(
-  surah: number,
-  ayah: number,
-  language: "en" | "ar",
-  page = 1,
-  limit = 4,
-): Promise<QfHadithResponse | QfContentError> {
-  return invokeQfContent<QfHadithResponse>({
-    action: "hadith-ayah",
-    surah,
-    ayah,
-    language,
-    page,
-    limit,
-  });
-}
-
 export async function fetchQfReciters(language: "en" | "ar"): Promise<QfRecitersResponse | QfContentError> {
   return invokeQfContent<QfRecitersResponse>({
     action: "audio-reciter-lookup",
@@ -155,8 +93,8 @@ export async function fetchQfReciters(language: "en" | "ar"): Promise<QfReciters
   });
 }
 
-async function invokeQfContent<T extends QfAudioResponse | QfHadithResponse | QfRecitersResponse>(
-  body: AudioRequest | HadithRequest | RecitersRequest,
+async function invokeQfContent<T extends QfAudioResponse | QfRecitersResponse>(
+  body: AudioRequest | RecitersRequest,
 ): Promise<T | QfContentError> {
   if (!isQfContentEnabled() || !isSupabaseConfigured()) {
     return {

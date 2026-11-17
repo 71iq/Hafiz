@@ -19,6 +19,7 @@ let mockRows: { source: TafsirSourceId; text: string }[] = [];
 let mockTafsirFailure: Error | null = null;
 let mockQiraat: { text: string; ayah_group: string | null } | null = null;
 let mockSupabaseConfigured = false;
+let mockQfContentEnabled = false;
 const mockForbidden = jest.fn<never, unknown[]>(() => {
   throw new Error("Unexpected fixture side effect");
 });
@@ -35,7 +36,13 @@ const mockDatabase = {
     if (!sql.trimStart().startsWith("SELECT")) return mockForbidden(sql);
     if (sql.includes("FROM translations")) return { text_en: "Synthetic translation body" };
     if (sql.includes("JOIN surahs")) {
-      return { text_uthmani: "نص", text_qcf2: "a b", v2_page: 1, surah_name_arabic: "الفاتحة", surah_name_english: "Al-Fatihah" };
+      return {
+        text_uthmani: "نص",
+        text_qcf2: "a b",
+        v2_page: 1,
+        surah_name_arabic: "الفاتحة",
+        surah_name_english: "Al-Fatihah",
+      };
     }
     if (sql.includes("surah > ?")) return params?.[2] === 1 ? { surah: 1, ayah: 2 } : null;
     if (sql.includes("qiraat_encyclopedia")) return mockQiraat;
@@ -73,11 +80,13 @@ jest.mock("@/lib/settings/context", () => {
 jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: () => mockSupabaseConfigured, supabase: {} }));
 jest.mock("@/lib/selection/context", () => ({ useSelection: () => mockSelection }));
 jest.mock("@/lib/audio/ayah-audio", () => ({ useAyahAudio: () => mockAudio }));
-jest.mock("@/lib/quran-foundation/config", () => ({ isQfContentEnabled: () => false, isRecitationEnabled: () => false }));
+jest.mock("@/lib/quran-foundation/config", () => ({
+  isQfContentEnabled: () => mockQfContentEnabled,
+  isRecitationEnabled: () => false,
+}));
 jest.mock("@/components/reflections/ReflectionsSection", () => ({ ReflectionsSection: () => null }));
 jest.mock("@/components/notes/PrivateNotesSection", () => ({ PrivateNotesSection: () => null }));
 jest.mock("@/components/mushaf/word-tabs/QiraatTab", () => ({ QiraatTab: () => null }));
-jest.mock("@/components/mushaf/ayah-tabs/HadithTab", () => ({ HadithTab: () => null }));
 jest.mock("@/lib/selection/queries", () => ({
   addBookmark: (...a: unknown[]) => mockForbidden(...a),
   removeBookmark: (...a: unknown[]) => mockForbidden(...a),
@@ -186,6 +195,7 @@ describe.each(cases)("ayah detail $language/$width", ({ language, width }) => {
     mockTafsirFailure = null;
     mockQiraat = null;
     mockSupabaseConfigured = false;
+    mockQfContentEnabled = false;
     expectedWarnings = 0;
     mockRows = [{ source: "muyassar", text: "Synthetic initial tafsir body" }];
     Object.assign(mockSettings, {
@@ -226,6 +236,18 @@ describe.each(cases)("ayah detail $language/$width", ({ language, width }) => {
     mockSupabaseConfigured = true;
     const view = await renderModal();
     expect(tabLabels(view).slice(-3)).toEqual([s.privateNotes, s.wordTabQiraat, s.reflections]);
+  });
+
+  it("offers no Hadith tab even with cloud content enabled, and opens a stale Hadith tab key on Tafsir", async () => {
+    mockQiraat = { text: "قرئ: نص", ayah_group: null };
+    mockSupabaseConfigured = true;
+    mockQfContentEnabled = true;
+    // A key saved before the Hadith tab was removed still reaches the modal as an untyped value.
+    const view = await renderModal({ initialTab: "hadith" as ComponentProps<typeof AyahDetailModal>["initialTab"] });
+    const translationLabel = interpolate(s.ayahDetailTranslationTab, { language: "English" });
+    expect(tabLabels(view)).toEqual([translationLabel, s.tafseer, s.privateNotes, s.wordTabQiraat, s.reflections]);
+    expect(view.getByRole("tab", { selected: true, name: s.tafseer })).toBeTruthy();
+    expect(view.getByText("Synthetic initial tafsir body")).toBeTruthy();
   });
 
   it("downloads from the picker, saves the source and returns to the tafsir tab showing it", async () => {
@@ -280,9 +302,12 @@ describe.each(cases)("ayah detail $language/$width", ({ language, width }) => {
   it("names a missing preferred source and the one shown instead", async () => {
     mockSettings.tafseerSource = "zilal";
     const view = await renderModal();
-    const notice = `${interpolate(s.tafsirSourceMissing, { name: label("zilal") })} ${interpolate(s.tafsirShowingSource, {
-      name: label("muyassar"),
-    })}`;
+    const notice = `${interpolate(s.tafsirSourceMissing, { name: label("zilal") })} ${interpolate(
+      s.tafsirShowingSource,
+      {
+        name: label("muyassar"),
+      },
+    )}`;
     expect(view.getByText(notice)).toBeTruthy();
     expect(view.getByText("Synthetic initial tafsir body")).toBeTruthy();
   });

@@ -1,13 +1,9 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
-import type { QfAudioResponse, QfHadithResponse } from "./content";
+import type { QfAudioResponse } from "./content";
 
 const QF_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type CachedQfAudio = QfAudioResponse & {
-  isStale: boolean;
-};
-
-export type CachedQfHadith = QfHadithResponse & {
   isStale: boolean;
 };
 
@@ -25,28 +21,16 @@ type AudioCacheRow = {
   fetched_at: string;
 };
 
-type HadithCacheRow = {
-  surah: number;
-  ayah: number;
-  language: "en" | "ar";
-  page: number;
-  limit_count: number;
-  direction: string;
-  has_more: number;
-  payload_json: string;
-  fetched_at: string;
-};
-
 export async function readCachedAyahAudio(
   db: DatabaseExecutor,
   surah: number,
   ayah: number,
-  recitationId: number
+  recitationId: number,
 ): Promise<CachedQfAudio | null> {
   const row = await db.getFirstAsync<AudioCacheRow>(
     `SELECT * FROM qf_ayah_audio_cache
      WHERE recitation_id = ? AND surah = ? AND ayah = ?`,
-    [recitationId, surah, ayah]
+    [recitationId, surah, ayah],
   );
   if (!row) return null;
   return {
@@ -70,7 +54,7 @@ export async function writeCachedAyahAudio(
   db: DatabaseExecutor,
   response: QfAudioResponse,
   surah: number,
-  ayah: number
+  ayah: number,
 ): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO qf_ayah_audio_cache
@@ -88,61 +72,7 @@ export async function writeCachedAyahAudio(
       response.audio.reciterName ?? null,
       response.audio.recitationStyle ?? null,
       response.fetchedAt,
-    ]
-  );
-}
-
-export async function readCachedAyahHadiths(
-  db: DatabaseExecutor,
-  surah: number,
-  ayah: number,
-  language: "en" | "ar",
-  page: number,
-  limit: number
-): Promise<CachedQfHadith | null> {
-  const row = await db.getFirstAsync<HadithCacheRow>(
-    `SELECT * FROM qf_ayah_hadith_cache
-     WHERE surah = ? AND ayah = ? AND language = ? AND page = ? AND limit_count = ?`,
-    [surah, ayah, language, page, limit]
-  );
-  if (!row) return null;
-  const parsedHadiths = parseJson(row.payload_json);
-  const hadiths = Array.isArray(parsedHadiths) ? parsedHadiths : [];
-  return {
-    ok: true,
-    verseKey: `${surah}:${ayah}`,
-    language: row.language,
-    direction: row.direction,
-    page: row.page,
-    limit: row.limit_count,
-    hasMore: row.has_more === 1,
-    hadiths,
-    fetchedAt: row.fetched_at,
-    isStale: isStale(row.fetched_at) || hadiths.length === 0,
-  };
-}
-
-export async function writeCachedAyahHadiths(
-  db: DatabaseExecutor,
-  response: QfHadithResponse,
-  surah: number,
-  ayah: number
-): Promise<void> {
-  await db.runAsync(
-    `INSERT OR REPLACE INTO qf_ayah_hadith_cache
-      (surah, ayah, language, page, limit_count, direction, has_more, payload_json, fetched_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      surah,
-      ayah,
-      response.language,
-      response.page,
-      response.limit,
-      response.direction,
-      response.hasMore ? 1 : 0,
-      JSON.stringify(response.hadiths),
-      response.fetchedAt,
-    ]
+    ],
   );
 }
 

@@ -1,12 +1,18 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, ScrollView, Share, useWindowDimensions } from "react-native";
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  Pressable,
+  Animated as RNAnimated,
+  Platform,
+  ScrollView,
+  Share,
+  useWindowDimensions,
+} from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
-import {
-  quranPageFontName,
-  quranPageMarkerFontPaletteStyle,
-  quranPageFontPaletteStyle,
-} from "@/lib/fonts/loader";
+import { quranPageFontName, quranPageMarkerFontPaletteStyle, quranPageFontPaletteStyle } from "@/lib/fonts/loader";
 import { useRecyclingState } from "@shopify/flash-list";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -21,15 +27,7 @@ import { AyahWordText } from "./WordSpan";
 import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
 import { useSimilarMarks } from "@/lib/hifz/use-similar-markers";
 import { SimilarVerseButton } from "./SimilarVerseMarker";
-import {
-  BookOpenText,
-  Bookmark,
-  EyeOff,
-  NotebookPen,
-  Pause,
-  Play,
-  Share2,
-} from "lucide-react-native";
+import { BookOpenText, Bookmark, EyeOff, NotebookPen, Pause, Play, Share2 } from "lucide-react-native";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import {
   addBookmark as dbAddBookmark,
@@ -40,7 +38,7 @@ import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { audioFailureMessage } from "@/lib/audio/labels";
-import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
+import { isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
 import { textStartStyle } from "@/lib/ui/direction";
 
@@ -110,7 +108,8 @@ function AyahBlockInner({
     isLoaded: settingsLoaded,
   } = useSettings();
   const s = useStrings();
-  const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
+  const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } =
+    useSelection();
   const isWeakSpot = useWeakSpotMarker();
   // MUT-02: the page's marks are read once for every block on that page, once the setting is known.
   const similarMarked = useSimilarMarks(db, v2Page, settingsLoaded && markSimilarVerses).has(`${surah}:${ayah}`);
@@ -120,7 +119,7 @@ function AyahBlockInner({
   // FlashList reuses a block for another ayah; recycling state resets with the ayah, so an open
   // detail sheet does not carry over to the verse that reuses it.
   const [detailOpen, setDetailOpen] = useRecyclingState(false, [surah, ayah]);
-  const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("hadith");
+  const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("tafsir");
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
 
@@ -152,7 +151,6 @@ function AyahBlockInner({
       marker: tokens[tokens.length - 1],
     };
   }, [text]);
-
 
   const openDetail = useCallback((tab: AyahDetailTabKey) => {
     setDetailTab(tab);
@@ -206,7 +204,18 @@ function AyahBlockInner({
     } finally {
       setBookmarkBusy(false);
     }
-  }, [bookmarkBusy, bookmarked, db, surah, ayah, showToast, s.bookmarkAdded, s.bookmarkRemoved, s.bookmarkActionFailed, refreshBookmarks]);
+  }, [
+    bookmarkBusy,
+    bookmarked,
+    db,
+    surah,
+    ayah,
+    showToast,
+    s.bookmarkAdded,
+    s.bookmarkRemoved,
+    s.bookmarkActionFailed,
+    refreshBookmarks,
+  ]);
 
   const handleSelectAyah = useCallback(() => {
     selectAyah(surah, ayah);
@@ -245,7 +254,8 @@ function AyahBlockInner({
   // Native opens the system share sheet. Web uses Web Share where the browser offers it and
   // otherwise copies, and the control is labeled for what it does. A dismissed share sheet or a
   // failed copy is never announced as a success.
-  const webCanShare = Platform.OS === "web" && typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const webCanShare =
+    Platform.OS === "web" && typeof navigator !== "undefined" && typeof navigator.share === "function";
   const shareLabel = Platform.OS !== "web" || webCanShare ? s.readerShareAyah : s.readerCopyAyah;
   const handleShare = useCallback(async () => {
     if (shareBusy) return;
@@ -314,7 +324,9 @@ function AyahBlockInner({
         />
       )}
       <View
-        className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}
+        className={
+          isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"
+        }
         // Hand-mirrored rows pin LTR coordinates; under the reader's RTL root row-reverse flipped twice
         // and put the ayah reference on the left in Arabic.
         style={{
@@ -334,12 +346,13 @@ function AyahBlockInner({
               transform: [{ scale: pressed ? 0.97 : 1 }],
             })}
           >
-            <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
+            <Text
+              className="text-primary-accent dark:text-primary-bright"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+            >
               {formatAyahRef(isRTL, surah, ayah)}
             </Text>
-            {bookmarked && (
-              <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
-            )}
+            {bookmarked && <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />}
           </Pressable>
           {isRecitationEnabled() && (
             <ActionIcon
@@ -358,7 +371,9 @@ function AyahBlockInner({
             />
           )}
           <ActionIcon
-            icon={shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Share2 size={15} color={iconColor} />}
+            icon={
+              shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Share2 size={15} color={iconColor} />
+            }
             onPress={handleShare}
             disabled={shareBusy}
             accessibilityLabel={shareLabel}
@@ -415,7 +430,13 @@ function AyahBlockInner({
       ) : (
         <View
           className={isPhone ? "pt-3 pb-1" : "pt-5 pb-1"}
-          style={{ direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
+          style={{
+            direction: "ltr",
+            alignItems: "flex-end",
+            paddingHorizontal: 3,
+            alignSelf: "stretch",
+            width: "100%",
+          }}
         >
           {Platform.OS === "android" ? (
             // Android clips each separate Text to its own box, which cut page-font word glyphs that draw
@@ -557,7 +578,10 @@ function AyahBlockInner({
             style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
           >
             <EyeOff size={15} color={iconColor} />
-            <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+            >
               {s.revealHideThisAyah}
             </Text>
           </Pressable>
@@ -594,14 +618,6 @@ function AyahBlockInner({
             onPress={() => openDetail("tafsir")}
             isRTL={isRTL}
           />
-          {isQfContentEnabled() && (
-            <ActionPill
-              label={s.ayahTabHadith}
-              icon={<BookOpenText size={14} color={iconColor} />}
-              onPress={() => openDetail("hadith")}
-              isRTL={isRTL}
-            />
-          )}
           {/* Shown when the ayah has Qira'at data, or when that could not be read (the tab reports it). */}
           {hasQiraat !== false ? (
             <ActionPill
@@ -702,9 +718,7 @@ function ActionPill({
       disabled={disabled}
       {...readerControlProps}
       className={`items-center gap-1.5 rounded-full px-3 py-2 ${
-        active
-          ? "bg-primary-accent/10 dark:bg-primary-bright/10"
-          : "bg-surface dark:bg-surface-dark"
+        active ? "bg-primary-accent/10 dark:bg-primary-bright/10" : "bg-surface dark:bg-surface-dark"
       }`}
       style={{
         direction: isRTL ? "rtl" : "ltr",

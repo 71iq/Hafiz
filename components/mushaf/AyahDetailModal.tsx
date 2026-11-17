@@ -1,14 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, Share, Text, View, useWindowDimensions } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { ArrowRight, ArrowLeft, BookOpenText, Bookmark, ChevronLeft, ChevronRight, Copy, Flag, Pause, Play, Share2 } from "lucide-react-native";
+import {
+  ArrowRight,
+  ArrowLeft,
+  BookOpenText,
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Flag,
+  Pause,
+  Play,
+  Share2,
+} from "lucide-react-native";
 import { useIssueReporter } from "@/components/app-update/IssueReporter";
 import { formatAyahRef } from "@/lib/arabic";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
-import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
 import { PrivateNotesSection } from "@/components/notes/PrivateNotesSection";
 import { SimilarVerseComparison } from "@/components/hifz/SimilarVerseComparison";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
@@ -17,14 +37,10 @@ import { MirroredRow } from "@/components/ui/MirroredRow";
 import { DetailTabRow } from "@/components/mushaf/DetailTabRow";
 import { useDetailArrowKeys } from "@/components/mushaf/use-detail-arrow-keys";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
-import {
-  quranPageFontName,
-  quranPageMarkerFontPaletteStyle,
-  quranPageFontPaletteStyle,
-} from "@/lib/fonts/loader";
+import { quranPageFontName, quranPageMarkerFontPaletteStyle, quranPageFontPaletteStyle } from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { audioFailureMessage } from "@/lib/audio/labels";
-import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
+import { isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { useDatabase } from "@/lib/database/provider";
 import { setPendingDeepLink } from "@/lib/deep-link";
 import { useSimilarAyah } from "@/lib/hifz/use-similar-markers";
@@ -72,7 +88,7 @@ type Loaded<T> = { key: string; value: T } | { key: string; failed: true };
 
 type QiraatAvailability = "pending" | "present" | "absent" | "error";
 
-export type AyahDetailTabKey = "similar" | "translation" | "tafsir" | "hadith" | "qiraat" | "notes" | "reflections";
+export type AyahDetailTabKey = "similar" | "translation" | "tafsir" | "qiraat" | "notes" | "reflections";
 
 type Props = {
   target: TargetAyah | null;
@@ -144,7 +160,7 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
   const [similarWidth, setSimilarWidth] = useState<number | null>(null);
   const keyScopeRef = useRef<View>(null);
 
-  const activeTarget = target ? currentTarget ?? target : null;
+  const activeTarget = target ? (currentTarget ?? target) : null;
   const open = activeTarget !== null;
   const targetKey = activeTarget ? `${activeTarget.surah}:${activeTarget.ayah}` : "";
   const stepped =
@@ -173,7 +189,9 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     ? quranPageMarkerFontPaletteStyle(quranFontStyle, row.v2_page, effectiveTheme, quranMarkerStyle)
     : null;
   const title = row
-    ? (uiLanguage === "ar" ? row.surah_name_arabic : row.surah_name_english)
+    ? uiLanguage === "ar"
+      ? row.surah_name_arabic
+      : row.surah_name_english
     : `${activeTarget?.surah ?? ""}:${activeTarget?.ayah ?? ""}`;
   const subtitle = activeTarget ? formatAyahRef(isRTL, activeTarget.surah, activeTarget.ayah) : undefined;
 
@@ -225,7 +243,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     list.push({ key: "tafsir", label: s.tafseer });
     list.push({ key: "notes", label: s.privateNotes });
     if (showQiraat) list.push({ key: "qiraat", label: s.wordTabQiraat });
-    if (isQfContentEnabled()) list.push({ key: "hadith", label: s.ayahTabHadith });
     if (showReflections) list.push({ key: "reflections", label: s.reflections });
     return list;
   }, [langInfo, s, showQiraat, showReflections, showSimilar, showTranslation]);
@@ -251,7 +268,7 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
          WHERE surah < ? OR (surah = ? AND ayah < ?)
          ORDER BY surah DESC, ayah DESC
          LIMIT 1`,
-        [activeTarget.surah, activeTarget.surah, activeTarget.ayah]
+        [activeTarget.surah, activeTarget.surah, activeTarget.ayah],
       ),
       db.getFirstAsync<TargetAyah>(
         `SELECT surah, ayah
@@ -259,13 +276,15 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
          WHERE surah > ? OR (surah = ? AND ayah > ?)
          ORDER BY surah, ayah
          LIMIT 1`,
-        [activeTarget.surah, activeTarget.surah, activeTarget.ayah]
+        [activeTarget.surah, activeTarget.surah, activeTarget.ayah],
       ),
-    ]).then(([previous, next]) => {
-      if (!cancelled) setAdjacentAyahs({ previous: previous ?? null, next: next ?? null });
-    }).catch(() => {
-      if (!cancelled) setAdjacentAyahs({ previous: null, next: null });
-    });
+    ])
+      .then(([previous, next]) => {
+        if (!cancelled) setAdjacentAyahs({ previous: previous ?? null, next: next ?? null });
+      })
+      .catch(() => {
+        if (!cancelled) setAdjacentAyahs({ previous: null, next: null });
+      });
     return () => {
       cancelled = true;
     };
@@ -280,13 +299,15 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
        FROM quran_text q
        JOIN surahs s ON s.number = q.surah
        WHERE q.surah = ? AND q.ayah = ?`,
-      [activeTarget.surah, activeTarget.ayah]
-    ).then((value) => {
-      if (!cancelled) setAyahRow({ key, value: value ?? null });
-    }).catch((error) => {
-      console.warn("[AyahDetailModal] Failed to load ayah:", error);
-      if (!cancelled) setAyahRow({ key, failed: true });
-    });
+      [activeTarget.surah, activeTarget.ayah],
+    )
+      .then((value) => {
+        if (!cancelled) setAyahRow({ key, value: value ?? null });
+      })
+      .catch((error) => {
+        console.warn("[AyahDetailModal] Failed to load ayah:", error);
+        if (!cancelled) setAyahRow({ key, failed: true });
+      });
     return () => {
       cancelled = true;
     };
@@ -298,22 +319,26 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     const key = targetKey;
     const query =
       translationLanguage === DEFAULT_LANGUAGE
-        ? db.getFirstAsync<{ text_en: string }>(
-            "SELECT text_en FROM translations WHERE surah = ? AND ayah = ?",
-            [activeTarget.surah, activeTarget.ayah]
-          ).then((value) => value?.text_en ?? "")
-        : db.getFirstAsync<{ text: string }>(
-            "SELECT text FROM translation_active WHERE surah = ? AND ayah = ?",
-            [activeTarget.surah, activeTarget.ayah]
-          ).then((value) => value?.text ?? "");
+        ? db
+            .getFirstAsync<{
+              text_en: string;
+            }>("SELECT text_en FROM translations WHERE surah = ? AND ayah = ?", [activeTarget.surah, activeTarget.ayah])
+            .then((value) => value?.text_en ?? "")
+        : db
+            .getFirstAsync<{
+              text: string;
+            }>("SELECT text FROM translation_active WHERE surah = ? AND ayah = ?", [activeTarget.surah, activeTarget.ayah])
+            .then((value) => value?.text ?? "");
 
     let cancelled = false;
-    query.then((text) => {
-      if (!cancelled) setTranslation({ key, value: text.trim() });
-    }).catch((error) => {
-      console.warn("[AyahDetailModal] Failed to load translation:", error);
-      if (!cancelled) setTranslation({ key, failed: true });
-    });
+    query
+      .then((text) => {
+        if (!cancelled) setTranslation({ key, value: text.trim() });
+      })
+      .catch((error) => {
+        console.warn("[AyahDetailModal] Failed to load translation:", error);
+        if (!cancelled) setTranslation({ key, failed: true });
+      });
     return () => {
       cancelled = true;
     };
@@ -323,21 +348,23 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     if (!activeTarget) return;
     const key = tafsirKey;
     let cancelled = false;
-    db.getAllAsync<{ source: string; text: string }>(
-      "SELECT source, text FROM tafseer WHERE surah = ? AND ayah = ?",
-      [activeTarget.surah, activeTarget.ayah]
-    ).then((rows) => {
-      if (cancelled) return;
-      const rowsBySource = new Map(rows.map((item) => [item.source, item.text]));
-      const orderedRows = AVAILABLE_TAFSIR_SOURCES.flatMap<TafsirRow>((source) => {
-        const text = rowsBySource.get(source.id)?.trim();
-        return text ? [{ source: source.id, text }] : [];
+    db.getAllAsync<{ source: string; text: string }>("SELECT source, text FROM tafseer WHERE surah = ? AND ayah = ?", [
+      activeTarget.surah,
+      activeTarget.ayah,
+    ])
+      .then((rows) => {
+        if (cancelled) return;
+        const rowsBySource = new Map(rows.map((item) => [item.source, item.text]));
+        const orderedRows = AVAILABLE_TAFSIR_SOURCES.flatMap<TafsirRow>((source) => {
+          const text = rowsBySource.get(source.id)?.trim();
+          return text ? [{ source: source.id, text }] : [];
+        });
+        setTafsir({ key, value: orderedRows });
+      })
+      .catch((error) => {
+        console.warn("[AyahDetailModal] Failed to load tafsir:", error);
+        if (!cancelled) setTafsir({ key, failed: true });
       });
-      setTafsir({ key, value: orderedRows });
-    }).catch((error) => {
-      console.warn("[AyahDetailModal] Failed to load tafsir:", error);
-      if (!cancelled) setTafsir({ key, failed: true });
-    });
     return () => {
       cancelled = true;
     };
@@ -369,7 +396,9 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
         showToast(s.bookmarkRemoved);
       } else {
         await dbAddBookmark(db, activeTarget.surah, activeTarget.ayah);
-        showToast(interpolate(s.ayahDetailBookmarked, { ref: formatAyahRef(isRTL, activeTarget.surah, activeTarget.ayah) }));
+        showToast(
+          interpolate(s.ayahDetailBookmarked, { ref: formatAyahRef(isRTL, activeTarget.surah, activeTarget.ayah) }),
+        );
       }
       await refreshBookmarks();
     } catch (e) {
@@ -431,11 +460,14 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
     }
   }, [activeTarget, recitationId, toggleAyah, showToast, s]);
 
-  const handleNavigateAyah = useCallback((direction: "previous" | "next") => {
-    const nextTarget = adjacentAyahs[direction];
-    if (!nextTarget) return;
-    setCurrentTarget(nextTarget);
-  }, [adjacentAyahs]);
+  const handleNavigateAyah = useCallback(
+    (direction: "previous" | "next") => {
+      const nextTarget = adjacentAyahs[direction];
+      if (!nextTarget) return;
+      setCurrentTarget(nextTarget);
+    },
+    [adjacentAyahs],
+  );
 
   // Stepping inside the sheet never moves the reader; this explicit action does.
   const handleGoToAyah = useCallback(() => {
@@ -481,12 +513,7 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
 
   return (
     <>
-      <ResponsiveSheet
-        open={open}
-        onClose={onClose}
-        maxWidth={1080}
-        maxHeight={maxOverlayHeight}
-      >
+      <ResponsiveSheet open={open} onClose={onClose} maxWidth={1080} maxHeight={maxOverlayHeight}>
         <View ref={keyScopeRef} style={{ flexGrow: 1, flexShrink: 1, flexBasis: "auto", minHeight: 0 }}>
           {/* Phones at 360-393dp leave little room beside the close button, so the header keeps only
               ayah navigation and the per-ayah actions sit in the body under the ayah text. */}
@@ -499,13 +526,17 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
             actions={
               <View className={isRTL ? "flex-row-reverse items-center gap-1" : "flex-row items-center gap-1"}>
                 <ArrowButton
-                  icon={isRTL ? <ChevronRight size={18} color={iconColor} /> : <ChevronLeft size={18} color={iconColor} />}
+                  icon={
+                    isRTL ? <ChevronRight size={18} color={iconColor} /> : <ChevronLeft size={18} color={iconColor} />
+                  }
                   onPress={() => handleNavigateAyah("previous")}
                   disabled={!adjacentAyahs.previous}
                   accessibilityLabel={s.previousAyah}
                 />
                 <ArrowButton
-                  icon={isRTL ? <ChevronLeft size={18} color={iconColor} /> : <ChevronRight size={18} color={iconColor} />}
+                  icon={
+                    isRTL ? <ChevronLeft size={18} color={iconColor} /> : <ChevronRight size={18} color={iconColor} />
+                  }
                   onPress={() => handleNavigateAyah("next")}
                   disabled={!adjacentAyahs.next}
                   accessibilityLabel={s.nextAyah}
@@ -583,7 +614,9 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                       )
                     }
                     label={audioState.playing ? s.ayahAudioPauseShort : s.ayahAudioListen}
-                    accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
+                    accessibilityLabel={
+                      audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay
+                    }
                     onPress={handleAudioPress}
                     disabled={audioState.loading}
                     isRTL={isRTL}
@@ -594,7 +627,11 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                     bookmarkBusy ? (
                       <ActivityIndicator size="small" color={iconColor} />
                     ) : (
-                      <Bookmark size={15} color={bookmarked ? accentColor : iconColor} fill={bookmarked ? accentColor : "none"} />
+                      <Bookmark
+                        size={15}
+                        color={bookmarked ? accentColor : iconColor}
+                        fill={bookmarked ? accentColor : "none"}
+                      />
                     )
                   }
                   label={bookmarked ? s.removeBookmark : s.bookmark}
@@ -603,7 +640,13 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                   isRTL={isRTL}
                 />
                 <AyahActionButton
-                  icon={copyBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Copy size={15} color={iconColor} />}
+                  icon={
+                    copyBusy ? (
+                      <ActivityIndicator size="small" color={iconColor} />
+                    ) : (
+                      <Copy size={15} color={iconColor} />
+                    )
+                  }
                   label={s.copy}
                   onPress={handleCopy}
                   disabled={copyBusy || !row}
@@ -611,7 +654,13 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                 />
                 {canShareText() ? (
                   <AyahActionButton
-                    icon={shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Share2 size={15} color={iconColor} />}
+                    icon={
+                      shareBusy ? (
+                        <ActivityIndicator size="small" color={iconColor} />
+                      ) : (
+                        <Share2 size={15} color={iconColor} />
+                      )
+                    }
                     label={s.ayahDetailShare}
                     onPress={handleShare}
                     disabled={shareBusy || !row}
@@ -634,7 +683,12 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                 >
                   <Text
                     className="flex-1 text-primary-muted dark:text-primary-bright"
-                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                    style={{
+                      fontFamily: "Manrope_600SemiBold",
+                      fontSize: 14,
+                      ...textStartStyle(isRTL),
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
                   >
                     {s.ayahDetailGoToAyah}
                   </Text>
@@ -654,10 +708,17 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                   }
                   accessibilityRole="link"
                   className="mt-2 min-h-11 items-center gap-2 self-start"
-                  style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", alignSelf: isRTL ? "flex-end" : "flex-start" }}
+                  style={{
+                    direction: "ltr",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    alignSelf: isRTL ? "flex-end" : "flex-start",
+                  }}
                 >
                   <Flag size={14} color={iconColor} />
-                  <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
+                  <Text
+                    className="text-warm-500 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
+                  >
                     {s.ayahDetailReportIssue}
                   </Text>
                 </Pressable>
@@ -760,7 +821,11 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                       <Text
                         className="text-primary-accent dark:text-primary-bright"
                         numberOfLines={1}
-                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, writingDirection: isRTL ? "rtl" : "ltr" }}
+                        style={{
+                          fontFamily: "Manrope_600SemiBold",
+                          fontSize: 12,
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
                       >
                         {s.tafseerManageSources}
                       </Text>
@@ -833,7 +898,13 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                         style={
                           shownTafsirIsRtl
                             ? { ...ARABIC_DETAIL_TEXT, writingDirection: "rtl", textAlign: "right" }
-                            : { fontFamily: "Manrope_400Regular", fontSize: 16, lineHeight: 26, writingDirection: "ltr", textAlign: "left" }
+                            : {
+                                fontFamily: "Manrope_400Regular",
+                                fontSize: 16,
+                                lineHeight: 26,
+                                writingDirection: "ltr",
+                                textAlign: "left",
+                              }
                         }
                       >
                         {shownTafsir?.text ?? s.noTafseerData}
@@ -842,8 +913,9 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                   )}
                 </View>
               )}
-              {isQfContentEnabled() && shownTab === "hadith" && <HadithTab surah={activeTarget.surah} ayah={activeTarget.ayah} />}
-              {shownTab === "qiraat" && <QiraatTab surah={activeTarget.surah} ayah={activeTarget.ayah} showHeader={false} />}
+              {shownTab === "qiraat" && (
+                <QiraatTab surah={activeTarget.surah} ayah={activeTarget.ayah} showHeader={false} />
+              )}
               {shownTab === "notes" && <PrivateNotesSection surah={activeTarget.surah} ayah={activeTarget.ayah} />}
               {shownTab === "reflections" && (
                 <ReflectionsSection
@@ -954,7 +1026,13 @@ function InlineError({
       <Text
         accessibilityLiveRegion="polite"
         className="text-red-600 dark:text-red-400"
-        style={{ fontFamily: "Manrope_500Medium", fontSize: 14, lineHeight: 22, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+        style={{
+          fontFamily: "Manrope_500Medium",
+          fontSize: 14,
+          lineHeight: 22,
+          ...textStartStyle(isRTL),
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
       >
         {message}
       </Text>
@@ -1051,24 +1129,14 @@ function AyahActionButton({
   );
 }
 
-function TafsirSourceButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+function TafsirSourceButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       className={`min-h-[44px] justify-center rounded-full px-3 ${
-        active
-          ? "bg-primary-accent/10 dark:bg-primary-bright/10"
-          : "bg-surface dark:bg-surface-dark"
+        active ? "bg-primary-accent/10 dark:bg-primary-bright/10" : "bg-surface dark:bg-surface-dark"
       }`}
       style={{ cursor: Platform.OS === "web" ? "pointer" : undefined }}
     >

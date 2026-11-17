@@ -269,20 +269,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
       PRIMARY KEY (recitation_id, surah, ayah)
     );
 
-    -- Quran Foundation hadith-by-ayah cache (online enrichment, not synced)
-    CREATE TABLE IF NOT EXISTS qf_ayah_hadith_cache (
-      surah INTEGER NOT NULL,
-      ayah INTEGER NOT NULL,
-      language TEXT NOT NULL,
-      page INTEGER NOT NULL,
-      limit_count INTEGER NOT NULL,
-      direction TEXT NOT NULL,
-      has_more INTEGER NOT NULL DEFAULT 0,
-      payload_json TEXT NOT NULL,
-      fetched_at TEXT NOT NULL,
-      PRIMARY KEY (surah, ayah, language, page, limit_count)
-    );
-
     -- Vocabulary flashcards (saved word meanings)
     CREATE TABLE IF NOT EXISTS vocab_cards (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -595,7 +581,6 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_mutashabihat_refs_group ON mutashabihat_refs(group_id);
     CREATE INDEX IF NOT EXISTS idx_mutashabihat_refs_surah_ayah ON mutashabihat_refs(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_qf_audio_cache_sa ON qf_ayah_audio_cache(surah, ayah);
-    CREATE INDEX IF NOT EXISTS idx_qf_hadith_cache_sa ON qf_ayah_hadith_cache(surah, ayah, language);
     CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(surah, ayah_start, ayah_end);
     CREATE INDEX IF NOT EXISTS idx_reflection_journey_levels_order ON reflection_journey_levels(order_index);
     CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_unlocked ON achievement_unlocks(unlocked_at);
@@ -604,6 +589,10 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
 
 export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   const legacyDate = "1970-01-01T00:00:00.000Z";
+
+  // The ayah Hadith tab was removed until Hafiz has a licensed source. Its online cache held
+  // third-party content that may not be kept, so earlier installs drop it (the index goes with it).
+  await db.execAsync("DROP TABLE IF EXISTS qf_ayah_hadith_cache");
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS user_word_meanings (
@@ -634,8 +623,18 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   await addColumnIfMissing(db, "highlights", "sync_id", "sync_id TEXT");
   await addColumnIfMissing(db, "highlights", "updated_at", "updated_at TEXT");
   await addColumnIfMissing(db, "highlights", "deleted_at", "deleted_at TEXT");
-  await addColumnIfMissing(db, "reflection_journey_entries", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
-  await addColumnIfMissing(db, "reflection_journey_entries", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(
+    db,
+    "reflection_journey_entries",
+    "created_at",
+    `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
+  );
+  await addColumnIfMissing(
+    db,
+    "reflection_journey_entries",
+    "updated_at",
+    `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
+  );
   await addColumnIfMissing(db, "reflection_journey_entries", "completed_at", "completed_at TEXT");
   await addColumnIfMissing(db, "achievement_unlocks", "seen_at", "seen_at TEXT");
   await addColumnIfMissing(db, "achievement_unlocks", "local_payload", "local_payload TEXT NOT NULL DEFAULT '{}'");
@@ -643,7 +642,12 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   await addColumnIfMissing(db, "achievement_unlocks", "sync_status", "sync_status TEXT DEFAULT 'pending'");
   await addColumnIfMissing(db, "user_settings", "updated_at", "updated_at TEXT");
   await addColumnIfMissing(db, "user_settings", "deleted_at", "deleted_at TEXT");
-  await addColumnIfMissing(db, "achievement_progress", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(
+    db,
+    "achievement_progress",
+    "updated_at",
+    `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
+  );
   await addColumnIfMissing(db, "achievement_progress", "payload", "payload TEXT NOT NULL DEFAULT '{}'");
   await addColumnIfMissing(db, "mutashabihat_refs", "pre_text", "pre_text TEXT");
   await addColumnIfMissing(db, "mutashabihat_refs", "similar_text", "similar_text TEXT");
@@ -718,7 +722,7 @@ async function addColumnIfMissing(
   db: DatabaseExecutor,
   table: string,
   column: string,
-  definition: string
+  definition: string,
 ): Promise<void> {
   try {
     await db.getFirstAsync(`SELECT ${column} FROM ${table} LIMIT 1`);

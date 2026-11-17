@@ -110,16 +110,22 @@ also returns a hash for the Google client secret. Use the original credential
 or a new second secret from the existing Google OAuth client, while preserving
 the first secret for the old hosting.
 
-Quran Foundation content (ayah hadiths and the online reciter list) was
-restored on 2026-11-17 with `EXPO_PUBLIC_QF_CONTENT_ENABLED=true`. The
-`qf-content` function uses the surviving prelive OAuth client, the same client
-as the `custom:quran-foundation` Auth provider; Quran Foundation production does
-not know this client. `/etc/hafiz/functions.env` holds its credentials,
-`QF_CONTENT_ENV=prelive` and the `QF_USER_*` settings. Caddy exposes only
-`/functions/v1/qf-content`. Recitation does not depend on this: the built-in
-recitations play per-ayah files from the public verses.quran.foundation and
-quranicaudio CDNs (`lib/audio/public-ayah-audio.ts`), and the online list only
-adds reciters over the bundled ones.
+Quran Foundation content (the online reciter list and audio lookup for
+recitations without a public file) was restored on 2026-11-17 with
+`EXPO_PUBLIC_QF_CONTENT_ENABLED=true`. The ayah Hadith tab was removed until
+Hafiz has a licensed, scholar-verified source, so `qf-content` no longer
+serves hadiths and answers the old `hadith-ayah` action with `bad_request`.
+The VM keeps serving hadiths until `supabase/functions/qf-content/index.ts` is
+copied to `/opt/hafiz/supabase/volumes/functions/qf-content/` and
+`hafiz-functions` restarts. The `qf-content` function uses the surviving
+prelive OAuth client, the same client as the `custom:quran-foundation` Auth
+provider; Quran Foundation production does not know this client.
+`/etc/hafiz/functions.env` holds its credentials, `QF_CONTENT_ENV=prelive` and
+the `QF_USER_*` settings. Caddy exposes only `/functions/v1/qf-content`.
+Recitation does not depend on this: the built-in recitations play per-ayah
+files from the public verses.quran.foundation and quranicaudio CDNs
+(`lib/audio/public-ayah-audio.ts`), and the online list only adds reciters
+over the bundled ones.
 
 Quran Foundation login and sync stay off (`EXPO_PUBLIC_QF_USER_AUTH_ENABLED=false`,
 no public `qf-user` route) until Quran Foundation registers

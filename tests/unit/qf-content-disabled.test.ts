@@ -1,4 +1,4 @@
-import { fetchQfAyahAudio, fetchQfAyahHadiths, fetchQfReciters } from "@/lib/quran-foundation/content";
+import { fetchQfAyahAudio, fetchQfReciters } from "@/lib/quran-foundation/content";
 import { isQfContentEnabled } from "@/lib/quran-foundation/config";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -30,7 +30,6 @@ describe("Quran Foundation content feature gate", () => {
 
   it.each([
     ["audio", () => fetchQfAyahAudio(2, 255)],
-    ["hadiths", () => fetchQfAyahHadiths(2, 255, "en")],
     ["reciters", () => fetchQfReciters("ar")],
   ])("returns not_configured for disabled %s content without invoking Supabase", async (_name, request) => {
     await expect(request()).resolves.toMatchObject({ ok: false, code: "not_configured" });

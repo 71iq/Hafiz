@@ -270,7 +270,7 @@
           "children": [
             {
               "id": "shared.ayahdetail.tabs",
-              "title": "Tab order and availability: Similar verses, Translation, Tafsir, Notes, Qira'at, Hadith, Reflections",
+              "title": "Tab order and availability: Similar verses, Translation, Tafsir, Notes, Qira'at, Reflections",
               "kind": "transition",
               "cases": ["AYAH-06"],
               "uses": [],
@@ -300,15 +300,6 @@
               "title": "Qira'at tab (shown when the ayah has qira'at)",
               "kind": "widget",
               "cases": ["AYAH-08"],
-              "uses": [],
-              "native": false,
-              "children": []
-            },
-            {
-              "id": "shared.ayahdetail.hadith",
-              "title": "Hadith tab (when enabled)",
-              "kind": "widget",
-              "cases": ["AYAH-09"],
               "uses": [],
               "native": false,
               "children": []

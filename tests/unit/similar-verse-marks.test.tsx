@@ -207,7 +207,6 @@ jest.mock("@/lib/quran-foundation/config", () => ({
 jest.mock("@/components/reflections/ReflectionsSection", () => ({ ReflectionsSection: () => null }));
 jest.mock("@/components/notes/PrivateNotesSection", () => ({ PrivateNotesSection: () => null }));
 jest.mock("@/components/mushaf/word-tabs/QiraatTab", () => ({ QiraatTab: () => null }));
-jest.mock("@/components/mushaf/ayah-tabs/HadithTab", () => ({ HadithTab: () => null }));
 jest.mock("@/components/settings/TafsirSourcePicker", () => ({ TafsirSourcePicker: () => null }));
 jest.mock("@/components/mushaf/WordToken", () => {
   const { Text } = jest.requireActual<typeof import("react-native")>("react-native");

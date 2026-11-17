@@ -1,4 +1,4 @@
-type Action = "audio-ayah" | "audio-reciter-lookup" | "hadith-ayah";
+type Action = "audio-ayah" | "audio-reciter-lookup";
 type ErrorCode = "bad_request" | "not_configured" | "rate_limited" | "upstream";
 
 type QfEnv = "production" | "prelive";
@@ -27,16 +27,6 @@ type AudioFile = {
   };
 };
 
-type HadithPayload = {
-  hadiths?: unknown[];
-  page?: number;
-  limit?: number;
-  has_more?: boolean;
-  hasMore?: boolean;
-  language?: string;
-  direction?: string;
-};
-
 type RecitationResource = {
   id?: number;
   reciter_name?: string;
@@ -57,7 +47,7 @@ class QfContentFailure extends Error {
     readonly action: Action,
     readonly phase: "token" | "api",
     readonly status?: number,
-    readonly pathGroup?: string
+    readonly pathGroup?: string,
   ) {
     super(`QF content ${phase} failed`);
   }
@@ -74,13 +64,10 @@ const API_BASE_BY_ENV: Record<QfEnv, string> = {
 };
 
 const AYAH_COUNTS = [
-  0, 7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99,
-  128, 111, 110, 98, 135, 112, 78, 118, 64, 77, 227, 93, 88, 69, 60, 34, 30,
-  73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45,
-  60, 49, 62, 55, 78, 96, 29, 22, 24, 13, 14, 11, 11, 18, 12, 12, 30, 52,
-  52, 44, 28, 28, 20, 56, 40, 31, 50, 40, 46, 42, 29, 19, 36, 25, 22, 17,
-  19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8, 11, 11, 8, 3, 9, 5, 4, 7,
-  3, 6, 3, 5, 4, 5, 6,
+  0, 7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98, 135, 112, 78, 118, 64, 77,
+  227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45, 60, 49, 62, 55,
+  78, 96, 29, 22, 24, 13, 14, 11, 11, 18, 12, 12, 30, 52, 52, 44, 28, 28, 20, 56, 40, 31, 50, 40, 46, 42, 29, 19, 36,
+  25, 22, 17, 19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8, 11, 11, 8, 3, 9, 5, 4, 7, 3, 6, 3, 5, 4, 5, 6,
 ];
 
 const DEFAULT_RECITATION_ID = 6;
@@ -114,7 +101,7 @@ Deno.serve(async (req) => {
   }
 
   const action = body.action;
-  if (action !== "audio-ayah" && action !== "audio-reciter-lookup" && action !== "hadith-ayah") {
+  if (action !== "audio-ayah" && action !== "audio-reciter-lookup") {
     return jsonError("bad_request", "Unsupported Quran Foundation content action.");
   }
 
@@ -133,10 +120,7 @@ Deno.serve(async (req) => {
       return jsonError("bad_request", parsedAyah.message);
     }
 
-    if (action === "audio-ayah") {
-      return await handleAudio(config.value, parsedAyah.surah, parsedAyah.ayah);
-    }
-    return await handleHadith(config.value, parsedAyah.surah, parsedAyah.ayah, body);
+    return await handleAudio(config.value, parsedAyah.surah, parsedAyah.ayah);
   } catch (error) {
     if (error instanceof QfContentFailure) {
       logQfContentFailure(error);
@@ -156,7 +140,7 @@ async function handleAudio(config: Config, surah: number, ayah: number): Promise
   if (!upstream.ok) return upstream.response;
 
   const files = Array.isArray((upstream.data as { audio_files?: unknown }).audio_files)
-    ? ((upstream.data as { audio_files: AudioFile[] }).audio_files)
+    ? (upstream.data as { audio_files: AudioFile[] }).audio_files
     : [];
   const audioFile = files.find((file) => file.verse_key === verseKey) ?? files[0];
   if (!audioFile?.url) {
@@ -194,75 +178,21 @@ async function handleRecitations(config: Config, body: Record<string, unknown>):
     config,
     `/content/api/v4/resources/recitations?${params.toString()}`,
     "audio-reciter-lookup",
-    "recitations"
+    "recitations",
   );
   if (!upstream.ok) return upstream.response;
 
   const payload = upstream.data as RecitationsPayload;
   const reciters = Array.isArray(payload.recitations)
-    ? payload.recitations.map(normalizeReciter).filter((reciter): reciter is NonNullable<ReturnType<typeof normalizeReciter>> => reciter !== null)
+    ? payload.recitations
+        .map(normalizeReciter)
+        .filter((reciter): reciter is NonNullable<ReturnType<typeof normalizeReciter>> => reciter !== null)
     : [];
 
   return jsonSuccess({
     ok: true,
     language,
     reciters,
-    fetchedAt: new Date().toISOString(),
-  });
-}
-
-async function handleHadith(
-  config: Config,
-  surah: number,
-  ayah: number,
-  body: Record<string, unknown>
-): Promise<Response> {
-  const language = body.language;
-  if (language !== "en" && language !== "ar") {
-    return jsonError("bad_request", "Hadith language must be en or ar.");
-  }
-
-  const page = parsePositiveInt(body.page ?? 1);
-  if (page === null) return jsonError("bad_request", "Hadith page must be a positive integer.");
-
-  const limit = parsePositiveInt(body.limit ?? 4);
-  if (limit === null || limit > 5) {
-    return jsonError("bad_request", "Hadith limit must be between 1 and 5.");
-  }
-
-  const verseKey = `${surah}:${ayah}`;
-  const params = new URLSearchParams({
-    language,
-    page: String(page),
-    limit: String(limit),
-  });
-  const upstream = await getQfJson(
-    config,
-    `/content/api/v4/hadith_references/by_ayah/${encodeURIComponent(verseKey)}/hadiths?${params.toString()}`,
-    "hadith-ayah",
-    "hadith_references"
-  );
-  if (!upstream.ok) return upstream.response;
-
-  const payload = upstream.data as HadithPayload;
-  const qfHadiths = Array.isArray(payload.hadiths) ? payload.hadiths : [];
-  const resolvedPayload =
-    qfHadiths.length > 0
-      ? payload
-      : (await fetchQuranComHadiths(verseKey, language, page, limit).catch(() => null)) ?? payload;
-  const hadiths = Array.isArray((resolvedPayload as HadithPayload).hadiths)
-    ? ((resolvedPayload as HadithPayload).hadiths)
-    : [];
-
-  return jsonSuccess({
-    ok: true,
-    verseKey,
-    language,
-    direction: stringOrUndefined((resolvedPayload as HadithPayload).direction) ?? (language === "ar" ? "rtl" : "ltr"),
-    page: numberOrUndefined((resolvedPayload as HadithPayload).page) ?? page,
-    limit: numberOrUndefined((resolvedPayload as HadithPayload).limit) ?? limit,
-    hasMore: Boolean((resolvedPayload as HadithPayload).has_more ?? (resolvedPayload as HadithPayload).hasMore),
-    hadiths: normalizeHadiths(hadiths, language),
     fetchedAt: new Date().toISOString(),
   });
 }
@@ -276,7 +206,10 @@ type Config = {
   recitationId: number;
 };
 
-function readConfig(action: Action, recitationIdInput: unknown): { ok: true; value: Config } | { ok: false; message: string } {
+function readConfig(
+  action: Action,
+  recitationIdInput: unknown,
+): { ok: true; value: Config } | { ok: false; message: string } {
   const clientId = Deno.env.get("QF_CONTENT_CLIENT_ID")?.trim() ?? Deno.env.get("QF_CLIENT_ID")?.trim();
   const clientSecret = Deno.env.get("QF_CONTENT_CLIENT_SECRET")?.trim() ?? Deno.env.get("QF_CLIENT_SECRET")?.trim();
   const envInput = Deno.env.get("QF_CONTENT_ENV")?.trim() ?? Deno.env.get("QF_ENV")?.trim();
@@ -313,7 +246,7 @@ async function getQfJson(
   path: string,
   action: Action,
   pathGroup: string,
-  didRetry = false
+  didRetry = false,
 ): Promise<{ ok: true; data: unknown } | { ok: false; response: Response }> {
   const token = await getAccessToken(config, action);
   const response = await fetch(`${config.apiBaseUrl}${path}`, {
@@ -371,7 +304,7 @@ async function fetchToken(config: Config, action: Action): Promise<string> {
     throw new QfContentFailure("upstream", action, "token", response.status);
   }
 
-  const token = await response.json() as { access_token?: string; expires_in?: number };
+  const token = (await response.json()) as { access_token?: string; expires_in?: number };
   if (!token.access_token || typeof token.expires_in !== "number") {
     throw new QfContentFailure("upstream", action, "token");
   }
@@ -415,7 +348,7 @@ function clearToken() {
 
 function logQfContentFailure(error: QfContentFailure) {
   console.warn(
-    `[qf-content] upstream failed action=${error.action} phase=${error.phase} status=${error.status ?? "unknown"} path=${error.pathGroup ?? "token"}`
+    `[qf-content] upstream failed action=${error.action} phase=${error.phase} status=${error.status ?? "unknown"} path=${error.pathGroup ?? "token"}`,
   );
 }
 
@@ -427,7 +360,7 @@ function contentErrorMessage(code: Exclude<ErrorCode, "bad_request">): string {
 
 function parseAyah(
   surahInput: unknown,
-  ayahInput: unknown
+  ayahInput: unknown,
 ): { ok: true; surah: number; ayah: number } | { ok: false; message: string } {
   const surah = parsePositiveInt(surahInput);
   const ayah = parsePositiveInt(ayahInput);
@@ -475,91 +408,6 @@ function normalizeReciter(value: unknown) {
     translatedLanguageName: stringOrUndefined(row.translated_name?.language_name),
     style: stringOrUndefined(row.style) ?? "",
   };
-}
-
-async function fetchQuranComHadiths(
-  verseKey: string,
-  language: "en" | "ar",
-  page: number,
-  limit: number
-): Promise<HadithPayload | null> {
-  const params = new URLSearchParams({
-    language,
-    page: String(page),
-    limit: String(limit),
-  });
-  const response = await fetch(
-    `https://quran.com/api/proxy/content/api/qdc/hadith_references/by_ayah/${encodeURIComponent(verseKey)}/hadiths?${params.toString()}`,
-    {
-      headers: {
-        accept: "application/json",
-        referer: `https://quran.com/${verseKey}/hadith`,
-      },
-    }
-  );
-  if (!response.ok) return null;
-  const payload = await response.json() as HadithPayload;
-  return Array.isArray(payload.hadiths) ? payload : null;
-}
-
-function normalizeHadiths(value: unknown[], language: "en" | "ar"): unknown[] {
-  return value.map((hadith) => {
-    if (!isRecord(hadith)) return hadith;
-    const texts = Array.isArray(hadith.hadith) ? hadith.hadith : [];
-    const languageTexts = texts.filter((text) => !isRecord(text) || text.lang === language);
-    return {
-      ...hadith,
-      hadith: (languageTexts.length > 0 ? languageTexts : texts).map(normalizeHadithText),
-    };
-  });
-}
-
-function normalizeHadithText(value: unknown): unknown {
-  if (!isRecord(value)) return value;
-  const body = stringOrUndefined(value.body);
-  return {
-    ...value,
-    ...(body ? { body: htmlToText(body) } : {}),
-  };
-}
-
-function htmlToText(value: string): string {
-  return decodeHtmlEntities(
-    value
-      .replace(/\r\n/g, "\n")
-      .replace(/<\s*br\s*\/?>/gi, "\n")
-      .replace(/<\/p>\s*<p[^>]*>/gi, "\n\n")
-      .replace(/<\/?p[^>]*>/gi, "\n")
-      .replace(/<[^>]+>/g, "")
-  )
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-}
-
-function decodeHtmlEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: "&",
-    apos: "'",
-    gt: ">",
-    lt: "<",
-    nbsp: " ",
-    quot: '"',
-  };
-  return value
-    .replace(/&([a-z]+);/gi, (match, name: string) => named[name.toLowerCase()] ?? match)
-    .replace(/&#(\d+);/g, (match, code: string) => safeCodePoint(Number(code), match))
-    .replace(/&#x([0-9a-f]+);/gi, (match, code: string) => safeCodePoint(parseInt(code, 16), match));
-}
-
-function safeCodePoint(code: number, fallback: string): string {
-  return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : fallback;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function numberOrUndefined(value: unknown): number | undefined {
