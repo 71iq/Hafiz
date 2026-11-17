@@ -24,7 +24,15 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.hafiz",
-      "versionCode": 3
+      "versionCode": 3,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "https", "host": "hafizquran.app", "path": "/auth/qf-app-callback" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",

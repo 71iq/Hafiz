@@ -169,7 +169,14 @@ files remain forbidden. Caddy caches hashed bundles under `/_expo/static`
 and bundled assets, while HTML and the route manifest require revalidation.
 The Quran Foundation connection flow returns to its initiating web origin,
 so staging can test the callback without sending it to the old production app.
-Native clients retain the canonical HTTPS callback.
+Native clients use their own callback, `https://hafizquran.app/auth/qf-app-callback`.
+Android opens only that path in the app through a verified App Link. The website
+keeps `/auth/qf-callback`, so Chrome on a phone with Hafiz installed still
+finishes a connection the website started. `QF_USER_REDIRECT_URIS` and the
+Quran Foundation client registration must list both callbacks. Caddy serves
+`/.well-known/assetlinks.json` with the release signing certificate's SHA-256
+digest because the archive cannot carry that hidden path. A different release
+key must update the Caddyfile digest together with `scripts/release-android.sh`.
 
 `hafiz-promote` validates paths, entry types, file counts, size limits and every
 file checksum, then swaps `/opt/hafiz/current` atomically. If the HTTP check

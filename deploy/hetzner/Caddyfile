@@ -19,6 +19,13 @@
     file_server
   }
 
+  # Android App Link verification for https://hafizquran.app/auth/qf-app-callback. The static
+  # deploy rejects hidden paths, so Caddy serves the release certificate's digest here.
+  handle /.well-known/assetlinks.json {
+    header Content-Type application/json
+    respond `[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.anonymous.hafiz","sha256_cert_fingerprints":["37:4B:11:94:3C:7D:FB:6E:51:B9:5E:74:50:5E:B2:37:36:D5:3E:07:84:E8:CF:13:E7:1C:3F:AE:EE:C2:51:AC"]}}]` 200
+  }
+
   handle {
     root * /opt/hafiz/current/dist
     header Cache-Control "no-cache"

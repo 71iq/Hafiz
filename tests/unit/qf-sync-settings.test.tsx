@@ -10,6 +10,7 @@ import { strings } from "@/lib/i18n/strings";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { type useSettings } from "@/lib/settings/context";
 import { getQfConnectionStatus, getQfLinkedIdentityState } from "@/lib/quran-foundation/user";
+import * as WebBrowser from "expo-web-browser";
 
 const mockDatabase = {
   getFirstAsync: jest.fn(async () => null),
@@ -21,6 +22,8 @@ const mockDatabase = {
 const mockUnexpected = jest.fn((...args: unknown[]) => {
   throw new Error(`Unexpected remote, auth, OAuth, or navigation call: ${args.map(String).join(", ")}`);
 });
+const mockPush = jest.fn((...args: unknown[]): unknown => mockUnexpected(...args));
+const mockBeginQfOAuthConnection = jest.fn(async (...args: unknown[]): Promise<unknown> => mockUnexpected(...args));
 const mockUser = {
   id: "00000000-0000-4000-8000-000000000001",
   email: "synthetic@example.invalid",
@@ -46,9 +49,10 @@ jest.mock("@/lib/settings/context", () => {
   return { ...actual, useSettings: () => ({ ...actual.useSettings(), ...mockSettings }) };
 });
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: mockUnexpected, setParams: mockUnexpected, replace: mockUnexpected }),
+  useRouter: () => ({ push: mockPush, setParams: mockUnexpected, replace: mockUnexpected }),
   useLocalSearchParams: () => mockParams,
 }));
+jest.mock("expo-web-browser", () => ({ openAuthSessionAsync: jest.fn() }));
 jest.mock("@/lib/auth/config", () => ({ isEmailAuthFlowsEnabled: () => false }));
 jest.mock("@/lib/auth/store", () => ({
   useAuthStore: Object.assign(
@@ -65,7 +69,7 @@ jest.mock("@/lib/quran-foundation/config", () => {
   return { ...actual, isQfContentEnabled: () => false, isQfSyncEnabled: () => true };
 });
 jest.mock("@/lib/quran-foundation/user", () => ({
-  beginQfOAuthConnection: (...args: unknown[]) => mockUnexpected(...args),
+  beginQfOAuthConnection: (...args: unknown[]) => mockBeginQfOAuthConnection(...args),
   disconnectQfUser: (...args: unknown[]) => mockUnexpected(...args),
   getQfConnectionStatus: jest.fn(async () => ({ ok: true as const, status: "connected" as const })),
   getQfLinkedIdentityState: jest.fn((...args: unknown[]) => mockUnexpected(...args)),
@@ -279,5 +283,51 @@ describe.each(["en", "ar"] as const)("QF status after an account switch in %s (R
     expect(mockRunInitialQfUserSync).toHaveBeenCalledTimes(1);
     expect(view.queryByText(locale.qfSyncFailed)).toBeNull();
     expect(view.queryByText(locale.qfFinishConnection)).toBeNull();
+  });
+});
+
+describe.each(["en", "ar"] as const)("native QF connect in %s", (language) => {
+  const redirectUri = "https://hafizquran.app/auth/qf-app-callback";
+  const authorizationUrl = "https://oauth.example.invalid/authorize?client=synthetic";
+
+  async function pressConnect(result: WebBrowser.WebBrowserAuthSessionResult) {
+    configure(language);
+    jest.mocked(getQfConnectionStatus).mockResolvedValueOnce({ ok: true, status: "disconnected" });
+    jest.mocked(getQfLinkedIdentityState).mockResolvedValueOnce({ linked: false } as never);
+    mockBeginQfOAuthConnection.mockResolvedValueOnce({
+      ok: true,
+      authorizationUrl,
+      expiresAt: "2026-01-01T00:10:00.000Z",
+    });
+    jest.mocked(WebBrowser.openAuthSessionAsync).mockResolvedValueOnce(result);
+    const view = await openSettings();
+    await act(async () => {
+      fireEvent.press(await view.findByText(strings[language].qfConnect));
+    });
+    expect(mockBeginQfOAuthConnection).toHaveBeenCalledWith(redirectUri, "/settings");
+    expect(WebBrowser.openAuthSessionAsync).toHaveBeenCalledTimes(1);
+    expect(WebBrowser.openAuthSessionAsync).toHaveBeenCalledWith(authorizationUrl, redirectUri);
+    return view;
+  }
+
+  it("routes the App Link's result to the callback route once", async () => {
+    mockPush.mockImplementationOnce(() => undefined);
+    await pressConnect({ type: "success", url: `${redirectUri}?code=synthetic-code&state=synthetic%3Dstate` });
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/auth/qf-callback",
+      params: { code: "synthetic-code", state: "synthetic=state" },
+    });
+  });
+
+  it("clears the pending state without an error when the browser is closed", async () => {
+    const locale = strings[language];
+    const view = await pressConnect({ type: "cancel" as WebBrowser.WebBrowserResultType });
+
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(view.queryByText(locale.qfConnectionStarted)).toBeNull();
+    expect(view.queryByText(locale.qfConnectionFailed)).toBeNull();
+    expect(view.getByText(locale.qfConnect)).toBeTruthy();
   });
 });

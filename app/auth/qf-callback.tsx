@@ -7,7 +7,9 @@ import { strings } from "@/lib/i18n/strings";
 import { useAppLanguage } from "@/lib/i18n/useStrings";
 import { getQfOAuthRedirectUri } from "@/lib/quran-foundation/oauth-redirect";
 
-export default function QfCallbackScreen() {
+// redirectUri must match the address the authorization began with. The app callback route passes
+// its own, so a browser that opens it, without the app, still completes against that address.
+export default function QfCallbackScreen({ redirectUri }: { redirectUri?: string }) {
   const router = useRouter();
   const params = useLocalSearchParams<{ code?: string; state?: string; error?: string; error_description?: string }>();
   const s = strings[useAppLanguage()];
@@ -33,7 +35,7 @@ export default function QfCallbackScreen() {
         return;
       }
 
-      const response = await completeQfOAuthConnection(code, state, getQfOAuthRedirectUri());
+      const response = await completeQfOAuthConnection(code, state, redirectUri ?? getQfOAuthRedirectUri());
       if (response.ok) {
         router.replace("/settings?qf=connected");
         return;
@@ -52,7 +54,7 @@ export default function QfCallbackScreen() {
     return () => {
       cancelled = true;
     };
-  }, [params.code, params.error, params.error_description, params.state, router, s.qfAuthCallbackFailed]);
+  }, [params.code, params.error, params.error_description, params.state, redirectUri, router, s.qfAuthCallbackFailed]);
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
