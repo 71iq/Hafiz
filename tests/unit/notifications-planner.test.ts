@@ -96,7 +96,6 @@ function input(overrides: Partial<PlannerInput> = {}): PlannerInput {
     backoff: 0,
     delivered: [],
     remindLater: null,
-    groupPending: null,
     facts: () => ({}),
     random: () => 0,
     ...overrides,
@@ -347,8 +346,8 @@ describe("planNotifications", () => {
     // Today is a day every-other-day back-off keeps and tomorrow one it skips, so a miscount shows.
     const today = addDays(TODAY, 1);
     const tomorrow = addDays(today, 1);
-    // Five ignored; a group message already took one of today's two places.
-    const delivered = [{ type: "group_encouragement" as const, templateId: "group_encouragement.1", localDate: today, at: RIYADH.at(today, 2 * 60) }];
+    // Five ignored; a Friday al-Kahf reminder already took one of today's two places.
+    const delivered = [{ type: "friday_kahf" as const, templateId: "friday_kahf.1", localDate: today, at: RIYADH.at(today, 2 * 60) }];
     const result = planNotifications(
       input({ now: RIYADH.at(today, 3 * 60), habit: { days: days(streak(5, 0)), pause: null }, backoff: backoffLevel(5), ignoredCount: 5, delivered }),
     );
@@ -445,22 +444,6 @@ describe("planNotifications", () => {
     expect(planNotifications({ ...base, habit: done, remindLater: pending }).slots.some((slot) => slot.type === "remind_later")).toBe(false);
   });
 
-  it("batches halaqa encouragement into one notification, moved out of quiet hours", () => {
-    const now = RIYADH.at(TODAY, 22 * 60 + 50);
-    const groupPending = { first_received_at: now.toISOString(), count: 3 };
-    const habit = { days: days(streak(5, 0)), pause: null };
-    const prefs = prefsWith({ types: { streak_at_risk: false } });
-    const result = planNotifications(input({ now, groupPending, habit, prefs }));
-    const group = result.slots.filter((slot) => slot.type === "group_encouragement");
-    expect(group).toHaveLength(1);
-    expect(summary({ slots: group, skipped: [] })).toEqual([`${addDays(TODAY, 1)} 09:00 group_encouragement`]);
-    expect(group[0].vars.count).toBe(3);
-
-    // With the wird and at-risk reminders already planned, the encouragement waits (NOT-07).
-    const capped = planNotifications(input({ now, groupPending, habit }));
-    expect(capped.skipped).toContainEqual(expect.objectContaining({ type: "group_encouragement", reason: "cap" }));
-  });
-
   it("follows the 6.3 comeback cadence", () => {
     const at = (offset: number) => addDays(TODAY, offset);
     const weekly = days(streak(3, -3));
@@ -529,8 +512,7 @@ describe("planNotifications properties", () => {
     withPrayers: fc.boolean(),
     backoff: fc.constantFrom<0 | 1 | 2>(0, 1, 2),
     clock: fc.constantFrom(RIYADH, LONDON, NEW_YORK),
-    group: fc.boolean(),
-    deliveredToday: fc.array(fc.constantFrom<NotificationType>("wird_reminder", "remind_later", "group_encouragement", "streak_at_risk"), {
+    deliveredToday: fc.array(fc.constantFrom<NotificationType>("wird_reminder", "remind_later", "friday_kahf", "streak_at_risk"), {
       maxLength: 3,
     }),
     followUp: fc.boolean(),
@@ -552,7 +534,6 @@ describe("planNotifications properties", () => {
       prayers: scenario.withPrayers ? prayerTimes(clock, WINTER) : () => null,
       habit: { days: days(record), pause: null },
       backoff: scenario.backoff,
-      groupPending: scenario.group ? { first_received_at: now.toISOString(), count: 1 } : null,
       delivered: scenario.deliveredToday.map((type, index) => ({
         type,
         templateId: `${type}.${index + 2}`,

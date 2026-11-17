@@ -97,10 +97,10 @@ function localDay(): { today: LocalDate; boundary: number } {
 }
 
 /**
- * Today's local date for a screen that keys its data by day, such as the Board's week (BRD-01) and a
- * halaqa's encouragements. It moves on at local midnight, on a return from the background and on a
- * time zone change (useDayBoundaryRefresh), so a screen left open overnight asks for the new day. The
- * next midnight is kept with the date, so a time zone change re-arms the timer for the new zone's.
+ * Today's local date for a screen that keys its data by day, such as the Board's week (BRD-01). It
+ * moves on at local midnight, on a return from the background and on a time zone change
+ * (useDayBoundaryRefresh), so a screen left open overnight asks for the new day. The next midnight is
+ * kept with the date, so a time zone change re-arms the timer for the new zone's.
  */
 export function useLocalToday(): LocalDate {
   const [day, setDay] = useState(localDay);

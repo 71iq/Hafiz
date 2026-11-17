@@ -36,7 +36,8 @@ export const LOCAL_KEYS = {
   optInPrompts: "notif_optin_prompts",
   backoff: "notif_backoff",
   remindLater: "notif_remind_later",
-  groupPending: "notif_group_pending",
+  // notif_group_pending held Halaqa encouragement batches. Halaqa is removed for now, so nothing reads or
+  // writes it, and rows already stored are left as they are (lib/database/sync.ts keeps them on restore).
   ramadanOffer: "notif_ramadan_offer",
   bannerDismissed: "notif_banner_dismissed",
 } as const;
@@ -181,25 +182,6 @@ export const remindLaterSchema = z.object({
   fingerprint: z.string(),
 });
 export type RemindLaterPending = z.infer<typeof remindLaterSchema>;
-
-/**
- * Encouragements received and not yet notified (5.8.2). Each batch belongs to the account that
- * received it and becomes at most one notification; only the signed-in account's batches are
- * scheduled. A batch records the log row of the notification that carries it, so that notification's
- * delivery retires that batch alone, and arrivals after it start a new batch.
- */
-const groupBatchSchema = z.object({
-  id: z.string(),
-  account_id: z.string(),
-  first_received_at: z.string(),
-  count: z.number().int().min(1),
-  log_id: z.string().nullable(),
-});
-export type GroupBatch = z.infer<typeof groupBatchSchema>;
-export const groupPendingSchema = z.object({ batches: z.array(groupBatchSchema) });
-
-/** The batch the planner places: when its first encouragement arrived and how many it holds. */
-export type GroupPending = Readonly<Pick<GroupBatch, "first_received_at" | "count">>;
 
 export const ramadanOfferSchema = z.object({ hijri_year: z.number().int() });
 

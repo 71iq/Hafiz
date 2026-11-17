@@ -1,7 +1,7 @@
 import type { HifzPlan } from "@/lib/hifz/plan";
 
 /**
- * Matching bands for halaqa and board placement (spec 5.7.3, 8.13). The client reports its bands and
+ * Matching bands for board placement (spec 5.7.3, 8.13). The client reports its bands and
  * UTC offset; the server picks the group (MAT-03). Keep these rules in step with private.offset_band
  * and the band checks in supabase/migrations/20261113120000_learning_consistency.sql.
  */

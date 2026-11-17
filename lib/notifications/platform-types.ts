@@ -18,12 +18,6 @@ export type ReminderData = Readonly<{
   at: number;
   /** Changes whenever the time or text changes, so an unchanged reminder is left in place. */
   contentKey: string;
-  /**
-   * The account a halaqa encouragement belongs to (5.8.2). One for another account, or without an
-   * owner, is cancelled, removed from the tray and not shown while the app is open
-   * (lib/notifications/schedule.ts).
-   */
-  accountId?: string;
 }>;
 
 export type ScheduledReminder = Readonly<{ osId: string; data: ReminderData }>;
@@ -52,19 +46,8 @@ export type ReminderPlatform = Readonly<{
   supportsScheduling: boolean;
   getPermission: () => Promise<PermissionState>;
   requestPermission: () => Promise<PermissionState>;
-  /**
-   * Channel, category and foreground handler. A reminder that arrives while the app is open shows
-   * only when `shouldPresent` allows it, and one it hides is passed to `onHidden`: it was never shown,
-   * though the OS no longer holds it. The latest call's callbacks apply. Safe to call repeatedly.
-   */
-  configure: (
-    options: Readonly<{
-      channelName: string;
-      remindLaterAction: string;
-      shouldPresent: (data: ReminderData) => boolean;
-      onHidden: (data: ReminderData) => void;
-    }>,
-  ) => Promise<void>;
+  /** Channel, category and foreground handler. Safe to call repeatedly. */
+  configure: (options: Readonly<{ channelName: string; remindLaterAction: string }>) => Promise<void>;
   listScheduled: () => Promise<ScheduledReminder[]>;
   listPresented: () => Promise<PresentedReminder[]>;
   schedule: (request: ReminderRequest) => Promise<string>;
@@ -92,7 +75,6 @@ export function isReminderData(value: unknown): value is ReminderData {
     ROUTES.includes(String(data.route)) &&
     typeof data.at === "number" &&
     Number.isFinite(data.at) &&
-    typeof data.contentKey === "string" &&
-    (data.accountId === undefined || typeof data.accountId === "string")
+    typeof data.contentKey === "string"
   );
 }

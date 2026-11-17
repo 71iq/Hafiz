@@ -308,7 +308,7 @@ describe("useTodayWird across a day boundary", () => {
   });
 });
 
-describe("useLocalToday across a day boundary (Board and Halaqa)", () => {
+describe("useLocalToday across a day boundary (Board)", () => {
   it("moves on to the new day at local midnight while the screen stays open", async () => {
     jest.setSystemTime(at(15, 23, 59));
     const { result } = renderHook(() => useLocalToday());

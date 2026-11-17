@@ -324,7 +324,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
             "Settings, study cards, review logs, bookmarks, highlights, and private note metadata",
             "Public reflections, comments and likes",
             "Wird days, review sessions and recitation mistakes, kept private to your account",
-            "Halaqa memberships, sharing choices and encouragements, and Board participation if you join",
+            "Board participation if you join, and halaqa memberships, sharing choices and encouragements saved by an earlier version of the app",
           ],
         },
         {
@@ -332,7 +332,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
           title: "Public content",
           body: [
             "Public reflections, comments, likes, your username, display name and profile photo may be visible to other Hafiz users. Do not post private information in public reflection areas.",
-            "Your progress is private by default. Halaqa members see only your wird days this week, streak and juz completions, and only when you share them. Teachers in a halaqa see your plan or recent grades only if you allow it. If you join the Board, people in your weekly group see your name or nickname, weekly consistency points and streak. Mistakes, grades and excused days are never shown to them.",
+            "Your progress is private by default. You can show your streak and juz completions on your profile, and turn that off again, in Settings > Account > Privacy and sharing. If you join the Board, people in your weekly group see your name or nickname, weekly consistency points and streak. Mistakes, grades and excused days are never shown to them. If you joined a halaqa in an earlier version of the app, its members and teachers still see what you chose to share there until you leave. You can leave every halaqa from Privacy and sharing.",
           ],
         },
         {
@@ -398,7 +398,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
             "الإعدادات، وبطاقات الدراسة، وسجل المراجعة، والإشارات، والتمييزات، وبيانات الملاحظات الخاصة",
             "التأملات العامة، والتعليقات، والإعجابات",
             "أيام الوِرد، وجلسات المراجعة، وأخطاء التلاوة، وتبقى خاصة بحسابك",
-            "عضويات الحلقات، واختيارات المشاركة، والتشجيعات، والمشاركة في اللوحة إن انضممت إليها",
+            "المشاركة في اللوحة إن انضممت إليها، وعضويات الحلقات واختيارات المشاركة والتشجيعات المحفوظة من إصدار سابق من التطبيق",
           ],
         },
         {
@@ -406,7 +406,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
           title: "المحتوى العام",
           body: [
             "قد تكون التأملات العامة، والتعليقات، والإعجابات، واسم المستخدم، والاسم المعروض، وصورة الملف ظاهرة لمستخدمي حافظ الآخرين. لا تنشر معلومات خاصة في مساحات التأمل العامة.",
-            "تقدّمك خاص افتراضيًا. لا يرى أعضاء الحلقة إلا أيام وِردك هذا الأسبوع وسلسلتك والأجزاء التي أتممتها، وذلك عندما تشاركها فقط. ولا يرى المعلّم في الحلقة خطتك أو تقييماتك الأخيرة إلا بإذنك. وإن انضممت إلى اللوحة، يرى من في مجموعتك الأسبوعية اسمك أو لقبك ونقاط المواظبة الأسبوعية وسلسلتك. ولا تظهر لهم الأخطاء ولا التقييمات ولا أيام العذر أبدًا.",
+            "تقدّمك خاص افتراضيًا. ويمكنك إظهار سلسلتك والأجزاء التي أتممتها في ملفك، وإخفاؤها مجددًا، من الإعدادات > الحساب > الخصوصية والمشاركة. وإن انضممت إلى اللوحة، يرى من في مجموعتك الأسبوعية اسمك أو لقبك ونقاط المواظبة الأسبوعية وسلسلتك. ولا تظهر لهم الأخطاء ولا التقييمات ولا أيام العذر أبدًا. وإن انضممت إلى حلقة في إصدار سابق من التطبيق، يبقى أعضاؤها ومعلّموها يرون ما اخترت مشاركته فيها حتى تغادرها. ويمكنك مغادرة كل الحلقات من الخصوصية والمشاركة.",
           ],
         },
         {
@@ -472,7 +472,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
           id: "accounts-sync",
           title: "Accounts and sync",
           body: [
-            "You may use the core reading experience without an account. Optional account features, cloud sync, reflections, halaqa and Board features require online services and may be unavailable at times.",
+            "You may use the core reading experience without an account. Optional account features, cloud sync, reflections and Board features require online services and may be unavailable at times.",
             "You are responsible for keeping your account credentials secure and for the content you publish through public features.",
           ],
         },
@@ -541,7 +541,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
           id: "accounts-sync",
           title: "الحسابات والمزامنة",
           body: [
-            "يمكنك استخدام تجربة القراءة الأساسية دون حساب. أما ميزات الحساب الاختيارية والمزامنة السحابية والتأملات والحلقات واللوحة فتحتاج إلى خدمات متصلة وقد لا تكون متاحة دائمًا.",
+            "يمكنك استخدام تجربة القراءة الأساسية دون حساب. أما ميزات الحساب الاختيارية والمزامنة السحابية والتأملات واللوحة فتحتاج إلى خدمات متصلة وقد لا تكون متاحة دائمًا.",
             "أنت مسؤول عن حماية بيانات حسابك وعن المحتوى الذي تنشره عبر الميزات العامة.",
           ],
         },

@@ -19,7 +19,6 @@ export type TemplateVar =
   | "surah"
   | "prayer"
   | "cutoff"
-  | "count"
   | "pages"
   | "minutes"
   | "range"
@@ -130,15 +129,6 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
   t("friday_kahf", 7, "notifTKahf7"),
   t("friday_kahf", 8, "notifTKahf8"),
 
-  t("group_encouragement", 1, "notifTGroup1"),
-  t("group_encouragement", 2, "notifTGroup2", ["count"]),
-  t("group_encouragement", 3, "notifTGroup3"),
-  t("group_encouragement", 4, "notifTGroup4"),
-  t("group_encouragement", 5, "notifTGroup5"),
-  t("group_encouragement", 6, "notifTGroup6"),
-  t("group_encouragement", 7, "notifTGroup7"),
-  t("group_encouragement", 8, "notifTGroup8"),
-
   t("comeback", 1, "notifTBack1"),
   t("comeback", 2, "notifTBack2", ["surah"]),
   t("comeback", 3, "notifTBack3"),
@@ -167,7 +157,6 @@ const TITLE_KEYS: Readonly<Record<NotificationType, NotificationStringKey>> = {
   grace_used: "notifTitleGrace",
   earnback_open: "notifTitleEarnBack",
   friday_kahf: "notifTitleKahf",
-  group_encouragement: "notifTitleGroup",
   comeback: "notifTitleComeback",
 };
 

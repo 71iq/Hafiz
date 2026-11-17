@@ -272,7 +272,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     staleTime: 1000 * 60 * 2,
   });
 
-  // Signed-in viewers see only the juz completions a shared halaqa has; signed-out viewers see none.
+  // Badges of another person load only for a signed-in viewer; the server decides which it sees.
   const publicBadgesQuery = useQuery({
     queryKey: ["publicAchievementUnlocks", user?.id ?? "signed-out", requestedUserId],
     queryFn: () => fetchPublicAchievementUnlocks(requestedUserId),
@@ -443,7 +443,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
   const invalidateProfileSurfaces = useCallback((isCurrent: () => boolean) => {
     const keys = [["publicProfile"], reflectionQueryKeys.feed.all, reflectionQueryKeys.reflections.all,
-      reflectionQueryKeys.comments.all, ["halaqa"], ["board"]];
+      reflectionQueryKeys.comments.all, ["board"]];
     for (const queryKey of keys) {
       if (!isCurrent()) return;
       queryClient.invalidateQueries({ queryKey });

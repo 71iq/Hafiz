@@ -6,7 +6,7 @@ import type { DayPrayerTimes } from "@/lib/prayer/times";
 import type { DayClock } from "@/lib/notifications/clock";
 import { buildDayTimes, isQuietAt, makeUpCutoff, type DayTimesInput, type ReminderDayTimes } from "@/lib/notifications/day-times";
 import { createHabitProjector, type HabitProjector } from "@/lib/notifications/habit-projection";
-import type { GroupPending, RemindLaterPending } from "@/lib/notifications/settings";
+import type { RemindLaterPending } from "@/lib/notifications/settings";
 import { chooseTemplate, type TemplateUse, type TemplateVars } from "@/lib/notifications/templates";
 import { COUNTED_FOR_BACKOFF, type NotificationType, type PlannedSlot, type ReminderPrefs, type ReminderRoute } from "@/lib/notifications/types";
 
@@ -19,7 +19,6 @@ const LATE_DAY_CAP = 3;
 const DORMANT_WEEKLY_DAYS: readonly number[] = [30, 37, 44, 51];
 const DORMANT_MONTHLY_UNTIL_DAYS = 183;
 const MAKE_UP_LEAD_MINUTES = 90;
-const GROUP_BATCH_MINUTES = 30;
 const MINUTE = 60_000;
 /** A Monday. Every-other-day back-off counts from here, so the days stay put across replans. */
 const BACKOFF_EPOCH: LocalDate = "2026-01-05";
@@ -73,7 +72,6 @@ export type PlannerInput = Readonly<{
    */
   late?: readonly DeliveredReminder[];
   remindLater: RemindLaterPending | null;
-  groupPending: GroupPending | null;
   facts: (date: LocalDate) => ReminderFactValues;
   /** Templates already chosen for a `type|localDate`, kept when still eligible so replans are stable. */
   preferredTemplates?: ReadonlyMap<string, string>;
@@ -153,8 +151,8 @@ function minutesBefore(at: Date, minutes: number): Date {
  *
  * Rules: nothing on a day already done, excused or paused (NOT-05); quiet hours except the opt-in
  * late reminder and a Ramadan anchor the user chose (NOT-08, NOT-10); every slot inside its own
- * date (NOT-06); back-off (NOT-09); the daily cap with follow-ups and group messages counted
- * (NOT-07); follow-up skip rules (NOT-05b); random template choice without repeats (NOT-12).
+ * date (NOT-06); back-off (NOT-09); the daily cap with follow-ups counted (NOT-07); follow-up skip
+ * rules (NOT-05b); random template choice without repeats (NOT-12).
  */
 export function planNotifications(input: PlannerInput): PlanResult {
   const { now, clock, prefs } = input;
@@ -364,17 +362,15 @@ export function planNotifications(input: PlannerInput): PlanResult {
 
   const remindLater = remindLaterCandidate(input, today, timesFor, project, sharedVars, skipped);
   if (remindLater) candidates.push(remindLater);
-  const group = groupCandidate(input, timesFor, today, horizon);
-  if (group) candidates.push(group);
 
   // Timing filters. A reminder that already fired is not sent again that day, even at a new time;
   // each "Remind me in 1 hour" request is its own follow-up.
   const sent = (candidate: Candidate) =>
     candidate.type !== "remind_later" &&
     input.delivered.some((item) => item.type === candidate.type && item.localDate === candidate.localDate);
-  // NOT-07 caps per date, counting everything that already fired that day, follow-ups and group
-  // messages included. A follow-up ranks first, so it takes the place of the lowest-ranked later
-  // reminder of its day only when the cap would otherwise be exceeded.
+  // NOT-07 caps per date, counting everything that already fired that day, follow-ups included. A
+  // follow-up ranks first, so it takes the place of the lowest-ranked later reminder of its day only
+  // when the cap would otherwise be exceeded.
   const capDate = (date: LocalDate, list: readonly Candidate[]) => {
     const kept: Candidate[] = [];
     const dropped: Candidate[] = [];
@@ -550,42 +546,6 @@ function remindLaterCandidate(
     vars: { ...sharedVars(date), next: length >= 1 ? length + 1 : undefined },
     route: "wird",
     priority: 0,
-    exemptQuiet: false,
-    backoff: false,
-    late: false,
-    times: timesFor(date),
-  };
-}
-
-function groupCandidate(
-  input: PlannerInput,
-  timesFor: (date: LocalDate) => ReminderDayTimes,
-  today: LocalDate,
-  horizon: number,
-): Candidate | null {
-  const pending = input.groupPending;
-  if (!pending || !input.prefs.types.group_encouragement) return null;
-  const { clock } = input;
-  const first = new Date(pending.first_received_at);
-  if (!Number.isFinite(first.getTime())) return null;
-  let at = new Date(Math.max(first.getTime() + GROUP_BATCH_MINUTES * MINUTE, input.now.getTime() + MINUTE));
-  let date = clock.dateOf(at);
-  const sentOn = (day: LocalDate) =>
-    input.delivered.some((item) => item.type === "group_encouragement" && item.localDate === day);
-  const morningOf = (day: LocalDate) => clock.at(day, 9 * 60);
-  if (at.getTime() < timesFor(date).quietEndsAt.getTime()) at = morningOf(date);
-  if (isQuietAt(timesFor(date), at) || sentOn(date)) {
-    date = addDays(date, 1);
-    at = morningOf(date);
-  }
-  if (date < today || date >= addDays(today, horizon)) return null;
-  return {
-    type: "group_encouragement",
-    localDate: date,
-    at,
-    vars: { count: pending.count },
-    route: "home",
-    priority: 4,
     exemptQuiet: false,
     backoff: false,
     late: false,

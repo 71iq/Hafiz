@@ -17,35 +17,6 @@ function LoadingBlock({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-/** A halaqa while it loads: the goal card, then member rows with avatar, name and week dots. */
-export function HalaqaSkeleton({ label }: { label: string }) {
-  const { isRTL } = useSettings();
-  return (
-    <LoadingBlock label={label}>
-      <Card elevation="low" className="gap-3 p-5">
-        <SkeletonText width="55%" lineHeight={22} />
-        <SkeletonText width="30%" lineHeight={12} />
-        <Skeleton height={12} borderRadius={6} className="mt-2" />
-      </Card>
-      {[0, 1, 2].map((index) => (
-        <Card key={index} elevation="low" className="gap-3 px-4 py-3.5">
-          <View className="items-center gap-3" style={socialRowStyle(isRTL)}>
-            <Skeleton width={40} height={40} borderRadius={20} />
-            <View className="min-w-0 flex-1" style={{ alignItems: isRTL ? "flex-end" : "flex-start" }}>
-              <SkeletonText width={index === 1 ? "45%" : "60%"} lineHeight={14} />
-            </View>
-          </View>
-          <View className="items-center gap-1.5" style={socialRowStyle(isRTL)}>
-            {Array.from({ length: 7 }, (_, dot) => (
-              <Skeleton key={dot} width={12} height={12} borderRadius={6} />
-            ))}
-          </View>
-        </Card>
-      ))}
-    </LoadingBlock>
-  );
-}
-
 /**
  * The Board join form while the account's stored choices load, shaped like BoardJoin: one card with
  * the trophy disc and centered headline, the intention text, two toggle rows and Join.
@@ -96,26 +67,6 @@ export function StandingsSkeleton({ label }: { label: string }) {
           <Skeleton width={28} height={28} borderRadius={8} />
         </View>
       ))}
-    </LoadingBlock>
-  );
-}
-
-/** The teacher view while it loads: the plan card's lines and stage rows. */
-export function TeacherViewSkeleton({ label }: { label: string }) {
-  const { isRTL } = useSettings();
-  return (
-    <LoadingBlock label={label}>
-      <Card elevation="low" className="gap-2 p-4">
-        <SkeletonText width="30%" lineHeight={16} />
-        <SkeletonText width="70%" lineHeight={12} />
-        <SkeletonText width="55%" lineHeight={12} />
-        {[0, 1, 2].map((index) => (
-          <View key={index} className="min-h-8 items-center justify-between" style={socialRowStyle(isRTL)}>
-            <SkeletonText width="40%" lineHeight={12} />
-            <SkeletonText width={24} lineHeight={12} />
-          </View>
-        ))}
-      </Card>
     </LoadingBlock>
   );
 }

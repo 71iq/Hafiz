@@ -19,7 +19,6 @@ import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 import { SettingsProvider } from "@/lib/settings/context";
 import { loadUiBootstrap } from "@/lib/settings/ui-bootstrap";
 import { useReminderResponses, useReminderScheduling } from "@/lib/notifications/use-reminder-scheduling";
-import { useGroupEncouragementChecks } from "@/lib/halaqa/encouragement-notifications";
 import { useBoardBandRefresh } from "@/lib/board/refresh";
 import { useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
 import { ErrorBoundary as ScopedErrorBoundary, RouteErrorFallback } from "@/components/ui/ErrorBoundary";
@@ -99,18 +98,13 @@ function ReminderLifecycle() {
   return null;
 }
 
-/**
- * Social upkeep for the signed-in account: halaqa encouragement since the last check becomes one
- * batched local reminder (5.8.2), and the board bands stay current for the weekly placement pass.
- */
-function EncouragementChecks() {
+/** The board bands stay current for the weekly placement pass, which uses the last ones reported. */
+function BoardBandRefresh() {
   const { isReady } = useDatabaseStatus();
-  return isReady ? <EncouragementCheckRunner /> : null;
+  return isReady ? <BoardBandRefreshRunner /> : null;
 }
 
-function EncouragementCheckRunner() {
-  useGroupEncouragementChecks();
-  // The weekly board pass places joined users from the bands their device last reported.
+function BoardBandRefreshRunner() {
   useBoardBandRefresh();
   return null;
 }
@@ -183,7 +177,7 @@ export default function RootLayout() {
                 {/* Android system button contrast follows the resolved theme; web and iOS render nothing. */}
                 <NavigationBarTheme />
                 <ReminderLifecycle />
-                <EncouragementChecks />
+                <BoardBandRefresh />
                 <MinorPhotoCleanup />
                 <AuthRedirectReturn />
                 <Stack

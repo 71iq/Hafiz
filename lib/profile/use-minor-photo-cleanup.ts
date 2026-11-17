@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
-import { onlineManager, useQuery, useQueryClient } from "@tanstack/react-query";
+import { onlineManager, useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
-import { halaqaKeys } from "@/lib/halaqa/api";
 import { deleteOwnAvatarFiles, fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { captureSocialOwner, requireSocialOwner } from "@/lib/social/owner";
 import { socialFailureOf } from "@/lib/social/remote";
@@ -84,13 +83,12 @@ export const OWN_PRIVACY_REVALIDATE_MS = 10 * 60_000;
 
 /**
  * Watches the signed-in account's own privacy. While it is a minor, leftover photo files are removed
- * after each fresh privacy read, again on returning to the foreground or reconnecting after a
- * failure, and halaqa lists reload, since recording minority leaves matched halaqas. The board and
- * halaqa screens invalidate the privacy key after they change it, which refetches it here. Mount once.
+ * after each fresh privacy read, and again on returning to the foreground or reconnecting after a
+ * failure. The board screen invalidates the privacy key after it changes it, which refetches it here.
+ * Mount once.
  */
 export function useMinorPhotoCleanup(): void {
   const userId = useAuthStore((state) => state.user?.id ?? null);
-  const queryClient = useQueryClient();
   const privacy = useQuery({
     queryKey: profilePrivacyKeys.mine(userId),
     queryFn: async () => {
@@ -115,11 +113,6 @@ export function useMinorPhotoCleanup(): void {
   useEffect(() => {
     if (userId && knownAdult) forgetMinorPhotoCleanup(userId);
   }, [userId, knownAdult]);
-
-  // Recording minority leaves matched halaqas, so the lists reload once when minority is seen.
-  useEffect(() => {
-    if (userId && isMinor) void queryClient.invalidateQueries({ queryKey: halaqaKeys.all(userId) });
-  }, [queryClient, userId, isMinor]);
 
   useEffect(() => {
     if (!userId || !isMinor) return;

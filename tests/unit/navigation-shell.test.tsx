@@ -55,7 +55,7 @@ afterEach(() => {
 
 describe("phone tab bar", () => {
   const Tabs = createBottomTabNavigator();
-  const names = ["home", "mushaf", "halaqa", "leaderboard", "progress", "settings", "reflection-feed"];
+  const names = ["home", "mushaf", "leaderboard", "progress", "settings", "reflection-feed"];
   const Screen = () => <Text>screen</Text>;
 
   it("shows Home, Mushaf, Progress and Settings in that order below 768px", () => {
@@ -91,6 +91,8 @@ describe("browser tab titles", () => {
     expect(documentTitleFor("/mushaf", strings.ar)).toBe(`${strings.ar.tabMushaf} | ${strings.ar.appName}`);
     expect(documentTitleFor("/", strings.ar)).toBe(strings.ar.appName);
     expect(documentTitleFor("/unknown", strings.en)).toBe("Hafiz");
+    // Halaqa is removed for now: an old /halaqa link opens the not-found screen under the app's name.
+    expect(documentTitleFor("/halaqa", strings.en)).toBe("Hafiz");
   });
 });
 

@@ -27,7 +27,6 @@ export const shellStrings = {
     // Navigation
     navigationClose: "Close navigation",
     navigationSecondaryTitle: "Community and reflection",
-    navigationHalaqaHint: "Your private study circle",
     navigationBoardHint: "Weekly consistency board",
     navigationJourneyHint: "Guided reflection levels",
     navigationGuest: "Guest",
@@ -66,7 +65,6 @@ export const shellStrings = {
     documentTitleTerms: "شروط الخدمة",
     navigationClose: "إغلاق التنقل",
     navigationSecondaryTitle: "المجتمع والتدبر",
-    navigationHalaqaHint: "حلقتك الخاصة للدراسة",
     navigationBoardHint: "لوحة المواظبة الأسبوعية",
     navigationJourneyHint: "مستويات تأمل موجّهة",
     navigationGuest: "زائر",

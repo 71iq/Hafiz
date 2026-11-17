@@ -9,7 +9,6 @@ import { projectHabit } from "@/lib/notifications/habit-projection";
 import type {
   PermissionState,
   PresentedReminder,
-  ReminderData,
   ReminderRequest,
   ReminderResponse,
   ScheduledReminder,
@@ -23,15 +22,11 @@ import {
 import { reminderPlatform } from "@/lib/notifications/platform";
 import { openReminderRoute, resolveReminderHref } from "@/lib/notifications/reminder-route";
 import {
-  configureReminderPlatform,
   diffReminders,
   loadReminderContext,
-  notifyGroupEncouragement,
   reconcileReminders,
   requestRemindLater,
   rescheduleReminders,
-  setReminderAccountSource,
-  shouldPresentReminder,
 } from "@/lib/notifications/schedule";
 import { LOCAL_KEYS, writeReminderPref } from "@/lib/notifications/settings";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
@@ -47,10 +42,6 @@ type FakePlatform = {
   dismissed: string[];
   badge: number | null;
   nextId: number;
-  /** Runs as a cancel request reaches the OS, before it takes effect: an alarm can still go off. */
-  beforeCancel: () => void;
-  /** The foreground handler's callbacks from the latest configure call. */
-  foreground: { shouldPresent: (data: ReminderData) => boolean; onHidden: (data: ReminderData) => void } | null;
 };
 
 const fake: FakePlatform = {
@@ -62,8 +53,6 @@ const fake: FakePlatform = {
   dismissed: [],
   badge: null,
   nextId: 1,
-  beforeCancel: () => undefined,
-  foreground: null,
 };
 
 jest.mock("@/lib/notifications/platform", () => ({
@@ -76,9 +65,7 @@ jest.mock("@/lib/notifications/platform", () => ({
       fake.permission = fake.requested;
       return fake.requested;
     },
-    configure: async (options: NonNullable<FakePlatform["foreground"]>) => {
-      fake.foreground = { shouldPresent: options.shouldPresent, onHidden: options.onHidden };
-    },
+    configure: async () => {},
     listScheduled: async () => fake.scheduled.map(({ osId, data }) => ({ osId, data })),
     listPresented: async () => fake.presented,
     schedule: async (request: ReminderRequest) => {
@@ -87,7 +74,6 @@ jest.mock("@/lib/notifications/platform", () => ({
       return osId;
     },
     cancel: async (ids: readonly string[]) => {
-      fake.beforeCancel();
       fake.scheduled = fake.scheduled.filter((item) => !ids.includes(item.osId));
     },
     dismiss: async (ids: readonly string[]) => {
@@ -105,10 +91,6 @@ jest.mock("@/lib/notifications/platform", () => ({
 
 let store: OutboxDatabase;
 const TODAY = "2026-11-12";
-const ACCOUNT_A = "00000000-0000-4000-8000-00000000000a";
-const ACCOUNT_B = "00000000-0000-4000-8000-00000000000b";
-let signedInAccount: string | null = ACCOUNT_A;
-const accountOf = (userId: string) => ({ userId, isCurrent: () => signedInAccount === userId });
 const at = (date: string, hours: number, minutes = 0) => atLocalTime(date, hours * 60 + minutes);
 
 function day(date: string, status: "done" | "grace" = "done"): HabitDayRow {
@@ -143,18 +125,6 @@ function lastDays(count: number, endOffset = -1): string[] {
 /** The OS shows every reminder due by `until` and stops holding it, as a one-shot alarm does. */
 function osFires(until: Date) {
   fake.scheduled = fake.scheduled.filter((item) => item.data.at > until.getTime());
-}
-
-/**
- * One alarm goes off while the app is open: the OS lets go of it and the foreground handler shows it
- * or hides it, as lib/notifications/platform.native.ts does.
- */
-function firesWhileOpen(alarm: ScheduledReminder) {
-  const handler = fake.foreground;
-  if (!handler) throw new Error("The reminder platform was not configured");
-  fake.scheduled = fake.scheduled.filter((item) => item.osId !== alarm.osId);
-  if (handler.shouldPresent(alarm.data)) fake.presented = [...fake.presented, { osId: alarm.osId, data: alarm.data }];
-  else handler.onHidden(alarm.data);
 }
 
 function logRow(id: string) {
@@ -197,8 +167,6 @@ async function addLogRow(id: string, type: string, scheduled: Date, delivered: D
 
 beforeEach(async () => {
   store = await openOutboxDatabase();
-  signedInAccount = ACCOUNT_A;
-  setReminderAccountSource(() => signedInAccount);
   Object.assign(fake, {
     supportsScheduling: true,
     permission: { status: "granted", canAskAgain: true },
@@ -208,8 +176,6 @@ beforeEach(async () => {
     dismissed: [],
     badge: null,
     nextId: 1,
-    beforeCancel: () => undefined,
-    foreground: null,
   });
   jest.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -394,16 +360,6 @@ describe("rescheduleReminders", () => {
     ).toBe(false);
   });
 
-  it("batches halaqa encouragement into one notification", async () => {
-    await seed([...lastDays(5), TODAY]);
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10, 5) });
-    const group = fake.scheduled.filter((item) => item.data.type === "group_encouragement");
-    expect(group).toHaveLength(1);
-    expect(group[0].data.at).toBe(at(TODAY, 10, 30).getTime());
-    expect(group[0].request.body).not.toContain("{{");
-  });
-
   it("marks a reminder converted when a session starts within 2 hours", async () => {
     await seed(lastDays(5));
     await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
@@ -508,7 +464,7 @@ describe("rescheduleReminders", () => {
     await seed(lastDays(5));
     await rescheduleReminders(store.db, { now: at(TODAY, 3), language: "en" });
     const original = fake.scheduled.find((item) => item.data.type === "wird_reminder" && item.data.localDate === TODAY)!;
-    await addLogRow("group-1", "group_encouragement", at(TODAY, 9));
+    await addLogRow("kahf-1", "friday_kahf", at(TODAY, 9));
     osFires(at(TODAY, 10));
     // It showed and is still in the tray.
     fake.presented = [...fake.presented, { osId: original.osId, data: original.data }];
@@ -561,177 +517,6 @@ describe("rescheduleReminders", () => {
     expect(backoff()).toMatchObject({ consecutive_ignored: 14, level: 2 });
     await rescheduleReminders(store.db, { now: at("2026-11-20", 3), language: "en" });
     expect(backoff().consecutive_ignored).toBe(14);
-  });
-});
-
-describe("halaqa encouragement batches (5.8.2)", () => {
-  const groupScheduled = () => fake.scheduled.filter((item) => item.data.type === "group_encouragement");
-  type StoredBatch = { account_id: string; count: number; log_id: string | null };
-  const batches = () => (storedSetting(LOCAL_KEYS.groupPending) as { batches: StoredBatch[] } | null)?.batches ?? [];
-  const scheduledBatchOwner = () =>
-    groupScheduled().map((item) => batches().find((batch) => batch.log_id === item.data.logId)?.account_id ?? null);
-
-  it("schedules only the signed-in account's batch, and records nothing once its account changed", async () => {
-    await seed([...lastDays(5), TODAY]);
-    expect(await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) })).toBe(true);
-    expect(groupScheduled()).toHaveLength(1);
-
-    // B signs in: A's notification leaves the OS, and A's later arrival is not recorded.
-    signedInAccount = ACCOUNT_B;
-    await rescheduleReminders(store.db, { now: at(TODAY, 10, 5), language: "en" });
-    expect(groupScheduled()).toHaveLength(0);
-    expect(await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10, 6) })).toBe(false);
-    expect(batches()).toEqual([expect.objectContaining({ account_id: ACCOUNT_A, count: 1 })]);
-
-    // B signs in while A's arrival is being recorded: the check after the read stops it.
-    signedInAccount = ACCOUNT_A;
-    let checks = 0;
-    const switching = { userId: ACCOUNT_A, isCurrent: () => checks++ === 0 };
-    expect(await notifyGroupEncouragement(store.db, { account: switching, now: at(TODAY, 10, 7), count: 3 })).toBe(false);
-    expect(batches()).toEqual([expect.objectContaining({ account_id: ACCOUNT_A, count: 1 })]);
-
-    // B's own arrival is B's batch alone.
-    signedInAccount = ACCOUNT_B;
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_B), now: at(TODAY, 10, 8), count: 2 });
-    expect(batches().map((batch) => [batch.account_id, batch.count])).toEqual([
-      [ACCOUNT_A, 1],
-      [ACCOUNT_B, 2],
-    ]);
-    expect(scheduledBatchOwner()).toEqual([ACCOUNT_B]);
-
-    // Back to A: A's batch is scheduled again and B's leaves the OS.
-    signedInAccount = ACCOUNT_A;
-    await rescheduleReminders(store.db, { now: at(TODAY, 10, 9), language: "en" });
-    expect(scheduledBatchOwner()).toEqual([ACCOUNT_A]);
-  });
-
-  it.each([
-    ["the account signs out", null],
-    ["another account signs in", ACCOUNT_B],
-  ])("removes a shown encouragement from the tray once %s", async (_label, next) => {
-    await seed([...lastDays(5), TODAY]);
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
-    const own = groupScheduled()[0];
-    expect(own.data.accountId).toBe(ACCOUNT_A);
-    // The OS shows it at 10:30, next to one from an older build that names no account.
-    osFires(at(TODAY, 10, 30));
-    const { accountId: _owner, ...unowned } = own.data;
-    fake.presented = [
-      { osId: own.osId, data: own.data },
-      { osId: "unowned", data: { ...unowned, logId: "unowned-log" } },
-    ];
-    await rescheduleReminders(store.db, { now: at(TODAY, 10, 35), language: "en" });
-    expect(fake.dismissed).toEqual(["unowned"]);
-
-    signedInAccount = next;
-    await rescheduleReminders(store.db, { now: at(TODAY, 10, 40), language: "en" });
-    expect(fake.dismissed).toEqual(["unowned", own.osId]);
-  });
-
-  it("removes another account's shown encouragement even with reminders turned off", async () => {
-    await seed([...lastDays(5), TODAY]);
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
-    const own = groupScheduled()[0];
-    osFires(at(TODAY, 10, 30));
-    fake.presented = [{ osId: own.osId, data: own.data }];
-    await writeReminderPref(store.db, { kind: "enabled", value: false });
-    signedInAccount = ACCOUNT_B;
-    await rescheduleReminders(store.db, { now: at(TODAY, 10, 40), language: "en" });
-    expect(fake.dismissed).toEqual([own.osId]);
-  });
-
-  // Fourth review, finding 3: the alarm goes off after the run read the tray and before it cancelled the
-  // alarm. Cancelling leaves a notification already shown, so A's activity stayed in B's tray.
-  it.each([
-    ["on", true],
-    ["off", false],
-  ])("removes another account's encouragement that goes off during the run, with reminders %s", async (_label, enabled) => {
-    await seed([...lastDays(5), TODAY]);
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
-    const alarm = groupScheduled()[0];
-    expect(alarm.data.accountId).toBe(ACCOUNT_A);
-    if (!enabled) await writeReminderPref(store.db, { kind: "enabled", value: false });
-    fake.beforeCancel = () => {
-      if (!fake.scheduled.some((item) => item.osId === alarm.osId)) return;
-      fake.scheduled = fake.scheduled.filter((item) => item.osId !== alarm.osId);
-      fake.presented = [...fake.presented, { osId: alarm.osId, data: alarm.data }];
-    };
-
-    signedInAccount = ACCOUNT_B;
-    const result = await rescheduleReminders(store.db, { now: at(TODAY, 10, 30), language: "en" });
-    expect(result.status).toBe(enabled ? "scheduled" : "disabled");
-    expect(groupScheduled()).toEqual([]);
-    expect(fake.presented.filter((item) => item.data.type === "group_encouragement")).toEqual([]);
-    expect(fake.dismissed).toEqual([alarm.osId]);
-  });
-
-  it("lets only the signed-in account's encouragement show while the app is open", async () => {
-    await seed([...lastDays(5), TODAY]);
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
-    const own = groupScheduled()[0].data;
-    const { accountId: _owner, ...unowned } = own;
-    const wird = fake.scheduled.find((item) => item.data.type !== "group_encouragement")?.data;
-    expect(wird).toBeDefined();
-
-    expect(shouldPresentReminder(own)).toBe(true);
-    expect(shouldPresentReminder(unowned)).toBe(false);
-    signedInAccount = ACCOUNT_B;
-    expect(shouldPresentReminder(own)).toBe(false);
-    signedInAccount = null;
-    expect(shouldPresentReminder(own)).toBe(false);
-    // Other reminders carry no account and show as before.
-    expect(shouldPresentReminder(wird!)).toBe(true);
-  });
-
-  // Fifth review, finding N5: A's encouragement went off while B was signed in, before the run that
-  // cancels it. The handler hid it and the OS let go of the alarm, so the run took it for delivered,
-  // retired A's batch, and A never got the encouragement.
-  it("gives an encouragement hidden from another account back to its owner, counted once", async () => {
-    await seed([...lastDays(5), TODAY]);
-    await configureReminderPlatform({ channelName: "Reminders", remindLaterAction: "Remind me in 1 hour" });
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
-    const alarm = groupScheduled()[0];
-    expect(batches()).toEqual([expect.objectContaining({ account_id: ACCOUNT_A, log_id: alarm.data.logId })]);
-
-    signedInAccount = ACCOUNT_B;
-    firesWhileOpen(alarm);
-    expect(fake.presented).toEqual([]);
-    await rescheduleReminders(store.db, { now: at(TODAY, 10, 31), language: "en" });
-    expect(logRow(alarm.data.logId)).toEqual({ delivered_at: null, cancelled_at: at(TODAY, 10, 31).toISOString() });
-    expect(batches()).toEqual([expect.objectContaining({ account_id: ACCOUNT_A, count: 1, log_id: null })]);
-    expect(groupScheduled()).toEqual([]);
-    expect(fake.presented).toEqual([]);
-
-    // A signs in again: the batch goes out to A, and only that notification counts as delivered.
-    signedInAccount = ACCOUNT_A;
-    await rescheduleReminders(store.db, { now: at(TODAY, 10, 40), language: "en" });
-    const again = groupScheduled();
-    expect(again.map((item) => [item.data.accountId, item.data.at])).toEqual([
-      [ACCOUNT_A, at(TODAY, 10, 41).getTime()],
-    ]);
-    firesWhileOpen(again[0]);
-    expect(fake.presented.map((item) => item.osId)).toEqual([again[0].osId]);
-    await rescheduleReminders(store.db, { now: at(TODAY, 10, 45), language: "en" });
-    expect(logCount("type = 'group_encouragement' AND delivered_at IS NOT NULL")).toBe(1);
-    expect(logRow(again[0].data.logId)).toEqual({ delivered_at: at(TODAY, 10, 45).toISOString(), cancelled_at: null });
-    expect(batches()).toEqual([]);
-  });
-
-  it("gives an arrival after a delivered notification its own notification", async () => {
-    await seed([...lastDays(5), TODAY]);
-    // Leaves room under tomorrow's cap next to the morning wird reminder.
-    await writeReminderPref(store.db, { kind: "type", type: "streak_at_risk", value: false });
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 10) });
-    expect(groupScheduled().map((item) => item.data.at)).toEqual([at(TODAY, 10, 30).getTime()]);
-    osFires(at(TODAY, 10, 30));
-
-    await notifyGroupEncouragement(store.db, { account: accountOf(ACCOUNT_A), now: at(TODAY, 11) });
-    // One a day: the new batch goes out the next morning, and only the delivered batch is retired, so
-    // later runs keep it.
-    expect(groupScheduled().map((item) => item.data.localDate)).toEqual([addDays(TODAY, 1)]);
-    await rescheduleReminders(store.db, { now: at(TODAY, 11, 5), language: "en" });
-    expect(groupScheduled().map((item) => item.data.localDate)).toEqual([addDays(TODAY, 1)]);
-    expect(batches()).toEqual([expect.objectContaining({ account_id: ACCOUNT_A, count: 1 })]);
   });
 });
 

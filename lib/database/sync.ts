@@ -809,9 +809,10 @@ async function readReplacedLocalState(db: DatabaseExecutor): Promise<ReplacedLoc
  * Device-only state built from the replaced account's data: today's hifz page list, the monthly
  * check, today's extras and pending reminder follow-ups. Rebuilt from the restored account.
  *
- * Pending halaqa encouragement batches (notif_group_pending) stay: each batch names its account and
- * only the signed-in account's batches are scheduled, while each account's acknowledged ids stay
- * under its own key. Dropping the batches would leave those ids acknowledged and never announced.
+ * Halaqa encouragement rows from earlier builds (notif_group_pending and the per-account
+ * device_halaqa_encouragements_acked:* keys) stay untouched. Halaqa is removed for now and nothing
+ * reads them, but each names its account, and keeping them lets a returning Halaqa resume without
+ * announcing old encouragement twice.
  */
 const ACCOUNT_DERIVED_DEVICE_KEYS = new Set([
   "device_hifz_today_plan",

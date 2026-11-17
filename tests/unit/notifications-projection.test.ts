@@ -55,7 +55,6 @@ function plannerInput(days: HabitDay[]): PlannerInput {
     backoff: 0,
     delivered: [],
     remindLater: null,
-    groupPending: null,
     facts: () => ({}),
     random: () => 0,
   };

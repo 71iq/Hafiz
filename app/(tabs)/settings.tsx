@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from "react"
 import { View, Text, Pressable, ActivityIndicator, Linking, Platform, StyleSheet, useWindowDimensions } from "react-native";
 import { AccountSyncCard, lastSyncedLabel } from "@/components/settings/AccountSyncCard";
 import { LogoutConfirmDialog } from "@/components/settings/LogoutConfirmDialog";
+import { ProfilePrivacySheet } from "@/components/settings/ProfilePrivacySheet";
 import { useIssueReporter } from "@/components/app-update/IssueReporter";
 import { WhatsNewSheet } from "@/components/app-update/WhatsNewSheet";
 import { installedAppVersion } from "@/lib/app-update/build-info";
@@ -33,6 +34,7 @@ import {
   FileText,
   ExternalLink,
   Sparkles,
+  ShieldCheck,
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react-native";
@@ -156,6 +158,8 @@ export default function SettingsScreen() {
   const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [whatsNewVisible, setWhatsNewVisible] = useState(false);
+  // The account the privacy sheet was opened for; it closes when that account is no longer signed in.
+  const [privacyFor, setPrivacyFor] = useState<string | null>(null);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
@@ -821,6 +825,19 @@ export default function SettingsScreen() {
                   </View>
                 </Pressable>
                 <AccountSyncCard />
+                {/* Public profile choices, the under-18 setting and halaqas from an earlier version (SOC-01, ETH-07). */}
+                {configured ? (
+                  <View className="mb-4">
+                    <SettingsLinkRow
+                      icon={ShieldCheck}
+                      title={s.privacySettingsTitle}
+                      description={s.privacySettingsDesc}
+                      onPress={() => setPrivacyFor(user.id)}
+                      isDark={isDark}
+                      isRTL={isRTL}
+                    />
+                  </View>
+                ) : null}
                 {configured && qfSyncEnabled && (
                   <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">
                     <View className="flex-row items-center gap-3">
@@ -1109,6 +1126,9 @@ export default function SettingsScreen() {
         onConfirm={handleLogout}
       />
       <WhatsNewSheet open={whatsNewVisible} version={appVersion} onClose={() => setWhatsNewVisible(false)} />
+      {privacyFor && user?.id === privacyFor ? (
+        <ProfilePrivacySheet key={privacyFor} userId={privacyFor} onClose={() => setPrivacyFor(null)} onNotice={setToast} />
+      ) : null}
       {issueReporter.fallback}
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
       <TranslationLanguagePicker visible={pickerVisible} onClose={() => setPickerVisible(false)} />

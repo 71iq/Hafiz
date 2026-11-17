@@ -46,10 +46,7 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
   return parsePublicProfileRow(data);
 }
 
-/**
- * Badges this viewer may read: the owner's own, or another person's juz completions when a shared
- * halaqa has them. Row-level security filters the rest.
- */
+/** Badges this viewer may read: the owner's own, or what row-level security allows of another person's. */
 export async function fetchPublicAchievementUnlocks(userId: string): Promise<AchievementUnlock[]> {
   if (!isSupabaseConfigured() || !userId) return [];
 

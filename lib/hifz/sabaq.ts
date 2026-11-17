@@ -65,15 +65,7 @@ export type SabaqTarget = Readonly<{
    * since then can uncover lines.
    */
   completesPage: boolean;
-  /** The lines are a teacher's next sabaq (SOC-03) rather than the plan's next page. */
-  assigned: boolean;
 }>;
-
-/**
- * SOC-03: a teacher's next sabaq, a page and a range of its lines (lib/halaqa/sabaq-assignment.ts). The
- * teacher chooses where; the plan still chooses how many lines one lesson holds.
- */
-export type AssignedSabaq = Readonly<{ page: number; fromLine: number; toLine: number }>;
 
 function ayahLines(page: RecitationPage): PageLine[] {
   return page.lines.filter((line) => line.kind === "ayah" && line.tokens.length > 0);
@@ -131,9 +123,6 @@ async function readMemorizedPages(db: DatabaseExecutor): Promise<Set<number>> {
  * Choose today's chunk: the first lines not yet memorized on the first page in the plan's order
  * that is not yet memorized, about `wantLines` long and extended up to 2 lines so it ends at an
  * ayah end. A chunk never runs into lines already memorized.
- *
- * SOC-03: with a teacher's next sabaq whose page is not memorized, the chunk comes from the assigned
- * lines instead and stays inside them. Once they are all memorized, the plan's order applies again.
  */
 export async function nextSabaqTarget(
   db: DatabaseExecutor,
@@ -141,47 +130,21 @@ export async function nextSabaqTarget(
     plan,
     wantLines,
     pageWords,
-    assigned = null,
   }: {
     plan: HifzPlan;
     wantLines: number;
     pageWords: (page: number) => PageWordsLines | null;
-    assigned?: AssignedSabaq | null;
   },
 ): Promise<SabaqTarget | null> {
   const memorized = await readMemorizedPages(db);
-  if (assigned && !memorized.has(assigned.page)) {
-    const target = await chunkTarget(db, { page: assigned.page, wantLines, pageWords, range: assigned });
-    if (target) return target;
-  }
   const page = newPageOrder(plan).find((candidate) => !memorized.has(candidate));
   if (page === undefined) return null;
-  return chunkTarget(db, { page, wantLines, pageWords, range: null });
+  return chunkTarget(db, { page, wantLines, pageWords });
 }
 
 /**
- * SOC-03: whether a teacher's next sabaq still has lines to memorize: its page has no page card and
- * one of its ayah lines is not memorized. Home shows the assignment only then. Without the page's
- * word data the lines come from the page layout table, as the sabaq screen does when that data fails.
- */
-export async function assignedSabaqOpen(
-  db: DatabaseExecutor,
-  assigned: AssignedSabaq,
-  pageWords: PageWordsLines | null = null,
-): Promise<boolean> {
-  if ((await readMemorizedPages(db)).has(assigned.page)) return false;
-  const done = await readDoneChunks(db, chunkCardPrefix(assigned.page));
-  const lines = ayahLines(await loadRecitationPage(db, assigned.page, pageWords));
-  return lines.some((line) => inRange(assigned, line) && !coveredBy(done, line.lineNumber));
-}
-
-function inRange(range: AssignedSabaq | null, line: PageLine): boolean {
-  return range === null || (line.lineNumber >= range.fromLine && line.lineNumber <= range.toLine);
-}
-
-/**
- * The chunk on one page: its first lines not memorized, within `range` when one is given, up to the
- * next memorized line or the range's end. Null when no such line is left.
+ * The chunk on one page: its first lines not memorized, up to the next memorized line. Null when no
+ * such line is left.
  */
 async function chunkTarget(
   db: DatabaseExecutor,
@@ -189,18 +152,17 @@ async function chunkTarget(
     page,
     wantLines,
     pageWords,
-    range,
-  }: { page: number; wantLines: number; pageWords: (page: number) => PageWordsLines | null; range: AssignedSabaq | null },
+  }: { page: number; wantLines: number; pageWords: (page: number) => PageWordsLines | null },
 ): Promise<SabaqTarget | null> {
   const done = await readDoneChunks(db, chunkCardPrefix(page));
   const covered = (line: PageLine) => coveredBy(done, line.lineNumber);
   const pageData = await loadRecitationPage(db, page, pageWords(page));
   const lines = ayahLines(pageData);
   // The first lines not memorized, up to the next memorized ones: a chunk whose check or look failed
-  // after a later chunk passed is offered again in its place. An assigned chunk ends with the range.
-  const start = lines.findIndex((line) => inRange(range, line) && !covered(line));
+  // after a later chunk passed is offered again in its place.
+  const start = lines.findIndex((line) => !covered(line));
   if (start < 0) return null;
-  const end = lines.findIndex((line, index) => index > start && (covered(line) || !inRange(range, line)));
+  const end = lines.findIndex((line, index) => index > start && covered(line));
   const remaining = lines.slice(start, end < 0 ? lines.length : end);
   let count = Math.max(1, Math.min(wantLines, remaining.length));
   let extended = 0;
@@ -235,7 +197,6 @@ async function chunkTarget(
     ayahs,
     linkAyahs: linkRows.reverse(),
     completesPage: lines.every((line) => chunkLines.has(line.lineNumber) || covered(line)),
-    assigned: range !== null,
   };
 }
 

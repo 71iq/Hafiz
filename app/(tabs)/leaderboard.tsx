@@ -66,7 +66,6 @@ function BoardContent({ userId }: { userId: string }) {
   const today = useLocalToday();
   const [joinError, setJoinError] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // Bands come from the local plan and memorized cards (8.13), and the week start from the wird
   // settings; the server picks the cohort.
@@ -90,12 +89,9 @@ function BoardContent({ userId }: { userId: string }) {
   const join = useMutation({
     mutationFn: async (choice: BoardJoinChoice) => {
       if (!inputs.data) throw new Error("Board inputs are not ready");
-      // ETH-07: the server says whether joining as a minor left a matched halaqa, so the screen can.
-      const { leftMatched } = await joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
-      return { leavesMatched: leftMatched };
+      await joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
     },
-    onSuccess: async (result, choice) => {
-      if (result.leavesMatched) setNotice(s.socialLeftMatched);
+    onSuccess: async (_result, choice) => {
       await Promise.all([
         refresh(),
         reloadPrivacy(),
@@ -144,7 +140,6 @@ function BoardContent({ userId }: { userId: string }) {
         <SocialNotice icon={CloudOff} message={interpolate(s.socialCachedAt, { date: formatSocialDate(savedAt, language, true) })} />
       ) : null}
       {leaveError ? <SocialNotice message={leaveError} actionLabel={s.socialDismiss} onAction={() => setLeaveError(null)} /> : null}
-      {notice ? <SocialNotice message={notice} actionLabel={s.socialDismiss} onAction={() => setNotice(null)} /> : null}
 
       {loading ? (
         <StandingsSkeleton label={s.loading} />

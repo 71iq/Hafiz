@@ -1,7 +1,7 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Platform, View } from "react-native";
 import { Tabs } from "expo-router";
-import { House, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked, Users } from "lucide-react-native";
+import { House, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -150,29 +150,15 @@ function TabsWithStrings() {
             ),
           }}
         />
-        {/* Phones show Home, Mushaf, Progress and Settings (AppNavigation PHONE_TAB_ROUTES); Halaqa and
-            Board are reached from labeled rows on Home and Progress. From 768px the panel and sidebar
-            list all six destinations. The Board keeps the leaderboard route. */}
+        {/* Phones show Home, Mushaf, Progress and Settings (AppNavigation PHONE_TAB_ROUTES); the
+            Board is reached from labeled rows on Home and Progress. From 768px the panel and sidebar
+            list all five destinations. The Board keeps the leaderboard route. */}
         <Tabs.Screen
           name="mushaf"
           options={{
             title: s.tabMushaf,
             tabBarIcon: ({ color, size }) => (
               <BookOpen
-                size={size}
-                color={color}
-                fill="none"
-                strokeWidth={2}
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="halaqa"
-          options={{
-            title: s.tabHalaqa,
-            tabBarIcon: ({ color, size }) => (
-              <Users
                 size={size}
                 color={color}
                 fill="none"
