@@ -8,14 +8,26 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.3": {
+    en: [
+      "Updates now download and install inside the app, and can download on their own over Wi-Fi.",
+      "Privacy and sharing in Settings sets what your profile shows.",
+      "Halaqa groups are paused for now. The weekly consistency Board stays.",
+    ],
+    ar: [
+      "تُنزَّل التحديثات الآن وتُثبَّت من داخل التطبيق، ويمكن أن تُنزَّل تلقائيًا عبر الواي فاي.",
+      "تحدد «الخصوصية والمشاركة» في الإعدادات ما يظهر في ملفك.",
+      "الحلقات متوقفة مؤقتًا، وتبقى لوحة المواظبة الأسبوعية.",
+    ],
+  },
   "1.0.2": {
     en: [
-      "Join the weekly consistency Board, an optional small group ranked by wird days.",
+      "Study with a Halaqa group and see the weekly consistency Board.",
       "Progress and your profile show the same figures, including your current consistency.",
       "Many fixes for review, grading and sheets on Android phones.",
     ],
     ar: [
-      "انضم إلى لوحة المواظبة الأسبوعية، وهي مجموعة صغيرة اختيارية مرتبة بحسب أيام الوِرد.",
+      "ادرس مع الحلقة وتابع لوحة المواظبة الأسبوعية.",
       "يعرض التقدم وملفك الشخصي الأرقام نفسها، ومنها مواظبتك الحالية.",
       "إصلاحات كثيرة للمراجعة والتقييم والنوافذ على هواتف أندرويد.",
     ],
