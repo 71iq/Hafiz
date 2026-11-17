@@ -12,6 +12,14 @@ const androidReleaseSchema = z.object({
   // Same-origin path only, so a tampered manifest cannot send users elsewhere.
   apk: z.string().regex(/^\/downloads\/android\/[A-Za-z0-9._-]+\.apk$/),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  // Optional so manifests published before in-app updates still parse. The Android app checks a
+  // download against them natively (lib/app-update/download-plan.ts); hashing 400 MB in JavaScript
+  // would stall the app.
+  size: z.number().int().positive().optional(),
+  md5: z
+    .string()
+    .regex(/^[0-9a-f]{32}$/)
+    .optional(),
 });
 
 export type AndroidRelease = z.infer<typeof androidReleaseSchema>;

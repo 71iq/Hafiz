@@ -5,6 +5,7 @@ import { LogoutConfirmDialog } from "@/components/settings/LogoutConfirmDialog";
 import { useIssueReporter } from "@/components/app-update/IssueReporter";
 import { WhatsNewSheet } from "@/components/app-update/WhatsNewSheet";
 import { installedAppVersion } from "@/lib/app-update/build-info";
+import { installedAndroidVersionCode } from "@/lib/app-update/use-android-update";
 import { SyncIndicator, useSyncStatusDetails } from "@/components/ui/SyncIndicator";
 import { subscribeSettingSaveFailed } from "@/lib/settings/save-feedback";
 import { PUBLIC_PAGE_FROM_SETTINGS } from "@/lib/public-pages/content";
@@ -136,11 +137,15 @@ export default function SettingsScreen() {
     setMarkSimilarVerses,
     hapticsEnabled,
     setHapticsEnabled,
+    autoDownloadUpdates,
+    setAutoDownloadUpdates,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
   const appReleaseRows = useAppReleaseRows();
   const appVersion = installedAppVersion();
+  // The installed Android app downloads its own updates; the QA build, web and iOS do not.
+  const showsAutoDownloadSetting = installedAndroidVersionCode() !== null;
   const syncDetails = useSyncStatusDetails();
   const router = useRouter();
   // Sign-in from Settings returns to the Account category through the allowlisted return origin (W13).
@@ -996,6 +1001,32 @@ export default function SettingsScreen() {
                   isRTL={isRTL}
                 />
               ))}
+              {showsAutoDownloadSetting ? (
+                <SwitchRow
+                  label={s.autoDownloadUpdatesLabel}
+                  hint={s.autoDownloadUpdatesHint}
+                  value={autoDownloadUpdates}
+                  onValueChange={setAutoDownloadUpdates}
+                  className="items-center justify-between gap-3 px-3 py-3"
+                  style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row", minHeight: 44 }}
+                >
+                  <View className="min-w-0 flex-1">
+                    <Text
+                      className="mb-1 text-charcoal dark:text-neutral-100"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                    >
+                      {s.autoDownloadUpdatesLabel}
+                    </Text>
+                    <Text
+                      className="text-warm-400 dark:text-neutral-500"
+                      style={{ fontFamily: "Manrope_400Regular", fontSize: 12, lineHeight: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                    >
+                      {s.autoDownloadUpdatesHint}
+                    </Text>
+                  </View>
+                  <SwitchTrack value={autoDownloadUpdates} />
+                </SwitchRow>
+              ) : null}
               <SettingsLinkRow
                 icon={Sparkles}
                 title={s.aboutWhatsNew}

@@ -56,7 +56,13 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/app-update/AppReleaseCard.tsx",
     "button",
     "source",
-    "Download/update card row mirrors with settings RTL; copy aligns to the reading side.",
+    "Download/update card row mirrors with settings RTL; copy aligns to the reading side and the progress bar fills from the reading side.",
+  ),
+  entry(
+    "components/app-update/AppUpdateHost.tsx",
+    "overlay",
+    "rntl",
+    "Install and metered-download prompts use ConfirmDialog with the settings direction; covered by tests/unit/app-release.test.tsx.",
   ),
   entry(
     "components/app-update/IssueReporter.tsx",

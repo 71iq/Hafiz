@@ -17,6 +17,7 @@ import { authStrings } from "@/lib/i18n/features/auth";
 import { settingsPublicStrings } from "@/lib/i18n/features/settings-public";
 import { audioStrings } from "@/lib/i18n/features/audio";
 import { detailStrings } from "@/lib/i18n/features/detail";
+import { appUpdateStrings } from "@/lib/i18n/features/app-update";
 
 export const strings = {
   en: {
@@ -224,7 +225,7 @@ export const strings = {
     appDownloadSubtitle: "Read and review offline on your phone.",
     appDownloadButton: "Download APK",
     appUpdateTitle: "Update available",
-    appUpdateSubtitle: "Hafiz {{version}} is ready to install.",
+    appUpdateSubtitle: "Hafiz {{version}} is available.",
     appUpdateButton: "Update",
     settingsAppVersion: "App version",
     settingsAppVersionValue: "Version {{version}} · Tap to check for updates",
@@ -927,6 +928,7 @@ export const strings = {
     ...settingsPublicStrings.en,
     ...audioStrings.en,
     ...detailStrings.en,
+    ...appUpdateStrings.en,
   },
   ar: {
     appName: "حافظ",
@@ -1124,7 +1126,7 @@ export const strings = {
     appDownloadSubtitle: "اقرأ وراجع دون اتصال على هاتفك.",
     appDownloadButton: "تنزيل التطبيق",
     appUpdateTitle: "يتوفر تحديث",
-    appUpdateSubtitle: "الإصدار {{version}} من حافظ جاهز للتثبيت.",
+    appUpdateSubtitle: "الإصدار {{version}} من حافظ متاح.",
     appUpdateButton: "تحديث",
     settingsAppVersion: "إصدار التطبيق",
     settingsAppVersionValue: "الإصدار {{version}} · اضغط للتحقق من التحديثات",
@@ -1811,6 +1813,7 @@ export const strings = {
     ...settingsPublicStrings.ar,
     ...audioStrings.ar,
     ...detailStrings.ar,
+    ...appUpdateStrings.ar,
   },
 } as const;
 

@@ -60,6 +60,7 @@ export const DEVICE_SETTING_KEYS = {
   audioRepeatEach: "device_audio_repeat_each",
   audioDelaySeconds: "device_audio_delay_seconds",
   hapticsEnabled: "device_haptics_enabled",
+  autoDownloadUpdates: "device_auto_download_updates",
 } as const;
 export const AUDIO_REPEAT_MIN = 1;
 export const AUDIO_REPEAT_MAX = 99;
@@ -266,6 +267,9 @@ type SettingsContextType = {
   setAudioDelaySeconds: (seconds: number) => void;
   hapticsEnabled: boolean;
   setHapticsEnabled: (enabled: boolean) => void;
+  /** Android: download a newer release in the background on unmetered Wi-Fi. Device-only, default on. */
+  autoDownloadUpdates: boolean;
+  setAutoDownloadUpdates: (enabled: boolean) => void;
   isRTL: boolean;
   isDark: boolean;
   isLoaded: boolean;
@@ -330,6 +334,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setAudioDelaySeconds: () => {},
   hapticsEnabled: true,
   setHapticsEnabled: () => {},
+  autoDownloadUpdates: true,
+  setAutoDownloadUpdates: () => {},
   isRTL: false,
   isDark: false,
   isLoaded: false,
@@ -589,6 +595,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [audioRepeatEach, setAudioRepeatEachState] = useState(DEFAULT_AUDIO_REPEAT);
   const [audioDelaySeconds, setAudioDelaySecondsState] = useState(DEFAULT_AUDIO_DELAY_SECONDS);
   const [hapticsEnabled, setHapticsEnabledState] = useState(true);
+  const [autoDownloadUpdates, setAutoDownloadUpdatesState] = useState(true);
   const [loadedDb, setLoadedDb] = useState<AppDatabase | null>(null);
   // Per-key write generations: a failed write reverts only if no newer choice was made since (C03).
   const writeGenerations = useRef(new Map<string, number>());
@@ -745,6 +752,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedHaptics = decodeBoolean(saved[DEVICE_SETTING_KEYS.hapticsEnabled]);
         invalidIfSet(DEVICE_SETTING_KEYS.hapticsEnabled, savedHaptics !== null);
         if (savedHaptics !== null) setHapticsEnabledState(savedHaptics);
+        const savedAutoDownload = decodeBoolean(saved[DEVICE_SETTING_KEYS.autoDownloadUpdates]);
+        invalidIfSet(DEVICE_SETTING_KEYS.autoDownloadUpdates, savedAutoDownload !== null);
+        if (savedAutoDownload !== null) setAutoDownloadUpdatesState(savedAutoDownload);
 
         const savedLimit = saved.daily_review_limit;
         if (savedLimit !== null) {
@@ -1271,6 +1281,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [hapticsEnabled, persist],
   );
 
+  const setAutoDownloadUpdates = useCallback(
+    (enabled: boolean) => {
+      const previous = autoDownloadUpdates;
+      setAutoDownloadUpdatesState(enabled);
+      persist(
+        DEVICE_SETTING_KEYS.autoDownloadUpdates,
+        String(enabled),
+        () => setAutoDownloadUpdatesState(previous),
+        undefined,
+        () => setAutoDownloadUpdatesState(enabled),
+      );
+    },
+    [autoDownloadUpdates, persist],
+  );
+
   const accountPromoDismissed = isAccountPromoDismissed(accountPromoDismissedAt);
 
   const isRTL = uiLanguage === "ar";
@@ -1338,6 +1363,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setAudioDelaySeconds,
         hapticsEnabled,
         setHapticsEnabled: setHapticsPreference,
+        autoDownloadUpdates,
+        setAutoDownloadUpdates,
         isRTL,
         isDark,
         isLoaded,

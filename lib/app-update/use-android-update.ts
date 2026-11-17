@@ -1,21 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { Platform } from "react-native";
 import * as Application from "expo-application";
 import { fetchAndroidRelease, newerAndroidRelease, type AndroidRelease } from "./release";
+import { getUpdateState, resetUpdateStore, setUpdateState, useUpdateState } from "./update-store";
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
-// One shared check for every screen that shows the update, refreshed at most every six hours
-// unless the user asks again. Failures (offline, server down) leave the last known release.
-let lastCheck: { at: number; release: AndroidRelease } | null = null;
+// One shared check for every screen that shows the update and for the background download,
+// refreshed at most every six hours unless the user asks again. Failures (offline, server down)
+// leave the last known release.
 let pending: Promise<AndroidRelease> | null = null;
 
-function loadRelease(force: boolean): Promise<AndroidRelease> {
-  if (!force && lastCheck && Date.now() - lastCheck.at < SIX_HOURS) return Promise.resolve(lastCheck.release);
+/** The published release, from the six-hour cache unless forced. Rejects when it cannot be read. */
+export function checkAndroidRelease(force: boolean): Promise<AndroidRelease> {
+  const latest = getUpdateState().latest;
+  if (!force && latest && Date.now() - latest.at < SIX_HOURS) return Promise.resolve(latest.release);
   if (pending) return pending;
   pending = fetchAndroidRelease()
     .then((release) => {
-      lastCheck = { at: Date.now(), release };
+      setUpdateState((current) => ({ ...current, latest: { at: Date.now(), release } }));
       return release;
     })
     .finally(() => {
@@ -24,10 +27,10 @@ function loadRelease(force: boolean): Promise<AndroidRelease> {
   return pending;
 }
 
-/** Test seam: forget the shared release check. */
+/** Test seam: forget the shared release check and the update state that depends on it. */
 export function resetAndroidReleaseCheck() {
-  lastCheck = null;
   pending = null;
+  resetUpdateStore();
 }
 
 /** Installed Android version code, or null off Android and for the side-by-side QA build. */
@@ -41,28 +44,18 @@ export function installedAndroidVersionCode(): number | null {
 /** The newer published release, plus a way to check again now. */
 export function useAndroidRelease(): { update: AndroidRelease | null; checkAgain: () => void } {
   const installed = installedAndroidVersionCode();
-  const [release, setRelease] = useState<AndroidRelease | null>(lastCheck?.release ?? null);
-  const mounted = useRef(true);
+  const release = useUpdateState((current) => current.latest?.release ?? null);
 
   const check = useCallback(
     (force: boolean) => {
       if (installed === null) return;
-      loadRelease(force).then(
-        (next) => {
-          if (mounted.current) setRelease(next);
-        },
-        () => undefined,
-      );
+      checkAndroidRelease(force).catch(() => undefined);
     },
     [installed],
   );
 
   useEffect(() => {
-    mounted.current = true;
     check(false);
-    return () => {
-      mounted.current = false;
-    };
   }, [check]);
 
   return {
