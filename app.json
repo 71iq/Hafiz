@@ -25,6 +25,7 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.hafiz",
       "versionCode": 3,
+      "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
       "intentFilters": [
         {
           "action": "VIEW",

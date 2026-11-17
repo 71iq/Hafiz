@@ -2,30 +2,37 @@ import { useState } from "react";
 import { Linking, Platform, Pressable, Text, View } from "react-native";
 import { Download, X as XIcon } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
+import { Progress } from "@/components/ui/Progress";
 import { useSettings } from "@/lib/settings/context";
-import { interpolate, useStrings } from "@/lib/i18n/useStrings";
-import { ANDROID_LATEST_APK_URL, androidReleaseApkUrl } from "@/lib/app-update/release";
-import { useAndroidUpdate } from "@/lib/app-update/use-android-update";
+import { useStrings } from "@/lib/i18n/useStrings";
+import { ANDROID_LATEST_APK_URL } from "@/lib/app-update/release";
+import { useAppUpdateView } from "@/lib/app-update/use-app-update";
 import { textStartStyle } from "@/lib/ui/direction";
+import { runUpdateAction, updateCopy } from "./update-copy";
 
 /**
- * Home card for the sideloaded Android app: on the web it offers the APK download, and in the
- * Android app it appears only when a newer release is published. Opening the APK URL hands the
- * download to the browser, whose prompt installs it over the current app.
+ * Home card for the sideloaded Android app. On the web it offers the APK download. In the Android
+ * app it appears while a newer release exists or a download is under way: Update downloads it inside
+ * the app with progress, and Install update opens Android's installer. Android never hands the APK
+ * to the browser.
  */
 export function AppReleaseCard() {
   const s = useStrings();
-  const { isDark, isRTL } = useSettings();
-  const update = useAndroidUpdate();
-  const [dismissed, setDismissed] = useState(false);
+  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { view } = useAppUpdateView();
+  // Closing hides the card in its current state only, so a finished download shows it again.
+  const stateKey = view.kind === "none" ? view.kind : `${view.kind}:${view.release.versionCode}`;
+  const [dismissedState, setDismissedState] = useState<string | null>(null);
 
   const isWeb = Platform.OS === "web";
-  if (dismissed || (!isWeb && !update)) return null;
+  const copy = isWeb ? null : updateCopy(view, s, uiLanguage);
+  if (dismissedState === stateKey || (!isWeb && !copy)) return null;
 
-  const title = update ? s.appUpdateTitle : s.appDownloadTitle;
-  const subtitle = update ? interpolate(s.appUpdateSubtitle, { version: update.versionName }) : s.appDownloadSubtitle;
-  const action = update ? s.appUpdateButton : s.appDownloadButton;
-  const url = update ? androidReleaseApkUrl(update) : ANDROID_LATEST_APK_URL;
+  const title = copy ? copy.title : s.appDownloadTitle;
+  const subtitle = copy ? copy.description : s.appDownloadSubtitle;
+  const action = copy ? copy.action : s.appDownloadButton;
+  const onAction = copy ? () => runUpdateAction(view) : () => void Linking.openURL(ANDROID_LATEST_APK_URL);
+  const downloading = copy !== null && view.kind === "downloading";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
 
   return (
@@ -53,22 +60,34 @@ export function AppReleaseCard() {
           >
             {subtitle}
           </Text>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={`${action}, ${title}`}
-            onPress={() => void Linking.openURL(url)}
-            className="rounded-full bg-primary-accent px-4 py-1.5"
-            style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
-          >
-            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-              {action}
-            </Text>
-          </Pressable>
+          {downloading ? (
+            <Progress
+              value={copy.percent ?? 0}
+              dir={isRTL ? "rtl" : "ltr"}
+              className="mb-1"
+              accessibilityRole="progressbar"
+              accessibilityLabel={title}
+              accessibilityValue={copy.percent === null ? undefined : { min: 0, max: 100, now: copy.percent }}
+            />
+          ) : null}
+          {action ? (
+            <Pressable
+              accessibilityRole={copy ? "button" : "link"}
+              accessibilityLabel={`${action}, ${title}`}
+              onPress={onAction}
+              className="rounded-full bg-primary-accent px-4 py-1.5"
+              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
+            >
+              <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                {action}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={s.genericClose}
-          onPress={() => setDismissed(true)}
+          onPress={() => setDismissedState(stateKey)}
           hitSlop={8}
           className="w-7 h-7 items-center justify-center"
         >

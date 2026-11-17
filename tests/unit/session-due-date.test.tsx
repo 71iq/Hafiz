@@ -165,6 +165,8 @@ const mockSettings: ReturnType<typeof useSettings> = {
   setAudioDelaySeconds: jest.fn(),
   hapticsEnabled: true,
   setHapticsEnabled: jest.fn(),
+  autoDownloadUpdates: true,
+  setAutoDownloadUpdates: jest.fn(),
   isRTL: true,
   isDark: false,
   isLoaded: true,

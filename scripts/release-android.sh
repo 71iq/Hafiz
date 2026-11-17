@@ -73,8 +73,13 @@ cert=$("$APKSIGNER" verify --print-certs "$APK" 2>/dev/null |
 
 FILE="hafiz-$VERSION_NAME-$VERSION_CODE.apk"
 SHA=$(sha256sum "$APK" | cut -d' ' -f1)
-MANIFEST=$(node -e 'console.log(JSON.stringify({versionCode:+process.argv[1],versionName:process.argv[2],apk:"/downloads/android/"+process.argv[3],sha256:process.argv[4]}))' \
-  "$VERSION_CODE" "$VERSION_NAME" "$FILE" "$SHA")
+# The installed app checks its in-app download against size and md5, which Android computes
+# natively; SHA-256 over 400 MB would have to run in JavaScript. sha256 stays for people checking.
+SIZE=$(stat -c %s "$APK")
+MD5=$(md5sum "$APK" | cut -d' ' -f1)
+MANIFEST=$(node -e 'const [code, name, file, sha256, size, md5] = process.argv.slice(1);
+  console.log(JSON.stringify({versionCode:+code,versionName:name,apk:"/downloads/android/"+file,sha256,size:+size,md5}))' \
+  "$VERSION_CODE" "$VERSION_NAME" "$FILE" "$SHA" "$SIZE" "$MD5")
 
 echo "Publishing $FILE ($SHA)"
 remote "install -d -m 755 $REMOTE_DIR && cat > $REMOTE_DIR/.$FILE.part" < "$APK"

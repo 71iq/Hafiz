@@ -535,6 +535,15 @@
           "children": []
         },
         {
+          "id": "home.appupdate",
+          "title": "Android update card: Update, progress, Install update, Try again",
+          "kind": "widget",
+          "cases": [],
+          "uses": ["settings.about.update"],
+          "native": true,
+          "children": []
+        },
+        {
           "id": "home.journey",
           "title": "Reflection-journey card",
           "kind": "transition",
@@ -1634,6 +1643,24 @@
               "cases": ["SET-18"],
               "uses": ["shared.overlay"],
               "native": false,
+              "children": []
+            },
+            {
+              "id": "settings.about.update",
+              "title": "Android in-app update: size on metered networks, download progress, verification, install, Try again",
+              "kind": "widget",
+              "cases": ["SET-21"],
+              "uses": ["shared.confirm"],
+              "native": true,
+              "children": []
+            },
+            {
+              "id": "settings.about.autoupdate",
+              "title": "Download updates automatically: Wi-Fi download while open, install prompt, ready notification",
+              "kind": "widget",
+              "cases": ["SET-22"],
+              "uses": ["settings.about.update", "shared.confirm"],
+              "native": true,
               "children": []
             },
             {

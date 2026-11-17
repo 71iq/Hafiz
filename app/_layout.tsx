@@ -27,6 +27,7 @@ import { strings } from "@/lib/i18n/strings";
 import { documentTitleFor } from "@/lib/navigation/document-title";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { NavigationBarTheme } from "@/components/settings/NavigationBarTheme";
+import { AppUpdateHost } from "@/components/app-update/AppUpdateHost";
 
 const queryClient = createAppQueryClient();
 const NATIVE_UI_FONT_WAIT_MS = 3000;
@@ -180,6 +181,7 @@ export default function RootLayout() {
                 <BoardBandRefresh />
                 <MinorPhotoCleanup />
                 <AuthRedirectReturn />
+                <AppUpdateHost />
                 <Stack
                   screenOptions={{ headerShown: false }}
                   // Routes outside the tabs get the Hafiz fallback inside the providers; the tabs
