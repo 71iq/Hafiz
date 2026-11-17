@@ -59,7 +59,7 @@ import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isRecitationEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config";
-import { getQfOAuthRedirectUri } from "@/lib/quran-foundation/oauth-redirect";
+import { getQfOAuthRedirectUri, readQfCallbackParams } from "@/lib/quran-foundation/oauth-redirect";
 import { formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recitations";
 import {
   beginQfOAuthConnection,
@@ -70,6 +70,7 @@ import {
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -332,17 +333,30 @@ export default function SettingsScreen() {
     setQfBusy(true);
     setQfMessage(null);
     try {
-      const response = await beginQfOAuthConnection(getQfOAuthRedirectUri(), "/settings");
+      const redirectUri = getQfOAuthRedirectUri();
+      const response = await beginQfOAuthConnection(redirectUri, "/settings");
       if (!isCurrentAccount()) return;
       if (!response.ok) throw new Error(response.message);
       setQfMessage(s.qfConnectionStarted);
-      await openQfAuthorizationUrl(response.authorizationUrl);
+      if (Platform.OS === "web") {
+        await openQfAuthorizationUrl(response.authorizationUrl);
+        return;
+      }
+      // The App Link closes this session. Its warm delivery is dropped in +native-intent,
+      // so this is the only place that routes the code to the callback.
+      const result = await WebBrowser.openAuthSessionAsync(response.authorizationUrl, redirectUri);
+      if (!isCurrentAccount()) return;
+      if (result.type === "success" && result.url) {
+        router.push({ pathname: "/auth/qf-callback", params: readQfCallbackParams(result.url) });
+      } else {
+        setQfMessage(null);
+      }
     } catch (err) {
       if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfConnectionFailed);
     } finally {
       setQfBusy(false);
     }
-  }, [captureAccount, s.qfConnectionFailed, s.qfConnectionStarted]);
+  }, [captureAccount, router, s.qfConnectionFailed, s.qfConnectionStarted]);
 
   const handleQfDisconnect = useCallback(async () => {
     const isCurrentAccount = captureAccount();
