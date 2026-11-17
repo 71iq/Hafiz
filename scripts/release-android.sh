@@ -37,7 +37,7 @@ fi
 
 repo_vars=$(gh variable list --json name,value 2>/dev/null || echo '[]')
 for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_QF_USER_AUTH_ENABLED \
-  EXPO_PUBLIC_QF_CONTENT_ENABLED EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED EXPO_PUBLIC_SOCIAL_AUTH_ENABLED; do
+  EXPO_PUBLIC_QF_CONTENT_ENABLED EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS; do
   if [ -z "${!name:-}" ]; then
     value=$(node -e 'const v=JSON.parse(process.argv[1]).find((x)=>x.name===process.argv[2]);process.stdout.write(v?v.value:"")' "$repo_vars" "$name")
     [ -n "$value" ] && export "$name=$value"
@@ -45,6 +45,9 @@ for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_Q
 done
 test -n "${EXPO_PUBLIC_SUPABASE_URL:-}" && test -n "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}" ||
   { echo "Public Supabase values are missing (gh variable list failed)." >&2; exit 1; }
+# Unset means every social provider (the local development default), so a release must name them.
+test -n "${EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS+x}" ||
+  { echo "Set EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS (a repository variable or the environment; none disables social sign-in)." >&2; exit 1; }
 
 echo "Building Hafiz $VERSION_NAME ($VERSION_CODE)"
 # Metro, Hermes and Gradle each get their own 6 GiB scope, as in scripts/android-qa-build.sh.

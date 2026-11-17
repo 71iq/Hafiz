@@ -53,7 +53,7 @@ jest.mock("@/lib/auth/store", () => ({
 }));
 jest.mock("@/lib/auth/config", () => ({
   isEmailAuthFlowsEnabled: () => mockEmailEnabled,
-  isSocialAuthEnabled: () => false,
+  getEnabledSocialProviders: () => [],
 }));
 jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: () => mockConfigured }));
 jest.mock("@/lib/i18n/startup-language", () => ({ getStartupLanguage: () => mockLocale }));

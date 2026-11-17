@@ -6,12 +6,12 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { AuthError, type Session, type SignInWithOAuthCredentials } from "@supabase/supabase-js";
 import { supabase, prepareOwnedLink, readOwnedSession, restoreOwnedSession } from "@/lib/supabase";
-import { isSocialAuthEnabled } from "@/lib/auth/config";
+import { getEnabledSocialProviders, type SocialAuthProvider } from "@/lib/auth/config";
 import { connectQfFromSession, connectQfProviderTokens } from "@/lib/quran-foundation/user";
 import { captureQfRequestOwner, type QfSessionOwner } from "@/lib/quran-foundation/request-owner";
 import { QF_OAUTH_PROVIDER, QF_OAUTH_SCOPES } from "@/lib/quran-foundation/user-types";
 
-export type AppOAuthProvider = "google" | "apple" | "facebook" | typeof QF_OAUTH_PROVIDER;
+export type AppOAuthProvider = SocialAuthProvider | typeof QF_OAUTH_PROVIDER;
 type OAuthMode = "sign-in" | "link";
 type StateReader = () => { user: Pick<Session["user"], "id"> | null; session: Session | null };
 export type AppOAuthOutcome = { session: Session | null; qfConnected: boolean; qfOwner: QfSessionOwner | null };
@@ -32,7 +32,8 @@ export function startAppOAuth(provider: AppOAuthProvider, mode: OAuthMode, getSt
       try {
         if (!origin.isCurrent()) return obsolete;
         const isQf = provider === QF_OAUTH_PROVIDER;
-        if (!isQf && !isSocialAuthEnabled()) throw new Error("Social sign-in is temporarily unavailable.");
+        if (!isQf && !getEnabledSocialProviders().includes(provider))
+          throw new Error("Social sign-in is temporarily unavailable.");
         const redirectTo = getOAuthRedirectTo();
         // The installed SDK types omit configured custom OAuth providers.
         const credentials: SignInWithOAuthCredentials = {

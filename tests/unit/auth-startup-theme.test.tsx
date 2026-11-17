@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import { render, renderHook } from "@testing-library/react-native";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { useAuthDarkMode } from "@/components/auth/AuthScreenShell";
-import { isSocialAuthEnabled } from "@/lib/auth/config";
+import { getEnabledSocialProviders } from "@/lib/auth/config";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { strings } from "@/lib/i18n/strings";
 import { DirectionProvider } from "@/lib/ui/direction";
@@ -40,7 +40,7 @@ jest.mock("@/lib/supabase", () => ({
 }));
 
 jest.mock("@/lib/auth/config", () => ({
-  isSocialAuthEnabled: jest.fn(),
+  getEnabledSocialProviders: jest.fn(),
 }));
 
 jest.mock("@/lib/auth/oauth", () => ({
@@ -111,7 +111,7 @@ describe("auth startup theme resolution", () => {
     jest.replaceProperty(Platform, "OS", "web");
     mockColorScheme = "light";
     jest.mocked(isSupabaseConfigured).mockReturnValue(true);
-    jest.mocked(isSocialAuthEnabled).mockReturnValue(true);
+    jest.mocked(getEnabledSocialProviders).mockReturnValue(["google", "apple", "facebook"]);
     getItem.mockReset().mockReturnValue(null);
   });
 

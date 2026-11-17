@@ -141,10 +141,19 @@ email confirmation enabled. Caddy still rejects the email endpoints the app does
 not use (OTP, magic link, invite and reauthentication). The Google login uses a
 second client secret on the original OAuth client, because the first secret
 survived only as a hash. GoTrue has `GOTRUE_DISABLE_SIGNUP=false` and
-`GOTRUE_EXTERNAL_GOOGLE_ENABLED=true`; the web build sets
-`EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true`. Apple and Facebook have no
-credentials and must stay hidden in the app. The Resend, Cloudflare DNS and
+`GOTRUE_EXTERNAL_GOOGLE_ENABLED=true`; release builds set
+`EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true` and
+`EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS=google`. Apple and Facebook have no
+credentials and must stay out of that list. The Resend, Cloudflare DNS and
 Google credentials are kept in the local private migration directory.
+
+`EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS` is a comma-separated list of `google`,
+`apple` and `facebook`, so `google` enables Google without Apple, which needs a
+paid Apple developer account. An empty value or `none` shows no social buttons.
+An unset value shows all three for local development, so set it for every
+release build. The web deploy treats a missing repository variable as `none`,
+and `scripts/release-android.sh` refuses to build without it. It replaced
+`EXPO_PUBLIC_SOCIAL_AUTH_ENABLED`. Quran Foundation login keeps its own flag.
 
 ## Automatic releases
 
@@ -171,7 +180,7 @@ health and exits without replacing it.
 Public CI variables are `EXPO_PUBLIC_SUPABASE_URL`,
 `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_QF_USER_AUTH_ENABLED`,
 `EXPO_PUBLIC_QF_CONTENT_ENABLED`, `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED`,
-`EXPO_PUBLIC_SOCIAL_AUTH_ENABLED` and `HAFIZ_HETZNER_HOST`. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
+`EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS` and `HAFIZ_HETZNER_HOST`. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
 `HAFIZ_HETZNER_KNOWN_HOSTS`. Server secrets never enter the web build or Git.
 Infrastructure, database migrations and Edge Function source changes require
 an administrator deployment. The web deploy key cannot modify them.
