@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.2": {
+    en: [
+      "Study with a Halaqa group and see the weekly consistency Board.",
+      "Progress and your profile show the same figures, including your current consistency.",
+      "Many fixes for review, grading and sheets on Android phones.",
+    ],
+    ar: [
+      "ادرس مع الحلقة وتابع لوحة المواظبة الأسبوعية.",
+      "يعرض التقدم وملفك الشخصي الأرقام نفسها، ومنها مواظبتك الحالية.",
+      "إصلاحات كثيرة للمراجعة والتقييم والنوافذ على هواتف أندرويد.",
+    ],
+  },
   "1.0.1": {
     en: [
       "Phones now have four main tabs: Home, Mushaf, Progress and Settings.",
