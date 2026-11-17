@@ -30,7 +30,7 @@ export const appUpdateStrings = {
     appUpdateChannelName: "App updates",
     autoDownloadUpdatesLabel: "Download updates automatically",
     autoDownloadUpdatesHint:
-      "On Wi-Fi without a data limit, a new version downloads in the background. Hafiz asks before installing it.",
+      "On Wi-Fi without a data limit, a new version downloads while Hafiz is open. Hafiz asks before installing it.",
   },
   ar: {
     appUpdateSubtitleSize: "الإصدار {{version}} من حافظ متاح. حجم التنزيل {{size}}.",
@@ -59,6 +59,6 @@ export const appUpdateStrings = {
     appUpdateChannelName: "تحديثات التطبيق",
     autoDownloadUpdatesLabel: "تنزيل التحديثات تلقائيًا",
     autoDownloadUpdatesHint:
-      "على شبكة Wi-Fi بلا حد للبيانات يُنزَّل الإصدار الجديد في الخلفية، ويسألك حافظ قبل تثبيته.",
+      "على شبكة Wi-Fi بلا حد للبيانات يُنزَّل الإصدار الجديد أثناء فتح حافظ، ويسألك حافظ قبل تثبيته.",
   },
 } as const;

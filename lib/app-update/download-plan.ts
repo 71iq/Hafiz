@@ -1,7 +1,7 @@
 import type { AndroidRelease } from "./release";
 
 /**
- * Pure rules for the Android in-app update: the download's states, when a background download may
+ * Pure rules for the Android in-app update: the download's states, when an automatic download may
  * start, which files in the updates folder to keep, and whether a finished download is the published
  * APK. lib/app-update/update-controller.ts applies them through the platform adapter.
  */
@@ -71,7 +71,7 @@ export function isUnmeteredWifi(network: NetworkSnapshot | null): boolean {
 }
 
 /**
- * Whether a background download starts for the newer release. Never on cellular or metered
+ * Whether an automatic download starts for the newer release. Never on cellular or metered
  * networks, never twice, and never again after a download that failed verification: that one waits
  * for the user's Try again so a broken file is not fetched on every return to the app.
  */

@@ -6,7 +6,7 @@ import { getUpdateState, resetUpdateStore, setUpdateState, useUpdateState } from
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
-// One shared check for every screen that shows the update and for the background download,
+// One shared check for every screen that shows the update and for the automatic download,
 // refreshed at most every six hours unless the user asks again. Failures (offline, server down)
 // leave the last known release.
 let pending: Promise<AndroidRelease> | null = null;

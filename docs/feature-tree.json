@@ -1719,7 +1719,7 @@
             },
             {
               "id": "settings.about.autoupdate",
-              "title": "Download updates automatically: background Wi-Fi download, install prompt, ready notification",
+              "title": "Download updates automatically: Wi-Fi download while open, install prompt, ready notification",
               "kind": "widget",
               "cases": ["SET-21"],
               "uses": ["settings.about.update", "shared.confirm"],

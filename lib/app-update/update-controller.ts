@@ -19,14 +19,24 @@ import { installedAndroidVersionCode } from "./use-android-update";
  * The Android in-app update: one shared download into the updates folder, verified before it is
  * offered, then installed through Android's package installer. Web and iOS never reach it, and the
  * side-by-side QA build (no installed version code) does nothing.
+ *
+ * The download is an ordinary request owned by the app process, so it only moves while Hafiz runs:
+ * Android freezes a cached app soon after it leaves the screen (always from Android 14). An
+ * interrupted download keeps its partial file and resumes on return to the app or when unmetered
+ * Wi-Fi comes back. Keeping it alive in the background would need a foreground service or
+ * DownloadManager.
  */
+
+/** How long an automatic download waits after an error before reading the network, so a Wi-Fi loss
+ * that broke the socket before NetInfo reported it still counts as a pause. */
+const NETWORK_SETTLE_MS = 2000;
 
 type ReadyNotice = (release: AndroidRelease) => Readonly<{ title: string; body: string; channelName: string }>;
 
 let activeRun: Promise<void> | null = null;
 let activeTask: UpdateDownloadTask | null = null;
 let activeIsAuto = false;
-/** Set when a background download must stop, including before its request has started. */
+/** Set when an automatic download must stop, including before its request has started. */
 let pauseRequested = false;
 let activePartial: string | null = null;
 let restoring: Promise<void> | null = null;
@@ -170,9 +180,57 @@ async function runDownload(release: AndroidRelease): Promise<void> {
   notifyIfInBackground(release);
 }
 
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function partialSize(release: AndroidRelease): Promise<number> {
+  const info = await platform.fileInfo(updateFileNames.partial(release.versionCode), { md5: false });
+  return info.exists ? (info.size ?? 0) : 0;
+}
+
 /**
- * Starts (or resumes) the download of a release. Every caller shares the one running download. A
- * background download pauses when the device leaves unmetered Wi-Fi; its partial file stays.
+ * Whether a download that threw stopped for the network rather than failed. An automatic download
+ * pauses when unmetered Wi-Fi ended: Android usually breaks the socket before NetInfo reports the
+ * change, so after an error the network is read again once it has had time to settle.
+ */
+async function pausedByNetwork(auto: boolean): Promise<boolean> {
+  if (pauseRequested) return true;
+  if (!auto) return false;
+  if (!isUnmeteredWifi(await platform.getNetwork())) return true;
+  await wait(NETWORK_SETTLE_MS);
+  return pauseRequested || !isUnmeteredWifi(await platform.getNetwork());
+}
+
+/**
+ * Runs the download until it finishes, pauses or fails. An automatic download that broke on
+ * unmetered Wi-Fi while Hafiz is open (a socket that stalled while Android froze the app) resumes
+ * on its own as long as the last attempt added bytes, so a server that keeps failing is not retried
+ * in a loop; that waits for the next return to the app or network change, or for Try again.
+ */
+async function downloadUntilSettled(release: AndroidRelease, auto: boolean): Promise<void> {
+  await restoreUpdateFiles();
+  for (;;) {
+    const before = await partialSize(release);
+    try {
+      await runDownload(release);
+      return;
+    } catch (error) {
+      // The partial file stays, so a resume, Try again or the next check continues it.
+      warn("Download interrupted", error);
+      if (await pausedByNetwork(auto)) {
+        dispatchUpdateEvent({ type: "paused" });
+        return;
+      }
+      const progressed = (await partialSize(release).catch(() => before)) > before;
+      if (auto && progressed && !platform.isAppInBackground()) continue;
+      dispatchUpdateEvent({ type: "failed", release, reason: "download" });
+      return;
+    }
+  }
+}
+
+/**
+ * Starts (or resumes) the download of a release. Every caller shares the one running download. An
+ * automatic download pauses when the device leaves unmetered Wi-Fi; its partial file stays.
  */
 export function startUpdateDownload(release: AndroidRelease, { auto }: { auto: boolean }): Promise<void> {
   if (!platform.supported || installedAndroidVersionCode() === null) return Promise.resolve();
@@ -186,10 +244,8 @@ export function startUpdateDownload(release: AndroidRelease, { auto }: { auto: b
         if (!isUnmeteredWifi(network)) pauseActiveDownload();
       })
     : () => undefined;
-  activeRun = restoreUpdateFiles()
-    .then(() => runDownload(release))
+  activeRun = downloadUntilSettled(release, auto)
     .catch((error: unknown) => {
-      // A dropped connection keeps the partial file, so Try again or the next check resumes it.
       warn("Download failed", error);
       dispatchUpdateEvent({ type: "failed", release, reason: "download" });
     })
@@ -215,7 +271,7 @@ export function pauseAutomaticDownload(): void {
 }
 
 /**
- * The background download decision after a release check, on reconnect and when the setting
+ * The automatic download decision after a release check, on reconnect and when the setting
  * changes: only for a newer release, with the setting on, on unmetered Wi-Fi.
  */
 export async function maybeAutoDownload(enabled: boolean): Promise<void> {

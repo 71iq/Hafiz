@@ -267,7 +267,7 @@ type SettingsContextType = {
   setAudioDelaySeconds: (seconds: number) => void;
   hapticsEnabled: boolean;
   setHapticsEnabled: (enabled: boolean) => void;
-  /** Android: download a newer release in the background on unmetered Wi-Fi. Device-only, default on. */
+  /** Android: download a newer release while Hafiz runs on unmetered Wi-Fi. Device-only, default on. */
   autoDownloadUpdates: boolean;
   setAutoDownloadUpdates: (enabled: boolean) => void;
   isRTL: boolean;

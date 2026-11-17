@@ -308,6 +308,67 @@ describe("network rules", () => {
     expect(phase()).toEqual({ status: "idle" });
   });
 
+  it("pauses, not fails, when losing Wi-Fi breaks the socket before the pause reaches it", async () => {
+    const run = startUpdateDownload(release, { auto: true });
+    await flush();
+    mockFiles.set("4.apk.part", { size: 300, md5: "" });
+    mockNetwork = CELLULAR;
+    mockDownloads[0].reject(new Error("Software caused connection abort"));
+    for (const listener of mockNetworkListeners) listener(CELLULAR);
+    await run;
+    expect(phase()).toEqual({ status: "idle" });
+    expect(mockFiles.get("4.apk.part")?.size).toBe(300);
+  });
+
+  it("pauses when the network watcher already asked but the download rejected", async () => {
+    const run = startUpdateDownload(release, { auto: true });
+    await flush();
+    mockDownloads[0].pause.mockImplementation(async () => undefined);
+    for (const listener of mockNetworkListeners) listener(CELLULAR);
+    mockDownloads[0].reject(new Error("socket closed"));
+    await run;
+    expect(phase()).toEqual({ status: "idle" });
+  });
+
+  it("pauses when NetInfo reports the Wi-Fi loss only after the socket broke", async () => {
+    jest.useFakeTimers();
+    try {
+      const run = startUpdateDownload(release, { auto: true });
+      await jest.advanceTimersByTimeAsync(0);
+      mockDownloads[0].reject(new Error("socket closed"));
+      await jest.advanceTimersByTimeAsync(0);
+      mockNetwork = CELLULAR;
+      await jest.advanceTimersByTimeAsync(2000);
+      await run;
+      expect(phase()).toEqual({ status: "idle" });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("resumes an automatic download that stalled while Hafiz was suspended", async () => {
+    jest.useFakeTimers();
+    try {
+      const run = startUpdateDownload(release, { auto: true });
+      await jest.advanceTimersByTimeAsync(0);
+      mockFiles.set("4.apk.part", { size: 300, md5: "" });
+      mockDownloads[0].reject(new Error("timeout"));
+      await jest.advanceTimersByTimeAsync(2000);
+      expect(mockDownloads).toHaveLength(2);
+      expect(mockDownloads[1].resumeFrom).toBe(300);
+      expect(phase()).toMatchObject({ status: "downloading" });
+
+      // A second error without new bytes waits for Try again or the next resume.
+      mockDownloads[1].reject(new Error("timeout"));
+      await jest.advanceTimersByTimeAsync(2000);
+      await run;
+      expect(mockDownloads).toHaveLength(2);
+      expect(phase()).toEqual({ status: "failed", release, reason: "download" });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("does not start a background download when Wi-Fi ends before the request", async () => {
     const run = startUpdateDownload(release, { auto: true });
     for (const listener of mockNetworkListeners) listener(CELLULAR);

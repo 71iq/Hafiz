@@ -24,7 +24,7 @@ type ReadyNotice = Parameters<typeof setUpdateReadyNotice>[0];
 /**
  * Root lifecycle for the Android update, mounted once. It restores a verified download, checks for a
  * release at start and on every return to the app (six-hour cache), cleans superseded files, and
- * starts the background download when the setting allows it: after each check, when the setting is
+ * starts the automatic download when the setting allows it: after each check, when the setting is
  * turned on, on return to the app and when unmetered Wi-Fi comes back. Turning the setting off
  * pauses that download.
  */
@@ -69,8 +69,8 @@ export function useAppUpdateLifecycle({
     };
   }, [installed, latest, settingsLoaded, autoDownload]);
 
-  // A paused or dropped background download continues when unmetered Wi-Fi returns or the person
-  // comes back to the app, even while the six-hour cache holds the same release.
+  // A paused or dropped automatic download continues when unmetered Wi-Fi returns or the person
+  // comes back to the app (Android suspends Hafiz soon after it leaves the screen), even while the six-hour cache holds the same release.
   useEffect(() => {
     if (installed === null || !settingsLoaded || !autoDownload) return;
     const unsubscribeNetwork = appUpdatePlatform.subscribeNetwork((network) => {
