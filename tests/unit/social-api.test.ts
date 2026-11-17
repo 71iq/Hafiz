@@ -1,7 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { boardRead, boardViewSchema, fetchBoard, joinBoard } from "@/lib/board/api";
 import { strings } from "@/lib/i18n/strings";
-import { deleteOwnAvatarFiles, fetchProfileSummary, ProfilePrivacyChangedError } from "@/lib/profile/privacy";
+import {
+  deleteOwnAvatarFiles,
+  fetchProfileSummary,
+  leaveLegacyHalaqas,
+  ProfilePrivacyChangedError,
+  saveProfilePrivacy,
+} from "@/lib/profile/privacy";
 import { loadWithSocialCache } from "@/lib/social/cache";
 import { socialFailureMessage } from "@/lib/social/messages";
 import { captureSocialOwner, requireSocialOwner } from "@/lib/social/owner";
@@ -187,6 +193,83 @@ describe("a minor's photo (ETH-07)", () => {
     error: null,
   });
 
+  it("deletes the account's own photo files before it records minority, as that account", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/2.png`).add(`${OTHER}/3.jpg`);
+    mockRpc.mockImplementation(async () => {
+      // By the time minority is recorded, nothing is left to publish.
+      expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
+      return privacy(true);
+    });
+    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
+    expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
+    // The pass before the save, and the one after it, which finds nothing left with one request.
+    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "remove", "list"]);
+    expect(mockStorageCalls.every((call) => call.bucket === "avatars" && bearerSubject(call.auth) === USER)).toBe(true);
+  });
+
+  it("does not record minority when a photo could not be deleted, so the save can be retried", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRemoveRefused = true;
+    mockRpc.mockResolvedValue(privacy(true));
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
+    ).rejects.toMatchObject({ failure: { kind: "failed" } });
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("removes a photo uploaded while minority was being recorded, once it is recorded", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRpc.mockImplementation(async () => {
+      // Another device uploads before the server starts refusing this account's uploads.
+      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
+      return privacy(true);
+    });
+    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
+    expect([...mockAvatarFiles]).toEqual([]);
+  });
+
+  it("keeps a recorded save when the pass after it fails", async () => {
+    mockRpc.mockImplementation(async () => {
+      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
+      mockRemoveRefused = true;
+      return privacy(true);
+    });
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
+    ).resolves.toMatchObject({ isMinor: true });
+  });
+
+  it("leaves an adult's photos alone and turns profile visibility off as asked", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRpc.mockResolvedValue(privacy(false));
+    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: false, expectedMinor: false }, owner());
+    expect(mockStorageCalls).toEqual([]);
+    expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", {
+      p_show_streak: false,
+      p_show_juz_completions: false,
+      p_is_minor: false,
+      p_expected_minor: false,
+    });
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+  });
+
+  it("sends the minority the form loaded and reports a refusal for a changed setting as its own error", async () => {
+    mockAvatarFiles.add(`${USER}/1.jpg`);
+    mockRpc.mockResolvedValue({ data: null, error: { message: "privacy_changed", code: "P0001" } });
+    // The form still shows a minor, but another device withdrew it: the adult's photo is not deleted.
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: true }, owner()),
+    ).rejects.toBeInstanceOf(ProfilePrivacyChangedError);
+    expect([...mockAvatarFiles]).toEqual([`${USER}/1.jpg`]);
+  });
+
+  it("says when recording minority took the account off the Board (BRD-07)", async () => {
+    mockRpc.mockResolvedValue({ data: { ...privacy(true).data, board_joined: false, left_board: true }, error: null });
+    await expect(
+      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
+    ).resolves.toMatchObject({ isMinor: true, boardJoined: false, leftBoard: true });
+  });
+
   it("deletes photos in nested folders too", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/old/2.jpg`).add(`${USER}/old/deeper/3.png`).add(`${OTHER}/old/4.jpg`);
     await expect(deleteOwnAvatarFiles(owner())).resolves.toBe(3);
@@ -255,6 +338,46 @@ describe("a minor's photo (ETH-07)", () => {
       joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner()),
     ).rejects.toMatchObject({ failure: { kind: "failed" } });
     expect(mockRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("halaqas from an earlier version (SET-20)", () => {
+  const A = "00000000-0000-4000-8000-0000000000a1";
+  const B = "00000000-0000-4000-8000-0000000000b2";
+  const groups = (ids: string[]) => ({ data: ids.map((id) => ({ id, kind: "invite", name: "Group" })), error: null });
+
+  it("leaves every halaqa the account is still in, as that account", async () => {
+    mockRpc.mockImplementation(async (fn) => (fn === "get_my_halaqas" ? groups([A, B]) : { data: null, error: null }));
+    await expect(leaveLegacyHalaqas(owner())).resolves.toBe(2);
+    expect(mockRpc.mock.calls).toEqual([
+      ["get_my_halaqas", {}],
+      ["leave_halaqa", { p_group_id: A }],
+      ["leave_halaqa", { p_group_id: B }],
+    ]);
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
+  });
+
+  it("skips a halaqa already left on another device and keeps going", async () => {
+    mockRpc.mockImplementation(async (fn, args) => {
+      if (fn === "get_my_halaqas") return groups([A, B]);
+      return args.p_group_id === A ? { data: null, error: { message: "not_a_member", code: "42501" } } : { data: null, error: null };
+    });
+    await expect(leaveLegacyHalaqas(owner())).resolves.toBe(2);
+    expect(mockRpc.mock.calls.map(([, args]) => args.p_group_id)).toEqual([undefined, A, B]);
+  });
+
+  it("stops at any other failure so the person can try again", async () => {
+    mockRpc.mockImplementation(async (fn) =>
+      fn === "get_my_halaqas" ? groups([A, B]) : { data: null, error: { message: "Failed to fetch" } },
+    );
+    await expect(leaveLegacyHalaqas(owner())).rejects.toMatchObject({ failure: { kind: "offline" } });
+    expect(mockRpc.mock.calls.filter(([fn]) => fn === "leave_halaqa")).toHaveLength(1);
+  });
+
+  it("does nothing more when the account is in no halaqa", async () => {
+    mockRpc.mockResolvedValue({ data: [], error: null });
+    await expect(leaveLegacyHalaqas(owner())).resolves.toBe(0);
+    expect(mockRpc.mock.calls.map(([fn]) => fn)).toEqual(["get_my_halaqas"]);
   });
 });
 

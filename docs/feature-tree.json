@@ -1607,7 +1607,17 @@
           "cases": ["SET-11"],
           "uses": ["shared.confirm", "profile.own", "auth.login", "shell.sync", "shell.sync.restore"],
           "native": false,
-          "children": []
+          "children": [
+            {
+              "id": "settings.account.privacy",
+              "title": "Privacy and sharing: profile visibility, under 18, leave halaqas from an earlier version",
+              "kind": "widget",
+              "cases": ["SET-20"],
+              "uses": ["shared.overlay"],
+              "native": false,
+              "children": []
+            }
+          ]
         },
         {
           "id": "settings.qf",

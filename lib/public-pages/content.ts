@@ -332,7 +332,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
           title: "Public content",
           body: [
             "Public reflections, comments, likes, your username, display name and profile photo may be visible to other Hafiz users. Do not post private information in public reflection areas.",
-            "Your progress is private by default. If you join the Board, people in your weekly group see your name or nickname, weekly consistency points and streak. Mistakes, grades and excused days are never shown to them. Sharing choices you made for a halaqa in an earlier version of the app stay in effect for its members and teachers.",
+            "Your progress is private by default. You can show your streak and juz completions on your profile, and turn that off again, in Settings > Account > Privacy and sharing. If you join the Board, people in your weekly group see your name or nickname, weekly consistency points and streak. Mistakes, grades and excused days are never shown to them. If you joined a halaqa in an earlier version of the app, its members and teachers still see what you chose to share there until you leave. You can leave every halaqa from Privacy and sharing.",
           ],
         },
         {
@@ -406,7 +406,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
           title: "المحتوى العام",
           body: [
             "قد تكون التأملات العامة، والتعليقات، والإعجابات، واسم المستخدم، والاسم المعروض، وصورة الملف ظاهرة لمستخدمي حافظ الآخرين. لا تنشر معلومات خاصة في مساحات التأمل العامة.",
-            "تقدّمك خاص افتراضيًا. وإن انضممت إلى اللوحة، يرى من في مجموعتك الأسبوعية اسمك أو لقبك ونقاط المواظبة الأسبوعية وسلسلتك. ولا تظهر لهم الأخطاء ولا التقييمات ولا أيام العذر أبدًا. وتبقى اختيارات المشاركة التي حدّدتها لحلقة في إصدار سابق من التطبيق سارية لأعضائها ومعلّميها.",
+            "تقدّمك خاص افتراضيًا. ويمكنك إظهار سلسلتك والأجزاء التي أتممتها في ملفك، وإخفاؤها مجددًا، من الإعدادات > الحساب > الخصوصية والمشاركة. وإن انضممت إلى اللوحة، يرى من في مجموعتك الأسبوعية اسمك أو لقبك ونقاط المواظبة الأسبوعية وسلسلتك. ولا تظهر لهم الأخطاء ولا التقييمات ولا أيام العذر أبدًا. وإن انضممت إلى حلقة في إصدار سابق من التطبيق، يبقى أعضاؤها ومعلّموها يرون ما اخترت مشاركته فيها حتى تغادرها. ويمكنك مغادرة كل الحلقات من الخصوصية والمشاركة.",
           ],
         },
         {

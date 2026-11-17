@@ -599,6 +599,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   ),
   entry("components/settings/NavigationBarTheme.tsx", "direction-neutral", "source", "Renders nothing on web and iOS."),
   entry(
+    "components/settings/ProfilePrivacySheet.tsx",
+    "overlay",
+    "source",
+    "ResponsiveSheet of mirrored switch rows; retry and leave buttons sit at the reading start; footer buttons reverse in RTL.",
+  ),
+  entry(
     "components/settings/ReadingStepper.tsx",
     "button",
     "rntl",

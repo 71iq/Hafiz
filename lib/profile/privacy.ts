@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { requireSignedOutViewer, requireSocialOwner, type SocialOwner } from "@/lib/social/owner";
-import { callSocialRpc, classifyRemoteError, socialError, socialFailureOf } from "@/lib/social/remote";
+import { callSocialRpc, classifyRemoteError, socialError, socialFailureOf, voidResult } from "@/lib/social/remote";
 
 /**
  * Profile visibility (SOC-01, ETH-07). Everything beyond identity is private unless the person turns it
@@ -37,6 +37,7 @@ export type ProfileSummary = z.output<typeof profileSummarySchema>;
 export const profilePrivacyKeys = {
   mine: (userId: string | null) => ["profilePrivacy", userId ?? "signed-out"] as const,
   summary: (viewerId: string | null, targetId: string) => ["profileSummary", viewerId ?? "signed-out", targetId] as const,
+  legacyHalaqas: (userId: string | null) => ["legacyHalaqas", userId ?? "signed-out"] as const,
 };
 
 /** The owner's own choices. Runs as that account (lib/social/owner.ts). */
@@ -61,6 +62,74 @@ export class ProfilePrivacyChangedError extends Error {
 export function profilePrivacyWriteError(error: unknown): unknown {
   const failure = socialFailureOf(error);
   return failure.kind === "failed" && failure.message === "privacy_changed" ? new ProfilePrivacyChangedError() : error;
+}
+
+const savedPrivacySchema = privacyRow
+  .extend({ left_board: z.boolean() })
+  .transform((row) => ({ ...toPrivacy(row), leftBoard: row.left_board }));
+/** The saved choices, and whether recording minority took the account off the Board (BRD-07). */
+export type SavedProfilePrivacy = z.output<typeof savedPrivacySchema>;
+
+/**
+ * Saves the visibility choices (Settings, Privacy and sharing). `expectedMinor` is the minority the
+ * form loaded; the server refuses the save with ProfilePrivacyChangedError when the stored value
+ * differs. Recording minority (ETH-07) deletes the stored photo files first and is not sent when that
+ * fails, so the save can be retried before anything is recorded. The server then clears the profile
+ * photo, refuses new uploads, leaves matched halaqas, takes a Board member without a nickname off the
+ * Board, and one more pass removes a photo another device uploaded in between.
+ */
+export async function saveProfilePrivacy(
+  input: { showStreak: boolean; showJuzCompletions: boolean; isMinor: boolean; expectedMinor: boolean },
+  owner: SocialOwner,
+): Promise<SavedProfilePrivacy> {
+  // Only a change to minority deletes first. A form that already showed a minor has nothing new to
+  // record, and a stale one would otherwise delete an adult's photos before the server refuses it.
+  if (input.isMinor && !input.expectedMinor) await deleteOwnAvatarFiles(owner);
+  const saved = await callSocialRpc(
+    "set_profile_privacy",
+    {
+      p_show_streak: input.showStreak,
+      p_show_juz_completions: input.showJuzCompletions,
+      p_is_minor: input.isMinor,
+      p_expected_minor: input.expectedMinor,
+    },
+    savedPrivacySchema,
+    owner,
+  ).catch((error: unknown) => {
+    throw profilePrivacyWriteError(error);
+  });
+  if (saved.isMinor) await deleteAvatarFilesAfterMinority(owner);
+  return saved;
+}
+
+/**
+ * Halaqa is not in this version, but the server keeps memberships and sharing choices made in an
+ * earlier one, and their members and teachers still read what was shared. These let the person see
+ * that they are still in a halaqa and leave every one, which withdraws all of that sharing. Only the
+ * group ids are read.
+ */
+const legacyHalaqaIdsSchema = z.array(z.object({ id: z.string().uuid() })).transform((rows) => rows.map((row) => row.id));
+
+export function fetchLegacyHalaqaIds(owner: SocialOwner): Promise<string[]> {
+  return callSocialRpc("get_my_halaqas", {}, legacyHalaqaIdsSchema, owner);
+}
+
+/**
+ * Leaves every halaqa this account is still in, one at a time, as that account. A group the person
+ * already left elsewhere (not_a_member) is skipped. Any other failure stops here and is thrown; the
+ * groups already left stay left, and a retry reads the list again.
+ */
+export async function leaveLegacyHalaqas(owner: SocialOwner): Promise<number> {
+  const ids = await fetchLegacyHalaqaIds(owner);
+  for (const id of ids) {
+    try {
+      await callSocialRpc("leave_halaqa", { p_group_id: id }, voidResult, owner);
+    } catch (error) {
+      const failure = socialFailureOf(error);
+      if (!(failure.kind === "failed" && failure.message === "not_a_member")) throw error;
+    }
+  }
+  return ids.length;
 }
 
 /**
