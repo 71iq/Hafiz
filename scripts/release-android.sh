@@ -37,7 +37,7 @@ fi
 
 repo_vars=$(gh variable list --json name,value 2>/dev/null || echo '[]')
 for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_QF_USER_AUTH_ENABLED \
-  EXPO_PUBLIC_QF_CONTENT_ENABLED EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED EXPO_PUBLIC_SOCIAL_AUTH_ENABLED; do
+  EXPO_PUBLIC_QF_CONTENT_ENABLED EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS; do
   if [ -z "${!name:-}" ]; then
     value=$(node -e 'const v=JSON.parse(process.argv[1]).find((x)=>x.name===process.argv[2]);process.stdout.write(v?v.value:"")' "$repo_vars" "$name")
     [ -n "$value" ] && export "$name=$value"

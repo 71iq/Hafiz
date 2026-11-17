@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Mail } from "lucide-react-native";
-import { isEmailAuthFlowsEnabled, isSocialAuthEnabled } from "@/lib/auth/config";
+import { getEnabledSocialProviders, isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { carryAuthEmail, readCarriedAuthEmail } from "@/lib/auth/form-handoff";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -177,7 +177,7 @@ function ForgotPasswordFormScreen() {
 
       <AuthTextLink label={s.authBackToLogin} dir={dir} align="center" onPress={backToLogin} />
 
-      {isSocialAuthEnabled() ? (
+      {getEnabledSocialProviders().length > 0 ? (
         <Text
           className="mt-2 text-warm-600 dark:text-neutral-400"
           style={{

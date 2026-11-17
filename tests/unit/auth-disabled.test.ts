@@ -23,18 +23,18 @@ jest.mock("@/lib/quran-foundation/user", () => ({
 
 describe("temporarily disabled account flows", () => {
   const originalEmailFlag = process.env.EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED;
-  const originalSocialFlag = process.env.EXPO_PUBLIC_SOCIAL_AUTH_ENABLED;
+  const originalSocialFlag = process.env.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS;
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED = "false";
-    process.env.EXPO_PUBLIC_SOCIAL_AUTH_ENABLED = "false";
+    process.env.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS = "none";
   });
   afterAll(() => {
     if (originalEmailFlag === undefined) delete process.env.EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED;
     else process.env.EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED = originalEmailFlag;
-    if (originalSocialFlag === undefined) delete process.env.EXPO_PUBLIC_SOCIAL_AUTH_ENABLED;
-    else process.env.EXPO_PUBLIC_SOCIAL_AUTH_ENABLED = originalSocialFlag;
+    if (originalSocialFlag === undefined) delete process.env.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS;
+    else process.env.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS = originalSocialFlag;
   });
 
   it("rejects signup, confirmation resend and recovery without a request", async () => {
@@ -55,6 +55,17 @@ describe("temporarily disabled account flows", () => {
       "temporarily unavailable",
     );
     await expect(startAppOAuth("google", "link", useAuthStore.getState).result).rejects.toThrow(
+      "temporarily unavailable",
+    );
+    expect(supabase.auth.signInWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it("rejects a provider left out of the enabled list without a request", async () => {
+    process.env.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS = "google";
+    await expect(startAppOAuth("apple", "sign-in", useAuthStore.getState).result).rejects.toThrow(
+      "temporarily unavailable",
+    );
+    await expect(startAppOAuth("facebook", "sign-in", useAuthStore.getState).result).rejects.toThrow(
       "temporarily unavailable",
     );
     expect(supabase.auth.signInWithOAuth).not.toHaveBeenCalled();

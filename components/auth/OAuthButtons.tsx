@@ -5,7 +5,7 @@ import { BookOpen } from "lucide-react-native";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth, type AppOAuthProvider } from "@/lib/auth/oauth";
 import { useAuthStore } from "@/lib/auth/store";
-import { isSocialAuthEnabled } from "@/lib/auth/config";
+import { getEnabledSocialProviders, type SocialAuthProvider } from "@/lib/auth/config";
 import { persistAuthReturnForRedirect } from "@/lib/auth/return-origin";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { isQfLoginEnabled } from "@/lib/quran-foundation/config";
@@ -36,7 +36,7 @@ type Props = {
   onSignedIn?: () => void;
 };
 
-type SocialProvider = "google" | "apple" | "facebook";
+type SocialProvider = SocialAuthProvider;
 type BusyProvider = SocialProvider | "qf";
 
 const googleLogo = require("@/assets/images/auth/google.png") as ImageSourcePropType;
@@ -89,7 +89,10 @@ export function OAuthButtons({ strings: s, isDark, onError, onSignedIn }: Props)
     if (committedDb.current.db !== db) committedDb.current = { db };
   }, [db]);
 
-  if (!isSupabaseConfigured() || !isSocialAuthEnabled()) return null;
+  // Quran Foundation sign-in has its own flag, so it can show without any social provider.
+  const enabledSocial = getEnabledSocialProviders();
+  const qfAuthEnabled = isQfLoginEnabled();
+  if (!isSupabaseConfigured() || (enabledSocial.length === 0 && !qfAuthEnabled)) return null;
 
   const failureText = (provider: BusyProvider) =>
     interpolate(s.authProviderFailed ?? "Could not sign in with {{provider}}. Try again.", {
@@ -143,12 +146,12 @@ export function OAuthButtons({ strings: s, isDark, onError, onSignedIn }: Props)
   const handleQfPress = () => handleOAuth(QF_OAUTH_PROVIDER, "qf");
 
   const mutedColor = resolvedIsDark ? "#525252" : "#DFD9D1";
-  const qfAuthEnabled = isQfLoginEnabled();
-  const providers: { id: SocialProvider; label: string; source: ImageSourcePropType }[] = [
+  const allProviders: { id: SocialProvider; label: string; source: ImageSourcePropType }[] = [
     { id: "google", label: s.authContinueWithGoogle, source: googleLogo },
     { id: "apple", label: s.authContinueWithApple, source: appleLogo },
     { id: "facebook", label: s.authContinueWithFacebook, source: facebookLogo },
   ];
+  const providers = allProviders.filter((provider) => enabledSocial.includes(provider.id));
   const statusText = busyProvider
     ? interpolate(s.authOpeningProvider ?? "Opening {{provider}}...", { provider: PROVIDER_NAMES[busyProvider] })
     : failedProvider
@@ -174,27 +177,29 @@ export function OAuthButtons({ strings: s, isDark, onError, onSignedIn }: Props)
         <View style={{ flex: 1, height: 1, backgroundColor: mutedColor }} />
       </View>
 
-      <View style={{ gap: 10 }}>
-        {providers.map((provider) => (
-          <OAuthProviderButton
-            key={provider.id}
-            onPress={() => handlePress(provider.id)}
-            label={provider.label}
-            source={provider.source}
-            colors={providerButtonStyle(provider.id, resolvedIsDark)}
-            focusColor={resolvedIsDark ? "#2dd4bf" : "#0d9488"}
-            dir={dir}
-            disabled={!!busyProvider}
-            loading={busyProvider === provider.id}
-          />
-        ))}
-      </View>
+      {providers.length > 0 && (
+        <View style={{ gap: 10 }}>
+          {providers.map((provider) => (
+            <OAuthProviderButton
+              key={provider.id}
+              onPress={() => handlePress(provider.id)}
+              label={provider.label}
+              source={provider.source}
+              colors={providerButtonStyle(provider.id, resolvedIsDark)}
+              focusColor={resolvedIsDark ? "#2dd4bf" : "#0d9488"}
+              dir={dir}
+              disabled={!!busyProvider}
+              loading={busyProvider === provider.id}
+            />
+          ))}
+        </View>
+      )}
 
       {qfAuthEnabled && (
         <Pressable
           onPress={handleQfPress}
           disabled={!!busyProvider}
-          className="mt-3 flex-row items-center justify-center gap-2 rounded-full border px-4 py-3"
+          className={`${providers.length > 0 ? "mt-3 " : ""}flex-row items-center justify-center gap-2 rounded-full border px-4 py-3`}
           style={({ pressed }) => ({
             opacity: busyProvider && busyProvider !== "qf" ? 0.55 : pressed ? 0.75 : 1,
             backgroundColor: "#FFFFFF",

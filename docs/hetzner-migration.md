@@ -126,13 +126,18 @@ and assume it can decrypt the old connection. Re-enabling the integration
 requires credentials and reauthorization of the affected connection.
 The owner requested temporarily disabling signup, password reset and Google
 login. Build with `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=false` and
-`EXPO_PUBLIC_SOCIAL_AUTH_ENABLED=false`. The app hides those actions and redirects
+`EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS=none`. The app hides those actions and redirects
 direct signup/recovery routes to login. Caddy rejects email-dependent endpoints.
 GoTrue has `GOTRUE_DISABLE_SIGNUP=true` and `GOTRUE_EXTERNAL_GOOGLE_ENABLED=false`.
 Existing password login, session refresh and account sync remain enabled.
 Keep email confirmation enabled. To restore the disabled flows, supply SMTP and
 a valid Google client secret, update the server settings and CI variables, then
 verify email delivery and OAuth before re-enabling the controls.
+`EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS` is a comma-separated list of `google`,
+`apple` and `facebook`, so `google` enables Google without Apple, which needs a
+paid Apple developer account. An empty value or `none` shows no social buttons.
+An unset value shows all three for local development, so set it for every
+release build. Quran Foundation login keeps its own flag.
 
 ## Automatic releases
 
@@ -159,7 +164,7 @@ health and exits without replacing it.
 Public CI variables are `EXPO_PUBLIC_SUPABASE_URL`,
 `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_QF_USER_AUTH_ENABLED`,
 `EXPO_PUBLIC_QF_CONTENT_ENABLED`, `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED`,
-`EXPO_PUBLIC_SOCIAL_AUTH_ENABLED` and `HAFIZ_HETZNER_HOST`. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
+`EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS` and `HAFIZ_HETZNER_HOST`. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
 `HAFIZ_HETZNER_KNOWN_HOSTS`. Server secrets never enter the web build or Git.
 Infrastructure, database migrations and Edge Function source changes require
 an administrator deployment. The web deploy key cannot modify them.

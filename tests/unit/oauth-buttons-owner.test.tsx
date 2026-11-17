@@ -4,7 +4,7 @@ import { I18nManager } from "react-native";
 import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
-import { isSocialAuthEnabled } from "@/lib/auth/config";
+import { getEnabledSocialProviders } from "@/lib/auth/config";
 import type { AuthCommandResult, AuthOwner } from "@/lib/auth/coordinator";
 import { useAuthStore } from "@/lib/auth/store";
 import { startAppOAuth, type AppOAuthOutcome } from "@/lib/auth/oauth";
@@ -21,7 +21,7 @@ jest.mock("nativewind", () => ({
   useColorScheme: () => ({ colorScheme: "light", setColorScheme: jest.fn() }),
 }));
 jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: jest.fn() }));
-jest.mock("@/lib/auth/config", () => ({ isSocialAuthEnabled: jest.fn() }));
+jest.mock("@/lib/auth/config", () => ({ getEnabledSocialProviders: jest.fn() }));
 jest.mock("@/lib/auth/oauth", () => ({ startAppOAuth: jest.fn() }));
 jest.mock("@/lib/auth/store", () => ({ useAuthStore: { getState: jest.fn() } }));
 jest.mock("@/lib/database/provider", () => ({ useDatabaseStatus: () => ({ db: mockDatabase }) }));
@@ -99,7 +99,7 @@ beforeEach(() => {
   jest.spyOn(ReactNative, "useWindowDimensions").mockReturnValue(phoneDimensions);
   jest.replaceProperty(I18nManager, "isRTL", false);
   jest.mocked(isSupabaseConfigured).mockReturnValue(true);
-  jest.mocked(isSocialAuthEnabled).mockReturnValue(true);
+  jest.mocked(getEnabledSocialProviders).mockReturnValue(["google", "apple", "facebook"]);
   jest.mocked(isQfLoginEnabled).mockReturnValue(true);
   jest
     .mocked(useAuthStore.getState)

@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
-import { isEmailAuthFlowsEnabled, isSocialAuthEnabled } from "@/lib/auth/config";
+import { getEnabledSocialProviders, isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import {
   carryAuthEmail,
   peekAuthHandoffNotice,
@@ -14,6 +14,7 @@ import {
   takeAuthHandoffNotice,
 } from "@/lib/auth/form-handoff";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { isQfLoginEnabled } from "@/lib/quran-foundation/config";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate, useAppLanguage } from "@/lib/i18n/useStrings";
@@ -70,7 +71,8 @@ export default function LoginScreen() {
   }, []);
   const configured = isSupabaseConfigured();
   const emailFlowsEnabled = isEmailAuthFlowsEnabled();
-  const socialEnabled = isSocialAuthEnabled();
+  // Matches OAuthButtons: the notice shows only when no provider button does.
+  const oauthAvailable = getEnabledSocialProviders().length > 0 || isQfLoginEnabled();
   const { width } = useWindowDimensions();
   const colors = useAuthIconColors();
   const reveal = useRevealOnFocus();
@@ -153,7 +155,7 @@ export default function LoginScreen() {
         <AuthFormNotice message={s.authSessionEnded} tone="info" dir={dir} />
       ) : null}
       {!emailFlowsEnabled ? <AuthFormNotice message={s.authTemporarilyLimited} tone="info" dir={dir} /> : null}
-      {!socialEnabled ? <AuthFormNotice message={s.authSocialOff} tone="info" dir={dir} /> : null}
+      {!oauthAvailable ? <AuthFormNotice message={s.authSocialOff} tone="info" dir={dir} /> : null}
       <AuthFormNotice message={serverNotice} dir={dir} action={resendAction} />
       {resendState === "sent" ? <AuthFormNotice message={s.authConfirmationResent} tone="success" dir={dir} /> : null}
 
