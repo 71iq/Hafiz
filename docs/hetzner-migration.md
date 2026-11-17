@@ -138,7 +138,9 @@ Signup, password reset and Google login were disabled during the migration and
 restored on 2026-11-17. Auth email goes through the free Resend plan
 (about 100 emails a day): `hafizquran.app` is verified in Resend with DKIM, SPF
 and return-path records in Cloudflare, and GoTrue uses `smtp.resend.com` on port
-587 with a sending-only key. Port 465 is unreachable from this network. Keep
+587 with a sending-only key. The SMTP values live in `/etc/hafiz/supabase.env`
+(`SMTP_*`, mapped by the pinned compose file), not in `auth.env`. Email links
+expire after one hour (`GOTRUE_MAILER_OTP_EXP=3600`), as on the former project. Port 465 is unreachable from this network. Keep
 email confirmation enabled. Caddy still rejects the email endpoints the app does
 not use (OTP, magic link, invite and reauthentication). The Google login uses a
 second client secret on the original OAuth client, because the first secret
