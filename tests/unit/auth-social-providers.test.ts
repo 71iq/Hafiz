@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { getEnabledSocialProviders, parseSocialAuthProviders } from "@/lib/auth/config";
 
 describe("social sign-in provider list", () => {
@@ -31,5 +33,14 @@ describe("social sign-in provider list", () => {
       delete process.env.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS;
       expect(getEnabledSocialProviders()).toEqual(["google", "apple", "facebook"]);
     });
+  });
+
+  // Unset offers every provider, so a release path must never build with the variable missing.
+  it("never leaves the variable unset in release builds", () => {
+    const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
+    expect(read(".github/workflows/hetzner-deploy.yml")).toContain(
+      "EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS: ${{ vars.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS || 'none' }}",
+    );
+    expect(read("scripts/release-android.sh")).toContain('test -n "${EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS+x}" ||');
   });
 });

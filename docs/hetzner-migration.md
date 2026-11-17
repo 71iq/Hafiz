@@ -137,7 +137,12 @@ verify email delivery and OAuth before re-enabling the controls.
 `apple` and `facebook`, so `google` enables Google without Apple, which needs a
 paid Apple developer account. An empty value or `none` shows no social buttons.
 An unset value shows all three for local development, so set it for every
-release build. Quran Foundation login keeps its own flag.
+release build. The web deploy treats a missing repository variable as `none`,
+and `scripts/release-android.sh` refuses to build without it. This variable
+replaced `EXPO_PUBLIC_SOCIAL_AUTH_ENABLED`. When adopting it, create the
+repository variable `EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS=none`, or `google` once
+GoTrue Google login is restored, then delete `EXPO_PUBLIC_SOCIAL_AUTH_ENABLED`.
+Quran Foundation login keeps its own flag.
 
 ## Automatic releases
 

@@ -24,7 +24,8 @@ jobs:
       EXPO_PUBLIC_QF_USER_AUTH_ENABLED: ${{ vars.EXPO_PUBLIC_QF_USER_AUTH_ENABLED }}
       EXPO_PUBLIC_QF_CONTENT_ENABLED: ${{ vars.EXPO_PUBLIC_QF_CONTENT_ENABLED }}
       EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED: ${{ vars.EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED }}
-      EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS: ${{ vars.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS }}
+      # Unset would offer every social provider; a missing variable must offer none.
+      EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS: ${{ vars.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS || 'none' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
