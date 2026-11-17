@@ -10,12 +10,12 @@ export const MAX_RELEASE_NOTE_BULLETS = 3;
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
   "1.0.2": {
     en: [
-      "Study with a Halaqa group and see the weekly consistency Board.",
+      "Join the weekly consistency Board, an optional small group ranked by wird days.",
       "Progress and your profile show the same figures, including your current consistency.",
       "Many fixes for review, grading and sheets on Android phones.",
     ],
     ar: [
-      "ادرس مع الحلقة وتابع لوحة المواظبة الأسبوعية.",
+      "انضم إلى لوحة المواظبة الأسبوعية، وهي مجموعة صغيرة اختيارية مرتبة بحسب أيام الوِرد.",
       "يعرض التقدم وملفك الشخصي الأرقام نفسها، ومنها مواظبتك الحالية.",
       "إصلاحات كثيرة للمراجعة والتقييم والنوافذ على هواتف أندرويد.",
     ],
