@@ -115,9 +115,9 @@ recitations without a public file) was restored on 2026-11-17 with
 `EXPO_PUBLIC_QF_CONTENT_ENABLED=true`. The ayah Hadith tab was removed until
 Hafiz has a licensed, scholar-verified source, so `qf-content` no longer
 serves hadiths and answers the old `hadith-ayah` action with `bad_request`.
-The VM keeps serving hadiths until `supabase/functions/qf-content/index.ts` is
-copied to `/opt/hafiz/supabase/volumes/functions/qf-content/` and
-`hafiz-functions` restarts. The `qf-content` function uses the surviving
+The VM runs this version since 2026-11-17; Edge Function changes reach it only
+when copied to `/opt/hafiz/supabase/volumes/functions/` and `hafiz-functions`
+is recreated. The `qf-content` function uses the surviving
 prelive OAuth client, the same client as the `custom:quran-foundation` Auth
 provider; Quran Foundation production does not know this client.
 `/etc/hafiz/functions.env` holds its credentials, `QF_CONTENT_ENV=prelive` and
