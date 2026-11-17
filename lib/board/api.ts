@@ -118,7 +118,7 @@ export function isValidBoardNickname(nickname: string | null): boolean {
 }
 
 /**
- * Joining sets the account's minority (ETH-07), as saveProfilePrivacy does. `expectedMinor` is the
+ * Joining sets the account's minority (ETH-07). `expectedMinor` is the
  * value the form loaded, and the server refuses the join with ProfilePrivacyChangedError when the
  * stored value differs, so a form loaded before another device recorded minority cannot clear it.
  * Recording minority deletes the stored photo files before the join is sent, which is not sent when
@@ -127,7 +127,7 @@ export function isValidBoardNickname(nickname: string | null): boolean {
 export async function joinBoard(
   input: { nickname: string | null; isMinor: boolean; expectedMinor: boolean; inputs: BoardInputs; today: string },
   owner: SocialOwner,
-): Promise<{ view: BoardView; leftMatched: boolean }> {
+): Promise<BoardView> {
   if (input.isMinor && !input.expectedMinor) await deleteOwnAvatarFiles(owner);
   const raw = await callSocialRpcRaw(
     "join_board",
@@ -142,13 +142,9 @@ export async function joinBoard(
     throw profilePrivacyWriteError(error);
   });
   const view = parseSocialPayload(boardViewSchema, raw);
-  // Whether this join took the account out of a matched halaqa, decided in the join's transaction.
-  const leftMatched = parseSocialPayload(leftMatchedSchema, raw).left_matched === true;
   if (input.isMinor) await deleteAvatarFilesAfterMinority(owner);
-  return { view, leftMatched };
+  return view;
 }
-
-const leftMatchedSchema = z.object({ left_matched: z.boolean().optional() });
 
 /** Stores the latest bands for the weekly pass (8.13). A no-op on the server for users off the board. */
 export async function refreshBoardBandsRemote(inputs: BoardInputs, today: string, owner: SocialOwner): Promise<void> {

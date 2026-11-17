@@ -7,7 +7,6 @@ import { createSchema } from "@/lib/database/schema";
 import { acceptRestoreConsent, fullSync, type SyncResult } from "@/lib/database/sync";
 import { State } from "@/lib/fsrs/scheduler";
 import { getReviewStats } from "@/lib/fsrs/queries";
-import { encouragementAcksKey } from "@/lib/halaqa/encouragement-notifications";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const OLD = "2026-01-01T00:00:00.000Z";
@@ -1654,12 +1653,13 @@ it("drops device state built from the replaced account when restoring another", 
   expect(keys).toContain("hifz_auto_delay_ms");
 });
 
-it("keeps another account's pending encouragement batches through a restore, with their acknowledgements", async () => {
+// Halaqa is removed for now; the device rows its encouragement reminders left behind are kept as they are.
+it("keeps an earlier build's Halaqa encouragement rows through a restore", async () => {
   const otherAccount = "00000000-0000-4000-8000-000000000002";
   const pending = JSON.stringify({
     batches: [{ id: "group-1", account_id: otherAccount, first_received_at: NEW, count: 2, log_id: null }],
   });
-  const acksKey = encouragementAcksKey(otherAccount);
+  const acksKey = `device_halaqa_encouragements_acked:${otherAccount}`;
   putSetting("notif_group_pending", pending);
   putSetting(acksKey, "{}");
   mockTableRows.set("user_settings:restore", [boundaryRows.user_settings]);

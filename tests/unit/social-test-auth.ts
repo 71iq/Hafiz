@@ -1,5 +1,5 @@
 /**
- * Shared fixtures for the halaqa and board tests: a signed-in auth state whose session token
+ * Shared fixtures for the board and profile tests: a signed-in auth state whose session token
  * getAuthSessionIdentity accepts, and a Supabase rpc builder that records the token it was sent with.
  */
 export type FakeAuthState = {

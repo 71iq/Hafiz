@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
-import { BookMarked, ChevronLeft, ChevronRight, Trophy, Users, type LucideIcon } from "lucide-react-native";
+import { BookMarked, ChevronLeft, ChevronRight, Trophy, type LucideIcon } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -8,14 +8,13 @@ import type { UIStringKey } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
 import { accentIconColor, mutedIconColor } from "@/lib/ui/theme-icons";
 
-export type SecondaryDestination = "halaqa" | "leaderboard" | "reflection-journey";
+export type SecondaryDestination = "leaderboard" | "reflection-journey";
 
 const DESTINATIONS: Record<
   SecondaryDestination,
   { href: Href; label: UIStringKey; hint: UIStringKey; icon: LucideIcon }
 > = {
   // Route names stay as they are: each screen keeps its own sign-in and opt-in gates.
-  halaqa: { href: "/(tabs)/halaqa", label: "tabHalaqa", hint: "navigationHalaqaHint", icon: Users },
   leaderboard: { href: "/(tabs)/leaderboard", label: "tabBoard", hint: "navigationBoardHint", icon: Trophy },
   "reflection-journey": {
     href: "/(tabs)/reflection-journey",
@@ -26,7 +25,7 @@ const DESTINATIONS: Record<
 };
 
 /**
- * Labeled entry rows for destinations that are not phone tabs (Halaqa, Board, Journey). Home and
+ * Labeled entry rows for destinations that are not phone tabs (Board, Journey). Home and
  * Progress show them so every destination stays reachable below 768px with four tabs.
  */
 export function SecondaryDestinations({

@@ -7,7 +7,6 @@ const ROUTE_TITLE_KEYS: Record<string, UIStringKey> = {
   "/mushaf": "tabMushaf",
   "/progress": "tabProgress",
   "/settings": "tabSettings",
-  "/halaqa": "tabHalaqa",
   "/leaderboard": "tabBoard",
   "/reflection-feed": "reflectionFeedTitle",
   "/reflection-journey": "reflectionJourneyTitle",

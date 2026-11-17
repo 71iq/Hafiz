@@ -63,44 +63,6 @@ export function profilePrivacyWriteError(error: unknown): unknown {
   return failure.kind === "failed" && failure.message === "privacy_changed" ? new ProfilePrivacyChangedError() : error;
 }
 
-const savedPrivacySchema = privacyRow
-  .extend({ left_board: z.boolean() })
-  .transform((row) => ({ ...toPrivacy(row), leftBoard: row.left_board }));
-/** The saved choices, and whether recording minority took the account off the Board (BRD-07). */
-export type SavedProfilePrivacy = z.output<typeof savedPrivacySchema>;
-
-/**
- * Saves the visibility choices. `expectedMinor` is the minority the form loaded; the server refuses
- * the save with ProfilePrivacyChangedError when the stored value differs. Recording minority (ETH-07)
- * deletes the stored photo files first and is not sent when that fails, so the save can be retried
- * before anything is recorded. The server then clears the profile photo, refuses new uploads, leaves
- * matched halaqas, takes a Board member without a nickname off the Board, and one more pass removes a
- * photo another device uploaded in between.
- */
-export async function saveProfilePrivacy(
-  input: { showStreak: boolean; showJuzCompletions: boolean; isMinor: boolean; expectedMinor: boolean },
-  owner: SocialOwner,
-): Promise<SavedProfilePrivacy> {
-  // Only a change to minority deletes first. A form that already showed a minor has nothing new to
-  // record, and a stale one would otherwise delete an adult's photos before the server refuses it.
-  if (input.isMinor && !input.expectedMinor) await deleteOwnAvatarFiles(owner);
-  const saved = await callSocialRpc(
-    "set_profile_privacy",
-    {
-      p_show_streak: input.showStreak,
-      p_show_juz_completions: input.showJuzCompletions,
-      p_is_minor: input.isMinor,
-      p_expected_minor: input.expectedMinor,
-    },
-    savedPrivacySchema,
-    owner,
-  ).catch((error: unknown) => {
-    throw profilePrivacyWriteError(error);
-  });
-  if (saved.isMinor) await deleteAvatarFilesAfterMinority(owner);
-  return saved;
-}
-
 /**
  * The pass after minority is recorded. From then on the bucket refuses this account's uploads, so
  * this removes any photo uploaded since the first pass. Before deleting what it found it reads the

@@ -2,7 +2,6 @@ import React from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { QueryClient, QueryClientProvider, focusManager, onlineManager } from "@tanstack/react-query";
 import { act, cleanup, render, waitFor } from "@testing-library/react-native";
-import { halaqaKeys } from "@/lib/halaqa/api";
 import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import {
   OWN_PRIVACY_REVALIDATE_MS,
@@ -138,19 +137,17 @@ afterEach(() => {
 });
 
 describe("minor photo cleanup (ETH-07)", () => {
-  it("removes a minor account's leftover photos as that account and reloads its halaqas", async () => {
+  it("removes a minor account's leftover photos as that account", async () => {
     const user = account(1);
     signIn(signedIn(user));
     mockAvatarFiles.add(`${user}/left-behind.jpg`).add(`${account(99)}/someone-else.jpg`);
     mockRpc.mockResolvedValue(privacy(true));
     const client = newClient();
-    client.setQueryData(halaqaKeys.mine(user), []);
     mount(client);
     await waitFor(() => expect(mockAvatarFiles.has(`${user}/left-behind.jpg`)).toBe(false));
     expect(mockAvatarFiles.has(`${account(99)}/someone-else.jpg`)).toBe(true);
     expect(mockStorageCalls.every((call) => bearerSubject(call.auth) === user)).toBe(true);
     expect(bearerSubject(mockHeaders.Authorization)).toBe(user);
-    expect(client.getQueryState(halaqaKeys.mine(user))?.isInvalidated).toBe(true);
   });
 
   it("lists once per privacy read when nothing is left, not on every mount", async () => {

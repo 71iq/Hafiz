@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isSupabaseConfigured, supabase, supabaseAnonKey } from "@/lib/supabase";
 
 /**
- * Halaqa and board are online features (SB-01). Each failure keeps its cause so the UI can tell
+ * The board is an online feature (SB-01). Each failure keeps its cause so the UI can tell
  * missing configuration, offline state, a server refusal and an invalid response apart
  * (CONVENTIONS.md, DEL-08).
  */
@@ -10,25 +10,10 @@ const SOCIAL_REJECTION_CODES = [
   "not_authenticated",
   "invalid_local_date",
   "invalid_bands",
-  "invalid_name",
-  "invalid_code",
-  "halaqa_full",
-  "halaqa_limit",
-  "not_a_member",
-  "not_allowed",
-  "invalid_role",
-  "invalid_sharing",
-  "invalid_recipient",
-  "free_text_invite_only",
-  "invalid_template",
-  "already_encouraged_today",
-  "minor_not_allowed",
   "nickname_required",
   "invalid_nickname",
   "invalid_privacy",
   "invalid_week_start",
-  "plan_not_shared",
-  "invalid_assignment",
 ] as const;
 /**
  * Who a request runs as. The Supabase client is shared, so a request started for one viewer could
@@ -45,7 +30,7 @@ export type SocialViewer = Readonly<{
   accessToken: () => Promise<string>;
 }>;
 
-/** A signed-in account a halaqa or board request belongs to. */
+/** A signed-in account a board or profile request belongs to. */
 export type SocialOwner = SocialViewer & Readonly<{ userId: string }>;
 
 export type SocialRejectionCode = (typeof SOCIAL_REJECTION_CODES)[number];

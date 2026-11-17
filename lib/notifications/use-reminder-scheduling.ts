@@ -1,7 +1,6 @@
 import { usePathname, useRootNavigationState } from "expo-router";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
-import { useAuthStore } from "@/lib/auth/store";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { deviceZoneKey } from "@/lib/habit/dates";
@@ -17,7 +16,6 @@ import {
   recordReminderOpened,
   requestRemindLater,
   rescheduleReminders,
-  setReminderAccountSource,
 } from "@/lib/notifications/schedule";
 import type { ReminderRoute } from "@/lib/notifications/types";
 
@@ -30,24 +28,12 @@ function warn(error: unknown) {
 
 /**
  * NOT-04: replan the next 7 days on app start, on return to the foreground, when the time zone
- * changes, after sync, after review activity (sessions and grades), when the language changes, and
- * when the account signs out or another signs in: only the signed-in account's halaqa encouragement
- * stays scheduled or shown, or shows while the app is open (5.8.2). Mount once, under the database
- * and settings providers.
+ * changes, after sync, after review activity (sessions and grades), and when the language changes.
+ * Mount once, under the database and settings providers.
  */
 export function useReminderScheduling(): void {
   const { db, isReady } = useDatabaseStatus();
   const { uiLanguage, isLoaded } = useSettings();
-  const accountId = useAuthStore((state) => state.user?.id ?? null);
-
-  useEffect(() => {
-    setReminderAccountSource(() => useAuthStore.getState().user?.id ?? null);
-  }, []);
-
-  // Replans when another account signs in or out. A run already waiting is shared.
-  useEffect(() => {
-    if (db && isReady && isLoaded) rescheduleReminders(db, { language: uiLanguage }).catch(warn);
-  }, [db, isReady, isLoaded, uiLanguage, accountId]);
 
   useEffect(() => {
     if (!db || !isReady || !isLoaded) return;

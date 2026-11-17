@@ -641,30 +641,6 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Standing rows mirror rank, avatar, name and points; numbers use the interface digits.",
   ),
   entry(
-    "components/social/EncouragementSheet.tsx",
-    "overlay",
-    "source",
-    "ResponsiveSheet of one-tap template rows that mirror icon and text; note field follows the UI direction.",
-  ),
-  entry(
-    "components/social/HalaqaGroup.tsx",
-    "card",
-    "rntl",
-    "Group header, goal bar fill and week dots run from the reading side; member rows mirror (tests/unit/halaqa-screen.test.tsx).",
-  ),
-  entry(
-    "components/social/HalaqaSharingSheet.tsx",
-    "overlay",
-    "source",
-    "ResponsiveSheet of mirrored switch rows; footer buttons reverse in RTL.",
-  ),
-  entry(
-    "components/social/HalaqaStart.tsx",
-    "card",
-    "rntl",
-    "Empty-state actions, the compact disclosure rows and the create or join sheet mirror; the invite code input stays LTR.",
-  ),
-  entry(
     "components/social/SocialControls.tsx",
     "feedback",
     "source",
@@ -674,25 +650,13 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/social/SocialScreen.tsx",
     "app-shell",
     "source",
-    "Halaqa and Board tab shell; title and subtitle align to the reading side.",
+    "Board tab shell; title and subtitle align to the reading side.",
   ),
   entry(
     "components/social/SocialSkeletons.tsx",
     "feedback",
     "source",
-    "Loading rows for halaqa members, board standings and the teacher view; rows use the explicit mirrored row style.",
-  ),
-  entry(
-    "components/social/TeacherSabaqAssignment.tsx",
-    "form-field",
-    "rntl",
-    "Next-sabaq form in the teacher view; the three number fields and buttons mirror, and digits follow the interface. The range preview's Uthmani opening reads RTL in both languages.",
-  ),
-  entry(
-    "components/social/TeacherViewSheet.tsx",
-    "overlay",
-    "source",
-    "Teacher view sheet; stage and grade rows mirror and cards read as pages or ayahs in the interface digits.",
+    "Loading rows for the board join form and standings; rows use the explicit mirrored row style.",
   ),
   entry(
     "components/sync/RestoreConsent.tsx",
@@ -788,7 +752,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/ui/SecondaryDestinations.tsx",
     "app-shell",
     "rntl",
-    "Halaqa, Board and Journey rows mirror their chevrons and labels.",
+    "Board and Journey rows mirror their chevrons and labels.",
   ),
   entry(
     "components/ui/Sheet.tsx",

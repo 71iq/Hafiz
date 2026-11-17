@@ -59,7 +59,6 @@ export const PHONE_TAB_ROUTES = ["home", "mushaf", "progress", "settings"] as co
 const SIDEBAR_PRIMARY_ROUTES = [
   "home",
   "mushaf",
-  "halaqa",
   "leaderboard",
   "progress",
   "reflection-feed",

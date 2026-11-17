@@ -357,7 +357,7 @@ export default function ProgressScreen() {
           onOpenDeck={(item, title) => setDeckCardsTarget({ id: item.deckId, title })}
         />
 
-        <SecondaryDestinations destinations={["halaqa", "leaderboard"]} />
+        <SecondaryDestinations destinations={["leaderboard"]} />
 
         {/* Surah progress */}
         <Text

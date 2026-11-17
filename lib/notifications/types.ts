@@ -11,7 +11,6 @@ export const NOTIFICATION_TYPES = [
   "grace_used",
   "earnback_open",
   "friday_kahf",
-  "group_encouragement",
   "comeback",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -26,13 +25,12 @@ const DEFAULT_TYPE_PREFS: Readonly<Record<NotificationType, boolean>> = {
   grace_used: true,
   earnback_open: true,
   friday_kahf: false,
-  group_encouragement: true,
   comeback: true,
 };
 
 /**
  * Reminders that ask for a session, which count as ignored when no session follows within 2 hours
- * (NOT-09). Kahf and halaqa messages are not counted. The planner projects the same set.
+ * (NOT-09). Kahf messages are not counted. The planner projects the same set.
  */
 export const COUNTED_FOR_BACKOFF: ReadonlySet<NotificationType> = new Set<NotificationType>([
   "wird_reminder",

@@ -3,7 +3,6 @@ import { Linking, Platform } from "react-native";
 import {
   isReminderData,
   type PermissionState,
-  type ReminderData,
   type ReminderPlatform,
   type ReminderResponse,
 } from "@/lib/notifications/platform-types";
@@ -22,22 +21,29 @@ const CATEGORY_ID = "wird-reminder";
 const REMIND_LATER_ACTION = "remind_later";
 
 let handlerInstalled = false;
-let shouldPresent: (data: ReminderData) => boolean = () => true;
-let onHidden: (data: ReminderData) => void = () => {};
 
 /**
- * Whether a notification that arrives while the app is open shows. Hafiz posts only its own
- * reminders; one it cannot read shows as before, unless it claims to be a halaqa encouragement,
- * which may belong to another account (5.8.2). A reminder it hides is reported, so the next run does
- * not count the alarm the OS let go of as delivered.
+ * A Halaqa encouragement reminder an earlier build scheduled. Halaqa is removed for now, and such a
+ * reminder may belong to another account on this device, so it is never shown, and configure cancels
+ * any still scheduled and clears any left in the tray. Later reminders never carry this type.
  */
-function presentable(data: unknown): boolean {
-  if (isReminderData(data)) {
-    if (shouldPresent(data)) return true;
-    onHidden(data);
-    return false;
+function isRetiredEncouragement(data: unknown): boolean {
+  if (data === null || typeof data !== "object") return false;
+  const fields = data as Record<string, unknown>;
+  return fields.source === "hafiz-reminder" && fields.type === "group_encouragement";
+}
+
+async function retireEncouragementReminders(): Promise<void> {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const request of scheduled) {
+    if (isRetiredEncouragement(request.content.data)) await Notifications.cancelScheduledNotificationAsync(request.identifier);
   }
-  return !(data !== null && typeof data === "object" && (data as Record<string, unknown>).type === "group_encouragement");
+  const presented = await Notifications.getPresentedNotificationsAsync();
+  for (const notification of presented) {
+    if (isRetiredEncouragement(notification.request.content.data)) {
+      await Notifications.dismissNotificationAsync(notification.request.identifier);
+    }
+  }
 }
 
 function toPermission(response: Notifications.NotificationPermissionsStatus): PermissionState {
@@ -69,14 +75,12 @@ export const reminderPlatform: ReminderPlatform = {
     );
   },
 
-  async configure({ channelName, remindLaterAction, shouldPresent: check, onHidden: report }) {
-    shouldPresent = check;
-    onHidden = report;
+  async configure({ channelName, remindLaterAction }) {
     // Until this runs, expo-notifications shows nothing that arrives while the app is open.
     if (!handlerInstalled) {
       Notifications.setNotificationHandler({
         handleNotification: async (notification) => {
-          const show = presentable(notification.request.content.data);
+          const show = !isRetiredEncouragement(notification.request.content.data);
           return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: false, shouldSetBadge: false };
         },
       });
@@ -94,6 +98,7 @@ export const reminderPlatform: ReminderPlatform = {
     await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
       { identifier: REMIND_LATER_ACTION, buttonTitle: remindLaterAction, options: { opensAppToForeground: true } },
     ]);
+    await retireEncouragementReminders();
   },
 
   async listScheduled() {

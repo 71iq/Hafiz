@@ -23,8 +23,8 @@ export const authStrings = {
     authSendAgain: "Send again",
     authSendAgainIn: "Send again in {{seconds}} s",
     authDisplayNameOptional: "Display name (optional)",
-    authDisplayNameHelp: "Shown to your Halaqa and Board members when set.",
-    authUsernameHint: "3-20 English letters (A-Z), numbers or _. Shown to your Halaqa and Board members.",
+    authDisplayNameHelp: "Shown to your Board members when set.",
+    authUsernameHint: "3-20 English letters (A-Z), numbers or _. Shown to your Board members.",
     authPasswordMinHint: "At least 6 characters",
     authForgotSent: "If {{email}} has a Hafiz account, we sent it a reset link. Check your inbox and spam folder.",
     authForgotSentBrowser:
@@ -62,8 +62,8 @@ export const authStrings = {
     authSendAgain: "إرسال مجددًا",
     authSendAgainIn: "الإرسال مجددًا بعد {{seconds}} ث",
     authDisplayNameOptional: "الاسم المعروض (اختياري)",
-    authDisplayNameHelp: "يظهر لأعضاء حلقتك ولوحتك عند تعيينه.",
-    authUsernameHint: "من ٣ إلى ٢٠ حرفًا إنجليزيًا (A-Z) أو رقمًا أو _. يظهر لأعضاء حلقتك ولوحتك.",
+    authDisplayNameHelp: "يظهر لأعضاء لوحتك عند تعيينه.",
+    authUsernameHint: "من ٣ إلى ٢٠ حرفًا إنجليزيًا (A-Z) أو رقمًا أو _. يظهر لأعضاء لوحتك.",
     authPasswordMinHint: "٦ أحرف على الأقل",
     authForgotSent:
       "إذا كان {{email}} مرتبطًا بحساب في حافظ، فقد أرسلنا إليه رابط إعادة التعيين. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.",

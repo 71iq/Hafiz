@@ -61,7 +61,7 @@ export function SocialNotice({
   );
 }
 
-/** Shown on Halaqa and Board for signed-out viewers and for builds without the account service. */
+/** Shown on the Board for signed-out viewers and for builds without the account service. */
 export function SocialGate({
   icon: Icon,
   title,

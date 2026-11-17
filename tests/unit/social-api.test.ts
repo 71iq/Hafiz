@@ -1,34 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { boardViewSchema, fetchBoard, joinBoard } from "@/lib/board/api";
-import {
-  fetchHalaqaDetail,
-  fetchReceivedEncouragements,
-  fetchTeacherView,
-  halaqaDetailRead,
-  halaqaKeys,
-  joinHalaqaByCode,
-  normalizeInviteCode,
-  sendEncouragement,
-  setHalaqaMemberRole,
-  setHalaqaSharing,
-} from "@/lib/halaqa/api";
-import {
-  clearSabaqAssignment,
-  forgetMySabaqAssignment,
-  loadMySabaqAssignment,
-  parseAssignmentInput,
-  setSabaqAssignment,
-} from "@/lib/halaqa/sabaq-assignment";
-import { DEFAULT_HIFZ_PLAN } from "@/lib/hifz/plan";
+import { boardRead, boardViewSchema, fetchBoard, joinBoard } from "@/lib/board/api";
 import { strings } from "@/lib/i18n/strings";
-import {
-  deleteOwnAvatarFiles,
-  fetchProfileSummary,
-  ProfilePrivacyChangedError,
-  saveProfilePrivacy,
-} from "@/lib/profile/privacy";
+import { deleteOwnAvatarFiles, fetchProfileSummary, ProfilePrivacyChangedError } from "@/lib/profile/privacy";
 import { loadWithSocialCache } from "@/lib/social/cache";
-import { encouragementText } from "@/lib/social/encouragements";
 import { socialFailureMessage } from "@/lib/social/messages";
 import { captureSocialOwner, requireSocialOwner } from "@/lib/social/owner";
 import { classifyRemoteError, socialFailureOf } from "@/lib/social/remote";
@@ -101,55 +75,19 @@ function signIn(state: FakeAuthState) {
   mockClientSession = state.session;
 }
 const owner = () => requireSocialOwner(USER);
-const GROUP = "00000000-0000-4000-8000-0000000000aa";
 
-const summary = {
-  id: GROUP,
-  kind: "invite",
-  name: "Family",
-  invite_code: "ABCD2345",
-  member_count: 2,
-  role: "teacher",
-  is_creator: true,
-  share_consistency: true,
-  share_juz: true,
-  share_plan_with_teachers: false,
-  share_grades_with_teachers: false,
-};
-const detailPayload = {
-  group: summary,
-  goal: { week_start: "2026-11-09", contributors: 2, target: 10, wird_days: 3 },
-  encouraged_today: false,
-  members: [
-    {
-      user_id: USER,
-      name: "Teacher A",
-      username: "teacher_a",
-      avatar_url: null,
-      role: "teacher",
-      is_me: true,
-      week: [true, true, false, false, false, false, false],
-      streak: 4,
-      juz_completions: 1,
-      encouraged_today: false,
-      teacher_view: false,
-    },
-    {
-      user_id: OTHER,
-      name: "Member B",
-      username: "member_b",
-      avatar_url: null,
-      role: "member",
-      is_me: false,
-      week: null,
-      streak: null,
-      juz_completions: null,
-      encouraged_today: true,
-      teacher_view: true,
-    },
+const boardInputs = { bands: { levelBand: "juz_amma", paceBand: "light", utcOffsetMinutes: 180 }, weekStart: 6 } as const;
+const readyBoard = {
+  status: "ready",
+  week_start: "2026-11-09",
+  member_count: 5,
+  min_members: 5,
+  standings: [
+    { rank: 1, name: "Little Star", uses_nickname: true, avatar_url: null, points: 3, streak: 4, is_me: false },
+    { rank: 2, name: "Member B", uses_nickname: false, avatar_url: null, points: 2, streak: 1, is_me: true },
   ],
-  received: [{ id: GROUP, from_name: "Member B", template_id: "ease", body: null, created_at: "2026-11-13T08:00:00+00:00" }],
 };
+
 
 beforeEach(async () => {
   mockRpc.mockReset();
@@ -163,102 +101,11 @@ beforeEach(async () => {
   await AsyncStorage.clear();
 });
 
-describe("halaqa adapter", () => {
-  it("validates the group view and maps it to domain fields", async () => {
-    mockRpc.mockResolvedValue({ data: detailPayload, error: null });
-    const detail = await fetchHalaqaDetail(GROUP, "2026-11-13", owner());
-    expect(mockRpc).toHaveBeenCalledWith("get_halaqa_detail", { p_group_id: GROUP, p_today: "2026-11-13" });
-    expect(detail.goal).toEqual({ weekStart: "2026-11-09", contributors: 2, target: 10, wirdDays: 3 });
-    expect(detail.members[1]).toMatchObject({ week: null, streak: null, canOpenTeacherView: true, encouragedToday: true });
-    expect(detail.group.sharing).toEqual({
-      consistency: true,
-      juz: true,
-      planWithTeachers: false,
-      gradesWithTeachers: false,
-    });
-  });
-
-  it("rejects a week that is not seven days instead of drawing wrong dots", async () => {
-    mockRpc.mockResolvedValue({
-      data: { ...detailPayload, members: [{ ...detailPayload.members[0], week: [true] }] },
-      error: null,
-    });
-    await expect(fetchHalaqaDetail(GROUP, "2026-11-13", owner())).rejects.toMatchObject({
-      failure: { kind: "invalid_response" },
-    });
-  });
-
-  it("keeps server refusals as typed causes with their own messages", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "halaqa_full" } });
-    const error = await joinHalaqaByCode(" abcd-2345 ", owner()).catch((caught: unknown) => caught);
-    expect(mockRpc).toHaveBeenCalledWith("join_halaqa_by_code", { p_code: "ABCD2345" });
-    expect(socialFailureOf(error)).toEqual({ kind: "rejected", code: "halaqa_full" });
-    expect(socialFailureMessage(error, strings.ar)).toBe(strings.ar.socialErrorHalaqaFull);
-  });
-
-  it("sends a template or a trimmed note, never an empty body", async () => {
-    mockRpc.mockResolvedValue({ data: { id: GROUP }, error: null });
-    await sendEncouragement({ groupId: GROUP, toUserId: OTHER, templateId: "dua", body: "   ", today: "2026-11-13" }, owner());
-    expect(mockRpc).toHaveBeenLastCalledWith("send_halaqa_encouragement", {
-      p_group_id: GROUP,
-      p_to_user: OTHER,
-      p_template_id: "dua",
-      p_body: null,
-      p_today: "2026-11-13",
-    });
-  });
-
-  it("reports a missing account service without calling the server", async () => {
-    mockConfigured = false;
-    await expect(fetchHalaqaDetail(GROUP, "2026-11-13", owner())).rejects.toMatchObject({
-      failure: { kind: "unconfigured" },
-    });
-    expect(mockRpc).not.toHaveBeenCalled();
-  });
-
-  it("keys every remote halaqa read by the viewer", () => {
-    expect(halaqaKeys.detail(USER, GROUP, "2026-11-13")).toContain(USER);
-    expect(halaqaKeys.detail(OTHER, GROUP, "2026-11-13")).not.toEqual(halaqaKeys.detail(USER, GROUP, "2026-11-13"));
-  });
-
-  it("normalizes pasted invite codes", () => {
-    expect(normalizeInviteCode("abcd 2345")).toBe("ABCD2345");
-  });
-});
-
-describe("encouragement templates (SOC-06, MAT-01)", () => {
-  it("renders each template in the reader's language and a generic line for unknown ones", () => {
-    expect(encouragementText("ease", strings.en)).toBe(strings.en.halaqaEncourageEase);
-    expect(encouragementText("ease", strings.ar)).toBe(strings.ar.halaqaEncourageEase);
-    expect(encouragementText("future_template", strings.en)).toBe(strings.en.halaqaEncourageGeneric);
-  });
-
-  it("never claims reward or uses guilt words", () => {
-    const keys = Object.keys(strings.en).filter((key) => key.startsWith("halaqaEncourage"));
-    expect(keys.length).toBeGreaterThanOrEqual(9);
-    for (const key of keys) {
-      const text = strings.en[key as keyof typeof strings.en];
-      expect(text).not.toMatch(/hasanat|reward|sin|shame|disappoint|should have|lost|failed/i);
-    }
-  });
-});
-
 describe("board adapter", () => {
-  const inputs = { bands: { levelBand: "juz_amma", paceBand: "light", utcOffsetMinutes: 180 }, weekStart: 6 } as const;
+  const inputs = boardInputs;
 
   it("parses each board state and never exposes user ids", async () => {
-    mockRpc.mockResolvedValue({
-      data: {
-        status: "ready",
-        week_start: "2026-11-09",
-        member_count: 5,
-        min_members: 5,
-        standings: [
-          { rank: 1, name: "Little Star", uses_nickname: true, avatar_url: null, points: 3, streak: 4, is_me: false },
-        ],
-      },
-      error: null,
-    });
+    mockRpc.mockResolvedValue({ data: { ...readyBoard, standings: readyBoard.standings.slice(0, 1) }, error: null });
     const view = await fetchBoard(inputs, "2026-11-13", owner());
     expect(mockRpc).toHaveBeenCalledWith("get_board", {
       p_level_band: "juz_amma",
@@ -340,30 +187,6 @@ describe("a minor's photo (ETH-07)", () => {
     error: null,
   });
 
-  it("deletes the account's own photo files before it records minority, as that account", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/2.png`).add(`${OTHER}/3.jpg`);
-    mockRpc.mockImplementation(async () => {
-      // Third review, finding 1: by the time minority is recorded, nothing is left to publish.
-      expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
-      return privacy(true);
-    });
-    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
-    expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
-    // The pass before the save, and the one after it, which finds nothing left with one request.
-    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "remove", "list"]);
-    expect(mockStorageCalls.every((call) => call.bucket === "avatars" && bearerSubject(call.auth) === USER)).toBe(true);
-  });
-
-  it("does not record minority when a photo could not be deleted, so the save can be retried", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRemoveRefused = true;
-    mockRpc.mockResolvedValue(privacy(true));
-    await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
-    ).rejects.toMatchObject({ failure: { kind: "failed" } });
-    expect(mockRpc).not.toHaveBeenCalled();
-  });
-
   it("deletes photos in nested folders too", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/old/2.jpg`).add(`${USER}/old/deeper/3.png`).add(`${OTHER}/old/4.jpg`);
     await expect(deleteOwnAvatarFiles(owner())).resolves.toBe(3);
@@ -396,60 +219,8 @@ describe("a minor's photo (ETH-07)", () => {
     expect(mockStorageCalls.some((call) => call.op === "remove")).toBe(false);
   });
 
-  it("removes a photo uploaded while minority was being recorded, once it is recorded", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockImplementation(async () => {
-      // Another device uploads before the server starts refusing this account's uploads.
-      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
-      return privacy(true);
-    });
-    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
-    expect([...mockAvatarFiles]).toEqual([]);
-  });
-
-  it("keeps a recorded save when the pass after it fails", async () => {
-    mockRpc.mockImplementation(async () => {
-      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
-      mockRemoveRefused = true;
-      return privacy(true);
-    });
-    await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
-    ).resolves.toMatchObject({ isMinor: true });
-  });
-
-  it("leaves an adult's photos alone", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockResolvedValue(privacy(false));
-    await saveProfilePrivacy({ showStreak: true, showJuzCompletions: false, isMinor: false, expectedMinor: false }, owner());
-    expect(mockStorageCalls).toEqual([]);
-  });
-
-  it("sends the minority the form loaded and reports a refusal for a changed setting as its own error", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockResolvedValue({ data: null, error: { message: "privacy_changed", code: "P0001" } });
-    // The form still shows a minor, but another device withdrew it: the adult's photo is not deleted.
-    await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: true }, owner()),
-    ).rejects.toBeInstanceOf(ProfilePrivacyChangedError);
-    expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", {
-      p_show_streak: false,
-      p_show_juz_completions: false,
-      p_is_minor: true,
-      p_expected_minor: true,
-    });
-    expect([...mockAvatarFiles]).toEqual([`${USER}/1.jpg`]);
-  });
-
-  it("says when recording minority took the account off the Board (BRD-07)", async () => {
-    mockRpc.mockResolvedValue({ data: { ...privacy(true).data, board_joined: false, left_board: true }, error: null });
-    await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
-    ).resolves.toMatchObject({ isMinor: true, boardJoined: false, leftBoard: true });
-  });
-
   const gathering = { data: { status: "gathering", week_start: "2026-11-09", member_count: 1, min_members: 5 }, error: null };
-  const inputs = { bands: { levelBand: "juz_amma", paceBand: "light", utcOffsetMinutes: 180 }, weekStart: 6 } as const;
+  const inputs = boardInputs;
 
   it("deletes them before joining the board as a minor, and once more after", async () => {
     mockAvatarFiles.add(`${USER}/1.jpg`);
@@ -488,13 +259,13 @@ describe("a minor's photo (ETH-07)", () => {
 });
 
 describe("offline copy (SB-01)", () => {
-  const read = halaqaDetailRead(GROUP, "2026-11-13");
+  const read = boardRead(boardInputs, "2026-11-13");
 
   it("shows the last state with its date when offline, and keeps it per account", async () => {
-    mockRpc.mockResolvedValue({ data: detailPayload, error: null });
+    mockRpc.mockResolvedValue({ data: readyBoard, error: null });
     const fresh = await loadWithSocialCache({
       userId: USER,
-      name: "detail",
+      name: "board",
       read,
       offline: false,
       now: () => new Date("2026-11-13T08:00:00.000Z"),
@@ -502,41 +273,41 @@ describe("offline copy (SB-01)", () => {
     expect(fresh.source).toBe("network");
 
     mockRpc.mockReset();
-    const cached = await loadWithSocialCache({ userId: USER, name: "detail", read, offline: true });
+    const cached = await loadWithSocialCache({ userId: USER, name: "board", read, offline: true });
     expect(mockRpc).not.toHaveBeenCalled();
     expect(cached).toMatchObject({ source: "cache", savedAt: "2026-11-13T08:00:00.000Z" });
-    expect(cached.data.members).toHaveLength(2);
+    expect(cached.data).toMatchObject({ status: "ready", standings: [{ rank: 1 }, { rank: 2 }] });
 
     signIn(signedIn(OTHER));
-    await expect(loadWithSocialCache({ userId: OTHER, name: "detail", read, offline: true })).rejects.toMatchObject({
+    await expect(loadWithSocialCache({ userId: OTHER, name: "board", read, offline: true })).rejects.toMatchObject({
       failure: { kind: "offline" },
     });
   });
 
   it("falls back to the copy when the request cannot reach the server", async () => {
-    mockRpc.mockResolvedValueOnce({ data: detailPayload, error: null });
-    await loadWithSocialCache({ userId: USER, name: "detail", read, offline: false });
+    mockRpc.mockResolvedValueOnce({ data: readyBoard, error: null });
+    await loadWithSocialCache({ userId: USER, name: "board", read, offline: false });
     mockRpc.mockResolvedValueOnce({ data: null, error: { message: "TypeError: Network request failed" } });
-    await expect(loadWithSocialCache({ userId: USER, name: "detail", read, offline: false })).resolves.toMatchObject({
+    await expect(loadWithSocialCache({ userId: USER, name: "board", read, offline: false })).resolves.toMatchObject({
       source: "cache",
     });
   });
 
   it("never hides a server refusal behind an old copy", async () => {
-    mockRpc.mockResolvedValueOnce({ data: detailPayload, error: null });
-    await loadWithSocialCache({ userId: USER, name: "detail", read, offline: false });
-    mockRpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "not_a_member" } });
-    await expect(loadWithSocialCache({ userId: USER, name: "detail", read, offline: false })).rejects.toMatchObject({
-      failure: { kind: "rejected", code: "not_a_member" },
+    mockRpc.mockResolvedValueOnce({ data: readyBoard, error: null });
+    await loadWithSocialCache({ userId: USER, name: "board", read, offline: false });
+    mockRpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "invalid_bands" } });
+    await expect(loadWithSocialCache({ userId: USER, name: "board", read, offline: false })).rejects.toMatchObject({
+      failure: { kind: "rejected", code: "invalid_bands" },
     });
   });
 
   it("ignores a stored copy that no longer passes validation", async () => {
     await AsyncStorage.setItem(
-      `hafiz_social_cache_v1:${USER}:detail`,
-      JSON.stringify({ savedAt: "2026-11-13T08:00:00.000Z", payload: { group: "broken" } }),
+      `hafiz_social_cache_v1:${USER}:board`,
+      JSON.stringify({ savedAt: "2026-11-13T08:00:00.000Z", payload: { status: "broken" } }),
     );
-    await expect(loadWithSocialCache({ userId: USER, name: "detail", read, offline: true })).rejects.toMatchObject({
+    await expect(loadWithSocialCache({ userId: USER, name: "board", read, offline: true })).rejects.toMatchObject({
       failure: { kind: "offline" },
     });
   });
@@ -545,25 +316,31 @@ describe("offline copy (SB-01)", () => {
 describe("remote error causes", () => {
   it("separates offline, refusal and other failures", () => {
     expect(classifyRemoteError(new TypeError("Failed to fetch"))).toEqual({ kind: "offline" });
-    expect(classifyRemoteError({ message: "invalid_code" })).toEqual({ kind: "rejected", code: "invalid_code" });
+    expect(classifyRemoteError({ message: "invalid_nickname" })).toEqual({ kind: "rejected", code: "invalid_nickname" });
     expect(classifyRemoteError({ message: "duplicate key" })).toEqual({ kind: "failed", message: "duplicate key" });
   });
 
+  it("shows a Board refusal by its cause, in the reader's language", () => {
+    const error = { code: "P0001", message: "nickname_required" };
+    expect(socialFailureOf(error)).toEqual({ kind: "rejected", code: "nickname_required" });
+    expect(socialFailureMessage(error, strings.ar)).toBe(strings.ar.socialErrorNicknameRequired);
+    expect(socialFailureMessage({ message: "upstream exploded" }, strings.en)).toBe(strings.en.socialErrorGeneric);
+  });
 });
 
 describe("account binding (requests belong to the account that started them)", () => {
-  const read = halaqaDetailRead(GROUP, "2026-11-13");
+  const read = boardRead(boardInputs, "2026-11-13");
 
   it("sends the owner's own token, not whatever the shared client would attach", async () => {
-    mockRpc.mockResolvedValue({ data: detailPayload, error: null });
-    await fetchHalaqaDetail(GROUP, "2026-11-13", owner());
+    mockRpc.mockResolvedValue({ data: readyBoard, error: null });
+    await fetchBoard(boardInputs, "2026-11-13", owner());
     expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
   });
 
   it("refuses to start when the client's session already belongs to another account", async () => {
     const captured = owner();
     mockClientSession = signedIn(OTHER).session;
-    await expect(fetchHalaqaDetail(GROUP, "2026-11-13", captured)).rejects.toMatchObject({
+    await expect(fetchBoard(boardInputs, "2026-11-13", captured)).rejects.toMatchObject({
       failure: { kind: "account_changed" },
     });
     expect(mockRpc).not.toHaveBeenCalled();
@@ -572,13 +349,13 @@ describe("account binding (requests belong to the account that started them)", (
   it("never caches or returns a response that arrives after the account changed", async () => {
     let respond: (value: { data: unknown; error: unknown }) => void = () => undefined;
     mockRpc.mockReturnValue(new Promise((resolve) => (respond = resolve)));
-    const load = loadWithSocialCache({ userId: USER, name: "detail", read, offline: false });
+    const load = loadWithSocialCache({ userId: USER, name: "board", read, offline: false });
     await waitForRpc();
     signIn(signedIn(OTHER));
-    respond({ data: detailPayload, error: null });
+    respond({ data: readyBoard, error: null });
     await expect(load).rejects.toMatchObject({ failure: { kind: "account_changed" } });
-    expect(await AsyncStorage.getItem(`hafiz_social_cache_v1:${USER}:detail`)).toBeNull();
-    expect(await AsyncStorage.getItem(`hafiz_social_cache_v1:${OTHER}:detail`)).toBeNull();
+    expect(await AsyncStorage.getItem(`hafiz_social_cache_v1:${USER}:board`)).toBeNull();
+    expect(await AsyncStorage.getItem(`hafiz_social_cache_v1:${OTHER}:board`)).toBeNull();
   });
 
   it("treats a new sign-in of the same account as a different owner", async () => {
@@ -589,335 +366,10 @@ describe("account binding (requests belong to the account that started them)", (
 
   it("does not load for an account that is not signed in, even from its offline copy", async () => {
     signIn(signedOut());
-    await expect(loadWithSocialCache({ userId: USER, name: "detail", read, offline: true })).rejects.toMatchObject({
+    await expect(loadWithSocialCache({ userId: USER, name: "board", read, offline: true })).rejects.toMatchObject({
       failure: { kind: "account_changed" },
     });
     expect(captureSocialOwner(USER)).toBeNull();
-  });
-
-  it("stops a two-step save before its second write once the account changed", async () => {
-    mockRpc.mockImplementation(async (fn) => {
-      // The account switches while the first write is in flight.
-      if (fn === "set_halaqa_sharing") signIn(signedIn(OTHER));
-      return { data: { ...detailPayload.group }, error: null };
-    });
-    const captured = owner();
-    const sharing = { consistency: true, juz: true, planWithTeachers: false, gradesWithTeachers: false };
-    await expect(setHalaqaSharing(GROUP, sharing, captured)).rejects.toMatchObject({
-      failure: { kind: "account_changed" },
-    });
-    const second = await saveProfilePrivacy({ showStreak: true, showJuzCompletions: true, isMinor: false, expectedMinor: false }, captured).catch(
-      (caught: unknown) => caught,
-    );
-    expect(socialFailureOf(second)).toEqual({ kind: "account_changed" });
-    expect(socialFailureMessage(second, strings.en)).toBe(strings.en.socialErrorAccountChanged);
-    expect(mockRpc.mock.calls.map(([fn]) => fn)).toEqual(["set_halaqa_sharing"]);
-  });
-});
-
-describe("teacher view plan (SOC-03)", () => {
-  it("reads the member's plan with the app's plan schema", async () => {
-    mockRpc.mockResolvedValue({
-      data: { name: "Member B", plan: { hifz_plan: JSON.stringify(DEFAULT_HIFZ_PLAN), tiers: { sabqi: 3 } }, grades: null },
-      error: null,
-    });
-    const view = await fetchTeacherView(GROUP, OTHER, "2026-11-13", owner());
-    expect(view.plan?.hifzPlan).toMatchObject({ newPerDay: 0.5, cycleDays: 30 });
-    expect(view.plan?.tiers).toEqual({ sabqi: 3 });
-  });
-
-  it("shows no plan for a missing or unreadable one", async () => {
-    mockRpc.mockResolvedValue({ data: { name: null, plan: { hifz_plan: "not json", tiers: {} }, grades: null }, error: null });
-    await expect(fetchTeacherView(GROUP, OTHER, "2026-11-13", owner())).resolves.toMatchObject({ plan: { hifzPlan: null } });
-  });
-});
-
-describe("teacher role (SOC-03)", () => {
-  it("asks the server to set a member's role, as the account that started it", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: null });
-    await expect(setHalaqaMemberRole(GROUP, OTHER, "teacher", owner())).resolves.toBeUndefined();
-    await setHalaqaMemberRole(GROUP, OTHER, "member", owner());
-    expect(mockRpc.mock.calls).toEqual([
-      ["set_halaqa_member_role", { p_group_id: GROUP, p_member_id: OTHER, p_role: "teacher" }],
-      ["set_halaqa_member_role", { p_group_id: GROUP, p_member_id: OTHER, p_role: "member" }],
-    ]);
-    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
-  });
-
-  it("keeps the server's refusal of anyone but the invite halaqa's creator as its cause", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { code: "42501", message: "not_allowed" } });
-    const error = await setHalaqaMemberRole(GROUP, OTHER, "teacher", owner()).catch((caught: unknown) => caught);
-    expect(socialFailureOf(error)).toEqual({ kind: "rejected", code: "not_allowed" });
-    expect(socialFailureMessage(error, strings.ar)).toBe(strings.ar.socialErrorGeneric);
-  });
-});
-
-describe("a teacher's next sabaq (SOC-03)", () => {
-  const stored = {
-    group_id: GROUP,
-    group_name: "Family",
-    teacher_name: "Teacher A",
-    page: 582,
-    from_line: 3,
-    to_line: 9,
-    assigned_at: "2026-11-13T08:00:00+00:00",
-  };
-
-  it("sets and clears a member's next sabaq, as the account that started it", async () => {
-    mockRpc.mockResolvedValueOnce({ data: stored, error: null }).mockResolvedValueOnce({ data: null, error: null });
-    await expect(
-      setSabaqAssignment({ groupId: GROUP, memberId: OTHER, page: 582, fromLine: 3, toLine: 9 }, owner()),
-    ).resolves.toMatchObject({ page: 582, fromLine: 3, toLine: 9, teacherName: "Teacher A" });
-    await expect(clearSabaqAssignment(GROUP, OTHER, owner())).resolves.toBeUndefined();
-    expect(mockRpc.mock.calls).toEqual([
-      [
-        "set_halaqa_sabaq_assignment",
-        { p_group_id: GROUP, p_member_id: OTHER, p_page: 582, p_from_line: 3, p_to_line: 9 },
-      ],
-      ["clear_halaqa_sabaq_assignment", { p_group_id: GROUP, p_member_id: OTHER }],
-    ]);
-    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
-  });
-
-  it("shows the server's refusals in the reader's language", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { code: "42501", message: "plan_not_shared" } });
-    const refused = await setSabaqAssignment({ groupId: GROUP, memberId: OTHER, page: 1, fromLine: 1, toLine: 15 }, owner()).catch(
-      (caught: unknown) => caught,
-    );
-    expect(socialFailureOf(refused)).toEqual({ kind: "rejected", code: "plan_not_shared" });
-    expect(socialFailureMessage(refused, strings.ar)).toBe(strings.ar.socialErrorPlanNotShared);
-    mockRpc.mockResolvedValue({ data: null, error: { message: "invalid_assignment" } });
-    const invalid = await setSabaqAssignment({ groupId: GROUP, memberId: OTHER, page: 1, fromLine: 9, toLine: 3 }, owner()).catch(
-      (caught: unknown) => caught,
-    );
-    expect(socialFailureMessage(invalid, strings.en)).toBe(strings.en.teacherAssignInvalid);
-  });
-
-  it("reads the assignment with the plan in the teacher view, and an older server's view without it", async () => {
-    mockRpc.mockResolvedValueOnce({
-      data: { name: "Member B", plan: { hifz_plan: null, tiers: {}, sabaq_assignment: stored }, grades: null },
-      error: null,
-    });
-    const view = await fetchTeacherView(GROUP, OTHER, "2026-11-13", owner());
-    expect(view.plan?.sabaqAssignment).toMatchObject({ page: 582, fromLine: 3, toLine: 9 });
-    mockRpc.mockResolvedValueOnce({ data: { name: null, plan: { hifz_plan: null, tiers: {} }, grades: null }, error: null });
-    expect((await fetchTeacherView(GROUP, OTHER, "2026-11-13", owner())).plan?.sabaqAssignment).toBeNull();
-  });
-
-  it("rejects a stored range the app could not use", async () => {
-    mockRpc.mockResolvedValue({ data: { ...stored, from_line: 9, to_line: 3 }, error: null });
-    const error = await setSabaqAssignment({ groupId: GROUP, memberId: OTHER, page: 1, fromLine: 1, toLine: 1 }, owner()).catch(
-      (caught: unknown) => caught,
-    );
-    expect(socialFailureOf(error)).toEqual({ kind: "invalid_response" });
-  });
-
-  it("gives the lesson the server's assignment, keeps it for offline, and never fails the lesson", async () => {
-    mockRpc.mockResolvedValue({ data: stored, error: null });
-    await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
-    expect(mockRpc).toHaveBeenCalledWith("get_my_sabaq_assignment", {});
-    // Offline, and when the request cannot reach the server or fails, the saved copy decides.
-    mockRpc.mockReset();
-    await expect(loadMySabaqAssignment(USER, true)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
-    expect(mockRpc).not.toHaveBeenCalled();
-    mockRpc.mockRejectedValue(new TypeError("Network request failed"));
-    await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
-    mockRpc.mockResolvedValue({ data: null, error: { message: "upstream exploded" } });
-    await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
-    // A cleared assignment replaces the copy.
-    mockRpc.mockResolvedValue({ data: null, error: null });
-    await expect(loadMySabaqAssignment(USER, false)).resolves.toBeNull();
-    await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
-    // Signed out, or another account: nothing.
-    await expect(loadMySabaqAssignment(null, false)).resolves.toBeNull();
-    signIn(signedIn(OTHER));
-    mockRpc.mockResolvedValue({ data: stored, error: null });
-    await expect(loadMySabaqAssignment(USER, false)).resolves.toBeNull();
-  });
-
-  it("uses the saved copy when the server is slow, and keeps the late answer for next time", async () => {
-    mockRpc.mockResolvedValueOnce({ data: stored, error: null });
-    await loadMySabaqAssignment(USER, false);
-    jest.useFakeTimers();
-    try {
-      let answer: (value: { data: unknown; error: unknown }) => void = () => undefined;
-      mockRpc.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
-      const lesson = loadMySabaqAssignment(USER, false);
-      await jest.advanceTimersByTimeAsync(5_000);
-      await expect(lesson).resolves.toEqual({ page: 582, fromLine: 3, toLine: 9 });
-      answer({ data: { ...stored, page: 2 }, error: null });
-      await jest.advanceTimersByTimeAsync(0);
-    } finally {
-      jest.useRealTimers();
-    }
-    mockRpc.mockRejectedValue(new TypeError("Network request failed"));
-    await expect(loadMySabaqAssignment(USER, false)).resolves.toEqual({ page: 2, fromLine: 3, toLine: 9 });
-  });
-
-  it("drops the offline copy when this device ends assignments, and a read in flight cannot bring it back", async () => {
-    mockRpc.mockResolvedValueOnce({ data: stored, error: null });
-    await loadMySabaqAssignment(USER, false);
-    let answer: (value: { data: unknown; error: unknown }) => void = () => undefined;
-    mockRpc.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
-    const inFlight = loadMySabaqAssignment(USER, false);
-    await forgetMySabaqAssignment(USER);
-    answer({ data: stored, error: null });
-    // The read started before sharing was withdrawn: its answer is not kept, and the lesson gets none.
-    await expect(inFlight).resolves.toBeNull();
-    await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
-  });
-
-  it("returns nothing from a load a forget overtook, offline or online", async () => {
-    mockRpc.mockResolvedValueOnce({ data: stored, error: null });
-    await loadMySabaqAssignment(USER, false);
-    // Offline: the copy is read before the forget finishes, but the lesson must not use it.
-    const offlineLoad = loadMySabaqAssignment(USER, true);
-    await forgetMySabaqAssignment(USER);
-    await expect(offlineLoad).resolves.toBeNull();
-    // Online: the answer arrives after the forget began.
-    let answer: (value: { data: unknown; error: unknown }) => void = () => undefined;
-    mockRpc.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
-    const onlineLoad = loadMySabaqAssignment(USER, false);
-    const forgetting = forgetMySabaqAssignment(USER);
-    answer({ data: stored, error: null });
-    await forgetting;
-    await expect(onlineLoad).resolves.toBeNull();
-  });
-
-  it("never saves an older read's answer over a newer one", async () => {
-    let older: (value: { data: unknown; error: unknown }) => void = () => undefined;
-    mockRpc.mockReturnValueOnce(new Promise((resolve) => (older = resolve)));
-    const first = loadMySabaqAssignment(USER, false);
-    // The teacher clears it; a newer read sees that first.
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
-    await expect(loadMySabaqAssignment(USER, false)).resolves.toBeNull();
-    older({ data: stored, error: null });
-    await expect(first).resolves.toBeNull();
-    await expect(loadMySabaqAssignment(USER, true)).resolves.toBeNull();
-  });
-
-  it("reads a typed range in Western or Arabic-Indic digits, inside the mushaf's pages and lines", () => {
-    expect(parseAssignmentInput("582", "3", "9")).toEqual({ page: 582, fromLine: 3, toLine: 9 });
-    expect(parseAssignmentInput("٥٨٢", "٣", "٩")).toEqual({ page: 582, fromLine: 3, toLine: 9 });
-    expect(parseAssignmentInput(" 1 ", "1", "15")).toEqual({ page: 1, fromLine: 1, toLine: 15 });
-    for (const [page, from, to] of [
-      ["0", "1", "15"],
-      ["605", "1", "15"],
-      ["", "1", "15"],
-      ["1", "0", "15"],
-      ["1", "1", "16"],
-      ["1", "9", "3"],
-      ["1.5", "1", "2"],
-      ["-1", "1", "2"],
-    ]) {
-      expect(parseAssignmentInput(page, from, to)).toBeNull();
-    }
-  });
-});
-
-describe("received encouragements (5.8.2)", () => {
-  it("lists ids with the server's time, for the device to acknowledge", async () => {
-    mockRpc.mockResolvedValue({
-      data: {
-        items: [{ id: GROUP, created_at: "2026-11-13T08:00:00.123456+00:00" }],
-        more: false,
-        checked_at: "2026-11-13T09:00:00+00:00",
-      },
-      error: null,
-    });
-    const result = await fetchReceivedEncouragements(owner());
-    expect(mockRpc).toHaveBeenCalledWith("get_received_encouragements", {});
-    expect(result).toEqual({
-      items: [{ id: GROUP, createdAt: "2026-11-13T08:00:00.123456+00:00" }],
-      checkedAt: "2026-11-13T09:00:00+00:00",
-      complete: true,
-    });
-  });
-
-  // Third review, finding 5: more arrivals than one page are all listed, oldest included.
-  const encouragementId = (n: number) => `00000000-0000-4000-8e00-${String(n).padStart(12, "0")}`;
-  const createdAt = (n: number) => `2026-11-13T08:00:00.${String(n).padStart(6, "0")}+00:00`;
-  const page = (from: number, to: number, more: boolean, checkedAt: string) => ({
-    data: {
-      items: Array.from({ length: to - from + 1 }, (_, i) => ({ id: encouragementId(from + i), created_at: createdAt(from + i) })),
-      more,
-      checked_at: checkedAt,
-    },
-    error: null,
-  });
-
-  it("reads every page of the window by the cursor the previous page ended on", async () => {
-    mockRpc
-      .mockResolvedValueOnce(page(1, 100, true, "2026-11-13T09:00:00+00:00"))
-      .mockResolvedValueOnce(page(101, 151, false, "2026-11-13T09:00:01+00:00"));
-    const result = await fetchReceivedEncouragements(owner());
-    expect(mockRpc.mock.calls).toEqual([
-      ["get_received_encouragements", {}],
-      ["get_received_encouragements", { p_after_created_at: createdAt(100), p_after_id: encouragementId(100) }],
-    ]);
-    expect(result.items).toHaveLength(151);
-    expect(result.items[0]).toEqual({ id: encouragementId(1), createdAt: createdAt(1) });
-    expect(new Set(result.items.map((item) => item.id)).size).toBe(151);
-    expect(result.checkedAt).toBe("2026-11-13T09:00:00+00:00");
-    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
-  });
-
-  /** A server that pages `total` items in order, 100 at a time, by the cursor it is sent. */
-  function pagedInbox(total: number) {
-    mockRpc.mockImplementation(async (_fn, args) => {
-      const after = args.p_after_id ? Number(String(args.p_after_id).slice(-12)) : 0;
-      const to = Math.min(after + 100, total);
-      return page(after + 1, to, to < total, "2026-11-13T09:00:00+00:00");
-    });
-  }
-
-  // Fourth review, finding 4: leaving and joining halaqas can fill seven days with more than 50 pages.
-  it("reads every page of a long history while each page moves forward", async () => {
-    pagedInbox(5_940);
-    const result = await fetchReceivedEncouragements(owner());
-    expect(mockRpc).toHaveBeenCalledTimes(60);
-    expect(result.complete).toBe(true);
-    expect(result.items).toHaveLength(5_940);
-    expect(result.items.at(-1)).toEqual({ id: encouragementId(5_940), createdAt: createdAt(5_940) });
-  });
-
-  it("stops at a page that does not move past its cursor, keeping what it listed", async () => {
-    mockRpc.mockImplementation(async () => page(1, 100, true, "2026-11-13T09:00:00+00:00"));
-    const result = await fetchReceivedEncouragements(owner());
-    expect(mockRpc).toHaveBeenCalledTimes(2);
-    expect(result.complete).toBe(false);
-    expect(result.items.map((item) => item.id)).toEqual(Array.from({ length: 100 }, (_, i) => encouragementId(i + 1)));
-  });
-
-  it("stops at a large safety bound, keeping what it listed instead of failing", async () => {
-    let n = 0;
-    mockRpc.mockImplementation(async () => {
-      n += 1;
-      return page(n, n, true, "2026-11-13T09:00:00+00:00");
-    });
-    const result = await fetchReceivedEncouragements(owner());
-    expect(mockRpc.mock.calls.length).toBeGreaterThan(60);
-    expect(mockRpc).toHaveBeenCalledTimes(result.items.length);
-    expect(result.complete).toBe(false);
-    expect(new Set(result.items.map((item) => item.id)).size).toBe(result.items.length);
-  });
-
-  it("compares times to the microsecond, then by id, as the server orders them", async () => {
-    const pageOf = (items: [string, string][], more: boolean) => ({
-      data: { items: items.map(([id, created_at]) => ({ id, created_at })), more, checked_at: "2026-11-13T09:00:00+00:00" },
-      error: null,
-    });
-    mockRpc
-      .mockResolvedValueOnce(pageOf([[encouragementId(9), "2026-11-13T08:00:00.123456+00:00"]], true))
-      // Same millisecond, later microsecond, smaller id: still forward.
-      .mockResolvedValueOnce(pageOf([[encouragementId(1), "2026-11-13T08:00:00.1235+00:00"]], true))
-      // Same time, larger id: forward.
-      .mockResolvedValueOnce(pageOf([[encouragementId(2), "2026-11-13T08:00:00.1235+00:00"]], true))
-      .mockResolvedValueOnce(pageOf([[encouragementId(3), "2026-11-13T08:00:01+00:00"]], false));
-    const result = await fetchReceivedEncouragements(owner());
-    expect(mockRpc).toHaveBeenCalledTimes(4);
-    expect(result.complete).toBe(true);
-    expect(result.items.map((item) => item.id)).toEqual([encouragementId(9), encouragementId(1), encouragementId(2), encouragementId(3)]);
   });
 });
 

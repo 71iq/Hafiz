@@ -48,7 +48,6 @@ const TYPE_LABELS: Readonly<Record<NotificationType, readonly [UIStringKey, UISt
   grace_used: ["notifTypeGrace", "notifTypeGraceHint"],
   earnback_open: ["notifTypeEarnBack", "notifTypeEarnBackHint"],
   friday_kahf: ["notifTypeKahf", "notifTypeKahfHint"],
-  group_encouragement: ["notifTypeGroup", "notifTypeGroupHint"],
   comeback: ["notifTypeComeback", "notifTypeComebackHint"],
 };
 

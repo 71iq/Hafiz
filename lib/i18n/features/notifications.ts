@@ -18,7 +18,6 @@ export const notificationsStrings = {
     notifTitleGrace: "Grace day",
     notifTitleEarnBack: "Bring your streak back",
     notifTitleKahf: "Friday: Surah al-Kahf",
-    notifTitleGroup: "From your halaqa",
     notifTitleComeback: "Your wird",
 
     // wird_reminder
@@ -112,16 +111,6 @@ export const notificationsStrings = {
     notifTKahf7: "Friday is here. Open the mushaf at Surah al-Kahf.",
     notifTKahf8: "Your Friday reading: Surah al-Kahf.",
 
-    // group_encouragement
-    notifTGroup1: "Your halaqa sent you encouragement today.",
-    notifTGroup2: "Encouragement from your halaqa today: {{count}}.",
-    notifTGroup3: "\"May Allah make it easy.\" A message from your halaqa.",
-    notifTGroup4: "Your halaqa is reciting together. Join them with today's wird.",
-    notifTGroup5: "A kind word from your halaqa is waiting.",
-    notifTGroup6: "Your halaqa sent you a message. Open Hafiz to see it.",
-    notifTGroup7: "Someone in your halaqa encouraged you today.",
-    notifTGroup8: "Encouragement arrived from your halaqa.",
-
     // comeback
     notifTBack1: "Welcome back whenever you are ready. Start with what you know well.",
     notifTBack2: "{{surah}} is due today. Just one page to start.",
@@ -195,8 +184,6 @@ export const notificationsStrings = {
     notifTypeEarnBackHint: "Once, when a paused streak can be brought back",
     notifTypeKahf: "Friday: Surah al-Kahf",
     notifTypeKahfHint: "Optional. Friday morning",
-    notifTypeGroup: "Halaqa encouragement",
-    notifTypeGroupHint: "At most one a day",
     notifTypeComeback: "Welcome-back reminders",
     notifTypeComebackHint: "Fewer reminders after a break, and then they stop",
     notifBadgeLabel: "App icon badge",
@@ -271,7 +258,6 @@ export const notificationsStrings = {
     notifTitleGrace: "يوم سماح",
     notifTitleEarnBack: "استعِد سلسلتك",
     notifTitleKahf: "الجمعة: سورة الكهف",
-    notifTitleGroup: "من حلقتك",
     notifTitleComeback: "وِردك",
 
     notifTWird1: "وِردك جاهز. عدد الصفحات: {{pages}}، والمدة بالدقائق نحو {{minutes}}.",
@@ -357,15 +343,6 @@ export const notificationsStrings = {
     notifTKahf7: "حلّت الجمعة. افتح المصحف على سورة الكهف.",
     notifTKahf8: "قراءتك ليوم الجمعة: سورة الكهف.",
 
-    notifTGroup1: "أرسلت إليك حلقتك تشجيعًا اليوم.",
-    notifTGroup2: "تشجيعات من حلقتك اليوم: {{count}}.",
-    notifTGroup3: "«يسّر الله لك». رسالة من حلقتك.",
-    notifTGroup4: "حلقتك تقرأ معًا. شاركهم بوِرد اليوم.",
-    notifTGroup5: "كلمة طيبة من حلقتك بانتظارك.",
-    notifTGroup6: "أرسلت إليك حلقتك رسالة. افتح حافظ لتراها.",
-    notifTGroup7: "شجّعك أحد أفراد حلقتك اليوم.",
-    notifTGroup8: "وصلك تشجيع من حلقتك.",
-
     notifTBack1: "أهلًا بك متى شئت. ابدأ بما تحفظه جيدًا.",
     notifTBack2: "حان موعد {{surah}} اليوم. صفحة واحدة للبداية.",
     notifTBack3: "صفحة واحدة اليوم، وحفظك ما زال معك.",
@@ -435,8 +412,6 @@ export const notificationsStrings = {
     notifTypeEarnBackHint: "مرة واحدة، حين يمكن استعادة سلسلة متوقفة",
     notifTypeKahf: "الجمعة: سورة الكهف",
     notifTypeKahfHint: "اختياري. صباح الجمعة",
-    notifTypeGroup: "تشجيع الحلقة",
-    notifTypeGroupHint: "مرة واحدة في اليوم على الأكثر",
     notifTypeComeback: "تذكيرات العودة",
     notifTypeComebackHint: "تذكيرات أقل بعد الانقطاع، ثم تتوقف",
     notifBadgeLabel: "شارة أيقونة التطبيق",

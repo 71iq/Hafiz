@@ -156,10 +156,6 @@ export async function readBackoffRows(
   );
 }
 
-export async function readLogRow(db: DatabaseExecutor, id: string): Promise<NotificationLogRow | null> {
-  return db.getFirstAsync<NotificationLogRow>(`SELECT ${LOG_COLUMNS} FROM notification_log WHERE id = ?`, [id]);
-}
-
 export async function insertLogRow(db: DatabaseExecutor, row: NotificationLogRow): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO notification_log (${LOG_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

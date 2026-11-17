@@ -134,11 +134,11 @@ function expectOneTabStop(row: HTMLElement) {
 }
 
 describe("switch rows on web", () => {
-  it("gives each of the ten web reminder rows its state and a single tab stop", async () => {
+  it("gives each of the nine web reminder rows its state and a single tab stop", async () => {
     await show(<ReminderSettingsSection />);
     const rows = [...host.querySelectorAll<HTMLElement>('[role="switch"]')];
     // The master switch and every type except remind_later, which web cannot offer.
-    expect(rows).toHaveLength(10);
+    expect(rows).toHaveLength(9);
 
     expect(switchNamed(en.notifMasterLabel).getAttribute("aria-checked")).toBe("true");
     expect(switchNamed(en.notifTypeWird).getAttribute("aria-checked")).toBe(
