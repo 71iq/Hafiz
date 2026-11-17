@@ -132,15 +132,19 @@ was lost, so a new `QF_TOKEN_ENCRYPTION_KEY` was generated. Its only copies are
 migration directory; back both up. Connections saved under the old key cannot
 be decrypted and must reconnect. The one existing connection is already marked
 `needs_reauth`.
-The owner requested temporarily disabling signup, password reset and Google
-login. Build with `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=false` and
-`EXPO_PUBLIC_SOCIAL_AUTH_ENABLED=false`. The app hides those actions and redirects
-direct signup/recovery routes to login. Caddy rejects email-dependent endpoints.
-GoTrue has `GOTRUE_DISABLE_SIGNUP=true` and `GOTRUE_EXTERNAL_GOOGLE_ENABLED=false`.
-Existing password login, session refresh and account sync remain enabled.
-Keep email confirmation enabled. To restore the disabled flows, supply SMTP and
-a valid Google client secret, update the server settings and CI variables, then
-verify email delivery and OAuth before re-enabling the controls.
+Signup, password reset and Google login were disabled during the migration and
+restored on 2026-11-17. Auth email goes through the free Resend plan
+(about 100 emails a day): `hafizquran.app` is verified in Resend with DKIM, SPF
+and return-path records in Cloudflare, and GoTrue uses `smtp.resend.com` on port
+587 with a sending-only key. Port 465 is unreachable from this network. Keep
+email confirmation enabled. Caddy still rejects the email endpoints the app does
+not use (OTP, magic link, invite and reauthentication). The Google login uses a
+second client secret on the original OAuth client, because the first secret
+survived only as a hash. GoTrue has `GOTRUE_DISABLE_SIGNUP=false` and
+`GOTRUE_EXTERNAL_GOOGLE_ENABLED=true`; the web build sets
+`EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true`. Apple and Facebook have no
+credentials and must stay hidden in the app. The Resend, Cloudflare DNS and
+Google credentials are kept in the local private migration directory.
 
 ## Automatic releases
 
@@ -286,10 +290,8 @@ its original user ID. The web build keeps the original Auth storage key. Existin
 still run the old bundle must reload to use the new API. Their local SQLite
 files and queued changes are not reset by the migration.
 
-Signup, password reset, Google login and Quran Foundation login and sync were
-disabled at the owner's request during the migration. Restoring Google login
-requires a valid client secret; restoring signup and recovery requires SMTP.
-Quran Foundation login and sync need the redirect URIs above registered.
+Signup, password reset and Google login were restored on 2026-11-17. Quran
+Foundation login and sync still need the redirect URIs above registered.
 
 Supabase's [platform restore guide](https://supabase.com/docs/guides/self-hosting/restore-from-platform)
 documents the separate storage, function, OAuth and SMTP configuration needed
