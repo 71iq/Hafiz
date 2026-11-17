@@ -26,17 +26,19 @@ describe("OAuth callback deep links", () => {
   });
 
   it("drops a warm Quran Foundation App Link for the open Settings session and keeps a cold one", () => {
-    const link = "https://hafizquran.app/auth/qf-callback?code=c1&state=s1";
+    const link = "https://hafizquran.app/auth/qf-app-callback?code=c1&state=s1";
     expect(isQfCallbackPath(link)).toBe(true);
-    expect(isQfCallbackPath("/auth/qf-callback?code=c1")).toBe(true);
+    expect(isQfCallbackPath("/auth/qf-app-callback?code=c1")).toBe(true);
     expect(redirectOAuthCallbackPath(link, false)).toBeNull();
     expect(redirectOAuthCallbackPath(link, true)).toBe(link);
   });
 
   it.each([
-    "https://hafizquran.app/auth/qf-callbacks",
-    "https://example.invalid/auth/qf-callback?code=c1",
-    "https://hafizquran.app/profile/auth/qf-callback",
+    "https://hafizquran.app/auth/qf-callback?code=c1&state=s1",
+    "/auth/qf-callback?code=c1",
+    "https://hafizquran.app/auth/qf-app-callbacks",
+    "https://example.invalid/auth/qf-app-callback?code=c1",
+    "https://hafizquran.app/profile/auth/qf-app-callback",
   ])("leaves %s alone", (path) => {
     expect(isQfCallbackPath(path)).toBe(false);
     expect(redirectOAuthCallbackPath(path, false)).toBe(path);

@@ -29,7 +29,7 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "data": [{ "scheme": "https", "host": "hafizquran.app", "pathPrefix": "/auth/qf-callback" }],
+          "data": [{ "scheme": "https", "host": "hafizquran.app", "path": "/auth/qf-app-callback" }],
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ]

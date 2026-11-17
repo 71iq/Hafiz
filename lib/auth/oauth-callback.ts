@@ -1,8 +1,9 @@
 // Matches hafiz://auth/callback, exp://host/--/auth/callback and /auth/callback,
 // with or without a query string or fragment.
 const OAUTH_CALLBACK_PATH = /^(?:[a-z][a-z\d+.-]*:\/\/(?:[^/?#]*\/--\/)?)?\/?auth\/callback\/?(?:[?#]|$)/i;
-// Matches the Quran Foundation App Link https://hafizquran.app/auth/qf-callback and its path.
-const QF_CALLBACK_PATH = /^(?:https:\/\/hafizquran\.app)?\/?auth\/qf-callback\/?(?:[?#]|$)/i;
+// Matches the Quran Foundation App Link https://hafizquran.app/auth/qf-app-callback and its
+// path. The website's /auth/qf-callback is never delivered to the app.
+const QF_CALLBACK_PATH = /^(?:https:\/\/hafizquran\.app)?\/?auth\/qf-app-callback\/?(?:[?#]|$)/i;
 
 export function isOAuthCallbackPath(path: string): boolean {
   return OAUTH_CALLBACK_PATH.test(path);

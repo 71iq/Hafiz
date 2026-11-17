@@ -1,8 +1,14 @@
 import { Platform } from "react-native";
 
+// Native clients return through their own address. Android claims it as a verified App Link,
+// so it must differ from the website's /auth/qf-callback: otherwise Chrome on a phone with
+// Hafiz installed would hand the website's own connection to the app.
+export const QF_APP_CALLBACK_PATH = "/auth/qf-app-callback";
+export const QF_APP_REDIRECT_URI = `https://hafizquran.app${QF_APP_CALLBACK_PATH}`;
+
 export function getQfOAuthRedirectUri(): string {
-  const origin = Platform.OS === "web" ? globalThis.location?.origin : undefined;
-  return `${origin ?? "https://hafizquran.app"}/auth/qf-callback`;
+  if (Platform.OS !== "web") return QF_APP_REDIRECT_URI;
+  return `${globalThis.location?.origin ?? "https://hafizquran.app"}/auth/qf-callback`;
 }
 
 const QF_CALLBACK_PARAMS = ["code", "state", "error", "error_description"] as const;

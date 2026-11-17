@@ -287,7 +287,7 @@ describe.each(["en", "ar"] as const)("QF status after an account switch in %s (R
 });
 
 describe.each(["en", "ar"] as const)("native QF connect in %s", (language) => {
-  const redirectUri = "https://hafizquran.app/auth/qf-callback";
+  const redirectUri = "https://hafizquran.app/auth/qf-app-callback";
   const authorizationUrl = "https://oauth.example.invalid/authorize?client=synthetic";
 
   async function pressConnect(result: WebBrowser.WebBrowserAuthSessionResult) {

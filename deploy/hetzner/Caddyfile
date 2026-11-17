@@ -19,7 +19,7 @@
     file_server
   }
 
-  # Android App Link verification for https://hafizquran.app/auth/qf-callback. The static
+  # Android App Link verification for https://hafizquran.app/auth/qf-app-callback. The static
   # deploy rejects hidden paths, so Caddy serves the release certificate's digest here.
   handle /.well-known/assetlinks.json {
     header Content-Type application/json
