@@ -124,8 +124,10 @@ adds reciters over the bundled ones.
 Quran Foundation login and sync stay off (`EXPO_PUBLIC_QF_USER_AUTH_ENABLED=false`,
 no public `qf-user` route) until Quran Foundation registers
 `https://api.hafizquran.app/auth/v1/callback`,
-`https://hafizquran.app/auth/qf-callback` and
-`https://staging.hafizquran.app/auth/qf-callback` for that client; its
+`https://hafizquran.app/auth/qf-callback`,
+`https://staging.hafizquran.app/auth/qf-callback` and
+`https://hafizquran.app/auth/qf-app-callback` (Android and iOS) for that client,
+and `QF_USER_REDIRECT_URIS` must list the last three; its
 authorize endpoint currently rejects them. The original token encryption key
 was lost, so a new `QF_TOKEN_ENCRYPTION_KEY` was generated. Its only copies are
 `/root/hafiz-migration/qf-token-encryption-key.b64` and the local private

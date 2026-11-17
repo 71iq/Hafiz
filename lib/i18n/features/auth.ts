@@ -30,7 +30,7 @@ export const authStrings = {
     authForgotSentBrowser:
       "The link opens hafizquran.app in your browser. Set your new password there, then log in here.",
     authBackToLogin: "Back to Log In",
-    authForgotSocialNote: "Signed up with Google, Apple or Facebook? Use that button on Log In.",
+    authForgotSocialNote: "Signed up with a social account? Use that button on Log In.",
     authResetChecking: "Checking your reset link...",
     authResetRequestNew: "Request a new link",
     authSocialOff: "Social sign-in is unavailable right now.",
@@ -70,7 +70,7 @@ export const authStrings = {
     authForgotSentBrowser:
       "يفتح الرابط موقع hafizquran.app في المتصفح. عيّن كلمة المرور الجديدة هناك، ثم سجّل الدخول هنا.",
     authBackToLogin: "العودة لتسجيل الدخول",
-    authForgotSocialNote: "سجلت عبر Google أو Apple أو Facebook؟ استخدم الزر نفسه في صفحة الدخول.",
+    authForgotSocialNote: "سجلت عبر حساب اجتماعي؟ استخدم الزر نفسه في صفحة الدخول.",
     authResetChecking: "جارٍ التحقق من رابط إعادة التعيين...",
     authResetRequestNew: "اطلب رابطًا جديدًا",
     authSocialOff: "الدخول عبر الحسابات الأخرى غير متاح حاليًا.",
