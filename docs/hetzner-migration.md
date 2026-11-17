@@ -110,20 +110,28 @@ also returns a hash for the Google client secret. Use the original credential
 or a new second secret from the existing Google OAuth client, while preserving
 the first secret for the old hosting.
 
-The owner confirmed that the original Quran Foundation encryption key is
-unavailable and requested disabling the integration for now. Set
-`EXPO_PUBLIC_QF_USER_AUTH_ENABLED=false` and
-`EXPO_PUBLIC_QF_CONTENT_ENABLED=false` in the web build. Login, connection,
-external sync and remote hadith controls are hidden, content requests stop
-before calling Supabase, and Caddy has no public function route. Recitation
-does not depend on this: the built-in recitations play per-ayah files from the
-public verses.quran.foundation and quranicaudio CDNs
-(`lib/audio/public-ayah-audio.ts`), so audio stays available. Hadiths already
-opened on a device stay readable from its local cache.
-All connection records, identities, cached content and original deployed
-functions remain in the migration backups. Do not generate a replacement key
-and assume it can decrypt the old connection. Re-enabling the integration
-requires credentials and reauthorization of the affected connection.
+Quran Foundation content (ayah hadiths and the online reciter list) was
+restored on 2026-11-17 with `EXPO_PUBLIC_QF_CONTENT_ENABLED=true`. The
+`qf-content` function uses the surviving prelive OAuth client, the same client
+as the `custom:quran-foundation` Auth provider; Quran Foundation production does
+not know this client. `/etc/hafiz/functions.env` holds its credentials,
+`QF_CONTENT_ENV=prelive` and the `QF_USER_*` settings. Caddy exposes only
+`/functions/v1/qf-content`. Recitation does not depend on this: the built-in
+recitations play per-ayah files from the public verses.quran.foundation and
+quranicaudio CDNs (`lib/audio/public-ayah-audio.ts`), and the online list only
+adds reciters over the bundled ones.
+
+Quran Foundation login and sync stay off (`EXPO_PUBLIC_QF_USER_AUTH_ENABLED=false`,
+no public `qf-user` route) until Quran Foundation registers
+`https://api.hafizquran.app/auth/v1/callback`,
+`https://hafizquran.app/auth/qf-callback` and
+`https://staging.hafizquran.app/auth/qf-callback` for that client; its
+authorize endpoint currently rejects them. The original token encryption key
+was lost, so a new `QF_TOKEN_ENCRYPTION_KEY` was generated. Its only copies are
+`/root/hafiz-migration/qf-token-encryption-key.b64` and the local private
+migration directory; back both up. Connections saved under the old key cannot
+be decrypted and must reconnect. The one existing connection is already marked
+`needs_reauth`.
 The owner requested temporarily disabling signup, password reset and Google
 login. Build with `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=false` and
 `EXPO_PUBLIC_SOCIAL_AUTH_ENABLED=false`. The app hides those actions and redirects
@@ -278,10 +286,10 @@ its original user ID. The web build keeps the original Auth storage key. Existin
 still run the old bundle must reload to use the new API. Their local SQLite
 files and queued changes are not reset by the migration.
 
-Signup, password reset, Google login and Quran Foundation are intentionally
-disabled at the owner's request. The owner confirmed web-only usage. Restoring
-Google login requires a valid client secret; restoring signup and recovery
-requires SMTP. Quran Foundation also needs credentials and reauthorization.
+Signup, password reset, Google login and Quran Foundation login and sync were
+disabled at the owner's request during the migration. Restoring Google login
+requires a valid client secret; restoring signup and recovery requires SMTP.
+Quran Foundation login and sync need the redirect URIs above registered.
 
 Supabase's [platform restore guide](https://supabase.com/docs/guides/self-hosting/restore-from-platform)
 documents the separate storage, function, OAuth and SMTP configuration needed
