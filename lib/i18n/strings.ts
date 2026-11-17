@@ -813,8 +813,6 @@ export const strings = {
     qfManualSync: "Sync now",
     qfSyncComplete: "Quran Foundation sync complete",
     qfSyncFailed: "Quran Foundation sync failed",
-    qfContentUnavailable: "Quran Foundation content is temporarily unavailable.",
-    qfContentMisconfigured: "Quran Foundation content is not configured.",
     qfAuthCallbackLoading: "Completing Quran Foundation connection...",
     qfAuthCallbackFailed: "Quran Foundation connection failed",
     // Leaderboard
@@ -1677,8 +1675,6 @@ export const strings = {
     qfManualSync: "زامن الآن",
     qfSyncComplete: "اكتملت مزامنة Quran Foundation",
     qfSyncFailed: "فشلت مزامنة Quran Foundation",
-    qfContentUnavailable: "محتوى Quran Foundation غير متاح مؤقتًا.",
-    qfContentMisconfigured: "محتوى Quran Foundation غير مهيأ.",
     qfAuthCallbackLoading: "جارٍ إكمال اتصال Quran Foundation...",
     qfAuthCallbackFailed: "فشل اتصال Quran Foundation",
     // Leaderboard
