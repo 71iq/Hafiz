@@ -49,10 +49,18 @@ def check(root):
         categories = {item.get(ANDROID + "name") for item in intent.findall("category")}
         if "android.intent.action.VIEW" in actions and {"android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"} <= categories:
             schemes.update(item.get(ANDROID + "scheme") for item in intent.findall("data"))
-    require(schemes == {expo["scheme"]}, "Android browsable scheme differs from app.json")
+    # app.json intentFilters (such as the verified https app link) add their own browsable schemes.
+    expected_schemes = {expo["scheme"]}
+    for intent in expo["android"].get("intentFilters", []):
+        if {"BROWSABLE", "DEFAULT"} <= set(intent.get("category", [])):
+            expected_schemes.update(item["scheme"] for item in intent.get("data", []) if "scheme" in item)
+    require(schemes == expected_schemes, "Android browsable scheme differs from app.json")
     predictive = expo["android"]["predictiveBackGestureEnabled"]
     require(isinstance(predictive, bool) and application.get(ANDROID + "enableOnBackInvokedCallback") == str(predictive).lower(), "Android predictive back differs from app.json")
     require(application.get(ANDROID + "supportsRtl") == "true", "Android RTL support must remain enabled")
+    declared = {item.get(ANDROID + "name") for item in ET.parse(native / "AndroidManifest.xml").getroot().findall("uses-permission")}
+    for permission in expo["android"].get("permissions", []):
+        require(permission in declared, "Android manifest lacks app.json permission " + permission)
     require(expo["userInterfaceStyle"] == "automatic" and styles["AppTheme"].get("parent") == "Theme.AppCompat.DayNight.NoActionBar", "Review automatic/DayNight theme ownership")
     splash = {item.get("name"): item.text for item in styles["Theme.App.SplashScreen"]}
     require(color(splash["windowSplashScreenBackground"]).lower() == expo["splash"]["backgroundColor"].lower(), "Android splash background differs from app.json")
