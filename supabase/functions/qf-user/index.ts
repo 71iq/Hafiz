@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.99.3";
+import { decodeBase64, decrypt, decryptStoredToken, encodeBase64, encrypt, importEncryptionKey } from "./token-crypto.ts";
 
 type QfEnv = "production" | "prelive";
 type ErrorCode =
@@ -230,12 +231,12 @@ async function handleCompleteOAuth(config: Config, userId: string, body: Record<
     return jsonError("bad_request", "Quran Foundation connection state expired.");
   }
 
-  const token = await exchangeAuthorizationCode(
-    config,
-    code,
-    redirectUri,
-    await decrypt(config.encryptionKey, oauthState.code_verifier_ciphertext)
-  );
+  // State written under a replaced encryption key cannot be read; the user starts a new connection.
+  const codeVerifier = await decrypt(config.encryptionKey, oauthState.code_verifier_ciphertext).catch(() => null);
+  if (codeVerifier === null) {
+    return jsonError("bad_request", "Quran Foundation connection state is invalid.");
+  }
+  const token = await exchangeAuthorizationCode(config, code, redirectUri, codeVerifier);
   if (token.idToken && oauthState.nonce && jwtPayload(token.idToken)?.nonce !== oauthState.nonce) {
     return jsonError("bad_request", "Quran Foundation ID token nonce is invalid.");
   }
@@ -438,7 +439,7 @@ async function getAccessToken(config: Config, userId: string, forceRefresh: bool
 
   const expiresAt = row.expires_at ? Date.parse(row.expires_at) : 0;
   if (!forceRefresh && expiresAt > Date.now() + 60_000) {
-    return decrypt(config.encryptionKey, row.access_token_ciphertext);
+    return decryptStoredToken(config.encryptionKey, row.access_token_ciphertext, () => markNeedsReauth(config, userId));
   }
 
   if (!row.refresh_token_ciphertext) {
@@ -446,7 +447,9 @@ async function getAccessToken(config: Config, userId: string, forceRefresh: bool
     throw new Error("needs_reauth");
   }
 
-  const refreshToken = await decrypt(config.encryptionKey, row.refresh_token_ciphertext);
+  const refreshToken = await decryptStoredToken(config.encryptionKey, row.refresh_token_ciphertext, () =>
+    markNeedsReauth(config, userId)
+  );
   const refreshed = await refreshAccessToken(config, refreshToken).catch(async () => {
     await markNeedsReauth(config, userId);
     throw new Error("needs_reauth");
@@ -669,31 +672,6 @@ function parseCsvEnv(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-async function importEncryptionKey(raw: string): Promise<CryptoKey> {
-  const bytes = decodeBase64(raw);
-  if (bytes.byteLength !== 32) {
-    throw new Error("QF_TOKEN_ENCRYPTION_KEY must be a 32-byte base64 value.");
-  }
-  return crypto.subtle.importKey("raw", bytes, "AES-GCM", false, ["encrypt", "decrypt"]);
-}
-
-async function encrypt(key: CryptoKey, value: string): Promise<string> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(value)));
-  return `v1:${encodeBase64(iv)}:${encodeBase64(ciphertext)}`;
-}
-
-async function decrypt(key: CryptoKey, value: string): Promise<string> {
-  const [version, ivBase64, ciphertextBase64] = value.split(":");
-  if (version !== "v1" || !ivBase64 || !ciphertextBase64) throw new Error("Encrypted token is invalid.");
-  const plaintext = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: decodeBase64(ivBase64) },
-    key,
-    decodeBase64(ciphertextBase64)
-  );
-  return new TextDecoder().decode(plaintext);
-}
-
 function normalizeBookmark(value: unknown): {
   id: string;
   surah: number;
@@ -869,21 +847,8 @@ async function pkceChallenge(codeVerifier: string): Promise<string> {
   return encodeBase64Url(new Uint8Array(digest));
 }
 
-function encodeBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
 function encodeBase64Url(bytes: Uint8Array): string {
   return encodeBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function decodeBase64(value: string): Uint8Array {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
 }
 
 function decodeBase64Url(value: string): Uint8Array {
