@@ -31,12 +31,12 @@ function ring(time, start, end) {
 }
 const breath = (time) => gate(time, 0, 2.4, 2.4, 4.8);
 function wave(time) {
-  return 29 + 96 * gate(time, 0.2, 0.6, 1.3, 1.6) + 20 * gate(time, 0.6, 0.95, 0.95, 1.3);
+  return 29 + 121 * gate(time, .2, .6, 1.3, 1.6) - 20 * gate(time,.6,.81,.81,1.02) + 10 * gate(time,.81,1.05,1.05,1.3);
 }
 export const peaks = {
   A01: [],
   A02: [2.4, 3.38],
-  A04: [0.6, 0.95, 1.3, 1.69],
+  A04: [0.6, .81, 1.05, 1.3, 1.69],
   A06: [0.32, 0.58, 0.82, 1.3],
   A07: [0.9, 1.6, 1.74, 2.55],
   A08: [0.55, 0.78, 0.96, 1.5],
@@ -103,7 +103,7 @@ export function sample(job, time, level = 1) {
       pose.halo = gate(time, peak, peak+.10, peak+.17, peak+.30);
       face.eyeOpen = blink(time, juz ? 3 : 2.3, 0.35, 0.09);
       if (juz) {
-        const count = level >= 3 ? 5 : 6;
+        const count = 5;
         pose.motes = Array.from({ length: count }, (_, idx) => {
           const launch = 1 + (0.88 * idx) / (count - 1);
           return unit(time, launch, launch + 1.12);
@@ -112,12 +112,13 @@ export function sample(job, time, level = 1) {
       break;
     }
     case "A08": {
-      const swell = gate(time, 0.2, 0.57, 0.57, 0.89),
-        wobble = ring(time, 0.62, 1.2);
-      pose.width += (small ? 0.06 : 0.03) * (swell + 0.65 * wobble);
+      const swell = gate(time, 0.2, 0.57, 0.57, 1.12);
+      const lift = (t) => 30*gate(t,.2,.53,.59,.90)+4*gate(t,.51,.60,.60,.69)-8*gate(t,.80,.91,.91,1.01)+4*gate(t,.94,1.06,1.06,1.2);
+      pose.width += .03 * swell;
       pose.height = 1 / Math.sqrt(pose.width);
-      pose.leaf = (small ? 22 : 12) * gate(time, 0.24, 0.61, 0.61, 0.97) + 7 * ring(time, 0.7, 1.27);
-      pose.leafFollower = (small ? 18 : 10) * gate(time, 0.29, 0.66, 0.66, 1.02) + 5 * ring(time, 0.74, 1.3);
+      pose.arms = [29+10*swell,29+10*swell];
+      pose.leaf = lift(time);
+      pose.leafFollower = .78*lift(time-.045);
       face.eyeOpen = blink(time, 1.3);
       break;
     }

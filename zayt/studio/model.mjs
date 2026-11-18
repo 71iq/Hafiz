@@ -42,6 +42,37 @@ function tube(parent, path, radius, material) {
   end.position.copy(point(path.at(-1)));
   parent.add(end);
 }
+const armRings = 34, armSides = 32;
+function armSurface() {
+  const geometry = new THREE.BufferGeometry(), indices = [];
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((armRings+1)*armSides*3),3));
+  for(let row=0;row<armRings;row++) for(let col=0;col<armSides;col++) {
+    const first=row*armSides+col, next=row*armSides+(col+1)%armSides;
+    indices.push(first,next,first+armSides,next,next+armSides,first+armSides);
+  }
+  geometry.setIndex(indices);
+  return geometry;
+}
+function shapeArm(mesh, sign, angle, heart) {
+  const anchor=point([sign*.755,1.006,.09]), axis=point([sign*Math.sin(angle),-Math.cos(angle),.23]).normalize();
+  const knots=[anchor,anchor.clone().addScaledVector(axis,.16),anchor.clone().addScaledVector(axis,.34),anchor.clone().addScaledVector(axis,.52)];
+  knots[1].x+=sign*.048;knots[2].x+=sign*.026;
+  const chest=[[-.715,.76,.18],[-.77,.69,.46],[-.45,.72,.70],[.003,.84,.772]];
+  const curve=new THREE.CatmullRomCurve3(knots.map((v,i)=>v.lerp(point(chest[i]),heart)));
+  const coords=mesh.geometry.attributes.position;
+  for(let row=0;row<=armRings;row++) {
+    const u=row/armRings, center=curve.getPointAt(u), tangent=curve.getTangentAt(u);
+    const side=point([0,0,1]).cross(tangent).normalize(), front=tangent.clone().cross(side);
+    const cap=Math.min(1,(1-u)*curve.getLength()/.099), radius=(.098+.038*(1-u)**2)*Math.sqrt(Math.max(.00001,1-(1-cap)**2));
+    for(let col=0;col<armSides;col++) {
+      const rad=2*Math.PI*col/armSides, v=center.clone().addScaledVector(side,radius*Math.cos(rad)).addScaledVector(front,radius*Math.sin(rad));
+      coords.setXYZ(row*armSides+col,v.x,v.y,v.z);
+    }
+  }
+  coords.needsUpdate=true;
+  mesh.geometry.computeVertexNormals();
+  mesh.geometry.computeBoundingSphere();
+}
 function blade(length, width) {
   const positions = [],
     colors = [],
@@ -176,31 +207,27 @@ export function buildRig(scene) {
     root.add(mesh);
     return mesh;
   });
-  const arms = [-1, 1].map((sign) => {
-    const shape = new THREE.SphereGeometry(1, 48, 36), coords = shape.attributes.position;
-    for (let vertex=0; vertex<coords.count; vertex++) {
-      const axial=coords.getY(vertex), u=(axial+1)/2, bulge=1.10+.31*(1-u);
-      coords.setXYZ(vertex,coords.getX(vertex)*bulge+sign*.30*Math.sin(Math.PI*u),axial,coords.getZ(vertex)*bulge);
-    }
-    shape.computeVertexNormals();
-    const mesh = new THREE.Mesh(shape, limb);
+  const arms = [-1, 1].map(() => {
+    const mesh = new THREE.Mesh(armSurface(), limb);
     torso.add(mesh);
     return mesh;
   });
   const halo = aura(root, drop.geometry.parameters.points);
   let seed = 0x5a617974;
   const random = () => (seed = (Math.imul(1664525, seed) + 1013904223) >>> 0) / 4294967296;
-  const motes = Array.from({ length: 6 }, (_, index) => {
+  const moteQuad = new THREE.PlaneGeometry(.157,.157);
+  const motes = Array.from({ length: 5 }, (_, index) => {
     const mesh = new THREE.Mesh(
-      oval,
-      new THREE.MeshBasicMaterial({ color: index % 2 ? 0xdca53c : 0xffd470, transparent: true, depthWrite: false }),
+      moteQuad,
+      new THREE.ShaderMaterial({transparent:true,depthWrite:false, uniforms:{strength:{value:0}},
+        vertexShader:`varying vec2 disc;void main(){disc=uv*2.-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+        fragmentShader:`varying vec2 disc;uniform float strength;void main(){float a=1.-smoothstep(.17,1.,length(disc));gl_FragColor=vec4(1.,.82,.45,strength*a*a);}`}),
     );
     root.add(mesh);
     return {
       mesh,
       x: (index % 2 ? -1 : 1) * (0.08 + random() * 0.31),
-      raise: 0.89 + random() * 0.28,
-      radius: 0.057 + random() * 0.016,
+      raise: 0.38 + random() * 0.07,
     };
   });
   return (pose, style) => {
@@ -236,26 +263,15 @@ export function buildRig(scene) {
       const sign = index ? 1 : -1,
         angle = (pose.arms[index] * Math.PI) / 180,
         heart = index ? 0 : pose.chest;
-      const start = point([sign * (0.79 - 0.012 * heart), 1.006 - 0.035 * heart, 0.105 + 0.31 * heart]);
-      const end = point([
-        start.x + sign * 0.425 * Math.sin(angle) * (1 - heart) - sign * 0.52 * heart,
-        start.y - 0.425 * Math.cos(angle) * (1 - heart) - 0.26 * heart,
-        start.z + 0.11 + 0.36 * heart,
-      ]);
-      const direction = end.clone().sub(start);
-      start.addScaledVector(direction,-.28);
-      arm.position.copy(start).lerp(end, 0.5);
-      arm.quaternion.setFromUnitVectors(point([0, 1, 0]), direction.clone().normalize());
-      arm.scale.set(0.102, direction.length()*.72, 0.11);
+      shapeArm(arm,sign,angle,heart);
     });
     halo.visible = style.variant === 'dark' && pose.halo>0;
     halo.material.uniforms.power.value = pose.halo * .273;
-    motes.forEach(({ mesh, x, raise, radius }, index) => {
+    motes.forEach(({ mesh, x, raise }, index) => {
       const progress = pose.motes[index] ?? 0;
       mesh.visible = progress > 0 && progress < 1;
-      mesh.position.set(x, 2.76 + raise * progress, 0.42);
-      mesh.scale.setScalar(radius * (0.8 + 0.2 * Math.sin(Math.PI * progress)));
-      mesh.material.opacity = 0.92 * Math.sin(Math.PI * progress) ** 1.1;
+      mesh.position.set(x, 3.50 + raise * progress, -.10);
+      mesh.material.uniforms.strength.value = .96 * Math.sin(Math.PI * progress);
     });
   };
 }

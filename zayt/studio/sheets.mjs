@@ -113,13 +113,13 @@ export async function surfacesSheet(jobs) {
   const motionPeaks = {
     A01: 0,
     A02: 2.4,
-    A04: 0.95,
+    A04: 0.6,
     A06: 0.58,
-    A07: 1.6,
+    A07: 1.74,
     A08: 0.57,
     A10: 0.5,
     A11: 1,
-    A15: 1.8,
+    A15: 1.94,
     A17: 0.36,
     A19: 1.55,
   };
