@@ -79,16 +79,32 @@ function blade(length, width) {
     new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.82 }),
   );
 }
-function aura(scene, shadow) {
+function aura(scene, profile) {
+  const outline=[...profile,...profile.slice(1,-1).reverse().map(({x,y})=>new THREE.Vector2(-x,y))];
+  const positions=[], uv=[], indices=[];
+  for (const [index, pos] of outline.entries()) {
+    const next=(index+1)%outline.length, before=outline[(index+outline.length-1)%outline.length];
+    const tangent=outline[next].clone().sub(before).normalize();
+    for(const distance of [-.018,.215]) {
+      positions.push(pos.x+distance*tangent.y,pos.y-distance*tangent.x,-1.4);
+      uv.push(distance/.215,0);
+    }
+    indices.push(index*2,index*2+1,next*2,next*2,index*2+1,next*2+1);
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  geometry.setIndex(indices);
   const mat = new THREE.ShaderMaterial({
     transparent: true,
+    side: THREE.DoubleSide,
+    forceSinglePass: true,
     depthWrite: false,
     uniforms: { power: { value: 0 } },
-    vertexShader: `varying vec2 pos;void main(){pos=uv*2.-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-    fragmentShader: `varying vec2 pos;uniform float power;void main(){float fall=max(0.,1.-dot(pos,pos));float opacity=power*fall*fall*fall;float d=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715))))-.5;gl_FragColor=vec4(${shadow ? "0.37,0.20,0.055" : "1.,.765,.235"},floor(opacity*255.+d+.5)/255.);}`,
+    vertexShader: `varying float radius;void main(){radius=uv.x;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader: `varying float radius;uniform float power;void main(){float a=power*(1.-smoothstep(0.,1.,radius));float d=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715))));gl_FragColor=vec4(1.,.677,.21,floor(a*255.+d)/255.);}`,
   });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(shadow ? 1.68 : 2.92, shadow ? 0.19 : 3.1), mat);
-  mesh.position.set(0, shadow ? 0.075 : 1.56, -1.4);
+  const mesh = new THREE.Mesh(geometry, mat);
   mesh.renderOrder = -3;
   scene.add(mesh);
   return mesh;
@@ -171,8 +187,7 @@ export function buildRig(scene) {
     torso.add(mesh);
     return mesh;
   });
-  const halo = aura(root, false),
-    shadow = aura(root, true);
+  const halo = aura(root, drop.geometry.parameters.points);
   let seed = 0x5a617974;
   const random = () => (seed = (Math.imul(1664525, seed) + 1013904223) >>> 0) / 4294967296;
   const motes = Array.from({ length: 6 }, (_, index) => {
@@ -233,11 +248,8 @@ export function buildRig(scene) {
       arm.quaternion.setFromUnitVectors(point([0, 1, 0]), direction.clone().normalize());
       arm.scale.set(0.102, direction.length()*.72, 0.11);
     });
-    const tight = style.level >= 3;
-    halo.scale.set(tight ? 0.84 : 1, tight ? 0.78 : 1, 1);
-    halo.position.y = tight ? 1.19 : 1.56;
-    halo.material.uniforms.power.value = style.variant === "dark" ? pose.halo * (tight ? 0.24 : 0.32) : 0;
-    shadow.material.uniforms.power.value = style.variant === "light" ? 0.135 : 0;
+    halo.visible = style.variant === 'dark' && pose.halo>0;
+    halo.material.uniforms.power.value = pose.halo * .273;
     motes.forEach(({ mesh, x, raise, radius }, index) => {
       const progress = pose.motes[index] ?? 0;
       mesh.visible = progress > 0 && progress < 1;

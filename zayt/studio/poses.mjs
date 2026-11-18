@@ -49,7 +49,7 @@ export const peaks = {
 export function hold(name) {
   const pose = rest();
   if (name.startsWith("warm_smile")) pose.face.mouthCurve = 1;
-  if (name === "warm_smile_glow_35") pose.glow = pose.halo = 0.35;
+  if (name === "warm_smile_glow_35") pose.glow = 0.35;
   if (name === "seated") {
     pose.sit = pose.feet = 1;
     pose.height = 0.92;
@@ -98,12 +98,9 @@ export function sample(job, time, level = 1) {
       const juz = id === "A15",
         peak = juz ? 1.8 : 1.6,
         progress = ease(time, 0.3, peak);
-      pose.glow = progress * (1 - 0.65 * ease(time, peak + 0.12, juz ? 3.3 : 2.8));
+      pose.glow = progress * (1 - 0.65 * ease(time, peak + 0.30, juz ? 3.3 : 2.8));
       pose.fillHeight = -0.02 + 3.22 * progress;
-      pose.halo =
-        level >= 2
-          ? ease(time, peak - (juz ? 0.68 : 0.47), peak) * (1 - 0.65 * ease(time, peak + 0.2, peak + 0.78))
-          : pose.glow;
+      pose.halo = gate(time, peak, peak+.10, peak+.17, peak+.30);
       face.eyeOpen = blink(time, 1.6, 0.35, 0.09);
       if (juz) {
         const count = level >= 3 ? 5 : 6;

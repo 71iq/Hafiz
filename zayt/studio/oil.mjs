@@ -100,10 +100,10 @@ export function oilMaterial(body, reflection) {
         c=mix(c,vec3(1.,.905,.47),focus*.98);
         float band=exp(-sq((p.y-sweep)/.194))*smoothstep(.01,.43,depth);
         float lit=glow*(1.-smoothstep(fillHeight-.26,fillHeight+.23,p.y));
-        float core=bell(vec2((p.x-.075)/.56,(p.y-1.16)/1.19));
-        float opticalPath=smoothstep(.22,.91,depth)*(.31+.69*core);
-        c+=lit*opticalPath*vec3(.34,.245,.047)*(1.-.73*env);
-        c+=lit*core*vec3(.048,.044,.012);
+        float core=bell(vec2((p.x-.025)/.53,(p.y-1.18)/1.03));
+        float opticalPath=smoothstep(.33,.90,depth)*(.27+.73*core);
+        vec3 emission=mix(vec3(1.,.914,.659),vec3(1.,.953,.784),smoothstep(.50,1.,core));
+        c=mix(c,emission,lit*opticalPath*(1.-.78*lobe));
         c+=band*vec3(.29,.275,.20);
         if(p.z>0.){
           vec2 shoulder=vec2(-.78,.93);vec2 armEnd=mix(vec2(-.99,.60),vec2(-.26,.69),chest)-shoulder;
