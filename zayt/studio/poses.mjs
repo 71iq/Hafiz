@@ -30,7 +30,7 @@ export function sample(job,time,level=1){
     case 'A07':case 'A15':{
       const juz=id==='A15',peak=juz?1.8:1.6,progress=ease(time,.3,peak);
       pose.glow=progress*(1-.65*ease(time,peak+.12,juz?3.30:2.80));pose.fillHeight=-.02+3.22*progress;pose.halo=level>=2?ease(time,peak-(juz?.68:.47),peak)*(1-.65*ease(time,peak+.20,peak+.78)):pose.glow;
-      face.eyeOpen=blink(time,1.6,.32,.105);
+      face.eyeOpen=blink(time,1.6,.35,.09);
       if(juz){const count=level>=3?5:6;pose.motes=Array.from({length:count},(_,idx)=>{const launch=1+(.88*idx/(count-1));return unit(time,launch,launch+1.12);});}break;}
     case 'A08':{const swell=gate(time,.2,.57,.57,.89),wobble=ring(time,.62,1.20);
       pose.width+= (small?.06:.03)*(swell+.65*wobble);pose.height=1/Math.sqrt(pose.width);

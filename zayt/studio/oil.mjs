@@ -61,10 +61,13 @@ export function oilMaterial(body, reflection) {
         c=mix(c,vec3(1.,.981,.68),.88*focus);
         c+=vec3(.055,.045,.016)*bell(vec2((p.x-.25)/.53,(p.y-.51)/.25));
         float transmitted=bell(vec2((p.x-.22)/.67,(p.y-.72)/.44)); c+=vec3(.047,.045,.013)*transmitted;
-        float band=exp(-sq((p.y-sweep+.23*p.x-.085*p.x*p.x)/.212));
+        float band=exp(-sq((p.y-sweep)/.194))*smoothstep(.01,.43,depth);
         float lit=glow*(1.-smoothstep(fillHeight-.26,fillHeight+.23,p.y));
-        c=mix(c,vec3(1.,.954,.63),.92*band*(.71+.29*depth));
-        c=mix(c,vec3(1.,.945,.59),.71*lit*(.65+.35*depth));
+        float core=bell(vec2((p.x-.075)/.56,(p.y-1.16)/1.19));
+        float opticalPath=smoothstep(.22,.91,depth)*(.31+.69*core);
+        c+=lit*opticalPath*vec3(.34,.245,.047)*(1.-.73*env);
+        c+=lit*core*vec3(.048,.044,.012);
+        c+=band*vec3(.29,.275,.20);
         if(p.z>0.){
           vec2 cheek=vec2((abs(p.x)-.495)/.20,(p.y-.937)/.125);
           c=mix(c,vec3(.99,.48,.32),blush*.52*bell(cheek));

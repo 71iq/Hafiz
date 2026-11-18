@@ -55,7 +55,8 @@ export function buildRig(scene){
   large.position.set(.075,.156,-.008);small.position.set(.071,.092,.018);
   const oval=new THREE.SphereGeometry(1,48,32);
   const feet=[-1,1].map(()=>{const mesh=new THREE.Mesh(oval,limb);root.add(mesh);return mesh;});
-  const arms=[-1,1].map(()=>{const mesh=new THREE.Mesh(oval,limb);torso.add(mesh);return mesh;});
+  const capsule=new THREE.CapsuleGeometry(1,1.55,14,40);
+  const arms=[-1,1].map(()=>{const mesh=new THREE.Mesh(capsule,limb);torso.add(mesh);return mesh;});
   const halo=aura(root,false),shadow=aura(root,true);
   let seed=0x5a617974;const random=()=>((seed=(Math.imul(1664525,seed)+1013904223)>>>0)/4294967296);
   const motes=Array.from({length:6},(_,index)=>{const mesh=new THREE.Mesh(oval,new THREE.MeshBasicMaterial({color:index%2?0xdca53c:0xffd470,transparent:true,depthWrite:false}));
@@ -73,7 +74,7 @@ export function buildRig(scene){
     arms.forEach((arm,index)=>{const sign=index?1:-1,angle=pose.arms[index]*Math.PI/180,heart=index?0:pose.chest;
       const start=point([sign*(.79-.23*heart),1.006,.105+.53*heart]);
       const end=point([start.x+sign*.425*Math.sin(angle)*(1-heart)-sign*.33*heart,start.y-.425*Math.cos(angle)*(1-heart)-.15*heart,start.z+.11+.18*heart]);
-      const direction=end.clone().sub(start);arm.position.copy(start).lerp(end,.5);arm.quaternion.setFromUnitVectors(point([0,1,0]),direction.clone().normalize());arm.scale.set(.100,direction.length()*.61,.117);
+      const direction=end.clone().sub(start);arm.position.copy(start).lerp(end,.5);arm.quaternion.setFromUnitVectors(point([0,1,0]),direction.clone().normalize());arm.scale.set(.121,direction.length()*1.18/3.55,.124);
     });
     const tight=style.level>=3;halo.scale.set(tight?.84:1,tight?.78:1,1);halo.position.y=tight?1.19:1.56;
     halo.material.uniforms.power.value=style.variant==='dark'?pose.halo*(tight?.24:.32):0;shadow.material.uniforms.power.value=style.variant==='light'?.135:0;
