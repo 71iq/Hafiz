@@ -160,9 +160,14 @@ export function buildRig(scene) {
     root.add(mesh);
     return mesh;
   });
-  const capsule = new THREE.CapsuleGeometry(1, 1.55, 14, 40);
-  const arms = [-1, 1].map(() => {
-    const mesh = new THREE.Mesh(capsule, limb);
+  const arms = [-1, 1].map((sign) => {
+    const shape = new THREE.SphereGeometry(1, 48, 36), coords = shape.attributes.position;
+    for (let vertex=0; vertex<coords.count; vertex++) {
+      const axial=coords.getY(vertex), u=(axial+1)/2, bulge=1.10+.31*(1-u);
+      coords.setXYZ(vertex,coords.getX(vertex)*bulge+sign*.30*Math.sin(Math.PI*u),axial,coords.getZ(vertex)*bulge);
+    }
+    shape.computeVertexNormals();
+    const mesh = new THREE.Mesh(shape, limb);
     torso.add(mesh);
     return mesh;
   });
@@ -206,11 +211,11 @@ export function buildRig(scene) {
     small.rotation.set(-0.16, 0.1, ((-12 + pose.leafFollower) * Math.PI) / 180);
     feet.forEach((foot, index) => {
       const sign = index ? 1 : -1;
-      foot.scale.set(0.176 + 0.055 * pose.feet, 0.132 + 0.011 * pose.feet, 0.249 + 0.058 * pose.feet);
+      foot.scale.set(0.179 + 0.055 * pose.feet, 0.158 + 0.011 * pose.feet, 0.249 + 0.058 * pose.feet);
       foot.rotation.z = sign * (-0.2 + 0.14 * pose.feet);
       foot.rotation.y = sign * (0.27 + 0.22 * pose.feet);
       foot.rotation.x = -0.35 * pose.feet;
-      foot.position.set(sign * (0.33 + 0.2 * pose.feet), 0.138 + 0.034 * pose.feet, 0.17 + 0.48 * pose.feet);
+      foot.position.set(sign * (0.33 + 0.2 * pose.feet), 0.16 + 0.034 * pose.feet, 0.17 + 0.48 * pose.feet);
     });
     arms.forEach((arm, index) => {
       const sign = index ? 1 : -1,
@@ -223,9 +228,10 @@ export function buildRig(scene) {
         start.z + 0.11 + 0.36 * heart,
       ]);
       const direction = end.clone().sub(start);
+      start.addScaledVector(direction,-.28);
       arm.position.copy(start).lerp(end, 0.5);
       arm.quaternion.setFromUnitVectors(point([0, 1, 0]), direction.clone().normalize());
-      arm.scale.set(0.121, (direction.length() * 1.18) / 3.55, 0.124);
+      arm.scale.set(0.102, direction.length()*.72, 0.11);
     });
     const tight = style.level >= 3;
     halo.scale.set(tight ? 0.84 : 1, tight ? 0.78 : 1, 1);

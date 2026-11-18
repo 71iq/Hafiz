@@ -75,29 +75,29 @@ export function oilMaterial(body, reflection) {
       float env=texture2D(reflection,vec2(atan(reflected.x,reflected.z)/6.283185+.5+drift,asin(clamp(reflected.y,-1.,1.))/3.141593+.5)).r;
       float key=max(dot(normal,normalize(vec3(-.62,.86,.60))),0.);
       float fill=max(dot(normal,normalize(vec3(.7,.17,.92))),0.);
-      vec3 c=oil*(.77+.20*key+.11*fill);
-      c=mix(c,vec3(.53,.335,.033),.62*pow(1.-depth,.65));
-      c+=vec3(.095,.066,.007)*bell(vec2(normal.x/.76,(normal.y+.02)/.75));
-      float border=exp(-sq((depth-.30)/.15));
-      c=mix(c,vec3(1.,.84,.40),border*(.20+.35*max(normal.x,0.)));
-      float caustic=bell(vec2((normal.x-.64)/.32,(normal.y+.58)/.30));
-      c=mix(c,vec3(1.,.91,.49),caustic*.88);
-      c=mix(c,vec3(1.,.99,.83),env*(body>.5?.73:.42));
+      float pathLength=1.-smoothstep(.38,.98,depth);
+      vec3 c=oil-mix(vec3(0.),vec3(.055,.097,.116),pathLength);
+      c=mix(c,oil-vec3(.137,.165,.118),1.-smoothstep(.02,.34,depth));
+      c+=vec3(.01,.014,.004)*(key-.5);
+      if(body<.5){
+        c*=.84+.17*key+.06*fill;
+        float softbox=bell(vec2((normal.x+.43)/.36,(normal.y-.60)/.27));
+        c=mix(c,vec3(1.,.879,.46),.62*softbox+.12*env);
+      }
       if(body>.5){
-        float optical=pow(1.-depth,.66);
-        c*=1.-.18*optical-.10*smoothstep(1.75,2.7,p.y);
-        float inner=exp(-sq((depth-.40)/.11));
-        c=mix(c,vec3(.99,.785,.275),inner*.43);
-        c+=vec3(.09,.070,.019)*bell(vec2((p.x+.08)/.51,(p.y-1.12)/.79));
+        c=mix(c,vec3(.978,.736,.235),.82*smoothstep(2.06,2.74,p.y));
+        c=mix(c,vec3(1.,.853,.37),env*.29*(1.-smoothstep(-.3,.25,normal.x)));
+        float lens=bell(vec2((normal.x-.73)/.20,(normal.y+.38)/.58));
+        c=mix(c,vec3(.99,.759,.16),lens*.65);
         float streakX=p.x+.38-.36*(p.y-1.80);
         float box=bell(vec2(streakX/.056,(p.y-1.80)/.257));
         float lobe=bell(vec2(streakX/.132,(p.y-1.82)/.45));
         c=mix(c,vec3(1.,.89,.51),lobe*.85);
-        c=mix(c,vec3(1.,.996,.88),smoothstep(.20,.85,box)*.98);
-        float focus=bell(vec2((normal.x-.66)/.19,(normal.y+.58)/.19));
-        c=mix(c,vec3(1.,.981,.68),.88*focus);
-        c+=vec3(.055,.045,.016)*bell(vec2((p.x-.25)/.53,(p.y-.51)/.25));
-        float transmitted=bell(vec2((p.x-.22)/.67,(p.y-.72)/.44)); c+=vec3(.047,.045,.013)*transmitted;
+        c=mix(c,vec3(1.,.985,.81),smoothstep(.07,.75,box)*smoothstep(1.43,1.82,p.y)*.98);
+        float pool=bell(vec2((normal.x-.60)/.47,(normal.y+.59)/.31));
+        float focus=bell(vec2((normal.x-.64)/.21,(normal.y+.60)/.22));
+        c=mix(c,vec3(1.,.795,.22),pool*.95);
+        c=mix(c,vec3(1.,.905,.47),focus*.98);
         float band=exp(-sq((p.y-sweep)/.194))*smoothstep(.01,.43,depth);
         float lit=glow*(1.-smoothstep(fillHeight-.26,fillHeight+.23,p.y));
         float core=bell(vec2((p.x-.075)/.56,(p.y-1.16)/1.19));
