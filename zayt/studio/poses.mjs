@@ -23,6 +23,7 @@ export function sample(job,time,level=1){
   switch(id){
     case 'A02':{const rise=breath(time);pose.height+=rise*(small?.04:.02);pose.width+=rise*(small?.02:.01);
       pose.leaf=-(small?15:7.5)*rise;pose.leafFollower=-(small?13:7)*breath(Math.max(0,time-.065))*(1-ease(time,4.6,4.8));
+      if(level>=2){pose.breathHeight=pose.height-1;pose.baseWidth=pose.width-1;pose.height=pose.width=1;}
       face.eyeOpen=blink(time,3.17,.30,.055);break;}
     case 'A04':pose.arms[0]=wave(time);pose.height-=.013*ring(time,1.6,1.8);pose.leaf=4*ring(time,1.57,1.8);break;
     case 'A06':{const phase=unit(time,.2,1);const ramp=phase<.10?phase*phase/.18:phase>.90?1-(1-phase)**2/.18:(phase-.05)/.90;

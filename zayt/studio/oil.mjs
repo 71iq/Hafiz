@@ -23,13 +23,15 @@ function studioReflection() {
 
 export function oilMaterial(body, reflection) {
   const uniforms=Object.fromEntries(Object.entries({body: Number(body), oil: new THREE.Vector3(), reflection,
-    eyeOpen:1,eyeScale:.7,browHeight:0,browTilt:0,mouthCurve:0,blush:.5,highlight:1,glow:0,fillHeight:0,sweep:-2,drift:0}).map(([key,value])=>[key,{value}]));
+    eyeOpen:1,eyeScale:.7,browHeight:0,browTilt:0,mouthCurve:0,blush:.5,highlight:1,glow:0,fillHeight:0,sweep:-2,drift:0,breathHeight:0,baseWidth:0,chest:0}).map(([key,value])=>[key,{value}]));
   return new THREE.ShaderMaterial({uniforms,transparent:true,premultipliedAlpha:true,
-    vertexShader:`varying vec3 p; varying vec3 n; void main(){p=position; n=normalMatrix*normal; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    vertexShader:`varying vec3 p; varying vec3 n; uniform float breathHeight,baseWidth; void main(){p=position;vec3 surface=position;vec3 norm=normal;
+      if(breathHeight>0.){float u=clamp((p.y-1.36)/1.38,0.,1.);float width=1.+baseWidth*(1.-smoothstep(.45,.85,p.y));float height=1.+breathHeight*2.55*(6.*u*(1.-u))/1.38;surface.x*=width;surface.y+=breathHeight*2.55*u*u*(3.-2.*u);surface.z/=width*height;norm=normal/vec3(width,height,1./(width*height));}
+      n=normalMatrix*norm; gl_Position=projectionMatrix*modelViewMatrix*vec4(surface,1.);}`,
     fragmentShader:`precision highp float;
     varying vec3 p; varying vec3 n;
     uniform sampler2D reflection; uniform vec3 oil;
-    uniform float body,eyeOpen,eyeScale,browHeight,browTilt,mouthCurve,blush,highlight,glow,fillHeight,sweep,drift;
+    uniform float body,eyeOpen,eyeScale,browHeight,browTilt,mouthCurve,blush,highlight,glow,fillHeight,sweep,drift,chest;
     float sq(float x){return x*x;} float bell(vec2 v){return exp(-dot(v,v));}
     float ink(float distance){float aa=max(fwidth(distance)*.60,.0006);return 1.-smoothstep(-aa,aa,distance);}
     void main(){
@@ -69,6 +71,9 @@ export function oilMaterial(body, reflection) {
         c+=lit*core*vec3(.048,.044,.012);
         c+=band*vec3(.29,.275,.20);
         if(p.z>0.){
+          vec2 shoulder=vec2(-.78,.93);vec2 armEnd=mix(vec2(-.99,.60),vec2(-.26,.69),chest)-shoulder;
+          vec2 nearArm=p.xy-shoulder-armEnd*clamp(dot(p.xy-shoulder,armEnd)/dot(armEnd,armEnd),0.,1.);
+          c*=1.-vec3(.18,.27,.29)*chest*exp(-dot(nearArm,nearArm)/.018);
           vec2 cheek=vec2((abs(p.x)-.495)/.20,(p.y-.937)/.125);
           c=mix(c,vec3(.99,.48,.32),blush*.52*bell(cheek));
           vec2 eye=vec2(abs(p.x)-.39,p.y-1.096); float rad=.134*eyeScale;

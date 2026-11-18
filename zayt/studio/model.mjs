@@ -63,17 +63,18 @@ export function buildRig(scene){
     root.add(mesh);return {mesh,x:(index%2?-1:1)*(.08+random()*.31),raise:.89+random()*.28,radius:.057+random()*.016};});
   return (pose,style)=>{
     root.position.set(...pose.root); torso.scale.set(pose.width,pose.height,1/(pose.width*pose.height)); torso.position.y=.19*(1-pose.height)-.177*pose.sit;
+    body.uniforms.breathHeight.value=pose.breathHeight||0;body.uniforms.baseWidth.value=pose.baseWidth||0;sprig.position.y=2.731+2.55*(pose.breathHeight||0);
     const oil=palettes[style.color??'gold'];for(const mat of [body,limb])mat.uniforms.oil.value.set(...oil.map(channel=>channel/255));
-    for(const [key,value] of Object.entries({...pose.face,eyeScale:style.eyes??.7,glow:pose.glow,fillHeight:pose.fillHeight,sweep:pose.sweep,drift:pose.drift}))body.uniforms[key].value=value;
+    for(const [key,value] of Object.entries({...pose.face,eyeScale:style.eyes??.7,glow:pose.glow,fillHeight:pose.fillHeight,sweep:pose.sweep,drift:pose.drift,chest:pose.chest}))body.uniforms[key].value=value;
     large.rotation.set(.07,-.09,(43+pose.leaf)*Math.PI/180);small.rotation.set(-.16,.10,(-12+pose.leafFollower)*Math.PI/180);
     feet.forEach((foot,index)=>{const sign=index?1:-1;
-      foot.scale.set(.176+.043*pose.feet,.132-.024*pose.feet,.249+.052*pose.feet);
-      foot.rotation.z=sign*(-.20+.14*pose.feet);foot.rotation.y=sign*.27;
-      foot.position.set(sign*(.33+.13*pose.feet),.138-.024*pose.feet,.17+.34*pose.feet);
+      foot.scale.set(.176+.055*pose.feet,.132+.011*pose.feet,.249+.058*pose.feet);
+      foot.rotation.z=sign*(-.20+.14*pose.feet);foot.rotation.y=sign*(.27+.22*pose.feet);foot.rotation.x=-.35*pose.feet;
+      foot.position.set(sign*(.33+.20*pose.feet),.138+.034*pose.feet,.17+.48*pose.feet);
     });
     arms.forEach((arm,index)=>{const sign=index?1:-1,angle=pose.arms[index]*Math.PI/180,heart=index?0:pose.chest;
-      const start=point([sign*(.79-.23*heart),1.006,.105+.53*heart]);
-      const end=point([start.x+sign*.425*Math.sin(angle)*(1-heart)-sign*.33*heart,start.y-.425*Math.cos(angle)*(1-heart)-.15*heart,start.z+.11+.18*heart]);
+      const start=point([sign*(.79-.012*heart),1.006-.035*heart,.105+.31*heart]);
+      const end=point([start.x+sign*.425*Math.sin(angle)*(1-heart)-sign*.52*heart,start.y-.425*Math.cos(angle)*(1-heart)-.26*heart,start.z+.11+.36*heart]);
       const direction=end.clone().sub(start);arm.position.copy(start).lerp(end,.5);arm.quaternion.setFromUnitVectors(point([0,1,0]),direction.clone().normalize());arm.scale.set(.121,direction.length()*1.18/3.55,.124);
     });
     const tight=style.level>=3;halo.scale.set(tight?.84:1,tight?.78:1,1);halo.position.y=tight?1.19:1.56;

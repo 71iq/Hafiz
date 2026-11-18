@@ -17,7 +17,7 @@ export async function encode(job,{quality=83,entries,dest=path.join(out,job.medi
 }
 if(process.argv[1]===new URL(import.meta.url).pathname){const jobs=select(process.argv.slice(2));if(!jobs.length)throw Error('No export selected');
   for(const job of jobs){const dir=frameDir(job),capture=JSON.parse(fs.readFileSync(path.join(dir,'capture.json'))),trials=[];
-    for(const quality of [83,77,70]){await encode(job,{quality});const bytes=fs.statSync(path.join(out,job.media)).size;trials.push({quality,bytes,level:capture.level});if(!cap(job,false)||bytes<=cap(job,false)||job.mode==='still')break;}
+    for(const quality of job.key==='A06-S'?[77,70]:[83,77,70]){await encode(job,{quality});const bytes=fs.statSync(path.join(out,job.media)).size;trials.push({quality,bytes,level:capture.level});if(!cap(job,false)||bytes<=cap(job,false)||job.mode==='still')break;}
     if(job.poster&&job.id!=='A02'){const dest=path.join(out,job.poster);execFileSync(path.join(bin,'cwebp'),['-quiet','-m','6','-q','87','-alpha_q','100',path.join(dir,'hold.png'),'-o',dest]);}
     const log=path.join(cache,'trials',job.key+'.json');let old=fs.existsSync(log)?JSON.parse(fs.readFileSync(log)):[];json(log,[...old.filter(t=>t.level!==capture.level),...trials]);console.log(job.key,trials);
   }

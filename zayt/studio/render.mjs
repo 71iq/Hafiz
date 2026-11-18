@@ -7,7 +7,7 @@ import {camera} from './capture.mjs';
 const jobs=select(process.argv.slice(2));
 if(!jobs.length)throw Error('Specify pilot, P0, P1, P2, all or ID-tier[-variant]');
 await camera(async capture=>{
-  for(const job of jobs){const level=Number(process.env.ZAYT_LEVEL||(job.variant==='dark'?3:1)),dir=frameDir(job),masters=path.join(cache,'masters',job.key),count=job.nominal_samples||1;
+  for(const job of jobs){const level=Number(process.env.ZAYT_LEVEL||(job.variant==='dark'?3:job.id==='A02'?2:1)),dir=frameDir(job),masters=path.join(process.env.ZAYT_WORK||cache,'masters',job.key),count=job.nominal_samples||1;
     mkdir(dir);mkdir(masters);const hashes=[],poses=[],style={variant:job.variant,level};let previous;
     for(let index=0;index<count;index++){
       const time=count===1?0:job.seconds*(index/(count-1)),pose=sample(job,time,level),signature=JSON.stringify(pose),file=nameFrame(index);
