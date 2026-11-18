@@ -151,7 +151,7 @@ jest.mock("@/components/habit/SessionHabitCards", () => ({
   useCommitmentLabel: (_db: unknown, strings: { habitCommitTomorrow: string }) => strings.habitCommitTomorrow,
   strongerWirdEvent: (current: unknown, next: { kind: string }) => (next.kind === "none" ? current : next),
 }));
-jest.mock("@/components/habit/ZaytMood", () => ({ ZaytMood: () => null }));
+jest.mock("@/components/habit/ZaytAnimation", () => ({ ZaytAnimation: () => null, ZaytStill: () => null }));
 jest.mock("@/components/ui/Toast", () => {
   const { Text } = jest.requireActual<typeof import("react-native")>("react-native");
   return { Toast: ({ message }: { message: string }) => <Text>{message}</Text> };

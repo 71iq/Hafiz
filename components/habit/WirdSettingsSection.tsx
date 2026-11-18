@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { HabitBreakSheet } from "@/components/habit/HabitBreakSheet";
+import { ZaytStill } from "@/components/habit/ZaytAnimation";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 import type { AppDatabase } from "@/lib/database/types";
@@ -155,9 +156,16 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
         </MirroredRow>
 
         <MirroredRow dir={dir} className="items-center justify-between gap-3">
-          <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="flex-1 text-charcoal dark:text-neutral-200">
-            {s.habitSettingsZayt}
-          </Text>
+          {/* The still shows what the switch controls, and leaves with every other Zayt when it is off. */}
+          {settings.showZayt ? <ZaytStill tier="S" height={40} /> : null}
+          <View className="flex-1">
+            <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
+              {s.habitSettingsZayt}
+            </Text>
+            <Text dir={dir} variant="caption">
+              {s.habitSettingsZaytHint}
+            </Text>
+          </View>
           <Switch
             accessibilityLabel={s.habitSettingsZayt}
             value={settings.showZayt}

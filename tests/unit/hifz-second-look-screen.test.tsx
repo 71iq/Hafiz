@@ -84,7 +84,7 @@ jest.mock("@/components/habit/SessionHabitCards", () => ({
   useCommitmentLabel: (_db: unknown, strings: { habitCommitTomorrow: string }) => strings.habitCommitTomorrow,
   strongerWirdEvent: (current: unknown, next: { kind: string }) => (next.kind === "none" ? current : next),
 }));
-jest.mock("@/components/habit/ZaytMood", () => ({ ZaytMood: () => null }));
+jest.mock("@/components/habit/ZaytAnimation", () => ({ ZaytAnimation: () => null, ZaytStill: () => null }));
 // The lesson's exit dialog is covered in hifz-screens.test.tsx; these tests never open it.
 jest.mock("@/components/ui/ConfirmDialog", () => ({ ConfirmDialog: () => null }));
 jest.mock("@/lib/fsrs/review-sessions", () => ({ startReviewSession: jest.fn(), endReviewSession: jest.fn() }));

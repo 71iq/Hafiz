@@ -15,12 +15,14 @@ import { Text } from "@/components/ui/Text";
 import { GradingButtons } from "@/components/flashcards/GradingButtons";
 import {
   SessionHabitCards,
+  sessionZayt,
   showsCommitment,
   strongerWirdEvent,
   useCommitmentLabel,
   type SessionHabitInput,
 } from "@/components/habit/SessionHabitCards";
-import { ZaytMood } from "@/components/habit/ZaytMood";
+import { ZaytAnimation, ZaytStill } from "@/components/habit/ZaytAnimation";
+import { zaytResultEventId } from "@/lib/zayt/presentation";
 import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
 import { SabaqSecondLook } from "@/components/hifz/SabaqSecondLook";
 import { SimilarVerseComparison } from "@/components/hifz/SimilarVerseComparison";
@@ -735,9 +737,21 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         }}
       >
         <View style={{ width: "100%", maxWidth: step === "done" ? doneWidth : pageWidth - 16, gap: 6, alignItems: centered ? "center" : undefined }}>
+          {/* The intention's line is the hero, so Zayt keeps it company as a still. */}
           {step === "intention" && showZayt ? (
             <View className="mb-2">
-              <ZaytMood mood="gentle_welcome" height={112} />
+              <ZaytStill tier="S" height={72} />
+            </View>
+          ) : null}
+          {/* One Zayt per screen: the hero appears only when the session summary has none. */}
+          {step === "done" && showZayt && habitResult && !sessionZayt(habitResult) ? (
+            <View className="mb-2">
+              <ZaytAnimation
+                tier="M"
+                animation={outcome?.passed === false ? "A10" : "A06"}
+                height={112}
+                presentationId={zaytResultEventId(habitResult)}
+              />
             </View>
           ) : null}
           <Text

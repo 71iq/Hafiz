@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { CalendarCheck2, Coffee, HeartHandshake, Sparkles, Target } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
-import { ZaytMood, type ZaytMoodName } from "@/components/habit/ZaytMood";
+import { ZaytAnimation } from "@/components/habit/ZaytAnimation";
 import { ReminderPromptCard, useReminderOffer } from "@/components/notifications/ReminderPromptCard";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
@@ -17,6 +17,8 @@ import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { readReminderPrefs } from "@/lib/notifications/settings";
 import { prayerLabel } from "@/lib/notifications/templates";
 import type { ReminderAnchor } from "@/lib/notifications/types";
+import type { ZaytSmallAnimation } from "@/lib/zayt/animations";
+import { zaytResultEventId } from "@/lib/zayt/presentation";
 
 /** ETH-05: suggest rest after this much review in one session. */
 const REST_SUGGESTION_MS = 45 * 60_000;
@@ -91,14 +93,20 @@ function promptCard(input: SessionHabitInput, reminderOffer: boolean): CardKind 
   return null;
 }
 
-/** 5.11: Zayt's mood for the session end, calm in every case (ZAY-01). */
-function sessionMood(input: SessionHabitInput, prompt: CardKind | null, milestone: boolean): ZaytMoodName | null {
-  if (prompt === "rest") return "tired_low_energy";
-  if (prompt === "struggle") return "compassionate_again";
+/**
+ * 5.11: Zayt's animation at the session end, calm in every case (ZAY-01). The first match wins:
+ * rest, a hard session, a streak milestone, a streak earned back or a day made up, then today's
+ * minimum. Rest and a hard session put Zayt in their prompt card; the rest put it in the streak card.
+ * The reminder offer and the goal never hold Zayt, so the choice does not depend on them.
+ */
+export function sessionZayt(input: SessionHabitInput): Readonly<{ animation: ZaytSmallAnimation; card: "streak" | "rest" | "struggle" }> | null {
+  const prompt = promptCard(input, false);
+  if (prompt === "rest") return { animation: "A11", card: "rest" };
+  if (prompt === "struggle") return { animation: "A10", card: "struggle" };
   if (!input.event) return null;
-  if (milestone) return "warm_glow_good";
-  if (input.event.kind === "earned_back") return "recovering_calm";
-  return "quiet_shimmer_easy";
+  if (isStreakMilestone(input.event.length)) return { animation: "A07", card: "streak" };
+  if (input.event.kind === "earned_back" || input.event.kind === "made_up") return { animation: "A08", card: "streak" };
+  return { animation: "A06", card: "streak" };
 }
 
 function eventLine(input: SessionHabitInput, language: "en" | "ar", s: UIStrings): string {
@@ -136,7 +144,8 @@ export function SessionHabitCards({
   const prompt = promptCard(input, reminderAnchor !== null);
   const length = input.event?.length ?? 0;
   const milestone = input.event !== null && isStreakMilestone(length);
-  const mood = input.overview?.settings.showZayt === false ? null : sessionMood(input, prompt, milestone);
+  // ZAY-02: no Zayt until the setting is known to be on.
+  const placement = input.overview?.settings.showZayt === true ? sessionZayt(input) : null;
 
   const chooseGoal = (target: number) => {
     setGoalChoice(target);
@@ -148,10 +157,10 @@ export function SessionHabitCards({
       });
   };
 
-  // Zayt sits inside the first card beside its text instead of floating between cards.
-  const zayt = mood ? (
+  // Zayt sits inside the card whose text it accompanies, beside that text, never between cards.
+  const zayt = placement ? (
     <View className="flex-shrink-0">
-      <ZaytMood mood={mood} height={64} />
+      <ZaytAnimation tier="S" animation={placement.animation} height={64} presentationId={zaytResultEventId(input)} />
     </View>
   ) : null;
 
@@ -160,7 +169,7 @@ export function SessionHabitCards({
       {input.event ? (
         <Card elevation="low" className="px-5 py-4" accessibilityRole="summary">
           <MirroredRow dir={dir} className="items-center gap-3">
-            {zayt}
+            {placement?.card === "streak" ? zayt : null}
             <View className="flex-1">
               <MirroredRow dir={dir} className="items-center gap-2">
                 {milestone ? <Sparkles size={16} color={accent} /> : <CalendarCheck2 size={16} color={accent} />}
@@ -243,7 +252,7 @@ export function SessionHabitCards({
       {prompt === "rest" ? (
         <Card elevation="low" className="px-5 py-4">
           <MirroredRow dir={dir} className="items-center gap-2">
-            {input.event ? null : zayt}
+            {placement?.card === "rest" ? zayt : null}
             <Coffee size={16} color={accent} />
             <Text dir={dir} className="flex-1 text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
               {s.habitRestSuggestion}
@@ -255,7 +264,7 @@ export function SessionHabitCards({
       {prompt === "struggle" ? (
         <Card elevation="low" className="px-5 py-4">
           <MirroredRow dir={dir} className="items-center gap-2">
-            {input.event ? null : zayt}
+            {placement?.card === "struggle" ? zayt : null}
             <HeartHandshake size={16} color={accent} />
             <Text dir={dir} className="flex-1 text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 19 }}>
               {s.habitStruggleReward}

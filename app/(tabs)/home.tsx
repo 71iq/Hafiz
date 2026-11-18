@@ -72,6 +72,8 @@ import {
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 import { getUnseenUnlocks, markAchievementSeen, subscribeAchievementUnlocks } from "@/lib/achievements/queries";
+import { ZaytAnimation } from "@/components/habit/ZaytAnimation";
+import { isZaytLiveEvent, markZaytLiveEvent, markZaytPresented } from "@/lib/zayt/presentation";
 import type { AchievementUnlock } from "@/lib/achievements/types";
 import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
@@ -108,6 +110,14 @@ type DeckCardsTarget = {
 };
 
 const GRACE_NOTE_SEEN_KEY = "device_habit_grace_note_seen";
+/** The last wird day of the return episode whose welcome wave already played on this device. */
+const ZAYT_RETURN_SEEN_KEY = "device_zayt_return_seen";
+/** A juz completed on this device; the duplicate first-juz badge and the aggregates get no Zayt. */
+const JUZ_UNLOCK = /^juz_\d{2}_completed$/;
+
+function juzZaytEventId(unlock: { achievementId: string; unlockedAt: string }): string {
+  return `juz:${unlock.achievementId}:${unlock.unlockedAt}`;
+}
 
 /**
  * Home's achievement notices: the visible one stays first while newer unlocks queue behind it, so a
@@ -159,6 +169,8 @@ export default function HomeScreen() {
   const { wird, inboxCount, remediationDue, monthlyCheckDue, secondLooksDue, nextLookAt, refresh: refreshWird } = useTodayWird(db);
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
+  /** Whether the played return episode was read, so the wave never starts before it is known. */
+  const [zaytReturnLoaded, setZaytReturnLoaded] = useState(false);
   const [dueLoaded, setDueLoaded] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -278,12 +290,13 @@ export default function HomeScreen() {
       );
 
       const vocabSettings = await readDeckReviewSettings(db, MEANINGS_DECK_ID);
-      const [memorizedTotal, vocabTodayStats, reflectionJourneySummary, graceSeen] =
+      const [memorizedTotal, vocabTodayStats, reflectionJourneySummary, graceSeen, zaytReturnSeen] =
         await Promise.all([
           getMemorizedAyahCardCount(db),
           getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
           getReflectionJourneySummary(db),
           db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [GRACE_NOTE_SEEN_KEY]),
+          db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [ZAYT_RETURN_SEEN_KEY]),
         ]);
       const currentLevelTitle = reflectionJourneySummary.currentLevelTitle
         ? localizeReflectionJourneyText(reflectionJourneySummary.currentLevelTitle, uiLanguage)
@@ -298,6 +311,8 @@ export default function HomeScreen() {
       setSmartDecks(smartDisplays);
       setMemorizedCards(memorizedTotal);
       setGraceNoteSeen(graceSeen?.value ?? null);
+      if (zaytReturnSeen?.value) markZaytPresented(`return:${zaytReturnSeen.value}`);
+      setZaytReturnLoaded(true);
       setVocabStats(vocabTodayStats);
       setDueLoaded(true);
       loadUnlocks();
@@ -410,11 +425,13 @@ export default function HomeScreen() {
   // A live unlock waits behind the visible notice instead of replacing it.
   useEffect(
     () =>
-      subscribeAchievementUnlocks((unlock) =>
+      subscribeAchievementUnlocks((unlock) => {
+        // Only an unlock published live on this device is new; restored or synced ones are not.
+        if (JUZ_UNLOCK.test(unlock.achievementId)) markZaytLiveEvent(juzZaytEventId(unlock));
         setUnlockQueue((current) =>
           current.some((entry) => entry.achievementId === unlock.achievementId) ? current : [...current, unlock],
-        ),
-      ),
+        );
+      }),
     [],
   );
 
@@ -480,6 +497,16 @@ export default function HomeScreen() {
   const lastWirdDay = habit ? habit.days.filter((day) => day.localDate <= habit.today).at(-1)?.localDate ?? null : null;
   const returning =
     !!habit && !!wird && wird.todo.length > 0 && !habit.streak.doneToday && lastWirdDay !== null && diffDays(lastWirdDay, habit.today) >= 7;
+  // ZAY-02: no Zayt until the setting is known to be on. The return episode is the gap since the
+  // last wird day, so the wave plays once per episode, on this device, across launches.
+  const showZayt = habit?.settings.showZayt === true;
+  const returnZaytEventId = returning && zaytReturnLoaded && lastWirdDay ? `return:${lastWirdDay}` : null;
+  const rememberZaytReturn = useCallback(() => {
+    if (lastWirdDay) putUserSetting(db, ZAYT_RETURN_SEEN_KEY, lastWirdDay).catch(console.warn);
+  }, [db, lastWirdDay]);
+  // One Zayt per screen: the welcome-back card wins over a juz notice.
+  const juzZaytId =
+    latestUnlock && showZayt && !returning && JUZ_UNLOCK.test(latestUnlock.achievementId) ? juzZaytEventId(latestUnlock) : null;
   useEffect(() => {
     if (!dueLoaded || !habit?.streak.doneToday || remainingToday > 0) return;
     markFullWirdIfComplete(db, { now: new Date(), remaining: remainingToday }).catch(console.warn);
@@ -584,6 +611,11 @@ export default function HomeScreen() {
         {latestUnlock && (
           <AchievementUnlockToast
             unlock={latestUnlock}
+            zayt={
+              juzZaytId ? (
+                <ZaytAnimation tier="M" animation="A15" height={112} presentationId={isZaytLiveEvent(juzZaytId) ? juzZaytId : null} />
+              ) : null
+            }
             moreCount={unlockQueue.length - 1}
             onDismiss={dismissLatestUnlock}
             onOpen={() => router.navigate({ pathname: "/(tabs)/progress", params: { achievements: "1" } } as Href)}
@@ -707,7 +739,9 @@ export default function HomeScreen() {
           <WelcomeBackCard
             language={uiLanguage}
             s={s}
-            showZayt={habit?.settings.showZayt ?? true}
+            showZayt={showZayt}
+            zaytEventId={returnZaytEventId}
+            onZaytPresented={rememberZaytReturn}
             onChoose={(level) =>
               router.push({ pathname: "/hifz/review", params: { mode: "welcome_back", level: String(level) } } as Href)
             }

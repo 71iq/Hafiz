@@ -1,18 +1,26 @@
 import { Pressable, View } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { MirroredRow } from "@/components/ui/MirroredRow";
-import { ZaytMood } from "@/components/habit/ZaytMood";
+import { ZaytAnimation } from "@/components/habit/ZaytAnimation";
 import { Text } from "@/components/ui/Text";
 import type { SupportLevel } from "@/lib/hifz/grading";
 import type { UIStrings } from "@/lib/i18n/strings";
 
-type Props = { language: "en" | "ar"; s: UIStrings; showZayt: boolean; onChoose: (level: SupportLevel) => void };
+type Props = {
+  language: "en" | "ar";
+  s: UIStrings;
+  showZayt: boolean;
+  /** The current return episode, or null once its wave has played (10.3). */
+  zaytEventId: string | null;
+  onZaytPresented?: () => void;
+  onChoose: (level: SupportLevel) => void;
+};
 
 /**
  * 6.4 welcome back, without blame: the user says how their memorization feels, which sets the
  * starting support level, and the review opens with their strongest pages.
  */
-export function WelcomeBackCard({ language, s, showZayt, onChoose }: Props) {
+export function WelcomeBackCard({ language, s, showZayt, zaytEventId, onZaytPresented, onChoose }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const options: { label: string; level: SupportLevel }[] = [
     { label: s.hifzWelcomeBackSolid, level: 4 },
@@ -22,7 +30,9 @@ export function WelcomeBackCard({ language, s, showZayt, onChoose }: Props) {
   return (
     <Card elevation="low" className="mb-6 p-5 rounded-4xl">
       <MirroredRow dir={dir} className="items-center gap-3">
-        {showZayt ? <ZaytMood mood="gentle_welcome" height={56} /> : null}
+        {showZayt ? (
+          <ZaytAnimation tier="S" animation="A04" height={56} presentationId={zaytEventId} onPresented={onZaytPresented} />
+        ) : null}
         <View className="flex-1">
           <Text dir={dir} style={{ fontFamily: "Manrope_700Bold", fontSize: 15, lineHeight: 21 }} className="text-charcoal dark:text-neutral-100">
             {s.hifzWelcomeBackTitle}

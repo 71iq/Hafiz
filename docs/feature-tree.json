@@ -485,7 +485,7 @@
           "title": "Welcome-back review offer",
           "kind": "widget",
           "cases": ["PLAN-09"],
-          "uses": ["hifz.review"],
+          "uses": ["hifz.review", "wird.zayt"],
           "native": false,
           "children": []
         },
@@ -521,7 +521,7 @@
           "title": "Achievement announcements",
           "kind": "widget",
           "cases": ["HOME-04"],
-          "uses": [],
+          "uses": ["wird.zayt"],
           "native": false,
           "children": []
         },
@@ -1015,6 +1015,15 @@
           "title": "Session-end wird cards and Zayt",
           "kind": "widget",
           "cases": ["WIRD-08"],
+          "uses": ["wird.zayt"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "wird.zayt",
+          "title": "Zayt animation playback, once per new moment",
+          "kind": "widget",
+          "cases": ["WIRD-11"],
           "uses": [],
           "native": false,
           "children": []
@@ -1226,7 +1235,7 @@
           "title": "Sabaq: new lines",
           "kind": "screen",
           "cases": ["PLAN-08"],
-          "uses": ["wird.minimum", "wird.sessioncards", "hifz.setup.repetitions"],
+          "uses": ["wird.minimum", "wird.sessioncards", "wird.zayt", "hifz.setup.repetitions"],
           "native": false,
           "children": [
             {
@@ -1273,7 +1282,7 @@
           "title": "Response draft, complete, edit, next, discard",
           "kind": "widget",
           "cases": ["JOURNEY-04", "JOURNEY-05", "JOURNEY-06", "JOURNEY-07"],
-          "uses": ["shared.toast", "shared.discard"],
+          "uses": ["shared.toast", "shared.discard", "wird.zayt"],
           "native": false,
           "children": []
         }
@@ -1578,7 +1587,7 @@
           "title": "Wird settings and hifz plan link",
           "kind": "widget",
           "cases": ["SET-16"],
-          "uses": ["hifz.setup"],
+          "uses": ["hifz.setup", "wird.zayt"],
           "native": false,
           "children": []
         },

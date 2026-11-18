@@ -55,7 +55,7 @@ jest.mock("@/components/habit/SessionHabitCards", () => ({
   useCommitmentLabel: (_db: unknown, strings: { habitCommitTomorrow: string }) => strings.habitCommitTomorrow,
   strongerWirdEvent: (current: unknown) => current,
 }));
-jest.mock("@/components/habit/ZaytMood", () => ({ ZaytMood: () => null }));
+jest.mock("@/components/habit/ZaytAnimation", () => ({ ZaytAnimation: () => null, ZaytStill: () => null }));
 jest.mock("@/components/ui/ConfirmDialog", () => ({ ConfirmDialog: () => null }));
 jest.mock("@/lib/fsrs/review-sessions", () => ({ startReviewSession: jest.fn(), endReviewSession: jest.fn() }));
 jest.mock("@/lib/habit/queries", () => ({ loadHabitOverview: jest.fn() }));
