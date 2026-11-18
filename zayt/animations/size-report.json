@@ -1,0 +1,2345 @@
+{
+  "manifestVersion": 3,
+  "tools": {
+    "node": "v24.18.0",
+    "playwright": "1.60.0",
+    "chromium": "148.0.7778.96",
+    "chromiumBuild": "1223",
+    "flags": [
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader",
+      "--ignore-gpu-blocklist"
+    ],
+    "webgl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "driver": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "three": "180",
+    "threePackage": "0.180.0",
+    "esbuild": "0.25.12",
+    "sharp": "0.35.5",
+    "libvips": "8.18.7",
+    "encoder": "libwebp img2webp/cwebp 1.6.0",
+    "libwebp": "1.6.0"
+  },
+  "runtimeBytes": 1609172,
+  "runtimeCap": 3500000,
+  "runtimeFits": true,
+  "overages": [
+    {
+      "path": "S/A02_idle_breathe.webp",
+      "over": 165862,
+      "trials": [
+        {
+          "quality": 83,
+          "bytes": 461328,
+          "level": 1
+        },
+        {
+          "quality": 77,
+          "bytes": 413382,
+          "level": 1
+        },
+        {
+          "quality": 70,
+          "bytes": 387790,
+          "level": 1
+        },
+        {
+          "quality": 83,
+          "bytes": 379106,
+          "level": 2
+        },
+        {
+          "quality": 77,
+          "bytes": 337368,
+          "level": 2
+        },
+        {
+          "quality": 70,
+          "bytes": 315862,
+          "level": 2
+        }
+      ],
+      "options": {
+        "base": 315862,
+        "droppingAnimationSaves": 315862,
+        "quality": 70,
+        "at2point5x": {
+          "bytes": 259414,
+          "saved": 56448
+        }
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "S/A01_rest_pose.webp",
+      "role": "runtime",
+      "kind": "still",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 4854,
+      "cap": 25000,
+      "sha256": "a46e470bf68470ce7aa050174aa202cdb7e044b9f194c7ccdbfc63bc53f04589"
+    },
+    {
+      "path": "M/A01_rest_pose.webp",
+      "role": "review",
+      "kind": "still",
+      "tier": "M",
+      "variant": "shared",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 9486,
+      "cap": null,
+      "sha256": "bb7af2e109ff731cd2e8a53724d8eb9347d7ea0e38d986e719a118011a331d8b"
+    },
+    {
+      "path": "L/A01_rest_pose.webp",
+      "role": "review",
+      "kind": "still",
+      "tier": "L",
+      "variant": "shared",
+      "dimensions": [
+        384,
+        480
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 11986,
+      "cap": null,
+      "sha256": "e9dd31f6186023884b630ca9130fde3eb156e5e38cca4acf37a8ae133831a6d7"
+    },
+    {
+      "path": "S/A02_idle_breathe.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 115,
+      "encodedFrames": 115,
+      "milliseconds": 4800,
+      "loopCount": 2,
+      "alpha": true,
+      "bytes": 315862,
+      "cap": 150000,
+      "sha256": "e35e8b93c6f125321e669067e23a47ff21397caa67698f4057afbd0d49f88d5c"
+    },
+    {
+      "path": "S/A04_welcome_wave.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 43,
+      "encodedFrames": 42,
+      "milliseconds": 1800,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 51100,
+      "cap": 150000,
+      "sha256": "e79aba7dbe944f88b25f8b698402c7308aad35e6cf84a404f535a0d206b4022e"
+    },
+    {
+      "path": "S/A04_welcome_wave_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 4858,
+      "cap": 25000,
+      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+    },
+    {
+      "path": "S/A06_wird_done_shimmer.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 38,
+      "encodedFrames": 30,
+      "milliseconds": 1600,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 23952,
+      "cap": 150000,
+      "sha256": "b4eca594058003118b4da3962ac34b49b217cc6567d8b1e828c55ca37a978a44"
+    },
+    {
+      "path": "S/A06_wird_done_shimmer_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 4858,
+      "cap": 25000,
+      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+    },
+    {
+      "path": "M/A06_wird_done_shimmer.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "M",
+      "variant": "shared",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 38,
+      "encodedFrames": 30,
+      "milliseconds": 1600,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 50296,
+      "cap": 300000,
+      "sha256": "297409734d839205d8dab5b51fea8f3dc54dcefa485f0bd343eed3d51dd49097"
+    },
+    {
+      "path": "M/A06_wird_done_shimmer_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "M",
+      "variant": "shared",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 9502,
+      "cap": 50000,
+      "sha256": "edea1ca98682903018942a32a98d28ad04eb5fac86eda1901d6360ceb965b9e0"
+    },
+    {
+      "path": "S/A07_milestone_glow_light.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "light",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 72,
+      "encodedFrames": 58,
+      "milliseconds": 3000,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 89238,
+      "cap": 150000,
+      "sha256": "a01f423430b1e7cf96ca7bf24155d9fa9891ef3411f69707efad9e02e4e97306"
+    },
+    {
+      "path": "S/A07_milestone_glow_light_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "S",
+      "variant": "light",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 5242,
+      "cap": 25000,
+      "sha256": "3c8bb2516075075ec73dc142402b80a321e7fbde93be6a2c6204c3973bde36b3"
+    },
+    {
+      "path": "S/A07_milestone_glow_dark.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "dark",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 72,
+      "encodedFrames": 57,
+      "milliseconds": 3000,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 105826,
+      "cap": 150000,
+      "sha256": "8f2d04c157b697308f3632276ee19665df64bb47445c5628bb66eb73a476243f"
+    },
+    {
+      "path": "S/A07_milestone_glow_dark_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "S",
+      "variant": "dark",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 5778,
+      "cap": 25000,
+      "sha256": "b01e39683b52eca130b0111f8b6f24365104b38aa679d24cbc4d1717959e3bae"
+    },
+    {
+      "path": "S/A08_earned_back_steady.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 48,
+      "encodedFrames": 37,
+      "milliseconds": 2000,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 110210,
+      "cap": 150000,
+      "sha256": "e0ba78de8a67791cddd8001ebfbc077bcf04c23439b697b75920ee5d0193c44c"
+    },
+    {
+      "path": "S/A08_earned_back_steady_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 4858,
+      "cap": 25000,
+      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+    },
+    {
+      "path": "S/A10_hard_session_compassion.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 48,
+      "encodedFrames": 39,
+      "milliseconds": 2000,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 27272,
+      "cap": 150000,
+      "sha256": "b672c30a09147c127be08895325be949784545e025014d41423601e31c0381ca"
+    },
+    {
+      "path": "S/A10_hard_session_compassion_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 4858,
+      "cap": 25000,
+      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+    },
+    {
+      "path": "M/A10_hard_session_compassion.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "M",
+      "variant": "shared",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 48,
+      "encodedFrames": 39,
+      "milliseconds": 2000,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 50160,
+      "cap": 300000,
+      "sha256": "6a70cb39fc2851ab422208e0a240f63dabaf746cd0a7058565b917e491d7c136"
+    },
+    {
+      "path": "M/A10_hard_session_compassion_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "M",
+      "variant": "shared",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 9502,
+      "cap": 50000,
+      "sha256": "edea1ca98682903018942a32a98d28ad04eb5fac86eda1901d6360ceb965b9e0"
+    },
+    {
+      "path": "S/A11_rest_sit.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 53,
+      "encodedFrames": 43,
+      "milliseconds": 2200,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 144932,
+      "cap": 150000,
+      "sha256": "f2ba7603d5dd10fa2ed1b2644f09955b13b7fdc1080c26e64cba7a7ec521e60a"
+    },
+    {
+      "path": "S/A11_rest_sit_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 4508,
+      "cap": 25000,
+      "sha256": "d35831072ac8dfc08144c047e9ef0de4d3bcc0deea18a3c8468a1739cffdc2d5"
+    },
+    {
+      "path": "M/A15_juz_light_light.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "M",
+      "variant": "light",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 86,
+      "encodedFrames": 72,
+      "milliseconds": 3600,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 272780,
+      "cap": 300000,
+      "sha256": "115a4157e0451c2a70159726167bddc6bd58e7b6ba6217e7ef679494d4638b7d"
+    },
+    {
+      "path": "M/A15_juz_light_light_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "M",
+      "variant": "light",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 10256,
+      "cap": 50000,
+      "sha256": "11caac56bf49202179edcebadb8863a9bbf037ef80ae3c59521dd67a45f52dbf"
+    },
+    {
+      "path": "M/A15_juz_light_dark.webp",
+      "role": "runtime",
+      "kind": "animation",
+      "tier": "M",
+      "variant": "dark",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 86,
+      "encodedFrames": 72,
+      "milliseconds": 3600,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 286872,
+      "cap": 300000,
+      "sha256": "f0694a409322b823724a9828b649f6d7df66e40d624bfc643105ba142c088506"
+    },
+    {
+      "path": "M/A15_juz_light_dark_poster.webp",
+      "role": "runtime",
+      "kind": "poster",
+      "tier": "M",
+      "variant": "dark",
+      "dimensions": [
+        308,
+        384
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 11598,
+      "cap": 50000,
+      "sha256": "99d5b0bbfc865a18283e38e15008816723be02a9084b8a1146f7e779ae447ab1"
+    },
+    {
+      "path": "S/A17_tap_hello.webp",
+      "role": "review",
+      "kind": "animation",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 22,
+      "encodedFrames": 18,
+      "milliseconds": 900,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 24546,
+      "cap": null,
+      "sha256": "f751ea0dad093d7547f5fe21cad4ae4b8808ef90260ec3b22cb3265e7480fe09"
+    },
+    {
+      "path": "S/A17_tap_hello_poster.webp",
+      "role": "review",
+      "kind": "poster",
+      "tier": "S",
+      "variant": "shared",
+      "dimensions": [
+        172,
+        216
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 4858,
+      "cap": null,
+      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+    },
+    {
+      "path": "L/A19_onboarding_hello.webp",
+      "role": "review",
+      "kind": "animation",
+      "tier": "L",
+      "variant": "shared",
+      "dimensions": [
+        384,
+        480
+      ],
+      "nominalSamples": 62,
+      "encodedFrames": 52,
+      "milliseconds": 2600,
+      "loopCount": 1,
+      "alpha": true,
+      "bytes": 235556,
+      "cap": null,
+      "sha256": "1db18c8e030e709f84365d14ddd8ef82d613c788eec7bc2971c923f795070ac6"
+    },
+    {
+      "path": "L/A19_onboarding_hello_poster.webp",
+      "role": "review",
+      "kind": "poster",
+      "tier": "L",
+      "variant": "shared",
+      "dimensions": [
+        384,
+        480
+      ],
+      "nominalSamples": 1,
+      "encodedFrames": 1,
+      "milliseconds": 0,
+      "loopCount": 0,
+      "alpha": true,
+      "bytes": 12012,
+      "cap": null,
+      "sha256": "10d3acb45d276cda29a832e90c745bbaffb5dd01071b39f8ad31a7019f5ae9ed"
+    }
+  ],
+  "audits": [
+    {
+      "key": "A01-S",
+      "masterSequence": "f4221aadd4e8607cf73e6679b70b3c936c2b35b1157af29bdfab343345df3d53",
+      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "lastMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "posterPath": null,
+      "posterDelta": null,
+      "fiveSamplesVsPoster": null,
+      "posterSurfaces": null,
+      "encodedVsMaster": {
+        "worstRms": 3.955,
+        "worstP99": 15,
+        "worstSample": 0
+      },
+      "fullyClosedMs": 0,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1781,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "f420d1b0ce4ae9e1e82b7b0b97d3d4e70a96b424515e126c947b19d56ec37fdc"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "cf035783fa89ed87fbebbf5042fbd2c13c9b01bc01cfe97107446243ed6b164b"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "ee7597a21073922dd7bfca6c9e0d96d9a3235bc27015e315b8d2ab45f8f0102e"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "60d8c48ffd1bef5d0c8aacbf0d10d6f1b466e0475822867043045646edd8cca1"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "8f9eed35c9bd1afb800ac3e4d3790955dbcb130ec3cc5ba9a24d0d96decab115"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "97f54dce6bb45bd25a43d3219aba91ede4948aca3d60defca8f0e35faa0feaaf"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "f6e3cc52604c76b2db2dbbd5de55212e1461b0853d10cd98b2e238d966c4e2e6"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "f1fd05c50890ea391108a1a624bca9b3a318c40fcd233018d68845c32df7795a"
+        }
+      ]
+    },
+    {
+      "key": "A01-M",
+      "masterSequence": "25c88f48a781e984051754aebb6956894b3af5fa7509dc4f0914bc25bb459c4c",
+      "firstMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
+      "lastMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
+      "posterPath": null,
+      "posterDelta": null,
+      "fiveSamplesVsPoster": null,
+      "posterSurfaces": null,
+      "encodedVsMaster": {
+        "worstRms": 3.339,
+        "worstP99": 13,
+        "worstSample": 0
+      },
+      "fullyClosedMs": 0,
+      "alphaBounds": [
+        55,
+        64,
+        252,
+        375
+      ],
+      "minimumMarginPx": 8,
+      "maxSlotPt": 128,
+      "conservativeFlashAreaPx": 4686,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "64689fd6cae29c6cc696c9b1cd57cc65b2d17198147b55962b18ee7b47fd46d2"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "89ea4de417df14117e52fb32768ead89b31e73dd625a9bc74b025fe8dae614a6"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "c2f9734630ea7f443f6d3ae0bc83df046f0f22baa415d4aaeac5027be5f13262"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "9bd523b6666696d4d8590de7e65ab732eafa9e116ef22a185037344d50fd9869"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "b4715148a42b5664696a62e8d255779699d7728366540fb8186e0af8ec30afd0"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "1264ae37c656131b9557c25c2610568955a11cbd50ff456bce9089b8d2cdc2e9"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "ad8a85eae55d8d8aa9403df228d128c325650896c5920526f2339f4acaae65e4"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "ba7c8a7382edfba761dc9066b4b38461bc54b52cc3293cbc91bec79a98e3a9dc"
+        }
+      ]
+    },
+    {
+      "key": "A01-L",
+      "masterSequence": "687df5f231b09195f5da5a50b36ce83763de7450a6d30099405fcf7f08691592",
+      "firstMaster": "13b94563f14e9fa89398e689e4225c2d1ed3c4cb3ef47b5e5a82d8601d1e8f2d",
+      "lastMaster": "13b94563f14e9fa89398e689e4225c2d1ed3c4cb3ef47b5e5a82d8601d1e8f2d",
+      "posterPath": null,
+      "posterDelta": null,
+      "fiveSamplesVsPoster": null,
+      "posterSurfaces": null,
+      "encodedVsMaster": {
+        "worstRms": 2.835,
+        "worstP99": 11,
+        "worstSample": 0
+      },
+      "fullyClosedMs": 0,
+      "alphaBounds": [
+        68,
+        80,
+        315,
+        469
+      ],
+      "minimumMarginPx": 10,
+      "maxSlotPt": 200,
+      "conservativeFlashAreaPx": 10514,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "9db11dfda3df27ecb463cd1c2d0103c5eed5ce5881c92f24e62214583b7d7ae2"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "e6a3a3adaf1877125559d880bdd67540184f85a433fbf375270ec119004e8389"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "936fc1cfda4eea22bd5a4900f51ab1cea0d3dd936d8c16e24dc1ce8fb3acbe9c"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "2a2f57fa2e0255bf0efbddf838a4413a3d4cc2d5a80ce08c7539d7e101b77be3"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "f20674895f7b8037122061af75c03832d59687e486a36402914c708d9e3fb6a0"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "e6f69c500b7a3232e6f8e234cb81d02ebf104555b215c41fd301b464c6de47bf"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "256bdec8001f54108a1ad18ebd09778aae6adb14c182f06348a83946f2a6f8a0"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "31d708066a74e3cf60cae484c62df282a16517c0ee7796db7a3d44b101b9cfac"
+        }
+      ]
+    },
+    {
+      "key": "A02-S",
+      "masterSequence": "f8e0b2f05192f1e01f80040cd842390dda75f40a1a957c6d996e7c299d2b70fb",
+      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "lastMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "posterPath": "S/A01_rest_pose.webp",
+      "posterDelta": {
+        "rms": 4.902,
+        "p99": 17
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          62,
+          104,
+          60,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "f420d1b0ce4ae9e1e82b7b0b97d3d4e70a96b424515e126c947b19d56ec37fdc"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "cf035783fa89ed87fbebbf5042fbd2c13c9b01bc01cfe97107446243ed6b164b"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "ee7597a21073922dd7bfca6c9e0d96d9a3235bc27015e315b8d2ab45f8f0102e"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "60d8c48ffd1bef5d0c8aacbf0d10d6f1b466e0475822867043045646edd8cca1"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "8f9eed35c9bd1afb800ac3e4d3790955dbcb130ec3cc5ba9a24d0d96decab115"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "97f54dce6bb45bd25a43d3219aba91ede4948aca3d60defca8f0e35faa0feaaf"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "f6e3cc52604c76b2db2dbbd5de55212e1461b0853d10cd98b2e238d966c4e2e6"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "f1fd05c50890ea391108a1a624bca9b3a318c40fcd233018d68845c32df7795a"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 5.683,
+        "worstP99": 22,
+        "worstSample": 0
+      },
+      "fullyClosedMs": 334,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1837,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "c2b70bc9c5cdf06410f5baad7562c778310926d1cd162e58c7d6dcf773b7f1e2"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "85222207153ae3df769a3b62ec93b19a7b6994224cf27552362eecb13910dd37"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "19e42f3414d821799bd5cc87e724d33d22a584dcb7dadb35ce631e839be2b418"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "08c04104130c610ce351556acef1cec113b757fba6015c6bef8d064124201a51"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "bbacc455d35ad5906b44c9c2cde025557f637628f876f9b5a922c7ed52fb42a7"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "3411c0cc52efaef4051fa0c1da7945d90c0bc12abe81b9dc320b5d8dfaaf0474"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "a2d367a3fe0dd6064ac4e45f034a8d3525760c503556d4de393e51c6453477f2"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "aa44a738ddf46e9c9f2b0c1966783dc2a6b837713300feac69342069bdb91dd9"
+        }
+      ]
+    },
+    {
+      "key": "A04-S",
+      "masterSequence": "ccbc0cf56befb9d16a600eed266f1f2140793cc9808185493da17a4b494dfc9d",
+      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
+      "posterPath": "S/A04_welcome_wave_poster.webp",
+      "posterDelta": {
+        "rms": 4.007,
+        "p99": 13
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          38,
+          36,
+          36,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 4.457,
+        "worstP99": 17,
+        "worstSample": 19
+      },
+      "fullyClosedMs": 0,
+      "alphaBounds": [
+        20,
+        35,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1871,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "5c447982d0b0ced3ea6e9e111535e695fef76e745c25dc4ce36597c5c83eab09"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "799cf3d1f119cf493e4c752f979122ca7713f4ca509172bcd03756e1e263f619"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "1f66e145cbfa45c2b11f4828f393faefee42b38c0934c940476a806ef127ab30"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "1306062c139fc1230f20664c2805aaa5bdca58b1ab236fe3563b6115fa7597d5"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "1be671223621f1ed54aab52292058fa1bc536ba5a7dc02e46ce8bac45306500f"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "fe090c5f6b1ee43cf6f9ddb08752e1012b7bd38512794911050a977c1fa352e9"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "8593ca06350a5ee1ed0900610248c6a0e54bdfd6efbb09b7b46faa4d328b31b9"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "fb792a0d24ceaa5941962fc770992903fa7ec8cbb4b8ae769cdeea001accbbb6"
+        }
+      ]
+    },
+    {
+      "key": "A06-S",
+      "masterSequence": "1040d0e71cdc64fcca3ebe2faaa47b5c5d949ced20270a9ba82da596383296cb",
+      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
+      "posterPath": "S/A06_wird_done_shimmer_poster.webp",
+      "posterDelta": {
+        "rms": 4.877,
+        "p99": 17
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          89,
+          26,
+          19,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 5.246,
+        "worstP99": 20,
+        "worstSample": 6
+      },
+      "fullyClosedMs": 337,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1781,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "193fde45d5559f80a9b512e1321a53dd69093f1cf28ca32b2f3a04ca569f1764"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "712c286f26724e385816ec88d981152e10bcb396b72f279789236acc6f2aeb59"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "6afc137be557f4b465ec7e8bc3678f8abe5447099153bf52b7d88e0bb3a5c023"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "e59350e2869ae32406383fa4148c890aab61eb563b6ffba5539defba7b87346d"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "7c3fa6658e02adc377cc370df4c4878264007072e895ac53581f667c0a73e22a"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "d98054ebd657d48b79e60a5d7424232ac730a5210dda70f4b1dd718cd764c915"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "807919c2727397818aa123d4a2202bd9d2a8e6c60bd3143a63b906509bfae731"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "094671304f44059c5b2a7fb99ba3a2a2dd7f8fa3bf1cf7f0992f83a37b986e6b"
+        }
+      ]
+    },
+    {
+      "key": "A06-M",
+      "masterSequence": "c38bbb55e29b0ef15f6db17b6337ffb48f2f0acad0b173f1462690dea57c0aa1",
+      "firstMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
+      "lastMaster": "63910852d32b06a2f82447af4909005ec58d79bac94608e17fafa72bad990f7b",
+      "posterPath": "M/A06_wird_done_shimmer_poster.webp",
+      "posterDelta": {
+        "rms": 3.78,
+        "p99": 14
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          89,
+          25,
+          17,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "4fda53dac4aed7d55ddb2c4f0ed16d895177e3dccaa3376d70ae61157b62809a"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "52708a7fae46d01762a18ef53e24013c7fec30e12b5223e50b268677fe1a0a58"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "48f57df7a2d0b148c103bede3c8b2dcd442fbc50d1048f4d24a818da044c0d3a"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "9d47ff614fca32e4f27c7729190f348dcd04128572f4cca5535fe6e4e2a7af55"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "e30acdf05d65113bdc482d7f37717e275b71a4c780582aff751b18fd86219066"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "9c7665d0dba0f01986aafbd2aa15cd6de34ad8f86307123ab1f1c891d8f83a52"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "171dd73440a57a91de7b3ccfa9840932a6aef7350a942a4b14a060c896f2d236"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "dc4083f8b73865fb70add9054ee457f7833703660865fa8dae8d0a6aab1f2d51"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.255,
+        "worstP99": 12,
+        "worstSample": 12
+      },
+      "fullyClosedMs": 337,
+      "alphaBounds": [
+        55,
+        64,
+        252,
+        375
+      ],
+      "minimumMarginPx": 8,
+      "maxSlotPt": 128,
+      "conservativeFlashAreaPx": 4686,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "7a7d107dd58818b63bf70b13325e0a3eb11647daa7cfe0130a096f5a840eda3c"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "089e13fb142b88c97c552df892eef808c5843179e360f5d1afe1949fed9c7ab2"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "9b0d0cbe1494d8e5a82cbe3fa3485434dc18b093939240214f33e2f93eed9e92"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "5a90ce523d63d08fb75eacd6dc4d47db09ca1f8e84c4c4c9e87c65036a8c6051"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "9779a54ad7fd7682682045c66fab03b89abee8554826c27b2a534031c0c01eed"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "f0b0ada74332bbd8ebe1ff92d7a64af00c907fba424ac79338fc7f6024c4be0a"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "14a454695252da325196ea779c77904fbbc6e62a40343213aa95f7ddc9d864dc"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "280e2149dd56a0b423720ddbab873a1639341748da52fd1af1cd1782295084e3"
+        }
+      ]
+    },
+    {
+      "key": "A07-S-light",
+      "masterSequence": "4855663b5c7d25b63f66a9481f2ae207a98ecf250a3df7bff7c60bd3714183cf",
+      "firstMaster": "0e12ede21e246e3c20f1d46952d5fd470f081be7835e739761ea6089ea8a6d59",
+      "lastMaster": "a1ad429889f5ece9c56a489a571aca279939e25069224a88ab9070729d96334a",
+      "posterPath": "S/A07_milestone_glow_light_poster.webp",
+      "posterDelta": {
+        "rms": 4.235,
+        "p99": 14
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          85,
+          64,
+          315,
+          31,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "5d2d586e1a37507b458b69ea24681602c5f5118ab57796bf6899cd78a963d179"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "9e1f6d58be745e6473b3c9a59fb4e41ce4c73d06fd9ad1f8edba6cd40ba7e445"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "28acf365daaf27f81199ac14c82cbe7929956ac63187c300e84964a20a758f03"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "dea9a3912796536b9574c311a11392709a911f17e323cce886813248e20946ae"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "ee38a56b4d1d599f889d0f8c25f117ce6d891bdbba4fa0e30397116771089b7a"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "8f8f5653428969312a965366d313c47b81f76c987c37c3914bd7f349459f1bae"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "967176ba33c6a15f04b94cee013b02fe041480d517d7a418b070be1f2836069c"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "7fc39cd6e7777d70f2c0d773d5567172b2575711293d32993df5c85bb9f94c0c"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 4.136,
+        "worstP99": 15,
+        "worstSample": 33
+      },
+      "fullyClosedMs": 375,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1816,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "9edb7f7e2aac7e21e98dbf7453cffe24293ab0321294d3359dc6edc1739ed8ca"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "23dd2bc285a5c90f80c457831f54f4eb8cd9d6366e6e664cba0d826844990f5d"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "2d044b4ac0781c35e197bf1b8a85255d37d59037ceecf6bdeb108619ae52e745"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "b5edbb5e9826b9b59759c440e9c8f0b76e414642276a5753f7655fc833e0a3b3"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "711a13fccd974e5072464bd0480be99bfc46fc2ec25948da283083369990dba5"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "2dbf77e8c0a677731e6fa80faf14e941ffae255b3affa9905943ae704271efd6"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "ff13bd5e3b3f32de7dcda30144d4c9c362996f45b0f90625920f4122440681da"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "cba85cb2c1bd8e62cd2b57c2044c8199960bd00884fbde9458275b26e9ccc737"
+        }
+      ]
+    },
+    {
+      "key": "A07-S-dark",
+      "masterSequence": "a44d669299fe66e529f55ba880a878790668295a99864e03eea5808543047ab5",
+      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "lastMaster": "82997b67a6ed4e543778cd2eec6e8c8cbfd9037d0c0905e28a02e01053315ec3",
+      "posterPath": "S/A07_milestone_glow_dark_poster.webp",
+      "posterDelta": {
+        "rms": 4.309,
+        "p99": 16
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#000000",
+        "channelThreshold": 24,
+        "changedPixels": [
+          81,
+          61,
+          322,
+          31,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "93d2b4d5deb6f2aff1a38e70a31311f9338ca606e2b08458067e37b8acd2b446"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "a2880790cb518d24420dd2120084efe9bdba8c7785e2ee13cc4163a1544d717c"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "a763cd0fe106ed29b1179ea18d2e6ad1e3bc8a52d39824230f0245314d58f0d8"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "63265fd7f541339aeb09c08ccd79210d35c5981bf7f476cada68498a18f125f8"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "3a52371e10817cb019667dcb799372394b03f96febd0c421c1748fb41d2a8923"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "cc2fcad6d5da2ac420794c05194c9f557feed22a988bf423b3d9847b5f55acbd"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "0e25f5db5e40cca8669ddad3f68a732786df00a20b8084c9b4181806d7547e06"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "42a47c11db9e5def4355de6babe20c9fae2ae6d781e917fa4c229087da4461c9"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 4.417,
+        "worstP99": 18,
+        "worstSample": 67
+      },
+      "fullyClosedMs": 375,
+      "alphaBounds": [
+        29,
+        36,
+        142,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1960,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "09284c639b80df228b5269c989316a6dfe0268bce2b5fd20fed7f21f286ea234"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "0df1fa7e614cc4cbd6a6d332c7edf5a71f7d26b0e68f2e8a3c2f29a3cf15e490"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "4317c6c1253da3adff87d2150ff4afdda3caed94bc550100dddfda073028704a"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "997878f32ecc53f69ae4ccef948f8226c0f9a13bb06bef22ce4dedd4ac2efd80"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "6b97fda317d1e745546690e2d1d4a696d7771f3cc342d071983f9ac655a80f53"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "b4f446d0b4ee1b7dff0c9cc7112f28980f4112ed89831f9e9764dc150a7fb186"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "540f77a3b759c935871ff13a7d69efd22f569e852d55f42df8beec289a7c39df"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "7c7a2dee068911480b673b735af4246c2634cd4c5cec3a8331855cf7e28f3558"
+        }
+      ]
+    },
+    {
+      "key": "A08-S",
+      "masterSequence": "1c19d3f00cd45eee1e36e8da8b516620fe66a793355bdcabcb8d76fce103c3d8",
+      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
+      "posterPath": "S/A08_earned_back_steady_poster.webp",
+      "posterDelta": {
+        "rms": 3.971,
+        "p99": 13
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          189,
+          0,
+          18,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 4.548,
+        "worstP99": 17,
+        "worstSample": 28
+      },
+      "fullyClosedMs": 333,
+      "alphaBounds": [
+        27,
+        31,
+        144,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1880,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "d4945b3d6774c3a692958b2b794e0592fed72864af76edf1a43965a705e75746"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "ce17afdd3efbc85002cd1873a24e9f7b0a11350313190eac6222c17351326caa"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "f86cebad566af13cc5c30b1e156036457ae139297466465e706e491eb971b602"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "8b9833825eb79808e304d8ca040ea17908b2ed956ce7d3cd30f9c649f7fcb99d"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "3ca53e2f32afe39a7ea7df7fff4f241164c4e6267c51119a54d2f38e960b146c"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "72a641228e556c0810c415f4ab79dc05f0018437f8fb1daf53db669067b5d6e5"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "de00027a43ff12e8673b8219089836a7d336905e2e0517c4c444e84baf36dd50"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "cf72bb4bf57cc4b1c7105432a46b9ec5027344a4f01130f19dd2877348349bd7"
+        }
+      ]
+    },
+    {
+      "key": "A10-S",
+      "masterSequence": "58291f528c73451eff410c7fe9a3586d08a6817eb0193484d2064640a0c6d07b",
+      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
+      "posterPath": "S/A10_hard_session_compassion_poster.webp",
+      "posterDelta": {
+        "rms": 3.909,
+        "p99": 13
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          38,
+          57,
+          34,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 4.807,
+        "worstP99": 18,
+        "worstSample": 17
+      },
+      "fullyClosedMs": 375,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1781,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "e05f766ba58c5eef28e0975e8fcd133df3b1691e8ac22e0ccfbde39b13650bd6"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "7c6bc6da5f35f9c9194fd47066e10ad0f75e75e3dd5c12aeb5f937c927fdd2a1"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "d10295dd86e35cbbe079c50ed51fd74558c109196ca7ee03c46b67aa0cd2d275"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "b12b7a33b757ee0d8b98f2866af64f976e1cfc5ed5f4ad7c463e6a13c631185a"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "ea341a91ff606a8ceb219f4d6713c198bb3fff1ad5eff66dda7ed5fd7702d925"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "f671b694e41cd0a32f3530507bb3c95c9ed1bac96aca689d3496c1a840257c05"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "8e8a80273d5ba1645d9cb50b60e92d38bb263e6d30234f29eaa99499dc15ff17"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "6b2dbbae5ff326e55541c5f1a61fdfa9fa70f09ddd9a21bbf9bf484295b4a76e"
+        }
+      ]
+    },
+    {
+      "key": "A10-M",
+      "masterSequence": "26a2e03cfa709169844c099659591dd5e9190804a4540ca38a36dfb9b601d2f5",
+      "firstMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
+      "lastMaster": "63910852d32b06a2f82447af4909005ec58d79bac94608e17fafa72bad990f7b",
+      "posterPath": "M/A10_hard_session_compassion_poster.webp",
+      "posterDelta": {
+        "rms": 3.021,
+        "p99": 10
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          35,
+          53,
+          34,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "4fda53dac4aed7d55ddb2c4f0ed16d895177e3dccaa3376d70ae61157b62809a"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "52708a7fae46d01762a18ef53e24013c7fec30e12b5223e50b268677fe1a0a58"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "48f57df7a2d0b148c103bede3c8b2dcd442fbc50d1048f4d24a818da044c0d3a"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "9d47ff614fca32e4f27c7729190f348dcd04128572f4cca5535fe6e4e2a7af55"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "e30acdf05d65113bdc482d7f37717e275b71a4c780582aff751b18fd86219066"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "9c7665d0dba0f01986aafbd2aa15cd6de34ad8f86307123ab1f1c891d8f83a52"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "171dd73440a57a91de7b3ccfa9840932a6aef7350a942a4b14a060c896f2d236"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "dc4083f8b73865fb70add9054ee457f7833703660865fa8dae8d0a6aab1f2d51"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.774,
+        "worstP99": 14,
+        "worstSample": 28
+      },
+      "fullyClosedMs": 375,
+      "alphaBounds": [
+        55,
+        64,
+        252,
+        375
+      ],
+      "minimumMarginPx": 8,
+      "maxSlotPt": 128,
+      "conservativeFlashAreaPx": 4686,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "10e2943a752e0e41ea237970228d9a9a7dc35fc5467f8f5974035b8434bf77a8"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "3d0b99774f436859f4e39cf808ac0316263a588f336a1cf7fa26fbcba3c2eae5"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "5acc16aa88f83357dcddfb149c118cd0f320c44a2c381556850a961ac9807954"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "42dde35e1957a8d269cbe1f219b97992fad030a28276d5a6fe5deffea36be5e6"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "39a25104f0a3fe7df2658835601b2bc41bd42a24f89b2a86085b763a70d9ebf8"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "f8e2309afb0f2a37aecbc1d434c9fd8d883f0015afe7f6566786918e6adc22a8"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "77ca0742ebb1d203663a3f310e78e46402a16d67c9423e747fb4acfab35f2c80"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "1676d140b650dfb575d5e347909397bab6ffba82197e67b64267b50583e45cc5"
+        }
+      ]
+    },
+    {
+      "key": "A11-S",
+      "masterSequence": "cf5770eed4a091971bca2c8b2b6345510b44397d7a6569511b4b494bd404bd39",
+      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "lastMaster": "efb99816746a8028feae595b2e7412a8be1e4984e46bf2a228ea5a14f19ad98a",
+      "posterPath": "S/A11_rest_sit_poster.webp",
+      "posterDelta": {
+        "rms": 4.591,
+        "p99": 16
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          540,
+          321,
+          33,
+          16,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "0d90a217f04640ae0ec1146511dfb6502b8cf9a2289a240ea18111c118db7957"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "62322bed4ceba191c63107642ecc7dc90dcdd20049b1e4038c925ab042cf3af3"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "68bd3fe1d678007b954ae9162c1ab96f4923155b9e1192d0ce6dfb164d604309"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "0dff66eb726eba568acc5eb5027058a07ff23ee5ab1b638c645b455089ff84fe"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "514bce926cbe3273c6680a4d06b5f7efc5ce3da604625afba3eaab252a7669ec"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "03b013baa0dd679fe8beab0d26bb95a67d7c6821115d21ec2caa5ce664f59f57"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "fdef2b5ca0926bd0cff33a5e38da99f471e8b414e9b9482abf0bb1478cec97ca"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "228c02bcba3dde38f2b8c7388f4f96666f75fa3fd44497d0a181a145e8464b99"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 5.358,
+        "worstP99": 21,
+        "worstSample": 0
+      },
+      "fullyClosedMs": 332,
+      "alphaBounds": [
+        28,
+        36,
+        143,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1931,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "0ad0b2cc6137a50b503b103f57a8671a4da4bd1ed4c48e5e3c1fa91da686a514"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "e06b97daea9c3e87ce98eb2eee1113a1b17aa24a82ed05f2ede3c40bbb520d1e"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "704aa357e1b8afce2f67cca00724234aa7edccb038c61dc1334ace881ae51408"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "2daf83bdc3869def240f5f51e05341259841db287761e3b8ee046c6343800956"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "d8d06578f5ce4560492d17e1c6392bb8b75305e739a25612514edc64c3a6b81f"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "d451c22ea196ac8bafa97cf48fe52a19b87d8be628e1fbbed665f447ae526b7a"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "9191be90b794cabd273c02faff2ec4e1d72c0b793b4c62aee6314f1ea7c1adcd"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "3906ac460e88f4c472c740af5ed369bd54dff7cbd79aebb2d8ada4b7643df7a6"
+        }
+      ]
+    },
+    {
+      "key": "A15-M-light",
+      "masterSequence": "28d05309cbbdf7d68c484d5815603e189ab42dcadf0ef5cb7dad919a8cd2a2e9",
+      "firstMaster": "afa5908c176b6a5e7f1b94f70f5156e0e1e6d62e3277b8aed11aac25c3f5475b",
+      "lastMaster": "b0dbaa9250e955813176ed2aafc1bd267d2f90f811884bd15a228d27996db145",
+      "posterPath": "M/A15_juz_light_light_poster.webp",
+      "posterDelta": {
+        "rms": 3.77,
+        "p99": 14
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          77,
+          46,
+          346,
+          5,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "3dc4f05fedca28a7c58dbc04682026f1335b38373ddf788054c2c641d43b0a4e"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "dfc41790eb267f143fc76befd5326ef6f049b8383e470dd0317da3a91dd0fcab"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "5b2202cd3dcfb26ee85a6afa36bad8e360b4df19b14742e66ca955bab27525cc"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "5b8725f680e7a981c70268dd24a4c55d1111d728deadb875b4caa69b3cff92cc"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "b9a1744f13fa700b95ae8d12c202fc288df71b7cc9a8316f6fc7577915dde249"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "ed68c83c83bd6b09f1f65672ce2fb467decd858bffbb065cb4d77a2475a941cc"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "cb9afdc4f47daa34a0ec360343874331365667311e41857516273bbf51d9fefb"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "7d9f97989ef8c73105d5b8155932119ad709834e485a950b99bdb545961fba17"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.287,
+        "worstP99": 12,
+        "worstSample": 50
+      },
+      "fullyClosedMs": 377,
+      "alphaBounds": [
+        55,
+        11,
+        252,
+        376
+      ],
+      "minimumMarginPx": 7,
+      "maxSlotPt": 128,
+      "conservativeFlashAreaPx": 5581,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "63224cbddcb9d5b59e81498a8cd641e814275bfffe1b7e94fa6d2c311e117add"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "f7d9a0c8c74677931b5d7557bb7579369e50767517de6806d35684202b94bba7"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "0c9941f5f80c7daf68cf03e6a92672e46d7a96cbf241aa71d2541c0c7866ed29"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "969ffd3d612f55c08a14c69ba5e6c89f1af2f1197b9649cb359dbd50d133def2"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "6b2c6d4142e130677a7c4f6942eb19908b61ac18c0cce26fb855a2ea8b5c5bef"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "194d9d7dce2935f4cd5d1c76820d6b65b6f77332029b6bc271e7de0201d40294"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "edf1d81c30bb027ea3d08807704e9d13e06a18b6e20890845404660b7b0f22b7"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "3aae6acc57f8b760f19caf949a7c273800d5784a51c39f4bb7bd7f5bd4d75628"
+        }
+      ]
+    },
+    {
+      "key": "A15-M-dark",
+      "masterSequence": "4dada47e06ccebca72364a2ce450d1e32e6ecd09768e5ffc24b60aba1e61b8cb",
+      "firstMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
+      "lastMaster": "47a2fe85d89fec6cbd557f9f63ab66b87191e79b71e5a684558f82c76e879455",
+      "posterPath": "M/A15_juz_light_dark_poster.webp",
+      "posterDelta": {
+        "rms": 3.794,
+        "p99": 14
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#000000",
+        "channelThreshold": 24,
+        "changedPixels": [
+          90,
+          56,
+          345,
+          5,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "1107dac976c5bdcaa5b39a470db6a3866828a300c8d283ddf5009c7a5719ca47"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "4ef703727d5dcab6c6a210caecaaf3d129f040606f98fd1cfb6f7a14c9d7f087"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "74ca76e75eacac697f44007955df31094b7c29a131c23ae4070239595460d9b2"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "ffdb3a8d805adbf38ef65db32ad3f57c36dd44982a1f3336228f91009ad1f7b5"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "a26f6be44ea6050fc268e2ad5870dbd33fbfa3f56749f7899ce69a4bc2970419"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "e3f077013f8b6a2f6bfd3ca04a9c493aae0b2be1aa4744ed0ecb29dc94744dc9"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "408f8baeb1a2e907826ee8a263165beeb9b6158f6ae3e479784a8ddcb4a30240"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "b36165a2ec1d28e06c5cbfe154f2bceb8c7a6a0ab114f1429509d91b26d79fe8"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.847,
+        "worstP99": 15,
+        "worstSample": 33
+      },
+      "fullyClosedMs": 377,
+      "alphaBounds": [
+        53,
+        11,
+        255,
+        375
+      ],
+      "minimumMarginPx": 8,
+      "maxSlotPt": 128,
+      "conservativeFlashAreaPx": 5890,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "fbbba413c3a4c2dec8414f465b180719e00b18d50918e583431755b46e21701c"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "cb6e33cfa99096d52d90e8e5220521d42fc5ea771745299800669fc26b5ed117"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "feb85a84524806ffb07d22a327692ac489f20276398b494e40781795bf546b1f"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "09fdbb8b7e48f1072f3f207a2a2592ea04d7b6cea7faeb8c1a75e05bd531e275"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "6ae9fbacf63ffde9e70aef6a71d35aa267029922b36d8f82a025eda9e602f36c"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "3b8206a9eda88b3f529389799a81f1a814a04928b62743976374e80e94249eb8"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "ed208c5643b412b621ea50bf5e61d0ac5b8e20fc9d901a442b24bf36b7d2e15a"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "f33fb79d0a645aabf89ade26fa05c0cdffd2bd74163f8d29bebc4514904b584c"
+        }
+      ]
+    },
+    {
+      "key": "A17-S",
+      "masterSequence": "f69ed01e745e752012cd78783cbc83994f8883b41cb4682f23668998e00e7757",
+      "firstMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
+      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
+      "posterPath": "S/A17_tap_hello_poster.webp",
+      "posterDelta": {
+        "rms": 3.833,
+        "p99": 13
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          50,
+          48,
+          0,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 4.538,
+        "worstP99": 17,
+        "worstSample": 10
+      },
+      "fullyClosedMs": 163,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1813,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "b10cc9d9e8b6d936c95449a8401f3b6a76edd2d5585c659ebdd837c90a495357"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "5ed3be24be325a5b21a63142053c23247ac9bfde7c681ebb1efa28c5f828d8e5"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "95d3a50ae7c137844e3d3eb5cfd865b2f90af78a8baa9f2a50507ea69167e46e"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "2f4a7180502e997666e25c11c10f5f614d5a5ced4ad560395ff8354e21ff8587"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "7ed5eaaac4d639487ef99e5884255367a21c75b63e716604adf5f826caabba2e"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "4287400c71dc46914eaf59eaae89138247b5366ff5a6ea6ed8170aff56c96a62"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "33732cbc66a8f60c2ecf434648af652844117675f2546c20cd469e4847e7e2d2"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "226698bd214e756c4c3a6e71a959ecdc0708b5cf91bd3efd3f87ac96e1cf41b1"
+        }
+      ]
+    },
+    {
+      "key": "A19-L",
+      "masterSequence": "bb0998083d7e0105345d0124cc850e2b611c258590bf6d91b2492db3d6f53907",
+      "firstMaster": "79420d21a0f853a7f9e95fa0c49bf857125db8b78b7924d8577869d6acbc6f73",
+      "lastMaster": "e1ad083377b1024aedabb14f9820a8e79ebb6ec55ade1a6193bb27d98e30ff33",
+      "posterPath": "L/A19_onboarding_hello_poster.webp",
+      "posterDelta": {
+        "rms": 2.99,
+        "p99": 11
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          703,
+          16,
+          38,
+          38,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "bed161ebc678dbbde6ae176a6e42efcf6ee47b8ac4ac793e28ac19d9d067983e"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "82ba226ce8eaf050b4772338fe687c35e2fa1ced0808133028e3e79d4f5fb83e"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "bc7fdf9dece73ad8e48d3c55f95910d5c91c981e761ac0943e2ab7f5dc8bbede"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "0ecd36f0895cb2c69b1aaf2e4d3132ea62930cc7b7a6eba10979dfa1954ad158"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "a8fed3c5bdb401570791c3fa8fa3f20b626a6bb19de0da5317b1364b050eead6"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "04a3ca51e2fe67d5f1376804b183125cfd91e780477f42f77e014029a1f62f83"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "1c513cbf16b8d3000ed561be626f7315ccad32b80c991f980588d5e810b4c234"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "5eb42559110fedad8299973d68c4b38a1729a5b4dd2c38b0a1365bc44c53def9"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.341,
+        "worstP99": 13,
+        "worstSample": 50
+      },
+      "fullyClosedMs": 503,
+      "alphaBounds": [
+        47,
+        11,
+        320,
+        469
+      ],
+      "minimumMarginPx": 10,
+      "maxSlotPt": 200,
+      "conservativeFlashAreaPx": 14659,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "fa89c1c98d6df5a5e7310bc532d50ee7d5aa89ac5279adb10394dc947c95a61f"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "4b59009d0a4ee32a595e82ff9c331138fbe56ec4d25677df3ef82c0f5d2f67fe"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "21ea386270d7d60d8f9245d9f52827a7370a4459e218d56e2bf51297b8757ea9"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "2f6d1d0e7843534f5850de24402da2d2a5130be37c4e73d550dbc1cdc01235db"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "574ff8d2e2c8594cbceaf21206e0d33335b3eb83f061ce5a96e4f690b4ca8658"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "096b70827094add27a34417568a351a3c7c66503b812e345ba35de5aa5bd19cf"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "b4232ab4e2fdbfe5c167eddb6e13094992405886d04615e66da41c3fca50b572"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "de59c04ee7e6bc510af0a3e8557c576f61bba871417fe78e18ec20d2bb6707ce"
+        }
+      ]
+    }
+  ],
+  "repro": {
+    "key": "A06-S",
+    "count": 38,
+    "first": "1040d0e71cdc64fcca3ebe2faaa47b5c5d949ced20270a9ba82da596383296cb",
+    "second": "1040d0e71cdc64fcca3ebe2faaa47b5c5d949ced20270a9ba82da596383296cb"
+  }
+}

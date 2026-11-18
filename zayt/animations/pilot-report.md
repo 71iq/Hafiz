@@ -4,7 +4,7 @@ The revised pilot uses the deep-gold oil, 70% eyes and rounded capsule arms. `pi
 
 | Clip | Bytes / cap | Observation at slot size |
 |---|---:|---|
-| A06 S | 24,800 / 150,000 | One horizontal band crosses the lower body, face and tip. The arm, highlight and leaves stay still. |
+| A06 S | 23,952 / 150,000 | One horizontal band crosses the lower body, face and tip. The arm, highlight and leaves stay still. |
 | A07 S light | 89,238 / 150,000 | A bright gold core fills the drop. The darker outline and specular reflection remain visible against beige. No exterior light. |
 | A07 S dark | 105,826 / 150,000 | A short, soft spill accompanies peak intensity on black. Its edge is dithered at fixed canvas coordinates. No ring. |
 | A04 S | 51,100 / 150,000 | The rounded tip of the right arm lifts clear of the body. The other arm stays at the side. |
@@ -16,4 +16,4 @@ The first dark S encode measured 339,572 bytes at quality 83. Qualities 77 and 7
 
 The initial peak lost too much saturation. The revised material adds warm light through the core, leaving the edge and reflection intact. Larger decoded frames also revealed rectangular colour steps that were absent in the masters. Lowering quality would not fix these. The three light effects now encode bounded source-replacement rectangles or lossless opaque-pixel updates. Changes below two channel levels accumulate against the last written pixels, not the last nominal sample. The final hold flushes that tolerance. Alpha quality is 100. The pilot uses quality 83, effort 6 and mixed lossy/lossless packets. The arm-only wave uses libwebp's mixed encoder, with 9/17 keyframe bounds. Identical consecutive samples share their full duration.
 
-The final daily shimmer uses quality 77, down from 27,548 bytes at quality 83, so it remains the smallest moving runtime asset. No pilot file needs a resolution or frame-rate exception. Gallery files are review candidates, not an app change or a device playback test.
+The final daily shimmer uses quality 75. It measured 27,546 bytes at quality 83, 24,806 at 77 and 24,350 at 76. At 23,952 bytes it is smaller even than the 24,546-byte review-only tap. Comparing the decoded 75 and 77 encodes on beige showed the same soft sweep without streaks. No pilot file needs a resolution or frame-rate exception. These are gallery proofs, not a device playback test.

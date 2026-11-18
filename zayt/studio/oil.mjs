@@ -1,34 +1,69 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 
-export const palettes = {lemon: [244,207,70], muted: [237,206,89], gold: [224,179,45]};
+export const palettes = { lemon: [244, 207, 70], muted: [237, 206, 89], gold: [224, 179, 45] };
 
 function studioReflection() {
-  const width = 384, height = 192, pixels = new Uint8Array(width * height * 4);
-  const panels = [[-0.91,0.75,0.24,0.11,0.40,1], [0.89,0.38,-0.55,0.075,0.56,0.85], [-0.5,-0.65,-0.55,0.32,0.075,0.24]];
-  for (let row=0; row<height; row++) for (let col=0; col<width; col++) {
-    const lon=((col+.5)/width-.5)*2*Math.PI, lat=((row+.5)/height-.5)*Math.PI;
-    let intensity=0;
-    for (const [x,y,z,rx,ry,weight] of panels) {
-      const yaw=Math.atan2(x,z), pitch=Math.atan2(y,Math.hypot(x,z));
-      const dx=Math.atan2(Math.sin(lon-yaw),Math.cos(lon-yaw))*Math.cos(pitch)/rx;
-      const dy=(lat-pitch)/ry;
-      intensity+=weight*Math.exp(-Math.pow(dx*dx+dy*dy,1.35));
+  const width = 384,
+    height = 192,
+    pixels = new Uint8Array(width * height * 4);
+  const panels = [
+    [-0.91, 0.75, 0.24, 0.11, 0.4, 1],
+    [0.89, 0.38, -0.55, 0.075, 0.56, 0.85],
+    [-0.5, -0.65, -0.55, 0.32, 0.075, 0.24],
+  ];
+  for (let row = 0; row < height; row++)
+    for (let col = 0; col < width; col++) {
+      const lon = ((col + 0.5) / width - 0.5) * 2 * Math.PI,
+        lat = ((row + 0.5) / height - 0.5) * Math.PI;
+      let intensity = 0;
+      for (const [x, y, z, rx, ry, weight] of panels) {
+        const yaw = Math.atan2(x, z),
+          pitch = Math.atan2(y, Math.hypot(x, z));
+        const dx = (Math.atan2(Math.sin(lon - yaw), Math.cos(lon - yaw)) * Math.cos(pitch)) / rx;
+        const dy = (lat - pitch) / ry;
+        intensity += weight * Math.exp(-Math.pow(dx * dx + dy * dy, 1.35));
+      }
+      const offset = (row * width + col) * 4;
+      pixels.fill(Math.min(255, Math.round(255 * intensity)), offset, offset + 3);
+      pixels[offset + 3] = 255;
     }
-    const offset=(row*width+col)*4;
-    pixels.fill(Math.min(255,Math.round(255*intensity)),offset,offset+3); pixels[offset+3]=255;
-  }
-  const texture=new THREE.DataTexture(pixels,width,height); texture.magFilter=texture.minFilter=THREE.LinearFilter;
-  texture.wrapS=THREE.RepeatWrapping; texture.needsUpdate=true; return texture;
+  const texture = new THREE.DataTexture(pixels, width, height);
+  texture.magFilter = texture.minFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 export function oilMaterial(body, reflection) {
-  const uniforms=Object.fromEntries(Object.entries({body: Number(body), oil: new THREE.Vector3(), reflection,
-    eyeOpen:1,eyeScale:.7,browHeight:0,browTilt:0,mouthCurve:0,blush:.5,highlight:1,glow:0,fillHeight:0,sweep:-2,drift:0,breathHeight:0,baseWidth:0,chest:0}).map(([key,value])=>[key,{value}]));
-  return new THREE.ShaderMaterial({uniforms,transparent:true,premultipliedAlpha:true,
-    vertexShader:`varying vec3 p; varying vec3 n; uniform float breathHeight,baseWidth; void main(){p=position;vec3 surface=position;vec3 norm=normal;
+  const uniforms = Object.fromEntries(
+    Object.entries({
+      body: Number(body),
+      oil: new THREE.Vector3(),
+      reflection,
+      eyeOpen: 1,
+      eyeScale: 0.7,
+      browHeight: 0,
+      browTilt: 0,
+      mouthCurve: 0,
+      blush: 0.5,
+      highlight: 1,
+      glow: 0,
+      fillHeight: 0,
+      sweep: -2,
+      drift: 0,
+      breathHeight: 0,
+      baseWidth: 0,
+      chest: 0,
+    }).map(([key, value]) => [key, { value }]),
+  );
+  return new THREE.ShaderMaterial({
+    uniforms,
+    transparent: true,
+    premultipliedAlpha: true,
+    vertexShader: `varying vec3 p; varying vec3 n; uniform float breathHeight,baseWidth; void main(){p=position;vec3 surface=position;vec3 norm=normal;
       if(breathHeight>0.){float u=clamp((p.y-1.36)/1.38,0.,1.);float width=1.+baseWidth*(1.-smoothstep(.45,.85,p.y));float height=1.+breathHeight*2.55*(6.*u*(1.-u))/1.38;surface.x*=width;surface.y+=breathHeight*2.55*u*u*(3.-2.*u);surface.z/=width*height;norm=normal/vec3(width,height,1./(width*height));}
       n=normalMatrix*norm; gl_Position=projectionMatrix*modelViewMatrix*vec4(surface,1.);}`,
-    fragmentShader:`precision highp float;
+    fragmentShader: `precision highp float;
     varying vec3 p; varying vec3 n;
     uniform sampler2D reflection; uniform vec3 oil;
     uniform float body,eyeOpen,eyeScale,browHeight,browTilt,mouthCurve,blush,highlight,glow,fillHeight,sweep,drift,chest;
@@ -94,7 +129,8 @@ export function oilMaterial(body, reflection) {
         }
       }
       float opacity=1.-.13*pow(1.-depth,3.); gl_FragColor=vec4(clamp(c,0.,1.)*opacity,opacity);
-    }`});
+    }`,
+  });
 }
 
-export {studioReflection};
+export { studioReflection };
