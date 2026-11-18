@@ -28,6 +28,7 @@ module.exports = defineConfig([
       "quran.com-frontend-next/**",
       "supabase/functions/**",
       "web-build/**",
+      "zayt/studio/**",
     ],
   },
   ...expoConfig.map((config) =>
