@@ -1,6 +1,7 @@
 import { act, render, screen } from "@testing-library/react-native";
 import { SessionHabitCards, sessionZayt, type SessionHabitInput } from "@/components/habit/SessionHabitCards";
 import { ZaytAnimation } from "@/components/habit/ZaytAnimation";
+import { avatarInitial } from "@/components/profile/ProfileAvatar";
 import type { AppDatabase } from "@/lib/database/types";
 import type { HabitOverview } from "@/lib/habit/queries";
 import { strings } from "@/lib/i18n/strings";
@@ -173,5 +174,13 @@ describe("Show Zayt in the session summary (ZAY-02)", () => {
     render(<SessionHabitCards input={input({ overview: null })} db={db} language="en" isDark={false} s={strings.en} />);
     await act(async () => undefined);
     expect(screen.queryByTestId(/^zayt-/, HIDDEN)).toBeNull();
+  });
+});
+
+describe("the profile placeholder (7.3)", () => {
+  it("uses the first visible character of the trimmed name", () => {
+    expect(avatarInitial("  sara")).toBe("S");
+    expect(avatarInitial("أحمد")).toBe("أ");
+    expect(avatarInitial("   ")).toBeNull();
   });
 });
