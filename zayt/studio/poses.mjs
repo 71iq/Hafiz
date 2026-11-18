@@ -38,13 +38,13 @@ export const peaks = {
   A02: [2.4, 3.38],
   A04: [0.6, 0.95, 1.3, 1.69],
   A06: [0.32, 0.58, 0.82, 1.3],
-  A07: [0.9, 1.6, 1.82, 2.33],
+  A07: [0.9, 1.6, 1.74, 2.55],
   A08: [0.55, 0.78, 0.96, 1.5],
   A10: [0.5, 0.92, 1.4],
-  A11: [0.6, 1, 1.19, 1.45, 1.8],
-  A15: [1, 1.8, 2.1, 2.45, 2.86],
+  A11: [0.46, 0.63, 0.82, 1, 1.19, 1.45],
+  A15: [1, 1.8, 1.95, 2.45, 3.25],
   A17: [0.13, 0.36, 0.54],
-  A19: [0.2, 0.45, 0.55, 0.67, 1.55, 2.35],
+  A19: [0.08, 0.2, 0.3, 0.39, 0.5, 0.64, 1.55, 2.35],
 };
 export function hold(name) {
   const pose = rest();
@@ -101,7 +101,7 @@ export function sample(job, time, level = 1) {
       pose.glow = progress * (1 - 0.65 * ease(time, peak + 0.30, juz ? 3.3 : 2.8));
       pose.fillHeight = -0.02 + 3.22 * progress;
       pose.halo = gate(time, peak, peak+.10, peak+.17, peak+.30);
-      face.eyeOpen = blink(time, 1.6, 0.35, 0.09);
+      face.eyeOpen = blink(time, juz ? 3 : 2.3, 0.35, 0.09);
       if (juz) {
         const count = level >= 3 ? 5 : 6;
         pose.motes = Array.from({ length: count }, (_, idx) => {
@@ -130,7 +130,7 @@ export function sample(job, time, level = 1) {
       pose.height = 1 - 0.08 * pose.sit + 0.009 * Math.abs(ring(time, 1, 1.6));
       pose.width = 1 / Math.sqrt(pose.height);
       pose.leaf = -9 * gate(time, 0.3, 1, 1, 1.4) + 3 * ring(time, 1.06, 1.6);
-      face.eyeOpen = blink(time, 1.45, 0.35, 0.13);
+      face.eyeOpen = blink(time, 0.445, 0.324, 0.024);
       break;
     case "A17":
       face.mouthCurve = 1 + 0.4 * gate(time, 0, 0.17, 0.17, 0.45);
@@ -139,13 +139,13 @@ export function sample(job, time, level = 1) {
       pose.leafFollower = -13 * gate(time, 0.14, 0.4, 0.4, 0.7);
       break;
     case "A19":
-      pose.opacity = ease(time, 0, 0.2);
-      pose.root[1] = 0.61 * (1 - ease(time, 0, 0.45));
-      face.eyeOpen = ease(time, 0.5, 0.7);
-      pose.height -= 0.075 * gate(time, 0.45, 0.55, 0.55, 0.66) + 0.014 * ring(time, 0.55, 0.75);
+      pose.opacity = ease(time, 0, 0.08);
+      pose.root[1] = 0.61 * (1 - unit(time, 0, 0.3)**2);
+      face.eyeOpen = ease(time, 0.13, 0.2);
+      pose.height += .05*gate(time,0,.19,.27,.30) - .075*gate(time,.30,.365,.365,.42) + .027*ring(time,.42,.75);
       pose.arms[0] = wave(((time - 0.75) * 1.8) / 1.6);
-      pose.leaf = 11 * ring(time, 0.45, 0.79);
-      pose.leafFollower = 8 * ring(time, 0.49, 0.82);
+      pose.leaf = 11 * ring(time, 0.42, 0.75);
+      pose.leafFollower = 8 * ring(time, 0.45, 0.77);
       face.mouthCurve = ease(time, 0.75, 1.05);
       break;
   }
