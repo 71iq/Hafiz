@@ -98,16 +98,17 @@ export function oilMaterial(body, reflection) {
         float focus=bell(vec2((normal.x-.64)/.21,(normal.y+.60)/.22));
         c=mix(c,vec3(1.,.795,.22),pool*.95);
         c=mix(c,vec3(1.,.905,.47),focus*.98);
-        float latitude=p.y+.19*(1.-depth)-.040*normal.x;
+        float latitude=p.y+.23*(1.-depth)+.13*p.x*p.x-.040*normal.x;
         float band=(1.-smoothstep(0.,.31,abs(latitude-sweep)))*smoothstep(.04,.5,depth);
         float faceZone=smoothstep(.72,.91,p.y)*(1.-smoothstep(1.43,1.63,p.y));
-        band*=1.-.5*faceZone;
+        float strength=band*(1.-.5*faceZone);
         float lit=glow*(1.-smoothstep(fillHeight-.26,fillHeight+.23,p.y));
         float core=bell(vec2((p.x-.025)/.53,(p.y-1.18)/1.03));
         float opticalPath=smoothstep(.33,.90,depth)*(.27+.73*core);
         vec3 emission=mix(vec3(1.,.914,.659),vec3(1.,.953,.784),smoothstep(.50,1.,core));
         c=mix(c,emission,lit*opticalPath*(1.-.78*lobe));
-        c=mix(c,vec3(1.,.923,.601),band*.92*(1.-.7*box));
+        c=mix(c,vec3(1.,.923,.601),strength*.92*(1.-.7*box));
+        c.g=mix(c.g,c.b+.805*(c.r-c.b),smoothstep(.12,.86,band)*(1.-box));
         if(p.z>0.){
           vec2 shoulder=vec2(-.78,.59);vec2 armEnd=mix(vec2(-.99,.60),vec2(-.045,.758),chest)-shoulder;
           vec2 nearArm=p.xy-shoulder-armEnd*clamp(dot(p.xy-shoulder,armEnd)/dot(armEnd,armEnd),0.,1.);

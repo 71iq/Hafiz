@@ -72,11 +72,13 @@ export async function strips(jobs, pilot = false) {
         8,
         22,
         16,
-        pilot ? "Budget pilot / beige and black, actual slot" : "Five samples at 56 pt / first to last, then poster",
+        pilot
+          ? "Budget pilot / five samples, poster, gesture peak / beige and black"
+          : "Five samples at 56 pt / first to last, then poster",
       ],
     ];
   let y = 35;
-  const width = pilot ? 758 : 450;
+  const width = pilot ? 795 : 450;
   for (const job of jobs) {
     const d = await decode(path.join(out, job.media)),
       height = pilot && job.tier === "M" ? 112 : 56,
@@ -84,16 +86,23 @@ export async function strips(jobs, pilot = false) {
     for (const bg of pilot ? [surfaces[0], surfaces[6]] : [job.variant === "dark" ? surfaces[6] : surfaces[0]]) {
       labels.push([6, y + height / 2 + 3, 11, job.key]);
       const poster = !job.poster ? d.frames.at(-1) : (await decode(path.join(out, job.poster))).frames[0];
-      for (let index = 0; index < 6; index++)
+      const peakTime = { A06: 0.51, A07: 1.74, A04: 0.6, A15: 1.94 }[job.id];
+      for (let index = 0; index < (pilot ? 7 : 6); index++)
         parts.push({
           input: await tile(
             d,
-            index === 5 ? poster : nominal(d, job, Math.round((index * (job.nominal_samples - 1)) / 4)),
+            index === 5
+              ? poster
+              : nominal(
+                  d,
+                  job,
+                  Math.round((index === 6 ? peakTime / job.seconds : index / 4) * (job.nominal_samples - 1)),
+                ),
             w,
             height,
             bg,
           ),
-          left: 115 + index * (w + 3) + (index === 5 ? 9 : 0),
+          left: 115 + index * (w + 3) + (index >= 5 ? 9 : 0),
           top: y,
         });
       y += height + 3;

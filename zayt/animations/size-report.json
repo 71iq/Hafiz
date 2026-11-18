@@ -1,5 +1,6 @@
 {
-  "manifestVersion": 3,
+  "manifestVersion": "3.1",
+  "manifestSha256": "9f1fefb996020a27c73975f1ecaa9f552527db777977c67f7e90d2c8f1fef9c4",
   "tools": {
     "node": "v24.18.0",
     "playwright": "1.60.0",
@@ -20,56 +21,120 @@
     "encoder": "libwebp img2webp/cwebp 1.6.0",
     "libwebp": "1.6.0"
   },
-  "runtimeBytes": 1609172,
+  "runtimeBytes": 1218780,
   "runtimeCap": 3500000,
   "runtimeFits": true,
-  "overages": [
-    {
-      "path": "S/A02_idle_breathe.webp",
-      "over": 165862,
-      "trials": [
-        {
-          "quality": 83,
-          "bytes": 461328,
-          "level": 1
-        },
-        {
-          "quality": 77,
-          "bytes": 413382,
-          "level": 1
-        },
-        {
-          "quality": 70,
-          "bytes": 387790,
-          "level": 1
-        },
-        {
-          "quality": 83,
-          "bytes": 379106,
-          "level": 2
-        },
-        {
-          "quality": 77,
-          "bytes": 337368,
-          "level": 2
-        },
-        {
-          "quality": 70,
-          "bytes": 315862,
-          "level": 2
-        }
-      ],
-      "options": {
-        "base": 315862,
-        "droppingAnimationSaves": 315862,
-        "quality": 70,
-        "at2point5x": {
-          "bytes": 259414,
-          "saved": 56448
-        }
+  "overages": [],
+  "encoderTrials": {
+    "A02-S": [
+      {
+        "quality": 83,
+        "bytes": 426104,
+        "level": 1
       }
-    }
-  ],
+    ],
+    "A04-S": [
+      {
+        "quality": 83,
+        "bytes": 48044,
+        "level": 1
+      }
+    ],
+    "A06-S": [
+      {
+        "quality": 75,
+        "bytes": 21824,
+        "level": 1
+      }
+    ],
+    "A06-M": [
+      {
+        "quality": 83,
+        "bytes": 43888,
+        "level": 1
+      }
+    ],
+    "A07-S-light": [
+      {
+        "quality": 83,
+        "bytes": 74996,
+        "level": 1
+      }
+    ],
+    "A07-S-dark": [
+      {
+        "quality": 83,
+        "bytes": 107022,
+        "level": 1
+      }
+    ],
+    "A08-S": [
+      {
+        "quality": 83,
+        "bytes": 97070,
+        "level": 1
+      }
+    ],
+    "A10-S": [
+      {
+        "quality": 83,
+        "bytes": 26342,
+        "level": 1
+      }
+    ],
+    "A10-M": [
+      {
+        "quality": 83,
+        "bytes": 47140,
+        "level": 1
+      }
+    ],
+    "A11-S": [
+      {
+        "quality": 83,
+        "bytes": 148312,
+        "level": 1
+      }
+    ],
+    "A15-M-light": [
+      {
+        "quality": 83,
+        "bytes": 248134,
+        "level": 1
+      }
+    ],
+    "A15-M-dark": [
+      {
+        "quality": 83,
+        "bytes": 331856,
+        "level": 1
+      },
+      {
+        "quality": 77,
+        "bytes": 301820,
+        "level": 1
+      },
+      {
+        "quality": 70,
+        "bytes": 286158,
+        "level": 1
+      }
+    ],
+    "A17-S": [
+      {
+        "quality": 83,
+        "bytes": 22706,
+        "level": 1
+      }
+    ],
+    "A19-L": [
+      {
+        "quality": 83,
+        "bytes": 214108,
+        "level": 1
+      }
+    ]
+  },
   "files": [
     {
       "path": "S/A01_rest_pose.webp",
@@ -86,9 +151,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 4854,
+      "bytes": 4490,
       "cap": 25000,
-      "sha256": "a46e470bf68470ce7aa050174aa202cdb7e044b9f194c7ccdbfc63bc53f04589"
+      "sha256": "e8a0300c0774f09e5573b9f63ab263389dfdc6a570c3387d3b844c898951373c"
     },
     {
       "path": "M/A01_rest_pose.webp",
@@ -105,9 +170,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 9486,
+      "bytes": 8446,
       "cap": null,
-      "sha256": "bb7af2e109ff731cd2e8a53724d8eb9347d7ea0e38d986e719a118011a331d8b"
+      "sha256": "9d268eddafb5bd739887bd94286f0e0162b91134be5d24513b222eeedb13a308"
     },
     {
       "path": "L/A01_rest_pose.webp",
@@ -124,13 +189,13 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 11986,
+      "bytes": 10794,
       "cap": null,
-      "sha256": "e9dd31f6186023884b630ca9130fde3eb156e5e38cca4acf37a8ae133831a6d7"
+      "sha256": "37b75df802e78c680fae9a7497f45345587ed20ce71dd244f88ed01d7726f047"
     },
     {
       "path": "S/A02_idle_breathe.webp",
-      "role": "runtime",
+      "role": "review",
       "kind": "animation",
       "tier": "S",
       "variant": "shared",
@@ -143,9 +208,9 @@
       "milliseconds": 4800,
       "loopCount": 2,
       "alpha": true,
-      "bytes": 315862,
-      "cap": 150000,
-      "sha256": "e35e8b93c6f125321e669067e23a47ff21397caa67698f4057afbd0d49f88d5c"
+      "bytes": 426104,
+      "cap": null,
+      "sha256": "47d799a4b29783810232dc65b8e644dfe5ef92730b823455a00d0718f52f4294"
     },
     {
       "path": "S/A04_welcome_wave.webp",
@@ -162,9 +227,9 @@
       "milliseconds": 1800,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 51100,
+      "bytes": 48044,
       "cap": 150000,
-      "sha256": "e79aba7dbe944f88b25f8b698402c7308aad35e6cf84a404f535a0d206b4022e"
+      "sha256": "1029469c95d60b3eb36a0e5205dc966444a542e42ec92e567752e71f98cbd877"
     },
     {
       "path": "S/A04_welcome_wave_poster.webp",
@@ -181,9 +246,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 4858,
+      "bytes": 4486,
       "cap": 25000,
-      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+      "sha256": "a0ba0172fdc58511d04d6136b88ded38622a0b1e7f591b0996efb35fcc039f0c"
     },
     {
       "path": "S/A06_wird_done_shimmer.webp",
@@ -200,9 +265,9 @@
       "milliseconds": 1600,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 23952,
+      "bytes": 21824,
       "cap": 150000,
-      "sha256": "b4eca594058003118b4da3962ac34b49b217cc6567d8b1e828c55ca37a978a44"
+      "sha256": "a11f9118cce2827886bf202601ad963dda790f7815a71e2efb4e256ab00cc25c"
     },
     {
       "path": "S/A06_wird_done_shimmer_poster.webp",
@@ -219,9 +284,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 4858,
+      "bytes": 4486,
       "cap": 25000,
-      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+      "sha256": "a0ba0172fdc58511d04d6136b88ded38622a0b1e7f591b0996efb35fcc039f0c"
     },
     {
       "path": "M/A06_wird_done_shimmer.webp",
@@ -238,9 +303,9 @@
       "milliseconds": 1600,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 50296,
+      "bytes": 43888,
       "cap": 300000,
-      "sha256": "297409734d839205d8dab5b51fea8f3dc54dcefa485f0bd343eed3d51dd49097"
+      "sha256": "0ce2168e3a338db89227ab0393ef52e22990eaa6186be97c8ac4bd0b0444ae9e"
     },
     {
       "path": "M/A06_wird_done_shimmer_poster.webp",
@@ -257,9 +322,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 9502,
+      "bytes": 8468,
       "cap": 50000,
-      "sha256": "edea1ca98682903018942a32a98d28ad04eb5fac86eda1901d6360ceb965b9e0"
+      "sha256": "43ebc83256c6c7727a50fce7c766759dfd6942e4cdc21eb347f1b0ad2f4de336"
     },
     {
       "path": "S/A07_milestone_glow_light.webp",
@@ -272,13 +337,13 @@
         216
       ],
       "nominalSamples": 72,
-      "encodedFrames": 58,
+      "encodedFrames": 52,
       "milliseconds": 3000,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 89238,
+      "bytes": 74996,
       "cap": 150000,
-      "sha256": "a01f423430b1e7cf96ca7bf24155d9fa9891ef3411f69707efad9e02e4e97306"
+      "sha256": "22bd1f757b59bb2e31efa3906c5b03b700b493ff548a6d304f639c9350098182"
     },
     {
       "path": "S/A07_milestone_glow_light_poster.webp",
@@ -295,9 +360,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 5242,
+      "bytes": 4582,
       "cap": 25000,
-      "sha256": "3c8bb2516075075ec73dc142402b80a321e7fbde93be6a2c6204c3973bde36b3"
+      "sha256": "3a36538388a7c62613756d81e028064f003fceddb285d1aa6cb8a49cb3dc04f3"
     },
     {
       "path": "S/A07_milestone_glow_dark.webp",
@@ -310,13 +375,13 @@
         216
       ],
       "nominalSamples": 72,
-      "encodedFrames": 57,
+      "encodedFrames": 59,
       "milliseconds": 3000,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 105826,
+      "bytes": 107022,
       "cap": 150000,
-      "sha256": "8f2d04c157b697308f3632276ee19665df64bb47445c5628bb66eb73a476243f"
+      "sha256": "e8edb790e83c38816437d1e91da9d185c2ed499d02a999c2f93e7c2ee151eebc"
     },
     {
       "path": "S/A07_milestone_glow_dark_poster.webp",
@@ -333,9 +398,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 5778,
+      "bytes": 4582,
       "cap": 25000,
-      "sha256": "b01e39683b52eca130b0111f8b6f24365104b38aa679d24cbc4d1717959e3bae"
+      "sha256": "3a36538388a7c62613756d81e028064f003fceddb285d1aa6cb8a49cb3dc04f3"
     },
     {
       "path": "S/A08_earned_back_steady.webp",
@@ -352,9 +417,9 @@
       "milliseconds": 2000,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 110210,
+      "bytes": 97070,
       "cap": 150000,
-      "sha256": "e0ba78de8a67791cddd8001ebfbc077bcf04c23439b697b75920ee5d0193c44c"
+      "sha256": "ea5ac7c310985cdbdb18cac78ae33e13ef1347faf3d2084e0d8e85ef28d43acb"
     },
     {
       "path": "S/A08_earned_back_steady_poster.webp",
@@ -371,9 +436,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 4858,
+      "bytes": 4486,
       "cap": 25000,
-      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+      "sha256": "a0ba0172fdc58511d04d6136b88ded38622a0b1e7f591b0996efb35fcc039f0c"
     },
     {
       "path": "S/A10_hard_session_compassion.webp",
@@ -386,13 +451,13 @@
         216
       ],
       "nominalSamples": 48,
-      "encodedFrames": 39,
+      "encodedFrames": 40,
       "milliseconds": 2000,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 27272,
+      "bytes": 26342,
       "cap": 150000,
-      "sha256": "b672c30a09147c127be08895325be949784545e025014d41423601e31c0381ca"
+      "sha256": "71b86b4b8f5c5c5d0db3df2b1bdac6e36aa93770423f634bac9853aa957481c0"
     },
     {
       "path": "S/A10_hard_session_compassion_poster.webp",
@@ -409,9 +474,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 4858,
+      "bytes": 4486,
       "cap": 25000,
-      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+      "sha256": "a0ba0172fdc58511d04d6136b88ded38622a0b1e7f591b0996efb35fcc039f0c"
     },
     {
       "path": "M/A10_hard_session_compassion.webp",
@@ -424,13 +489,13 @@
         384
       ],
       "nominalSamples": 48,
-      "encodedFrames": 39,
+      "encodedFrames": 40,
       "milliseconds": 2000,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 50160,
+      "bytes": 47140,
       "cap": 300000,
-      "sha256": "6a70cb39fc2851ab422208e0a240f63dabaf746cd0a7058565b917e491d7c136"
+      "sha256": "7ea0706b1d5d8ea96a8345fe33af14b706906ecf878598745295ca51c618da47"
     },
     {
       "path": "M/A10_hard_session_compassion_poster.webp",
@@ -447,9 +512,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 9502,
+      "bytes": 8468,
       "cap": 50000,
-      "sha256": "edea1ca98682903018942a32a98d28ad04eb5fac86eda1901d6360ceb965b9e0"
+      "sha256": "43ebc83256c6c7727a50fce7c766759dfd6942e4cdc21eb347f1b0ad2f4de336"
     },
     {
       "path": "S/A11_rest_sit.webp",
@@ -462,13 +527,13 @@
         216
       ],
       "nominalSamples": 53,
-      "encodedFrames": 43,
+      "encodedFrames": 39,
       "milliseconds": 2200,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 144932,
+      "bytes": 148312,
       "cap": 150000,
-      "sha256": "f2ba7603d5dd10fa2ed1b2644f09955b13b7fdc1080c26e64cba7a7ec521e60a"
+      "sha256": "0a9d56a7afdfe3aa5d9daf3683948ed5d5ed67aba06ef364844cc55f60219e62"
     },
     {
       "path": "S/A11_rest_sit_poster.webp",
@@ -485,9 +550,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 4508,
+      "bytes": 4196,
       "cap": 25000,
-      "sha256": "d35831072ac8dfc08144c047e9ef0de4d3bcc0deea18a3c8468a1739cffdc2d5"
+      "sha256": "8f9296be67ebe6fa02771f5d542ecac5c7cbf7c4f0db54965564f63a011b2fc4"
     },
     {
       "path": "M/A15_juz_light_light.webp",
@@ -500,13 +565,13 @@
         384
       ],
       "nominalSamples": 86,
-      "encodedFrames": 72,
+      "encodedFrames": 75,
       "milliseconds": 3600,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 272780,
+      "bytes": 248134,
       "cap": 300000,
-      "sha256": "115a4157e0451c2a70159726167bddc6bd58e7b6ba6217e7ef679494d4638b7d"
+      "sha256": "d0aa2f04cdd9d2f9c2d98faa87dda5f01cd5ae2f322c5cd39b80a91d42d34954"
     },
     {
       "path": "M/A15_juz_light_light_poster.webp",
@@ -523,9 +588,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 10256,
+      "bytes": 8560,
       "cap": 50000,
-      "sha256": "11caac56bf49202179edcebadb8863a9bbf037ef80ae3c59521dd67a45f52dbf"
+      "sha256": "78d89ab479dd566191eb89bc5f31efbfdd04464e8e1f2e3efb5978dcfff4df12"
     },
     {
       "path": "M/A15_juz_light_dark.webp",
@@ -538,13 +603,13 @@
         384
       ],
       "nominalSamples": 86,
-      "encodedFrames": 72,
+      "encodedFrames": 75,
       "milliseconds": 3600,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 286872,
+      "bytes": 286158,
       "cap": 300000,
-      "sha256": "f0694a409322b823724a9828b649f6d7df66e40d624bfc643105ba142c088506"
+      "sha256": "a9de6ee58f6701c8b1d1f79c2f3e9e184f11a3bdae16f68877484efe469640f4"
     },
     {
       "path": "M/A15_juz_light_dark_poster.webp",
@@ -561,9 +626,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 11598,
+      "bytes": 8560,
       "cap": 50000,
-      "sha256": "99d5b0bbfc865a18283e38e15008816723be02a9084b8a1146f7e779ae447ab1"
+      "sha256": "78d89ab479dd566191eb89bc5f31efbfdd04464e8e1f2e3efb5978dcfff4df12"
     },
     {
       "path": "S/A17_tap_hello.webp",
@@ -580,9 +645,9 @@
       "milliseconds": 900,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 24546,
+      "bytes": 22706,
       "cap": null,
-      "sha256": "f751ea0dad093d7547f5fe21cad4ae4b8808ef90260ec3b22cb3265e7480fe09"
+      "sha256": "60d85c902b312d55e9cc62426f0320f8edbcd498036a3b373bb128d84a98c1a8"
     },
     {
       "path": "S/A17_tap_hello_poster.webp",
@@ -599,9 +664,9 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 4858,
+      "bytes": 4486,
       "cap": null,
-      "sha256": "639b464e7a9f98b5ba47a16dbd3e55e3a6b3d2d539d099548a7e2fc99b82ec8d"
+      "sha256": "a0ba0172fdc58511d04d6136b88ded38622a0b1e7f591b0996efb35fcc039f0c"
     },
     {
       "path": "L/A19_onboarding_hello.webp",
@@ -618,9 +683,9 @@
       "milliseconds": 2600,
       "loopCount": 1,
       "alpha": true,
-      "bytes": 235556,
+      "bytes": 214108,
       "cap": null,
-      "sha256": "1db18c8e030e709f84365d14ddd8ef82d613c788eec7bc2971c923f795070ac6"
+      "sha256": "efc12917e684905bf8bca7f846bbbed75d92b8920f8fb8528960d51576a60e04"
     },
     {
       "path": "L/A19_onboarding_hello_poster.webp",
@@ -637,27 +702,28 @@
       "milliseconds": 0,
       "loopCount": 0,
       "alpha": true,
-      "bytes": 12012,
+      "bytes": 10820,
       "cap": null,
-      "sha256": "10d3acb45d276cda29a832e90c745bbaffb5dd01071b39f8ad31a7019f5ae9ed"
+      "sha256": "6919dc2ba084111e10b5c89af79a99811d49f2329587fcb840af3295fd67fddd"
     }
   ],
   "audits": [
     {
       "key": "A01-S",
-      "masterSequence": "f4221aadd4e8607cf73e6679b70b3c936c2b35b1157af29bdfab343345df3d53",
-      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
-      "lastMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "masterSequence": "19f561370d4d9f7a10acef871392f8c7b5e5550c4037ac4a90878ae6322a2eeb",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
       "posterPath": null,
       "posterDelta": null,
       "fiveSamplesVsPoster": null,
       "posterSurfaces": null,
       "encodedVsMaster": {
-        "worstRms": 3.955,
-        "worstP99": 15,
+        "worstRms": 3.381,
+        "worstP99": 13,
         "worstSample": 0
       },
       "fullyClosedMs": 0,
+      "outsideHoldPixels": 0,
       "alphaBounds": [
         30,
         36,
@@ -666,172 +732,174 @@
       ],
       "minimumMarginPx": 4,
       "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1781,
+      "conservativeFlashAreaPx": 1783,
       "referenceAreaLimitPx": 21824,
       "surfaceEvidence": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "f420d1b0ce4ae9e1e82b7b0b97d3d4e70a96b424515e126c947b19d56ec37fdc"
+          "decodedCompositeHash": "ffc8155279ae95eae75ca7a88a94a0a29198823aea062373b58fbd79ce7c88c1"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "cf035783fa89ed87fbebbf5042fbd2c13c9b01bc01cfe97107446243ed6b164b"
+          "decodedCompositeHash": "e7f47220c063ff07b7a1eadbf7d934e9a402748044612917f9f9e45441c0e5dd"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "ee7597a21073922dd7bfca6c9e0d96d9a3235bc27015e315b8d2ab45f8f0102e"
+          "decodedCompositeHash": "548263d3ade2c4150b8a61c478591e503803893752a1b1f0e9d1c12e29508a69"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "60d8c48ffd1bef5d0c8aacbf0d10d6f1b466e0475822867043045646edd8cca1"
+          "decodedCompositeHash": "1e8d5b2b1e9fa8af4c2694a0f2a6a242cf3c9800838ac1f4519c6dd242e469a2"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "8f9eed35c9bd1afb800ac3e4d3790955dbcb130ec3cc5ba9a24d0d96decab115"
+          "decodedCompositeHash": "54aa15c8f7bb0e36f0e7f7e0d5e761f657da755c6c7b2feca5ccd7557c8a7ae1"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "97f54dce6bb45bd25a43d3219aba91ede4948aca3d60defca8f0e35faa0feaaf"
+          "decodedCompositeHash": "9542deefebc1ea1455d350d8aa5811038b145d896d7cc22b3b026e96c6588c24"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "f6e3cc52604c76b2db2dbbd5de55212e1461b0853d10cd98b2e238d966c4e2e6"
+          "decodedCompositeHash": "0753a0231924ef13eb5eb2341f0cb486c6f658472400d03057d98f23c8617ab6"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "f1fd05c50890ea391108a1a624bca9b3a318c40fcd233018d68845c32df7795a"
+          "decodedCompositeHash": "383ae4b70e2c93a1fe8f20ffcac95981e4c7b86b4a595b23ebd4186c221919e1"
         }
       ]
     },
     {
       "key": "A01-M",
-      "masterSequence": "25c88f48a781e984051754aebb6956894b3af5fa7509dc4f0914bc25bb459c4c",
-      "firstMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
-      "lastMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
+      "masterSequence": "46de9dfd4926aae9eaf3d801b3cb3c1a03b3136393e3a44c070739d3fd8dd8b0",
+      "firstMaster": "b402cf0e1859de4cecb5af75e483d35377baa6e288dd0d5e233837e063567c42",
+      "lastMaster": "b402cf0e1859de4cecb5af75e483d35377baa6e288dd0d5e233837e063567c42",
       "posterPath": null,
       "posterDelta": null,
       "fiveSamplesVsPoster": null,
       "posterSurfaces": null,
       "encodedVsMaster": {
-        "worstRms": 3.339,
-        "worstP99": 13,
+        "worstRms": 2.624,
+        "worstP99": 10,
         "worstSample": 0
       },
       "fullyClosedMs": 0,
+      "outsideHoldPixels": 0,
       "alphaBounds": [
-        55,
+        56,
         64,
-        252,
+        251,
         375
       ],
       "minimumMarginPx": 8,
       "maxSlotPt": 128,
-      "conservativeFlashAreaPx": 4686,
+      "conservativeFlashAreaPx": 4700,
       "referenceAreaLimitPx": 21824,
       "surfaceEvidence": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "64689fd6cae29c6cc696c9b1cd57cc65b2d17198147b55962b18ee7b47fd46d2"
+          "decodedCompositeHash": "18171dd417eb43dd0a99819ef880adc255adf521834dd0ef2d49fa4e3824a293"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "89ea4de417df14117e52fb32768ead89b31e73dd625a9bc74b025fe8dae614a6"
+          "decodedCompositeHash": "ea315662a5396119dc21410ee05cd3224e0105ebb090d276b7b0e24d5f7b0c55"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "c2f9734630ea7f443f6d3ae0bc83df046f0f22baa415d4aaeac5027be5f13262"
+          "decodedCompositeHash": "4b16fbf1713d16d7bd8856dab9a4e83f546986ef5f6a2d18a1df7184210407a0"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "9bd523b6666696d4d8590de7e65ab732eafa9e116ef22a185037344d50fd9869"
+          "decodedCompositeHash": "eb91f4ec92d48aed35abbf52310dc6b9304603581cb1010a49561a9fd19b9370"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "b4715148a42b5664696a62e8d255779699d7728366540fb8186e0af8ec30afd0"
+          "decodedCompositeHash": "84d889e38d084276af7879a9b3ce3c99c5ec718f6ccc4191cf45b8cb15653910"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "1264ae37c656131b9557c25c2610568955a11cbd50ff456bce9089b8d2cdc2e9"
+          "decodedCompositeHash": "3b4767e309e0ba905f565902905693653029c774c91026dd083fa4a30c7110bb"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "ad8a85eae55d8d8aa9403df228d128c325650896c5920526f2339f4acaae65e4"
+          "decodedCompositeHash": "d0cefa74d1c680c87d612915a705a7d67626ba33c97a21d9021eb2aca2524b6e"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "ba7c8a7382edfba761dc9066b4b38461bc54b52cc3293cbc91bec79a98e3a9dc"
+          "decodedCompositeHash": "93b9c0f932bf8ed65499cafcf9ba9e776f41ff9d4ca8de48be98d536907cc1f7"
         }
       ]
     },
     {
       "key": "A01-L",
-      "masterSequence": "687df5f231b09195f5da5a50b36ce83763de7450a6d30099405fcf7f08691592",
-      "firstMaster": "13b94563f14e9fa89398e689e4225c2d1ed3c4cb3ef47b5e5a82d8601d1e8f2d",
-      "lastMaster": "13b94563f14e9fa89398e689e4225c2d1ed3c4cb3ef47b5e5a82d8601d1e8f2d",
+      "masterSequence": "098977e928e8e8084a0405d0593116b62d771df6af2d9602f84fd52999e0f26f",
+      "firstMaster": "c1cdfb80f2ed1d190ee6f37ae4dd5d4898577a2c8c2dceed57d477fd6ef291c9",
+      "lastMaster": "c1cdfb80f2ed1d190ee6f37ae4dd5d4898577a2c8c2dceed57d477fd6ef291c9",
       "posterPath": null,
       "posterDelta": null,
       "fiveSamplesVsPoster": null,
       "posterSurfaces": null,
       "encodedVsMaster": {
-        "worstRms": 2.835,
-        "worstP99": 11,
+        "worstRms": 2.335,
+        "worstP99": 9,
         "worstSample": 0
       },
       "fullyClosedMs": 0,
+      "outsideHoldPixels": 0,
       "alphaBounds": [
-        68,
+        69,
         80,
-        315,
+        314,
         469
       ],
       "minimumMarginPx": 10,
       "maxSlotPt": 200,
-      "conservativeFlashAreaPx": 10514,
+      "conservativeFlashAreaPx": 10551,
       "referenceAreaLimitPx": 21824,
       "surfaceEvidence": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "9db11dfda3df27ecb463cd1c2d0103c5eed5ce5881c92f24e62214583b7d7ae2"
+          "decodedCompositeHash": "102353f99aea2e0b08326502c501bdaa879c5a246cc11fc0531923810e71bab6"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "e6a3a3adaf1877125559d880bdd67540184f85a433fbf375270ec119004e8389"
+          "decodedCompositeHash": "52756ed8b74fd0e4957a76f6818063f203f403a8999e1e1498519880cc562057"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "936fc1cfda4eea22bd5a4900f51ab1cea0d3dd936d8c16e24dc1ce8fb3acbe9c"
+          "decodedCompositeHash": "fdc6c6338fb006e1323f5720171ed49bceda40cb3b9a8f809f99d29f56839337"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "2a2f57fa2e0255bf0efbddf838a4413a3d4cc2d5a80ce08c7539d7e101b77be3"
+          "decodedCompositeHash": "006118f98dddffd3c62dfb195c62775034826052f3c7a898f1e67b1ecad47e25"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "f20674895f7b8037122061af75c03832d59687e486a36402914c708d9e3fb6a0"
+          "decodedCompositeHash": "207580e2f02d9074e874340907d700e13cee7de72d6a660505dfbd4b2c54f1ec"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "e6f69c500b7a3232e6f8e234cb81d02ebf104555b215c41fd301b464c6de47bf"
+          "decodedCompositeHash": "92d11f12b58eeafcf1932b9955f9ae0707a3aec3ffbaab34b927fc062fca40f1"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "256bdec8001f54108a1ad18ebd09778aae6adb14c182f06348a83946f2a6f8a0"
+          "decodedCompositeHash": "15c49bf1ee8ce154a5b4faa53cc9030b65f65a70cfa0bbb915792f1cc725c419"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "31d708066a74e3cf60cae484c62df282a16517c0ee7796db7a3d44b101b9cfac"
+          "decodedCompositeHash": "3fb5f2f818a3c1556488505868309a0c5b9cee1ceee1eeedfac9f47a6d57532e"
         }
       ]
     },
     {
       "key": "A02-S",
-      "masterSequence": "f8e0b2f05192f1e01f80040cd842390dda75f40a1a957c6d996e7c299d2b70fb",
-      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
-      "lastMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
+      "masterSequence": "17c32ff9958f3d022c1630f9c24b7305f91c928fae26430623dfb9f18ca4079f",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
       "posterPath": "S/A01_rest_pose.webp",
       "posterDelta": {
-        "rms": 4.902,
-        "p99": 17
+        "rms": 3.452,
+        "p99": 12
       },
       "fiveSamplesVsPoster": {
         "width": 45,
@@ -840,106 +908,107 @@
         "channelThreshold": 24,
         "changedPixels": [
           0,
-          62,
-          104,
-          60,
+          125,
+          185,
+          111,
           0
         ]
       },
       "posterSurfaces": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "f420d1b0ce4ae9e1e82b7b0b97d3d4e70a96b424515e126c947b19d56ec37fdc"
+          "decodedCompositeHash": "ffc8155279ae95eae75ca7a88a94a0a29198823aea062373b58fbd79ce7c88c1"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "cf035783fa89ed87fbebbf5042fbd2c13c9b01bc01cfe97107446243ed6b164b"
+          "decodedCompositeHash": "e7f47220c063ff07b7a1eadbf7d934e9a402748044612917f9f9e45441c0e5dd"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "ee7597a21073922dd7bfca6c9e0d96d9a3235bc27015e315b8d2ab45f8f0102e"
+          "decodedCompositeHash": "548263d3ade2c4150b8a61c478591e503803893752a1b1f0e9d1c12e29508a69"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "60d8c48ffd1bef5d0c8aacbf0d10d6f1b466e0475822867043045646edd8cca1"
+          "decodedCompositeHash": "1e8d5b2b1e9fa8af4c2694a0f2a6a242cf3c9800838ac1f4519c6dd242e469a2"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "8f9eed35c9bd1afb800ac3e4d3790955dbcb130ec3cc5ba9a24d0d96decab115"
+          "decodedCompositeHash": "54aa15c8f7bb0e36f0e7f7e0d5e761f657da755c6c7b2feca5ccd7557c8a7ae1"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "97f54dce6bb45bd25a43d3219aba91ede4948aca3d60defca8f0e35faa0feaaf"
+          "decodedCompositeHash": "9542deefebc1ea1455d350d8aa5811038b145d896d7cc22b3b026e96c6588c24"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "f6e3cc52604c76b2db2dbbd5de55212e1461b0853d10cd98b2e238d966c4e2e6"
+          "decodedCompositeHash": "0753a0231924ef13eb5eb2341f0cb486c6f658472400d03057d98f23c8617ab6"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "f1fd05c50890ea391108a1a624bca9b3a318c40fcd233018d68845c32df7795a"
+          "decodedCompositeHash": "383ae4b70e2c93a1fe8f20ffcac95981e4c7b86b4a595b23ebd4186c221919e1"
         }
       ],
       "encodedVsMaster": {
-        "worstRms": 5.683,
-        "worstP99": 22,
-        "worstSample": 0
+        "worstRms": 3.971,
+        "worstP99": 16,
+        "worstSample": 13
       },
       "fullyClosedMs": 334,
+      "outsideHoldPixels": 0,
       "alphaBounds": [
-        30,
+        29,
         36,
-        141,
+        142,
         211
       ],
       "minimumMarginPx": 4,
       "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1837,
+      "conservativeFlashAreaPx": 1870,
       "referenceAreaLimitPx": 21824,
       "surfaceEvidence": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "c2b70bc9c5cdf06410f5baad7562c778310926d1cd162e58c7d6dcf773b7f1e2"
+          "decodedCompositeHash": "486807bc9bfe0e09773769cd6ab6f36cb9df2ef572e2a70777494d5578e8dc31"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "85222207153ae3df769a3b62ec93b19a7b6994224cf27552362eecb13910dd37"
+          "decodedCompositeHash": "8da85385f1bbe8695e85fbf3021e791a2854b209ed0e48949a444d64811a020f"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "19e42f3414d821799bd5cc87e724d33d22a584dcb7dadb35ce631e839be2b418"
+          "decodedCompositeHash": "d942660118932e9af20beb4eccc6066064c8df5f0b37fb1fce8c8943865d4e7e"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "08c04104130c610ce351556acef1cec113b757fba6015c6bef8d064124201a51"
+          "decodedCompositeHash": "2e85f4231e76473297ddf7b61f2cdc50743d3fd7be008cfaf9bf7aec1294a060"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "bbacc455d35ad5906b44c9c2cde025557f637628f876f9b5a922c7ed52fb42a7"
+          "decodedCompositeHash": "b93569d7db9183a784d34eb91845e6abf42c96077d9efa564a29dd0e0e219cf7"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "3411c0cc52efaef4051fa0c1da7945d90c0bc12abe81b9dc320b5d8dfaaf0474"
+          "decodedCompositeHash": "4c253ad1a4e69620f5dc3396fd2d4c71d99cee17411c21fa411ab9379176f3c8"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "a2d367a3fe0dd6064ac4e45f034a8d3525760c503556d4de393e51c6453477f2"
+          "decodedCompositeHash": "4e4bf7016ce40eb477d10e59e7bf4193b18447d4cda06ea86f4a336045f560ed"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "aa44a738ddf46e9c9f2b0c1966783dc2a6b837713300feac69342069bdb91dd9"
+          "decodedCompositeHash": "03883217955a95f4298e7e5e1db2da173b23cc0fd60c4a66703ff2d364f0bc95"
         }
       ]
     },
     {
       "key": "A04-S",
-      "masterSequence": "ccbc0cf56befb9d16a600eed266f1f2140793cc9808185493da17a4b494dfc9d",
-      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
-      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
+      "masterSequence": "afc2ac40227f6a34f06fa9335c96488a18207eaf357973670cd59258406f88a7",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "9188136cd88d5f8aa01450a00c5a804415ff9190a2223bc7c68dc45337fc7b2c",
       "posterPath": "S/A04_welcome_wave_poster.webp",
       "posterDelta": {
-        "rms": 4.007,
-        "p99": 13
+        "rms": 3.264,
+        "p99": 11
       },
       "fiveSamplesVsPoster": {
         "width": 45,
@@ -950,594 +1019,55 @@
           0,
           38,
           36,
-          36,
+          37,
           0
         ]
       },
       "posterSurfaces": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
+          "decodedCompositeHash": "ca8fc9b04974aa76c2168cd34d60f5c950c237a40d6f804219d2d45ca7d90f75"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
+          "decodedCompositeHash": "851c9e0fe824ca892ed8e40ba0e28c3daad5269ffcf11df588dec879bf1cd914"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
+          "decodedCompositeHash": "20d494293a79e5d2abf8e51ff43ef8701b27616326bf7bf56a9133fae3460bd6"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
+          "decodedCompositeHash": "d2f8a40441c932e1d0c951f49fea1c70a704b56779085694b923a542b070a1d1"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
+          "decodedCompositeHash": "15eb9bbe6995b71eabef052f8063ec8d1d9ccba4b68af4941c7aac12bc7411a2"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
+          "decodedCompositeHash": "557e128bd4cbf3b70bbe7605ec79127e224085aa67d4fb9c411619fdc7c5bbb5"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
+          "decodedCompositeHash": "722acce8326cddc2995d87fa3f6a84980e0c2711ca600bdc240e7ce8f1ccbf34"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
+          "decodedCompositeHash": "8e456c6f8cf02ee55e85f249575779a4e76a0cfa98818105878ee95891962681"
         }
       ],
       "encodedVsMaster": {
-        "worstRms": 4.457,
-        "worstP99": 17,
-        "worstSample": 19
+        "worstRms": 3.859,
+        "worstP99": 15,
+        "worstSample": 6
       },
       "fullyClosedMs": 0,
+      "outsideHoldPixels": 0,
       "alphaBounds": [
         20,
         35,
         141,
-        211
-      ],
-      "minimumMarginPx": 4,
-      "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1871,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "5c447982d0b0ced3ea6e9e111535e695fef76e745c25dc4ce36597c5c83eab09"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "799cf3d1f119cf493e4c752f979122ca7713f4ca509172bcd03756e1e263f619"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "1f66e145cbfa45c2b11f4828f393faefee42b38c0934c940476a806ef127ab30"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "1306062c139fc1230f20664c2805aaa5bdca58b1ab236fe3563b6115fa7597d5"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "1be671223621f1ed54aab52292058fa1bc536ba5a7dc02e46ce8bac45306500f"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "fe090c5f6b1ee43cf6f9ddb08752e1012b7bd38512794911050a977c1fa352e9"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "8593ca06350a5ee1ed0900610248c6a0e54bdfd6efbb09b7b46faa4d328b31b9"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "fb792a0d24ceaa5941962fc770992903fa7ec8cbb4b8ae769cdeea001accbbb6"
-        }
-      ]
-    },
-    {
-      "key": "A06-S",
-      "masterSequence": "1040d0e71cdc64fcca3ebe2faaa47b5c5d949ced20270a9ba82da596383296cb",
-      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
-      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
-      "posterPath": "S/A06_wird_done_shimmer_poster.webp",
-      "posterDelta": {
-        "rms": 4.877,
-        "p99": 17
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#FFF8F1",
-        "channelThreshold": 24,
-        "changedPixels": [
-          0,
-          89,
-          26,
-          19,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 5.246,
-        "worstP99": 20,
-        "worstSample": 6
-      },
-      "fullyClosedMs": 337,
-      "alphaBounds": [
-        30,
-        36,
-        141,
-        211
-      ],
-      "minimumMarginPx": 4,
-      "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1781,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "193fde45d5559f80a9b512e1321a53dd69093f1cf28ca32b2f3a04ca569f1764"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "712c286f26724e385816ec88d981152e10bcb396b72f279789236acc6f2aeb59"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "6afc137be557f4b465ec7e8bc3678f8abe5447099153bf52b7d88e0bb3a5c023"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "e59350e2869ae32406383fa4148c890aab61eb563b6ffba5539defba7b87346d"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "7c3fa6658e02adc377cc370df4c4878264007072e895ac53581f667c0a73e22a"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "d98054ebd657d48b79e60a5d7424232ac730a5210dda70f4b1dd718cd764c915"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "807919c2727397818aa123d4a2202bd9d2a8e6c60bd3143a63b906509bfae731"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "094671304f44059c5b2a7fb99ba3a2a2dd7f8fa3bf1cf7f0992f83a37b986e6b"
-        }
-      ]
-    },
-    {
-      "key": "A06-M",
-      "masterSequence": "c38bbb55e29b0ef15f6db17b6337ffb48f2f0acad0b173f1462690dea57c0aa1",
-      "firstMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
-      "lastMaster": "63910852d32b06a2f82447af4909005ec58d79bac94608e17fafa72bad990f7b",
-      "posterPath": "M/A06_wird_done_shimmer_poster.webp",
-      "posterDelta": {
-        "rms": 3.78,
-        "p99": 14
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#FFF8F1",
-        "channelThreshold": 24,
-        "changedPixels": [
-          0,
-          89,
-          25,
-          17,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "4fda53dac4aed7d55ddb2c4f0ed16d895177e3dccaa3376d70ae61157b62809a"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "52708a7fae46d01762a18ef53e24013c7fec30e12b5223e50b268677fe1a0a58"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "48f57df7a2d0b148c103bede3c8b2dcd442fbc50d1048f4d24a818da044c0d3a"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "9d47ff614fca32e4f27c7729190f348dcd04128572f4cca5535fe6e4e2a7af55"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "e30acdf05d65113bdc482d7f37717e275b71a4c780582aff751b18fd86219066"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "9c7665d0dba0f01986aafbd2aa15cd6de34ad8f86307123ab1f1c891d8f83a52"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "171dd73440a57a91de7b3ccfa9840932a6aef7350a942a4b14a060c896f2d236"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "dc4083f8b73865fb70add9054ee457f7833703660865fa8dae8d0a6aab1f2d51"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 3.255,
-        "worstP99": 12,
-        "worstSample": 12
-      },
-      "fullyClosedMs": 337,
-      "alphaBounds": [
-        55,
-        64,
-        252,
-        375
-      ],
-      "minimumMarginPx": 8,
-      "maxSlotPt": 128,
-      "conservativeFlashAreaPx": 4686,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "7a7d107dd58818b63bf70b13325e0a3eb11647daa7cfe0130a096f5a840eda3c"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "089e13fb142b88c97c552df892eef808c5843179e360f5d1afe1949fed9c7ab2"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "9b0d0cbe1494d8e5a82cbe3fa3485434dc18b093939240214f33e2f93eed9e92"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "5a90ce523d63d08fb75eacd6dc4d47db09ca1f8e84c4c4c9e87c65036a8c6051"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "9779a54ad7fd7682682045c66fab03b89abee8554826c27b2a534031c0c01eed"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "f0b0ada74332bbd8ebe1ff92d7a64af00c907fba424ac79338fc7f6024c4be0a"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "14a454695252da325196ea779c77904fbbc6e62a40343213aa95f7ddc9d864dc"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "280e2149dd56a0b423720ddbab873a1639341748da52fd1af1cd1782295084e3"
-        }
-      ]
-    },
-    {
-      "key": "A07-S-light",
-      "masterSequence": "4855663b5c7d25b63f66a9481f2ae207a98ecf250a3df7bff7c60bd3714183cf",
-      "firstMaster": "0e12ede21e246e3c20f1d46952d5fd470f081be7835e739761ea6089ea8a6d59",
-      "lastMaster": "a1ad429889f5ece9c56a489a571aca279939e25069224a88ab9070729d96334a",
-      "posterPath": "S/A07_milestone_glow_light_poster.webp",
-      "posterDelta": {
-        "rms": 4.235,
-        "p99": 14
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#FFF8F1",
-        "channelThreshold": 24,
-        "changedPixels": [
-          85,
-          64,
-          315,
-          31,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "5d2d586e1a37507b458b69ea24681602c5f5118ab57796bf6899cd78a963d179"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "9e1f6d58be745e6473b3c9a59fb4e41ce4c73d06fd9ad1f8edba6cd40ba7e445"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "28acf365daaf27f81199ac14c82cbe7929956ac63187c300e84964a20a758f03"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "dea9a3912796536b9574c311a11392709a911f17e323cce886813248e20946ae"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "ee38a56b4d1d599f889d0f8c25f117ce6d891bdbba4fa0e30397116771089b7a"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "8f8f5653428969312a965366d313c47b81f76c987c37c3914bd7f349459f1bae"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "967176ba33c6a15f04b94cee013b02fe041480d517d7a418b070be1f2836069c"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "7fc39cd6e7777d70f2c0d773d5567172b2575711293d32993df5c85bb9f94c0c"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 4.136,
-        "worstP99": 15,
-        "worstSample": 33
-      },
-      "fullyClosedMs": 375,
-      "alphaBounds": [
-        30,
-        36,
-        141,
-        211
-      ],
-      "minimumMarginPx": 4,
-      "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1816,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "9edb7f7e2aac7e21e98dbf7453cffe24293ab0321294d3359dc6edc1739ed8ca"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "23dd2bc285a5c90f80c457831f54f4eb8cd9d6366e6e664cba0d826844990f5d"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "2d044b4ac0781c35e197bf1b8a85255d37d59037ceecf6bdeb108619ae52e745"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "b5edbb5e9826b9b59759c440e9c8f0b76e414642276a5753f7655fc833e0a3b3"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "711a13fccd974e5072464bd0480be99bfc46fc2ec25948da283083369990dba5"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "2dbf77e8c0a677731e6fa80faf14e941ffae255b3affa9905943ae704271efd6"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "ff13bd5e3b3f32de7dcda30144d4c9c362996f45b0f90625920f4122440681da"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "cba85cb2c1bd8e62cd2b57c2044c8199960bd00884fbde9458275b26e9ccc737"
-        }
-      ]
-    },
-    {
-      "key": "A07-S-dark",
-      "masterSequence": "a44d669299fe66e529f55ba880a878790668295a99864e03eea5808543047ab5",
-      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
-      "lastMaster": "82997b67a6ed4e543778cd2eec6e8c8cbfd9037d0c0905e28a02e01053315ec3",
-      "posterPath": "S/A07_milestone_glow_dark_poster.webp",
-      "posterDelta": {
-        "rms": 4.309,
-        "p99": 16
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#000000",
-        "channelThreshold": 24,
-        "changedPixels": [
-          81,
-          61,
-          322,
-          31,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "93d2b4d5deb6f2aff1a38e70a31311f9338ca606e2b08458067e37b8acd2b446"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "a2880790cb518d24420dd2120084efe9bdba8c7785e2ee13cc4163a1544d717c"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "a763cd0fe106ed29b1179ea18d2e6ad1e3bc8a52d39824230f0245314d58f0d8"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "63265fd7f541339aeb09c08ccd79210d35c5981bf7f476cada68498a18f125f8"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "3a52371e10817cb019667dcb799372394b03f96febd0c421c1748fb41d2a8923"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "cc2fcad6d5da2ac420794c05194c9f557feed22a988bf423b3d9847b5f55acbd"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "0e25f5db5e40cca8669ddad3f68a732786df00a20b8084c9b4181806d7547e06"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "42a47c11db9e5def4355de6babe20c9fae2ae6d781e917fa4c229087da4461c9"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 4.417,
-        "worstP99": 18,
-        "worstSample": 67
-      },
-      "fullyClosedMs": 375,
-      "alphaBounds": [
-        29,
-        36,
-        142,
-        211
-      ],
-      "minimumMarginPx": 4,
-      "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1960,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "09284c639b80df228b5269c989316a6dfe0268bce2b5fd20fed7f21f286ea234"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "0df1fa7e614cc4cbd6a6d332c7edf5a71f7d26b0e68f2e8a3c2f29a3cf15e490"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "4317c6c1253da3adff87d2150ff4afdda3caed94bc550100dddfda073028704a"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "997878f32ecc53f69ae4ccef948f8226c0f9a13bb06bef22ce4dedd4ac2efd80"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "6b97fda317d1e745546690e2d1d4a696d7771f3cc342d071983f9ac655a80f53"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "b4f446d0b4ee1b7dff0c9cc7112f28980f4112ed89831f9e9764dc150a7fb186"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "540f77a3b759c935871ff13a7d69efd22f569e852d55f42df8beec289a7c39df"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "7c7a2dee068911480b673b735af4246c2634cd4c5cec3a8331855cf7e28f3558"
-        }
-      ]
-    },
-    {
-      "key": "A08-S",
-      "masterSequence": "1c19d3f00cd45eee1e36e8da8b516620fe66a793355bdcabcb8d76fce103c3d8",
-      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
-      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
-      "posterPath": "S/A08_earned_back_steady_poster.webp",
-      "posterDelta": {
-        "rms": 3.971,
-        "p99": 13
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#FFF8F1",
-        "channelThreshold": 24,
-        "changedPixels": [
-          0,
-          189,
-          0,
-          18,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 4.548,
-        "worstP99": 17,
-        "worstSample": 28
-      },
-      "fullyClosedMs": 333,
-      "alphaBounds": [
-        27,
-        31,
-        144,
         211
       ],
       "minimumMarginPx": 4,
@@ -1547,47 +1077,47 @@
       "surfaceEvidence": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "d4945b3d6774c3a692958b2b794e0592fed72864af76edf1a43965a705e75746"
+          "decodedCompositeHash": "457aebd906549113958d407225351ed20aa8b50827a681ebb29190e53b65f1a1"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "ce17afdd3efbc85002cd1873a24e9f7b0a11350313190eac6222c17351326caa"
+          "decodedCompositeHash": "cbaa94d152d36cfd67c52f7ac521b3c271c227b9f548c73c6a3a0c704655649d"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "f86cebad566af13cc5c30b1e156036457ae139297466465e706e491eb971b602"
+          "decodedCompositeHash": "16e027b94365273a9bfd31ff9e7372ffe017252b04dd5ca3731f764ffd6672aa"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "8b9833825eb79808e304d8ca040ea17908b2ed956ce7d3cd30f9c649f7fcb99d"
+          "decodedCompositeHash": "50eb3dae75516d8cc89903ee56d835e7eaf95e086fc3d140b29294238f42f58d"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "3ca53e2f32afe39a7ea7df7fff4f241164c4e6267c51119a54d2f38e960b146c"
+          "decodedCompositeHash": "941b2bf266d1c4047005c876a03f5aef7753a90bfd29323f2325b08b7745c943"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "72a641228e556c0810c415f4ab79dc05f0018437f8fb1daf53db669067b5d6e5"
+          "decodedCompositeHash": "e4caeb6678002b35784f3cd29ef7d8fb0849608ab08c3288848e14401babc635"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "de00027a43ff12e8673b8219089836a7d336905e2e0517c4c444e84baf36dd50"
+          "decodedCompositeHash": "b8b19aa7a66934537f86be9fdbacd1a36df74bdd7b0afb09b11aa96428c03150"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "cf72bb4bf57cc4b1c7105432a46b9ec5027344a4f01130f19dd2877348349bd7"
+          "decodedCompositeHash": "34d246d1f496144e6ba7c8bd29ca7751e9aa38978c2deb7f5f7e7a3432fb2d89"
         }
       ]
     },
     {
-      "key": "A10-S",
-      "masterSequence": "58291f528c73451eff410c7fe9a3586d08a6817eb0193484d2064640a0c6d07b",
-      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
-      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
-      "posterPath": "S/A10_hard_session_compassion_poster.webp",
+      "key": "A06-S",
+      "masterSequence": "163824875694c49f82c3e55517c47c5fc394e95e6c61ec19f30c6c5194d955f7",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "9188136cd88d5f8aa01450a00c5a804415ff9190a2223bc7c68dc45337fc7b2c",
+      "posterPath": "S/A06_wird_done_shimmer_poster.webp",
       "posterDelta": {
-        "rms": 3.909,
-        "p99": 13
+        "rms": 4.461,
+        "p99": 17
       },
       "fiveSamplesVsPoster": {
         "width": 45,
@@ -1596,52 +1126,53 @@
         "channelThreshold": 24,
         "changedPixels": [
           0,
-          38,
-          57,
-          34,
+          80,
+          37,
+          16,
           0
         ]
       },
       "posterSurfaces": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
+          "decodedCompositeHash": "ca8fc9b04974aa76c2168cd34d60f5c950c237a40d6f804219d2d45ca7d90f75"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
+          "decodedCompositeHash": "851c9e0fe824ca892ed8e40ba0e28c3daad5269ffcf11df588dec879bf1cd914"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
+          "decodedCompositeHash": "20d494293a79e5d2abf8e51ff43ef8701b27616326bf7bf56a9133fae3460bd6"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
+          "decodedCompositeHash": "d2f8a40441c932e1d0c951f49fea1c70a704b56779085694b923a542b070a1d1"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
+          "decodedCompositeHash": "15eb9bbe6995b71eabef052f8063ec8d1d9ccba4b68af4941c7aac12bc7411a2"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
+          "decodedCompositeHash": "557e128bd4cbf3b70bbe7605ec79127e224085aa67d4fb9c411619fdc7c5bbb5"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
+          "decodedCompositeHash": "722acce8326cddc2995d87fa3f6a84980e0c2711ca600bdc240e7ce8f1ccbf34"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
+          "decodedCompositeHash": "8e456c6f8cf02ee55e85f249575779a4e76a0cfa98818105878ee95891962681"
         }
       ],
       "encodedVsMaster": {
-        "worstRms": 4.807,
-        "worstP99": 18,
-        "worstSample": 17
+        "worstRms": 4.432,
+        "worstP99": 17,
+        "worstSample": 11
       },
-      "fullyClosedMs": 375,
+      "fullyClosedMs": 337,
+      "outsideHoldPixels": 0,
       "alphaBounds": [
         30,
         36,
@@ -1650,51 +1181,596 @@
       ],
       "minimumMarginPx": 4,
       "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1781,
+      "conservativeFlashAreaPx": 1783,
       "referenceAreaLimitPx": 21824,
       "surfaceEvidence": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "e05f766ba58c5eef28e0975e8fcd133df3b1691e8ac22e0ccfbde39b13650bd6"
+          "decodedCompositeHash": "6503cd13a6da3b8fc16d04075653eb81ad2ffb65816f593302e144beb15b3826"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "7c6bc6da5f35f9c9194fd47066e10ad0f75e75e3dd5c12aeb5f937c927fdd2a1"
+          "decodedCompositeHash": "5a2782581a6be5c5de45be9e203b8350165cc312983816a86dea2204b9465524"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "d10295dd86e35cbbe079c50ed51fd74558c109196ca7ee03c46b67aa0cd2d275"
+          "decodedCompositeHash": "a66591ad3b627e5a3625e3e6f35238cc49ca2f7c92b72471df3ddd7b105b428f"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "b12b7a33b757ee0d8b98f2866af64f976e1cfc5ed5f4ad7c463e6a13c631185a"
+          "decodedCompositeHash": "462c5ccd34a7a615fea7669e76d553be9ab6916f11cffd679107244d0a89040e"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "ea341a91ff606a8ceb219f4d6713c198bb3fff1ad5eff66dda7ed5fd7702d925"
+          "decodedCompositeHash": "ffe997cd6ef0158b44dc0e1a603bd96f15e5049d28c59aa5880ba29211492eed"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "f671b694e41cd0a32f3530507bb3c95c9ed1bac96aca689d3496c1a840257c05"
+          "decodedCompositeHash": "68289f82dcbf59be3098fc17d76b59c00647999979aed562dfa379478a18ed90"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "8e8a80273d5ba1645d9cb50b60e92d38bb263e6d30234f29eaa99499dc15ff17"
+          "decodedCompositeHash": "7b77928b09c71e5036c31181d3bd4414d58f7278b75588c6d8be7656d96b2929"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "6b2dbbae5ff326e55541c5f1a61fdfa9fa70f09ddd9a21bbf9bf484295b4a76e"
+          "decodedCompositeHash": "dbe87a85dc84a7c862c635c7a91911b66ff4d8e1be08c3f22c7058833b7e4049"
+        }
+      ]
+    },
+    {
+      "key": "A06-M",
+      "masterSequence": "d19dd568600ef50ab104cc301e533378966e3e4b2ad184ec2f874005702e1a74",
+      "firstMaster": "b402cf0e1859de4cecb5af75e483d35377baa6e288dd0d5e233837e063567c42",
+      "lastMaster": "82214c4bd64cc62093d32db1dcb4e07cb412177c3ab5039159fe05bc7856219d",
+      "posterPath": "M/A06_wird_done_shimmer_poster.webp",
+      "posterDelta": {
+        "rms": 3.008,
+        "p99": 11
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          81,
+          38,
+          17,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "6607591ccfc5af3505d5d1cb16efdcc7c663e65df936327bea1eb421ad34306d"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "78fc3ec4c0b5c6c3f8b809c1c765fb59b20fc1ae8e71de4a93a6853a7ae0b1ce"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "f4629981a391b882ea6489c5f88452ffd6f213148bd5e3d0ecc5d55f023cd565"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "c8cf8609815c80b75d17f08be49bd02433d4925af7c884ba1957480d4fc3c824"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "5d694f2a400d190bd2a521e0934e5d7ef3f6179ef6d25ff32ca67af7d3231baa"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "26da9d8c4f86094bafca726ebdf7de08780ed3a9f170ad6d51867875e2dd97f0"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "e64c124cba2fef16a16a7810ae70d0207980854093bf9ecd313f3c4267c9fb1c"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "89adf0d63cbe2c697cdd9c4c72d14c5202993a0f9f3f8976893719a43f02a7da"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 2.85,
+        "worstP99": 11,
+        "worstSample": 11
+      },
+      "fullyClosedMs": 337,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        56,
+        64,
+        251,
+        375
+      ],
+      "minimumMarginPx": 8,
+      "maxSlotPt": 128,
+      "conservativeFlashAreaPx": 4700,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "80324475d833dcc1072348bb65a1b3428ec520f734923c5fdd8ba6e6a9b632a5"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "6236d19bb505f74cd1348f8ad7fad397d0dac55b06812f9eb6fba6b518870a24"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "c91a7d995dd965477d6ecedadcfaa2b26f871e8c7c835c273a9635db749106ac"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "07072de08884b5dec90869c207f532e1a4b0e93f331822b48b9a1784248e4dd1"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "e5054a0babdad32786ca15a0fcf5899a4824f47a3393d1b616e2acdaf738eaa2"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "ff8bd1da69e55ae4440665582e2b14636591773be53ff1ba2f9e5ac01e3ffc58"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "960659123899ade5e50ea7a4ff3b5da6b917ad8cdfa282ff741b7c7950a5e0e2"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "de1e89cec56e55490995729c6e410793966732d8fc204b2a3df2f8d643de7a14"
+        }
+      ]
+    },
+    {
+      "key": "A07-S-light",
+      "masterSequence": "b54d4a8882c7af29fdb0efca19b7e37e04c9caf8a2d0a4d6315c26a5f2bec5a2",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "19aac5a54b7cc5ede47805a01481cd15382f6bc7e45398c0cc288ea4db4713e1",
+      "posterPath": "S/A07_milestone_glow_light_poster.webp",
+      "posterDelta": {
+        "rms": 3.9,
+        "p99": 14
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          235,
+          167,
+          354,
+          283,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "9dc08c14a080a513fd9908649bf1769d5de4839c62d6cf6bf775328b2bad4dfd"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "fefd636b94eccc5d127d34f907ed2189ee04edb122778307afaa307fed95f8eb"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "88d3631d8dbdc82e12c4e0b37f2535629c5ad7106de3834fdd5f3fd294f28707"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "b50f70318cfbd8b8c27e37405665254aef00b0d5c0cf775116e20a5d57e6c1c4"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "5d34425f8286ac49d4ac2bdd93edcfcc8216023dacd04373d06e8d0c6fb11316"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "3401cebf2114f96627bd1a0f358e797ed3869c96bc40510b439727a4b3a3ff75"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "19f7fdab9ca872427a8c0c7868dcbb9fee47d0f8cfc097732e9d3b918d74d68c"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "829672900f01543873535e8b4d018320bcbd5a689f2d2274af9a8afe2710b76a"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.611,
+        "worstP99": 13,
+        "worstSample": 24
+      },
+      "fullyClosedMs": 333,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1783,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "e53a1625026247eaf72841b0bceeae63b4e588a27e942bd1686957da1438ca00"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "3cbc2779c93960a101c464238ee55cd1e495ceece60cc6552f2b53888fbca2cf"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "673c5a9f0e264a7365caa33ccd54d0a9526ea90160b41bd5dd5a4e89b063298e"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "550374d845f5fe6720de22a1d988e6a1d38d3e0cd4f136d0e6133d0250318609"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "f4697fda9b13e354633ab030943daf11138d1e739fd1f9dedd5d678e335ea1f0"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "49637ed7e3c6316db038149ee996f3d94761d91e76a24d0d62e5bd11bb32aa26"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "516c7698587d05545428a83480097cf0ecb6097c562080093e2d644fa9418b00"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "50728b525378a810ae5c87444ca2bd03418e35a5558d69779de7c542254370f9"
+        }
+      ]
+    },
+    {
+      "key": "A07-S-dark",
+      "masterSequence": "d864f28d87102443024e506b606bb54c91f8507d86cca6b8ba3e3912016ca505",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "19aac5a54b7cc5ede47805a01481cd15382f6bc7e45398c0cc288ea4db4713e1",
+      "posterPath": "S/A07_milestone_glow_dark_poster.webp",
+      "posterDelta": {
+        "rms": 3.917,
+        "p99": 14
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#000000",
+        "channelThreshold": 24,
+        "changedPixels": [
+          234,
+          167,
+          354,
+          284,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "9dc08c14a080a513fd9908649bf1769d5de4839c62d6cf6bf775328b2bad4dfd"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "fefd636b94eccc5d127d34f907ed2189ee04edb122778307afaa307fed95f8eb"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "88d3631d8dbdc82e12c4e0b37f2535629c5ad7106de3834fdd5f3fd294f28707"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "b50f70318cfbd8b8c27e37405665254aef00b0d5c0cf775116e20a5d57e6c1c4"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "5d34425f8286ac49d4ac2bdd93edcfcc8216023dacd04373d06e8d0c6fb11316"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "3401cebf2114f96627bd1a0f358e797ed3869c96bc40510b439727a4b3a3ff75"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "19f7fdab9ca872427a8c0c7868dcbb9fee47d0f8cfc097732e9d3b918d74d68c"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "829672900f01543873535e8b4d018320bcbd5a689f2d2274af9a8afe2710b76a"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.611,
+        "worstP99": 13,
+        "worstSample": 24
+      },
+      "fullyClosedMs": 333,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 2052,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "ae7f05f589fbe0c9720641d57a010cd00be64b1f64c46edb0a747da9f901afb3"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "8aa7cb798a5cd4eb37f4353892e61c66c906c181c74157b6b075393539f2e9b6"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "0715093721762530dea6bb69c591afdd24ef1f83a87d31522e499d4c91419612"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "df2919dbb17f2640fce2d9dd4e57c8b4f3e0b6399d65db985330b011af66f33c"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "7ef7aa7cf3985d72551222bf6a6c1873bf471842361e7840645666362da44f0e"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "38e37a1d5cdffc6fd7c9fcba0d79bbb9abfbd9f8db1d6f64cb53b7663ea7e3e7"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "bc2589883ab66494901e342560e87912540e062f99bb7ecb7d970a62e9c546c6"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "bdee4a29553de31f788e0aba9830bb85cebe3c3dc8b04f3999b7123ee07e4345"
+        }
+      ]
+    },
+    {
+      "key": "A08-S",
+      "masterSequence": "a81f537d638769f863e349de8219b18582493093834112bd56fcd92ee1354de4",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "9188136cd88d5f8aa01450a00c5a804415ff9190a2223bc7c68dc45337fc7b2c",
+      "posterPath": "S/A08_earned_back_steady_poster.webp",
+      "posterDelta": {
+        "rms": 3.039,
+        "p99": 11
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          165,
+          20,
+          17,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "ca8fc9b04974aa76c2168cd34d60f5c950c237a40d6f804219d2d45ca7d90f75"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "851c9e0fe824ca892ed8e40ba0e28c3daad5269ffcf11df588dec879bf1cd914"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "20d494293a79e5d2abf8e51ff43ef8701b27616326bf7bf56a9133fae3460bd6"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "d2f8a40441c932e1d0c951f49fea1c70a704b56779085694b923a542b070a1d1"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "15eb9bbe6995b71eabef052f8063ec8d1d9ccba4b68af4941c7aac12bc7411a2"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "557e128bd4cbf3b70bbe7605ec79127e224085aa67d4fb9c411619fdc7c5bbb5"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "722acce8326cddc2995d87fa3f6a84980e0c2711ca600bdc240e7ce8f1ccbf34"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "8e456c6f8cf02ee55e85f249575779a4e76a0cfa98818105878ee95891962681"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.778,
+        "worstP99": 15,
+        "worstSample": 0
+      },
+      "fullyClosedMs": 333,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        26,
+        27,
+        145,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1914,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "a83e437bf7e66cc2fd793b66d95c8c5bbedf800d67984b8b9c94fb9fd389ac84"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "57aee9f968906cead755001fb5d3aa400e7b75a45ee96a10119f6183dbcf21dc"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "269622f57c45afc31f3558ed193b6ee0fbb03aa62049e5f9d509ae411966f029"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "8d0626d44603e4e03bf490a8d584f8fb036443c468d11389881e5e36e06d25d9"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "3975d94da2dec67893eaa944dd3d5d6432caddd2ba7185959a994aefcb9804f5"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "64ddc0c3551f5e9bac9a4f4bb715d221aad6b5a36f836b9f2a3888cefd45469d"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "b4fcc47a595e5608e324fbece532e8dc6f2b0c07f486884e469edb4e7ad3b10b"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "29141ab33ec31953812282c02f8f9fd8b02e771883bfd4a5d9156950c54e0878"
+        }
+      ]
+    },
+    {
+      "key": "A10-S",
+      "masterSequence": "188b9a73d725141c9d2c637fd8f1cceb85a9866ee4cef0f8ca0f7b0b30d6c8b7",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "9188136cd88d5f8aa01450a00c5a804415ff9190a2223bc7c68dc45337fc7b2c",
+      "posterPath": "S/A10_hard_session_compassion_poster.webp",
+      "posterDelta": {
+        "rms": 3.139,
+        "p99": 11
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          46,
+          64,
+          42,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "ca8fc9b04974aa76c2168cd34d60f5c950c237a40d6f804219d2d45ca7d90f75"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "851c9e0fe824ca892ed8e40ba0e28c3daad5269ffcf11df588dec879bf1cd914"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "20d494293a79e5d2abf8e51ff43ef8701b27616326bf7bf56a9133fae3460bd6"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "d2f8a40441c932e1d0c951f49fea1c70a704b56779085694b923a542b070a1d1"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "15eb9bbe6995b71eabef052f8063ec8d1d9ccba4b68af4941c7aac12bc7411a2"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "557e128bd4cbf3b70bbe7605ec79127e224085aa67d4fb9c411619fdc7c5bbb5"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "722acce8326cddc2995d87fa3f6a84980e0c2711ca600bdc240e7ce8f1ccbf34"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "8e456c6f8cf02ee55e85f249575779a4e76a0cfa98818105878ee95891962681"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 4.009,
+        "worstP99": 15,
+        "worstSample": 16
+      },
+      "fullyClosedMs": 375,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1783,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "511a64c89bd869cf3d868a305ff7d91a4fd52053505a753d145107c3569003a2"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "0119e727f3302dddd5b6f19bca6c16d37b9ea62bc9f2a715ef1ca4566320876d"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "5b5f352396172a1ec8271c3b720393b49917864e2b27c1b1c5f90011a488d9a9"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "c6b8f7773d7931c3e6980cb6cf67aaa8f0a9c664a451db2d298c939f44455ad0"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "a5cfe1e65d0c51efed2e40c37228c61000bbd7242e3d90db53d7cc6588f0d449"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "e4cb4905c24e730b5650ec8d633b257b5b2d735de02a906c5ca98b7fa8ab7ec2"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "a3153f0524d53ac6cd53a552dde2207c384bfe926975af7e54aefe0944466023"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "c9c21408d86b97264844060a5eeb90259e87f518b92adc40884f73de03f7ccf7"
         }
       ]
     },
     {
       "key": "A10-M",
-      "masterSequence": "26a2e03cfa709169844c099659591dd5e9190804a4540ca38a36dfb9b601d2f5",
-      "firstMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
-      "lastMaster": "63910852d32b06a2f82447af4909005ec58d79bac94608e17fafa72bad990f7b",
+      "masterSequence": "ee3da8ffd9465713a2537e86e17a91a391a4df57d3946f939da7b868d7d82409",
+      "firstMaster": "b402cf0e1859de4cecb5af75e483d35377baa6e288dd0d5e233837e063567c42",
+      "lastMaster": "82214c4bd64cc62093d32db1dcb4e07cb412177c3ab5039159fe05bc7856219d",
       "posterPath": "M/A10_hard_session_compassion_poster.webp",
       "posterDelta": {
-        "rms": 3.021,
+        "rms": 2.685,
         "p99": 10
       },
       "fiveSamplesVsPoster": {
@@ -1704,537 +1780,106 @@
         "channelThreshold": 24,
         "changedPixels": [
           0,
-          35,
-          53,
-          34,
+          47,
+          66,
+          44,
           0
         ]
       },
       "posterSurfaces": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "4fda53dac4aed7d55ddb2c4f0ed16d895177e3dccaa3376d70ae61157b62809a"
+          "decodedCompositeHash": "6607591ccfc5af3505d5d1cb16efdcc7c663e65df936327bea1eb421ad34306d"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "52708a7fae46d01762a18ef53e24013c7fec30e12b5223e50b268677fe1a0a58"
+          "decodedCompositeHash": "78fc3ec4c0b5c6c3f8b809c1c765fb59b20fc1ae8e71de4a93a6853a7ae0b1ce"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "48f57df7a2d0b148c103bede3c8b2dcd442fbc50d1048f4d24a818da044c0d3a"
+          "decodedCompositeHash": "f4629981a391b882ea6489c5f88452ffd6f213148bd5e3d0ecc5d55f023cd565"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "9d47ff614fca32e4f27c7729190f348dcd04128572f4cca5535fe6e4e2a7af55"
+          "decodedCompositeHash": "c8cf8609815c80b75d17f08be49bd02433d4925af7c884ba1957480d4fc3c824"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "e30acdf05d65113bdc482d7f37717e275b71a4c780582aff751b18fd86219066"
+          "decodedCompositeHash": "5d694f2a400d190bd2a521e0934e5d7ef3f6179ef6d25ff32ca67af7d3231baa"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "9c7665d0dba0f01986aafbd2aa15cd6de34ad8f86307123ab1f1c891d8f83a52"
+          "decodedCompositeHash": "26da9d8c4f86094bafca726ebdf7de08780ed3a9f170ad6d51867875e2dd97f0"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "171dd73440a57a91de7b3ccfa9840932a6aef7350a942a4b14a060c896f2d236"
+          "decodedCompositeHash": "e64c124cba2fef16a16a7810ae70d0207980854093bf9ecd313f3c4267c9fb1c"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "dc4083f8b73865fb70add9054ee457f7833703660865fa8dae8d0a6aab1f2d51"
+          "decodedCompositeHash": "89adf0d63cbe2c697cdd9c4c72d14c5202993a0f9f3f8976893719a43f02a7da"
         }
       ],
       "encodedVsMaster": {
-        "worstRms": 3.774,
+        "worstRms": 3.32,
         "worstP99": 14,
         "worstSample": 28
       },
       "fullyClosedMs": 375,
+      "outsideHoldPixels": 0,
       "alphaBounds": [
-        55,
+        56,
         64,
-        252,
+        251,
         375
       ],
       "minimumMarginPx": 8,
       "maxSlotPt": 128,
-      "conservativeFlashAreaPx": 4686,
+      "conservativeFlashAreaPx": 4700,
       "referenceAreaLimitPx": 21824,
       "surfaceEvidence": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "10e2943a752e0e41ea237970228d9a9a7dc35fc5467f8f5974035b8434bf77a8"
+          "decodedCompositeHash": "2d1fca1976f5d0eef35e88853607f4706b5af29f47400622f5c575fa200d0434"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "3d0b99774f436859f4e39cf808ac0316263a588f336a1cf7fa26fbcba3c2eae5"
+          "decodedCompositeHash": "465122cecd12200e0dee6bdc812420a942f02a86c180ab35e4159e2311e9afa5"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "5acc16aa88f83357dcddfb149c118cd0f320c44a2c381556850a961ac9807954"
+          "decodedCompositeHash": "7500094a1b93a4f1a4445ab42d603750e02641dc352aa841df79ee457f5606e4"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "42dde35e1957a8d269cbe1f219b97992fad030a28276d5a6fe5deffea36be5e6"
+          "decodedCompositeHash": "fa4b2418e5fc30471ceb5fc98d06c62ac77d843b97dd850fe7b1c01d8ba6d2c1"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "39a25104f0a3fe7df2658835601b2bc41bd42a24f89b2a86085b763a70d9ebf8"
+          "decodedCompositeHash": "3faf141215487a134adda0df6a998ba3e1329ef2f8965b88931a3e9a77c88fec"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "f8e2309afb0f2a37aecbc1d434c9fd8d883f0015afe7f6566786918e6adc22a8"
+          "decodedCompositeHash": "3187f4a890381d5ccee6557872066d40048f49a26f8fb7f64d5f79505e9eaf61"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "77ca0742ebb1d203663a3f310e78e46402a16d67c9423e747fb4acfab35f2c80"
+          "decodedCompositeHash": "aaf992512117d5faadf218b73487560a15ca074a0fb812bb9fc42a12ff669da8"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "1676d140b650dfb575d5e347909397bab6ffba82197e67b64267b50583e45cc5"
+          "decodedCompositeHash": "370b27e153b201e97ff50fbca97a100595deb293772f7a74dee52a4d1ee0c1bf"
         }
       ]
     },
     {
       "key": "A11-S",
-      "masterSequence": "cf5770eed4a091971bca2c8b2b6345510b44397d7a6569511b4b494bd404bd39",
-      "firstMaster": "1539e9c3d766b5eebac0075d7b271fd18dee2416d399fa579273e66155507ce8",
-      "lastMaster": "efb99816746a8028feae595b2e7412a8be1e4984e46bf2a228ea5a14f19ad98a",
+      "masterSequence": "e6f37026b07c43cda130278c6bb43d028e8279c164087bbfb59aff45bfcfe190",
+      "firstMaster": "68a8a8b4f4ba6c86a37cb33d5c6376f84a921f5c71947953062e23a5bdce5a81",
+      "lastMaster": "665074f1712bcefd96f8c295062bf6153930929bec45f3778a6ad4895ba2cc1a",
       "posterPath": "S/A11_rest_sit_poster.webp",
       "posterDelta": {
-        "rms": 4.591,
-        "p99": 16
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#FFF8F1",
-        "channelThreshold": 24,
-        "changedPixels": [
-          540,
-          321,
-          33,
-          16,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "0d90a217f04640ae0ec1146511dfb6502b8cf9a2289a240ea18111c118db7957"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "62322bed4ceba191c63107642ecc7dc90dcdd20049b1e4038c925ab042cf3af3"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "68bd3fe1d678007b954ae9162c1ab96f4923155b9e1192d0ce6dfb164d604309"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "0dff66eb726eba568acc5eb5027058a07ff23ee5ab1b638c645b455089ff84fe"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "514bce926cbe3273c6680a4d06b5f7efc5ce3da604625afba3eaab252a7669ec"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "03b013baa0dd679fe8beab0d26bb95a67d7c6821115d21ec2caa5ce664f59f57"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "fdef2b5ca0926bd0cff33a5e38da99f471e8b414e9b9482abf0bb1478cec97ca"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "228c02bcba3dde38f2b8c7388f4f96666f75fa3fd44497d0a181a145e8464b99"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 5.358,
-        "worstP99": 21,
-        "worstSample": 0
-      },
-      "fullyClosedMs": 332,
-      "alphaBounds": [
-        28,
-        36,
-        143,
-        211
-      ],
-      "minimumMarginPx": 4,
-      "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1931,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "0ad0b2cc6137a50b503b103f57a8671a4da4bd1ed4c48e5e3c1fa91da686a514"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "e06b97daea9c3e87ce98eb2eee1113a1b17aa24a82ed05f2ede3c40bbb520d1e"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "704aa357e1b8afce2f67cca00724234aa7edccb038c61dc1334ace881ae51408"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "2daf83bdc3869def240f5f51e05341259841db287761e3b8ee046c6343800956"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "d8d06578f5ce4560492d17e1c6392bb8b75305e739a25612514edc64c3a6b81f"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "d451c22ea196ac8bafa97cf48fe52a19b87d8be628e1fbbed665f447ae526b7a"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "9191be90b794cabd273c02faff2ec4e1d72c0b793b4c62aee6314f1ea7c1adcd"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "3906ac460e88f4c472c740af5ed369bd54dff7cbd79aebb2d8ada4b7643df7a6"
-        }
-      ]
-    },
-    {
-      "key": "A15-M-light",
-      "masterSequence": "28d05309cbbdf7d68c484d5815603e189ab42dcadf0ef5cb7dad919a8cd2a2e9",
-      "firstMaster": "afa5908c176b6a5e7f1b94f70f5156e0e1e6d62e3277b8aed11aac25c3f5475b",
-      "lastMaster": "b0dbaa9250e955813176ed2aafc1bd267d2f90f811884bd15a228d27996db145",
-      "posterPath": "M/A15_juz_light_light_poster.webp",
-      "posterDelta": {
-        "rms": 3.77,
-        "p99": 14
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#FFF8F1",
-        "channelThreshold": 24,
-        "changedPixels": [
-          77,
-          46,
-          346,
-          5,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "3dc4f05fedca28a7c58dbc04682026f1335b38373ddf788054c2c641d43b0a4e"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "dfc41790eb267f143fc76befd5326ef6f049b8383e470dd0317da3a91dd0fcab"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "5b2202cd3dcfb26ee85a6afa36bad8e360b4df19b14742e66ca955bab27525cc"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "5b8725f680e7a981c70268dd24a4c55d1111d728deadb875b4caa69b3cff92cc"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "b9a1744f13fa700b95ae8d12c202fc288df71b7cc9a8316f6fc7577915dde249"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "ed68c83c83bd6b09f1f65672ce2fb467decd858bffbb065cb4d77a2475a941cc"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "cb9afdc4f47daa34a0ec360343874331365667311e41857516273bbf51d9fefb"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "7d9f97989ef8c73105d5b8155932119ad709834e485a950b99bdb545961fba17"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 3.287,
-        "worstP99": 12,
-        "worstSample": 50
-      },
-      "fullyClosedMs": 377,
-      "alphaBounds": [
-        55,
-        11,
-        252,
-        376
-      ],
-      "minimumMarginPx": 7,
-      "maxSlotPt": 128,
-      "conservativeFlashAreaPx": 5581,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "63224cbddcb9d5b59e81498a8cd641e814275bfffe1b7e94fa6d2c311e117add"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "f7d9a0c8c74677931b5d7557bb7579369e50767517de6806d35684202b94bba7"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "0c9941f5f80c7daf68cf03e6a92672e46d7a96cbf241aa71d2541c0c7866ed29"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "969ffd3d612f55c08a14c69ba5e6c89f1af2f1197b9649cb359dbd50d133def2"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "6b2c6d4142e130677a7c4f6942eb19908b61ac18c0cce26fb855a2ea8b5c5bef"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "194d9d7dce2935f4cd5d1c76820d6b65b6f77332029b6bc271e7de0201d40294"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "edf1d81c30bb027ea3d08807704e9d13e06a18b6e20890845404660b7b0f22b7"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "3aae6acc57f8b760f19caf949a7c273800d5784a51c39f4bb7bd7f5bd4d75628"
-        }
-      ]
-    },
-    {
-      "key": "A15-M-dark",
-      "masterSequence": "4dada47e06ccebca72364a2ce450d1e32e6ecd09768e5ffc24b60aba1e61b8cb",
-      "firstMaster": "8f2dee8df6964874214be6a372b4c30372aa172deb8a21859d517e89bbc01ff8",
-      "lastMaster": "47a2fe85d89fec6cbd557f9f63ab66b87191e79b71e5a684558f82c76e879455",
-      "posterPath": "M/A15_juz_light_dark_poster.webp",
-      "posterDelta": {
-        "rms": 3.794,
-        "p99": 14
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#000000",
-        "channelThreshold": 24,
-        "changedPixels": [
-          90,
-          56,
-          345,
-          5,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "1107dac976c5bdcaa5b39a470db6a3866828a300c8d283ddf5009c7a5719ca47"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "4ef703727d5dcab6c6a210caecaaf3d129f040606f98fd1cfb6f7a14c9d7f087"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "74ca76e75eacac697f44007955df31094b7c29a131c23ae4070239595460d9b2"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "ffdb3a8d805adbf38ef65db32ad3f57c36dd44982a1f3336228f91009ad1f7b5"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "a26f6be44ea6050fc268e2ad5870dbd33fbfa3f56749f7899ce69a4bc2970419"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "e3f077013f8b6a2f6bfd3ca04a9c493aae0b2be1aa4744ed0ecb29dc94744dc9"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "408f8baeb1a2e907826ee8a263165beeb9b6158f6ae3e479784a8ddcb4a30240"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "b36165a2ec1d28e06c5cbfe154f2bceb8c7a6a0ab114f1429509d91b26d79fe8"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 3.847,
-        "worstP99": 15,
-        "worstSample": 33
-      },
-      "fullyClosedMs": 377,
-      "alphaBounds": [
-        53,
-        11,
-        255,
-        375
-      ],
-      "minimumMarginPx": 8,
-      "maxSlotPt": 128,
-      "conservativeFlashAreaPx": 5890,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "fbbba413c3a4c2dec8414f465b180719e00b18d50918e583431755b46e21701c"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "cb6e33cfa99096d52d90e8e5220521d42fc5ea771745299800669fc26b5ed117"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "feb85a84524806ffb07d22a327692ac489f20276398b494e40781795bf546b1f"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "09fdbb8b7e48f1072f3f207a2a2592ea04d7b6cea7faeb8c1a75e05bd531e275"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "6ae9fbacf63ffde9e70aef6a71d35aa267029922b36d8f82a025eda9e602f36c"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "3b8206a9eda88b3f529389799a81f1a814a04928b62743976374e80e94249eb8"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "ed208c5643b412b621ea50bf5e61d0ac5b8e20fc9d901a442b24bf36b7d2e15a"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "f33fb79d0a645aabf89ade26fa05c0cdffd2bd74163f8d29bebc4514904b584c"
-        }
-      ]
-    },
-    {
-      "key": "A17-S",
-      "masterSequence": "f69ed01e745e752012cd78783cbc83994f8883b41cb4682f23668998e00e7757",
-      "firstMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
-      "lastMaster": "6dd0a109603549383b099381884eaa93e14be740de38a755e92eb9ca810ff888",
-      "posterPath": "S/A17_tap_hello_poster.webp",
-      "posterDelta": {
-        "rms": 3.833,
-        "p99": 13
-      },
-      "fiveSamplesVsPoster": {
-        "width": 45,
-        "height": 56,
-        "background": "#FFF8F1",
-        "channelThreshold": 24,
-        "changedPixels": [
-          0,
-          50,
-          48,
-          0,
-          0
-        ]
-      },
-      "posterSurfaces": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "c00f6a425f9c9f96cedb4adce4f7dad7b24a0f397f44703c76839591c1872a15"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "c1a4626ce7d8583ab9fe7a1e3508ab661beba9bcb092815420d7d9d87f02f9ed"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "3096c6b72fbd57e73b9d7b7b8f5cbf4f0b3524f99ef4a42dc7e229128b8bb376"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "dd3477831ab6b866dc32a41eb058374dc401d0ac67a201abf676e34e9917247a"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "ccf17498f059d7486e860412f1f1ce450cf6ebf6a4688ab986ad3bdca7de8b6c"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "ab6bc4f8e87b94a384189e28f19b0792a89555d90b7bb403e36fdfc4ef86aa08"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "6ffe8fe0ae5bbb53e2aa20f2275fb083f456e50f4cbfdd18622a74384d1bc7e8"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "e77c43902daa799df3157e027d8681bf929ae0d56a84dcd0834bf3d4f299d5a0"
-        }
-      ],
-      "encodedVsMaster": {
-        "worstRms": 4.538,
-        "worstP99": 17,
-        "worstSample": 10
-      },
-      "fullyClosedMs": 163,
-      "alphaBounds": [
-        30,
-        36,
-        141,
-        211
-      ],
-      "minimumMarginPx": 4,
-      "maxSlotPt": 72,
-      "conservativeFlashAreaPx": 1813,
-      "referenceAreaLimitPx": 21824,
-      "surfaceEvidence": [
-        {
-          "surface": "#FFF8F1",
-          "decodedCompositeHash": "b10cc9d9e8b6d936c95449a8401f3b6a76edd2d5585c659ebdd837c90a495357"
-        },
-        {
-          "surface": "#F9F3EB",
-          "decodedCompositeHash": "5ed3be24be325a5b21a63142053c23247ac9bfde7c681ebb1efa28c5f828d8e5"
-        },
-        {
-          "surface": "#FFFFFF",
-          "decodedCompositeHash": "95d3a50ae7c137844e3d3eb5cfd865b2f90af78a8baa9f2a50507ea69167e46e"
-        },
-        {
-          "surface": "#F8FAFC",
-          "decodedCompositeHash": "2f4a7180502e997666e25c11c10f5f614d5a5ced4ad560395ff8354e21ff8587"
-        },
-        {
-          "surface": "#0A0A0A",
-          "decodedCompositeHash": "7ed5eaaac4d639487ef99e5884255367a21c75b63e716604adf5f826caabba2e"
-        },
-        {
-          "surface": "#141414",
-          "decodedCompositeHash": "4287400c71dc46914eaf59eaae89138247b5366ff5a6ea6ed8170aff56c96a62"
-        },
-        {
-          "surface": "#000000",
-          "decodedCompositeHash": "33732cbc66a8f60c2ecf434648af652844117675f2546c20cd469e4847e7e2d2"
-        },
-        {
-          "surface": "#030303",
-          "decodedCompositeHash": "226698bd214e756c4c3a6e71a959ecdc0708b5cf91bd3efd3f87ac96e1cf41b1"
-        }
-      ]
-    },
-    {
-      "key": "A19-L",
-      "masterSequence": "bb0998083d7e0105345d0124cc850e2b611c258590bf6d91b2492db3d6f53907",
-      "firstMaster": "79420d21a0f853a7f9e95fa0c49bf857125db8b78b7924d8577869d6acbc6f73",
-      "lastMaster": "e1ad083377b1024aedabb14f9820a8e79ebb6ec55ade1a6193bb27d98e30ff33",
-      "posterPath": "L/A19_onboarding_hello_poster.webp",
-      "posterDelta": {
-        "rms": 2.99,
+        "rms": 3.354,
         "p99": 11
       },
       "fiveSamplesVsPoster": {
@@ -2243,95 +1888,532 @@
         "background": "#FFF8F1",
         "channelThreshold": 24,
         "changedPixels": [
-          703,
-          16,
-          38,
-          38,
+          436,
+          302,
+          32,
+          0,
           0
         ]
       },
       "posterSurfaces": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "bed161ebc678dbbde6ae176a6e42efcf6ee47b8ac4ac793e28ac19d9d067983e"
+          "decodedCompositeHash": "afd50bd919c0ddcf9d9f143d71e57e0b9deca5b43bc6990a6c52acd8b94c6d3b"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "82ba226ce8eaf050b4772338fe687c35e2fa1ced0808133028e3e79d4f5fb83e"
+          "decodedCompositeHash": "9639a4e0754140a6306fc74a7713af44a7298a7cd954c67601ab736fccc3fa5b"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "bc7fdf9dece73ad8e48d3c55f95910d5c91c981e761ac0943e2ab7f5dc8bbede"
+          "decodedCompositeHash": "dbf49e0c8e9f69a39a67a1f71c871f5848c44eb4fc784e16e004242021cb6a9d"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "0ecd36f0895cb2c69b1aaf2e4d3132ea62930cc7b7a6eba10979dfa1954ad158"
+          "decodedCompositeHash": "bfe0d1a8be3ede0eaf77076ffd5ba48a580174d52bfa7d8386551193a0c7bd72"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "a8fed3c5bdb401570791c3fa8fa3f20b626a6bb19de0da5317b1364b050eead6"
+          "decodedCompositeHash": "a9a0c3d1ff65f8b9cf24507bb4f70b48d41e28b1738a07a67d46744065df8f68"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "04a3ca51e2fe67d5f1376804b183125cfd91e780477f42f77e014029a1f62f83"
+          "decodedCompositeHash": "95a7bce0399d2154318b28e6715a35449138a8ae1972be85763515adc1797721"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "1c513cbf16b8d3000ed561be626f7315ccad32b80c991f980588d5e810b4c234"
+          "decodedCompositeHash": "078e493eddb2b74773d26f6d9153c797ef20308535e2e53b75f5aa3a977b6577"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "5eb42559110fedad8299973d68c4b38a1729a5b4dd2c38b0a1365bc44c53def9"
+          "decodedCompositeHash": "8e149bf666aa355046717a65e66f12ebbfe05690392db25165e6aec7c0b293bf"
         }
       ],
       "encodedVsMaster": {
-        "worstRms": 3.341,
-        "worstP99": 13,
-        "worstSample": 50
+        "worstRms": 4.126,
+        "worstP99": 17,
+        "worstSample": 25
       },
-      "fullyClosedMs": 503,
+      "fullyClosedMs": 332,
+      "outsideHoldPixels": 0,
       "alphaBounds": [
-        47,
-        11,
-        320,
-        469
+        28,
+        36,
+        143,
+        211
       ],
-      "minimumMarginPx": 10,
-      "maxSlotPt": 200,
-      "conservativeFlashAreaPx": 14659,
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1935,
       "referenceAreaLimitPx": 21824,
       "surfaceEvidence": [
         {
           "surface": "#FFF8F1",
-          "decodedCompositeHash": "fa89c1c98d6df5a5e7310bc532d50ee7d5aa89ac5279adb10394dc947c95a61f"
+          "decodedCompositeHash": "c1890cde0bd993a8dfc1ed1c37400b2635a02dca5ccd5117c7168e8dd0859b64"
         },
         {
           "surface": "#F9F3EB",
-          "decodedCompositeHash": "4b59009d0a4ee32a595e82ff9c331138fbe56ec4d25677df3ef82c0f5d2f67fe"
+          "decodedCompositeHash": "d5e11e08188a958ec8c2d620bda0ae82367922e30101d74522051f620dbaa541"
         },
         {
           "surface": "#FFFFFF",
-          "decodedCompositeHash": "21ea386270d7d60d8f9245d9f52827a7370a4459e218d56e2bf51297b8757ea9"
+          "decodedCompositeHash": "ec81505364c6db48353fdc3a0b90c80bddca360c3d5e728469633d047c198f29"
         },
         {
           "surface": "#F8FAFC",
-          "decodedCompositeHash": "2f6d1d0e7843534f5850de24402da2d2a5130be37c4e73d550dbc1cdc01235db"
+          "decodedCompositeHash": "55619b4337cc04d4c265e7ae3a68c69e0d63404af4c63924d0243be7d8135cd1"
         },
         {
           "surface": "#0A0A0A",
-          "decodedCompositeHash": "574ff8d2e2c8594cbceaf21206e0d33335b3eb83f061ce5a96e4f690b4ca8658"
+          "decodedCompositeHash": "d8d45950ce3e410a913dfc041681a23073ea5d627f9cc15354fe835f1d0fc1aa"
         },
         {
           "surface": "#141414",
-          "decodedCompositeHash": "096b70827094add27a34417568a351a3c7c66503b812e345ba35de5aa5bd19cf"
+          "decodedCompositeHash": "6b65e58e19cc492b15e7f6838923efddb8313210c62169762359143bb6258a80"
         },
         {
           "surface": "#000000",
-          "decodedCompositeHash": "b4232ab4e2fdbfe5c167eddb6e13094992405886d04615e66da41c3fca50b572"
+          "decodedCompositeHash": "113bd08f45278a176662bd3fe9c8fac26a421d1c3c622ea8b72e13de53ce0358"
         },
         {
           "surface": "#030303",
-          "decodedCompositeHash": "de59c04ee7e6bc510af0a3e8557c576f61bba871417fe78e18ec20d2bb6707ce"
+          "decodedCompositeHash": "e90535a087b764e7fd1c06d1ce9f33e824125ce91d2b14fce3d2141dca0a87b9"
+        }
+      ]
+    },
+    {
+      "key": "A15-M-light",
+      "masterSequence": "3fe4f52e3e352b5de6770694029e6e9ef12315376d4e2d5d8f342c2b2b866bab",
+      "firstMaster": "b402cf0e1859de4cecb5af75e483d35377baa6e288dd0d5e233837e063567c42",
+      "lastMaster": "7827ab4b17ed2f5c5ed8ed7e13c8e2052cf838c522411f809c569575efbe77f0",
+      "posterPath": "M/A15_juz_light_light_poster.webp",
+      "posterDelta": {
+        "rms": 3.07,
+        "p99": 11
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          233,
+          137,
+          361,
+          196,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "aec6a5368dc648e2490c344e3692f3c02a8878752d560fd4797336343329bf45"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "93e74b544bcfda3a253f9838b52fba5f67c9e693744873b82308b0cf1650dd65"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "b3bfd8ab574f83e85d73ac9ec417bc867baf661fb942d575971cae9215113f83"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "b96d76da2693fb851243e727979aae4e65044e604cf62461fda71c6bf5fb7bad"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "d65e9548143b1e504a99aa84f8a7193204ca92536cabef23827a4c83c0660f5f"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "89e99815c84c318ecce4966a8cb51e2deb03367db45f66af0d0db8ffe8b85b9d"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "c3a2c4d858848a14f1330c1c55e015bb749a3e5f40ed450639d98505f2daa1af"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "44bb76b463a7a6952ec726b1cb0f5b81dc3f6360b51964d154d20ff6ead322bc"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 2.857,
+        "worstP99": 11,
+        "worstSample": 24
+      },
+      "fullyClosedMs": 377,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        56,
+        8,
+        251,
+        375
+      ],
+      "minimumMarginPx": 8,
+      "maxSlotPt": 128,
+      "conservativeFlashAreaPx": 5248,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "338288973741ed6a5d90328edb65cc869b864b820f0826d6e4876b3cfb1a5bac"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "8a688b8a7b79f000d8a8ebb894c862a2305446faa7ddb6bcfdf05780f7a86817"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "44ce0626af6384f45deb05692777959cdbfe1c8cfbb8b252aab668e69edbac85"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "fdb73e39b9dbbeef5415392e5d1f9e856d504c1bd96b013b1eda400a651da9f6"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "609a14b563afd47aa120d26526529b4f8cf0200afa8e9cd07e678cbf0796044c"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "bbffca7383a933230bec43a0cda5a749e0a4a7e7def95f15a9b2be04ed8feee5"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "9007e9ca05f09955704ec5d6acb3b6b0446acb6170642d2413f350bcfe83e6f3"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "831e1df2e8f096e8e070f9bf60e3ef92ce23fca23442a5794ab42c4e76f7f903"
+        }
+      ]
+    },
+    {
+      "key": "A15-M-dark",
+      "masterSequence": "0c357f09a339f2865590785bcd0f4c166ba86f2beb2c8f838f4d78105a8c6625",
+      "firstMaster": "b402cf0e1859de4cecb5af75e483d35377baa6e288dd0d5e233837e063567c42",
+      "lastMaster": "7827ab4b17ed2f5c5ed8ed7e13c8e2052cf838c522411f809c569575efbe77f0",
+      "posterPath": "M/A15_juz_light_dark_poster.webp",
+      "posterDelta": {
+        "rms": 3.623,
+        "p99": 14
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#000000",
+        "channelThreshold": 24,
+        "changedPixels": [
+          236,
+          138,
+          372,
+          196,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "aec6a5368dc648e2490c344e3692f3c02a8878752d560fd4797336343329bf45"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "93e74b544bcfda3a253f9838b52fba5f67c9e693744873b82308b0cf1650dd65"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "b3bfd8ab574f83e85d73ac9ec417bc867baf661fb942d575971cae9215113f83"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "b96d76da2693fb851243e727979aae4e65044e604cf62461fda71c6bf5fb7bad"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "d65e9548143b1e504a99aa84f8a7193204ca92536cabef23827a4c83c0660f5f"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "89e99815c84c318ecce4966a8cb51e2deb03367db45f66af0d0db8ffe8b85b9d"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "c3a2c4d858848a14f1330c1c55e015bb749a3e5f40ed450639d98505f2daa1af"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "44bb76b463a7a6952ec726b1cb0f5b81dc3f6360b51964d154d20ff6ead322bc"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.535,
+        "worstP99": 14,
+        "worstSample": 55
+      },
+      "fullyClosedMs": 377,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        56,
+        8,
+        251,
+        375
+      ],
+      "minimumMarginPx": 8,
+      "maxSlotPt": 128,
+      "conservativeFlashAreaPx": 6163,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "b80dcccd8f93f4d77be7cd4c7d53eb889a68603d7507559e1f103178746c932e"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "f1eb78dc8d712c9fce0e63b46115414be371557b7f926f0b2ad35e75321afecd"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "997a76d279481ecc42e01bd59a1635b5b2eaf7c508c5c04f49e035a2677ce8bf"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "6444b2b8ea48c533b83b0a2c62ea5f4c5ba88102a64b31208ed97e0c4883a76a"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "ce233698a9f8d4dc35d5dc4ddfe64b7ecb05607d3d82732a24637ea9163034f0"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "0f46f515ab3d560ee7a21e0a78397dab4f1080044d5b5329a0b72a1450ee9060"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "b112ef499b3559252461cbbc78a1363ff4abd5733b88d81478437a822d395c3b"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "75d9c8a28d3ae94d879f21d23f2ffd5c0ee597833e2a6812db83396f414c64a2"
+        }
+      ]
+    },
+    {
+      "key": "A17-S",
+      "masterSequence": "a1dab96b39be2a82d77415443c4c40dac446fae4490438a679940cf1066a1a4d",
+      "firstMaster": "9188136cd88d5f8aa01450a00c5a804415ff9190a2223bc7c68dc45337fc7b2c",
+      "lastMaster": "9188136cd88d5f8aa01450a00c5a804415ff9190a2223bc7c68dc45337fc7b2c",
+      "posterPath": "S/A17_tap_hello_poster.webp",
+      "posterDelta": {
+        "rms": 3.053,
+        "p99": 11
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          0,
+          49,
+          49,
+          0,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "ca8fc9b04974aa76c2168cd34d60f5c950c237a40d6f804219d2d45ca7d90f75"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "851c9e0fe824ca892ed8e40ba0e28c3daad5269ffcf11df588dec879bf1cd914"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "20d494293a79e5d2abf8e51ff43ef8701b27616326bf7bf56a9133fae3460bd6"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "d2f8a40441c932e1d0c951f49fea1c70a704b56779085694b923a542b070a1d1"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "15eb9bbe6995b71eabef052f8063ec8d1d9ccba4b68af4941c7aac12bc7411a2"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "557e128bd4cbf3b70bbe7605ec79127e224085aa67d4fb9c411619fdc7c5bbb5"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "722acce8326cddc2995d87fa3f6a84980e0c2711ca600bdc240e7ce8f1ccbf34"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "8e456c6f8cf02ee55e85f249575779a4e76a0cfa98818105878ee95891962681"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.969,
+        "worstP99": 15,
+        "worstSample": 7
+      },
+      "fullyClosedMs": 163,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        30,
+        36,
+        141,
+        211
+      ],
+      "minimumMarginPx": 4,
+      "maxSlotPt": 72,
+      "conservativeFlashAreaPx": 1815,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "c0913b9ffc2dfcb4065fb412ff804b19b2c02ad603f1ca201a7d669c64745644"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "d54b779909b07e54fb218c689073362253288d053f469eaa7c59d9dd032cd828"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "c361b2aba8481ebd896a2d10e7bf9a556b03036bed2a7cf2d4e6f0a042684721"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "45c758d70e218ff91d7702c5c3c6df853e5144e53f1f83b459b79dd1800b122e"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "1b70260e17f5301e121d44e2e3b4c0e476321d466fc0780e0a10609a4046045d"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "c6efbd7492786b8fb63a60751931b8d74178859369fc7e076e88366f18ebb752"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "723ecc2e5f2df7f10add97c30fd4e635babf2a0724661629913023dcab84b363"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "4fee73b1380ff0a85fed0975450c69ad6c0c5917bdbe800bd73e35d30073f42b"
+        }
+      ]
+    },
+    {
+      "key": "A19-L",
+      "masterSequence": "a9ae155bbcc3d0bbbfa7265789879d2e9abee571fe4cdfc8402719adcd260b2e",
+      "firstMaster": "79420d21a0f853a7f9e95fa0c49bf857125db8b78b7924d8577869d6acbc6f73",
+      "lastMaster": "0918dd7312d5740d67769f7506d8dc3f23d9e87a720a8fd1819c0968da81b65c",
+      "posterPath": "L/A19_onboarding_hello_poster.webp",
+      "posterDelta": {
+        "rms": 2.666,
+        "p99": 10
+      },
+      "fiveSamplesVsPoster": {
+        "width": 45,
+        "height": 56,
+        "background": "#FFF8F1",
+        "channelThreshold": 24,
+        "changedPixels": [
+          705,
+          23,
+          35,
+          36,
+          0
+        ]
+      },
+      "posterSurfaces": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "fe7f945b4ebeb891fe8421115f6391e44138858ee8d4a3eebf13254a37d97245"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "6c442ce789029921a8c6c21e77df14965668740460f922e5e1f414052288324d"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "91caab6c31a70dea74afe881024619b41e064a27271d06856cb4a9e11f3b4d11"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "727372146dbd5c9ed408bac39adb970ee4d80296ea05750d4714214ff312f689"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "3af6ffe9964d6184674b9e5d0e670f46f9d06a43501f08b816033fc881c9322f"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "b71a6981a444bfe62da48477318689233fb8a275fe4b1520d04ed559bf07751d"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "a284a6bfdce79c05caa3c8a0a6ec3b93eb780b130807095c03b4c7aee635aaa7"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "2e5aae1519e44377d5733cd61b1df62131fc474d83e55e48373ddc9ce80b0d90"
+        }
+      ],
+      "encodedVsMaster": {
+        "worstRms": 3.166,
+        "worstP99": 13,
+        "worstSample": 13
+      },
+      "fullyClosedMs": 168,
+      "outsideHoldPixels": 0,
+      "alphaBounds": [
+        46,
+        7,
+        318,
+        469
+      ],
+      "minimumMarginPx": 7,
+      "maxSlotPt": 200,
+      "conservativeFlashAreaPx": 14632,
+      "referenceAreaLimitPx": 21824,
+      "surfaceEvidence": [
+        {
+          "surface": "#FFF8F1",
+          "decodedCompositeHash": "a723e839100c55d0904a91d9eb8cc9e4ba252aeec4125fa224d93cf10e94b8b7"
+        },
+        {
+          "surface": "#F9F3EB",
+          "decodedCompositeHash": "1f00fbc7f06af236faa265f17a75f60ea4da9e706db4112510f36a176f4c6127"
+        },
+        {
+          "surface": "#FFFFFF",
+          "decodedCompositeHash": "864ea7ded91c89285283aeffbdecd1646c2b44a068d6b48451f06d03b6705f2d"
+        },
+        {
+          "surface": "#F8FAFC",
+          "decodedCompositeHash": "42f020d3d6a5006504a2d030f80c96bc392e24709f02e679ca57a336081744c2"
+        },
+        {
+          "surface": "#0A0A0A",
+          "decodedCompositeHash": "b25ac115e42ffc2ad0bbfc6a72d9bdadb48118292f9eb01da70abf145d1093cf"
+        },
+        {
+          "surface": "#141414",
+          "decodedCompositeHash": "1982bff520da96f2b3e70eb5f31c39471d96f90afb0f3494c67ad9603610e186"
+        },
+        {
+          "surface": "#000000",
+          "decodedCompositeHash": "fbcc6c1355493b8d782510d24f59333e0e4293afc98b38d147331b19d9ce3f96"
+        },
+        {
+          "surface": "#030303",
+          "decodedCompositeHash": "585ce3d5dd523e4a2b9d93c49bacaf05a504698e4d69f7025c17f1fa3a25c260"
         }
       ]
     }
@@ -2339,7 +2421,7 @@
   "repro": {
     "key": "A06-S",
     "count": 38,
-    "first": "1040d0e71cdc64fcca3ebe2faaa47b5c5d949ced20270a9ba82da596383296cb",
-    "second": "1040d0e71cdc64fcca3ebe2faaa47b5c5d949ced20270a9ba82da596383296cb"
+    "first": "163824875694c49f82c3e55517c47c5fc394e95e6c61ec19f30c6c5194d955f7",
+    "second": "163824875694c49f82c3e55517c47c5fc394e95e6c61ec19f30c6c5194d955f7"
   }
 }

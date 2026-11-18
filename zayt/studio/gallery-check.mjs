@@ -59,8 +59,17 @@ try {
   assert.ok(!shots[0].equals(shots[1]));
   assert.ok(shots[2].equals(shots[3]));
   await page.click("#replay");
-  await page.waitForTimeout(840);
-  assert.ok(!(await image.screenshot()).equals(shots[3]));
+  const replayStart = Date.now(),
+    replayFrames = [];
+  await loaded();
+  for (const deadline of [300, 650, 1000, 1300]) {
+    await page.waitForTimeout(Math.max(0, replayStart + deadline - Date.now()));
+    replayFrames.push(await image.screenshot({ animations: "allow" }));
+  }
+  assert.ok(
+    replayFrames.some((frame) => !frame.equals(shots[3])),
+    "Replay never left the previous hold",
+  );
   await page.selectOption("#anim", "A02");
   await page.click("#replay");
   await loaded();

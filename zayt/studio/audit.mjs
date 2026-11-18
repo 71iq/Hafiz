@@ -199,7 +199,14 @@ for (const job of jobs) {
     if (pose.face.eyeOpen === 0) closed.push(n);
     assert.equal(pose.face.blush, 0.5);
     assert.equal(pose.face.browTilt, 0);
-    assert.equal(pose.arms[1], 29);
+    if (job.id === "A08") {
+      assert.equal(pose.arms[0], pose.arms[1]);
+      assert.ok(pose.arms[1] >= 29 && pose.arms[1] <= 39);
+    } else assert.equal(pose.arms[1], 29);
+    if (pose.sit === 1 || pose.glow >= 0.999 || pose.motes.some((value) => value > 0 && value < 1))
+      assert.equal(pose.face.eyeOpen, 1);
+    if (job.id === "A19" && pose.root[1] === 0) assert.equal(pose.face.eyeOpen, 1);
+    if (n === job.nominal_samples - 1) assert.equal(pose.halo, 0);
     assert.ok(pose.root[1] === 0 || job.id === "A19");
     checks(Math.abs(pose.height - 1) <= 0.080001, job.key + " height");
     if (job.id === "A07" || job.id === "A15")
@@ -210,6 +217,11 @@ for (const job of jobs) {
       sum + Math.round(((n + 1) * d.total) / job.nominal_samples) - Math.round((n * d.total) / job.nominal_samples),
     0,
   );
+  const holdPixels = await sharp(path.join(dir, "hold.png")).ensureAlpha().raw().toBuffer();
+  const lastPixels = d.frames.at(-1);
+  let outsideHoldPixels = 0;
+  for (let off = 3; off < holdPixels.length; off += 4) if (!holdPixels[off] && lastPixels[off]) outsideHoldPixels++;
+  assert.equal(outsideHoldPixels, 0, job.key + " exterior hold residue");
   checks(worstRms <= 6.5 && worstP99 <= 25, job.key + " decoded sample diverges from master");
   if (posterDelta)
     checks(posterDelta.rms <= 6 && posterDelta.p99 <= 20, job.key + " poster diverges from final sample");
@@ -226,6 +238,7 @@ for (const job of jobs) {
     posterSurfaces,
     encodedVsMaster: { worstRms, worstP99, worstSample },
     fullyClosedMs: closureMs,
+    outsideHoldPixels,
     ...compositeAudit(job, d),
   });
   console.log(job.key, worstRms, worstP99, posterDelta, audits.at(-1).conservativeFlashAreaPx);
@@ -256,11 +269,15 @@ assert.equal(repeated.masterSequence, repro.second);
 assert.equal(repro.first, repro.second);
 const report = {
   manifestVersion: manifest.version,
+  manifestSha256: sha(fs.readFileSync(new URL("./animations.json", import.meta.url))),
   tools,
   runtimeBytes: total,
   runtimeCap: manifest.budget_bytes.runtime_total,
   runtimeFits: total <= manifest.budget_bytes.runtime_total,
   overages,
+  encoderTrials: Object.fromEntries(
+    jobs.filter((job) => job.mode !== "still").map((job) => [job.key, read(cache, "trials", job.key + ".json")]),
+  ),
   files: rows,
   audits,
   repro,

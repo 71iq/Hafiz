@@ -47,7 +47,8 @@ export async function exactRects({ dir, frames, dest, quality, loops }) {
           old = previous?.[offset + 3] || 0;
         const changed = !previous
           ? alpha > 0
-          : Math.abs(alpha - old) > limit ||
+          : (old > 0 && alpha === 0) ||
+            Math.abs(alpha - old) > limit ||
             [0, 1, 2].some((ch) => Math.abs(data[offset + ch] * alpha - previous[offset + ch] * old) > 255 * limit);
         if (changed) {
           left = Math.min(left, col);

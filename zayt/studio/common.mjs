@@ -42,7 +42,9 @@ export const jobs = manifest.animations.flatMap((anim) =>
 export const pilot = ["A06-S", "A07-S-light", "A07-S-dark", "A04-S", "A15-M-light"];
 export const select = (keys) =>
   keys.flatMap((key) =>
-    key === "pilot" ? select(pilot) : jobs.filter((job) => [job.key, job.role === 'review' ? 'P2' : job.phase, job.id, "all"].includes(key)),
+    key === "pilot"
+      ? select(pilot)
+      : jobs.filter((job) => [job.key, job.role === "review" ? "P2" : job.phase, job.id, "all"].includes(key)),
   );
 export const frameDir = (job) => path.join(process.env.ZAYT_WORK || cache, "frames", job.key);
 export const nameFrame = (index) => String(index).padStart(3, "0") + ".png";
