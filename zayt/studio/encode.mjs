@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { out, bin, cache, select, mkdir, json, frameDir, nameFrame, manifest } from "./common.mjs";
 import { exactRects } from "./patch-codec.mjs";
 export function cap(job, still) {
+  if (job.role !== 'runtime') return null;
   return (
     manifest.budget_bytes[
       still ? (job.tier === "S" ? "still_or_poster_S" : "poster_" + job.tier) : "animated_" + job.tier

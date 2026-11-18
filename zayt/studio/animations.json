@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "spec": "zayt-spec.md v3, sections 5, 8 and 9",
+  "version": "3.1",
+  "spec": "zayt-spec.md v3.1, sections 5, 8 and 9",
   "fps": 24,
   "aspect_w_over_h": 0.8,
   "tiers": {
@@ -60,7 +60,7 @@
             "tier": "S",
             "kind": "still",
             "phase": "P0",
-            "note": "also A02 poster and Settings still"
+            "note": "sabaq intention, Settings still, and A02's poster"
           }
         ],
         "review": [
@@ -79,22 +79,22 @@
     {
       "id": "A02",
       "name": "idle_breathe",
-      "priority": "P0",
+      "priority": "P2",
       "mode": "loop",
       "seconds": 4.8,
       "directional": false,
-      "beats": "Breathe in 0-2.4 s (rise 2%, widen 1% near base, leaves sway 6-8 deg), out 2.4-4.8 s; one slow blink 3.2-3.55 s; last frame equals first; file loop count 2.",
+      "beats": "Review export only. Breathe in 0-2.4 s (rise 2%, widen 1% near base, leaves sway 6-8 deg), out 2.4-4.8 s; one slow blink 3.2-3.55 s; last frame equals first; file loop count 2.",
       "hold": "rest",
       "beat_sheet": "zayt-spec.md 8.5 A02",
       "exports": {
-        "runtime": [
+        "runtime": [],
+        "review": [
           {
             "tier": "S",
-            "phase": "P0",
+            "phase": "review",
             "loop_count": 2
           }
-        ],
-        "review": []
+        ]
       },
       "nominal_samples": 115
     },
@@ -105,7 +105,7 @@
       "mode": "once",
       "seconds": 1.8,
       "directional": false,
-      "beats": "Right arm (viewer's left) lifts clear of the shoulder line 0.2-0.6 s; one slow ~20 deg sway 0.6-1.3 s; lowers 1.3-1.6 s; settle.",
+      "beats": "Right arm (viewer's left) rises to ~60 deg above horizontal with a slight curve 0.2-0.6 s, passing through horizontal without holding; one slow sway between 40 and 70 deg 0.6-1.3 s; lowers 1.3-1.6 s; settle.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A04",
       "exports": {
@@ -126,7 +126,7 @@
       "mode": "once",
       "seconds": 1.6,
       "directional": false,
-      "beats": "One move: light band sweeps up feet to tip 0.2-1.0 s while the smile warms; one slow blink at 1.1 s. Smallest animation in the set.",
+      "beats": "One move: a band of light sweeps feet to tip 0.2-1.0 s, following the curve of the drop, feathered over >=40% of its height on each side, hue 46-50, half strength across the face; one slow blink at 1.1 s.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A06",
       "exports": {
@@ -151,7 +151,7 @@
       "mode": "once",
       "seconds": 3.0,
       "directional": false,
-      "beats": "Inner light rises base to tip 0.3-1.6 s (peak over >=0.4 s); dark render halo outside silhouette, light render none; no motes (S only); one slow blink at 1.6 s; face, blush and feet unchanged.",
+      "beats": "Inner light rises base to tip 0.3-1.6 s (peak over >=0.4 s), warming to #FFE9A8/#FFF3C8 at hue 44-48, never hue 60; dark render: visible amber halo 25-30% at the edge, zero within 10-12 px, peak to decay only; light render: none; no motes (S); one slow blink at ~2.3 s after the light starts to fall.",
       "hold": "warm_smile_glow_35",
       "beat_sheet": "zayt-spec.md 8.5 A07",
       "exports": {
@@ -178,7 +178,7 @@
       "mode": "once",
       "seconds": 2.0,
       "directional": false,
-      "beats": "One move: body swells 3% and settles in two wobbles while leaves lift and settle 0.2-1.2 s; one slow blink at 1.3 s. Also used for a made-up day.",
+      "beats": "Read in the leaves: large leaf lifts ~30 deg with one overshoot and two visible settles 0.2-1.2 s; body swells 3%; both arms rise ~10 deg with the swell; one slow blink at 1.3 s.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A08",
       "exports": {
@@ -199,7 +199,7 @@
       "mode": "once",
       "seconds": 2.0,
       "directional": false,
-      "beats": "Right arm to the chest 0-0.5 s; one slow blink (closed 0.4 s) 0.5-1.4 s with the smile kept; arm lowers 1.4-2.0 s. Brows never move; body never pitches forward.",
+      "beats": "Right arm tip comes to the centre line just under the mouth, higher than the shoulder, with a soft warm occlusion shadow 0-0.5 s; one slow blink (closed 0.4 s) 0.5-1.4 s; arm lowers 1.4-2.0 s. Never on the belly.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A10",
       "exports": {
@@ -224,7 +224,7 @@
       "mode": "once",
       "seconds": 2.2,
       "directional": false,
-      "beats": "Lowers and sits, feet slide forward 0-1.0 s; soft squash settles in two wobbles 1.0-1.6 s; one slow blink 1.4-2.2 s. No raised arms, no yawn.",
+      "beats": "Lowers and sits, feet slide forward 0-1.0 s; one slow blink during the descent 0.45-0.8 s; soft squash settles in two wobbles 1.0-1.6 s; every seated frame has open eyes.",
       "hold": "seated",
       "beat_sheet": "zayt-spec.md 8.5 A11",
       "exports": {
@@ -245,7 +245,7 @@
       "mode": "once",
       "seconds": 3.6,
       "directional": false,
-      "beats": "Inner light fills base to tip 0.3-1.8 s (peak over >=0.6 s); dark render halo, light render none; 5-7 round motes rise straight up from the tip and fade 1.0-3.0 s; one slow blink at 1.6 s; feet on the ground. Ceiling for every achievement.",
+      "beats": "Inner light fills base to tip 0.3-1.8 s (peak over >=0.6 s), hue 44-48; dark render visible amber halo; five soft single-colour motes (2-3 px core, ~6 px feather at M, no rim) rise straight up 1.0-3.0 s from above the leaves and fade by opacity only; one slow blink at ~3.0 s after the motes have gone.",
       "hold": "warm_smile_glow_35",
       "beat_sheet": "zayt-spec.md 8.5 A15",
       "exports": {
@@ -293,7 +293,7 @@
       "mode": "once",
       "seconds": 2.6,
       "directional": false,
-      "beats": "Review export only. Fade in 18% above rest with eyes closed 0-0.2 s; drop into place 0-0.45 s; landing squash 0.45-0.55 s; one wobble 0.55-0.75 s, eyes open at 0.5 s; A04 wave compressed into 0.75-2.35 s; settle 2.35-2.6 s.",
+      "beats": "Review export only. Fade in 0-0.08 s 18% above rest; gravity-eased fall 0-0.3 s with 5% stretch, eyes open at ~0.2 s; landing squash 0.3-0.42 s; two wobbles 0.42-0.75 s; A04 wave 0.75-2.35 s; settle 2.35-2.6 s.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A19",
       "exports": {
@@ -331,5 +331,13 @@
     "once": 1,
     "A02": 2
   },
-  "file_naming": "zayt/animations/<tier>/<id>_<name>[_light|_dark].webp and ..._poster.webp"
+  "file_naming": "zayt/animations/<tier>/<id>_<name>[_light|_dark].webp and ..._poster.webp",
+  "global_render_rules": [
+    "rest centre near value 88; flanks value >=80 and saturation >=88; darkest gold only in the last 4-6% of the silhouette; no inner contour line",
+    "arms blend into the body at the shoulder with a soft highlight; feet chunky and rounded with height, no inner ring; key highlight soft at its lower end; warm caustic",
+    "no contact shadow in any file, including the light glow variants",
+    "glow hue stays 44-48; never hue 60",
+    "hold frames: every pixel outside the silhouette exactly transparent",
+    "closed eyes never coincide with the light peak, rising motes or a seated pose"
+  ]
 }

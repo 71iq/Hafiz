@@ -8,7 +8,7 @@ const jobs = select(process.argv.slice(2));
 if (!jobs.length) throw Error("Specify pilot, P0, P1, P2, all or ID-tier[-variant]");
 await camera(async (capture) => {
   for (const job of jobs) {
-    const level = Number(process.env.ZAYT_LEVEL || (job.variant === "dark" ? 3 : job.id === "A02" ? 2 : 1)),
+    const level = Number(process.env.ZAYT_LEVEL || 1),
       dir = frameDir(job),
       masters = path.join(process.env.ZAYT_WORK || cache, "masters", job.key),
       count = job.nominal_samples || 1;
