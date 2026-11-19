@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.4": {
+    en: [
+      "Zayt, a drop of olive oil, now marks the end of a session with a short, calm animation.",
+      "Zayt waves when you return after a week away and lights up when you complete a juz. Turn it off in Settings, under Wird.",
+      "Without a photo, your profile shows the first letter of your name instead of Zayt.",
+    ],
+    ar: [
+      "يختم زيت، قطرة زيت الزيتون، الجلسة الآن بحركة قصيرة هادئة.",
+      "يلوّح زيت حين تعود بعد غياب أسبوع، ويضيء حين تُتمّ جزءًا. يمكنك إخفاؤه من الإعدادات، في قسم الوِرد.",
+      "إن لم تكن لديك صورة، يعرض ملفك الحرف الأول من اسمك بدل زيت.",
+    ],
+  },
   "1.0.3": {
     en: [
       "Updates now download and install inside the app, and can download on their own over Wi-Fi.",
