@@ -4,6 +4,7 @@ import { CalendarCheck2, Coffee, HeartHandshake, Sparkles, Target } from "lucide
 import { Card } from "@/components/ui/Card";
 import { ZaytAnimation } from "@/components/habit/ZaytAnimation";
 import { ReminderPromptCard, useReminderOffer } from "@/components/notifications/ReminderPromptCard";
+import { WidgetOfferCard, useWidgetOffer } from "@/components/habit/WidgetOfferCard";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import type { AppDatabase } from "@/lib/database/types";
@@ -78,17 +79,21 @@ export function useCommitmentLabel(db: AppDatabase, s: UIStrings, language: "en"
     : interpolate(s.habitCommitTomorrowAt, { time: formatClockMinutesForDisplay(anchor.minutes, language) });
 }
 
-type CardKind = "goal" | "rest" | "struggle" | "reminders";
+type CardKind = "goal" | "rest" | "struggle" | "reminders" | "widget";
+
+/** WIDGET-08: the widget offer comes only after a session that kept a streak of at least this many days. */
+const WIDGET_OFFER_MIN_STREAK = 3;
 
 /**
  * SES-01: at most one prompt card after the streak card, so a summary never shows more than 3. Rest
  * and encouragement come first because they answer how the session went; the reminder offer (ONB-02)
- * comes before the streak goal.
+ * and then the one-time widget offer (WIDGET-08) come before the streak goal.
  */
-function promptCard(input: SessionHabitInput, reminderOffer: boolean): CardKind | null {
+export function promptCard(input: SessionHabitInput, reminderOffer: boolean, widgetOffer: boolean): CardKind | null {
   if (input.durationMs >= REST_SUGGESTION_MS) return "rest";
   if (input.againCount >= 3 && input.total > 0 && input.againCount / input.total >= 0.3) return "struggle";
   if (reminderOffer) return "reminders";
+  if (widgetOffer && input.event && input.event.length >= WIDGET_OFFER_MIN_STREAK) return "widget";
   if (input.event && input.overview && !input.overview.goal && input.overview.streak.length >= 1) return "goal";
   return null;
 }
@@ -97,10 +102,10 @@ function promptCard(input: SessionHabitInput, reminderOffer: boolean): CardKind 
  * 5.11: Zayt's animation at the session end, calm in every case (ZAY-01). The first match wins:
  * rest, a hard session, a streak milestone, a streak earned back or a day made up, then today's
  * minimum. Rest and a hard session put Zayt in their prompt card; the rest put it in the streak card.
- * The reminder offer and the goal never hold Zayt, so the choice does not depend on them.
+ * The reminder offer, the widget offer and the goal never hold Zayt, so the choice does not depend on them.
  */
 export function sessionZayt(input: SessionHabitInput): Readonly<{ animation: ZaytSmallAnimation; card: "streak" | "rest" | "struggle" }> | null {
-  const prompt = promptCard(input, false);
+  const prompt = promptCard(input, false, false);
   if (prompt === "rest") return { animation: "A11", card: "rest" };
   if (prompt === "struggle") return { animation: "A10", card: "struggle" };
   if (!input.event) return null;
@@ -141,7 +146,8 @@ export function SessionHabitCards({
   const [goalChoice, setGoalChoice] = useState<number | null>(null);
   const [goalDismissed, setGoalDismissed] = useState(false);
   const reminderAnchor = useReminderOffer(db);
-  const prompt = promptCard(input, reminderAnchor !== null);
+  const widgetOffer = useWidgetOffer(db);
+  const prompt = promptCard(input, reminderAnchor !== null, widgetOffer);
   const length = input.event?.length ?? 0;
   const milestone = input.event !== null && isStreakMilestone(length);
   // ZAY-02: no Zayt until the setting is known to be on.
@@ -248,6 +254,8 @@ export function SessionHabitCards({
       {prompt === "reminders" && reminderAnchor ? (
         <ReminderPromptCard db={db} anchor={reminderAnchor} language={language} isDark={isDark} s={s} />
       ) : null}
+
+      {prompt === "widget" ? <WidgetOfferCard db={db} language={language} isDark={isDark} s={s} /> : null}
 
       {prompt === "rest" ? (
         <Card elevation="low" className="px-5 py-4">

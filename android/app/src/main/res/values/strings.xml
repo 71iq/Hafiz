@@ -1,4 +1,14 @@
 <resources>
   <string name="app_name">Hafiz</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
+  <!-- Home-screen widget. The picker shows these in the system language. -->
+  <string name="hafiz_widget_small_label">Hafiz streak</string>
+  <string name="hafiz_widget_medium_label">Hafiz wird</string>
+  <string name="hafiz_widget_small_description">Your wird streak and whether today is done.</string>
+  <string name="hafiz_widget_medium_description">Your streak, today\'s wird and plan, with Zayt.</string>
+  <string name="hafiz_widget_open_app">Open Hafiz to see today\'s wird</string>
+  <string name="hafiz_widget_open_app_description">Hafiz. Open Hafiz to see today\'s wird.</string>
+  <string name="hafiz_widget_preview_count">7</string>
+  <string name="hafiz_widget_preview_caption">day streak</string>
+  <string name="hafiz_widget_preview_headline">Wird done for today</string>
 </resources>

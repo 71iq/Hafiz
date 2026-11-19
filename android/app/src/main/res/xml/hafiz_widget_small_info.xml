@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Hafiz streak": the streak and whether today is done. Rendered by widget/WidgetRenderer.kt. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:maxResizeWidth="400dp"
+    android:maxResizeHeight="110dp"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="3600000"
+    android:initialLayout="@layout/hafiz_widget_message"
+    android:previewLayout="@layout/hafiz_widget_preview_small"
+    android:previewImage="@drawable/hafiz_widget_preview_small"
+    android:description="@string/hafiz_widget_small_description"
+    android:widgetCategory="home_screen"/>

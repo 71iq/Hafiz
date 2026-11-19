@@ -1,1 +1,8 @@
-<resources/>
+<resources>
+  <!-- Home-screen widget, Dark palette (lib/widget/palette.ts). Used for the app's System theme. -->
+  <color name="hafiz_widget_surface">#141414</color>
+  <color name="hafiz_widget_text_primary">#F5F5F5</color>
+  <color name="hafiz_widget_text_secondary">#A3A3A3</color>
+  <color name="hafiz_widget_accent">#2DD4BF</color>
+  <color name="hafiz_widget_accent_text">#2DD4BF</color>
+</resources>

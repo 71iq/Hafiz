@@ -587,6 +587,20 @@ export async function getDeckTodayStats(
   };
 }
 
+/**
+ * Ayah reviews due today across the ayah decks, without new cards: the same sum Home computes as
+ * ayahReviewsDue for ayah review's daily work (UNIT-02).
+ */
+export async function getAyahReviewsDueToday(db: AppDatabase): Promise<number> {
+  const counts = await Promise.all(
+    Object.values(SMART_DECK_IDS).map(async (deckId) => {
+      const stats = await getDeckTodayStats(db, deckId, await readDeckReviewSettings(db, deckId));
+      return stats.dueCount;
+    }),
+  );
+  return counts.reduce((sum, count) => sum + count, 0);
+}
+
 export async function getTotalCardCount(db: AppDatabase, deckId?: string): Promise<number> {
   if (isSmartDeckId(deckId)) {
     return (await getSmartDeckStats(db, deckId)).total;

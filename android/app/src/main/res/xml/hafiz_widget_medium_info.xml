@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Hafiz wird": the streak, today's wird and plan, with Zayt. Rendered by widget/WidgetRenderer.kt. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:minResizeWidth="250dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeWidth="560dp"
+    android:maxResizeHeight="300dp"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="3600000"
+    android:initialLayout="@layout/hafiz_widget_message"
+    android:previewLayout="@layout/hafiz_widget_preview_medium"
+    android:previewImage="@drawable/hafiz_widget_preview_medium"
+    android:description="@string/hafiz_widget_medium_description"
+    android:widgetCategory="home_screen"/>

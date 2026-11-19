@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- White, tinted to the widget surface by the layout or by the renderer's color filter. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#FFFFFFFF"/>
+  <corners android:radius="@dimen/hafiz_widget_radius"/>
+</shape>

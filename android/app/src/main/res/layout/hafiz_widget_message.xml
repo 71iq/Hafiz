@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The first and neutral state: no numbers, only a prompt to open Hafiz. -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layoutDirection="locale">
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/hafiz_widget_bg"
+        android:scaleType="fitXY"
+        android:tint="@color/hafiz_widget_surface"
+        android:importantForAccessibility="no"/>
+    <LinearLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:importantForAccessibility="noHideDescendants">
+        <ImageView
+            android:id="@+id/widget_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@mipmap/ic_launcher_round"
+            android:importantForAccessibility="no"/>
+        <TextView
+            android:id="@+id/widget_headline"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="13sp"
+            android:textColor="@color/hafiz_widget_text_primary"
+            android:textAlignment="viewStart"
+            android:breakStrategy="high_quality"
+            android:hyphenationFrequency="none"
+            android:ellipsize="end"
+            android:lineSpacingExtra="2dp"
+            android:maxLines="3"
+            android:text="@string/hafiz_widget_open_app"/>
+    </LinearLayout>
+</FrameLayout>

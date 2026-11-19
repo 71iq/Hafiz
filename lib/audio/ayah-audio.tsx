@@ -11,7 +11,7 @@ import type { DatabaseExecutor } from "@/lib/database/types";
 import { useDatabase } from "@/lib/database/provider";
 import { useAuthStore } from "@/lib/auth/store";
 import { isDefinitelyOffline } from "@/lib/audio/connectivity";
-import { formatAudioReference, type SurahNames } from "@/lib/audio/labels";
+import { formatAudioReference, type AudioFailure, type SurahNames } from "@/lib/audio/labels";
 import {
   readCachedAyahAudio,
   writeCachedAyahAudio,
@@ -31,7 +31,7 @@ export type AyahAudioTarget = {
 };
 
 /** Why a recitation could not play: no connection, no file for this ayah/reciter, or the player failed. */
-export type AudioFailure = "offline" | "unavailable" | "playback";
+export type { AudioFailure } from "@/lib/audio/labels";
 
 export type AudioSessionKind = "single" | "range" | "preview";
 export type AudioSessionStatus = "loading" | "playing" | "paused" | "error";

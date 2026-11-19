@@ -19,6 +19,8 @@ import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 import { SettingsProvider } from "@/lib/settings/context";
 import { loadUiBootstrap } from "@/lib/settings/ui-bootstrap";
 import { useReminderResponses, useReminderScheduling } from "@/lib/notifications/use-reminder-scheduling";
+import { useWidgetPublishing } from "@/lib/widget/use-widget-publishing";
+import { useWidgetTaps } from "@/lib/widget/tap";
 import { useBoardBandRefresh } from "@/lib/board/refresh";
 import { useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
 import { ErrorBoundary as ScopedErrorBoundary, RouteErrorFallback } from "@/components/ui/ErrorBoundary";
@@ -96,6 +98,13 @@ function StableDocumentTitle() {
 function ReminderLifecycle() {
   useReminderScheduling();
   useReminderResponses();
+  return null;
+}
+
+/** Android home-screen widget: publishes the timeline and routes widget taps. Web and iOS do nothing. */
+function WidgetLifecycle() {
+  useWidgetPublishing();
+  useWidgetTaps();
   return null;
 }
 
@@ -178,6 +187,7 @@ export default function RootLayout() {
                 {/* Android system button contrast follows the resolved theme; web and iOS render nothing. */}
                 <NavigationBarTheme />
                 <ReminderLifecycle />
+                <WidgetLifecycle />
                 <BoardBandRefresh />
                 <MinorPhotoCleanup />
                 <AuthRedirectReturn />

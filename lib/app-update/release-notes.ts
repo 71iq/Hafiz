@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.5": {
+    en: [
+      "Add the Hafiz widget to your Android home screen to see your streak and today's wird.",
+      "The widget follows your language, theme and Show Zayt, and keeps up with the day without opening Hafiz.",
+      "Turn off Show numbers on the widget in Settings to keep your streak private.",
+    ],
+    ar: [
+      "أضف أداة حافظ إلى شاشتك الرئيسية في أندرويد لترى سلسلتك ووِرد اليوم.",
+      "تتبع الأداة لغتك ومظهرك وإعداد إظهار زيت، وتواكب يومك دون فتح حافظ.",
+      "أوقف «إظهار الأرقام في الأداة» من الإعدادات لتبقى سلسلتك خاصة.",
+    ],
+  },
   "1.0.4": {
     en: [
       "Zayt, a drop of olive oil, now marks the end of a session with a short, calm animation.",

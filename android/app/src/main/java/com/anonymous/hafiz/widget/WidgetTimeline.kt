@@ -1,0 +1,267 @@
+package com.anonymous.hafiz.widget
+
+import android.util.JsonReader
+import android.util.JsonToken
+import java.io.StringReader
+import java.math.BigDecimal
+import java.util.TimeZone
+
+/**
+ * The widget timeline contract, mirroring lib/widget/types.ts and lib/widget/schema.ts (spec 7). Both
+ * sides enforce the same rules, so a timeline JavaScript accepts is one this parser accepts. A new
+ * field needs a version bump on both sides.
+ */
+data class WidgetColors(
+  val surface: Int,
+  val textPrimary: Int,
+  val textSecondary: Int,
+  val accent: Int,
+  val accentText: Int,
+)
+
+data class WidgetEntry(
+  val startsAt: Long,
+  val state: String,
+  val marker: String,
+  val count: String?,
+  val countCaption: String?,
+  val headline: String,
+  val detail: String?,
+  val note: String?,
+  val image: String?,
+  val contentDescription: String,
+  val tap: String,
+)
+
+data class WidgetTimeline(
+  val generatedAt: Long,
+  val expiresAt: Long,
+  val timeZone: String,
+  val language: String,
+  val rtl: Boolean,
+  /** Null for the app's System theme: the layouts' resource colors then follow the launcher. */
+  val colors: WidgetColors?,
+  val entries: List<WidgetEntry>,
+)
+
+/** A reason code only, never content from the timeline. */
+class InvalidTimelineException(val reason: String) : Exception(reason)
+
+object WidgetLimits {
+  const val VERSION = 1
+  const val MAX_ENTRIES = 64
+  const val MAX_BYTES = 65_536
+  const val MAX_SPAN_MS = 7L * 86_400_000L + 2L * 3_600_000L
+  const val MIN_INSTANT = 1_577_836_800_000L
+  const val MAX_INSTANT = 4_102_444_800_000L
+  val STATES = setOf(
+    "begin", "fresh_start", "open_day", "open_evening", "make_up", "earn_back_open",
+    "earn_back_done", "done", "safe", "milestone", "kept", "paused",
+  )
+  val MARKERS = setOf("begin", "open", "done", "kept", "paused")
+  val IMAGES = setOf("rest", "warm", "glow", "sit")
+  val TAPS = setOf("wird", "home")
+}
+
+object WidgetTimelineParser {
+  private val TOP_KEYS = setOf("version", "generatedAt", "expiresAt", "timeZone", "language", "direction", "colorMode", "colors", "entries")
+  private val ENTRY_KEYS = setOf(
+    "startsAt", "state", "marker", "count", "countCaption", "headline", "detail", "note", "image", "contentDescription", "tap",
+  )
+  private val COLOR_KEYS = setOf("surface", "textPrimary", "textSecondary", "accent", "accentText")
+  private val COLOR = Regex("^#[0-9A-F]{6}$")
+  private val TIME_ZONE = Regex("^[A-Za-z0-9_+\\-/:]+$")
+
+  /** Rules 7.4. Throws InvalidTimelineException with a reason code. */
+  fun parse(json: String): WidgetTimeline {
+    // Rule 10.
+    if (json.toByteArray(Charsets.UTF_8).size > WidgetLimits.MAX_BYTES) fail("size")
+    val root = readJson(json) as? Map<*, *> ?: fail("shape")
+    exactKeys(root, TOP_KEYS, "keys")
+
+    // Rule 1.
+    if (integer(root["version"], "version") != WidgetLimits.VERSION.toLong()) fail("version")
+    // Rule 2.
+    val generatedAt = instant(root["generatedAt"])
+    val expiresAt = instant(root["expiresAt"])
+    // Rule 4.
+    val timeZone = root["timeZone"] as? String ?: fail("zone")
+    if (timeZone.isEmpty() || timeZone.length > 64 || !TIME_ZONE.matches(timeZone)) fail("zone")
+    // Rule 5.
+    val language = root["language"] as? String ?: fail("language")
+    if (language != "en" && language != "ar") fail("language")
+    val direction = root["direction"] as? String ?: fail("direction")
+    if (direction != (if (language == "ar") "rtl" else "ltr")) fail("direction")
+    // Rule 6.
+    val colorMode = root["colorMode"] as? String ?: fail("colorMode")
+    if (colorMode != "fixed" && colorMode != "system") fail("colorMode")
+    val colorsValue = root["colors"]
+    val colors = if (colorMode == "fixed") {
+      parseColors(colorsValue as? Map<*, *> ?: fail("colors"))
+    } else {
+      if (colorsValue != null) fail("colors")
+      null
+    }
+    // Rules 3, 7, 8 and 9.
+    val list = root["entries"] as? List<*> ?: fail("entries")
+    if (list.isEmpty() || list.size > WidgetLimits.MAX_ENTRIES) fail("entries")
+    val entries = list.map { parseEntry(it as? Map<*, *> ?: fail("entry")) }
+    if (entries[0].startsAt != generatedAt) fail("first")
+    for (index in 1 until entries.size) {
+      if (entries[index].startsAt <= entries[index - 1].startsAt) fail("order")
+    }
+    if (expiresAt <= entries.last().startsAt) fail("expiry")
+    if (expiresAt - generatedAt > WidgetLimits.MAX_SPAN_MS) fail("span")
+
+    return WidgetTimeline(generatedAt, expiresAt, timeZone, language, language == "ar", colors, entries)
+  }
+
+  private fun parseColors(map: Map<*, *>): WidgetColors {
+    exactKeys(map, COLOR_KEYS, "colors")
+    fun color(key: String): Int {
+      val value = map[key] as? String ?: fail("colors")
+      if (!COLOR.matches(value)) fail("colors")
+      return (0xFF000000L or value.substring(1).toLong(16)).toInt()
+    }
+    return WidgetColors(color("surface"), color("textPrimary"), color("textSecondary"), color("accent"), color("accentText"))
+  }
+
+  private fun parseEntry(map: Map<*, *>): WidgetEntry {
+    exactKeys(map, ENTRY_KEYS, "entryKeys")
+    val state = enumValue(map["state"], WidgetLimits.STATES, "state")
+    val marker = enumValue(map["marker"], WidgetLimits.MARKERS, "marker")
+    val image = if (map["image"] == null) null else enumValue(map["image"], WidgetLimits.IMAGES, "image")
+    val tap = enumValue(map["tap"], WidgetLimits.TAPS, "tap")
+    val count = text(map["count"], 12, nullable = true, reason = "count")
+    val caption = text(map["countCaption"], 24, nullable = true, reason = "caption")
+    if ((count == null) != (caption == null)) fail("caption")
+    return WidgetEntry(
+      startsAt = instant(map["startsAt"]),
+      state = state,
+      marker = marker,
+      count = count,
+      countCaption = caption,
+      headline = text(map["headline"], 48, nullable = false, reason = "headline")!!,
+      detail = text(map["detail"], 120, nullable = true, reason = "detail"),
+      note = text(map["note"], 80, nullable = true, reason = "note"),
+      image = image,
+      contentDescription = text(map["contentDescription"], 400, nullable = false, reason = "description")!!,
+      tap = tap,
+    )
+  }
+
+  private fun exactKeys(map: Map<*, *>, keys: Set<String>, reason: String) {
+    if (map.keys != keys) fail(reason)
+  }
+
+  private fun enumValue(value: Any?, allowed: Set<String>, reason: String): String {
+    val text = value as? String ?: fail(reason)
+    if (text !in allowed) fail(reason)
+    return text
+  }
+
+  /** Rules 8 and 9: lengths in UTF-16 units, as JavaScript counts them, and no control characters. */
+  private fun text(value: Any?, max: Int, nullable: Boolean, reason: String): String? {
+    if (value == null) {
+      if (nullable) return null
+      fail(reason)
+    }
+    val text = value as? String ?: fail(reason)
+    if (text.isEmpty() || text.length > max) fail(reason)
+    if (text.any { it.code <= 0x1F || it.code == 0x7F }) fail("control")
+    return text
+  }
+
+  /** A JSON number with an integer value, as zod's int() accepts it (1, 1.0 or 1e3). */
+  private fun integer(value: Any?, reason: String): Long {
+    val number = value as? BigDecimal ?: fail(reason)
+    return try {
+      number.stripTrailingZeros().let { if (it.scale() > 0) fail(reason) else it.longValueExact() }
+    } catch (_: ArithmeticException) {
+      fail(reason)
+    }
+  }
+
+  private fun instant(value: Any?): Long {
+    val instant = integer(value, "instant")
+    if (instant < WidgetLimits.MIN_INSTANT || instant > WidgetLimits.MAX_INSTANT) fail("instant")
+    return instant
+  }
+
+  /** Strict JSON (RFC 8259) into maps, lists, strings, numbers, booleans and null. */
+  private fun readJson(json: String): Any? {
+    try {
+      JsonReader(StringReader(json)).use { reader ->
+        reader.isLenient = false
+        val value = readValue(reader, 0)
+        if (reader.peek() != JsonToken.END_DOCUMENT) fail("syntax")
+        return value
+      }
+    } catch (error: InvalidTimelineException) {
+      throw error
+    } catch (_: Exception) {
+      fail("syntax")
+    }
+  }
+
+  private fun readValue(reader: JsonReader, depth: Int): Any? {
+    if (depth > 8) fail("depth")
+    return when (reader.peek()) {
+      JsonToken.BEGIN_OBJECT -> {
+        val map = LinkedHashMap<String, Any?>()
+        reader.beginObject()
+        while (reader.hasNext()) map[reader.nextName()] = readValue(reader, depth + 1)
+        reader.endObject()
+        map
+      }
+      JsonToken.BEGIN_ARRAY -> {
+        val list = ArrayList<Any?>()
+        reader.beginArray()
+        while (reader.hasNext()) list.add(readValue(reader, depth + 1))
+        reader.endArray()
+        list
+      }
+      JsonToken.STRING -> reader.nextString()
+      JsonToken.NUMBER -> BigDecimal(reader.nextString())
+      JsonToken.BOOLEAN -> reader.nextBoolean()
+      JsonToken.NULL -> {
+        reader.nextNull()
+        null
+      }
+      else -> fail("syntax")
+    }
+  }
+
+  private fun fail(reason: String): Nothing = throw InvalidTimelineException(reason)
+}
+
+sealed class WidgetSelection {
+  data class Entry(val entry: WidgetEntry, val nextBoundary: Long) : WidgetSelection()
+  data class Neutral(val reason: String) : WidgetSelection()
+}
+
+/** Rules 7.5, matching selectWidgetEntry in lib/widget/timeline.ts. */
+object WidgetSelector {
+  private val OFFSET_ZONE = Regex("^UTC([+-])(\\d{2}):(\\d{2})$")
+
+  fun select(timeline: WidgetTimeline, nowMs: Long, zone: TimeZone): WidgetSelection {
+    if (!zoneMatches(timeline.timeZone, zone, nowMs)) return WidgetSelection.Neutral("zone")
+    val entries = timeline.entries
+    if (nowMs < entries[0].startsAt) return WidgetSelection.Neutral("early")
+    if (nowMs >= timeline.expiresAt) return WidgetSelection.Neutral("expired")
+    var index = 0
+    while (index + 1 < entries.size && entries[index + 1].startsAt <= nowMs) index += 1
+    val next = if (index + 1 < entries.size) entries[index + 1].startsAt else timeline.expiresAt
+    return WidgetSelection.Entry(entries[index], next)
+  }
+
+  fun zoneMatches(id: String, device: TimeZone, nowMs: Long): Boolean {
+    if (id == device.id) return true
+    val named = TimeZone.getTimeZone(id)
+    if (named.id == id && named.hasSameRules(device)) return true
+    val match = OFFSET_ZONE.matchEntire(id) ?: return false
+    val (sign, hours, minutes) = match.destructured
+    val offsetMinutes = (hours.toInt() * 60 + minutes.toInt()) * (if (sign == "-") -1 else 1)
+    return offsetMinutes * 60_000 == device.getOffset(nowMs)
+  }
+}

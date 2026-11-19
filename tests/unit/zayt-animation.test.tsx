@@ -21,6 +21,7 @@ jest.mock("@/components/notifications/ReminderPromptCard", () => ({
   ReminderPromptCard: () => null,
   useReminderOffer: () => null,
 }));
+jest.mock("@/components/habit/WidgetOfferCard", () => ({ WidgetOfferCard: () => null, useWidgetOffer: () => false }));
 
 // React Native's Jest View mock shares these instance methods, so this sets where every View sits.
 const measureInWindow = jest.requireActual<{ default: { measureInWindow: jest.Mock } }>("react-native/jest/MockNativeMethods")

@@ -82,7 +82,7 @@ def check(root):
         require(bool(list(resources.glob("mipmap-*/" + icon + ".*"))), "Missing native icon resource: " + icon)
     plugin_names = [plugin[0] if isinstance(plugin, list) else plugin for plugin in expo["plugins"]]
     require(
-        plugin_names == ["expo-router", "expo-sharing", "expo-asset", "expo-audio", "expo-notifications", "expo-location"],
+        plugin_names == ["expo-router", "expo-sharing", "expo-asset", "expo-audio", "expo-notifications", "expo-location", "expo-image"],
         "Review changed config-plugin ownership",
     )
     # expo-notifications: the committed project mirrors the plugin's icon and color by hand.
