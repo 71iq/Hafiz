@@ -86,9 +86,12 @@ export function zaytWidth(tier: ZaytTier, height: number): number {
 /**
  * 10.5 platform gate: a platform plays motion only after the packaged files pass on it (alpha, the
  * held last frame, cadence and interruption). Every other platform shows posters. Web passed in
- * Chromium; Android and iOS stay on posters until they are checked on devices.
+ * Chromium, and Android on an Android 10 emulator: each clip plays once and holds a frame that
+ * matches its poster. There the image is blank for a frame or two as the rest pose hands over to
+ * the clip, because Android clears an image while its new source loads. iOS stays on posters until
+ * it is checked on a device.
  */
-const MOTION_PLATFORMS: ReadonlySet<PlatformOSType> = new Set<PlatformOSType>(["web"]);
+const MOTION_PLATFORMS: ReadonlySet<PlatformOSType> = new Set<PlatformOSType>(["web", "android"]);
 
 export function zaytMotionAllowed(os: PlatformOSType): boolean {
   return MOTION_PLATFORMS.has(os);
