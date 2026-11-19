@@ -1,5 +1,5 @@
 import { formatAyahRef } from "@/lib/arabic";
-import type { AudioFailure } from "@/lib/audio/ayah-audio";
+export type AudioFailure = "offline" | "unavailable" | "playback";
 
 export type SurahNames = { en: string; ar: string };
 
