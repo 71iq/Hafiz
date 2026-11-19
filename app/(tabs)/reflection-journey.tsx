@@ -54,6 +54,8 @@ import {
 import type { ReflectionJourneyLevelListItem } from "@/lib/reflection-journey/types";
 import { useSelection, SelectionProvider } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
+import { useShowZayt } from "@/lib/zayt/presentation";
+import { ZaytAnimation } from "@/components/habit/ZaytAnimation";
 import { PERSISTENT_SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 import { accentIconColor, errorIconColor, mutedIconColor } from "@/lib/ui/theme-icons";
@@ -93,6 +95,9 @@ function ReflectionJourneyInner() {
   const [error, setError] = useState<{ levelId: string; kind: SaveKind } | null>(null);
   const [pending, setPending] = useState<SaveKind | null>(null);
   const [completedNotice, setCompletedNotice] = useState<string | null>(null);
+  /** Set only when this device completes the last level, so a later visit shows the still. */
+  const [journeyZaytEvent, setJourneyZaytEvent] = useState<string | null>(null);
+  const showZayt = useShowZayt(db) === true;
   const [inputHeight, setInputHeight] = useState(RESPONSE_MIN_HEIGHT);
 
   const isWide = width >= PERSISTENT_SIDEBAR_BREAKPOINT;
@@ -155,6 +160,7 @@ function ReflectionJourneyInner() {
     setError(null);
     setPending(null);
     setCompletedNotice(null);
+    setJourneyZaytEvent(null);
     setLevels([]);
     setSelectedLevelId(null);
     setLoadStatus("loading");
@@ -216,6 +222,10 @@ function ReflectionJourneyInner() {
       const owner = ownerRef.current;
       const levelId = selectedLevel.id;
       const text = responseText;
+      const finishesJourney =
+        kind === "complete" &&
+        selectedLevel.status !== "completed" &&
+        levels.every((level) => level.id === levelId || level.status === "completed");
       setPending(kind);
       setError(null);
       try {
@@ -232,6 +242,7 @@ function ReflectionJourneyInner() {
         setEdit((current) => (current && current.levelId === levelId && current.text === text ? null : current));
         if (kind === "draft") showToast(s.reflectionJourneyDraftSaved);
         else setCompletedNotice(levelId);
+        if (finishesJourney) setJourneyZaytEvent(`journey:${levelId}:${entry.updatedAt}`);
         void loadLevels();
       } catch (saveError) {
         console.warn("[ReflectionJourney] Failed to save:", saveError);
@@ -240,7 +251,7 @@ function ReflectionJourneyInner() {
         if (owner === ownerRef.current) setPending(null);
       }
     },
-    [db, loadLevels, pending, responseText, s.reflectionJourneyDraftSaved, selectedLevel, showToast]
+    [db, levels, loadLevels, pending, responseText, s.reflectionJourneyDraftSaved, selectedLevel, showToast]
   );
 
   if (levels.length === 0 && loadStatus !== "ready") {
@@ -581,6 +592,11 @@ function ReflectionJourneyInner() {
 
       {nextLevel === null ? (
         <Card elevation="low" className="rounded-4xl p-5 gap-3">
+          {journeyComplete && showZayt ? (
+            <View className="items-center">
+              <ZaytAnimation tier="M" animation="A15" height={112} presentationId={journeyZaytEvent} />
+            </View>
+          ) : null}
           {journeyComplete ? (
             <View className="items-center gap-2" style={rowStyle}>
               <Sparkles size={16} color={accent} />

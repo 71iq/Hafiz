@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { X } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
@@ -17,9 +18,11 @@ type Props = {
   onDismiss: () => void;
   /** Opens the achievements list; the close button alone marks this unlock seen. */
   onOpen?: () => void;
+  /** Zayt for a juz completed on this device, centred above the badge. */
+  zayt?: ReactNode;
 };
 
-export function AchievementUnlockToast({ unlock, moreCount = 0, onDismiss, onOpen }: Props) {
+export function AchievementUnlockToast({ unlock, moreCount = 0, onDismiss, onOpen, zayt }: Props) {
   const definition = getAchievementDefinition(unlock.achievementId);
   const { isDark, isRTL } = useSettings();
   const s = useStrings();
@@ -68,6 +71,7 @@ export function AchievementUnlockToast({ unlock, moreCount = 0, onDismiss, onOpe
           </View>
         </Pressable>
       </View>
+      {zayt ? <View className="mb-2 items-center">{zayt}</View> : null}
       {onOpen ? (
         <Pressable
           onPress={onOpen}
