@@ -18,6 +18,7 @@ import { settingsPublicStrings } from "@/lib/i18n/features/settings-public";
 import { audioStrings } from "@/lib/i18n/features/audio";
 import { detailStrings } from "@/lib/i18n/features/detail";
 import { appUpdateStrings } from "@/lib/i18n/features/app-update";
+import { widgetStrings } from "@/lib/i18n/features/widget";
 
 export const strings = {
   en: {
@@ -915,6 +916,7 @@ export const strings = {
     errorSubtitle: "This section couldn't load properly",
     errorTryAgain: "Try Again",
     ...habitStrings.en,
+    ...widgetStrings.en,
     ...notificationsStrings.en,
     ...socialStrings.en,
     ...hifzStrings.en,
@@ -1804,6 +1806,7 @@ export const strings = {
     errorSubtitle: "لم يتم تحميل هذا القسم بشكل صحيح",
     errorTryAgain: "حاول مجددًا",
     ...habitStrings.ar,
+    ...widgetStrings.ar,
     ...notificationsStrings.ar,
     ...socialStrings.ar,
     ...hifzStrings.ar,

@@ -1104,6 +1104,70 @@
       ]
     },
     {
+      "id": "homewidget",
+      "title": "Android home-screen widget",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": true,
+      "children": [
+        {
+          "id": "homewidget.layouts",
+          "title": "Widget providers, sizes and layouts",
+          "kind": "widget",
+          "cases": ["WIDGET-01"],
+          "uses": [],
+          "native": true,
+          "children": []
+        },
+        {
+          "id": "homewidget.states",
+          "title": "Widget states, copy, theme and TalkBack label",
+          "kind": "widget",
+          "cases": ["WIDGET-02"],
+          "uses": ["wird.settle", "wird.makeup", "wird.earnback", "home.hifzplan", "wird.zayt"],
+          "native": true,
+          "children": []
+        },
+        {
+          "id": "homewidget.publish",
+          "title": "Timeline republish while Hafiz is open",
+          "kind": "transition",
+          "cases": ["WIDGET-03"],
+          "uses": ["wird.minimum", "home.wird.break", "shell.sync", "settings.general", "settings.wird"],
+          "native": true,
+          "children": []
+        },
+        {
+          "id": "homewidget.background",
+          "title": "Boundary alarms, refresh broadcasts and neutral state",
+          "kind": "transition",
+          "cases": ["WIDGET-04"],
+          "uses": ["wird.settle"],
+          "native": true,
+          "children": []
+        },
+        {
+          "id": "homewidget.tap",
+          "title": "Widget tap routing on cold and warm starts",
+          "kind": "transition",
+          "cases": ["WIDGET-05"],
+          "uses": ["hifz.review", "review.session", "home", "shell.entry"],
+          "native": true,
+          "children": []
+        },
+        {
+          "id": "homewidget.offer",
+          "title": "One-time session-end widget offer",
+          "kind": "widget",
+          "cases": ["WIDGET-08"],
+          "uses": ["wird.sessioncards", "settings.widget"],
+          "native": true,
+          "children": []
+        }
+      ]
+    },
+    {
       "id": "hifz",
       "title": "Hifz plan and recitation",
       "kind": "group",
@@ -1598,6 +1662,15 @@
           "cases": [],
           "uses": ["reminders.settings"],
           "native": false,
+          "children": []
+        },
+        {
+          "id": "settings.widget",
+          "title": "Home screen widget: add, placed status, Show numbers",
+          "kind": "widget",
+          "cases": ["WIDGET-06", "WIDGET-07"],
+          "uses": ["homewidget.layouts"],
+          "native": true,
           "children": []
         },
         {
