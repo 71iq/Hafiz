@@ -22,7 +22,9 @@ Check the active branch and worktree before edits. Preserve the existing AppNavi
 
 Keep local reading independent of network services. Preserve sync IDs, timestamps, soft deletes and conflict semantics. Read the affected local schema, server policies and sync callers before changing persistence.
 
-Quran text, identifiers, verse/word positions, page mappings, Arabic assets, fonts and generated databases need explicit data-change authorization. Preserve licenses in NOTICE.md. Copy/share Unicode Quran text, not display glyph data such as text_qcf2. Preserve v2_page and page-font navigation. A page source replacement requires validation of all 604 pages. Runtime assets need both native require maps and web copy/fetch handling.
+Quran text, identifiers, verse/word positions, page mappings, Arabic assets, fonts and generated databases need explicit data-change authorization. Preserve licenses in NOTICE.md. Copy/share Unicode Quran text, not display glyph data such as text_qcf2. Preserve v2_page and page-font navigation. A page source replacement requires validation of all 604 pages. Runtime assets need native require maps, the Android pack list in scripts/pack-android-content.cjs and web copy/fetch handling.
+
+Android packs the Quran database, datasets and V4 pages into the APK. Classic pages and optional tafsirs download from hafizquran.app at the web export's content-hashed font paths and /data/tafsir-sources/, checked against hashes built into each APK. Released APKs keep requesting those paths, so the web deployment must keep serving those files unchanged.
 
 Use existing components/ui/ controls and ResponsiveOverlay. Preserve dismissal, focus restoration, scrolling, safe areas and keyboard avoidance. Use semantic theme tokens. Fix overflow through sizing and wrapping rather than shrinking typography unless requested.
 
