@@ -31,7 +31,7 @@ jest.mock("@/lib/database/native-loaders", () => ({
 }));
 jest.mock("@/lib/database/schema", () => ({
   createSchema: jest.fn(),
-  createTextSearchIndex: jest.fn(),
+  createQuranTextIndexes: jest.fn(),
   migrateUserSchema: jest.fn(),
 }));
 jest.mock("@/lib/arabic", () => ({

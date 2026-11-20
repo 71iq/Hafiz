@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import { MUTASHABIHAT_ROWS_FILE, refreshMutashabihatRows } from "@/lib/database/mutashabihat-rows";
-import { createSchema, createTextSearchIndex, migrateUserSchema } from "./schema";
+import { createSchema, createQuranTextIndexes, migrateUserSchema } from "./schema";
 import { reconcileLegacyHabitDaysOnce } from "@/lib/habit/reconcile";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
 import { mapRowsToCanonicalWords, type CanonicalWord } from "@/lib/database/word-mapping";
@@ -1188,8 +1188,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       console.log(`[Import] text_search migration done: ${updateRows.length} rows`);
     }
 
-    // Create text_search index (must happen after column migration)
-    await createTextSearchIndex(db);
+    await createQuranTextIndexes(db);
 
     const basmalaFixed = await removeBasmalaPrefixFromFirstAyahs(db);
     if (basmalaFixed > 0) console.log(`[Import] Removed the Basmala prefix from ${basmalaFixed} first ayahs`);
@@ -1279,6 +1278,8 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
 
   // Create tafseer source index (not in schema.ts to avoid error on old tables without source column)
   await db.execAsync("CREATE INDEX IF NOT EXISTS idx_tafseer_source ON tafseer(source)");
+
+  await createQuranTextIndexes(db);
 
   // Free the fetch cache — the parsed JSON (~50MB) has been inserted into
   // SQLite and is no longer needed in memory.
