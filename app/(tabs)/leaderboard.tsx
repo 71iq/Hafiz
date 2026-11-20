@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RefreshControl } from "react-native";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CloudOff, Trophy } from "lucide-react-native";
 import { BoardJoin } from "@/components/social/BoardJoin";
@@ -10,6 +10,7 @@ import { SocialScreen } from "@/components/social/SocialScreen";
 import { BoardJoinSkeleton, StandingsSkeleton } from "@/components/social/SocialSkeletons";
 import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys, boardRead, joinBoard, leaveBoard } from "@/lib/board/api";
+import { isBoardEnabled } from "@/lib/board/config";
 import { useDatabase } from "@/lib/database/provider";
 import { useLocalToday } from "@/lib/habit/use-day-boundary";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -31,6 +32,9 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 export default function BoardScreen() {
   const s = useStrings();
   const user = useAuthStore((state) => state.user);
+
+  // Hidden until enough people use Hafiz (lib/board/config.ts): an old link or return opens Home.
+  if (!isBoardEnabled()) return <Redirect href="/(tabs)/home" />;
 
   if (!isSupabaseConfigured()) {
     return (

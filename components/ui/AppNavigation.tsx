@@ -40,6 +40,7 @@ import {
 import { PanelLeftOpen, PanelRightOpen, Search, X } from "lucide-react-native";
 import { textStartStyle } from "@/lib/ui/direction";
 import { accentIconColor, mutedIconColor } from "@/lib/ui/theme-icons";
+import { isBoardEnabled } from "@/lib/board/config";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -470,7 +471,11 @@ function SidebarContent({
   const s = useStrings();
   const { effectiveTheme } = useSettings();
   const theme: ThemePalette = effectiveTheme ?? (isDark ? "dark" : "beige");
-  const primaryItems = getRouteItems(state, descriptors, SIDEBAR_PRIMARY_ROUTES);
+  const primaryItems = getRouteItems(
+    state,
+    descriptors,
+    isBoardEnabled() ? SIDEBAR_PRIMARY_ROUTES : SIDEBAR_PRIMARY_ROUTES.filter((name) => name !== "leaderboard"),
+  );
   const [settingsItem] = getRouteItems(state, descriptors, [SIDEBAR_SETTINGS_ROUTE]);
 
   const renderItem = ({ route, descriptor }: { route: any; descriptor: any }) => {

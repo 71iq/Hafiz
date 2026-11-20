@@ -31,6 +31,7 @@ import { AccountPromoCard } from "@/components/auth/AccountPromoCard";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
+import { isBoardEnabled } from "@/lib/board/config";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
@@ -969,7 +970,7 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        <SecondaryDestinations destinations={["leaderboard"]} />
+        {isBoardEnabled() ? <SecondaryDestinations destinations={["leaderboard"]} /> : null}
 
         {/* The web download offer lives in Settings > About; the app keeps its in-app update notice. */}
         {Platform.OS !== "web" ? <AppReleaseCard /> : null}

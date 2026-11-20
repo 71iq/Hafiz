@@ -36,7 +36,18 @@ function signIn(userId: string) {
 }
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
 
-jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useRouter: () => ({ push: jest.fn() }) }));
+jest.mock("expo-router", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  const { Text } = jest.requireActual<typeof import("react-native")>("react-native");
+  return {
+    router: { push: jest.fn() },
+    useRouter: () => ({ push: jest.fn() }),
+    Redirect: ({ href }: { href: string }) => <Text>{`redirect:${href}`}</Text>,
+  };
+});
+// The Board is hidden until enough people use Hafiz; these cases exercise it as when it is on.
+let mockBoardEnabled = true;
+jest.mock("@/lib/board/config", () => ({ isBoardEnabled: () => mockBoardEnabled }));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => ({ name: "synthetic" }) }));
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
@@ -122,6 +133,7 @@ function renderScreen(options: { staleTime?: number; seed?: (client: QueryClient
 
 let boardState: unknown;
 beforeEach(async () => {
+  mockBoardEnabled = true;
   mockSettings.isRTL = false;
   mockSettings.uiLanguage = "en";
   Object.assign(mockAuth, signedOut());
@@ -153,6 +165,15 @@ afterEach(() => {
 });
 
 describe("Board tab", () => {
+  it("opens Home and calls nothing while the Board is hidden", () => {
+    mockBoardEnabled = false;
+    signIn(USER);
+    const screen = renderScreen();
+    expect(screen.getByText("redirect:/(tabs)/home")).toBeTruthy();
+    expect(screen.queryByText(strings.en.boardTitle)).toBeNull();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
   it("asks a signed-out reader to sign in and calls nothing", () => {
     const screen = renderScreen();
     expect(screen.getByText(strings.en.boardSignInTitle)).toBeTruthy();
