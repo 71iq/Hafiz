@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Modal, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, Text, View, useWindowDimensions, type AccessibilityRole } from "react-native";
 import { Check, MoreHorizontal } from "lucide-react-native";
 import { isTopOverlayLayer, registerOverlayLayer, useOverlayLayerId } from "@/components/ui/ResponsiveOverlay";
 import { useSettings } from "@/lib/settings/context";
@@ -16,7 +16,7 @@ export type DropdownMenuItem = {
   destructive?: boolean;
   /** Draws a divider above this item. The first destructive item gets one automatically. */
   separatorBefore?: boolean;
-  /** Set for radio choices: the item is a menuitemradio and shows a check when true. */
+  /** Set for radio choices. The selected item shows a check. */
   checked?: boolean;
   /** A heading shown before the first item of each consecutive group. */
   group?: string;
@@ -127,6 +127,8 @@ export function DropdownMenu({
   const destructiveColor = isDark ? "#f87171" : "#dc2626";
   const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(95,78,64,0.12)";
   const firstDestructive = items.findIndex((item) => item.destructive);
+  // React Native Web accepts the ARIA menu role. Android rejects it and expects `radio`.
+  const radioRole = Platform.OS === "web" ? ("menuitemradio" as AccessibilityRole) : "radio";
 
   // The menu renders hidden first; its measured height decides above or below.
   const menuPosition = useMemo(() => {
@@ -305,7 +307,7 @@ export function DropdownMenu({
                         ref={(node) => {
                           itemRefs.current[index] = node;
                         }}
-                        accessibilityRole={isRadio ? ("menuitemradio" as "menuitem") : "menuitem"}
+                        accessibilityRole={isRadio ? radioRole : "menuitem"}
                         accessibilityLabel={item.label}
                         accessibilityState={
                           isRadio ? { disabled: !!item.disabled, checked: item.checked } : { disabled: !!item.disabled }

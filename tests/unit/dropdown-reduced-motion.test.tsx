@@ -1,5 +1,5 @@
 import React from "react";
-import { AccessibilityInfo, Modal, StyleSheet } from "react-native";
+import { AccessibilityInfo, Modal, Platform, StyleSheet } from "react-native";
 import { act, cleanup, fireEvent, render, renderHook } from "@testing-library/react-native";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
@@ -89,6 +89,19 @@ it("opens without motion while initial preference is unknown", () => {
   expect(modal(view)?.props.animationType).toBe("none");
   expect(measure).toHaveBeenCalledTimes(1);
   expect(view.getByRole("menuitem", { name: "Select" })).toBeTruthy();
+});
+it("renders checked and unchecked Android menu choices as native radio buttons", () => {
+  jest.replaceProperty(Platform, "OS", "android");
+  const view = setup({
+    items: [
+      { key: "scroll", label: "Scroll", checked: true, onPress: jest.fn() },
+      { key: "swipe", label: "Swipe", checked: false, onPress: jest.fn() },
+    ],
+  });
+
+  open(view);
+  expect(view.getByRole("radio", { name: "Scroll", checked: true })).toBeTruthy();
+  expect(view.getByRole("radio", { name: "Swipe", checked: false })).toBeTruthy();
 });
 it("keeps reduced opening and closing static", async () => {
   const view = setup();
