@@ -46,13 +46,13 @@ const SUBTITLE_LINE_HEIGHT = 22;
 const STAGE_LINE_HEIGHT = 18;
 
 export function LoadingScreen({ progress, showProgress = true }: Props) {
-  // Web reads its cached language on the first client frame. Native waits for the startup mirror and
-  // shows the logo and progress without language text until it resolves. Text lines keep their height
-  // while the language is unknown, so nothing shifts when it arrives.
+  // Web reads its cached language right after the first frame, which must match the static HTML
+  // the export renders without a language; reading it during that frame made React discard the HTML
+  // and render the page again. Native waits for the startup mirror. Until the language is known the
+  // logo and progress show without language text, and text lines keep their height, so nothing shifts
+  // when it arrives.
   const bootstrap = useUiBootstrap();
-  const [webLanguage, setWebLanguage] = useState<"en" | "ar" | null>(() =>
-    Platform.OS === "web" && typeof window !== "undefined" ? safeStartupLanguage() : null,
-  );
+  const [webLanguage, setWebLanguage] = useState<"en" | "ar" | null>(null);
   const uiLanguage = Platform.OS === "web" ? webLanguage : bootstrap.resolved ? safeStartupLanguage() : null;
   const s = uiLanguage ? strings[uiLanguage] : null;
   const isRTL = uiLanguage === "ar";
@@ -126,7 +126,9 @@ export function LoadingScreen({ progress, showProgress = true }: Props) {
 
       {showProgress ? (
         <View className="w-full max-w-xs">
-          <Progress value={percentage} />
+          {/* Its own direction: the static HTML is left to right, and a direction set from the
+              language changes the bar's props, so React updates what hydration kept. */}
+          <Progress value={percentage} dir={isRTL ? "rtl" : "ltr"} />
           <Text
             accessibilityLiveRegion="polite"
             className="mt-3 text-warm-700 dark:text-neutral-400 text-center"
