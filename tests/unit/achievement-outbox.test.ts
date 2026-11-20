@@ -86,6 +86,70 @@ describe("RF-173 achievement unlocks and their upload queue", () => {
     expect(heard.map((unlock) => unlock.achievementId)).toEqual(["first_mutashabih_pair"]);
   });
 
+  it("writes nothing when a repeated backfill finds every achievement unchanged, then only what changed", async () => {
+    seedDeckAndNote();
+    const word = store.sql.prepare(
+      "INSERT INTO word_roots (surah, ayah, word_pos, word_text) VALUES (?, ?, ?, 'synthetic')",
+    );
+    for (const [surah, ayah, words] of [
+      [2, 282, 3],
+      [1, 1, 2],
+    ]) {
+      for (let position = 1; position <= words; position++) word.run(surah, ayah, position);
+    }
+    await backfillAchievements(store.db, { notify: false });
+    expect(
+      store.sql.prepare("SELECT payload FROM achievement_progress WHERE achievement_id = 'longest_ayah_reviewed'").get()
+        ?.payload,
+    ).toBe(JSON.stringify({ surah: 2, ayah: 282, word_count: 3 }));
+    const progress = () =>
+      store.sql.prepare("SELECT achievement_id, current_value, updated_at FROM achievement_progress").all();
+    const first = progress();
+    expect(first.length).toBeGreaterThan(15);
+
+    store.statements.length = 0;
+    await backfillAchievements(store.db, { notify: false });
+
+    expect(store.statements.filter((source) => /^\s*(INSERT|UPDATE|DELETE)/i.test(source))).toEqual([]);
+    expect(progress()).toEqual(first);
+    // The longest ayah is read from its saved progress row instead of counting every word again.
+    expect(store.statements.filter((source) => source.includes("FROM word_roots"))).toEqual([]);
+
+    store.sql
+      .prepare(
+        `INSERT INTO private_notes (id, surah, ayah_start, ayah_end, content, created_at, updated_at)
+         VALUES ('note-2', 2, 256, 256, 'second synthetic note', ?, ?)`,
+      )
+      .run(OLD, OLD);
+    store.statements.length = 0;
+    await backfillAchievements(store.db, { notify: false });
+
+    const written = store.statements.filter((source) => /^\s*INSERT OR REPLACE INTO achievement_progress/.test(source));
+    expect(written).toHaveLength(1);
+    const notes = store.sql
+      .prepare("SELECT current_value FROM achievement_progress WHERE achievement_id = 'private_notes_10'")
+      .get();
+    expect(notes?.current_value).toBe(2);
+  });
+
+  it("recomputes from the stored rows after a rolled-back backfill", async () => {
+    seedDeckAndNote();
+    store.failQueueInsert(1);
+    await expect(backfillAchievements(store.db, { notify: false })).rejects.toThrow(
+      "Synthetic sync_queue write failure",
+    );
+    expect(store.sql.prepare("SELECT COUNT(*) AS count FROM achievement_progress").get()?.count).toBe(0);
+
+    await backfillAchievements(store.db, { notify: false });
+
+    expect(unlockIds()).toEqual(["first_deck_created", "first_private_note"]);
+    expect(
+      store.sql
+        .prepare("SELECT current_value FROM achievement_progress WHERE achievement_id = 'first_deck_created'")
+        .get()?.current_value,
+    ).toBe(1);
+  });
+
   it("does not notify during a silent backfill", async () => {
     seedDeckAndNote();
 

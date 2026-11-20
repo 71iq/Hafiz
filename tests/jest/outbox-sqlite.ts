@@ -14,6 +14,8 @@ export type OutboxDatabase = {
   /** Make the nth matching queue INSERT throw, counting from 1 after this call. */
   failQueueInsert(nth: number, table?: "sync_queue" | "qf_sync_queue"): void;
   queueInsertAttempts(): number;
+  /** Every statement sent to SQLite since the database opened, in order. */
+  statements: string[];
   close(): Promise<void>;
 };
 
@@ -33,15 +35,20 @@ function bindValues(args: unknown[]): SQLInputValue[] {
   return values;
 }
 
-export async function openOutboxDatabase(): Promise<OutboxDatabase> {
+/** `legacy` runs first, to create tables as an older version of the app left them. */
+export async function openOutboxDatabase(legacy?: (sql: DatabaseSync) => void): Promise<OutboxDatabase> {
   const sql = new DatabaseSync(":memory:");
+  legacy?.(sql);
   let failure: { nth: number; table: string } | null = null;
   let attempts = 0;
+  const statements: string[] = [];
   const owner = createConnectionOwner({
     execAsync: async (source) => {
+      statements.push(source);
       sql.exec(source);
     },
     prepareAsync: async (source) => {
+      statements.push(source);
       const statement = sql.prepare(source);
       return {
         executeAsync: async (...args: unknown[]) => {
@@ -73,6 +80,7 @@ export async function openOutboxDatabase(): Promise<OutboxDatabase> {
       attempts = 0;
     },
     queueInsertAttempts: () => attempts,
+    statements,
     close: () => owner.close(),
   };
 }

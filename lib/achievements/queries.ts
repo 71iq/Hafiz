@@ -20,6 +20,29 @@ type ProgressRow = {
   payload: string;
 };
 
+/**
+ * One transaction's executor with the progress rows and unlock ids as that transaction sees them.
+ * A backfill recomputes every achievement, and most are unchanged. Comparing against these avoids
+ * a write per achievement on each start and each graded review. It lives only for the transaction,
+ * so a rollback discards it with the writes it describes.
+ */
+type AchievementScope = DatabaseExecutor & { progress: Map<string, ProgressRow>; unlocked: Set<string> };
+
+async function achievementScope(db: DatabaseExecutor): Promise<AchievementScope> {
+  const progress = await db.getAllAsync<ProgressRow>(
+    "SELECT achievement_id, current_value, target_value, payload FROM achievement_progress",
+  );
+  const unlocked = await db.getAllAsync<{ achievement_id: string }>("SELECT achievement_id FROM achievement_unlocks");
+  return {
+    execAsync: db.execAsync.bind(db),
+    runAsync: db.runAsync.bind(db) as DatabaseExecutor["runAsync"],
+    getFirstAsync: db.getFirstAsync.bind(db) as DatabaseExecutor["getFirstAsync"],
+    getAllAsync: db.getAllAsync.bind(db) as DatabaseExecutor["getAllAsync"],
+    progress: new Map(progress.map((row) => [row.achievement_id, row])),
+    unlocked: new Set(unlocked.map((row) => row.achievement_id)),
+  };
+}
+
 export type AchievementDashboardItem = AchievementDefinition & {
   unlockedAt: string | null;
   seenAt: string | null;
@@ -59,11 +82,11 @@ function publishUnlocks(unlocks: AchievementUnlock[]): void {
  */
 export async function recordAchievementEvent(db: AppDatabase, event: AchievementEvent): Promise<void> {
   const unlocks: AchievementUnlock[] = [];
-  await db.withTransactionAsync((tx) => applyAchievementEvent(tx, event, unlocks));
+  await db.withTransactionAsync(async (tx) => applyAchievementEvent(await achievementScope(tx), event, unlocks));
   publishUnlocks(unlocks);
 }
 
-async function applyAchievementEvent(db: DatabaseExecutor, event: AchievementEvent, notify: UnlockSink): Promise<void> {
+async function applyAchievementEvent(db: AchievementScope, event: AchievementEvent, notify: UnlockSink): Promise<void> {
   switch (event.type) {
     case "review_logged":
       await backfillReviewAchievements(db, notify);
@@ -105,11 +128,11 @@ export async function backfillAchievements(
   options: { notify?: boolean } = {}
 ): Promise<void> {
   const unlocks: UnlockSink = options.notify ? [] : null;
-  await db.withTransactionAsync((tx) => backfillAllAchievements(tx, unlocks));
+  await db.withTransactionAsync(async (tx) => backfillAllAchievements(await achievementScope(tx), unlocks));
   if (unlocks) publishUnlocks(unlocks);
 }
 
-async function backfillAllAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
+async function backfillAllAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
   await backfillReviewAchievements(db, notify);
   await backfillDeckAchievements(db, notify);
   await backfillCompletionAchievements(db, notify);
@@ -208,11 +231,10 @@ export async function insertRemoteAchievementUnlock(
   );
 }
 
-async function backfillReviewAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
+async function backfillReviewAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
   const totalRow = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log");
   const total = totalRow?.count ?? 0;
   await upsertProgress(db, "first_review", Math.min(total, 1), 1);
-  await upsertProgress(db, "first_ayah_reviewed", 0, 1);
   for (const target of [100, 500, 1000, 5000]) {
     await upsertProgress(db, `reviews_${target}`, total, target);
   }
@@ -244,6 +266,8 @@ async function backfillReviewAchievements(db: DatabaseExecutor, notify: UnlockSi
   if (firstAyah) {
     await upsertProgress(db, "first_ayah_reviewed", 1, 1, { cardId: firstAyah.card_id });
     await unlockAchievement(db, "first_ayah_reviewed", firstAyah.reviewed_at, { cardId: firstAyah.card_id }, { cardId: firstAyah.card_id }, notify);
+  } else {
+    await upsertProgress(db, "first_ayah_reviewed", 0, 1);
   }
 
   const reviewRows = await db.getAllAsync<{ reviewed_at: string }>(
@@ -257,13 +281,7 @@ async function backfillReviewAchievements(db: DatabaseExecutor, notify: UnlockSi
     }
   }
 
-  const longestAyah = await db.getFirstAsync<{ surah: number; ayah: number; word_count: number }>(
-    `SELECT surah, ayah, COUNT(*) as word_count
-     FROM word_roots
-     GROUP BY surah, ayah
-     ORDER BY word_count DESC, surah ASC, ayah ASC
-     LIMIT 1`
-  );
+  const longestAyah = await longestAyahInQuran(db);
   if (longestAyah) {
     const cardId = `${longestAyah.surah}:${longestAyah.ayah}`;
     const reviewed = await db.getFirstAsync<{ reviewed_at: string }>(
@@ -277,7 +295,27 @@ async function backfillReviewAchievements(db: DatabaseExecutor, notify: UnlockSi
   }
 }
 
-async function backfillDeckAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
+type LongestAyah = { surah: number; ayah: number; word_count: number };
+
+/**
+ * The ayah with the most words. It is a property of the bundled text, and counting it reads all
+ * 50,000 word rows, so the answer saved in this achievement's progress row is used once it exists.
+ */
+async function longestAyahInQuran(db: AchievementScope): Promise<LongestAyah | null> {
+  const saved = parseJsonRecord(db.progress.get("longest_ayah_reviewed")?.payload);
+  if (typeof saved.surah === "number" && typeof saved.ayah === "number" && typeof saved.word_count === "number") {
+    return { surah: saved.surah, ayah: saved.ayah, word_count: saved.word_count };
+  }
+  return db.getFirstAsync<LongestAyah>(
+    `SELECT surah, ayah, COUNT(*) as word_count
+     FROM word_roots
+     GROUP BY surah, ayah
+     ORDER BY word_count DESC, surah ASC, ayah ASC
+     LIMIT 1`
+  );
+}
+
+async function backfillDeckAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
   const rows = await db.getAllAsync<{ key: string; value: string }>(
     "SELECT key, value FROM user_settings WHERE key LIKE 'deck_%' AND key != 'deck_meanings'"
   );
@@ -298,7 +336,7 @@ async function backfillDeckAchievements(db: DatabaseExecutor, notify: UnlockSink
   );
 }
 
-async function backfillCompletionAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
+async function backfillCompletionAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
   const surahRows = await db.getAllAsync<{ surah: number; total: number; mastered: number }>(
     `SELECT
        qt.surah as surah,
@@ -359,7 +397,7 @@ async function backfillCompletionAchievements(db: DatabaseExecutor, notify: Unlo
   }
 }
 
-async function backfillPrivateNoteAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
+async function backfillPrivateNoteAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
   const countRow = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM private_notes WHERE deleted_at IS NULL"
   );
@@ -387,13 +425,10 @@ async function backfillPrivateNoteAchievements(db: DatabaseExecutor, notify: Unl
   }
 }
 
-async function backfillReflectionAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
-  const first = await db.getFirstAsync<ProgressRow>(
-    "SELECT * FROM achievement_progress WHERE achievement_id = 'first_public_reflection'"
-  );
-  const count = await db.getFirstAsync<ProgressRow>(
-    "SELECT * FROM achievement_progress WHERE achievement_id = 'public_reflections_10'"
-  );
+async function backfillReflectionAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
+  // Read both before writing: these are counted by events, and the backfill only resets their payload.
+  const first = db.progress.get("first_public_reflection");
+  const count = db.progress.get("public_reflections_10");
   await upsertProgress(db, "first_public_reflection", first?.current_value ?? 0, 1);
   await upsertProgress(db, "public_reflections_10", count?.current_value ?? 0, 10);
   if ((first?.current_value ?? 0) >= 1) {
@@ -404,7 +439,7 @@ async function backfillReflectionAchievements(db: DatabaseExecutor, notify: Unlo
   }
 }
 
-async function backfillVocabAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
+async function backfillVocabAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
   const countRow = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM study_cards WHERE id LIKE 'word:%' AND deleted_at IS NULL"
   );
@@ -419,50 +454,60 @@ async function backfillVocabAchievements(db: DatabaseExecutor, notify: UnlockSin
 }
 
 async function upsertProgress(
-  db: DatabaseExecutor,
+  db: AchievementScope,
   achievementId: string,
   currentValue: number,
   targetValue: number,
   payload: Record<string, unknown> = {}
 ): Promise<void> {
+  const row: ProgressRow = {
+    achievement_id: achievementId,
+    current_value: Math.max(0, Math.floor(currentValue)),
+    target_value: targetValue,
+    payload: JSON.stringify(payload),
+  };
+  const stored = db.progress.get(achievementId);
+  if (
+    stored &&
+    stored.current_value === row.current_value &&
+    stored.target_value === row.target_value &&
+    stored.payload === row.payload
+  ) {
+    return;
+  }
   await db.runAsync(
     `INSERT OR REPLACE INTO achievement_progress
       (achievement_id, current_value, target_value, updated_at, payload)
      VALUES (?, ?, ?, ?, ?)`,
-    [achievementId, Math.max(0, Math.floor(currentValue)), targetValue, new Date().toISOString(), JSON.stringify(payload)]
+    [row.achievement_id, row.current_value, row.target_value, new Date().toISOString(), row.payload]
   );
+  db.progress.set(achievementId, row);
 }
 
 async function incrementProgress(
-  db: DatabaseExecutor,
+  db: AchievementScope,
   achievementId: string,
   delta: number,
   targetValue: number,
   payload: Record<string, unknown>
 ): Promise<void> {
-  const row = await db.getFirstAsync<ProgressRow>(
-    "SELECT * FROM achievement_progress WHERE achievement_id = ?",
-    [achievementId]
-  );
+  const row = db.progress.get(achievementId);
   await upsertProgress(db, achievementId, (row?.current_value ?? 0) + delta, targetValue, payload);
 }
 
 async function unlockIfProgressReached(
-  db: DatabaseExecutor,
+  db: AchievementScope,
   achievementId: string,
   unlockedAt: string,
   notify: UnlockSink
 ): Promise<void> {
-  const row = await db.getFirstAsync<ProgressRow>(
-    "SELECT * FROM achievement_progress WHERE achievement_id = ?",
-    [achievementId]
-  );
+  const row = db.progress.get(achievementId);
   if (!row || row.current_value < row.target_value) return;
   await unlockAchievement(db, achievementId, unlockedAt, parseJsonRecord(row.payload), { count: row.target_value }, notify);
 }
 
 async function unlockAchievement(
-  db: DatabaseExecutor,
+  db: AchievementScope,
   achievementId: string,
   unlockedAt: string,
   localPayload: Record<string, unknown> = {},
@@ -470,7 +515,7 @@ async function unlockAchievement(
   notify: UnlockSink
 ): Promise<void> {
   const definition = getAchievementDefinition(achievementId);
-  if (!definition) return;
+  if (!definition || db.unlocked.has(achievementId)) return;
 
   const storedPublicPayload = definition.payloadPolicy.public === "none" ? {} : publicPayload;
   const result = await db.runAsync(
@@ -479,6 +524,7 @@ async function unlockAchievement(
      VALUES (?, ?, NULL, ?, ?, 'pending')`,
     [achievementId, unlockedAt, JSON.stringify(localPayload), JSON.stringify(storedPublicPayload)]
   );
+  db.unlocked.add(achievementId);
   if ((result.changes ?? 0) <= 0) return;
 
   await enqueueSync(db, "achievement_unlocks", "INSERT", achievementId, {

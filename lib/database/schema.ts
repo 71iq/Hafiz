@@ -588,14 +588,36 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
   `);
 }
 
-export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
+/** Each table's column names, lower-cased. Read once so start-up does not probe columns one query at a time. */
+export type TableColumns = Map<string, Set<string>>;
+
+export async function readTableColumns(db: DatabaseExecutor): Promise<TableColumns> {
+  const rows = await db.getAllAsync<{ table_name: string; column_name: string }>(
+    `SELECT m.name AS table_name, p.name AS column_name
+       FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p
+      WHERE m.type = 'table'`,
+  );
+  const columns: TableColumns = new Map();
+  for (const row of rows) {
+    const table = row.table_name.toLowerCase();
+    if (!columns.has(table)) columns.set(table, new Set());
+    columns.get(table)!.add(row.column_name.toLowerCase());
+  }
+  return columns;
+}
+
+export function hasColumn(columns: TableColumns, table: string, column: string): boolean {
+  return columns.get(table.toLowerCase())?.has(column.toLowerCase()) ?? false;
+}
+
+export async function migrateUserSchema(db: DatabaseExecutor, known?: TableColumns): Promise<void> {
   const legacyDate = "1970-01-01T00:00:00.000Z";
+  const columns = known ?? (await readTableColumns(db));
 
   // The ayah Hadith tab was removed until Hafiz has a licensed source. Its online cache held
   // third-party content that may not be kept, so earlier installs drop it (the index goes with it).
-  await db.execAsync("DROP TABLE IF EXISTS qf_ayah_hadith_cache");
-
   await db.execAsync(`
+    DROP TABLE IF EXISTS qf_ayah_hadith_cache;
     CREATE TABLE IF NOT EXISTS user_word_meanings (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
@@ -608,64 +630,103 @@ export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
     );
   `);
 
-  await addColumnIfMissing(db, "study_cards", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
-  await addColumnIfMissing(db, "study_cards", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
-  await addColumnIfMissing(db, "study_cards", "suspended_at", "suspended_at TEXT");
-  await addColumnIfMissing(db, "study_cards", "buried_until", "buried_until TEXT");
-  await addColumnIfMissing(db, "study_cards", "marked_at", "marked_at TEXT");
-  await addColumnIfMissing(db, "study_cards", "deleted_at", "deleted_at TEXT");
+  await addColumnIfMissing(
+    db,
+    columns,
+    "study_cards",
+    "created_at",
+    `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
+  );
+  await addColumnIfMissing(
+    db,
+    columns,
+    "study_cards",
+    "updated_at",
+    `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
+  );
+  await addColumnIfMissing(db, columns, "study_cards", "suspended_at", "suspended_at TEXT");
+  await addColumnIfMissing(db, columns, "study_cards", "buried_until", "buried_until TEXT");
+  await addColumnIfMissing(db, columns, "study_cards", "marked_at", "marked_at TEXT");
+  await addColumnIfMissing(db, columns, "study_cards", "deleted_at", "deleted_at TEXT");
   await db.execAsync(`
     CREATE INDEX IF NOT EXISTS idx_study_cards_buried ON study_cards(buried_until);
     CREATE INDEX IF NOT EXISTS idx_study_cards_marked ON study_cards(marked_at);
   `);
-  await addColumnIfMissing(db, "private_notes", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
-  await addColumnIfMissing(db, "private_notes", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
-  await addColumnIfMissing(db, "private_notes", "deleted_at", "deleted_at TEXT");
-  await addColumnIfMissing(db, "highlights", "sync_id", "sync_id TEXT");
-  await addColumnIfMissing(db, "highlights", "updated_at", "updated_at TEXT");
-  await addColumnIfMissing(db, "highlights", "deleted_at", "deleted_at TEXT");
   await addColumnIfMissing(
     db,
+    columns,
+    "private_notes",
+    "created_at",
+    `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
+  );
+  await addColumnIfMissing(
+    db,
+    columns,
+    "private_notes",
+    "updated_at",
+    `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
+  );
+  await addColumnIfMissing(db, columns, "private_notes", "deleted_at", "deleted_at TEXT");
+  await addColumnIfMissing(db, columns, "highlights", "sync_id", "sync_id TEXT");
+  await addColumnIfMissing(db, columns, "highlights", "updated_at", "updated_at TEXT");
+  await addColumnIfMissing(db, columns, "highlights", "deleted_at", "deleted_at TEXT");
+  await addColumnIfMissing(
+    db,
+    columns,
     "reflection_journey_entries",
     "created_at",
     `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
   );
   await addColumnIfMissing(
     db,
+    columns,
     "reflection_journey_entries",
     "updated_at",
     `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
   );
-  await addColumnIfMissing(db, "reflection_journey_entries", "completed_at", "completed_at TEXT");
-  await addColumnIfMissing(db, "achievement_unlocks", "seen_at", "seen_at TEXT");
-  await addColumnIfMissing(db, "achievement_unlocks", "local_payload", "local_payload TEXT NOT NULL DEFAULT '{}'");
-  await addColumnIfMissing(db, "achievement_unlocks", "public_payload", "public_payload TEXT NOT NULL DEFAULT '{}'");
-  await addColumnIfMissing(db, "achievement_unlocks", "sync_status", "sync_status TEXT DEFAULT 'pending'");
-  await addColumnIfMissing(db, "user_settings", "updated_at", "updated_at TEXT");
-  await addColumnIfMissing(db, "user_settings", "deleted_at", "deleted_at TEXT");
+  await addColumnIfMissing(db, columns, "reflection_journey_entries", "completed_at", "completed_at TEXT");
+  await addColumnIfMissing(db, columns, "achievement_unlocks", "seen_at", "seen_at TEXT");
   await addColumnIfMissing(
     db,
+    columns,
+    "achievement_unlocks",
+    "local_payload",
+    "local_payload TEXT NOT NULL DEFAULT '{}'",
+  );
+  await addColumnIfMissing(
+    db,
+    columns,
+    "achievement_unlocks",
+    "public_payload",
+    "public_payload TEXT NOT NULL DEFAULT '{}'",
+  );
+  await addColumnIfMissing(db, columns, "achievement_unlocks", "sync_status", "sync_status TEXT DEFAULT 'pending'");
+  await addColumnIfMissing(db, columns, "user_settings", "updated_at", "updated_at TEXT");
+  await addColumnIfMissing(db, columns, "user_settings", "deleted_at", "deleted_at TEXT");
+  await addColumnIfMissing(
+    db,
+    columns,
     "achievement_progress",
     "updated_at",
     `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`,
   );
-  await addColumnIfMissing(db, "achievement_progress", "payload", "payload TEXT NOT NULL DEFAULT '{}'");
-  await addColumnIfMissing(db, "mutashabihat_refs", "pre_text", "pre_text TEXT");
-  await addColumnIfMissing(db, "mutashabihat_refs", "similar_text", "similar_text TEXT");
-  await addColumnIfMissing(db, "mutashabihat_refs", "post_text", "post_text TEXT");
+  await addColumnIfMissing(db, columns, "achievement_progress", "payload", "payload TEXT NOT NULL DEFAULT '{}'");
+  await addColumnIfMissing(db, columns, "mutashabihat_refs", "pre_text", "pre_text TEXT");
+  await addColumnIfMissing(db, columns, "mutashabihat_refs", "similar_text", "similar_text TEXT");
+  await addColumnIfMissing(db, columns, "mutashabihat_refs", "post_text", "post_text TEXT");
   // Learning and consistency: session and grading detail on each review (spec 7.1).
-  await addColumnIfMissing(db, "study_log", "session_id", "session_id TEXT");
-  await addColumnIfMissing(db, "study_log", "duration_ms", "duration_ms INTEGER");
-  await addColumnIfMissing(db, "study_log", "support_level", "support_level INTEGER");
-  await addColumnIfMissing(db, "study_log", "proposed_rating", "proposed_rating INTEGER");
-  await addColumnIfMissing(db, "study_log", "grader", "grader TEXT");
-  await addColumnIfMissing(db, "study_log", "local_date", "local_date TEXT");
-  await addColumnIfMissing(db, "study_log", "tz", "tz TEXT");
-  await addColumnIfMissing(db, "study_log", "error_count", "error_count INTEGER NOT NULL DEFAULT 0");
+  await addColumnIfMissing(db, columns, "study_log", "session_id", "session_id TEXT");
+  await addColumnIfMissing(db, columns, "study_log", "duration_ms", "duration_ms INTEGER");
+  await addColumnIfMissing(db, columns, "study_log", "support_level", "support_level INTEGER");
+  await addColumnIfMissing(db, columns, "study_log", "proposed_rating", "proposed_rating INTEGER");
+  await addColumnIfMissing(db, columns, "study_log", "grader", "grader TEXT");
+  await addColumnIfMissing(db, columns, "study_log", "local_date", "local_date TEXT");
+  await addColumnIfMissing(db, columns, "study_log", "tz", "tz TEXT");
+  await addColumnIfMissing(db, columns, "study_log", "error_count", "error_count INTEGER NOT NULL DEFAULT 0");
   // STR-08: the missed day this review was graded toward, while that day could still be made up.
-  await addColumnIfMissing(db, "study_log", "makeup_for", "makeup_for TEXT");
-  await addColumnIfMissing(db, "study_cards", "tier", "tier TEXT");
-  await addColumnIfMissing(db, "study_cards", "tier_changed_at", "tier_changed_at TEXT");
+  await addColumnIfMissing(db, columns, "study_log", "makeup_for", "makeup_for TEXT");
+  await addColumnIfMissing(db, columns, "study_cards", "tier", "tier TEXT");
+  await addColumnIfMissing(db, columns, "study_cards", "tier_changed_at", "tier_changed_at TEXT");
 
   await db.execAsync(`
     UPDATE study_cards
@@ -719,20 +780,19 @@ async function backfillStudyLogLocalDates(db: DatabaseExecutor): Promise<void> {
   }
 }
 
-async function addColumnIfMissing(
+export async function addColumnIfMissing(
   db: DatabaseExecutor,
+  columns: TableColumns,
   table: string,
   column: string,
   definition: string,
 ): Promise<void> {
+  if (hasColumn(columns, table, column)) return;
   try {
-    await db.getFirstAsync(`SELECT ${column} FROM ${table} LIMIT 1`);
-  } catch {
-    try {
-      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
-    } catch (error) {
-      console.warn(`[Database] Legacy schema migration skipped ${table}.${column}:`, error);
-    }
+    await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+    columns.get(table.toLowerCase())?.add(column.toLowerCase());
+  } catch (error) {
+    console.warn(`[Database] Legacy schema migration skipped ${table}.${column}:`, error);
   }
 }
 
@@ -756,6 +816,12 @@ async function createUserMigrationIndexes(db: DatabaseExecutor): Promise<void> {
     "CREATE INDEX IF NOT EXISTS idx_notification_log_date ON notification_log(local_date)",
   ];
 
+  try {
+    await db.execAsync(statements.join(";\n"));
+    return;
+  } catch {
+    // One index could not be created. Create the others one at a time below.
+  }
   for (const statement of statements) {
     try {
       await db.execAsync(statement);
