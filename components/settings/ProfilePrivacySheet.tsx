@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SocialErrorText, SocialToggleRow, socialRowStyle } from "@/components/social/SocialControls";
 import { Button } from "@/components/ui/Button";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
@@ -20,7 +20,7 @@ import {
 } from "@/lib/profile/privacy";
 import { useSettings } from "@/lib/settings/context";
 import { socialFailureMessage } from "@/lib/social/messages";
-import { requireSocialOwner } from "@/lib/social/owner";
+import { captureSocialOwner, requireSocialOwner } from "@/lib/social/owner";
 
 type Visibility = Pick<ProfilePrivacy, "showStreak" | "showJuzCompletions" | "isMinor">;
 
@@ -32,6 +32,10 @@ type Visibility = Pick<ProfilePrivacy, "showStreak" | "showJuzCompletions" | "is
  * ETH-07: saving sends the minority the form loaded, which the server compares. A cached copy can
  * predate another device changing it, so the profile choices appear only after a read that completed
  * while the sheet is open. When the stored values change, the drafts start again from them.
+ *
+ * Save and Leave act at once. Save closes the sheet with "Saved" and the app uses the new choices
+ * while the server stores them; a refusal restores the stored choices and says so through `onNotice`,
+ * which outlives the sheet. Leaving halaqas shows them left while the request runs.
  */
 export function ProfilePrivacySheet({
   userId,
@@ -75,55 +79,90 @@ export function ProfilePrivacySheet({
     refetchOnMount: "always",
   });
 
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const save = useMutation({
-    mutationFn: (input: Visibility & { expectedMinor: boolean }) =>
-      saveProfilePrivacy(input, requireSocialOwner(userId)),
-    onSuccess: async (saved) => {
-      onNotice(saved.leftBoard ? s.socialSavedLeftBoard : s.socialSaved);
-      onClose();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) }),
-        // Recording minority leaves matched halaqas on the server.
-        queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.legacyHalaqas(userId) }),
-        saved.leftBoard ? queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) }) : null,
-        // Recording minority clears the photo on the server, so the signed-in profile reloads.
-        saved.isMinor ? useAuthStore.getState().fetchProfile() : null,
-      ]);
-    },
-    onError: (error) => {
-      if (error instanceof ProfilePrivacyChangedError) {
-        // Another device changed the age setting. The choices reload and the person decides again.
-        setSaveError(s.socialErrorPrivacyChanged);
-        void privacy.refetch();
-        return;
-      }
-      setSaveError(socialFailureMessage(error, s));
-    },
-  });
+  // Each action runs once per press; the sheet's own state is set only while it is open.
+  const saving = useRef(false);
+  const leaving = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const save = () => {
+    if (!visibility || !loaded || !privacy.data || saving.current) return;
+    const owner = captureSocialOwner(userId);
+    if (!owner) return;
+    saving.current = true;
+    const key = profilePrivacyKeys.mine(userId);
+    const before = queryClient.getQueryData<ProfilePrivacy>(key);
+    const shown: ProfilePrivacy = { ...(before ?? privacy.data), ...visibility };
+    queryClient.setQueryData(key, shown);
+    onNotice(s.socialSaved);
+    onClose();
+    saveProfilePrivacy({ ...visibility, expectedMinor: loaded.isMinor }, owner).then(
+      async (saved) => {
+        if (!owner.isCurrent()) return;
+        // Recording minority can take a Board member without a nickname off the Board.
+        if (saved.leftBoard) onNotice(s.socialSavedLeftBoard);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: key }),
+          // Recording minority leaves matched halaqas on the server.
+          queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.legacyHalaqas(userId) }),
+          saved.leftBoard ? queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) }) : null,
+          // Recording minority clears the photo on the server, so the signed-in profile reloads.
+          saved.isMinor ? useAuthStore.getState().fetchProfile() : null,
+        ]);
+      },
+      (error: unknown) => {
+        // The stored choices still apply: show them again and read them back.
+        if (queryClient.getQueryData(key) === shown) queryClient.setQueryData(key, before);
+        void queryClient.invalidateQueries({ queryKey: key });
+        if (!owner.isCurrent()) return;
+        // ETH-07: another device changed the age setting; the person checks it and saves again.
+        const reason =
+          error instanceof ProfilePrivacyChangedError ? s.socialErrorPrivacyChanged : socialFailureMessage(error, s);
+        onNotice(`${s.privacyNotSaved} ${reason}`);
+      },
+    );
+  };
 
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [left, setLeft] = useState(false);
-  const leave = useMutation({
-    mutationFn: () => leaveLegacyHalaqas(requireSocialOwner(userId)),
-    onSuccess: async () => {
-      setLeft(true);
-      setConfirmLeave(false);
-      await queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.legacyHalaqas(userId) });
-    },
-  });
-
-  const pending = save.isPending || leave.isPending;
-  const close = () => {
-    if (!pending) onClose();
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const leave = () => {
+    if (leaving.current) return;
+    const owner = captureSocialOwner(userId);
+    if (!owner) return;
+    leaving.current = true;
+    setLeft(true);
+    setConfirmLeave(false);
+    setLeaveError(null);
+    const settle = () => {
+      leaving.current = false;
+      void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.legacyHalaqas(userId) });
+    };
+    leaveLegacyHalaqas(owner).then(settle, (error: unknown) => {
+      settle();
+      if (!owner.isCurrent()) return;
+      const message = `${s.legacyHalaqaStillIn} ${socialFailureMessage(error, s)}`;
+      if (!mounted.current) {
+        onNotice(message);
+        return;
+      }
+      setLeft(false);
+      setLeaveError(message);
+    });
   };
+
   const startButton = { alignSelf: isRTL ? "flex-end" : "flex-start" } as const;
   const outline = "h-11 px-4 border border-warm-300 dark:border-neutral-700";
   const inHalaqa = (halaqas.data?.length ?? 0) > 0;
 
   return (
-    <ResponsiveSheet open onClose={close} dismissOnBackdrop={!pending} maxWidth={560} maxHeight="88%">
-      <OverlayHeader title={s.privacySettingsTitle} onClose={close} showHandle isRTL={isRTL} />
+    <ResponsiveSheet open onClose={onClose} maxWidth={560} maxHeight="88%">
+      <OverlayHeader title={s.privacySettingsTitle} onClose={onClose} showHandle isRTL={isRTL} />
       <OverlayBody contentContainerClassName="gap-1 px-5 pb-4 pt-2">
         <Text variant="title-md" accessibilityRole="header">
           {s.profileVisibilityTitle}
@@ -134,20 +173,19 @@ export function ProfilePrivacySheet({
               label={s.profileShowStreak}
               value={visibility.showStreak && !visibility.isMinor}
               onValueChange={setVisible("showStreak")}
-              disabled={pending || visibility.isMinor}
+              disabled={visibility.isMinor}
             />
             <SocialToggleRow
               label={s.profileShowJuz}
               value={visibility.showJuzCompletions && !visibility.isMinor}
               onValueChange={setVisible("showJuzCompletions")}
-              disabled={pending || visibility.isMinor}
+              disabled={visibility.isMinor}
             />
             <SocialToggleRow
               label={s.profileIsMinor}
               hint={s.profileIsMinorHint}
               value={visibility.isMinor}
               onValueChange={setVisible("isMinor")}
-              disabled={pending}
             />
           </>
         ) : privacy.isError && !privacy.isFetching ? (
@@ -187,7 +225,7 @@ export function ProfilePrivacySheet({
             <Text variant="title-md" accessibilityRole="header">
               {s.legacyHalaqaTitle}
             </Text>
-            {left && !inHalaqa ? (
+            {left ? (
               <Text variant="body-sm" className="text-warm-700 dark:text-neutral-300" accessibilityLiveRegion="polite">
                 {s.legacyHalaqaLeft}
               </Text>
@@ -196,7 +234,7 @@ export function ProfilePrivacySheet({
                 <Text variant="body-sm" className="text-warm-700 dark:text-neutral-300">
                   {confirmLeave ? s.legacyHalaqaConfirm : s.legacyHalaqaBody}
                 </Text>
-                {leave.isError ? <SocialErrorText message={socialFailureMessage(leave.error, s)} /> : null}
+                {leaveError ? <SocialErrorText message={leaveError} /> : null}
                 {confirmLeave ? (
                   <View className="gap-3" style={socialRowStyle(isRTL)}>
                     <Button
@@ -204,15 +242,12 @@ export function ProfilePrivacySheet({
                       className="flex-1"
                       label={s.legacyHalaqaKeep}
                       onPress={() => setConfirmLeave(false)}
-                      disabled={pending}
                     />
                     <Button
                       variant="destructive"
                       className="flex-1"
                       label={s.legacyHalaqaConfirmLeave}
-                      onPress={() => leave.mutate()}
-                      disabled={pending}
-                      accessibilityState={{ disabled: pending, busy: leave.isPending }}
+                      onPress={leave}
                     />
                   </View>
                 ) : (
@@ -222,10 +257,9 @@ export function ProfilePrivacySheet({
                       className={outline}
                       label={s.legacyHalaqaLeave}
                       onPress={() => {
-                        leave.reset();
+                        setLeaveError(null);
                         setConfirmLeave(true);
                       }}
-                      disabled={pending}
                     />
                   </View>
                 )}
@@ -253,26 +287,17 @@ export function ProfilePrivacySheet({
         ) : null}
       </OverlayBody>
       <OverlayFooter isRTL={isRTL} className="px-5 pb-5">
-        {/* The footer is a row: this column takes its width, so the error sits above the buttons and
-            their row has a width for flex-1 to share. */}
+        {/* The footer is a row: this column takes its width, so the buttons' row has a width for
+            flex-1 to share. */}
         <View className="flex-1">
-          {saveError ? (
-            <View className="mb-3">
-              <SocialErrorText message={saveError} />
-            </View>
-          ) : null}
           <View className="gap-3" style={socialRowStyle(isRTL)}>
-            <Button variant="ghost" className="flex-1" label={s.socialCancel} onPress={close} disabled={pending} />
+            <Button variant="ghost" className="flex-1" label={s.socialCancel} onPress={onClose} />
             <Button
               className="flex-1"
               label={s.socialSave}
-              onPress={() => {
-                if (!visibility || !loaded) return;
-                setSaveError(null);
-                save.mutate({ ...visibility, expectedMinor: loaded.isMinor });
-              }}
-              disabled={pending || !visibility}
-              accessibilityState={{ disabled: pending || !visibility, busy: save.isPending }}
+              onPress={save}
+              disabled={!visibility}
+              accessibilityState={{ disabled: !visibility }}
             />
           </View>
         </View>

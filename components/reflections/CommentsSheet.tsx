@@ -8,12 +8,19 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { requireSocialOwner } from "@/lib/social/owner";
 import { useAuthStore } from "@/lib/auth/store";
-import { hapticLight } from "@/lib/haptics";
 import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
-import { fetchComments, addComment, toggleCommentLike } from "@/lib/reflections/api";
-import { SavedRowUnreadableError } from "@/lib/reflections/rows";
-import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
+import { fetchComments, toggleCommentLike } from "@/lib/reflections/api";
+import {
+  isPendingId,
+  pendingKeys,
+  settleListedComments,
+  takeRecoveredDraft,
+  useDraftAdopter,
+  useHiddenSet,
+  usePendingComments,
+  type RecoveredDraft,
+} from "@/lib/reflections/pending";
 import type { Reflection, ReflectionComment, ReflectionCommentSort } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { DiscardChangesDialog, isEditableTextDirty, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
@@ -24,8 +31,9 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { ReflectionCard } from "./ReflectionCard";
 import { formatCommentDateTime, formatLocalRelativeTime, ReflectionTime } from "./ReflectionTime";
-import { useReflectionMutationScope, type ReflectionMutationLease } from "./use-mutation-scope";
-import { useDeleteComment, useReportReflection } from "./use-reflection-actions";
+import { useReflectionMutationScope } from "./use-mutation-scope";
+import { useOptimisticLike } from "./use-optimistic-like";
+import { useDeleteComment, usePostComment, useReportReflection } from "./use-reflection-actions";
 import { textStartStyle } from "@/lib/ui/direction";
 
 export { formatCommentDateTime };
@@ -41,10 +49,11 @@ type Props = {
   onClose: () => void;
   /** Called after this sheet closes for a navigation, so a sheet that contains it can close too. */
   onNavigate?: () => void;
+  /** When the viewer sends a comment (it shows at once), so the count shown rises by one. */
   onCommentAdded?: (reflectionId: string) => void;
-  /** After the server confirmed deleting one of the viewer's comments, so the count shown drops by one. */
+  /** When one of the viewer's comments leaves the list (deleted, or its post failed), so the count drops by one. */
   onCommentRemoved?: (reflectionId: string) => void;
-  /** After the author's delete of the shown reflection settled; the sheet has already closed. */
+  /** When the author deletes the shown reflection; the sheet has already closed. */
   onReflectionGone?: (reflection: Reflection) => void;
   /**
    * Where a guest returns after signing in from this sheet: the ayah it was opened from (ayah
@@ -99,16 +108,17 @@ export function CommentsSheet({
     enabled: false,
   });
   const isMinor = ownPrivacy.data?.isMinor === true;
-  const [localComments, setLocalComments] = useState<ReflectionComment[]>([]);
   const [sort, setSort] = useState<ReflectionCommentSort>("oldest");
   const [sortOpen, setSortOpen] = useState(false);
-  const [text, setText] = useState("");
+  // The input's text, also kept in a ref so two submit events before a render send it once.
+  const [text, setTextState] = useState("");
+  const textRef = useRef("");
+  const setText = useCallback((next: string) => {
+    textRef.current = next;
+    setTextState(next);
+  }, []);
   const queryClient = useQueryClient();
-  const { begin, pending, retire } = useReflectionMutationScope(JSON.stringify(reflectionId), user?.id);
-  const submitting = pending.has("submit");
-  const [commentLikeOverrides, setCommentLikeOverrides] = useState<
-    Record<string, { source: ReflectionComment; lease: ReflectionMutationLease; liked: boolean; likesCount: number }>
-  >({});
+  const { begin, retire } = useReflectionMutationScope(JSON.stringify(reflectionId), user?.id);
   // Each failure shows where the person acted: the first load at the top, loading more beside its
   // button, and posting or liking above the input.
   const [failure, setFailure] = useState<"load" | "more" | "post" | "privacy" | "like" | "auth" | null>(null);
@@ -133,19 +143,25 @@ export function CommentsSheet({
   }, [retire, onClose]);
   // Comments have no report of their own: "Report reflection" reports the parent, and says so.
   const parentReport = useReportReflection(reflection ?? null);
-  // A sheet reopened after login has no parent list to adjust in place.
+  // A sheet reopened after login has no parent list to adjust in place, so its lists refetch once
+  // the server has the change.
   const refreshParentCounts = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
     void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.all });
   }, [queryClient]);
-  const removeLocalComment = useCallback(
-    (removed: ReflectionComment, deleted: boolean) => {
-      setLocalComments((prev) => prev.filter((row) => row.id !== removed.id));
-      if (deleted) (onCommentRemoved ?? refreshParentCounts)(removed.reflection_id);
+  const countUp = useCallback((id: string) => onCommentAdded?.(id), [onCommentAdded]);
+  const countDown = useCallback((id: string) => onCommentRemoved?.(id), [onCommentRemoved]);
+  const commentSaved = useCallback(() => {
+    if (!onCommentAdded) refreshParentCounts();
+  }, [onCommentAdded, refreshParentCounts]);
+  const commentRemoval = useDeleteComment(reflectionId, {
+    onRemoved: (removed) => countDown(removed.reflection_id),
+    onRestored: (restored) => countUp(restored.reflection_id),
+    onDeleted: () => {
+      if (!onCommentRemoved) refreshParentCounts();
     },
-    [onCommentRemoved, refreshParentCounts],
-  );
-  const commentRemoval = useDeleteComment(reflectionId, removeLocalComment);
+  });
+  const postComment = usePostComment({ onAdded: countUp, onRemoved: countDown, onSaved: commentSaved });
   // A typed comment asks before any intentional close or switch away from this reflection.
   const { guard, dialogProps } = useDiscardGuard(isEditableTextDirty(text, ""));
   const handleClose = useCallback(() => guard(closeNow), [closeNow, guard]);
@@ -178,36 +194,43 @@ export function CommentsSheet({
     () => commentsQuery.data?.pages.flatMap((page) => page.data) ?? [],
     [commentsQuery.data],
   );
-
-  const sourceComments = useMemo(() => {
+  // The viewer's own comments that the server has not listed yet, and the ones they deleted here.
+  const ownComments = usePendingComments(user?.id, reflectionId);
+  useEffect(() => {
+    settleListedComments(user?.id, new Set(loadedComments.map((comment) => comment.id)));
+  }, [loadedComments, user?.id]);
+  const hidden = useHiddenSet();
+  const comments = useMemo(() => {
     const loadedIds = new Set(loadedComments.map((comment) => comment.id));
-    return [...loadedComments, ...localComments.filter((comment) => !loadedIds.has(comment.id))];
-  }, [loadedComments, localComments]);
-  const currentComments = useRef(sourceComments);
-  useLayoutEffect(() => {
-    currentComments.current = sourceComments;
-  }, [sourceComments]);
-  // Currentness can change without a new query row, including a same-user session replacement.
-  const comments = sortComments(
-    sourceComments.map((comment) => {
-      const override = commentLikeOverrides[comment.id];
-      return override?.lease.isCurrent() && override.source === comment
-        ? { ...comment, likes_count: override.likesCount, user_has_liked: override.liked }
-        : comment;
-    }),
-    sort,
+    const shown = [...loadedComments, ...ownComments.filter((comment) => !loadedIds.has(comment.id))].filter(
+      (comment) => !user || !hidden.has(pendingKeys.comment(user.id, comment.id)),
+    );
+    return sortComments(shown, sort);
+  }, [loadedComments, ownComments, hidden, user, sort]);
+
+  // A comment whose post failed returns to this input when it is empty, with the reason above it.
+  const draftKey = user && reflectionId ? pendingKeys.commentDraft(user.id, reflectionId) : null;
+  const adoptDraft = useCallback(
+    (draft: RecoveredDraft) => {
+      if (textRef.current.trim()) return false;
+      setText(draft.content);
+      setFailure(draft.failure);
+      return true;
+    },
+    [setText],
   );
+  useDraftAdopter(draftKey, adoptDraft);
 
   useLayoutEffect(() => {
-    setLocalComments([]);
     setText("");
     setFailure(null);
     setSortOpen(false);
-    setCommentLikeOverrides({});
     setExpandedIds(new Set());
     setClampedIds(new Set());
     setDateRevealId(null);
-  }, [reflectionId, user?.id]);
+    const draft = draftKey ? takeRecoveredDraft(draftKey) : null;
+    if (draft) adoptDraft(draft);
+  }, [draftKey, reflectionId, user?.id, setText, adoptDraft]);
 
   // fetchNextPage reports a failed page through the query's error, not by throwing, so the kind
   // comes from the query: a failed next page shows beside "Load more", anything else at the top.
@@ -219,43 +242,15 @@ export function CommentsSheet({
     }
   }, [commentsQuery.error, commentsQuery.isFetchNextPageError]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!user || !reflectionId || !text.trim()) return;
-    const lease = begin("submit");
-    if (!lease) return;
-    const submitted = text;
+  // Sending clears the input and shows the comment at once; a failure brings the text back here.
+  const handleSubmit = useCallback(() => {
+    const submitted = textRef.current;
+    if (!user || !reflectionId || isPendingId(reflectionId) || !submitted.trim()) return;
+    const sent = postComment({ viewerId: user.id, reflectionId, draft: submitted, promisedPrivate: isMinor });
+    if (!sent) return;
+    setText("");
     setFailure(null);
-    const finishPosted = () => {
-      setText((current) => (current === submitted ? "" : current));
-      void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflectionId) });
-      (onCommentAdded ?? refreshParentCounts)(reflectionId);
-    };
-    try {
-      const comment = await addComment(user.id, reflectionId, submitted.trim(), isMinor);
-      if (!lease.isCurrent()) return;
-      setLocalComments((prev) => [...prev, comment]);
-      finishPosted();
-    } catch (error) {
-      const privacyChanged = error instanceof ReflectionPrivacyChangedError;
-      // The account is no longer a minor on the server: reload its privacy so the note goes away, and
-      // post nothing until the person sends again.
-      if (privacyChanged) void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user.id) });
-      if (!lease.isCurrent()) return;
-      // Posted, but the reply could not be read: the refetch shows it instead of a duplicate retry.
-      if (error instanceof SavedRowUnreadableError) {
-        finishPosted();
-        return;
-      }
-      if (privacyChanged) {
-        setFailure("privacy");
-        return;
-      }
-      console.warn("[Comments] Failed to add:", error);
-      setFailure("post");
-    } finally {
-      lease.release();
-    }
-  }, [user, reflectionId, text, isMinor, begin, onCommentAdded, queryClient, refreshParentCounts]);
+  }, [user, reflectionId, isMinor, postComment, setText]);
 
   const handleLoadMore = useCallback(async () => {
     if (!reflectionId || !commentsQuery.hasNextPage) return;
@@ -272,66 +267,11 @@ export function CommentsSheet({
     }
   }, [reflectionId, begin, commentsQuery]);
 
-  const handleCommentLike = useCallback(
-    async (comment: ReflectionComment) => {
-      if (!user) {
-        requireAuth();
-        return;
-      }
-      const lease = begin("like:" + comment.id);
-      if (!lease) return;
-      const source =
-        loadedComments.find((row) => row.id === comment.id) ??
-        localComments.find((row) => row.id === comment.id) ??
-        comment;
-      const wasLiked = comment.user_has_liked ?? false;
-      setFailure(null);
-      setCommentLikeOverrides((prev) => ({
-        ...prev,
-        [comment.id]: {
-          source,
-          lease,
-          liked: !wasLiked,
-          likesCount: Math.max(0, (comment.likes_count ?? 0) + (wasLiked ? -1 : 1)),
-        },
-      }));
-      hapticLight();
-      try {
-        await toggleCommentLike(user.id, comment.id, wasLiked);
-        if (lease.isCurrent() && reflectionId) {
-          const latest = currentComments.current.find((row) => row.id === comment.id);
-          if (latest) {
-            const desired = !wasLiked,
-              before = latest.user_has_liked ?? false;
-            setCommentLikeOverrides((prev) => ({
-              ...prev,
-              [comment.id]: {
-                source: latest,
-                lease,
-                liked: desired,
-                likesCount: Math.max(0, (latest.likes_count ?? 0) + (before === desired ? 0 : desired ? 1 : -1)),
-              },
-            }));
-          }
-          void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflectionId) });
-        }
-      } catch (error) {
-        if (lease.isCurrent()) {
-          console.warn("[Comments] Failed to update like:", error);
-          setCommentLikeOverrides((prev) => {
-            if (prev[comment.id]?.lease !== lease) return prev;
-            const next = { ...prev };
-            delete next[comment.id];
-            return next;
-          });
-          setFailure("like");
-        }
-      } finally {
-        lease.release();
-      }
-    },
-    [user, begin, loadedComments, localComments, reflectionId, requireAuth, queryClient],
-  );
+  const commentLikeSettled = useCallback(() => {
+    if (reflectionId)
+      void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflectionId) });
+  }, [queryClient, reflectionId]);
+  const commentLikeFailed = useCallback(() => setFailure("like"), []);
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
   // Android keeps this screen and its Modal window mounted under a pushed route, so the sheet
@@ -553,7 +493,7 @@ export function CommentsSheet({
                         onReveal={(show) => setDateRevealId((current) => (show ? c.id : current === c.id ? null : current))}
                         color={mutedColor}
                       />
-                      {user ? (
+                      {user && !isPendingId(c.id) ? (
                         <View>
                           <DropdownMenu
                             triggerLabel={s.commentOptions}
@@ -567,7 +507,6 @@ export function CommentsSheet({
                                       label: s.commentDeleteAction,
                                       destructive: true,
                                       icon: (color) => <Trash2 size={16} color={color} />,
-                                      disabled: commentRemoval.pending,
                                       onPress: () => commentRemoval.request(c),
                                     },
                                   ]
@@ -577,7 +516,7 @@ export function CommentsSheet({
                                         key: "report-parent",
                                         label: parentReport.reported ? s.reflectionReported : s.reflectionReportAction,
                                         icon: (color) => <Flag size={16} color={color} />,
-                                        disabled: parentReport.reported || parentReport.pending,
+                                        disabled: parentReport.reported,
                                         onPress: parentReport.request,
                                       },
                                     ]
@@ -661,31 +600,13 @@ export function CommentsSheet({
                         flexDirection: isRTL ? "row-reverse" : "row",
                       }}
                     >
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => handleCommentLike(c)}
-                        accessibilityLabel={c.user_has_liked ? s.removeCommentLike : s.likeComment}
-                        accessibilityValue={{ text: formatNumber(c.likes_count ?? 0, uiLanguage) }}
-                        disabled={pending.has("like:" + c.id)}
-                        className={`items-center gap-1 rounded-full px-2 py-1 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
-                        style={({ pressed }) => ({
-                          direction: "ltr",
-                          flexDirection: isRTL ? "row-reverse" : "row",
-                          opacity: pressed || pending.has("like:" + c.id) ? 0.6 : 1,
-                          backgroundColor: themeColors.surfaceMid,
-                        })}
-                      >
-                        <Heart
-                          size={14}
-                          color={c.user_has_liked ? "#ef4444" : mutedColor}
-                          fill={c.user_has_liked ? "#ef4444" : "none"}
-                        />
-                        {(c.likes_count ?? 0) > 0 ? (
-                          <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 11, color: mutedColor }}>
-                            {formatNumber(c.likes_count ?? 0, uiLanguage)}
-                          </Text>
-                        ) : null}
-                      </Pressable>
+                      <CommentLikeButton
+                        comment={c}
+                        onAuthRequired={requireAuth}
+                        onSettled={commentLikeSettled}
+                        onFailed={commentLikeFailed}
+                        onPressed={() => setFailure((current) => (current === "like" ? null : current))}
+                      />
                     </View>
                   </View>
                 ))}
@@ -787,13 +708,13 @@ export function CommentsSheet({
               />
               <Pressable
                 onPress={handleSubmit}
-                disabled={submitting || !text.trim()}
+                disabled={!text.trim()}
                 accessibilityRole="button"
                 accessibilityLabel={s.reflectionSend}
                 // A 44 px target around the 18 px icon.
                 className="-my-2 h-11 w-11 items-center justify-center"
                 style={({ pressed }) => ({
-                  opacity: pressed || submitting || !text.trim() ? 0.4 : 1,
+                  opacity: pressed || !text.trim() ? 0.4 : 1,
                 })}
               >
                 <Send size={18} color={isDark ? "#5eead4" : "#003638"} />
@@ -867,14 +788,11 @@ export function CommentsSheet({
         message={s.commentDeleteBody}
         cancelLabel={s.reflectionCancel}
         confirmLabel={s.reflectionDeleteConfirm}
-        pendingLabel={s.reflectionDeleting}
         destructive
-        confirmLoading={commentRemoval.pending}
-        error={commentRemoval.error}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={commentRemoval.cancel}
-        onConfirm={() => void commentRemoval.confirm()}
+        onConfirm={commentRemoval.confirm}
       />
       <ConfirmDialog
         visible={parentReport.open}
@@ -882,16 +800,81 @@ export function CommentsSheet({
         message={interpolate(s.reflectionReportFromCommentBody, { reference: referenceLabel ?? s.reflectionPostTitle })}
         cancelLabel={s.reflectionCancel}
         confirmLabel={s.reflectionReportConfirm}
-        pendingLabel={s.reflectionReporting}
         tone="info"
-        confirmLoading={parentReport.pending}
-        error={parentReport.error}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={parentReport.cancel}
-        onConfirm={() => void parentReport.confirm()}
+        onConfirm={parentReport.confirm}
       />
     </>
+  );
+}
+
+/**
+ * A comment's like: it answers each tap at once and stays pressable (use-optimistic-like.ts). A
+ * comment still being sent takes no likes until the server names it.
+ */
+function CommentLikeButton({
+  comment,
+  onAuthRequired,
+  onSettled,
+  onFailed,
+  onPressed,
+}: {
+  comment: ReflectionComment;
+  onAuthRequired: () => void;
+  onSettled: () => void;
+  onFailed: () => void;
+  onPressed: () => void;
+}) {
+  const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
+  const s = useStrings();
+  const user = useAuthStore((state) => state.user);
+  const mutedColor = isDark ? "#737373" : "#A39B93";
+  const sending = isPendingId(comment.id);
+  const like = useOptimisticLike({
+    kind: "comment",
+    id: comment.id,
+    liked: comment.user_has_liked ?? false,
+    count: comment.likes_count ?? 0,
+    send: (userId, liked) => toggleCommentLike(userId, comment.id, !liked),
+    onSettled: (_liked, delta) => {
+      if (delta) onSettled();
+    },
+    onFailed: (_liked, delta) => {
+      if (delta) onSettled();
+      onFailed();
+    },
+  });
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => {
+        if (!user) {
+          onAuthRequired();
+          return;
+        }
+        onPressed();
+        like.toggle();
+      }}
+      accessibilityLabel={like.liked ? s.removeCommentLike : s.likeComment}
+      accessibilityValue={{ text: formatNumber(like.count, uiLanguage) }}
+      disabled={sending}
+      className={`items-center gap-1 rounded-full px-2 py-1 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+      style={({ pressed }) => ({
+        direction: "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        opacity: pressed || sending ? 0.6 : 1,
+        backgroundColor: themeColors.surfaceMid,
+      })}
+    >
+      <Heart size={14} color={like.liked ? "#ef4444" : mutedColor} fill={like.liked ? "#ef4444" : "none"} />
+      {like.count > 0 ? (
+        <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 11, color: mutedColor }}>
+          {formatNumber(like.count, uiLanguage)}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
 

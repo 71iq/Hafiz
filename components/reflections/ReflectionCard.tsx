@@ -1,13 +1,13 @@
-import { useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useLayoutEffect, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
-import { useReflectionMutationScope, type ReflectionMutationLease } from "./use-mutation-scope";
 import { View, Text, Pressable } from "react-native";
 import { router } from "expo-router";
 import { Heart, MessageCircle, Flag, Trash2 } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
-import { hapticLight } from "@/lib/haptics";
 import { toggleLike } from "@/lib/reflections/api";
+import { isPendingId, pendingKeys, useIsHidden } from "@/lib/reflections/pending";
+import { useOptimisticLike } from "./use-optimistic-like";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { formatCompactCount } from "@/lib/reflections/format";
@@ -35,7 +35,7 @@ type Props = {
   onNavigate?: () => void;
   /** Clamp long content and offer Read more (which calls onPress). The full-post view leaves this off. */
   clamp?: boolean;
-  /** After the author's delete settled (deleted, or no longer available), so a detail view can close. */
+  /** When the author confirms deleting it and it leaves the lists, so a detail view can close. */
   onGone?: (reflection: Reflection) => void;
 };
 
@@ -57,89 +57,62 @@ export function ReflectionCard({
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
-  const { begin, pending } = useReflectionMutationScope(reflection.id, user?.id);
-  const currentReflection = useRef(reflection);
-  useLayoutEffect(() => {
-    currentReflection.current = reflection;
-  }, [reflection]);
-  const [preview, setPreview] = useState<{
-    lease: ReflectionMutationLease;
-    baseLiked: boolean;
-    baseCount: number;
-    liked: boolean;
-    count: number;
-  } | null>(null);
   const [failure, setFailure] = useState<"like" | "auth" | null>(null);
   const [timeRevealed, setTimeRevealed] = useState(false);
   const [clamped, setClamped] = useState(false);
-  const likeBusy = pending.has("like");
   const report = useReportReflection(reflection);
   const removal = useDeleteReflection(reflection, onGone);
   const isOwn = !!user && reflection.user_id === user.id;
-  const canonicalLiked = reflection.user_has_liked ?? false;
-  const activePreview =
-    preview?.lease.isCurrent() && preview.baseLiked === canonicalLiked && preview.baseCount === reflection.likes_count
-      ? preview
-      : null;
-  const liked = activePreview?.liked ?? canonicalLiked;
-  const likesCount = activePreview?.count ?? reflection.likes_count;
+  // A post the server has not named yet shows at once but takes no likes, replies or menu actions.
+  const sending = isPendingId(reflection.id);
+  const hidden = useIsHidden(user ? pendingKeys.reflection(user.id, reflection.id) : null);
   const error = failure === "like" ? s.reflectionLikeFailed : failure === "auth" ? s.reflectionFeedAuthRequired : null;
   const authorName = reflection.profiles?.display_name || reflection.profiles?.username || s.genericAnonymous;
 
-  useLayoutEffect(() => {
-    setPreview(null);
-    setFailure(null);
-    setTimeRevealed(false);
-  }, [reflection.id, user?.id]);
-
-  const handleLike = useCallback(async () => {
-    if (!user) {
-      // The surface stays open and explains itself; no like is replayed after signing in.
-      if (onAuthRequired) onAuthRequired();
-      else setFailure("auth");
-      return;
-    }
-    const lease = begin("like");
-    if (!lease) return;
-    const desired = !liked;
-    setFailure(null);
-    hapticLight();
-    setPreview({
-      lease,
-      baseLiked: canonicalLiked,
-      baseCount: reflection.likes_count,
-      liked: desired,
-      count: Math.max(0, likesCount + (desired ? 1 : -1)),
-    });
-    try {
-      await toggleLike(user.id, reflection.id, liked);
-      if (!lease.isCurrent()) return;
-      const latest = currentReflection.current,
-        before = latest.user_has_liked ?? false;
-      const delta = before === desired ? 0 : desired ? 1 : -1;
-      setPreview({
-        lease,
-        baseLiked: before,
-        baseCount: latest.likes_count,
-        liked: desired,
-        count: Math.max(0, latest.likes_count + delta),
-      });
-      if (delta) onLikeToggled(reflection.id, desired, delta);
+  // The server now holds `liked`: lists that keep their own rows adjust, and shared lists refetch.
+  const reconcileLike = useCallback(
+    (liked: boolean, delta: -1 | 0 | 1) => {
+      if (!delta) return;
+      onLikeToggled(reflection.id, liked, delta);
       for (let ayah = reflection.ayah_start; ayah <= reflection.ayah_end; ayah++) {
         void queryClient.invalidateQueries({
           queryKey: reflectionQueryKeys.reflections.ayah({ surah: reflection.surah, ayah }),
         });
       }
       void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
-    } catch {
-      if (lease.isCurrent()) {
-        setPreview(null);
-        setFailure("like");
-      }
-    } finally {
-      lease.release();
+    },
+    [onLikeToggled, queryClient, reflection],
+  );
+  const like = useOptimisticLike({
+    kind: "reflection",
+    id: reflection.id,
+    liked: reflection.user_has_liked ?? false,
+    count: reflection.likes_count,
+    send: (userId, liked) => toggleLike(userId, reflection.id, !liked),
+    onSettled: reconcileLike,
+    onFailed: (liked, delta) => {
+      reconcileLike(liked, delta);
+      setFailure("like");
+    },
+  });
+  const { liked, count: likesCount, toggle: toggleLikeChoice } = like;
+
+  useLayoutEffect(() => {
+    setFailure(null);
+    setTimeRevealed(false);
+  }, [reflection.id, user?.id]);
+
+  const handleLike = useCallback(() => {
+    if (!user) {
+      // The surface stays open and explains itself; no like is replayed after signing in.
+      if (onAuthRequired) onAuthRequired();
+      else setFailure("auth");
+      return;
     }
-  }, [user, begin, liked, canonicalLiked, likesCount, reflection, onLikeToggled, onAuthRequired, queryClient]);
+    if (sending) return;
+    setFailure(null);
+    toggleLikeChoice();
+  }, [user, sending, toggleLikeChoice, onAuthRequired]);
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
   const heartColor = liked ? "#ef4444" : mutedColor;
@@ -161,7 +134,7 @@ export function ReflectionCard({
     textAlign: contentAlign,
     writingDirection: isRTL ? ("rtl" as const) : ("ltr" as const),
   };
-  const canClamp = clamp && !!onPress;
+  const canClamp = clamp && !!onPress && !sending;
   const contentText = (
     <View style={{ marginBottom: canClamp && clamped ? 4 : isFeed ? 14 : 12 }}>
       {canClamp ? (
@@ -197,7 +170,6 @@ export function ReflectionCard({
           destructive: true,
           icon: (color) => <Trash2 size={16} color={color} />,
           onPress: removal.request,
-          disabled: removal.pending,
         },
       ]
     : [
@@ -206,9 +178,12 @@ export function ReflectionCard({
           label: report.reported ? s.reflectionReported : s.reflectionReportAction,
           icon: (color) => <Flag size={16} color={color} />,
           onPress: report.request,
-          disabled: report.reported || report.pending,
+          disabled: report.reported,
         },
       ];
+
+  // Deleted on this device: gone at once, and back if the server refuses.
+  if (hidden) return null;
 
   return (
     <>
@@ -256,7 +231,7 @@ export function ReflectionCard({
             />
           </View>
 
-          {user ? (
+          {user && !sending ? (
             <DropdownMenu items={menuItems} triggerLabel={s.reflectionMoreOptions} align="end" isRTL={isRTL} />
           ) : null}
         </View>
@@ -278,7 +253,7 @@ export function ReflectionCard({
           </Pressable>
         ) : null}
 
-        {onPress ? (
+        {onPress && !sending ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => onPress(reflection.id)}
@@ -317,11 +292,11 @@ export function ReflectionCard({
             accessibilityRole="button"
             accessibilityLabel={liked ? s.removeReflectionLike : s.likeReflection}
             accessibilityValue={{ text: formatCompactCount(likesCount, uiLanguage) }}
-            disabled={likeBusy}
+            disabled={sending}
             className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
             style={({ pressed }) => ({
               ...rowFlexStyle,
-              opacity: pressed || likeBusy ? 0.6 : 1,
+              opacity: pressed || sending ? 0.6 : 1,
               backgroundColor: themeColors.surfaceMid,
             })}
           >
@@ -338,10 +313,11 @@ export function ReflectionCard({
             accessibilityRole="button"
             accessibilityLabel={s.reflectionComments}
             accessibilityValue={{ text: formatCompactCount(reflection.comments_count, uiLanguage) }}
+            disabled={sending}
             className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
             style={({ pressed }) => ({
               ...rowFlexStyle,
-              opacity: pressed ? 0.6 : 1,
+              opacity: pressed || sending ? 0.6 : 1,
               backgroundColor: themeColors.surfaceMid,
             })}
           >
@@ -374,14 +350,11 @@ export function ReflectionCard({
         message={s.reflectionDeleteBody}
         cancelLabel={s.reflectionCancel}
         confirmLabel={s.reflectionDeleteConfirm}
-        pendingLabel={s.reflectionDeleting}
         destructive
-        confirmLoading={removal.pending}
-        error={removal.error}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={removal.cancel}
-        onConfirm={() => void removal.confirm()}
+        onConfirm={removal.confirm}
       />
       <ConfirmDialog
         visible={report.open}
@@ -389,14 +362,11 @@ export function ReflectionCard({
         message={s.reflectionReportBody}
         cancelLabel={s.reflectionCancel}
         confirmLabel={s.reflectionReportConfirm}
-        pendingLabel={s.reflectionReporting}
         tone="info"
-        confirmLoading={report.pending}
-        error={report.error}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={report.cancel}
-        onConfirm={() => void report.confirm()}
+        onConfirm={report.confirm}
       />
     </>
   );

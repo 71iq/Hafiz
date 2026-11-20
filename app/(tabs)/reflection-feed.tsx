@@ -35,6 +35,7 @@ import {
 } from "@/lib/reflections/types";
 import { formatAyahReference, isolateReference } from "@/lib/reflections/format";
 import { markCommentCountStale } from "@/lib/reflections/cache";
+import { settleListedPosts, usePendingPosts } from "@/lib/reflections/pending";
 import { useIsOffline } from "@/lib/social/use-social-query";
 import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
@@ -222,7 +223,30 @@ export default function ReflectionFeedScreen() {
       return retained.length === entries.length ? previous : Object.fromEntries(retained);
     });
   }, [feedRevision, user?.id, feedScope]);
-  const reflections = useMemo(
+  // The viewer's new posts show first while the newest reflections are listed, before the server
+  // lists them, when they match the location and search in use.
+  const includeOwnPost = useCallback(
+    (reflection: Reflection) => {
+      if (sort !== "newest") return false;
+      if (normalizedSearchQuery && !reflection.content.toLowerCase().includes(normalizedSearchQuery.toLowerCase()))
+        return false;
+      if (filter.type === "surah") return reflection.surah === filter.surah;
+      if (filter.type === "juz")
+        return (selectedJuzRanges ?? []).some(
+          (range) =>
+            range.surah === reflection.surah &&
+            range.ayah_start <= reflection.ayah_end &&
+            range.ayah_end >= reflection.ayah_start,
+        );
+      return true;
+    },
+    [sort, normalizedSearchQuery, filter, selectedJuzRanges],
+  );
+  const ownPosts = usePendingPosts(user?.id, includeOwnPost);
+  useEffect(() => {
+    settleListedPosts(user?.id, new Set(rawReflections.map((reflection) => reflection.id)));
+  }, [rawReflections, user?.id]);
+  const listedReflections = useMemo(
     () =>
       rawReflections.map((reflection) => {
         const overlay = commentDeltas[reflection.id];
@@ -242,6 +266,10 @@ export default function ReflectionFeedScreen() {
       }),
     [commentDeltas, rawReflections, user?.id, feedRevision, feedScope],
   );
+  const reflections = useMemo(() => {
+    const listed = new Set(listedReflections.map((reflection) => reflection.id));
+    return [...ownPosts.filter((reflection) => !listed.has(reflection.id)), ...listedReflections];
+  }, [ownPosts, listedReflections]);
   useLayoutEffect(() => {
     setCommentDeltas({});
     setCommentsReflectionId(null);
