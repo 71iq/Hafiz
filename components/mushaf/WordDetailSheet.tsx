@@ -70,10 +70,12 @@ export function WordDetailSheet() {
 
   const [activeTab, setActiveTab] = useState<TabKey>("meaning");
   const [ayahModalOpen, setAyahModalOpen] = useState(false);
-  const [adjacentWords, setAdjacentWords] = useState<{ previous: WordRef | null; next: WordRef | null }>({
-    previous: null,
-    next: null,
-  });
+  const [neighbors, setNeighbors] = useState<{
+    word: WordRef;
+    previous: WordRef | null;
+    next: WordRef | null;
+  } | null>(null);
+  const adjacentWords = neighbors?.word === detailWord ? neighbors : null;
   // The colour tajweed font draws black base glyphs on Android in dark themes, as in the reader, so
   // those themes show the header word in the classic font there.
   const headerFontStyle = Platform.OS !== "web" && isDark ? "qcf2" : WORD_HEADER_FONT_STYLE;
@@ -114,7 +116,7 @@ export function WordDetailSheet() {
   }, [closeDetail]);
 
   const handleNavigateWord = useCallback((direction: "previous" | "next") => {
-    const targetWord = adjacentWords[direction];
+    const targetWord = adjacentWords?.[direction];
     if (!targetWord) return;
     setAyahModalOpen(false);
     openDetail(targetWord);
@@ -176,7 +178,7 @@ export function WordDetailSheet() {
 
   useEffect(() => {
     if (!detailWord) {
-      setAdjacentWords({ previous: null, next: null });
+      setNeighbors(null);
       return;
     }
     let cancelled = false;
@@ -200,14 +202,14 @@ export function WordDetailSheet() {
         [detailWord.surah, detailWord.ayah, detailWord.wordPos]
       ),
     ]).then(([previous, next]) => {
-      if (!cancelled) setAdjacentWords({ previous: previous ?? null, next: next ?? null });
+      if (!cancelled) setNeighbors({ word: detailWord, previous, next });
     }).catch(() => {
-      if (!cancelled) setAdjacentWords({ previous: null, next: null });
+      if (!cancelled) setNeighbors(null);
     });
     return () => {
       cancelled = true;
     };
-  }, [db, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
+  }, [db, detailWord]);
 
   useEffect(() => {
     if (activeTab === "irab") return;
@@ -261,13 +263,13 @@ export function WordDetailSheet() {
                 <PanelNavIcon
                   icon={isRTL ? <ChevronRight size={18} color={panelIconColor} /> : <ChevronLeft size={18} color={panelIconColor} />}
                   onPress={() => handleNavigateWord("previous")}
-                  disabled={!adjacentWords.previous}
+                  disabled={!adjacentWords?.previous}
                   accessibilityLabel={s.previousWord}
                 />
                 <PanelNavIcon
                   icon={isRTL ? <ChevronLeft size={18} color={panelIconColor} /> : <ChevronRight size={18} color={panelIconColor} />}
                   onPress={() => handleNavigateWord("next")}
-                  disabled={!adjacentWords.next}
+                  disabled={!adjacentWords?.next}
                   accessibilityLabel={s.nextWord}
                 />
               </View>
