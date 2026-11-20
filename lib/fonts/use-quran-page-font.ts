@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 import { isQuranPageFontLoaded, loadQuranPageFont, type QuranPageFontStyle } from "./loader";
 
 /**
@@ -10,28 +10,21 @@ import { isQuranPageFontLoaded, loadQuranPageFont, type QuranPageFontStyle } fro
  * clips the ayah. Callers must not mount glyph text until this returns true.
  */
 export function useQuranPageFontReady(style: QuranPageFontStyle, page: number | null | undefined): boolean {
-  const [ready, setReady] = useState(() => (page ? isQuranPageFontLoaded(style, page) : false));
+  const [, refresh] = useReducer((revision: number) => revision + 1, 0);
+  const ready = page ? isQuranPageFontLoaded(style, page) : false;
 
   useEffect(() => {
-    if (!page) {
-      setReady(false);
-      return;
-    }
-    if (isQuranPageFontLoaded(style, page)) {
-      setReady(true);
-      return;
-    }
-    setReady(false);
+    if (!page || ready) return;
     let cancelled = false;
     loadQuranPageFont(style, page)
       .then(() => {
-        if (!cancelled) setReady(true);
+        if (!cancelled) refresh();
       })
       .catch(console.warn);
     return () => {
       cancelled = true;
     };
-  }, [style, page]);
+  }, [style, page, ready]);
 
   return ready;
 }

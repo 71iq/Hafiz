@@ -1,15 +1,18 @@
 import React from "react";
 import { act, render, renderHook } from "@testing-library/react-native";
+import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
+import type { QuranPageFontStyle } from "@/lib/fonts/loader";
+import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 
-let mockLoaded = new Set<number>();
+let mockLoaded = new Set<string>();
 let mockResolveLoad: (() => void) | null = null;
 
 jest.mock("@/lib/fonts/loader", () => ({
-  isQuranPageFontLoaded: (_style: string, page: number) => mockLoaded.has(page),
-  loadQuranPageFont: (_style: string, page: number) =>
+  isQuranPageFontLoaded: (style: string, page: number) => mockLoaded.has(`${style}:${page}`),
+  loadQuranPageFont: (style: string, page: number) =>
     new Promise<void>((resolve) => {
       mockResolveLoad = () => {
-        mockLoaded.add(page);
+        mockLoaded.add(`${style}:${page}`);
         resolve();
       };
     }),
@@ -28,9 +31,6 @@ jest.mock("@/lib/settings/context", () => ({
   }),
 }));
 
-import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
-import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
-
 beforeEach(() => {
   mockLoaded = new Set();
   mockResolveLoad = null;
@@ -48,7 +48,7 @@ describe("Quran page font readiness", () => {
   });
 
   it("reports an already loaded font as ready without a pending pass", () => {
-    mockLoaded.add(12);
+    mockLoaded.add("qcf2:12");
     const seen: boolean[] = [];
     renderHook(() => {
       const ready = useQuranPageFontReady("qcf2", 12);
@@ -56,6 +56,24 @@ describe("Quran page font readiness", () => {
       return ready;
     });
     expect(seen.every(Boolean)).toBe(true);
+  });
+
+  it("waits for the new font before displaying glyphs when Tajweed colors are turned off", async () => {
+    mockLoaded.add("v4-tajweed:12");
+    const seen: boolean[] = [];
+    const { rerender, result } = renderHook(({ style }: { style: QuranPageFontStyle }) => {
+      const ready = useQuranPageFontReady(style, 12);
+      seen.push(ready);
+      return ready;
+    }, { initialProps: { style: "v4-tajweed" } });
+
+    expect(result.current).toBe(true);
+    seen.length = 0;
+    rerender({ style: "v4" });
+    expect(seen).toEqual([false]);
+
+    await act(async () => mockResolveLoad?.());
+    expect(result.current).toBe(true);
   });
 
   it("is not ready without a page", () => {
