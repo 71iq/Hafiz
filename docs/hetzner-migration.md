@@ -115,9 +115,9 @@ recitations without a public file) was restored on 2026-11-17 with
 `EXPO_PUBLIC_QF_CONTENT_ENABLED=true`. The ayah Hadith tab was removed until
 Hafiz has a licensed, scholar-verified source, so `qf-content` no longer
 serves hadiths and answers the old `hadith-ayah` action with `bad_request`.
-The VM runs this version since 2026-11-17; Edge Function changes reach it only
-when copied to `/opt/hafiz/supabase/volumes/functions/` and `hafiz-functions`
-is recreated. The `qf-content` function uses the surviving
+The VM runs the version with ten-second upstream deadlines since 2026-11-20;
+Edge Function changes reach it only when copied to
+`/opt/hafiz/supabase/volumes/functions/` and `hafiz-functions` is recreated. The `qf-content` function uses the surviving
 prelive OAuth client, the same client as the `custom:quran-foundation` Auth
 provider; Quran Foundation production does not know this client.
 `/etc/hafiz/functions.env` holds its credentials, `QF_CONTENT_ENV=prelive` and
@@ -192,10 +192,10 @@ outside origin for requests or images must be added in
 
 The Caddyfile sends what a `<meta>` policy cannot: `frame-ancestors 'none'`,
 HSTS, a Permissions-Policy that keeps only location, and a 404 status with the
-app's not-found screen for an address that has no page. The 2026-11-20
-Caddyfile and the upstream timeouts in `supabase/functions/` reach production
-only through an administrator deployment: validate the combined Caddy
-configuration before reloading, and copy the functions as described above.
+app's not-found screen for an address that has no page. The VM's Caddy 2.11.7
+accepts `file_server { status 404 }`. This Caddyfile was installed as
+`/etc/caddy/hafiz.caddy` on 2026-11-20. Later changes still need an
+administrator deployment: validate the combined configuration before reloading.
 
 The Quran Foundation connection flow returns to its initiating web origin,
 so staging can test the callback without sending it to the old production app.
