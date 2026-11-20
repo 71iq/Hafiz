@@ -1,7 +1,51 @@
+diff --git a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
+--- a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
++++ b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
+@@ -56,2 +56,11 @@
+-    await vfs.isReady();
+-    return vfs;
++    try {
++      await vfs.isReady();
++      return vfs;
++    } catch (error) {
++      try {
++        await vfs.close();
++      } catch (cleanupError) {
++        throw new Error('SQLite worker cleanup failed: ' + String(cleanupError));
++      }
++      throw error;
++    }
+@@ -305,1 +314,1 @@
+-    await Promise.all(
++    const acquired = await Promise.allSettled(
+@@ -316,1 +325,3 @@
+-    );
++    );
++    const failed = acquired.find((entry) => entry.status === 'rejected');
++    if (failed) throw failed.reason;
+@@ -319,1 +330,2 @@
+-  #releaseAccessHandles() {
++  #releaseAccessHandles() {
++    let failure;
+@@ -321,1 +333,5 @@
+-      accessHandle.close();
++      try {
++        accessHandle.close();
++      } catch (error) {
++        failure ??= error;
++      }
+@@ -322,1 +338,2 @@
+-    }
++    }
++    if (failure) throw failure;
 diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/web/worker.ts
 --- a/node_modules/expo-sqlite/web/worker.ts
 +++ b/node_modules/expo-sqlite/web/worker.ts
-@@ -64,23 +64,33 @@
+@@ -18,1 +18,2 @@
+-  SQLITE_OPEN_CREATE,
++  SQLITE_OPEN_CREATE,
++  SQLITE_OPEN_MAIN_DB,
+@@ -64,14 +65,23 @@
 -self.onmessage = async (event: MessageEvent<SQLiteWorkerMessage>) => {
 -  let result: ResultType | null = null;
 -  let error: Error | null = null;
@@ -39,7 +83,7 @@ diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/w
 +      } catch (e) {
 +        cleanupFailure = new Error(CLEANUP_FAILURE + String(e));
 +        error = cleanupFailure;
-       }
+@@ -79,7 +89,8 @@
 -    : undefined;
 -  sendWorkerResult({
 -    id: event.data.id,
@@ -55,9 +99,7 @@ diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/w
 +  };
 +  requestTail = requestTail.then(execute, execute);
 +  return requestTail;
- };
-@@ -255,9 +265,14 @@
- async function closeDatabase(nativeDatabaseId: number) {
+@@ -256,6 +267,11 @@
 -  maybeFinalizeAllStatements(nativeDatabaseId);
 -  const { sqlite3 } = await maybeInitAsync();
 -  const dbEntity = databaseIdMap.get(nativeDatabaseId);
@@ -75,12 +117,149 @@ diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/w
 +  } catch (error) {
 +    // A failed close may already have invalidated SQLite's pointer tracking.
 +    throw new Error(CLEANUP_FAILURE + String(error));
-   }
- }
-@@ -358,14 +373,21 @@
-     );
-   }
-   const serializedData = new Uint8Array(await response.arrayBuffer());
+@@ -346,1 +362,1 @@
+-  const { sqlite3, vfs } = await maybeInitAsync();
++  const { vfs } = await maybeInitAsync();
+@@ -354,5 +370,131 @@
+-  const response = await fetch(assetDatabasePath);
+-  if (!response.ok) {
+-    throw new Error(
+-      `[importAssetDatabaseAsync] Failed to fetch asset database: ${response.statusText}`
+-    );
++  for (const entity of databaseIdMap.values()) {
++    if (entity.databasePath === databasePath) {
++      throw new Error('[importAssetDatabaseAsync] The database is open and cannot be replaced');
++    }
++  }
++  let failure: unknown;
++  for (const openSource of assetDatabaseSources(assetDatabasePath)) {
++    try {
++      await storeAssetDatabase(vfs, databasePath, await openSource());
++      return;
++    } catch (error) {
++      failure = error;
++    }
++  }
++  throw failure;
++}
++
++const SQLITE_FILE_MAGIC = 'SQLite format 3\u0000';
++const IMPORT_FILE_ID = -1;
++const IMPORT_HEADER_BYTES = 4096;
++const IMPORT_WRITE_BYTES = 1024 * 1024;
++
++type AssetDatabaseSource = () => Promise<ReadableStream<Uint8Array>>;
++
++/**
++ * The web export stores a gzip copy beside the database asset, a quarter of its size. The asset
++ * itself remains the source when that copy or DecompressionStream is unavailable.
++ */
++function assetDatabaseSources(assetDatabasePath: string): AssetDatabaseSource[] {
++  const read = (url: string) => async () => {
++    const response = await fetch(url);
++    if (!response.ok || !response.body) {
++      throw new Error(
++        `[importAssetDatabaseAsync] Failed to fetch asset database: ${response.statusText}`
++      );
++    }
++    return response.body as ReadableStream<Uint8Array>;
++  };
++  const plain = read(assetDatabasePath);
++  const Decompression = (globalThis as any).DecompressionStream;
++  if (typeof Decompression !== 'function' || assetDatabasePath.includes('?')) return [plain];
++  const compressed = read(`${assetDatabasePath}.gz`);
++  return [async () => (await compressed()).pipeThrough(new Decompression('gzip')), plain];
++}
++
++/**
++ * Stores a database file image in megabyte writes. SQLite's backup writes one page per call, which
++ * takes about a minute for 60 MB where OPFS is memory-backed (private windows). The first page is
++ * written last, so an interrupted copy is never a readable database, and a copy that is not a
++ * complete SQLite file is removed.
++ */
++async function storeAssetDatabase(
++  vfs: AccessHandlePoolVFS,
++  databasePath: string,
++  source: ReadableStream<Uint8Array>
++): Promise<void> {
++  const reader = source.getReader();
++  const done = (code: number, step: string) => {
++    if (code !== SQLITE_OK) throw new Error(`[importAssetDatabaseAsync] Failed to ${step} the database`);
++  };
++  // A journal left by an earlier copy must not be replayed over the new file.
++  vfs.jDelete(`${databasePath}-journal`, 0);
++  vfs.jDelete(`${databasePath}-wal`, 0);
++  let opened = false;
++  let stored = false;
++  try {
++    const flags = SQLITE_OPEN_MAIN_DB | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
++    done(vfs.jOpen(databasePath, IMPORT_FILE_ID, flags, new DataView(new ArrayBuffer(4))), 'create');
++    opened = true;
++    done(vfs.jTruncate(IMPORT_FILE_ID, 0), 'reset');
++    const header = new Uint8Array(IMPORT_HEADER_BYTES);
++    const pending = new Uint8Array(IMPORT_WRITE_BYTES);
++    let headerBytes = 0;
++    let pendingBytes = 0;
++    let total = 0;
++    const flush = () => {
++      if (pendingBytes === 0) return;
++      done(vfs.jWrite(IMPORT_FILE_ID, pending.subarray(0, pendingBytes), total - pendingBytes), 'write');
++      pendingBytes = 0;
++    };
++    while (true) {
++      const { done: finished, value } = await reader.read();
++      if (finished) break;
++      let offset = 0;
++      if (headerBytes < IMPORT_HEADER_BYTES) {
++        offset = Math.min(IMPORT_HEADER_BYTES - headerBytes, value.byteLength);
++        // The header's place in the first write stays zero until the rest is stored.
++        header.set(value.subarray(0, offset), headerBytes);
++        pending.fill(0, headerBytes, headerBytes + offset);
++        headerBytes += offset;
++        pendingBytes += offset;
++        total += offset;
++      }
++      while (offset < value.byteLength) {
++        const count = Math.min(IMPORT_WRITE_BYTES - pendingBytes, value.byteLength - offset);
++        pending.set(value.subarray(offset, offset + count), pendingBytes);
++        offset += count;
++        pendingBytes += count;
++        total += count;
++        if (pendingBytes === IMPORT_WRITE_BYTES) flush();
++      }
++    }
++    flush();
++    assertSqliteFile(header.subarray(0, headerBytes), total);
++    done(vfs.jSync(IMPORT_FILE_ID, 0), 'store');
++    done(vfs.jWrite(IMPORT_FILE_ID, header.subarray(0, headerBytes), 0), 'write');
++    done(vfs.jSync(IMPORT_FILE_ID, 0), 'store');
++    stored = true;
++  } finally {
++    if (!stored) await reader.cancel().catch(() => {});
++    try {
++      if (opened) vfs.jClose(IMPORT_FILE_ID);
++    } finally {
++      if (!stored) vfs.jDelete(databasePath, 0);
++    }
++  }
++}
++
++function assertSqliteFile(header: Uint8Array, total: number): void {
++  const incomplete = new Error('[importAssetDatabaseAsync] The asset is not a complete SQLite database');
++  if (header.byteLength < 100) throw incomplete;
++  for (let index = 0; index < SQLITE_FILE_MAGIC.length; index++) {
++    if (header[index] !== SQLITE_FILE_MAGIC.charCodeAt(index)) throw incomplete;
++  }
++  const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
++  const pageSize = view.getUint16(16) === 1 ? 65536 : view.getUint16(16);
++  const pageCount = view.getUint32(28);
++  // The header's page count is current when its two change counters agree.
++  const counted = pageCount !== 0 && view.getUint32(24) === view.getUint32(92);
++  if (pageSize < 512 || total % pageSize !== 0 || (counted && pageCount * pageSize !== total)) {
++    throw incomplete;
+@@ -359,12 +501,1 @@
+-  }
+-  const serializedData = new Uint8Array(await response.arrayBuffer());
 -  const srcDb = await sqlite3.open_v2(
 -    databasePath,
 -    SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
@@ -91,37 +270,11 @@ diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/w
 -  await sqlite3.backup(destDb, 'main', srcDb, 'main');
 -  await sqlite3.close(srcDb);
 -  await sqlite3.close(destDb);
-+  const temporary: DatabasePointer[] = [];
-+  try {
-+    const srcDb = await sqlite3.open_v2(
-+      databasePath,
-+      SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-+      VFS_NAME_PERSISTENT
-+    );
-+    temporary.push(srcDb);
-+    await sqlite3.deserialize(srcDb, 'main', serializedData);
-+    const destDb = await sqlite3.open_v2(databasePath);
-+    temporary.push(destDb);
-+    await sqlite3.backup(destDb, 'main', srcDb, 'main');
-+  } finally {
-+    const closed = await Promise.allSettled(temporary.map(async (pointer) => await sqlite3.close(pointer)));
-+    const failed = closed.find((entry) => entry.status === 'rejected');
-+    if (failed?.status === 'rejected') throw new Error(CLEANUP_FAILURE + String(failed.reason));
 +  }
- }
-@@ -750,7 +772,7 @@
-   while (stmt != null && stmt !== 0) {
-     const nextStmt: StatementPointer = sqlite3.next_stmt(dbEntity.pointer, stmt);
-     try {
+@@ -753,1 +884,1 @@
 -      sqlite3.finalize(stmt);
 +      await sqlite3.finalize(stmt);
-       finalizedStatements.push(stmt);
-     } catch (e) {
-       error = e;
-@@ -778,29 +800,27 @@
-   vfsMemory: MemoryVFS;
- }> {
-   if (!_sqlite3) {
+@@ -781,21 +912,20 @@
 -    const module = await WaSQLiteFactory({
 -      locateFile: () => wasmModule,
 -    });
@@ -143,8 +296,6 @@ diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/w
 -      if (_vfsMemory == null) {
 -        throw new Error('Failed to initialize MemoryVFS');
 -      }
--    }
--    _sqlite3.vfs_register(_vfsMemory, false);
 +    const module = await WaSQLiteFactory({ locateFile: () => wasmModule });
 +    const sqlite3 = SQLite.Factory(module) as SQLiteAPI;
 +    if (!sqlite3) throw new Error('Failed to initialize wa-sqlite');
@@ -165,11 +316,15 @@ diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/w
 +      const failed = closed.find((entry) => entry.status === 'rejected');
 +      if (failed?.status === 'rejected') throw new Error(CLEANUP_FAILURE + String(failed.reason));
 +      throw error;
+@@ -802,2 +932,1 @@
+-    }
+-    _sqlite3.vfs_register(_vfsMemory, false);
 +    }
-   }
-   if (_vfs == null || _vfsMemory == null) {
-     throw new Error('Invalid VFS state');
-@@ -811,1 +831,13 @@
+@@ -808,1 +937,13 @@
+-  return { sqlite3: _sqlite3, vfs: _vfs, vfsMemory: _vfsMemory };
++  return { sqlite3: _sqlite3, vfs: _vfs, vfsMemory: _vfsMemory };
++}
++
 +async function retireIdleRuntime(): Promise<void> {
 +  // SQLite close alone retains OPFS pool locks. Release them before host handoff,
 +  // also when an asset import finishes without a subsequent open.
@@ -180,56 +335,3 @@ diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/w
 +  _vfsMemory = null;
 +  statementIdMap.clear();
 +  sessionIdMap.clear();
-+}
-+
- //#endregion Internal helpers
-diff --git a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
---- a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
-+++ b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
-@@ -54,5 +54,14 @@
-   static async create(name, module) {
-     const vfs = new AccessHandlePoolVFS(name, module);
--    await vfs.isReady();
--    return vfs;
-+    try {
-+      await vfs.isReady();
-+      return vfs;
-+    } catch (error) {
-+      try {
-+        await vfs.close();
-+      } catch (cleanupError) {
-+        throw new Error('SQLite worker cleanup failed: ' + String(cleanupError));
-+      }
-+      throw error;
-+    }
-   }
-@@ -304,5 +313,5 @@
-     // Open access handles in parallel, separating associated and unassociated.
--    await Promise.all(
-+    const acquired = await Promise.allSettled(
-       files.map(async ([name, handle]) => {
-         const accessHandle = await handle.createSyncAccessHandle();
-         this.#mapAccessHandleToName.set(accessHandle, name);
-@@ -314,4 +323,6 @@
-         }
-       })
-     );
-+    const failed = acquired.find((entry) => entry.status === 'rejected');
-+    if (failed) throw failed.reason;
-   }
-@@ -319,7 +330,13 @@
-   #releaseAccessHandles() {
-+    let failure;
-     for (const accessHandle of this.#mapAccessHandleToName.keys()) {
--      accessHandle.close();
--    }
-+      try {
-+        accessHandle.close();
-+      } catch (error) {
-+        failure ??= error;
-+      }
-+    }
-+    if (failure) throw failure;
-     this.#mapAccessHandleToName.clear();
-     this.#mapPathToAccessHandle.clear();
-     this.#availableAccessHandles.clear();
