@@ -1,5 +1,11 @@
 #!/usr/bin/python3
-"""Validate and atomically install a static release, with health rollback."""
+"""Validate and atomically install a static release, with health rollback.
+
+Before the swap it applies the release's unrecorded database migrations. It reads them from
+GitHub at the release commit, not from the uploaded archive, so the web deploy key can trigger
+only SQL that is already reviewed on main.
+"""
+from datetime import datetime, timezone
 import fcntl
 import gzip
 import hashlib
@@ -10,6 +16,7 @@ import pwd
 import re
 import shutil
 import stat
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -19,6 +26,26 @@ MAX_ARCHIVE = 512 * 1024 * 1024
 MAX_EXPANDED = 1536 * 1024 * 1024
 ROOT = Path("/opt/hafiz")
 REQUIRED = {"dist/index.html", "dist/__release.json", "dist/NOTICE.md", "SHA256SUMS"}
+
+GITHUB_API = "https://api.github.com/repos/71iq/Hafiz"
+GITHUB_RAW = "https://raw.githubusercontent.com/71iq/Hafiz"
+MIGRATIONS = "supabase/migrations"
+# Eight early files use three-digit prefixes and two share 006, so history keys on the file name.
+MIGRATION_FILE = re.compile(r"[0-9]{3}(?:[0-9]{11})?_[a-z0-9_]+\.sql")
+MAX_LISTING = 4 * 1024 * 1024
+MAX_MIGRATION = 2 * 1024 * 1024
+# Root-only. Holds a database dump before each batch and the database output of a failed
+# migration, which can quote row values and so stays out of the public Actions log.
+MIGRATION_RECORDS = Path("/var/backups/hafiz/migrations")
+KEPT_MIGRATION_DUMPS = 10
+# postgres owns the application's tables and functions and holds the supautils grants for auth
+# and storage policies. Objects a superuser creates would run SECURITY DEFINER code as superuser.
+PSQL = ["docker", "exec", "-i", "hafiz-db", "psql", "-U", "postgres", "-d", "postgres",
+        "-X", "-q", "-v", "ON_ERROR_STOP=1"]
+HISTORY = "hafiz_deploy.migrations"
+# PL/pgSQL blocks use BEGIN without a semicolon and END; so neither form matches here.
+TRANSACTION_CONTROL = re.compile(r"^\s*(begin|commit|rollback|start\s+transaction)\s*;",
+                                 re.IGNORECASE | re.MULTILINE)
 
 
 def checked_members(archive):
@@ -104,6 +131,90 @@ def health(sha):
             raise RuntimeError("Web document health check failed")
 
 
+def fetch(url, limit):
+    request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
+                                                   "User-Agent": "hafiz-promote"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        data = response.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError("Download exceeds limit")
+    return data
+
+
+def released_migrations(sha):
+    """Return (file name, git blob id) for each migration at a commit on main, in name order."""
+    # With main as the base, the comparison is empty exactly when the commit is on main.
+    comparison = json.loads(fetch(f"{GITHUB_API}/compare/main...{sha}", MAX_LISTING))
+    if comparison.get("merge_base_commit", {}).get("sha") != sha or comparison.get("ahead_by") != 0:
+        raise ValueError("Release commit is not on main")
+    found = {}
+    for item in json.loads(fetch(f"{GITHUB_API}/contents/{MIGRATIONS}?ref={sha}", MAX_LISTING)):
+        name = item.get("name", "")
+        if item.get("type") != "file" or not name.endswith(".sql"):
+            continue
+        if not MIGRATION_FILE.fullmatch(name) or not re.fullmatch("[a-f0-9]{40}", item.get("sha", "")):
+            raise ValueError("Invalid migration file name")
+        found[name] = item["sha"]
+    return sorted(found.items())
+
+
+def migration_sql(sha, name, blob):
+    data = fetch(f"{GITHUB_RAW}/{sha}/{MIGRATIONS}/{name}", MAX_MIGRATION)
+    if hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest() != blob:
+        raise ValueError("Migration content does not match GitHub's listing: " + name)
+    sql = data.decode("utf-8")
+    if TRANSACTION_CONTROL.search(sql):
+        raise ValueError("Migration controls its own transaction: " + name)
+    return sql
+
+
+def psql(script, label, *options):
+    result = subprocess.run(PSQL + list(options), input=script.encode(), capture_output=True, timeout=900)
+    if result.returncode != 0:
+        MIGRATION_RECORDS.mkdir(mode=0o700, parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        log = MIGRATION_RECORDS / f"{stamp}-{label}.log"
+        log.write_bytes(result.stdout + result.stderr)
+        raise RuntimeError(f"Database step {label} failed and was rolled back; output in {log}")
+    return result.stdout.decode()
+
+
+def applied_migrations():
+    # Fails when the history table is missing: without it every file would replay.
+    return set(psql(f"SELECT file FROM {HISTORY};\n", "history", "-At").split())
+
+
+def dump_database(name):
+    MIGRATION_RECORDS.mkdir(mode=0o700, parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = MIGRATION_RECORDS / f"{stamp}-before-{name[:-4]}.dump"
+    with target.open("xb") as output:
+        subprocess.run(["docker", "exec", "hafiz-db", "pg_dump", "-U", "supabase_admin", "-d", "postgres",
+                        "--format=custom"], stdout=output, stderr=subprocess.DEVNULL, check=True, timeout=1800)
+    for old in sorted(MIGRATION_RECORDS.glob("*.dump"))[:-KEPT_MIGRATION_DUMPS]:
+        old.unlink()
+    return target
+
+
+def apply_migrations(sha):
+    """Apply each migration missing from the history table, in name order, one transaction each."""
+    applied = applied_migrations()
+    pending = [item for item in released_migrations(sha) if item[0] not in applied]
+    if not pending:
+        print("No pending database migrations")
+        return []
+    # Download and check every file before the database changes.
+    scripts = [(name, blob, migration_sql(sha, name, blob)) for name, blob in pending]
+    print("Database dump before migrating: " + str(dump_database(pending[0][0])))
+    for name, blob, sql in scripts:
+        # The name matches MIGRATION_FILE and the blob id is hexadecimal, so both are safe in SQL.
+        psql("BEGIN;\nSET LOCAL lock_timeout = '10s';\nSET LOCAL statement_timeout = '5min';\n"
+             + sql + f"\n;\nINSERT INTO {HISTORY} (file, git_blob) VALUES ('{name}', '{blob}');\n"
+             + "NOTIFY pgrst, 'reload schema';\nCOMMIT;\n", name[:-4])
+        print("Applied migration " + name)
+    return [name for name, _, _ in scripts]
+
+
 def main():
     if os.geteuid() != 0 or len(sys.argv) != 3 or not re.fullmatch("[a-f0-9]{40}", sys.argv[1]):
         raise ValueError("Expected root, commit and archive path")
@@ -123,6 +234,8 @@ def main():
         target = ROOT / "releases" / sha
         if target.exists():
             if (ROOT / "current").resolve() == target:
+                # Repeating the live commit's deploy applies its pending migrations, for example after a failure.
+                apply_migrations(sha)
                 health(sha)
                 print("Release already active")
                 return
@@ -143,6 +256,11 @@ def main():
                 with tarfile.open(fileobj=expanded, mode="r:") as archive:
                     extract_runtime(archive, temporary)
             verify_runtime(temporary, sha)
+            # The database changes before the new web goes live, so the release can call what the
+            # migrations add. A failed migration rolls back alone and stops the deploy with the
+            # current web still live; earlier migrations in the batch stay applied, as they do
+            # when a later health check restores the previous web.
+            apply_migrations(sha)
             for parent, _, _ in os.walk(temporary):
                 os.chmod(parent, 0o755)
             temporary.rename(target)

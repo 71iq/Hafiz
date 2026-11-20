@@ -179,5 +179,133 @@ class ExpansionAndManifestTests(unittest.TestCase):
             promote.verify_runtime(self.runtime, "b" * 40)
 
 
+def blob_id(data):
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+class MigrationTests(unittest.TestCase):
+    """apply_migrations with GitHub and the database replaced by recorders."""
+
+    FILES = {
+        "006_qf_oauth_states.sql": b"create table s (id int);\n",
+        "006_reflection_feed_filters.sql": b"create index r on s (id);\n",
+        "20261113120000_learning_consistency.sql": b"create table a (id int);\n",
+        "20261201090000_add_b.sql": b"create function f() returns int language plpgsql as $$\nBEGIN\n  RETURN 1;\nEND;\n$$;\n",
+        "20261130080000_add_c.sql": b"alter table a add column c text;\n",
+    }
+
+    def setUp(self):
+        self.files = dict(self.FILES)
+        self.merge_base, self.ahead_by = COMMIT, 0
+        self.listing_extra = [{"type": "file", "name": "README.md", "sha": "c" * 40}]
+        self.applied = {"006_qf_oauth_states.sql", "20261113120000_learning_consistency.sql"}
+        self.scripts, self.dumps = [], []
+        self.saved = {name: getattr(promote, name) for name in ("fetch", "psql", "dump_database")}
+        promote.fetch = self.fake_fetch
+        promote.psql = self.fake_psql
+        promote.dump_database = lambda version: self.dumps.append(version) or Path("/dump")
+        self.listed = None
+
+    def tearDown(self):
+        for name, value in self.saved.items():
+            setattr(promote, name, value)
+
+    def fake_fetch(self, url, limit):
+        if url == f"{promote.GITHUB_API}/compare/main...{COMMIT}":
+            return json.dumps({"merge_base_commit": {"sha": self.merge_base}, "ahead_by": self.ahead_by}).encode()
+        if url == f"{promote.GITHUB_API}/contents/{promote.MIGRATIONS}?ref={COMMIT}":
+            listed = self.listed or {name: blob_id(data) for name, data in self.files.items()}
+            items = [{"type": "file", "name": name, "sha": blob} for name, blob in listed.items()]
+            return json.dumps(items + self.listing_extra).encode()
+        prefix = f"{promote.GITHUB_RAW}/{COMMIT}/{promote.MIGRATIONS}/"
+        if url.startswith(prefix):
+            return self.files[url[len(prefix):]]
+        raise AssertionError("unexpected fetch " + url)
+
+    def fake_psql(self, script, label, *options):
+        if label == "history":
+            return "\n".join(sorted(self.applied)) + "\n"
+        if label == getattr(self, "fail_at", None):
+            raise RuntimeError("Database step failed")
+        self.scripts.append((label, script))
+        return ""
+
+    def test_applies_unrecorded_files_in_name_order_after_one_dump(self):
+        expected = ["006_reflection_feed_filters.sql", "20261130080000_add_c.sql", "20261201090000_add_b.sql"]
+        self.assertEqual(promote.apply_migrations(COMMIT), expected)
+        self.assertEqual(self.dumps, [expected[0]])
+        self.assertEqual([label for label, _ in self.scripts], [name[:-4] for name in expected])
+        _, script = self.scripts[1]
+        self.assertTrue(script.startswith("BEGIN;\nSET LOCAL lock_timeout = '10s';\n"))
+        self.assertIn("alter table a add column c text;\n", script)
+        blob = blob_id(self.files["20261130080000_add_c.sql"])
+        self.assertIn(f"INSERT INTO hafiz_deploy.migrations (file, git_blob) VALUES ('20261130080000_add_c.sql', '{blob}');", script)
+        self.assertTrue(script.endswith("NOTIFY pgrst, 'reload schema';\nCOMMIT;\n"))
+
+    def test_nothing_pending_changes_nothing(self):
+        self.applied = set(self.files)
+        self.assertEqual(promote.apply_migrations(COMMIT), [])
+        self.assertEqual((self.dumps, self.scripts), ([], []))
+
+    def test_rejects_commit_not_on_main(self):
+        for merge_base, ahead_by in (("b" * 40, 0), (COMMIT, 1)):
+            self.merge_base, self.ahead_by = merge_base, ahead_by
+            with self.assertRaises(ValueError):
+                promote.apply_migrations(COMMIT)
+        self.assertEqual((self.dumps, self.scripts), ([], []))
+
+    def test_rejects_content_that_differs_from_the_listing(self):
+        self.listed = {name: blob_id(data) for name, data in self.files.items()}
+        self.files["20261201090000_add_b.sql"] = b"drop table a;\n"
+        with self.assertRaises(ValueError):
+            promote.apply_migrations(COMMIT)
+        self.assertEqual((self.dumps, self.scripts), ([], []))
+
+    def test_rejects_invalid_names(self):
+        for extra in ("2026_short.sql", "20261201090000_Upper.sql", "20261201090000-dash.sql"):
+            self.files = dict(self.FILES, **{extra: b"select 1;\n"})
+            with self.assertRaises(ValueError):
+                promote.apply_migrations(COMMIT)
+        self.assertEqual((self.dumps, self.scripts), ([], []))
+
+    def test_rejects_a_migration_that_commits_by_itself(self):
+        self.files["20261201090000_add_b.sql"] = b"create table b (id int);\ncommit;\n"
+        with self.assertRaises(ValueError):
+            promote.apply_migrations(COMMIT)
+        self.assertEqual((self.dumps, self.scripts), ([], []))
+
+    def test_stops_at_the_first_failed_migration(self):
+        self.fail_at = "006_reflection_feed_filters"
+        with self.assertRaises(RuntimeError):
+            promote.apply_migrations(COMMIT)
+        self.assertEqual(self.scripts, [])
+
+
+class DatabaseOutputTests(unittest.TestCase):
+    def test_failed_step_keeps_database_output_out_of_the_message(self):
+        import shutil
+        import subprocess
+
+        records = Path(tempfile.mkdtemp())
+        saved_records, saved_run = promote.MIGRATION_RECORDS, promote.subprocess.run
+        promote.MIGRATION_RECORDS = records / "migrations"
+        promote.subprocess.run = lambda *args, **kwargs: subprocess.CompletedProcess(
+            args, 3, b"", b"ERROR: duplicate key value (email)=(someone@example.com)\n")
+        try:
+            with self.assertRaises(RuntimeError) as raised:
+                promote.psql("BEGIN;\nselect 1;\nCOMMIT;\n", "20261201090000")
+            self.assertNotIn("someone@example.com", str(raised.exception))
+            [log] = list((records / "migrations").iterdir())
+            self.assertIn(b"someone@example.com", log.read_bytes())
+            self.assertEqual(stat_mode(records / "migrations"), 0o700)
+        finally:
+            promote.MIGRATION_RECORDS, promote.subprocess.run = saved_records, saved_run
+            shutil.rmtree(records)
+
+
+def stat_mode(path):
+    return path.stat().st_mode & 0o777
+
+
 if __name__ == "__main__":
     unittest.main()
