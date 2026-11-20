@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useMemo, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
-import { openDatabaseAsync } from "expo-sqlite";
-import { importBundledDatabase } from "./bundled-database";
+import { openBundledDatabase } from "./bundled-database";
 import { createConnectionOwner, type ConnectionOwner } from "@/lib/database/connection-owner";
 import { createDatabaseBridgeClient, createDatabaseBridgeHost } from "@/lib/database/bridge-connection";
 import type { AppDatabase } from "@/lib/database/types";
@@ -299,9 +298,8 @@ function createDatabaseStore() {
       for (let index = 1; index <= OPEN_MAX_ATTEMPTS; index++) {
         if (!isActive()) return;
         try {
-          await importBundledDatabase(DATABASE_NAME);
-          if (!isActive()) return;
-          const raw = await openDatabaseAsync(DATABASE_NAME, { useNewConnection: true });
+          const raw = await openBundledDatabase(DATABASE_NAME, isActive);
+          if (!raw) return;
           const owner = createConnectionOwner(raw, (failure) => {
             const belongs = host === resource || attempt?.resources.includes(resource);
             if (!live(resource.epoch) || !belongs) return;

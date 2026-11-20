@@ -1,4 +1,12 @@
-import { defaultDatabaseDirectory } from "expo-sqlite";
+import { defaultDatabaseDirectory, openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 import { readerContent } from "@/modules/hafiz-reader-content";
 
-export const importBundledDatabase = (name: string) => readerContent.seedDatabase(defaultDatabaseDirectory, name);
+/** Seeds the database from the packed Quran seed, then opens it. Null when the start-up was abandoned meanwhile. */
+export async function openBundledDatabase(
+  databaseName: string,
+  isActive: () => boolean,
+): Promise<SQLiteDatabase | null> {
+  await readerContent.seedDatabase(defaultDatabaseDirectory, databaseName);
+  if (!isActive()) return null;
+  return openDatabaseAsync(databaseName, { useNewConnection: true });
+}

@@ -1,30 +1,38 @@
-import { importDatabaseFromAssetAsync, openDatabaseAsync } from "expo-sqlite";
+import { importDatabaseFromAssetAsync, openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 const QURAN_AYAH_COUNT = 6236;
 
 /**
- * Web seeds OPFS from the prebuilt Quran database; expo-sqlite skips any database that already exists.
- * A reload while that first copy was still writing left a partial file, which was then skipped on every
- * later visit, and the app fell back to JSON imports the site does not serve ("Database Error" for
- * good). A database without the complete Quran text is copied again. User data is only written after
- * setup succeeds, so a database that fails this check holds none.
+ * Opens the web database, which lives in OPFS and is seeded from the prebuilt Quran database.
+ *
+ * Each open, import and close starts and then retires the SQLite worker runtime, and that costs more
+ * than every start-up query together. A return visit therefore opens the stored database once and
+ * checks it on that same connection, instead of asking the importer whether it exists, opening it to
+ * check it, and opening it again to use it.
+ *
+ * A database without the complete Quran text is replaced. That covers a first visit, where opening
+ * creates an empty file, and a copy an earlier version left partial when a reload interrupted it.
+ * User data is only written after setup succeeds, so a database that fails this check holds none.
+ * Returns null when `isActive` reports that this start-up was abandoned while the copy ran.
  */
-export async function importBundledDatabase(databaseName: string, assetId: number = require("../../assets/data/quran.db")): Promise<void> {
-  await importDatabaseFromAssetAsync(databaseName, { assetId });
-  if (await hasCompleteQuranText(databaseName)) return;
-  console.warn("[Database] The stored Quran database is incomplete; copying it again.");
+export async function openBundledDatabase(
+  databaseName: string,
+  isActive: () => boolean,
+  assetId: number = require("../../assets/data/quran.db"),
+): Promise<SQLiteDatabase | null> {
+  const stored = await openDatabaseAsync(databaseName, { useNewConnection: true });
+  if (await hasCompleteQuranText(stored)) return stored;
+  await stored.closeAsync();
   await importDatabaseFromAssetAsync(databaseName, { assetId, forceOverwrite: true });
+  if (!isActive()) return null;
+  return openDatabaseAsync(databaseName, { useNewConnection: true });
 }
 
-async function hasCompleteQuranText(databaseName: string): Promise<boolean> {
-  let database: Awaited<ReturnType<typeof openDatabaseAsync>> | null = null;
+async function hasCompleteQuranText(database: SQLiteDatabase): Promise<boolean> {
   try {
-    database = await openDatabaseAsync(databaseName, { useNewConnection: true });
     const row = await database.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM quran_text");
     return (row?.count ?? 0) >= QURAN_AYAH_COUNT;
   } catch {
     return false;
-  } finally {
-    await database?.closeAsync().catch(() => undefined);
   }
 }

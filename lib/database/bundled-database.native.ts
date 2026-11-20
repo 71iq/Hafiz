@@ -1,6 +1,11 @@
 import { Asset } from "expo-asset";
 import { File, Paths } from "expo-file-system";
-import { defaultDatabaseDirectory, importDatabaseFromAssetAsync } from "expo-sqlite";
+import {
+  defaultDatabaseDirectory,
+  importDatabaseFromAssetAsync,
+  openDatabaseAsync,
+  type SQLiteDatabase,
+} from "expo-sqlite";
 
 /**
  * Seeds the local database from the prebuilt Quran database the app already bundles, so a fresh
@@ -9,7 +14,7 @@ import { defaultDatabaseDirectory, importDatabaseFromAssetAsync } from "expo-sql
  * so warm launches do no file work. Android's resource copy in the cache is removed afterwards so
  * the content is not stored twice.
  */
-export async function importBundledDatabase(databaseName: string, assetId: number = require("../../assets/data/quran.db")): Promise<void> {
+async function importBundledDatabase(databaseName: string, assetId: number = require("../../assets/data/quran.db")): Promise<void> {
   const target = new File(`file://${defaultDatabaseDirectory}`, databaseName);
   if (target.exists) return;
 
@@ -24,4 +29,11 @@ export async function importBundledDatabase(databaseName: string, assetId: numbe
     asset.downloaded = false;
     asset.localUri = null;
   }
+}
+
+/** Seeds the database on a fresh install, then opens it. Null when the start-up was abandoned meanwhile. */
+export async function openBundledDatabase(databaseName: string, isActive: () => boolean): Promise<SQLiteDatabase | null> {
+  await importBundledDatabase(databaseName);
+  if (!isActive()) return null;
+  return openDatabaseAsync(databaseName, { useNewConnection: true });
 }
