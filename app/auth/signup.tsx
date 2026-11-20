@@ -210,6 +210,8 @@ function SignupFormScreen() {
         inputProps={{
           autoComplete: "name",
           textContentType: "nickname",
+          // The profile editor's limit, which the server also enforces.
+          maxLength: 60,
           returnKeyType: "next",
           onSubmitEditing: () => passwordRef.current?.focus(),
           onFocus: reveal,
