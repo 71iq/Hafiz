@@ -52,9 +52,16 @@ describe("RF-189 page-view word ink on Android", () => {
     const [sizing, ink] = view.getAllByText(RAHMAN, { includeHiddenElements: true });
     // Screen readers hear the word once.
     expect(view.getAllByText(RAHMAN)).toHaveLength(1);
-    // The sizing text keeps the original box, highlight and taps, but draws no ink.
-    expect(flat(sizing)).toMatchObject({ color: "transparent", backgroundColor: "#0d948820" });
+    // Color-font layers ignore the text color, so hide the sizing copy with view opacity.
+    expect(flat(sizing).opacity).toBe(0);
     expect(flat(sizing).position).toBeUndefined();
+    expect(flat(sizing).backgroundColor).toBeUndefined();
+    const backgrounds = view.UNSAFE_root.findAll(
+      (node) => String(node.type) === "View" && flat(node).backgroundColor === "#0d948820",
+    );
+    expect(backgrounds).toHaveLength(1);
+    expect(backgrounds[0].props.pointerEvents).toBe("none");
+    expect(flat(backgrounds[0])).toMatchObject({ position: "absolute", top: 0, bottom: 0, start: 0, end: 0 });
     // The ink layer has room on both sides, keeps the glyph's right edge on the box's, and its View
     // ignores touches (Android ignores pointerEvents on Text).
     let layer = ink.parent;
@@ -63,6 +70,7 @@ describe("RF-189 page-view word ink on Android", () => {
     expect(layer.props.pointerEvents).toBe("none");
     expect(flat(layer)).toMatchObject({ position: "absolute", left: -60, right: -60 });
     expect(flat(ink)).toMatchObject({ paddingRight: 60, textAlign: "right" });
+    expect(flat(ink).opacity).toBeUndefined();
     expect(flat(ink).backgroundColor).toBeUndefined();
   });
 

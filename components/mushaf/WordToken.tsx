@@ -37,7 +37,7 @@ export const WEAK_SPOT_DARK = "#f59e0b";
 
 // Android clips each Text to its own box, but QCF page words draw outside their advance: over all
 // 604 pages, shaped words reach up to 1.77 em past the line-end (left) edge and, rarely, 1.48 em past
-// the right edge. On Android the word's Text keeps its box, highlight and taps but draws no ink; a
+// the right edge. On Android the word's Text keeps its box and tap target but draws no ink. A
 // non-interactive copy widened by this much on both sides draws the glyph. Its right padding keeps the
 // right-aligned glyph exactly where the word box puts it; centering would follow Android's ink
 // bounds and shift it (RF189).
@@ -110,6 +110,8 @@ function WordTokenInner({
       : {};
 
   const drawsInkLayer = Platform.OS === "android" && !hidden;
+  const wordBackgroundColor = bgColor ?? (isTooltipSelected ? "rgba(13, 148, 136, 0.08)" : undefined);
+  const wordPadding = compactLayout ? 0 : 1;
   const inkClassName = isTooltipSelected
     ? "text-primary-accent dark:text-primary-bright"
     : "text-charcoal dark:text-neutral-100";
@@ -122,7 +124,7 @@ function WordTokenInner({
       delayLongPress={400}
       disabled={disabled || hidden}
       style={{
-        paddingHorizontal: compactLayout ? 0 : 1,
+        paddingHorizontal: wordPadding,
         overflow: "visible",
         // The underline marking a hidden word sits on the wrapper, so the word itself can be fully
         // invisible below it.
@@ -136,6 +138,20 @@ function WordTokenInner({
       {...webContextMenu}
       {...webSelectionProps}
     >
+      {drawsInkLayer && wordBackgroundColor && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            start: wordPadding,
+            end: wordPadding,
+            backgroundColor: wordBackgroundColor,
+            borderRadius: 6,
+          }}
+        />
+      )}
       <Text
         selectable={Platform.OS === "web" && !hidden}
         className={inkClassName}
@@ -144,20 +160,15 @@ function WordTokenInner({
           ...(Platform.OS === "web" && fontPalette ? ({ fontPalette } as any) : null),
           fontSize,
           lineHeight,
-          paddingHorizontal: compactLayout ? 0 : 1,
-          ...(bgColor && {
-            backgroundColor: bgColor,
+          paddingHorizontal: wordPadding,
+          ...(!drawsInkLayer && wordBackgroundColor && {
+            backgroundColor: wordBackgroundColor,
             borderRadius: 6,
           }),
-          ...(isTooltipSelected && !bgColor && {
-            backgroundColor: "rgba(13, 148, 136, 0.08)",
-            borderRadius: 6,
-          }),
-          // Page fonts are colour fonts whose palette layers ignore the text colour, so a transparent
-          // colour still drew hidden words faintly. Opacity hides every layer.
-          ...(hidden && { color: "transparent", opacity: 0 }),
+          // Android Fabric treats transparent black as an unset text colour, and palette colours
+          // can ignore the text colour altogether. View opacity hides both kinds of font ink.
+          ...((hidden || drawsInkLayer) && { opacity: 0 }),
           ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),
-          ...(drawsInkLayer && { color: "transparent" }),
         }}
       >
         {glyph}
@@ -184,7 +195,7 @@ function WordTokenInner({
               fontSize,
               lineHeight,
               // The layer is placed from the Pressable's edge; add its and the word Text's padding.
-              paddingRight: fontSize * INK_OVERFLOW_EM + (compactLayout ? 0 : 2),
+              paddingRight: fontSize * INK_OVERFLOW_EM + 2 * wordPadding,
               textAlign: "right",
             }}
           >
