@@ -194,20 +194,6 @@ export function expectedApkSize(
   return response.status === 200 ? length : null;
 }
 
-/** Size and MD5 (computed natively) against what is known. Nothing known passes. */
-export function isVerifiedDownload(input: {
-  expectedSize: number | null;
-  expectedMd5: string | undefined;
-  actualSize: number | null;
-  actualMd5: string | null | undefined;
-}): boolean {
-  const { expectedSize, expectedMd5, actualSize, actualMd5 } = input;
-  if (actualSize === null || actualSize <= 0) return false;
-  if (expectedSize !== null && actualSize !== expectedSize) return false;
-  if (expectedMd5 !== undefined && actualMd5?.toLowerCase() !== expectedMd5) return false;
-  return true;
-}
-
 /** What the Home card and the Settings row show on Android. */
 export type UpdateView =
   | Readonly<{ kind: "none" }>

@@ -4,7 +4,6 @@ import {
   downloadPercent,
   expectedApkSize,
   isUnmeteredWifi,
-  isVerifiedDownload,
   nextUpdatePhase,
   planUpdateFiles,
   shouldAutoDownload,
@@ -180,23 +179,5 @@ describe("download response and verification", () => {
     ).toBe(900);
     expect(expectedApkSize(release, { status: 200, headers: {} }, 0)).toBeNull();
     expect(expectedApkSize(release, null, 0)).toBeNull();
-  });
-
-  it("checks size and the native MD5 against what is known", () => {
-    const md5 = withIntegrity.md5;
-    expect(isVerifiedDownload({ expectedSize: 1000, expectedMd5: md5, actualSize: 1000, actualMd5: md5 })).toBe(true);
-    expect(
-      isVerifiedDownload({ expectedSize: 1000, expectedMd5: md5, actualSize: 1000, actualMd5: md5?.toUpperCase() }),
-    ).toBe(true);
-    expect(isVerifiedDownload({ expectedSize: 1000, expectedMd5: md5, actualSize: 999, actualMd5: md5 })).toBe(false);
-    expect(
-      isVerifiedDownload({ expectedSize: 1000, expectedMd5: md5, actualSize: 1000, actualMd5: "f".repeat(32) }),
-    ).toBe(false);
-    expect(isVerifiedDownload({ expectedSize: null, expectedMd5: undefined, actualSize: 1, actualMd5: null })).toBe(
-      true,
-    );
-    expect(isVerifiedDownload({ expectedSize: null, expectedMd5: undefined, actualSize: 0, actualMd5: null })).toBe(
-      false,
-    );
   });
 });

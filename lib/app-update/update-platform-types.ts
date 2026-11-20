@@ -7,8 +7,6 @@ export type UpdateDownloadTask = Readonly<{
   pause: () => Promise<void>;
 }>;
 
-export type UpdateFileInfo = Readonly<{ exists: boolean; size: number | null; md5: string | null }>;
-
 /**
  * The device calls the Android in-app update needs. File names are relative to the app's updates
  * folder. Web and iOS get an unsupported stub; tests replace the module.
@@ -18,8 +16,9 @@ export type AppUpdatePlatform = Readonly<{
   /** Creates the updates folder when missing and lists its files. */
   listFiles: () => Promise<UpdateFileEntry[]>;
   deleteFile: (name: string) => Promise<void>;
-  /** The MD5 is computed natively, and only when asked for. */
-  fileInfo: (name: string, options: { md5: boolean }) => Promise<UpdateFileInfo>;
+  fileSize: (name: string) => Promise<number | null>;
+  /** Streams the update from the private cache on a native background queue. */
+  sha256: (name: string) => Promise<string>;
   readText: (name: string) => Promise<string>;
   writeText: (name: string, text: string) => Promise<void>;
   moveFile: (from: string, to: string) => Promise<void>;

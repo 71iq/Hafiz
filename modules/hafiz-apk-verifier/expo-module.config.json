@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["app.hafizquran.updates.HafizApkVerifierModule"]
+  }
+}

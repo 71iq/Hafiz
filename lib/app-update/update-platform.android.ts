@@ -1,3 +1,4 @@
+import { requireNativeModule } from "expo";
 import { AppState } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as IntentLauncher from "expo-intent-launcher";
@@ -43,11 +44,12 @@ export const appUpdatePlatform: AppUpdatePlatform = {
     await FileSystem.deleteAsync(uri(name), { idempotent: true });
   },
 
-  async fileInfo(name, { md5 }) {
-    const info = await FileSystem.getInfoAsync(uri(name), { md5 });
-    if (!info.exists || info.isDirectory) return { exists: false, size: null, md5: null };
-    return { exists: true, size: info.size, md5: info.md5 ?? null };
+  async fileSize(name) {
+    const info = await FileSystem.getInfoAsync(uri(name));
+    return info.exists && !info.isDirectory ? info.size : null;
   },
+
+  sha256: (name) => requireNativeModule<{ sha256(name: string): Promise<string> }>("HafizApkVerifier").sha256(name),
 
   readText: (name) => FileSystem.readAsStringAsync(uri(name)),
 

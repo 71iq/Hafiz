@@ -73,8 +73,7 @@ cert=$("$APKSIGNER" verify --print-certs "$APK" 2>/dev/null |
 
 FILE="hafiz-$VERSION_NAME-$VERSION_CODE.apk"
 SHA=$(sha256sum "$APK" | cut -d' ' -f1)
-# The installed app checks its in-app download against size and md5, which Android computes
-# natively; SHA-256 over 400 MB would have to run in JavaScript. sha256 stays for people checking.
+# Older installed clients still use MD5. Current clients verify SHA-256 natively.
 SIZE=$(stat -c %s "$APK")
 MD5=$(md5sum "$APK" | cut -d' ' -f1)
 MANIFEST=$(node -e 'const [code, name, file, sha256, size, md5] = process.argv.slice(1);

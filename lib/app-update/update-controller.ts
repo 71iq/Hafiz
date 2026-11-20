@@ -3,7 +3,6 @@ import {
   downloadPercent,
   expectedApkSize,
   isUnmeteredWifi,
-  isVerifiedDownload,
   planUpdateFiles,
   shouldAutoDownload,
   updateFileNames,
@@ -64,6 +63,21 @@ async function removeFiles(names: readonly string[]): Promise<void> {
   }
 }
 
+async function matchesApk(
+  name: string,
+  release: AndroidRelease,
+  actualSize: number | null,
+  expectedSize: number | null,
+): Promise<boolean> {
+  if (actualSize === null || actualSize <= 0 || (expectedSize !== null && actualSize !== expectedSize)) return false;
+  try {
+    return (await platform.sha256(name)) === release.sha256;
+  } catch (error) {
+    warn("Could not verify the update file", error);
+    return false;
+  }
+}
+
 /**
  * Applies planUpdateFiles: deletes old, unknown and superseded files and restores a verified APK as
  * ready. Once the published release is known, anything for another version goes.
@@ -77,6 +91,12 @@ async function reconcileFiles(installed: number, latestCode: number | null): Pro
   try {
     const release = parseAndroidRelease(JSON.parse(await platform.readText(meta)));
     if (release.versionCode !== plan.ready) throw new Error("Update record names another version");
+    if (getUpdateState().phase.status !== "idle") return;
+    if (!(await matchesApk(apk, release, await platform.fileSize(apk), release.size ?? null))) {
+      await removeFiles([apk, meta]);
+      dispatchUpdateEvent({ type: "failed", release, reason: "verify" });
+      return;
+    }
     if (getUpdateState().phase.status === "idle") dispatchUpdateEvent({ type: "verified", release });
   } catch (error) {
     warn("Discarding an unreadable update record", error);
@@ -120,9 +140,7 @@ function notifyIfInBackground(release: AndroidRelease): void {
 async function runDownload(release: AndroidRelease): Promise<void> {
   const partial = updateFileNames.partial(release.versionCode);
   activePartial = partial;
-  let resumeFrom = 0;
-  const existing = await platform.fileInfo(partial, { md5: false });
-  if (existing.exists && existing.size) resumeFrom = existing.size;
+  let resumeFrom = (await platform.fileSize(partial)) ?? 0;
   if (release.size !== undefined && resumeFrom > release.size) {
     await platform.deleteFile(partial);
     resumeFrom = 0;
@@ -162,14 +180,8 @@ async function runDownload(release: AndroidRelease): Promise<void> {
     return;
   }
 
-  const info = await platform.fileInfo(partial, { md5: release.md5 !== undefined });
-  const verified = isVerifiedDownload({
-    expectedSize: expectedApkSize(release, response, resumeFrom),
-    expectedMd5: release.md5,
-    actualSize: info.exists ? info.size : null,
-    actualMd5: info.md5,
-  });
-  if (!verified) {
+  const size = await platform.fileSize(partial);
+  if (!(await matchesApk(partial, release, size, expectedApkSize(release, response, resumeFrom)))) {
     await platform.deleteFile(partial);
     dispatchUpdateEvent({ type: "failed", release, reason: "verify" });
     return;
@@ -183,8 +195,7 @@ async function runDownload(release: AndroidRelease): Promise<void> {
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 async function partialSize(release: AndroidRelease): Promise<number> {
-  const info = await platform.fileInfo(updateFileNames.partial(release.versionCode), { md5: false });
-  return info.exists ? (info.size ?? 0) : 0;
+  return (await platform.fileSize(updateFileNames.partial(release.versionCode))) ?? 0;
 }
 
 /**
@@ -329,11 +340,18 @@ export async function installUpdate(): Promise<void> {
   installing = true;
   try {
     const apk = updateFileNames.ready(release.versionCode);
-    const info = await platform.fileInfo(apk, { md5: false });
-    if (!info.exists) {
+    const size = await platform.fileSize(apk);
+    if (size === null) {
       // Android cleared the cache folder; Try again downloads it again.
       await removeFiles([updateFileNames.meta(release.versionCode)]);
       dispatchUpdateEvent({ type: "failed", release, reason: "download" });
+      return;
+    }
+    const verified = await matchesApk(apk, release, size, release.size ?? null);
+    if (getUpdateState().phase !== phase) return;
+    if (!verified) {
+      await removeFiles([apk, updateFileNames.meta(release.versionCode)]);
+      dispatchUpdateEvent({ type: "failed", release, reason: "verify" });
       return;
     }
     await platform.launchInstaller(apk);
