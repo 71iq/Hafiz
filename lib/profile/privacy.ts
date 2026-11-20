@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { requireSignedOutViewer, requireSocialOwner, type SocialOwner } from "@/lib/social/owner";
-import { callSocialRpc, classifyRemoteError, socialError, socialFailureOf, voidResult } from "@/lib/social/remote";
+import { callSocialRpc, classifyRemoteError, socialError, socialFailureOf } from "@/lib/social/remote";
 
 /**
  * Profile visibility (SOC-01, ETH-07). Everything beyond identity is private unless the person turns it
@@ -37,7 +37,6 @@ export type ProfileSummary = z.output<typeof profileSummarySchema>;
 export const profilePrivacyKeys = {
   mine: (userId: string | null) => ["profilePrivacy", userId ?? "signed-out"] as const,
   summary: (viewerId: string | null, targetId: string) => ["profileSummary", viewerId ?? "signed-out", targetId] as const,
-  legacyHalaqas: (userId: string | null) => ["legacyHalaqas", userId ?? "signed-out"] as const,
 };
 
 /** The owner's own choices. Runs as that account (lib/social/owner.ts). */
@@ -75,8 +74,8 @@ export type SavedProfilePrivacy = z.output<typeof savedPrivacySchema>;
  * form loaded; the server refuses the save with ProfilePrivacyChangedError when the stored value
  * differs. Recording minority (ETH-07) deletes the stored photo files first and is not sent when that
  * fails, so the save can be retried before anything is recorded. The server then clears the profile
- * photo, refuses new uploads, leaves matched halaqas, takes a Board member without a nickname off the
- * Board, and one more pass removes a photo another device uploaded in between.
+ * photo, refuses new uploads and takes a Board member without a nickname off the Board, and one more
+ * pass removes a photo another device uploaded in between.
  */
 export async function saveProfilePrivacy(
   input: { showStreak: boolean; showJuzCompletions: boolean; isMinor: boolean; expectedMinor: boolean },
@@ -100,36 +99,6 @@ export async function saveProfilePrivacy(
   });
   if (saved.isMinor) await deleteAvatarFilesAfterMinority(owner);
   return saved;
-}
-
-/**
- * Halaqa is not in this version, but the server keeps memberships and sharing choices made in an
- * earlier one, and their members and teachers still read what was shared. These let the person see
- * that they are still in a halaqa and leave every one, which withdraws all of that sharing. Only the
- * group ids are read.
- */
-const legacyHalaqaIdsSchema = z.array(z.object({ id: z.string().uuid() })).transform((rows) => rows.map((row) => row.id));
-
-export function fetchLegacyHalaqaIds(owner: SocialOwner): Promise<string[]> {
-  return callSocialRpc("get_my_halaqas", {}, legacyHalaqaIdsSchema, owner);
-}
-
-/**
- * Leaves every halaqa this account is still in, one at a time, as that account. A group the person
- * already left elsewhere (not_a_member) is skipped. Any other failure stops here and is thrown; the
- * groups already left stay left, and a retry reads the list again.
- */
-export async function leaveLegacyHalaqas(owner: SocialOwner): Promise<number> {
-  const ids = await fetchLegacyHalaqaIds(owner);
-  for (const id of ids) {
-    try {
-      await callSocialRpc("leave_halaqa", { p_group_id: id }, voidResult, owner);
-    } catch (error) {
-      const failure = socialFailureOf(error);
-      if (!(failure.kind === "failed" && failure.message === "not_a_member")) throw error;
-    }
-  }
-  return ids.length;
 }
 
 /**

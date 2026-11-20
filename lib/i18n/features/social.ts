@@ -31,7 +31,7 @@ export const socialStrings = {
     socialProfilePrivateNote: "This person keeps their progress private.",
 
     privacySettingsTitle: "Privacy and sharing",
-    privacySettingsDesc: "What your profile shows, and halaqas from an earlier version",
+    privacySettingsDesc: "What your profile shows, and your age setting",
     privacyLoading: "Loading your privacy choices",
     profileVisibilityTitle: "Your public profile",
     profileShowStreak: "Show my streak on my profile",
@@ -44,16 +44,6 @@ export const socialStrings = {
     socialSaved: "Saved",
     privacyNotSaved: "Your privacy choices were not saved.",
     socialSavedLeftBoard: "Saved. Because you are under 18, you have left the Board. You can join again with a nickname.",
-    legacyHalaqaTitle: "Halaqas from an earlier version",
-    legacyHalaqaBody:
-      "You are still in a halaqa from an earlier version of Hafiz. Its members and teachers can see what you chose to share there, such as your wird days, streak, juz completions, plan or recent grades.",
-    legacyHalaqaLeave: "Leave and stop sharing",
-    legacyHalaqaConfirm:
-      "Leave every halaqa and stop sharing your progress with it? Halaqas are not in this version, so you can't join one again for now.",
-    legacyHalaqaConfirmLeave: "Leave",
-    legacyHalaqaKeep: "Keep",
-    legacyHalaqaLeft: "You have left your halaqas. They no longer see your progress.",
-    legacyHalaqaStillIn: "You are still in your halaqas.",
 
     boardTitle: "Board",
     boardSubtitle: "A small weekly group of people at a similar level, ranked by consistency.",
@@ -110,7 +100,7 @@ export const socialStrings = {
     socialProfilePrivateNote: "يُبقي هذا الشخص تقدّمه خاصًا.",
 
     privacySettingsTitle: "الخصوصية والمشاركة",
-    privacySettingsDesc: "ما يظهر في ملفك، والحلقات من إصدار سابق",
+    privacySettingsDesc: "ما يظهر في ملفك، وإعداد عمرك",
     privacyLoading: "يجري تحميل اختيارات الخصوصية",
     profileVisibilityTitle: "ملفك العام",
     profileShowStreak: "أظهر سلسلتي في ملفي",
@@ -122,15 +112,6 @@ export const socialStrings = {
     socialSaved: "حُفظ",
     privacyNotSaved: "لم تُحفظ اختياراتك في الخصوصية.",
     socialSavedLeftBoard: "حُفظ. ولأن عمرك دون الثامنة عشرة غادرتَ اللوحة، ويمكنك الانضمام إليها مجددًا بلقب.",
-    legacyHalaqaTitle: "الحلقات من إصدار سابق",
-    legacyHalaqaBody:
-      "ما زلت في حلقة من إصدار سابق من حافظ. يرى أعضاؤها ومعلّموها ما اخترت مشاركته فيها، مثل أيام وِردك وسلسلتك والأجزاء التي أتممتها وخطتك أو تقييماتك الأخيرة.",
-    legacyHalaqaLeave: "غادر وأوقف المشاركة",
-    legacyHalaqaConfirm: "أتغادر كل الحلقات وتوقف مشاركة تقدّمك معها؟ الحلقات غير متاحة في هذا الإصدار، فلا يمكنك الانضمام إلى حلقة مجددًا الآن.",
-    legacyHalaqaConfirmLeave: "غادر",
-    legacyHalaqaKeep: "إبقاء",
-    legacyHalaqaLeft: "غادرتَ حلقاتك، ولم يعد أعضاؤها يرون تقدّمك.",
-    legacyHalaqaStillIn: "ما زلت في حلقاتك.",
 
     boardTitle: "اللوحة",
     boardSubtitle: "مجموعة أسبوعية صغيرة من أشخاص في مستوى قريب، مرتبة بحسب المواظبة.",
