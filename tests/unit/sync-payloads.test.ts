@@ -1653,7 +1653,7 @@ it("drops device state built from the replaced account when restoring another", 
   expect(keys).toContain("hifz_auto_delay_ms");
 });
 
-// Halaqa is removed for now; the device rows its encouragement reminders left behind are kept as they are.
+// Halaqa is gone; the inert device rows its encouragement reminders left behind are kept as they are.
 it("keeps an earlier build's Halaqa encouragement rows through a restore", async () => {
   const otherAccount = "00000000-0000-4000-8000-000000000002";
   const pending = JSON.stringify({

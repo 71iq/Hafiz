@@ -1692,7 +1692,7 @@
           "children": [
             {
               "id": "settings.account.privacy",
-              "title": "Privacy and sharing: profile visibility, under 18, leave halaqas from an earlier version",
+              "title": "Privacy and sharing: profile visibility, under 18",
               "kind": "widget",
               "cases": ["SET-20"],
               "uses": ["shared.overlay"],

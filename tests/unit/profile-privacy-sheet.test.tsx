@@ -21,7 +21,6 @@ const mockSettings = {
   },
 };
 const USER = "00000000-0000-4000-8000-00000000000a";
-const GROUP = "00000000-0000-4000-8000-0000000000a1";
 const mockAuth: FakeAuthState & { fetchProfile: jest.Mock } = { ...signedIn(USER), fetchProfile: jest.fn() };
 const mockHeaders: Record<string, string> = {};
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
@@ -65,16 +64,12 @@ const publicStreak = {
   is_minor: false,
 };
 
-let halaqaIds: string[] = [];
 beforeEach(() => {
   mockRpc.mockReset();
-  halaqaIds = [];
   mockRpc.mockImplementation(async (fn, args) => {
     switch (fn) {
       case "get_profile_privacy":
         return { data: publicStreak, error: null };
-      case "get_my_halaqas":
-        return { data: halaqaIds.map((id) => ({ id })), error: null };
       case "set_profile_privacy":
         return {
           data: {
@@ -85,9 +80,6 @@ beforeEach(() => {
           },
           error: null,
         };
-      case "leave_halaqa":
-        halaqaIds = halaqaIds.filter((id) => id !== args.p_group_id);
-        return { data: null, error: null };
       default:
         throw new Error(`unexpected ${fn}`);
     }
@@ -139,23 +131,10 @@ describe("Privacy and sharing (SET-20)", () => {
     expect(view.onClose).toHaveBeenCalled();
   });
 
-  it("does not mention halaqas to someone who is in none", async () => {
+  // Halaqa and its server tables are gone, so the sheet no longer asks about halaqas from an earlier version.
+  it("reads only the profile choices", async () => {
     const view = renderSheet();
-    await waitFor(() => expect(mockRpc.mock.calls.some(([fn]) => fn === "get_my_halaqas")).toBe(true));
     await waitFor(() => expect(view.getByText(en.profileShowStreak)).toBeTruthy(), { timeout: 5000 });
-    expect(view.queryByText(en.legacyHalaqaTitle)).toBeNull();
-  });
-
-  it("leaves a halaqa from an earlier version after asking, and says sharing stopped", async () => {
-    halaqaIds = [GROUP];
-    const view = renderSheet();
-    await waitFor(() => expect(view.getByText(en.legacyHalaqaBody)).toBeTruthy(), { timeout: 5000 });
-    fireEvent.press(view.getByRole("button", { name: en.legacyHalaqaLeave }));
-    expect(view.getByText(en.legacyHalaqaConfirm)).toBeTruthy();
-    expect(mockRpc.mock.calls.some(([fn]) => fn === "leave_halaqa")).toBe(false);
-    fireEvent.press(view.getByRole("button", { name: en.legacyHalaqaConfirmLeave }));
-    await waitFor(() => expect(view.getByText(en.legacyHalaqaLeft)).toBeTruthy());
-    expect(mockRpc).toHaveBeenCalledWith("leave_halaqa", { p_group_id: GROUP });
-    expect(view.queryByRole("button", { name: en.legacyHalaqaLeave })).toBeNull();
+    expect(new Set(mockRpc.mock.calls.map(([fn]) => fn))).toEqual(new Set(["get_profile_privacy"]));
   });
 });

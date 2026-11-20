@@ -602,7 +602,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "components/settings/ProfilePrivacySheet.tsx",
     "overlay",
     "source",
-    "ResponsiveSheet of mirrored switch rows; retry and leave buttons sit at the reading start; footer buttons reverse in RTL.",
+    "ResponsiveSheet of mirrored switch rows; the retry button sits at the reading start; footer buttons reverse in RTL.",
   ),
   entry(
     "components/settings/ReadingStepper.tsx",
