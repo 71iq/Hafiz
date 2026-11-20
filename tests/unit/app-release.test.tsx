@@ -59,9 +59,8 @@ const mockPlatform = {
   listFiles: jest.fn(async () => []),
   deleteFile: jest.fn(async () => undefined),
   // Only the verified APK exists, so a download starts from the beginning.
-  fileInfo: jest.fn(async (name: string) =>
-    name.endsWith(".apk") ? { exists: true, size: 1000, md5: null } : { exists: false, size: null, md5: null },
-  ),
+  fileSize: jest.fn(async (name: string) => (name.endsWith(".apk") ? 1000 : null)),
+  sha256: jest.fn(async () => release.sha256),
   readText: jest.fn(async () => ""),
   writeText: jest.fn(async () => undefined),
   moveFile: jest.fn(async () => undefined),
