@@ -22,8 +22,8 @@ jest.mock("react-native", () => ({
   },
 }));
 jest.mock("@/lib/database/native-loaders", () => ({
-  nativeRequires: {},
-  nativeTafseerRequires: {},
+  loadNativeData: jest.fn(),
+  loadNativeTafseer: jest.fn(),
   nativeTafsirSourceLoader: (source: string, surah: number) => () => {
     mockLoaderCalls.push({ source, surah });
     return mockLoadSourceFile(source, surah);

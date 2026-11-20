@@ -9,7 +9,7 @@ import { defaultDatabaseDirectory, importDatabaseFromAssetAsync } from "expo-sql
  * so warm launches do no file work. Android's resource copy in the cache is removed afterwards so
  * the content is not stored twice.
  */
-export async function importBundledDatabase(databaseName: string, assetId: number): Promise<void> {
+export async function importBundledDatabase(databaseName: string, assetId: number = require("../../assets/data/quran.db")): Promise<void> {
   const target = new File(`file://${defaultDatabaseDirectory}`, databaseName);
   if (target.exists) return;
 

@@ -1,0 +1,10 @@
+diff --git a/node_modules/expo-symbols/build/SymbolView.js b/node_modules/expo-symbols/build/SymbolView.js
+index 09abf78..bed3a3a 100644
+--- a/node_modules/expo-symbols/build/SymbolView.js
++++ b/node_modules/expo-symbols/build/SymbolView.js
+@@ -1,4 +1,4 @@
+-import { useFonts } from '@expo-google-fonts/material-symbols';
++import { useFonts } from '@expo-google-fonts/material-symbols/useFonts';
+ import { useMemo } from 'react';
+ import { Platform, PlatformColor, Text, View } from 'react-native';
+ import { androidSymbolToString } from './android';

@@ -8,7 +8,7 @@ Hafiz is in early public preview. It is ready for a small group of people to vie
 
 ## Features
 
-- QCF2/KFGQPC V2 page fonts for Quran display.
+- On Android, all 604 Modern (V4) Mushaf pages, Al-Muyassar, and Fi Zilal are available offline from first launch. Download the Classic (QCF2) font or additional tafsirs once to use them offline.
 - Verse and page Mushaf views.
 - Word meanings, morphology, i'rab, tajweed, qira'at data, and occurrences where available.
 - Review tools, including FSRS-based scheduling.

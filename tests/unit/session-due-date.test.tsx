@@ -121,6 +121,7 @@ const mockSettings: ReturnType<typeof useSettings> = {
   setViewMode: jest.fn(),
   quranFontStyle: "qcf2",
   quranRenderFontStyle: "qcf2",
+  classicDownloadState: "ready",
   setQuranFontStyle: jest.fn(),
   quranMarkerStyle: "auto",
   setQuranMarkerStyle: jest.fn(),

@@ -1,0 +1,28 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+def repository = rootProject.projectDir.parentFile
+def contentDir = layout.buildDirectory.dir('generated/readerAssets')
+def packReaderContent = tasks.register('packReaderContent', Exec) {
+  workingDir repository
+  inputs.files(fileTree(new File(repository, 'assets/data')) { include '**/*.json', 'quran.db' })
+  inputs.files(fileTree(new File(repository, 'assets/fonts')) { include 'QPC_V2/*.ttf', 'QPC_V4_TAJWEED/*.ttf' })
+  inputs.file(new File(repository, 'scripts/pack-android-content.cjs'))
+  outputs.dir contentDir
+  commandLine 'node', 'scripts/pack-android-content.cjs', contentDir.get().asFile.absolutePath
+}
+
+android {
+  namespace 'app.hafizquran.content'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+  sourceSets.main.assets.srcDir(contentDir)
+}
+tasks.named('preBuild').configure { dependsOn packReaderContent }
+dependencies {
+  implementation 'com.github.luben:zstd-jni:1.5.7-4@aar'
+}

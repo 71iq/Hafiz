@@ -134,7 +134,7 @@ const MUSHAF_LINE_WIDTH_SCALE = 19.5;
 const MUSHAF_LINE_WIDTH_SCALE_V4_TAJWEED = 21.5;
 
 export function mushafLineWidthScale(fontStyle: string): number {
-  return fontStyle === "v4" || fontStyle === "v4-tajweed"
+  return fontStyle.startsWith("v4")
     ? MUSHAF_LINE_WIDTH_SCALE_V4_TAJWEED
     : MUSHAF_LINE_WIDTH_SCALE;
 }

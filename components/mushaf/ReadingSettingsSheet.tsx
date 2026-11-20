@@ -8,7 +8,7 @@ import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { formatSecondsPerWord, getNextFasterDelay, getNextSlowerDelay } from "@/components/mushaf/HifzControls";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
-import { isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
+import { classicFontCopy, isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
 import { toArabicNumber } from "@/lib/arabic";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -54,6 +54,7 @@ export function ReadingSettingsSheet({
     setFontSizeIndex,
     quranFontStyle,
     quranRenderFontStyle,
+    classicDownloadState,
     setQuranFontStyle,
     quranMarkerStyle,
     setQuranMarkerStyle,
@@ -90,12 +91,13 @@ export function ReadingSettingsSheet({
   const modalHorizontalPadding = compactRows ? 16 : 28;
   const titleFontSize = compactRows ? 21 : 24;
 
+  const classic = classicFontCopy(s, classicDownloadState, quranRenderFontStyle === "qcf2" && quranFontStyle !== "qcf2");
   const fontOptions = useMemo<ChoiceOption<QuranBaseFont>[]>(
     () => [
-      { value: "qcf2", label: s.quranFontQcf2 },
+      { value: "qcf2", label: classic.label },
       { value: "v4", label: s.quranFontV4 },
     ],
-    [s.quranFontQcf2, s.quranFontV4]
+    [classic.label, s.quranFontV4]
   );
   const markerStyleOptions = useMemo<ChoiceOption<QuranMarkerStyle>[]>(
     () => [
@@ -205,7 +207,7 @@ export function ReadingSettingsSheet({
                 className="text-warm-500 dark:text-neutral-400"
                 style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
               >
-                {quranRenderFontStyle !== quranFontStyle ? `${s.quranFontChoiceHint} ${s.quranFontDarkFallback}` : s.quranFontChoiceHint}
+                {classic.hint}
               </Text>
             </View>
             <Divider />

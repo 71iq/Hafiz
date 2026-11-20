@@ -1,3 +1,4 @@
+import { resolvePageFontStyle } from "@/lib/fonts/page-style";
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { View, Text, Pressable, ScrollView, Platform, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
@@ -76,9 +77,7 @@ export function WordDetailSheet() {
     next: WordRef | null;
   } | null>(null);
   const adjacentWords = neighbors?.word === detailWord ? neighbors : null;
-  // The colour tajweed font draws black base glyphs on Android in dark themes, as in the reader, so
-  // those themes show the header word in the classic font there.
-  const headerFontStyle = Platform.OS !== "web" && isDark ? "qcf2" : WORD_HEADER_FONT_STYLE;
+  const headerFontStyle = resolvePageFontStyle(WORD_HEADER_FONT_STYLE, isDark);
   const wordHeaderFontReady = useQuranPageFontReady(headerFontStyle, detailWord?.v2Page);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>(EMPTY_META);
   const contentScrollRef = useRef<ScrollView>(null);
