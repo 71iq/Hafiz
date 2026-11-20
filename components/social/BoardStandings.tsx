@@ -18,17 +18,10 @@ type JoinedView = Exclude<BoardView, { status: "not_joined" }>;
 
 /**
  * BRD-05 and BRD-08: this week's cohort. Standings show only once the group has enough people; each
- * row is a name or nickname, weekly consistency points and streak. Leaving is one tap (BRD-04).
+ * row is a name or nickname, weekly consistency points and streak. Leaving is one tap (BRD-04), and
+ * the screen leaves at once while the request runs.
  */
-export function BoardStandings({
-  view,
-  leaving,
-  onLeave,
-}: {
-  view: JoinedView;
-  leaving: boolean;
-  onLeave: () => void;
-}) {
+export function BoardStandings({ view, onLeave }: { view: JoinedView; onLeave: () => void }) {
   const s = useStrings();
   const { isRTL, uiLanguage } = useSettings();
   const language: Language = uiLanguage === "ar" ? "ar" : "en";
@@ -84,11 +77,9 @@ export function BoardStandings({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ disabled: leaving, busy: leaving }}
-        disabled={leaving}
         onPress={onLeave}
         className="min-h-11 items-center justify-center gap-2 self-center px-4"
-        style={[socialRowStyle(isRTL), { opacity: leaving ? 0.6 : 1 }]}
+        style={socialRowStyle(isRTL)}
       >
         <LogOut size={16} color={muted} />
         <Text variant="label-lg" className="text-warm-500 dark:text-neutral-400">

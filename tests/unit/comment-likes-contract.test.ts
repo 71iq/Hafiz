@@ -35,8 +35,9 @@ describe("reflection comment likes contract", () => {
     const sheet = read("components/reflections/CommentsSheet.tsx");
 
     expect(sheet).toContain("toggleCommentLike");
-    expect(sheet).toContain("commentLikeOverrides");
-    expect(sheet).toContain("handleCommentLike");
+    // Each comment's like answers at once and sends only the latest choice (use-optimistic-like.ts).
+    expect(sheet).toContain("useOptimisticLike");
+    expect(sheet).toContain("function CommentLikeButton");
     expect(sheet).toContain("<Heart");
     expect(sheet).toContain('sort === "popular"');
   });

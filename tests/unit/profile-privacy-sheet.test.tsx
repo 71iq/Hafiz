@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ProfilePrivacySheet } from "@/components/settings/ProfilePrivacySheet";
 import { strings } from "@/lib/i18n/strings";
+import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import { signedIn, type FakeAuthState } from "./social-test-auth";
 
 const mockSettings = {
@@ -109,7 +110,7 @@ function renderSheet() {
       </QueryClientProvider>
     </SafeAreaProvider>,
   );
-  return { ...view, onClose, onNotice };
+  return { ...view, onClose, onNotice, client };
 }
 
 const en = strings.en;
@@ -121,7 +122,14 @@ describe("Privacy and sharing (SET-20)", () => {
     fireEvent.press(view.getByRole("switch", { name: en.profileShowStreak }));
     fireEvent.press(view.getByRole("switch", { name: en.profileShowJuz }));
     fireEvent.press(view.getByRole("button", { name: en.socialSave }));
-    await waitFor(() => expect(view.onNotice).toHaveBeenCalledWith(en.socialSaved));
+    // Closed and confirmed at once, with the new choices in use while the server stores them.
+    expect(view.onNotice).toHaveBeenCalledWith(en.socialSaved);
+    expect(view.onClose).toHaveBeenCalledTimes(1);
+    expect(view.client.getQueryData(profilePrivacyKeys.mine(USER))).toMatchObject({
+      showStreak: false,
+      showJuzCompletions: false,
+    });
+    await waitFor(() => expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", expect.anything()));
     expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", {
       p_show_streak: false,
       p_show_juz_completions: false,
@@ -131,10 +139,31 @@ describe("Privacy and sharing (SET-20)", () => {
     expect(view.onClose).toHaveBeenCalled();
   });
 
+  it("restores the stored choices and says they were not saved when the server refuses", async () => {
+    const base = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation(async (fn, args) =>
+      fn === "set_profile_privacy"
+        ? { data: null, error: { code: "XX000", message: "synthetic failure" } }
+        : base(fn, args),
+    );
+    const view = renderSheet();
+    await waitFor(() => expect(view.getByText(en.profileShowStreak)).toBeTruthy(), { timeout: 5000 });
+    fireEvent.press(view.getByRole("switch", { name: en.profileShowStreak }));
+    fireEvent.press(view.getByRole("button", { name: en.socialSave }));
+    expect(view.onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(view.onNotice).toHaveBeenLastCalledWith(`${en.privacyNotSaved} ${en.socialErrorGeneric}`),
+    );
+    await waitFor(() =>
+      expect(view.client.getQueryData(profilePrivacyKeys.mine(USER))).toMatchObject({ showStreak: true }),
+    );
+  });
+
   // Halaqa and its server tables are gone, so the sheet no longer asks about halaqas from an earlier version.
   it("reads only the profile choices", async () => {
     const view = renderSheet();
     await waitFor(() => expect(view.getByText(en.profileShowStreak)).toBeTruthy(), { timeout: 5000 });
     expect(new Set(mockRpc.mock.calls.map(([fn]) => fn))).toEqual(new Set(["get_profile_privacy"]));
   });
+
 });

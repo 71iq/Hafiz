@@ -197,7 +197,11 @@ health and exits without replacing it.
 Public CI variables are `EXPO_PUBLIC_SUPABASE_URL`,
 `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_QF_USER_AUTH_ENABLED`,
 `EXPO_PUBLIC_QF_CONTENT_ENABLED`, `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED`,
-`EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS` and `HAFIZ_HETZNER_HOST`. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
+`EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS`, `EXPO_PUBLIC_BOARD_ENABLED` and `HAFIZ_HETZNER_HOST`.
+The Board stays hidden while `EXPO_PUBLIC_BOARD_ENABLED` is unset: its
+standings need weekly groups of at least five, so it waits until enough people
+use Hafiz. Its server functions keep running, and setting the variable to
+`true` shows it in the next build. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
 `HAFIZ_HETZNER_KNOWN_HOSTS`. Server secrets never enter the web build or Git.
 Infrastructure, database migrations and Edge Function source changes require
 an administrator deployment. The web deploy key cannot modify them.

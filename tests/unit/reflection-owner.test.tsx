@@ -6,6 +6,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { fetchReflections } from "@/lib/reflections/api";
 import type { Reflection } from "@/lib/reflections/types";
+import { addPendingPost, pendingId, resetPendingReflectionWritesForTests } from "@/lib/reflections/pending";
 import { strings } from "@/lib/i18n/strings";
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
@@ -23,6 +24,8 @@ jest.mock("@/components/reflections/WriteReflectionSheet", () => ({ WriteReflect
 jest.mock("@/components/ui/Skeleton", () => ({ ReflectionsSkeleton: () => null }));
 jest.mock("@/components/ui/OperationNoticeProvider", () => ({ useOperationNotice: () => jest.fn() }));
 jest.mock("@/components/ui/EmptyState", () => ({ EmptyState: () => null }));
+// A sent comment's undo, kept from the moment it was sent as the real post action keeps it.
+let mockUndoComment: (() => void) | null = null;
 jest.mock("@/components/reflections/CommentsSheet", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   const { Pressable, Text } = jest.requireActual<typeof import("react-native")>("react-native");
@@ -30,12 +33,20 @@ jest.mock("@/components/reflections/CommentsSheet", () => {
     CommentsSheet: ({
       reflectionId,
       onCommentAdded,
+      onCommentRemoved,
     }: {
       reflectionId: string | null;
       onCommentAdded: (id: string) => void;
+      onCommentRemoved: (id: string) => void;
     }) =>
       reflectionId ? (
-        <Pressable testID="add-comment" onPress={() => onCommentAdded(reflectionId)}>
+        <Pressable
+          testID="add-comment"
+          onPress={() => {
+            onCommentAdded(reflectionId);
+            mockUndoComment = () => onCommentRemoved(reflectionId);
+          }}
+        >
           <Text>Add</Text>
         </Pressable>
       ) : null,
@@ -119,6 +130,7 @@ describe("reflection state follows active viewer and ayah", () => {
   });
   afterEach(() => {
     cleanup();
+    resetPendingReflectionWritesForTests();
     client.clear();
     useAuthStore.setState({ user: null, session: null, profile: null });
     jest.restoreAllMocks();
@@ -132,6 +144,39 @@ describe("reflection state follows active viewer and ayah", () => {
     await waitFor(() => expect(view.getByText("synthetic-post|liked:false|comments:0")).toBeTruthy());
     expect(client.getQueryData(key(id))).toEqual(page(false));
     expect(fetchReflections).toHaveBeenCalledTimes(1);
+  });
+  it("shows the viewer's new post first on its ayah, with its count, before the server lists it", async () => {
+    client.setQueryData(key("synthetic-a"), page(false));
+    jest.mocked(fetchReflections).mockResolvedValue(page(false));
+    act(() =>
+      addPendingPost({
+        token: {},
+        viewerId: "synthetic-a",
+        status: "sending",
+        reflection: { ...row(false, pendingId("new")), user_id: "synthetic-a" },
+      }),
+    );
+    const view = render(screen());
+    await waitFor(() => expect(view.getByText("2")).toBeTruthy());
+    const tree = JSON.stringify(view.toJSON());
+    expect(tree.indexOf("pending:new|")).toBeGreaterThan(-1);
+    expect(tree.indexOf("pending:new|")).toBeLessThan(tree.indexOf("synthetic-post|"));
+    // Another ayah and another account do not show it.
+    view.rerender(screen(2, 2));
+    await waitFor(() => expect(view.queryByTestId("pending:new")).toBeNull());
+    view.rerender(screen());
+    await waitFor(() => expect(view.getByTestId("pending:new")).toBeTruthy());
+    act(() => useAuthStore.setState({ user: user("synthetic-b") }));
+    await waitFor(() => expect(view.queryByTestId("pending:new")).toBeNull());
+  });
+  it("a failed comment takes back the count it raised, through the callback kept when it was sent", async () => {
+    client.setQueryData(key("synthetic-a"), page(false));
+    const view = render(screen());
+    fireEvent.press(view.getByTestId("comments-synthetic-post"));
+    fireEvent.press(view.getByTestId("add-comment"));
+    expect(view.getByText("synthetic-post|liked:false|comments:1")).toBeTruthy();
+    act(() => mockUndoComment?.());
+    expect(view.getByText("synthetic-post|liked:false|comments:0")).toBeTruthy();
   });
   it("late first-page A completion cannot overwrite active B rows", async () => {
     const a = deferred(),

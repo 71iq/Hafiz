@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { selectQpcV4PlainPalette } from "@/lib/fonts/qpc-v4-plain-palette";
 import {
   DESKTOP_CONTENT_MAX_WIDTH,
   PERSISTENT_SIDEBAR_BREAKPOINT,
@@ -44,6 +45,35 @@ describe("font and viewport contracts", () => {
     expect(source).toContain("new FontFace");
     expect(source).toContain('display: "swap"');
     expect(source).toContain("font-palette");
+  });
+
+  it("selects the bundled plain palette on every V4 page without changing the glyph data", () => {
+    for (let page = 1; page <= 604; page += 1) {
+      const original = fs.readFileSync(path.join(root, `assets/fonts/QPC_V4_TAJWEED/p${page}.ttf`));
+      const font = Buffer.from(original);
+      const table = (tag: string) => {
+        for (let index = 0; index < font.readUInt16BE(4); index += 1) {
+          const entry = 12 + index * 16;
+          if (font.toString("ascii", entry, entry + 4) === tag) return entry;
+        }
+        throw new Error(`Page ${page} does not contain a ${tag} table`);
+      };
+      const cpal = table("CPAL");
+      const paletteIndices = font.readUInt32BE(cpal + 8) + 12;
+      const adjustment = font.readUInt32BE(table("head") + 8) + 8;
+
+      selectQpcV4PlainPalette(font);
+
+      expect(font.readUInt16BE(paletteIndices)).toBe(original.readUInt16BE(paletteIndices + 6));
+      let sum = 0;
+      for (let offset = 0; offset < font.length; offset += 4) sum = (sum + font.readUInt32BE(offset)) >>> 0;
+      expect(sum).toBe(0xb1b0afba);
+
+      original.copy(font, paletteIndices, paletteIndices, paletteIndices + 2);
+      original.copy(font, cpal + 4, cpal + 4, cpal + 8);
+      original.copy(font, adjustment, adjustment, adjustment + 4);
+      expect(font.compare(original)).toBe(0);
+    }
   });
 
   it("keeps Quran word layout protected against RTL double-reversal", () => {

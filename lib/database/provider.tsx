@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useContext, useMemo, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 import { openDatabaseAsync } from "expo-sqlite";
 import { importBundledDatabase } from "./bundled-database";
@@ -64,15 +64,26 @@ function isOpfsLockError(error: unknown) {
   );
 }
 
-export function DatabaseProvider({ children }: { children: React.ReactNode }) {
-  const [db, setDb] = useState<AppDatabase | null>(null);
-  const [isReady, setIsReady] = useState(false);
-  const [progress, setProgress] = useState<ImportProgress | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const retryRef = useRef<() => void>(() => {});
-  const retry = useCallback(() => retryRef.current(), []);
+function createDatabaseStore() {
+  const listeners = new Set<() => void>();
+  let retry = () => {};
+  const initial: DatabaseContextType = {
+    db: null,
+    isReady: false,
+    progress: null,
+    error: null,
+    retry: () => retry(),
+  };
+  let snapshot = initial;
+  let stop: (() => Promise<void>) | undefined;
+  let lastClose = Promise.resolve();
 
-  useEffect(() => {
+  function update(patch: Partial<Omit<DatabaseContextType, "retry">>) {
+    snapshot = { ...snapshot, ...patch };
+    for (const listener of listeners) listener();
+  }
+
+  function start() {
     const uniqueId = () =>
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
@@ -110,7 +121,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     let remote: Remote | null = null;
     let attempt: Attempt | null = null;
     let restartRequested = false;
-    let closeBarrier: Promise<void> = Promise.resolve();
+    let closeBarrier = lastClose;
     let closeFailure: Error | null = null;
     let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
     const cancelWaits = new Set<() => void>();
@@ -146,9 +157,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       remote = null;
       if (currentDb === owner.db) currentDb = null;
       if (!cancelled && publish) {
-        setDb(null);
-        setIsReady(false);
-        setProgress(null);
+        update({ db: null, isReady: false, progress: null });
       }
       if (recover && !cancelled && !hidden) scheduleRecovery();
     }
@@ -278,9 +287,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     function recordCloseFailure(failure: unknown) {
       closeFailure = asError(failure);
       if (!cancelled) {
-        setError(closeFailure.message);
-        setIsReady(false);
-        setDb(null);
+        update({ error: closeFailure.message, isReady: false, db: null });
       }
     }
     async function closeResources(resources: Host[]) {
@@ -300,7 +307,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
             const belongs = host === resource || attempt?.resources.includes(resource);
             if (!live(resource.epoch) || !belongs) return;
             retire(failure);
-            if (!cancelled) setError(failure.message);
+            if (!cancelled) update({ error: failure.message });
             if (!cancelled && !hidden) scheduleRecovery();
           });
           resource.owner = owner;
@@ -332,10 +339,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           remote = proxy;
           currentDb = proxy.db;
           cancelRecovery();
-          setDb(currentDb);
-          setProgress(null);
-          setError(null);
-          setIsReady(true);
+          update({ db: currentDb, progress: null, error: null, isReady: true });
           return true;
         }
         lastError = new Error("Unable to connect to the active database tab");
@@ -351,7 +355,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (!isActive() || !resource.db) return;
       const database = resource.db;
       await initializeDatabase(database, (next) => {
-        if (isActive()) setProgress(next);
+        if (isActive()) update({ progress: next });
       });
       if (!isActive()) return;
       await backfillAchievements(database, { notify: false });
@@ -366,16 +370,13 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       resource.ready = true;
       currentDb = database;
       cancelRecovery();
-      setDb(database);
-      setProgress(null);
-      setError(null);
-      setIsReady(true);
+      update({ db: database, progress: null, error: null, isReady: true });
       postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: resource.id });
     }
     function runInit(): Promise<void> {
       if (cancelled || hidden || currentDb) return Promise.resolve();
       if (closeFailure) {
-        setError(closeFailure.message);
+        update({ error: closeFailure.message });
         return Promise.resolve();
       }
       if (attempt) {
@@ -405,9 +406,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       owner.promise = (async () => {
         await previousClose;
         if (!isActive()) return;
-        setIsReady(false);
-        setError(null);
-        setProgress(null);
+        update({ isReady: false, error: null, progress: null });
         const resource = makeResource();
         try {
           const shouldHost = await tryAcquireHostLock(resource, isActive);
@@ -441,8 +440,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           }
           if (isActive()) {
             console.error("Database initialization failed:", failure);
-            setProgress(null);
-            setError(asError(failure).message);
+            update({ progress: null, error: asError(failure).message });
           }
         }
       })()
@@ -473,9 +471,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (remote) retireRemote(remote, reason, false, publish);
       currentDb = null;
       if (!cancelled && publish) {
-        setDb(null);
-        setIsReady(false);
-        setProgress(null);
+        update({ db: null, isReady: false, progress: null });
       }
       const previousClose = closeBarrier;
       closeBarrier = (async () => {
@@ -502,14 +498,14 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     const lifecycleWindow = isWeb && typeof window !== "undefined" ? window : null;
     lifecycleWindow?.addEventListener("pagehide", handlePageHide);
     lifecycleWindow?.addEventListener("pageshow", handlePageShow);
-    retryRef.current = () => {
+    retry = () => {
       // Only a settled failure retries; a running attempt or a live connection is left alone.
       if (cancelled || hidden || currentDb || attempt) return;
       void runInit();
     };
     void runInit();
     return () => {
-      retryRef.current = () => {};
+      retry = () => {};
       lifecycleWindow?.removeEventListener("pagehide", handlePageHide);
       lifecycleWindow?.removeEventListener("pageshow", handlePageShow);
       hidden = true;
@@ -518,10 +514,34 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       channel?.close();
       channel = null;
+      return closeBarrier;
     };
-  }, []);
+  }
 
-  const value = useMemo(() => ({ db, isReady, progress, error, retry }), [db, isReady, progress, error, retry]);
+  return {
+    getSnapshot: () => snapshot,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      stop ??= start();
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0 && stop) {
+          lastClose = stop();
+          stop = undefined;
+          snapshot = initial;
+        }
+      };
+    },
+  };
+}
+
+// Android can mount the replacement Activity before unmounting the old one. Both roots use the
+// same native connection. A new first subscriber also waits for any in-flight teardown.
+const nativeDatabaseStore = createDatabaseStore();
+
+export function DatabaseProvider({ children }: { children: React.ReactNode }) {
+  const store = useMemo(() => (Platform.OS === "web" ? createDatabaseStore() : nativeDatabaseStore), []);
+  const value = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   return <DatabaseContext.Provider value={value}>{children}</DatabaseContext.Provider>;
 }
 

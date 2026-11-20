@@ -18,7 +18,7 @@ import { resetAndroidReleaseCheck } from "@/lib/app-update/use-android-update";
 
 jest.mock("expo-application", () => ({ applicationId: "com.anonymous.hafiz", nativeBuildVersion: "3" }));
 
-type FakeFile = { size: number; md5: string; text?: string };
+type FakeFile = { size: number; sha256?: string; text?: string };
 type FakeDownload = {
   url: string;
   name: string;
@@ -37,16 +37,14 @@ const mockPlatform = {
   supported: true,
   listFiles: jest.fn(async () => [...mockFiles].map(([name, file]) => ({ name, size: file.size }))),
   deleteFile: jest.fn(async (name: string) => void mockFiles.delete(name)),
-  fileInfo: jest.fn(async (name: string, { md5 }: { md5: boolean }) => {
-    const file = mockFiles.get(name);
-    return file
-      ? { exists: true, size: file.size, md5: md5 ? file.md5 : null }
-      : { exists: false, size: null, md5: null };
+  fileSize: jest.fn(async (name: string) => mockFiles.get(name)?.size ?? null),
+  sha256: jest.fn(async (name: string) => {
+    const digest = mockFiles.get(name)?.sha256;
+    if (!digest) throw new Error("Unreadable file");
+    return digest;
   }),
   readText: jest.fn(async (name: string) => mockFiles.get(name)?.text ?? ""),
-  writeText: jest.fn(
-    async (name: string, text: string) => void mockFiles.set(name, { size: text.length, md5: "", text }),
-  ),
+  writeText: jest.fn(async (name: string, text: string) => void mockFiles.set(name, { size: text.length, text })),
   moveFile: jest.fn(async (from: string, to: string) => {
     mockFiles.set(to, mockFiles.get(from)!);
     mockFiles.delete(from);
@@ -97,11 +95,14 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 const phase = () => getUpdateState().phase;
 
 /** Writes the body the server sent and finishes the download. */
-async function finish(index: number, { bytes, md5 = MD5, status }: { bytes: number; md5?: string; status?: number }) {
+async function finish(
+  index: number,
+  { bytes, sha256 = release.sha256, status }: { bytes: number; sha256?: string; status?: number },
+) {
   await flush();
   const download = mockDownloads[index];
   const previous = download.resumeFrom > 0 ? (mockFiles.get(download.name)?.size ?? 0) : 0;
-  mockFiles.set(download.name, { size: previous + bytes, md5 });
+  mockFiles.set(download.name, { size: previous + bytes, sha256 });
   download.resolve({ status: status ?? (download.resumeFrom > 0 ? 206 : 200), headers: {} });
   await flush();
 }
@@ -135,7 +136,7 @@ describe("in-app download", () => {
 
     await finish(0, { bytes: 1000 });
     await run;
-    expect(mockPlatform.fileInfo).toHaveBeenCalledWith("4.apk.part", { md5: true });
+    expect(mockPlatform.sha256).toHaveBeenCalledWith("4.apk.part");
     expect(phase()).toEqual({ status: "ready", release });
     expect([...mockFiles.keys()].sort()).toEqual(["4.apk", "4.json"]);
     expect(JSON.parse(mockFiles.get("4.json")!.text!)).toEqual(release);
@@ -150,9 +151,9 @@ describe("in-app download", () => {
     expect(mockPlatform.download).toHaveBeenCalledTimes(1);
   });
 
-  it("deletes a file whose MD5 or size differs and shows the failure", async () => {
+  it("deletes a file whose SHA-256 differs and shows the failure", async () => {
     const run = startUpdateDownload(release, { auto: false });
-    await finish(0, { bytes: 1000, md5: "f".repeat(32) });
+    await finish(0, { bytes: 1000, sha256: "f".repeat(64) });
     await run;
     expect(phase()).toEqual({ status: "failed", release, reason: "verify" });
     expect(mockFiles.size).toBe(0);
@@ -162,15 +163,43 @@ describe("in-app download", () => {
     const plain: AndroidRelease = { ...release, size: undefined, md5: undefined };
     const run = startUpdateDownload(plain, { auto: false });
     await flush();
-    mockFiles.set("4.apk.part", { size: 999, md5: "" });
+    mockFiles.set("4.apk.part", { size: 999 });
     mockDownloads[0].resolve({ status: 200, headers: { "Content-Length": "1000" } });
     await run;
-    expect(mockPlatform.fileInfo).toHaveBeenLastCalledWith("4.apk.part", { md5: false });
+    expect(mockPlatform.sha256).not.toHaveBeenCalled();
     expect(phase()).toEqual({ status: "failed", release: plain, reason: "verify" });
   });
 
+  it("rejects a same-size download whose SHA-256 differs even without an optional MD5", async () => {
+    const legacy = { ...release, md5: undefined };
+    const run = startUpdateDownload(legacy, { auto: false });
+    await flush();
+    mockFiles.set("4.apk.part", { size: 1000, sha256: "b".repeat(64) });
+    mockDownloads[0].resolve({ status: 200, headers: {} });
+    await run;
+    expect(phase()).toEqual({ status: "failed", release: legacy, reason: "verify" });
+    expect(mockFiles.size).toBe(0);
+  });
+
+  it("accepts a SHA-256-only manifest when the server sends no length", async () => {
+    const legacy = { ...release, size: undefined, md5: undefined };
+    const run = startUpdateDownload(legacy, { auto: false });
+    await finish(0, { bytes: 1000 });
+    await run;
+    expect(phase()).toEqual({ status: "ready", release: legacy });
+  });
+
+  it("fails verification when the device cannot read the digest", async () => {
+    mockPlatform.sha256.mockRejectedValueOnce(new Error("Read error"));
+    const run = startUpdateDownload(release, { auto: false });
+    await finish(0, { bytes: 1000 });
+    await run;
+    expect(phase()).toEqual({ status: "failed", release, reason: "verify" });
+    expect(mockFiles.size).toBe(0);
+  });
+
   it("resumes a partial file and starts over when the server ignores the range", async () => {
-    mockFiles.set("4.apk.part", { size: 400, md5: "" });
+    mockFiles.set("4.apk.part", { size: 400 });
     const run = startUpdateDownload(release, { auto: false });
     await flush();
     expect(mockDownloads[0].resumeFrom).toBe(400);
@@ -186,7 +215,7 @@ describe("in-app download", () => {
   it("keeps the partial file after a dropped connection so Try again resumes it", async () => {
     const run = startUpdateDownload(release, { auto: false });
     await flush();
-    mockFiles.set("4.apk.part", { size: 300, md5: "" });
+    mockFiles.set("4.apk.part", { size: 300 });
     mockDownloads[0].reject(new Error("socket closed"));
     await run;
     expect(phase()).toEqual({ status: "failed", release, reason: "download" });
@@ -208,19 +237,28 @@ describe("in-app download", () => {
 
 describe("app start", () => {
   it("restores a verified download and deletes files for installed or older versions", async () => {
-    mockFiles.set("4.apk", { size: 1000, md5: MD5 });
-    mockFiles.set("4.json", { size: 1, md5: "", text: JSON.stringify(release) });
-    mockFiles.set("3.apk", { size: 1000, md5: "" });
-    mockFiles.set("3.json", { size: 1, md5: "", text: "{}" });
-    mockFiles.set("2.apk.part", { size: 10, md5: "" });
+    mockFiles.set("4.apk", { size: 1000, sha256: release.sha256 });
+    mockFiles.set("4.json", { size: 1, text: JSON.stringify(release) });
+    mockFiles.set("3.apk", { size: 1000 });
+    mockFiles.set("3.json", { size: 1, text: "{}" });
+    mockFiles.set("2.apk.part", { size: 10 });
     await restoreUpdateFiles();
     expect(phase()).toEqual({ status: "ready", release });
     expect([...mockFiles.keys()].sort()).toEqual(["4.apk", "4.json"]);
   });
 
+  it("checks a cached APK written by an older app before offering it offline", async () => {
+    mockFiles.set("4.apk", { size: 1000, sha256: "b".repeat(64) });
+    mockFiles.set("4.json", { size: 1, text: JSON.stringify(release) });
+    await restoreUpdateFiles();
+    expect(phase()).toEqual({ status: "failed", release, reason: "verify" });
+    expect(mockFiles.size).toBe(0);
+    expect(mockPlatform.launchInstaller).not.toHaveBeenCalled();
+  });
+
   it("discards a verified APK whose record cannot be read", async () => {
-    mockFiles.set("4.apk", { size: 1000, md5: MD5 });
-    mockFiles.set("4.json", { size: 1, md5: "", text: "not json" });
+    mockFiles.set("4.apk", { size: 1000, sha256: release.sha256 });
+    mockFiles.set("4.json", { size: 1, text: "not json" });
     await restoreUpdateFiles();
     expect(phase()).toEqual({ status: "idle" });
     expect(mockFiles.size).toBe(0);
@@ -261,6 +299,15 @@ describe("install", () => {
     await installUpdate();
     expect(mockPlatform.launchInstaller).not.toHaveBeenCalled();
     expect(phase()).toEqual({ status: "failed", release, reason: "download" });
+  });
+
+  it("refuses to launch the installer if the cached bytes changed after verification", async () => {
+    await readyRelease();
+    mockFiles.set("4.apk", { size: 1000, sha256: "b".repeat(64) });
+    await installUpdate();
+    expect(mockPlatform.launchInstaller).not.toHaveBeenCalled();
+    expect(phase()).toEqual({ status: "failed", release, reason: "verify" });
+    expect(mockFiles.size).toBe(0);
   });
 
   it("Later hides the prompt for that version only", async () => {
@@ -311,7 +358,7 @@ describe("network rules", () => {
   it("pauses, not fails, when losing Wi-Fi breaks the socket before the pause reaches it", async () => {
     const run = startUpdateDownload(release, { auto: true });
     await flush();
-    mockFiles.set("4.apk.part", { size: 300, md5: "" });
+    mockFiles.set("4.apk.part", { size: 300 });
     mockNetwork = CELLULAR;
     mockDownloads[0].reject(new Error("Software caused connection abort"));
     for (const listener of mockNetworkListeners) listener(CELLULAR);
@@ -351,7 +398,7 @@ describe("network rules", () => {
     try {
       const run = startUpdateDownload(release, { auto: true });
       await jest.advanceTimersByTimeAsync(0);
-      mockFiles.set("4.apk.part", { size: 300, md5: "" });
+      mockFiles.set("4.apk.part", { size: 300 });
       mockDownloads[0].reject(new Error("timeout"));
       await jest.advanceTimersByTimeAsync(2000);
       expect(mockDownloads).toHaveLength(2);

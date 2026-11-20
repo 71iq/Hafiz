@@ -36,7 +36,18 @@ function signIn(userId: string) {
 }
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
 
-jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useRouter: () => ({ push: jest.fn() }) }));
+jest.mock("expo-router", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  const { Text } = jest.requireActual<typeof import("react-native")>("react-native");
+  return {
+    router: { push: jest.fn() },
+    useRouter: () => ({ push: jest.fn() }),
+    Redirect: ({ href }: { href: string }) => <Text>{`redirect:${href}`}</Text>,
+  };
+});
+// The Board is hidden until enough people use Hafiz; these cases exercise it as when it is on.
+let mockBoardEnabled = true;
+jest.mock("@/lib/board/config", () => ({ isBoardEnabled: () => mockBoardEnabled }));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => ({ name: "synthetic" }) }));
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
@@ -122,6 +133,7 @@ function renderScreen(options: { staleTime?: number; seed?: (client: QueryClient
 
 let boardState: unknown;
 beforeEach(async () => {
+  mockBoardEnabled = true;
   mockSettings.isRTL = false;
   mockSettings.uiLanguage = "en";
   Object.assign(mockAuth, signedOut());
@@ -153,6 +165,15 @@ afterEach(() => {
 });
 
 describe("Board tab", () => {
+  it("opens Home and calls nothing while the Board is hidden", () => {
+    mockBoardEnabled = false;
+    signIn(USER);
+    const screen = renderScreen();
+    expect(screen.getByText("redirect:/(tabs)/home")).toBeTruthy();
+    expect(screen.queryByText(strings.en.boardTitle)).toBeNull();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
   it("asks a signed-out reader to sign in and calls nothing", () => {
     const screen = renderScreen();
     expect(screen.getByText(strings.en.boardSignInTitle)).toBeTruthy();
@@ -428,6 +449,89 @@ describe("Board tab", () => {
     fireEvent.press(screen.getByRole("button", { name: strings.en.boardLeave }));
     await waitFor(() => expect(mockRpc).toHaveBeenCalledWith("leave_board", {}));
     expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
+    // Once the leave settled, Join is available again.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: strings.en.boardJoin }).props.accessibilityState).toMatchObject({
+        disabled: false,
+      }),
+    );
+  });
+
+  it("moves to the Board as soon as Join is pressed, and back to the form with its choices when the join fails", async () => {
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    let answerJoin: (result: { data: unknown; error: unknown }) => void = () => undefined;
+    mockRpc.mockImplementation((fn, args) =>
+      fn === "join_board"
+        ? new Promise((resolve) => {
+            answerJoin = resolve;
+          })
+        : base(fn, args),
+    );
+    const screen = renderScreen();
+    await screen.findByText(strings.en.boardIntentionTitle);
+    fireEvent.press(screen.getByRole("switch", { name: strings.en.boardNicknameToggle }));
+    fireEvent.changeText(screen.getByLabelText(strings.en.boardNicknameLabel), "Little Star");
+    fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
+    // Query publishes the pending state on its next timer tick.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 10)));
+    // The form is gone before the server answers.
+    expect(screen.queryByText(strings.en.boardIntentionTitle)).toBeNull();
+    expect(mockRpc).toHaveBeenCalledWith("join_board", expect.objectContaining({ p_nickname: "Little Star" }));
+    await act(async () => answerJoin({ data: null, error: { code: "XX000", message: "synthetic failure" } }));
+    expect(await screen.findByText(strings.en.socialErrorGeneric, {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
+  });
+
+  it("does not bring back a failed join's choices once another device records the account as under 18 (ETH-07)", async () => {
+    signIn(USER);
+    const base = mockRpc.getMockImplementation()!;
+    let stored: Record<string, unknown> = privacy;
+    mockRpc.mockImplementation(async (fn, args) => {
+      if (fn === "get_profile_privacy") return { data: stored, error: null };
+      if (fn === "join_board") return { data: null, error: { code: "XX000", message: "synthetic failure" } };
+      return base(fn, args);
+    });
+    const screen = renderScreen();
+    await screen.findByText(strings.en.boardIntentionTitle);
+    fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
+    expect(await screen.findByText(strings.en.socialErrorGeneric, {}, { timeout: 5000 })).toBeTruthy();
+    // Another device records minority with a nickname; the Board reads the stored choice again.
+    stored = { ...privacy, is_minor: true, board_nickname: "Little Star" };
+    const active = queryClients.at(-1)!;
+    await act(async () => {
+      await active.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({
+        checked: true,
+      }),
+    );
+    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
+  });
+
+  it("leaves at once and brings the standings back with the reason when leaving fails", async () => {
+    signIn(USER);
+    boardState = ready;
+    const base = mockRpc.getMockImplementation()!;
+    let answerLeave: (result: { data: unknown; error: unknown }) => void = () => undefined;
+    mockRpc.mockImplementation((fn, args) =>
+      fn === "leave_board"
+        ? new Promise((resolve) => {
+            answerLeave = resolve;
+          })
+        : base(fn, args),
+    );
+    const screen = renderScreen();
+    fireEvent.press(await screen.findByRole("button", { name: strings.en.boardLeave }));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 10)));
+    // The standings are gone before the server answers, and Join waits for the leave to finish.
+    expect(screen.queryByText("Little Star")).toBeNull();
+    const join = await screen.findByRole("button", { name: strings.en.boardJoin }, { timeout: 5000 });
+    expect(join.props.accessibilityState).toMatchObject({ disabled: true });
+    await act(async () => answerLeave({ data: null, error: { code: "XX000", message: "synthetic failure" } }));
+    expect(await screen.findByText(`${strings.en.boardStillJoined} ${strings.en.socialErrorGeneric}`)).toBeTruthy();
+    expect(screen.getByText("Little Star")).toBeTruthy();
   });
 
   it("explains the weekly scoring in an info view without excuses or a global ranking", async () => {

@@ -48,6 +48,7 @@ import {
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 import { textStartStyle } from "@/lib/ui/direction";
 import { errorIconColor } from "@/lib/ui/theme-icons";
+import { isBoardEnabled } from "@/lib/board/config";
 import { SecondaryDestinations } from "@/components/ui/SecondaryDestinations";
 
 export default function ProgressScreen() {
@@ -357,7 +358,7 @@ export default function ProgressScreen() {
           onOpenDeck={(item, title) => setDeckCardsTarget({ id: item.deckId, title })}
         />
 
-        <SecondaryDestinations destinations={["leaderboard"]} />
+        {isBoardEnabled() ? <SecondaryDestinations destinations={["leaderboard"]} /> : null}
 
         {/* Surah progress */}
         <Text

@@ -22,8 +22,8 @@ test("PostCSS resolves the single reviewed installed source-map-js instance", ()
     ["node_modules/source-map-js"],
   );
   assert.equal(owner.resolve("source-map-js"), require.resolve(path.join(root, "node_modules/source-map-js")));
-  assert.equal(owner("source-map-js/package.json").version, "1.2.2");
-  assert.equal(copies[0][1].version, "1.2.2");
+  assert.equal(owner("source-map-js/package.json").version, "1.2.4");
+  assert.equal(copies[0][1].version, "1.2.4");
 });
 
 registerSourceMapCases("external source-map", owner("source-map-js"));
@@ -47,7 +47,7 @@ for (const form of ["object", "JSON"]) {
     assert.equal(result.toString(), "a{}");
     const origin = result.source.input.origin(1, 1);
     assert.equal(origin.line, 1);
-    assert.equal(origin.column, 0);
+    assert.equal(origin.column, 1);
     assert.equal(origin.source, "x");
   });
 }

@@ -24,6 +24,7 @@ const mockUnexpected = jest.fn((...args: unknown[]) => {
 });
 const mockPush = jest.fn((...args: unknown[]): unknown => mockUnexpected(...args));
 const mockBeginQfOAuthConnection = jest.fn(async (...args: unknown[]): Promise<unknown> => mockUnexpected(...args));
+const mockDisconnectQfUser = jest.fn(async (...args: unknown[]): Promise<unknown> => mockUnexpected(...args));
 const mockUser = {
   id: "00000000-0000-4000-8000-000000000001",
   email: "synthetic@example.invalid",
@@ -70,7 +71,7 @@ jest.mock("@/lib/quran-foundation/config", () => {
 });
 jest.mock("@/lib/quran-foundation/user", () => ({
   beginQfOAuthConnection: (...args: unknown[]) => mockBeginQfOAuthConnection(...args),
-  disconnectQfUser: (...args: unknown[]) => mockUnexpected(...args),
+  disconnectQfUser: (...args: unknown[]) => mockDisconnectQfUser(...args),
   getQfConnectionStatus: jest.fn(async () => ({ ok: true as const, status: "connected" as const })),
   getQfLinkedIdentityState: jest.fn((...args: unknown[]) => mockUnexpected(...args)),
 }));
@@ -209,6 +210,37 @@ describe.each(manualCases)("manual QF sync $language/$status", ({ language, stat
     expect(mockFullQfUserSync).toHaveBeenCalledWith(mockDatabase);
     expect(mockRunInitialQfUserSync).not.toHaveBeenCalled();
     expectMessageOutcome(view, language, status);
+  });
+});
+
+describe.each(["en", "ar"] as const)("QF disconnect in %s", (language) => {
+  it("shows Not connected at once and puts Connected back when the server refuses, even offline", async () => {
+    configure(language);
+    let answer: (value: unknown) => void = () => undefined;
+    mockDisconnectQfUser.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const view = await openSettings();
+    fireEvent.press(await view.findByLabelText(strings[language].qfDisconnect));
+    // Before the server answers.
+    expect(view.getAllByText(strings[language].qfDisconnected).length).toBeGreaterThan(0);
+    expect(view.queryByText(strings[language].qfManualSync)).toBeNull();
+    // Offline, a status read would also report disconnected; the refusal must not rely on one.
+    const online = jest.mocked(getQfConnectionStatus).getMockImplementation();
+    jest
+      .mocked(getQfConnectionStatus)
+      .mockResolvedValue({ ok: false, code: "unavailable", message: "offline" } as never);
+    try {
+      await act(async () => answer({ ok: false, code: "unavailable", message: "synthetic failure" }));
+      await waitFor(() => expect(view.getByText(strings[language].qfDisconnectFailed)).toBeTruthy());
+      expect(view.getByText(strings[language].qfConnected)).toBeTruthy();
+      expect(view.getByText(strings[language].qfManualSync)).toBeTruthy();
+    } finally {
+      if (online) jest.mocked(getQfConnectionStatus).mockImplementation(online);
+    }
   });
 });
 

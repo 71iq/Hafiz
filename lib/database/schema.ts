@@ -560,7 +560,8 @@ export async function createSchema(db: DatabaseExecutor): Promise<void> {
     -- ============================================================
 
     CREATE INDEX IF NOT EXISTS idx_quran_text_surah ON quran_text(surah);
-    CREATE INDEX IF NOT EXISTS idx_word_roots_root ON word_roots(root);
+    CREATE INDEX IF NOT EXISTS idx_word_roots_root_position ON word_roots(root, surah, ayah, word_pos);
+    DROP INDEX IF EXISTS idx_word_roots_root;
     CREATE INDEX IF NOT EXISTS idx_word_roots_surah_ayah ON word_roots(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_word_roots_surah_ayah_pos ON word_roots(surah, ayah, word_pos);
     CREATE INDEX IF NOT EXISTS idx_tajweed_surah_ayah ON tajweed_rules(surah, ayah);
@@ -764,11 +765,10 @@ async function createUserMigrationIndexes(db: DatabaseExecutor): Promise<void> {
   }
 }
 
-/** Create text_search index — must run AFTER the text_search column migration */
-export async function createTextSearchIndex(db: DatabaseExecutor): Promise<void> {
-  try {
-    await db.execAsync("CREATE INDEX IF NOT EXISTS idx_quran_text_search ON quran_text(text_search)");
-  } catch {
-    // Column may not exist yet on very old databases — the migration will handle it
-  }
+/** Older databases acquire the page and search columns during content migration. */
+export async function createQuranTextIndexes(db: DatabaseExecutor): Promise<void> {
+  await db.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_quran_text_page ON quran_text(v2_page, surah, ayah);
+    CREATE INDEX IF NOT EXISTS idx_quran_text_search ON quran_text(text_search);
+  `);
 }

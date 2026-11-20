@@ -8,11 +8,14 @@ import { strings } from "@/lib/i18n/strings";
 import type { WordRef } from "@/lib/word/context";
 
 let mockDetailWord: WordRef | null = null;
+const mockOpenDetail = jest.fn();
+let mockPrevious: Promise<WordRef | null> | null = null;
 const mockCloseDetail = jest.fn(() => {
   mockDetailWord = null;
 });
 const mockDatabase = {
   getFirstAsync: jest.fn(async (sql: string) => {
+    if (sql.includes("ORDER BY wr.surah DESC")) return mockPrevious;
     if (sql.includes("FROM surahs")) return { name_arabic: "البقرة", name_english: "Al-Baqarah" };
     if (sql.includes("COUNT(*)")) return { count: 12 };
     return null;
@@ -23,7 +26,7 @@ const mockDatabase = {
 jest.mock("@/lib/word/context", () => ({
   useWordInteraction: () => ({
     detailWord: mockDetailWord,
-    openDetail: jest.fn(),
+    openDetail: mockOpenDetail,
     closeDetail: mockCloseDetail,
     navigateToAyah: jest.fn(),
     hasReaderNavigation: true,
@@ -74,9 +77,36 @@ function Wrapper({ children }: React.PropsWithChildren) {
 afterEach(() => {
   cleanup();
   mockDetailWord = null;
+  mockPrevious = null;
+  mockOpenDetail.mockClear();
 });
 
 describe("WordDetailSheet tabs", () => {
+  it("waits for the open word's neighbors before allowing another step", async () => {
+    mockDetailWord = word;
+    mockPrevious = Promise.resolve({ ...word, wordPos: 1 });
+    const view = render(<WordDetailSheet />, { wrapper: Wrapper });
+    await act(async () => {});
+    const previous = () => view.getByRole("button", { name: strings.en.previousWord });
+    expect(previous()).toBeEnabled();
+
+    let finish!: (target: WordRef) => void;
+    mockPrevious = new Promise((resolve) => {
+      finish = resolve;
+    });
+    mockDetailWord = { ...word, wordPos: 6 };
+    view.rerender(<WordDetailSheet />);
+    expect(previous()).toBeDisabled();
+    fireEvent.press(previous());
+    expect(mockOpenDetail).not.toHaveBeenCalled();
+
+    await act(async () => {
+      finish(word);
+    });
+    fireEvent.press(previous());
+    expect(mockOpenDetail).toHaveBeenCalledWith(word);
+  });
+
   it("labels tabs plainly, opens Occurrences from Root and starts the next word on Meaning", async () => {
     mockDetailWord = word;
     const view = render(<WordDetailSheet />, { wrapper: Wrapper });

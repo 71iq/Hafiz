@@ -40,6 +40,7 @@ stop.md
 android/.gradle/
 android/build/
 android/app/build/
+modules/*/android/build/
 android/local.properties
 .aider*
 .vscode/

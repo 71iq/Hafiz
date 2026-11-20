@@ -1,5 +1,5 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { authCommands } from "@/lib/auth/commands";
 import { getAuthSessionIdentity, isAccountId } from "@/lib/auth/session-identity";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
@@ -19,6 +19,7 @@ import { OverlayBody, OverlayHeader, ResponsiveModal, ResponsiveSheet } from "@/
 import { getRecentUnlocks } from "@/lib/achievements/queries";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
+import type { Profile } from "@/lib/auth/types";
 import { useDatabase } from "@/lib/database/provider";
 import { loadStudyMetrics } from "@/lib/progress/metrics";
 import { loadHabitOverview } from "@/lib/habit/queries";
@@ -72,6 +73,31 @@ type ReviewSnapshot = {
 };
 
 type ProfileTab = "overview" | "notes";
+
+/**
+ * A profile save that failed, kept for the next time its owner opens the editor. Saving closes the
+ * editor at once, so the draft cannot stay on screen; it lives here for the app session only.
+ */
+type FailedProfileDraft = {
+  userId: string;
+  displayName: string;
+  bio: string;
+  country: string;
+  avatar: ImagePicker.ImagePickerAsset | null;
+  removeAvatar: boolean;
+  status: "saveFailed" | "photoFailed";
+};
+let failedProfileDraft: FailedProfileDraft | null = null;
+/** Test hook: forget a failed draft from an earlier case. */
+export function resetFailedProfileDraftForTests() {
+  failedProfileDraft = null;
+}
+type ProfileTextPatch = { displayName?: string | null; bio?: string | null; country?: string | null };
+const PROFILE_TEXT_FIELDS = [
+  ["displayName", "display_name"],
+  ["bio", "bio"],
+  ["country", "country"],
+] as const;
 
 const PROFILE_BIO_MAX_LENGTH = 280;
 const PROFILE_COUNTRY_MAX_LENGTH = 80;
@@ -194,7 +220,10 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const [countryDraft, setCountryDraft] = useState("");
   const [avatarDraft, setAvatarDraft] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [avatarRemovalDraft, setAvatarRemovalDraft] = useState(false);
-  const [profileSaving, setProfileSaving] = useState(false);
+  // The photo a save is uploading, shown in the header until the saved profile has it.
+  const [avatarPreview, setAvatarPreview] = useState<{ token: object; userId: string; uri: string | null } | null>(
+    null,
+  );
   const [profileStatus, setProfileStatus] = useState<
     "saveFailed" | "photoFailed" | "permissionDenied" | `photo-${AvatarProblem}` | null
   >(null);
@@ -247,7 +276,17 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     setAvatarDraft(null);
     setAvatarRemovalDraft(false);
     setProfileStatus(null);
-    setProfileSaving(false);
+    // A save that failed after the editor closed comes back here, with its reason.
+    const failed = failedProfileDraft;
+    if (editScope.active && failed && failed.userId === editScope.userId) {
+      failedProfileDraft = null;
+      setDisplayNameDraft(failed.displayName);
+      setBioDraft(failed.bio);
+      setCountryDraft(failed.country);
+      setAvatarDraft(failed.avatar);
+      setAvatarRemovalDraft(failed.removeAvatar);
+      setProfileStatus(failed.status);
+    }
     return () => {
       editScope.active = false;
       editScope.owner.cancel();
@@ -338,7 +377,9 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     (ownNeutral ? s.authProfile : visibleProfile?.username) ||
     (isSignedOutOwnProfile || isOwnProfile ? s.authProfile : s.genericAnonymous);
   const username = ownNeutral ? null : (visibleProfile?.username ?? null);
-  const avatarUrl = visibleProfile?.avatar_url ?? null;
+  const savingAvatar = avatarPreview?.userId === user?.id ? avatarPreview : null;
+  const savedAvatarUrl = savingAvatar ? savingAvatar.uri : (profile?.avatar_url ?? null);
+  const avatarUrl = isOwnProfile ? savedAvatarUrl : (visibleProfile?.avatar_url ?? null);
   const bio = visibleProfile?.bio?.trim() ?? "";
   const country = visibleProfile?.country?.trim() ?? "";
   const localizedCountry = useMemo(
@@ -355,13 +396,13 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const countryValue = countryDraft.trim();
   const countryDirty = countryValue !== currentCountry;
   const bioCount = `${bioDraft.length.toLocaleString(numberLocale)} / ${PROFILE_BIO_MAX_LENGTH.toLocaleString(numberLocale)}`;
-  const avatarPreviewUrl = avatarRemovalDraft ? null : avatarDraft?.uri ?? profile?.avatar_url ?? null;
+  const avatarPreviewUrl = avatarRemovalDraft ? null : (avatarDraft?.uri ?? savedAvatarUrl);
   const avatarDirty = !!avatarDraft || avatarRemovalDraft;
   const profileDirty = displayNameDirty || bioDirty || countryDirty || avatarDirty;
-  const saveProfileDisabled = !profileDirty || profileSaving || authLoading;
-  const saveProfileIconColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
-  const saveProfileTextColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
-  const saveProfileBackgroundColor = saveProfileDisabled && !profileSaving
+  const saveProfileDisabled = !profileDirty || authLoading;
+  const saveProfileIconColor = saveProfileDisabled ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
+  const saveProfileTextColor = saveProfileDisabled ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
+  const saveProfileBackgroundColor = saveProfileDisabled
     ? themeColors.surfaceHigh
     : isDark ? "#0f766e" : "#0d9488";
   const localStatsSnapshot = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0 };
@@ -475,51 +516,127 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     });
   }, [db, isOwnProfile, loadLocalOverview, queryClient, user?.id]);
 
-  const handleSaveProfile = useCallback(async () => {
+  // Whether this screen and its editor are still there when a save settles.
+  const mounted = useRef(true);
+  const editOpenNow = useRef(editOpen);
+  const photoChoice = useRef({ avatar: avatarDraft, remove: avatarRemovalDraft });
+  useLayoutEffect(() => {
+    editOpenNow.current = editOpen;
+    photoChoice.current = { avatar: avatarDraft, remove: avatarRemovalDraft };
+  }, [editOpen, avatarDraft, avatarRemovalDraft]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  /**
+   * Save acts at once: the editor closes with "Profile updated", the new name, bio and country show
+   * everywhere the signed-in profile does, and a new photo shows in this header while it uploads. The
+   * save belongs to the account, not the editor, so closing or leaving the screen does not stop it;
+   * another account or session does. A failure puts the earlier values back and returns the draft to
+   * the editor, or keeps it for its next opening with a notice.
+   */
+  const handleSaveProfile = useCallback(() => {
     if (!user || !profileDirty || !isCurrentEdit() || editScope.busy) return;
-    const owner = editScope.owner;
-    const isCurrentSave = () => editScope.owner === owner && isCurrentEdit();
     editScope.busy = true;
-    setProfileSaving(true);
-    setProfileStatus(null);
-    try {
-      const nextAvatarUrl = avatarDraft ? await uploadProfileAvatar(user.id, avatarDraft) : avatarRemovalDraft ? null : undefined;
-      if (!isCurrentSave()) return;
-      const result = await updateProfile({
-        displayName: displayNameDirty ? (displayNameValue.length > 0 ? displayNameValue : null) : undefined,
-        bio: bioDirty ? (bioValue.length > 0 ? bioValue : null) : undefined,
-        country: countryDirty ? (countryValue.length > 0 ? countryValue : null) : undefined,
-        avatarUrl: avatarDirty ? nextAvatarUrl : undefined,
-      }, owner);
-      if (!isCurrentSave() || result.status !== "completed") return;
-      setAvatarDraft(null);
-      setAvatarRemovalDraft(false);
-      queryClient.setQueryData(["publicProfile", user.id], result.value);
-      if (!isCurrentSave()) return;
-      invalidateProfileSurfaces(isCurrentSave);
-      if (!isCurrentSave()) return;
-      // Saved: the editor closes and a notice confirms it. The draft stays until this point.
-      editScope.busy = false;
-      setProfileSaving(false);
-      closeEdit();
-      showNotice(s.profileSaved);
-    } catch (e) {
-      if (!isCurrentSave()) return;
-      console.warn("[Profile] Failed to update profile:", e);
-      setProfileStatus(avatarDirty ? "photoFailed" : "saveFailed");
-    } finally {
-      if (editScope.active && editScope.owner === owner) {
-        if (!isCurrentSave()) {
-          editScope.active = false;
-          owner.cancel();
-          setEditOpen(false);
-        } else {
-          editScope.busy = false;
-          setProfileSaving(false);
-        }
+    const userId = user.id;
+    const saveOwner = authCommands.captureOwner();
+    const isCurrentSave = () => saveOwner.isCurrent() && useAuthStore.getState().user?.id === userId;
+    const draft: FailedProfileDraft = {
+      userId,
+      displayName: displayNameDraft,
+      bio: bioDraft,
+      country: countryDraft,
+      avatar: avatarDraft,
+      removeAvatar: avatarRemovalDraft,
+      status: avatarDirty ? "photoFailed" : "saveFailed",
+    };
+    const textPatch: ProfileTextPatch = {
+      displayName: displayNameDirty ? (displayNameValue.length > 0 ? displayNameValue : null) : undefined,
+      bio: bioDirty ? (bioValue.length > 0 ? bioValue : null) : undefined,
+      country: countryDirty ? (countryValue.length > 0 ? countryValue : null) : undefined,
+    };
+    const before = useAuthStore.getState().profile;
+    let shown: Profile | null = null;
+    if (before?.id === userId) {
+      const next = { ...before };
+      for (const [field, column] of PROFILE_TEXT_FIELDS) if (textPatch[field] !== undefined) next[column] = textPatch[field];
+      if (PROFILE_TEXT_FIELDS.some(([field]) => textPatch[field] !== undefined)) {
+        shown = next;
+        useAuthStore.setState({ profile: next });
       }
     }
-  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioValue, countryDirty, countryValue, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user, editScope, isCurrentEdit, closeEdit, showNotice, s.profileSaved]);
+    // Puts back each field that still shows this save's value.
+    const restore = () => {
+      const current = useAuthStore.getState().profile;
+      if (!shown || !before || current?.id !== userId) return;
+      const restored = { ...current };
+      let changed = false;
+      for (const [, column] of PROFILE_TEXT_FIELDS) {
+        if (shown[column] !== before[column] && current[column] === shown[column]) {
+          restored[column] = before[column];
+          changed = true;
+        }
+      }
+      if (changed) useAuthStore.setState({ profile: restored });
+    };
+    const previewToken = {};
+    if (avatarDirty) setAvatarPreview({ token: previewToken, userId, uri: avatarDraft?.uri ?? null });
+    closeEdit();
+    showNotice(s.profileSaved);
+
+    // A newer auth intent can end this save without a store notification; the editor then opens
+    // under a fresh origin rather than the one this save started from.
+    const superseded = () => {
+      restore();
+      if (mounted.current && !editScope.origin.isCurrent()) setEditOrigin(authCommands.captureOwner());
+    };
+    void (async () => {
+      try {
+        const nextAvatarUrl = avatarDraft
+          ? await uploadProfileAvatar(userId, avatarDraft)
+          : avatarRemovalDraft
+            ? null
+            : undefined;
+        if (!isCurrentSave()) {
+          superseded();
+          return;
+        }
+        const result = await updateProfile({ ...textPatch, avatarUrl: avatarDirty ? nextAvatarUrl : undefined }, saveOwner);
+        if (!isCurrentSave()) {
+          superseded();
+          return;
+        }
+        // Dropped by the auth queue while this account is still signed in: nothing was saved, so the
+        // person hears it and keeps the draft, as for any other failure.
+        if (result.status !== "completed") throw new Error("Profile save was not run");
+        queryClient.setQueryData(["publicProfile", userId], result.value);
+        if (!isCurrentSave()) return;
+        invalidateProfileSurfaces(isCurrentSave);
+      } catch (e) {
+        if (!isCurrentSave()) {
+          superseded();
+          return;
+        }
+        restore();
+        console.warn("[Profile] Failed to update profile:", e);
+        // An editor open again for this account shows the reason beside what it holds now;
+        // otherwise the draft waits for the next opening.
+        if (mounted.current && editOpenNow.current && useAuthStore.getState().user?.id === userId) {
+          setProfileStatus(draft.status);
+          // The photo this save carried comes back unless the open editor made its own photo choice.
+          if (draft.avatar && !photoChoice.current.avatar && !photoChoice.current.remove) setAvatarDraft(draft.avatar);
+          return;
+        }
+        failedProfileDraft = draft;
+        showNotice(s.profileSaveFailedDraftKept);
+      } finally {
+        if (mounted.current) setAvatarPreview((current) => (current?.token === previewToken ? null : current));
+      }
+    })();
+  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioDraft, bioValue, countryDirty, countryDraft, countryValue, displayNameDirty, displayNameDraft, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user, editScope, isCurrentEdit, closeEdit, showNotice, s.profileSaved, s.profileSaveFailedDraftKept]);
 
   const handlePickAvatar = useCallback(async () => {
     if (!isCurrentEdit() || editScope.busy || editScope.picking) return;
@@ -568,7 +685,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   }, [avatarDraft, profile?.avatar_url, editScope, isCurrentEdit]);
 
   // Closing the editor with changes asks first; an account change still clears it directly.
-  const { guard: guardEditClose, dialogProps: discardDialogProps } = useDiscardGuard(profileDirty && !profileSaving);
+  const { guard: guardEditClose, dialogProps: discardDialogProps } = useDiscardGuard(profileDirty);
   const requestCloseEdit = useCallback(() => guardEditClose(closeEdit), [guardEditClose, closeEdit]);
   const [badgesOpen, setBadgesOpen] = useState(false);
   const [surahsOpen, setSurahsOpen] = useState(false);
@@ -860,7 +977,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                       label={s.profileChangePhoto}
                       color={isDark ? "#5eead4" : "#003638"}
                       borderColor={isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.16)"}
-                      disabled={profileSaving || authLoading}
+                      disabled={authLoading}
                       isRTL={isRTL}
                       onPress={handlePickAvatar}
                     />
@@ -871,7 +988,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                       label={s.profileRemovePhoto}
                       color={isDark ? "#f87171" : "#dc2626"}
                       borderColor={isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.16)"}
-                      disabled={profileSaving || authLoading}
+                      disabled={authLoading}
                       isRTL={isRTL}
                       onPress={handleRemoveAvatar}
                     />
@@ -935,7 +1052,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 language={uiLanguage}
                 isDark={isDark}
                 isRTL={isRTL}
-                disabled={profileSaving || authLoading}
+                disabled={authLoading}
               />
             </View>
 
@@ -970,9 +1087,9 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
             onPress={handleSaveProfile}
             disabled={saveProfileDisabled}
             dir={isRTL ? "rtl" : "ltr"}
-            style={{ backgroundColor: saveProfileBackgroundColor, minHeight: 58, opacity: saveProfileDisabled && !profileSaving ? 1 : undefined }}
+            style={{ backgroundColor: saveProfileBackgroundColor, minHeight: 58, opacity: saveProfileDisabled ? 1 : undefined }}
           >
-            {profileSaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={22} color={saveProfileIconColor} />}
+            <Save size={22} color={saveProfileIconColor} />
             <Text style={{ color: saveProfileTextColor, fontFamily: "Manrope_600SemiBold", fontSize: 20 }}>
               {s.profileSave}
             </Text>

@@ -155,6 +155,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Session-end streak and prompt cards mirror icon rows; counts use the interface digits.",
   ),
   entry(
+    "components/habit/WidgetOfferCard.tsx",
+    "card",
+    "source",
+    "The offer uses the session direction for its text and button.",
+  ),
+  entry(
     "components/habit/WirdExtras.tsx",
     "card",
     "source",
@@ -586,6 +592,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Sync status row, message and action mirror with the UI direction.",
   ),
   entry(
+    "components/settings/HomeWidgetSettings.tsx",
+    "form-field",
+    "source",
+    "The widget description and numbers switch follow the interface direction.",
+  ),
+  entry(
     "components/settings/LogoutConfirmDialog.tsx",
     "overlay",
     "source",
@@ -615,6 +627,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "picker-menu",
     "source",
     "Picker rows and selected-state affordances mirror.",
+  ),
+  entry(
+    "components/settings/SettingsLinkRow.tsx",
+    "button",
+    "source",
+    "Settings links mirror the icon, text and navigation chevron.",
   ),
   entry(
     "components/settings/TafsirSourcePicker.tsx",

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RefreshControl } from "react-native";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CloudOff, Trophy } from "lucide-react-native";
 import { BoardJoin } from "@/components/social/BoardJoin";
@@ -10,6 +10,7 @@ import { SocialScreen } from "@/components/social/SocialScreen";
 import { BoardJoinSkeleton, StandingsSkeleton } from "@/components/social/SocialSkeletons";
 import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys, boardRead, joinBoard, leaveBoard } from "@/lib/board/api";
+import { isBoardEnabled } from "@/lib/board/config";
 import { useDatabase } from "@/lib/database/provider";
 import { useLocalToday } from "@/lib/habit/use-day-boundary";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -31,6 +32,9 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 export default function BoardScreen() {
   const s = useStrings();
   const user = useAuthStore((state) => state.user);
+
+  // Hidden until enough people use Hafiz (lib/board/config.ts): an old link or return opens Home.
+  if (!isBoardEnabled()) return <Redirect href="/(tabs)/home" />;
 
   if (!isSupabaseConfigured()) {
     return (
@@ -65,6 +69,8 @@ function BoardContent({ userId }: { userId: string }) {
   // Moves on at local midnight, so a tab left open overnight asks for the new day (BRD-01).
   const today = useLocalToday();
   const [joinError, setJoinError] = useState<string | null>(null);
+  // The choices of a join that failed, so the form comes back as the person left it.
+  const [retryChoice, setRetryChoice] = useState<BoardJoinChoice | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
   // Bands come from the local plan and memorized cards (8.13), and the week start from the wird
@@ -86,12 +92,16 @@ function BoardContent({ userId }: { userId: string }) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) });
   const reloadPrivacy = () => queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) });
 
+  // Join and Leave act at once: the screen moves to its next state while the request runs (the
+  // mutation stays pending through the refetch that brings the server's view), and a failure moves
+  // it back with the reason.
   const join = useMutation({
     mutationFn: async (choice: BoardJoinChoice) => {
       if (!inputs.data) throw new Error("Board inputs are not ready");
       await joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
     },
     onSuccess: async (_result, choice) => {
+      setRetryChoice(null);
       await Promise.all([
         refresh(),
         reloadPrivacy(),
@@ -99,13 +109,15 @@ function BoardContent({ userId }: { userId: string }) {
         choice.isMinor ? useAuthStore.getState().fetchProfile() : null,
       ]);
     },
-    onError: (error) => {
+    onError: (error, choice) => {
       if (error instanceof ProfilePrivacyChangedError) {
         // Another device changed the age setting. The form reloads from the stored choice.
+        setRetryChoice(null);
         setJoinError(s.socialErrorPrivacyChanged);
         void reloadPrivacy();
         return;
       }
+      setRetryChoice(choice);
       setJoinError(socialFailureMessage(error, s));
     },
   });
@@ -115,11 +127,13 @@ function BoardContent({ userId }: { userId: string }) {
     onSuccess: async () => {
       await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(userId) })]);
     },
-    onError: (error) => setLeaveError(socialFailureMessage(error, s)),
+    onError: (error) => setLeaveError(`${s.boardStillJoined} ${socialFailureMessage(error, s)}`),
   });
 
   const savedAt = board.data?.source === "cache" ? board.data.savedAt : null;
   const loading = inputs.isLoading || board.isLoading;
+  // Leaving shows the join form at once; the standings come back if the server refuses.
+  const shownView = view && view.status !== "not_joined" && leave.isPending ? { status: "not_joined" as const, weekStart: view.weekStart } : view;
 
   return (
     <SocialScreen
@@ -143,7 +157,7 @@ function BoardContent({ userId }: { userId: string }) {
 
       {loading ? (
         <StandingsSkeleton label={s.loading} />
-      ) : !view ? (
+      ) : !shownView ? (
         // Nothing private is shown without a current read; local study is unaffected.
         <SocialNotice
           icon={offline ? CloudOff : undefined}
@@ -155,25 +169,30 @@ function BoardContent({ userId }: { userId: string }) {
           actionLabel={offline ? undefined : s.socialTryAgain}
           onAction={offline ? undefined : () => void refresh()}
         />
-      ) : view.status === "not_joined" ? (
-        offline ? (
+      ) : shownView.status === "not_joined" ? (
+        join.isPending ? (
+          // Joined at once: the Board loads while the server places this account in a group.
+          <StandingsSkeleton label={s.loading} />
+        ) : offline ? (
           <SocialNotice icon={CloudOff} message={s.socialOfflineEmpty} />
         ) : (
-          // Mounted afresh on each reconnect, so it reads the stored choice again.
+          // Mounted afresh on each reconnect, so it reads the stored choice again. Join stays off
+          // until a Leave on its way has finished, so the two reach the server in order.
           <BoardJoinSection
             userId={userId}
-            pending={join.isPending || !inputs.data}
+            pending={leave.isPending || !inputs.data}
             error={joinError}
+            retryChoice={retryChoice}
             onJoin={(choice) => {
               setJoinError(null);
+              setLeaveError(null);
               join.mutate(choice);
             }}
           />
         )
       ) : (
         <BoardStandings
-          view={view}
-          leaving={leave.isPending}
+          view={shownView}
           onLeave={() => {
             setLeaveError(null);
             leave.mutate();
@@ -196,11 +215,14 @@ function BoardJoinSection({
   userId,
   pending,
   error,
+  retryChoice,
   onJoin,
 }: {
   userId: string;
   pending: boolean;
   error: string | null;
+  /** A failed join's choices, shown again while the stored age choice is still the one it loaded. */
+  retryChoice: BoardJoinChoice | null;
   onJoin: (choice: BoardJoinChoice) => void;
 }) {
   const s = useStrings();
@@ -233,12 +255,16 @@ function BoardJoinSection({
     }
     return <BoardJoinSkeleton label={s.loading} />;
   }
+  // ETH-07: a failed join's choices come back only while the stored age choice is the one that join
+  // loaded; once another device records a change, the form starts from the stored choice again.
+  const retry = retryChoice && retryChoice.expectedMinor === stored.isMinor ? retryChoice : null;
+  const initial = retry ?? { nickname: stored.boardNickname, isMinor: stored.isMinor };
   return (
     <BoardJoin
-      // A change to the stored choices starts the form again from them.
-      key={`${stored.isMinor}:${stored.boardNickname ?? ""}`}
-      initialNickname={stored.boardNickname}
-      initialIsMinor={stored.isMinor}
+      // A change to the stored choices, or a failed join, starts the form again from them.
+      key={`${stored.isMinor}:${stored.boardNickname ?? ""}:${JSON.stringify(retry)}`}
+      initialNickname={initial.nickname}
+      initialIsMinor={initial.isMinor}
       pending={pending}
       error={error}
       onJoin={(choice) => onJoin({ ...choice, expectedMinor: stored.isMinor })}

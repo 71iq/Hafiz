@@ -1,7 +1,7 @@
 module.exports = {
   preset: "jest-expo",
   transformIgnorePatterns: require("jest-expo/jest-preset").transformIgnorePatterns.map((pattern) =>
-    pattern.replace("react-native|", "@rn-primitives/slot|react-native|"),
+    pattern.replace("react-native|", "@rn-primitives/slot|decode-uri-component|react-native|"),
   ),
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",

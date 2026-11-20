@@ -166,6 +166,8 @@ function setSessionIdentity({ session, user }: Pick<AuthState, "session" | "user
 
 // Sign-outs started on this device are deliberate, so their SIGNED_OUT is not reported as expiry.
 let deliberateSignOuts = 0;
+// Local sign-outs (signOut) clear the account before the SDK call; see the listener.
+let localSignOuts = 0;
 
 // SDK notifications can renew credentials while the provider response is pending.
 // Keep the current matching session rather than republishing the callback snapshot.
@@ -331,6 +333,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             // startup, or a signed-in session ends (renewal rejected, or another tab signed out).
             // Transient network failures keep the session and publish nothing. Sign-outs started on
             // this device, and a guest's own sign-up or sign-in commands, are not reported.
+            // signOut already cleared the account, so a session the SDK renews before removing it
+            // does not bring the account back.
+            if (session && localSignOuts > 0) return;
             const ended = _event === "SIGNED_OUT" && deliberateSignOuts === 0 && (get().user !== null || duringStartup);
             setSessionIdentity({ session, user: session?.user ?? null }, _event === "SIGNED_OUT" ? ended : undefined);
             if (session?.user) {
@@ -494,10 +499,16 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     });
   },
 
+  // Signed out on this device without waiting for the server: the account leaves every screen as the
+  // queued sign-out starts, just before the SDK call, which holds the SDK's session lock, so a read
+  // that follows waits for the session to be removed rather than sending the old token. With an idle
+  // queue that is at once. A failure is only logged, as before. On a network error auth-js keeps the
+  // stored session, so this device can still hold it afterwards.
   signOut: async () =>
     authCommands.transition(async () => {
-      const loading = beginAuthLoading();
       deliberateSignOuts += 1;
+      localSignOuts += 1;
+      set({ session: null, user: null, profile: null, error: null, sessionEnded: false });
       try {
         const { error } = await supabase.auth.signOut({ scope: "local" });
         if (error) throw error;
@@ -505,8 +516,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         console.warn("[Auth] Sign out error:", errorMessage(err));
       } finally {
         deliberateSignOuts -= 1;
+        localSignOuts -= 1;
         set({ session: null, user: null, profile: null, error: null, sessionEnded: false });
-        loading.finish();
       }
     }),
 
@@ -548,6 +559,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     return authCommands.owned(owner, async () => {
       requireCurrent();
       set({ error: null });
+      // Registered before ensureProfile, so neither its read nor any other replaces a profile the
+      // screen already shows with this save's values (ProfileModalContent shows them at once).
+      const write = beginProfileWrite(user.id, owner);
       try {
         await get().ensureProfile(owner);
         requireCurrent();
@@ -558,33 +572,30 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         if (country !== undefined) patch.country = country;
 
         const profileAtWrite = get().profile;
-        const write = beginProfileWrite(user.id, owner);
-        try {
-          const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("*").single();
-          requireCurrent();
-          if (error) throw error;
-          if (!isProfileForUser(data, user.id) || data === null)
-            throw new Error("Profile save returned no matching profile");
-          const saved = data as Profile;
-          const current = get().profile;
-          let profile = saved;
-          if (current?.id === user.id && (current !== profileAtWrite || write.hadPendingWrite)) {
-            profile = { ...current };
-            if (displayName !== undefined) profile.display_name = saved.display_name;
-            if (avatarUrl !== undefined) profile.avatar_url = saved.avatar_url;
-            if (bio !== undefined) profile.bio = saved.bio;
-            if (country !== undefined) profile.country = saved.country;
-          }
-          set({ profile });
-          const published = get().profile;
-          return published?.id === user.id ? published : profile;
-        } finally {
-          write.release();
+        const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("*").single();
+        requireCurrent();
+        if (error) throw error;
+        if (!isProfileForUser(data, user.id) || data === null)
+          throw new Error("Profile save returned no matching profile");
+        const saved = data as Profile;
+        const current = get().profile;
+        let profile = saved;
+        if (current?.id === user.id && (current !== profileAtWrite || write.hadPendingWrite)) {
+          profile = { ...current };
+          if (displayName !== undefined) profile.display_name = saved.display_name;
+          if (avatarUrl !== undefined) profile.avatar_url = saved.avatar_url;
+          if (bio !== undefined) profile.bio = saved.bio;
+          if (country !== undefined) profile.country = saved.country;
         }
+        set({ profile });
+        const published = get().profile;
+        return published?.id === user.id ? published : profile;
       } catch (err) {
         if (isCurrent()) set({ error: errorMessage(err) ?? null });
         else owner.cancel();
         throw err;
+      } finally {
+        write.release();
       }
     });
   },
