@@ -1,4 +1,5 @@
 import {
+  AuthClient,
   AuthError,
   navigatorLock,
   type SupportedStorage,
@@ -11,6 +12,7 @@ import { createOwnedAuthClient } from "@/lib/auth/client-adapter";
 import { createBrowserSessionChannel } from "@/lib/auth/session-channel";
 import { safeProcessLock } from "@/lib/auth/safe-lock";
 import type { AuthOwner } from "@/lib/auth/coordinator";
+import { openIsolatedRecovery } from "@/lib/auth/isolated-recovery";
 
 type Options = {
   url: string;
@@ -45,6 +47,14 @@ function browserStorage(): SupportedStorage | null {
     return null;
   }
 }
+// Implicit-flow tokens in an address are never installed on the web, so a link cannot sign a
+// visitor into another account. Drop them unused so they leave the address bar and history.
+function discardSessionFragment() {
+  if (typeof window === "undefined" || typeof window.location?.hash !== "string" || !window.history) return;
+  const values = new URLSearchParams(window.location.hash.slice(1));
+  if (!values.has("access_token") && !values.has("refresh_token")) return;
+  window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+}
 export function createRootAuthRuntime(options: Options) {
   const storageKey = options.storageKey || `sb-${new URL(options.url).hostname.split(".")[0]}-auth-token`;
   const persistent = options.isWeb ? browserStorage() : options.nativeStorage;
@@ -60,13 +70,17 @@ export function createRootAuthRuntime(options: Options) {
     }
   }
   const supportsOwnedCommands = !options.isWeb || !!channel;
-  // The reset route installs its tokens through the guarded recovery command.
-  // Other web callback routes keep the SDK's existing URL detection.
+  // The reset route reads its own link tokens into an isolated recovery session (openPasswordRecovery).
+  // Other web routes exchange a PKCE code only with the verifier this browser saved when it started
+  // that sign-in, Google or an email confirmation. Native keeps the implicit flow: its OAuth tokens
+  // return to the browser session the app opened, and native URL detection stays off.
   const resetRoute =
     options.isWeb &&
     typeof window !== "undefined" &&
     typeof window.location?.pathname === "string" &&
     window.location.pathname.replace(/\/+$/, "").endsWith("/auth/reset-password");
+  if (options.isWeb && !resetRoute) discardSessionFragment();
+  const fetchImpl = options.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init));
   const runtime = createOwnedAuthClient({
     url: options.url,
     anonKey: options.anonKey,
@@ -75,9 +89,24 @@ export function createRootAuthRuntime(options: Options) {
     lock: webLock ? navigatorLock : safeProcessLock,
     autoRefreshToken: true,
     detectSessionInUrl: options.isWeb && !resetRoute,
-    fetch: options.fetch ?? ((input, init) => globalThis.fetch(input, init)),
+    flowType: options.isWeb ? "pkce" : "implicit",
+    fetch: fetchImpl,
     channel,
   });
+  // A memory-only client for password recovery. Its session never reaches the app's storage.
+  function recoveryClient() {
+    const baseUrl = options.url.trim();
+    return new AuthClient({
+      url: new URL("auth/v1", baseUrl.endsWith("/") ? baseUrl : baseUrl + "/").href,
+      headers: { apikey: options.anonKey, Authorization: `Bearer ${options.anonKey}` },
+      storageKey: storageKey + "-password-recovery",
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      flowType: "implicit",
+      fetch: fetchImpl,
+    });
+  }
   function requireOwnership() {
     if (!supportsOwnedCommands)
       throw new AuthError("Auth storage ownership is unavailable", 409, "auth_storage_lock_unavailable");
@@ -87,6 +116,12 @@ export function createRootAuthRuntime(options: Options) {
     auth: runtime.auth,
     storageKey,
     supportsOwnedCommands,
+    // Reset emails stay on the implicit flow so the link works on any device, including one other
+    // than the phone that asked. Native already uses that flow.
+    requestPasswordReset: (email: string, redirectTo: string) =>
+      (options.isWeb ? recoveryClient() : runtime.client.auth).resetPasswordForEmail(email, { redirectTo }),
+    openPasswordRecovery: (tokens: { access_token: string; refresh_token: string }) =>
+      openIsolatedRecovery(recoveryClient(), tokens),
     readSession: (owner: AuthOwner, session: Session | null, isActive: () => boolean) => {
       requireOwnership();
       return runtime.readSession(owner, session, isActive);
