@@ -21,6 +21,13 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     // @generated end expo-splashscreen
     super.onCreate(null)
+    // React Native's edge-to-edge setup, run inside super.onCreate, forces Android's translucent
+    // band behind three-button navigation. Hafiz draws its theme to the bottom edge and sets the
+    // button style per theme (NavigationBarTheme.android.tsx), so the band is turned off again.
+    // React Native modals get the band from their own window setup and keep it while open.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      window.isNavigationBarContrastEnforced = false
+    }
   }
 
   /**

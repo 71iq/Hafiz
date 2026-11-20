@@ -8,6 +8,12 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.8": {
+    en: [
+      "With the back, home and recent apps buttons, the bar at the bottom now matches the page instead of showing a shaded band.",
+    ],
+    ar: ["عند استخدام أزرار الرجوع والرئيسية والتطبيقات الأخيرة، يطابق الشريط السفلي لون الصفحة بدل ظهور شريط مظلّل."],
+  },
   "1.0.7": {
     en: [
       "Hafiz no longer requests camera, microphone or draw-over-other-apps permissions.",

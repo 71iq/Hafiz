@@ -4,6 +4,8 @@
     <item name="colorPrimary">@color/colorPrimary</item>
     <item name="android:statusBarColor">@android:color/transparent</item>
     <item name="android:navigationBarColor">@android:color/transparent</item>
+    <!-- No translucent band behind three-button navigation; MainActivity repeats this after React Native turns it on. -->
+    <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
   </style>
   <style name="Theme.App.SplashScreen" parent="Theme.SplashScreen">
     <item name="windowSplashScreenBackground">@color/splashscreen_background</item>
