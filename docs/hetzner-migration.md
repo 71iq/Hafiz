@@ -177,6 +177,26 @@ It does not allow an interactive shell or forwarding.
 The archive permits Expo's exact `dist/_expo/.routes.json` path. Other hidden
 files remain forbidden. Caddy caches hashed bundles under `/_expo/static`
 and bundled assets, while HTML and the route manifest require revalidation.
+Each `Cache-Control` rule in the Caddyfile has its own matcher. Until
+2026-11-20 the revalidation rule had none, ran last and replaced the long
+lifetime on every hashed file, so browsers revalidated each one on every visit.
+
+`npm run build:web` finishes with two steps on `dist`. The first writes a gzip
+copy beside the Quran database, which a first visit downloads instead of the
+63 MB file (17 MB), with the database itself as the fallback. The second adds a
+Content-Security-Policy `<meta>` to every page: scripts run only from the
+export's own files and its inline start-up scripts, each allowed by hash, and
+requests go only to the site and the `EXPO_PUBLIC_SUPABASE_URL` origin. A new
+outside origin for requests or images must be added in
+`scripts/add-web-content-security-policy.mjs`, or the browser blocks it.
+
+The Caddyfile sends what a `<meta>` policy cannot: `frame-ancestors 'none'`,
+HSTS, a Permissions-Policy that keeps only location, and a 404 status with the
+app's not-found screen for an address that has no page. The 2026-11-20
+Caddyfile and the upstream timeouts in `supabase/functions/` reach production
+only through an administrator deployment: validate the combined Caddy
+configuration before reloading, and copy the functions as described above.
+
 The Quran Foundation connection flow returns to its initiating web origin,
 so staging can test the callback without sending it to the old production app.
 Native clients use their own callback, `https://hafizquran.app/auth/qf-app-callback`.

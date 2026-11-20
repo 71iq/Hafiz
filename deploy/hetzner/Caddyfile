@@ -1,8 +1,22 @@
 # Import this file from the existing Caddyfile after validating both together.
-(hafiz_static) {
-  encode zstd gzip
+(hafiz_security) {
   header X-Content-Type-Options nosniff
   header Referrer-Policy strict-origin-when-cross-origin
+  # Browsers ignore this over plain HTTP, so the loopback health listener is unaffected.
+  header Strict-Transport-Security "max-age=31536000"
+}
+
+(hafiz_static) {
+  encode zstd gzip
+  import hafiz_security
+  # Hafiz is never shown inside another site's frame. The pages carry the rest of their policy in a
+  # <meta> tag written at build time (scripts/add-web-content-security-policy.mjs), which cannot
+  # express frame-ancestors.
+  header Content-Security-Policy "frame-ancestors 'none'"
+  header X-Frame-Options DENY
+  # Location is used only for prayer times. A sign-in popup must still reach the page that opened it.
+  header Permissions-Policy "geolocation=(self), camera=(), microphone=(), payment=(), usb=(), bluetooth=(), serial=(), hid=(), midi=(), display-capture=()"
+  header Cross-Origin-Opener-Policy same-origin-allow-popups
 
   # Sideloaded Android releases, published by scripts/release-android.sh outside the web release
   # so website deploys never remove them. Versioned APKs never change; hafiz.apk and latest.json do.
@@ -28,12 +42,24 @@
 
   handle {
     root * /opt/hafiz/current/dist
-    header Cache-Control "no-cache"
+    # Each rule needs its own matcher. An unmatched header rule runs after the matched ones and
+    # replaced the long cache lifetime with no-cache on every hashed file.
     @versioned path /_expo/static/* /assets/*
     header @versioned Cache-Control "public, max-age=31536000, immutable"
+    @revalidated not path /_expo/static/* /assets/*
+    header @revalidated Cache-Control "no-cache"
     @profile path_regexp profile ^/profile/[^/]+/?$
     rewrite @profile /profile/[userId].html
-    try_files {path} {path}.html {path}/index.html /+not-found.html
+    # An address with no page gets the app's not-found screen with a 404 status, so a missing data
+    # file is not mistaken for a successful response.
+    @missing not file {path} {path}.html {path}/index.html
+    handle @missing {
+      rewrite * /+not-found.html
+      file_server {
+        status 404
+      }
+    }
+    try_files {path} {path}.html {path}/index.html
     file_server
   }
 }
@@ -51,6 +77,7 @@ www.hafizquran.app {
 }
 
 api.hafizquran.app {
+  import hafiz_security
   request_body {
     max_size 8MB
   }
