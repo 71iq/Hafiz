@@ -70,6 +70,9 @@ const API_BASE_BY_ENV: Record<QfEnv, string> = {
   prelive: "https://apis-prelive.quran.foundation/auth",
 };
 
+// A stalled Quran Foundation request would otherwise hold this worker until the platform ends it.
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -409,6 +412,7 @@ async function qfJson(
       ...(options.body ? { "Content-Type": "application/json" } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   if (response.status === 401 && !didRetry) {
@@ -535,6 +539,7 @@ async function fetchTokenWithClientAuth(config: Config, params: Record<string, s
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams(params),
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   if (![400, 401, 403].includes(basicResponse.status)) {
@@ -551,6 +556,7 @@ async function fetchTokenWithClientAuth(config: Config, params: Record<string, s
       client_id: config.clientId,
       client_secret: config.clientSecret,
     }),
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 }
 

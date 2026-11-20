@@ -71,6 +71,8 @@ const AYAH_COUNTS = [
 ];
 
 const DEFAULT_RECITATION_ID = 6;
+// A stalled Quran Foundation request would otherwise hold this worker until the platform ends it.
+const UPSTREAM_TIMEOUT_MS = 10_000;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -254,6 +256,7 @@ async function getQfJson(
       "x-auth-token": token,
       "x-client-id": config.clientId,
     },
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   if (response.status === 401 && !didRetry) {
@@ -322,6 +325,7 @@ async function fetchTokenWithClientAuth(config: Config, params: Record<string, s
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams(params),
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   if (![400, 401, 403].includes(basicResponse.status)) {
@@ -338,6 +342,7 @@ async function fetchTokenWithClientAuth(config: Config, params: Record<string, s
       client_id: config.clientId,
       client_secret: config.clientSecret,
     }),
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 }
 
