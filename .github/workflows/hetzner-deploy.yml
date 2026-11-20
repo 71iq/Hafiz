@@ -24,6 +24,8 @@ jobs:
       EXPO_PUBLIC_QF_USER_AUTH_ENABLED: ${{ vars.EXPO_PUBLIC_QF_USER_AUTH_ENABLED }}
       EXPO_PUBLIC_QF_CONTENT_ENABLED: ${{ vars.EXPO_PUBLIC_QF_CONTENT_ENABLED }}
       EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED: ${{ vars.EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED }}
+      # Unset keeps the Board hidden until enough people use Hafiz for weekly groups.
+      EXPO_PUBLIC_BOARD_ENABLED: ${{ vars.EXPO_PUBLIC_BOARD_ENABLED }}
       # Unset would offer every social provider; a missing variable must offer none.
       EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS: ${{ vars.EXPO_PUBLIC_SOCIAL_AUTH_PROVIDERS || 'none' }}
     steps:
