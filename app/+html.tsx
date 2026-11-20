@@ -49,6 +49,11 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta name="apple-mobile-web-app-title" content="Hafiz" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
+        {/* The pages' Content-Security-Policy forbids evaluating text as script. zod reads this
+            global when it loads and then skips its \`new Function\` test, which the browser would
+            report as a policy violation on every page. It must run before the app bundle. */}
+        <script dangerouslySetInnerHTML={{ __html: zodWithoutEvalScript }} />
+
         <script dangerouslySetInnerHTML={{ __html: startupThemeScript }} />
 
         {/* Allow the document body to overflow by 1px so mobile browsers
@@ -65,6 +70,8 @@ export default function Root({ children }: { children: React.ReactNode }) {
     </html>
   );
 }
+
+const zodWithoutEvalScript = `globalThis.__zod_globalConfig = { jitless: true };`;
 
 const urlBarHideStyles = `
 html {
