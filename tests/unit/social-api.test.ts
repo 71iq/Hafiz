@@ -4,7 +4,6 @@ import { strings } from "@/lib/i18n/strings";
 import {
   deleteOwnAvatarFiles,
   fetchProfileSummary,
-  leaveLegacyHalaqas,
   ProfilePrivacyChangedError,
   saveProfilePrivacy,
 } from "@/lib/profile/privacy";
@@ -338,46 +337,6 @@ describe("a minor's photo (ETH-07)", () => {
       joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner()),
     ).rejects.toMatchObject({ failure: { kind: "failed" } });
     expect(mockRpc).not.toHaveBeenCalled();
-  });
-});
-
-describe("halaqas from an earlier version (SET-20)", () => {
-  const A = "00000000-0000-4000-8000-0000000000a1";
-  const B = "00000000-0000-4000-8000-0000000000b2";
-  const groups = (ids: string[]) => ({ data: ids.map((id) => ({ id, kind: "invite", name: "Group" })), error: null });
-
-  it("leaves every halaqa the account is still in, as that account", async () => {
-    mockRpc.mockImplementation(async (fn) => (fn === "get_my_halaqas" ? groups([A, B]) : { data: null, error: null }));
-    await expect(leaveLegacyHalaqas(owner())).resolves.toBe(2);
-    expect(mockRpc.mock.calls).toEqual([
-      ["get_my_halaqas", {}],
-      ["leave_halaqa", { p_group_id: A }],
-      ["leave_halaqa", { p_group_id: B }],
-    ]);
-    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
-  });
-
-  it("skips a halaqa already left on another device and keeps going", async () => {
-    mockRpc.mockImplementation(async (fn, args) => {
-      if (fn === "get_my_halaqas") return groups([A, B]);
-      return args.p_group_id === A ? { data: null, error: { message: "not_a_member", code: "42501" } } : { data: null, error: null };
-    });
-    await expect(leaveLegacyHalaqas(owner())).resolves.toBe(2);
-    expect(mockRpc.mock.calls.map(([, args]) => args.p_group_id)).toEqual([undefined, A, B]);
-  });
-
-  it("stops at any other failure so the person can try again", async () => {
-    mockRpc.mockImplementation(async (fn) =>
-      fn === "get_my_halaqas" ? groups([A, B]) : { data: null, error: { message: "Failed to fetch" } },
-    );
-    await expect(leaveLegacyHalaqas(owner())).rejects.toMatchObject({ failure: { kind: "offline" } });
-    expect(mockRpc.mock.calls.filter(([fn]) => fn === "leave_halaqa")).toHaveLength(1);
-  });
-
-  it("does nothing more when the account is in no halaqa", async () => {
-    mockRpc.mockResolvedValue({ data: [], error: null });
-    await expect(leaveLegacyHalaqas(owner())).resolves.toBe(0);
-    expect(mockRpc.mock.calls.map(([fn]) => fn)).toEqual(["get_my_halaqas"]);
   });
 });
 

@@ -434,7 +434,7 @@ CREATE POLICY "Users can delete own reflection journey entries"
   ON reflection_journey_entries FOR DELETE
   USING (auth.uid() = user_id);
 
--- Achievement read policies are defined with the halaqa tables below.
+-- Achievement read policies are defined with the activity and progress readers below.
 
 CREATE POLICY "Users can insert own achievement unlocks"
   ON achievement_unlocks FOR INSERT
@@ -961,9 +961,10 @@ CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.achievement_unlocks
 -- ============================================================
 -- Learning and consistency (migration 20261113120000)
 -- ============================================================
--- Wird-day sync with a server-side merge, private-by-default social data, halaqa groups and the
--- weekly board. Halaqa and board tables have no client policies: every read and write goes through
--- the SECURITY DEFINER RPCs below. Board points come only from synced habit_days.
+-- Wird-day sync with a server-side merge, private-by-default social data and the weekly board.
+-- Board tables have no client policies: every read and write goes through the SECURITY DEFINER RPCs
+-- below. Board points come only from synced habit_days. Halaqa (study groups) and review_partners
+-- were dropped by migration 20261120120000.
 
 CREATE SCHEMA IF NOT EXISTS private;
 
@@ -1498,21 +1499,11 @@ AS $$
 $$;
 
 -- Every write that can change is_minor (set_profile_privacy, join_board) calls this before it writes,
--- whichever way it changes, and holds both locks until it commits:
--- - The profiles row. A photo update in progress holds it, so the minority write waits for that
---   update to commit and then clears its photo. A photo update that comes later waits on the row,
---   and profiles_minor_photo then reads the committed minority. FOR NO KEY UPDATE conflicts with that
---   update but not with the key-share locks that foreign keys take, so an encouragement, membership
---   or sync insert that references this profile does not wait on it. A reflection write by this user
---   takes the row FOR SHARE (private.lock_activity_writer, private.visible_step), so it either commits
---   first and is recounted here (private.recount_minor_activity), or waits and reads the committed
---   minority.
---   Account deletion locks the row too, so a board join waits for it rather than deadlocking with it.
--- - The user's halaqa lock, which join_matched_halaqa takes before it checks minority. A matched join
---   either commits first, and private.apply_minor_privacy then leaves that halaqa, or reads the
---   committed minority and is refused.
--- Nothing takes these locks in the other order: halaqa joins take the halaqa lock and only key-share
--- the profile, and board reads and writes take the profile_privacy row, which this write takes last.
+-- whichever way it changes, and holds the profiles row until it commits. A photo update in progress
+-- holds it, so the minority write waits for that update to commit and then clears its photo. A photo
+-- update that comes later waits on the row, and profiles_minor_photo then reads the committed
+-- minority. A reflection write by this user takes the row FOR SHARE, so it either commits first and
+-- is recounted (private.recount_minor_activity), or waits and reads the committed minority.
 CREATE OR REPLACE FUNCTION private.lock_minor_change(member UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1520,29 +1511,18 @@ SET search_path = ''
 AS $$
 BEGIN
   PERFORM 1 FROM public.profiles WHERE id = member FOR NO KEY UPDATE;
-  PERFORM private.lock_halaqa_user(member);
 END;
 $$;
 
--- Runs for every write that sets is_minor, whichever path made it. The photo is cleared without
--- checking it first, so the update waits on a photo update still in progress and clears the photo it
--- commits. Matched halaqas are left as leave_halaqa leaves them (ETH-07): their members are
--- strangers. Invite halaqas hold people the minor chose, and stay.
+-- Runs for every write that sets is_minor (ETH-07). The photo is cleared without checking it first,
+-- so the update waits on a photo update still in progress and clears the photo it commits.
 CREATE OR REPLACE FUNCTION private.apply_minor_privacy()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
-DECLARE
-  matched UUID;
 BEGIN
   UPDATE public.profiles SET avatar_url = NULL WHERE id = NEW.user_id;
-  FOR matched IN
-    SELECT m.group_id FROM public.halaqa_members AS m
-    WHERE m.user_id = NEW.user_id AND m.kind = 'matched' AND m.left_at IS NULL
-  LOOP
-    PERFORM private.halaqa_leave(matched, NEW.user_id);
-  END LOOP;
   RETURN NULL;
 END;
 $$;
@@ -1978,126 +1958,6 @@ BEGIN
 END;
 $$;
 
--- ─── Halaqa (5.7.1) ───────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.halaqa_groups (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  kind TEXT NOT NULL CHECK (kind IN ('invite', 'matched')),
-  name TEXT CHECK (name IS NULL OR char_length(btrim(name)) BETWEEN 1 AND 60),
-  invite_code TEXT UNIQUE CHECK (invite_code ~ '^[A-HJ-NP-Z2-9]{8}$'),
-  level_band TEXT CHECK (level_band IN ('starting', 'juz_amma', 'juz_4_15', 'juz_16_29', 'hafiz')),
-  pace_band TEXT CHECK (pace_band IN ('maintenance', 'light', 'half_page', 'page_plus')),
-  utc_offset_band INTEGER CHECK (utc_offset_band BETWEEN -6 AND 7),
-  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  deleted_at TIMESTAMPTZ,
-  -- Lets halaqa_members carry the kind, so one active matched membership per user is a constraint.
-  CONSTRAINT halaqa_groups_id_kind_key UNIQUE (id, kind),
-  CONSTRAINT halaqa_groups_kind_fields CHECK (
-    (kind = 'invite' AND name IS NOT NULL AND invite_code IS NOT NULL
-      AND level_band IS NULL AND pace_band IS NULL AND utc_offset_band IS NULL)
-    OR (kind = 'matched' AND invite_code IS NULL
-      AND level_band IS NOT NULL AND pace_band IS NOT NULL AND utc_offset_band IS NOT NULL)
-  )
-);
-
-CREATE TABLE IF NOT EXISTS public.halaqa_members (
-  group_id UUID NOT NULL,
-  -- The group's kind, kept equal to it by the foreign key below.
-  kind TEXT NOT NULL CHECK (kind IN ('invite', 'matched')),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'teacher')),
-  share_consistency BOOLEAN NOT NULL DEFAULT true,
-  share_juz BOOLEAN NOT NULL DEFAULT true,
-  share_plan_with_teachers BOOLEAN NOT NULL DEFAULT false,
-  share_grades_with_teachers BOOLEAN NOT NULL DEFAULT false,
-  joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  left_at TIMESTAMPTZ,
-  PRIMARY KEY (group_id, user_id),
-  CONSTRAINT halaqa_members_group_kind_fkey FOREIGN KEY (group_id, kind)
-    REFERENCES public.halaqa_groups(id, kind) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS public.halaqa_encouragements (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id UUID NOT NULL REFERENCES public.halaqa_groups(id) ON DELETE CASCADE,
-  from_user UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  to_user UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  -- Fixed set, rendered in each reader's own language (MAT-01). Keep in sync with lib/halaqa/api.ts.
-  template_id TEXT CHECK (template_id IN (
-    'ease', 'missed_you', 'keep_going', 'small_steady', 'dua', 'together', 'welcome_back', 'well_done',
-    'firm_heart'
-  )),
-  -- Free text only in invite halaqas (SOC-06), checked by send_halaqa_encouragement.
-  body TEXT CHECK (body IS NULL OR (char_length(btrim(body)) BETWEEN 1 AND 200 AND body !~ '[[:cntrl:]]')),
-  -- The sender's local date as their device sent it, for display only.
-  local_date TEXT NOT NULL CHECK (local_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),
-  -- SOC-06: the sender's calendar day by the server's clock in their stored zone
-  -- (private.member_today), which the caller cannot choose. One send per group, sender and day.
-  sent_on DATE NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (template_id IS NOT NULL OR body IS NOT NULL),
-  CHECK (from_user <> to_user)
-);
-
--- SOC-03: a teacher's next sabaq for a member of their halaqa, a page and a range of its lines. One per
--- member and halaqa; the member's app memorizes those lines next (lib/hifz/teacher-sabaq.ts). Written
--- and read only through RPCs, and only while the member shares their plan with teachers.
-CREATE TABLE IF NOT EXISTS public.halaqa_sabaq_assignments (
-  group_id UUID NOT NULL REFERENCES public.halaqa_groups(id) ON DELETE CASCADE,
-  learner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  teacher_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  page INTEGER NOT NULL CHECK (page BETWEEN 1 AND 604),
-  from_line INTEGER NOT NULL CHECK (from_line BETWEEN 1 AND 15),
-  to_line INTEGER NOT NULL CHECK (to_line BETWEEN 1 AND 15),
-  assigned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (group_id, learner_id),
-  CHECK (from_line <= to_line),
-  CHECK (learner_id <> teacher_id)
-);
-
--- SOC-05 review partners. The table and its read rule ship now; pairing RPCs come with the partner UI.
-CREATE TABLE IF NOT EXISTS public.review_partners (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_a UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  user_b UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  weekly_goal_pages INTEGER NOT NULL DEFAULT 5 CHECK (weekly_goal_pages BETWEEN 1 AND 100),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  ended_at TIMESTAMPTZ,
-  CHECK (user_a < user_b)
-);
-
-CREATE INDEX IF NOT EXISTS idx_halaqa_members_user_active ON public.halaqa_members(user_id) WHERE left_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_halaqa_members_group_active ON public.halaqa_members(group_id) WHERE left_at IS NULL;
--- SOC-04: one standing matched halaqa per user.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_members_one_matched
-  ON public.halaqa_members(user_id) WHERE kind = 'matched' AND left_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_halaqa_groups_matched
-  ON public.halaqa_groups(level_band, pace_band, utc_offset_band) WHERE kind = 'matched' AND deleted_at IS NULL;
--- Serves get_received_encouragements' (created_at, id) cursor.
-CREATE INDEX IF NOT EXISTS idx_halaqa_encouragements_to_user ON public.halaqa_encouragements(to_user, created_at, id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_halaqa_encouragements_sender_day
-  ON public.halaqa_encouragements(group_id, from_user, sent_on);
--- Serves get_my_sabaq_assignment, which reads across the learner's halaqas.
-CREATE INDEX IF NOT EXISTS idx_halaqa_sabaq_assignments_learner ON public.halaqa_sabaq_assignments(learner_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_review_partners_active_pair
-  ON public.review_partners(user_a, user_b) WHERE ended_at IS NULL;
-
-ALTER TABLE public.halaqa_groups ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.halaqa_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.halaqa_encouragements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.halaqa_sabaq_assignments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.review_partners ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Partners can read their pairing" ON public.review_partners;
-CREATE POLICY "Partners can read their pairing"
-  ON public.review_partners FOR SELECT TO authenticated
-  USING ((SELECT auth.uid()) IN (user_a, user_b));
-
-REVOKE ALL ON public.halaqa_groups, public.halaqa_members, public.halaqa_encouragements, public.review_partners
-  FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON public.halaqa_sabaq_assignments FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON public.review_partners TO authenticated;
-
 -- ─── Board (5.7.2) ────────────────────────────────────────────────────────
 -- week_start is the first date of the members' week (BRD-01, STR-28); its weekday is their week start.
 CREATE TABLE IF NOT EXISTS public.board_cohorts (
@@ -2129,42 +1989,12 @@ ALTER TABLE public.board_members ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.board_cohorts, public.board_members FROM PUBLIC, anon, authenticated;
 
 -- ─── Activity and progress readers ────────────────────────────────────────
--- Juz completions are the only progress a halaqa member can share (SOC-02). Per-surah counts stay
--- with the owner (policy above).
-CREATE OR REPLACE FUNCTION public.halaqa_shares_with_me(target UUID, field TEXT)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.halaqa_members AS mine
-    JOIN public.halaqa_members AS theirs ON theirs.group_id = mine.group_id
-    JOIN public.halaqa_groups AS g ON g.id = mine.group_id AND g.deleted_at IS NULL
-    WHERE mine.user_id = (SELECT auth.uid())
-      AND mine.left_at IS NULL
-      AND theirs.user_id = target
-      AND theirs.left_at IS NULL
-      AND CASE field
-        WHEN 'consistency' THEN theirs.share_consistency
-        WHEN 'juz' THEN theirs.share_juz
-        ELSE false
-      END
-  );
-$$;
-REVOKE ALL ON FUNCTION public.halaqa_shares_with_me(UUID, TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.halaqa_shares_with_me(UUID, TEXT) TO authenticated;
-
+-- Achievement unlocks, juz completions included, and per-surah counts (policy above) are read by
+-- their owner only. A profile shows juz completions to others through get_profile_summary.
 DROP POLICY IF EXISTS "Users can read own achievement unlocks" ON public.achievement_unlocks;
 CREATE POLICY "Users can read own achievement unlocks"
   ON public.achievement_unlocks FOR SELECT TO authenticated
   USING ((SELECT auth.uid()) = user_id);
-DROP POLICY IF EXISTS "Halaqa members can read shared juz completions" ON public.achievement_unlocks;
-CREATE POLICY "Halaqa members can read shared juz completions"
-  ON public.achievement_unlocks FOR SELECT TO authenticated
-  USING (achievement_id ~ '^juz_[0-9]{2}_completed$' AND public.halaqa_shares_with_me(user_id, 'juz'));
 REVOKE ALL ON public.achievement_unlocks FROM anon;
 REVOKE ALL ON public.public_surah_progress FROM anon;
 
@@ -2396,7 +2226,7 @@ AS $$
   SELECT day - ((extract(dow FROM day)::INTEGER - week_start_day + 7) % 7);
 $$;
 
--- MAT-03: a pure, replayable match rule shared by board cohorts and matched halaqas. Returns the
+-- MAT-03: a pure, replayable match rule for board cohorts. Returns the
 -- preference tier of a group for a user, or NULL when the user may not join it:
 --   1. same level, pace and 2-hour offset band, while the group has room;
 --   2. same level and pace, offset within 3 hours;
@@ -2487,9 +2317,9 @@ BEGIN
   IF p_show_streak IS NULL OR p_show_juz_completions IS NULL OR p_is_minor IS NULL OR p_expected_minor IS NULL THEN
     RAISE EXCEPTION 'invalid_privacy';
   END IF;
-  -- Recording minority clears the photo and leaves matched halaqas (private.apply_minor_privacy), and
-  -- recording or withdrawing it recounts the person's likes and comments. Every minority write holds
-  -- this lock, so the stored value compared below holds until this write commits.
+  -- Recording minority clears the photo (private.apply_minor_privacy), and recording or withdrawing
+  -- it recounts the person's likes and comments. Every minority write holds this lock, so the stored
+  -- value compared below holds until this write commits.
   PERFORM private.lock_minor_change(uid);
   -- The row lock comes last, as in join_board. It waits for a board placement in progress, so the
   -- Board choice read here is the committed one.
@@ -2516,10 +2346,10 @@ BEGIN
 END;
 $$;
 
--- What a viewer may see of another person's consistency: the owner always; a halaqa member when the
--- person shared that field with the group; anyone when the person turned it on for their profile,
--- unless they stated they are a minor (ETH-07). Null fields are hidden. A minor's profile is hidden
--- as a whole from anyone but the owner and their halaqa co-members, as the profiles policy hides it.
+-- What a viewer may see of another person's consistency: the owner always, and anyone when the
+-- person turned it on for their profile, unless they stated they are a minor (ETH-07). Null fields
+-- are hidden. A minor's profile is hidden as a whole from anyone but the owner, as the profiles
+-- policy hides it.
 CREATE OR REPLACE FUNCTION public.get_profile_summary(p_user_id UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -2538,20 +2368,12 @@ BEGIN
     RETURN NULL;
   END IF;
   SELECT * INTO privacy FROM public.profile_privacy WHERE user_id = p_user_id;
-  IF COALESCE(privacy.is_minor, false) AND NOT is_owner AND NOT (viewer IS NOT NULL AND EXISTS (
-    SELECT 1
-    FROM public.halaqa_members AS mine
-    JOIN public.halaqa_members AS theirs ON theirs.group_id = mine.group_id
-    JOIN public.halaqa_groups AS g ON g.id = mine.group_id AND g.deleted_at IS NULL
-    WHERE mine.user_id = viewer AND mine.left_at IS NULL AND theirs.user_id = p_user_id AND theirs.left_at IS NULL
-  )) THEN
+  IF COALESCE(privacy.is_minor, false) AND NOT is_owner THEN
     RETURN NULL;
   END IF;
   see_streak := is_owner
-    OR (viewer IS NOT NULL AND public.halaqa_shares_with_me(p_user_id, 'consistency'))
     OR (COALESCE(privacy.show_streak, false) AND NOT COALESCE(privacy.is_minor, false));
   see_juz := is_owner
-    OR (viewer IS NOT NULL AND public.halaqa_shares_with_me(p_user_id, 'juz'))
     OR (COALESCE(privacy.show_juz_completions, false) AND NOT COALESCE(privacy.is_minor, false));
   RETURN jsonb_build_object(
     'streak', CASE WHEN see_streak THEN private.habit_streak(p_user_id, private.member_today(p_user_id)) END,
@@ -2560,802 +2382,6 @@ BEGIN
       FROM public.achievement_unlocks AS a
       WHERE a.user_id = p_user_id AND a.achievement_id ~ '^juz_[0-9]{2}_completed$'
     ) END
-  );
-END;
-$$;
-
--- ─── Halaqa RPCs ─────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION private.halaqa_active_count(target_group UUID)
-RETURNS INTEGER
-LANGUAGE sql
-STABLE
-SET search_path = ''
-AS $$
-  SELECT count(*)::INTEGER FROM public.halaqa_members WHERE group_id = target_group AND left_at IS NULL;
-$$;
-
-CREATE OR REPLACE FUNCTION private.require_halaqa_member(target_group UUID, member UUID)
-RETURNS public.halaqa_members
-LANGUAGE plpgsql
-STABLE
-SET search_path = ''
-AS $$
-DECLARE
-  membership public.halaqa_members;
-BEGIN
-  SELECT m.* INTO membership
-  FROM public.halaqa_members AS m
-  JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
-  WHERE m.group_id = target_group AND m.user_id = member AND m.left_at IS NULL;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'not_a_member' USING ERRCODE = '42501';
-  END IF;
-  RETURN membership;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION private.check_halaqa_limit(member UUID)
-RETURNS VOID
-LANGUAGE plpgsql
-STABLE
-SET search_path = ''
-AS $$
-BEGIN
-  IF (
-    SELECT count(*) FROM public.halaqa_members AS m
-    JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
-    WHERE m.user_id = member AND m.left_at IS NULL
-  ) >= 10 THEN
-    RAISE EXCEPTION 'halaqa_limit';
-  END IF;
-END;
-$$;
-
--- Serializes one user's halaqa joins, so the 10-group limit and the single matched halaqa are checked
--- against committed state. Taken before any group row lock.
-CREATE OR REPLACE FUNCTION private.lock_halaqa_user(member UUID)
-RETURNS VOID
-LANGUAGE sql
-VOLATILE
-SET search_path = ''
-AS $$
-  SELECT pg_advisory_xact_lock(hashtextextended('hafiz:halaqa-user:' || member::TEXT, 0));
-$$;
-
--- SOC-06: one encouragement per sender per calendar day in each group. `today` is the sender's day
--- by the server (private.member_today). A send on a later day also counts: that day can only come
--- from the sender's stored zone moving west, which must not open a second send.
-CREATE OR REPLACE FUNCTION private.encouraged_today(target_group UUID, sender UUID, today DATE, recipient UUID DEFAULT NULL)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SET search_path = ''
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.halaqa_encouragements AS e
-    WHERE e.group_id = target_group AND e.from_user = sender AND e.sent_on >= today
-      AND (recipient IS NULL OR e.to_user = recipient)
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION private.halaqa_summary(target_group UUID, member UUID)
-RETURNS JSONB
-LANGUAGE sql
-STABLE
-SET search_path = ''
-AS $$
-  SELECT jsonb_build_object(
-    'id', g.id,
-    'kind', g.kind,
-    'name', g.name,
-    'invite_code', g.invite_code,
-    'member_count', private.halaqa_active_count(g.id),
-    'role', m.role,
-    -- created_by is null once the creator deletes their account; the client needs a boolean.
-    'is_creator', COALESCE(g.created_by = member, false),
-    'share_consistency', m.share_consistency,
-    'share_juz', m.share_juz,
-    'share_plan_with_teachers', m.share_plan_with_teachers,
-    'share_grades_with_teachers', m.share_grades_with_teachers
-  )
-  FROM public.halaqa_groups AS g
-  JOIN public.halaqa_members AS m ON m.group_id = g.id AND m.user_id = member
-  WHERE g.id = target_group;
-$$;
-
-CREATE OR REPLACE FUNCTION private.new_invite_code()
-RETURNS TEXT
-LANGUAGE plpgsql
-VOLATILE
-SET search_path = ''
-AS $$
-DECLARE
-  alphabet CONSTANT TEXT := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  bytes BYTEA := uuid_send(gen_random_uuid());
-  code TEXT := '';
-  i INTEGER;
-BEGIN
-  -- Bytes 6 and 8 carry the UUID version and variant, so use the other fully random bytes.
-  FOREACH i IN ARRAY ARRAY[0, 1, 2, 3, 4, 5, 9, 10] LOOP
-    code := code || substr(alphabet, (get_byte(bytes, i) % 32) + 1, 1);
-  END LOOP;
-  RETURN code;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.get_my_halaqas()
-RETURNS JSONB
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-BEGIN
-  RETURN COALESCE((
-    SELECT jsonb_agg(private.halaqa_summary(g.id, uid) ORDER BY g.kind, m.joined_at)
-    FROM public.halaqa_members AS m
-    JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
-    WHERE m.user_id = uid AND m.left_at IS NULL
-  ), '[]'::JSONB);
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.create_invite_halaqa(p_name TEXT, p_as_teacher BOOLEAN DEFAULT false)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  clean_name TEXT := btrim(COALESCE(p_name, ''));
-  new_id UUID;
-  attempt INTEGER := 0;
-BEGIN
-  IF char_length(clean_name) NOT BETWEEN 1 AND 60 OR clean_name ~ '[[:cntrl:]]' THEN
-    RAISE EXCEPTION 'invalid_name';
-  END IF;
-  PERFORM private.lock_halaqa_user(uid);
-  PERFORM private.check_halaqa_limit(uid);
-  LOOP
-    attempt := attempt + 1;
-    BEGIN
-      INSERT INTO public.halaqa_groups (kind, name, invite_code, created_by)
-      VALUES ('invite', clean_name, private.new_invite_code(), uid)
-      RETURNING id INTO new_id;
-      EXIT;
-    EXCEPTION WHEN unique_violation THEN
-      IF attempt >= 5 THEN RAISE; END IF;
-    END;
-  END LOOP;
-  INSERT INTO public.halaqa_members (group_id, kind, user_id, role)
-  VALUES (new_id, 'invite', uid, CASE WHEN COALESCE(p_as_teacher, false) THEN 'teacher' ELSE 'member' END);
-  RETURN private.halaqa_summary(new_id, uid);
-END;
-$$;
-
--- SOC-02: invite halaqas hold up to 50 people. The group row lock orders this join with leave_halaqa,
--- so a group is never deleted as empty while someone is joining it.
-CREATE OR REPLACE FUNCTION public.join_halaqa_by_code(p_code TEXT)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  target public.halaqa_groups;
-  existing public.halaqa_members;
-BEGIN
-  PERFORM private.lock_halaqa_user(uid);
-  SELECT * INTO target FROM public.halaqa_groups
-  WHERE kind = 'invite' AND deleted_at IS NULL AND invite_code = upper(btrim(COALESCE(p_code, '')))
-  FOR UPDATE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'invalid_code';
-  END IF;
-  SELECT * INTO existing FROM public.halaqa_members WHERE group_id = target.id AND user_id = uid;
-  IF FOUND AND existing.left_at IS NULL THEN
-    RETURN private.halaqa_summary(target.id, uid);
-  END IF;
-  PERFORM private.check_halaqa_limit(uid);
-  IF private.halaqa_active_count(target.id) >= 50 THEN
-    RAISE EXCEPTION 'halaqa_full';
-  END IF;
-  -- Rejoining keeps the earlier sharing choices but never a teacher role.
-  INSERT INTO public.halaqa_members (group_id, kind, user_id, role)
-  VALUES (target.id, 'invite', uid, 'member')
-  ON CONFLICT (group_id, user_id) DO UPDATE SET left_at = NULL, role = 'member', joined_at = now();
-  RETURN private.halaqa_summary(target.id, uid);
-END;
-$$;
-
--- Leaving takes the group row lock that joining takes before it changes membership or checks for an
--- empty group, so a join that is still committing is counted. False when the member was not in the
--- group. leave_halaqa and recording minority (private.apply_minor_privacy) both leave through this.
-CREATE OR REPLACE FUNCTION private.halaqa_leave(target_group UUID, member UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SET search_path = ''
-AS $$
-BEGIN
-  PERFORM 1 FROM public.halaqa_groups WHERE id = target_group AND deleted_at IS NULL FOR UPDATE;
-  IF NOT FOUND THEN
-    RETURN false;
-  END IF;
-  UPDATE public.halaqa_members SET left_at = now()
-  WHERE group_id = target_group AND user_id = member AND left_at IS NULL;
-  IF NOT FOUND THEN
-    RETURN false;
-  END IF;
-  -- SOC-03: a member who leaves takes their next sabaq with them, and a teacher the ones they set.
-  DELETE FROM public.halaqa_sabaq_assignments
-  WHERE group_id = target_group AND (learner_id = member OR teacher_id = member);
-  IF private.halaqa_active_count(target_group) = 0 THEN
-    UPDATE public.halaqa_groups SET deleted_at = now() WHERE id = target_group;
-  END IF;
-  RETURN true;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.leave_halaqa(p_group_id UUID)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-BEGIN
-  IF NOT private.halaqa_leave(p_group_id, uid) THEN
-    RAISE EXCEPTION 'not_a_member' USING ERRCODE = '42501';
-  END IF;
-END;
-$$;
-
--- SOC-04: a standing matched halaqa of about 20. Minors join only invite halaqas (ETH-07), and a
--- re-match never returns the user to a halaqa they left. The per-user lock makes concurrent requests
--- by one user find each other's membership; idx_halaqa_members_one_matched backs it. Minority is
--- checked under that lock, which recording minority also takes (private.lock_minor_change), so a join
--- either commits before a minority write, which then leaves the halaqa, or is refused.
-CREATE OR REPLACE FUNCTION public.join_matched_halaqa(
-  p_level_band TEXT,
-  p_pace_band TEXT,
-  p_utc_offset_minutes INTEGER
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  chosen UUID;
-BEGIN
-  PERFORM private.check_bands(p_level_band, p_pace_band, p_utc_offset_minutes);
-  PERFORM private.lock_halaqa_user(uid);
-  IF private.is_minor(uid) THEN
-    RAISE EXCEPTION 'minor_not_allowed';
-  END IF;
-  SELECT g.id INTO chosen
-  FROM public.halaqa_members AS m
-  JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
-  WHERE m.user_id = uid AND m.left_at IS NULL AND m.kind = 'matched'
-  LIMIT 1;
-  IF FOUND THEN
-    RETURN private.halaqa_summary(chosen, uid);
-  END IF;
-  PERFORM private.check_halaqa_limit(uid);
-  PERFORM pg_advisory_xact_lock(hashtextextended('hafiz:matched-halaqa', 0));
-
-  SELECT c.id INTO chosen
-  FROM (
-    SELECT g.id, g.created_at, private.halaqa_active_count(g.id) AS size,
-      private.match_tier(g.level_band, g.pace_band, g.utc_offset_band, private.halaqa_active_count(g.id), 20,
-        p_level_band, p_pace_band, p_utc_offset_minutes) AS tier
-    FROM public.halaqa_groups AS g
-    WHERE g.kind = 'matched' AND g.deleted_at IS NULL
-      AND NOT EXISTS (SELECT 1 FROM public.halaqa_members AS left_m WHERE left_m.group_id = g.id AND left_m.user_id = uid)
-  ) AS c
-  WHERE c.tier IS NOT NULL
-  ORDER BY c.tier, c.size DESC, c.created_at, c.id
-  LIMIT 1;
-
-  -- A last member may be leaving the chosen group right now; its row lock settles that first.
-  IF chosen IS NOT NULL THEN
-    SELECT id INTO chosen FROM public.halaqa_groups WHERE id = chosen AND deleted_at IS NULL FOR UPDATE;
-  END IF;
-  IF chosen IS NULL THEN
-    INSERT INTO public.halaqa_groups (kind, level_band, pace_band, utc_offset_band, created_by)
-    VALUES ('matched', p_level_band, p_pace_band, private.offset_band(p_utc_offset_minutes), uid)
-    RETURNING id INTO chosen;
-  END IF;
-  INSERT INTO public.halaqa_members (group_id, kind, user_id, role) VALUES (chosen, 'matched', uid, 'member');
-  RETURN private.halaqa_summary(chosen, uid);
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.set_halaqa_sharing(
-  p_group_id UUID,
-  p_share_consistency BOOLEAN,
-  p_share_juz BOOLEAN,
-  p_share_plan_with_teachers BOOLEAN,
-  p_share_grades_with_teachers BOOLEAN
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-BEGIN
-  PERFORM private.require_halaqa_member(p_group_id, uid);
-  IF p_share_consistency IS NULL OR p_share_juz IS NULL
-    OR p_share_plan_with_teachers IS NULL OR p_share_grades_with_teachers IS NULL THEN
-    RAISE EXCEPTION 'invalid_sharing';
-  END IF;
-  UPDATE public.halaqa_members SET
-    share_consistency = p_share_consistency,
-    share_juz = p_share_juz,
-    share_plan_with_teachers = p_share_plan_with_teachers,
-    share_grades_with_teachers = p_share_grades_with_teachers
-  WHERE group_id = p_group_id AND user_id = uid;
-  -- SOC-03: a teacher's next sabaq needs the plan shared; sharing it again does not bring one back.
-  IF NOT p_share_plan_with_teachers THEN
-    DELETE FROM public.halaqa_sabaq_assignments WHERE group_id = p_group_id AND learner_id = uid;
-  END IF;
-  RETURN private.halaqa_summary(p_group_id, uid);
-END;
-$$;
-
--- Only the creator of an invite halaqa assigns teachers (SOC-03). Matched halaqas have none.
-CREATE OR REPLACE FUNCTION public.set_halaqa_member_role(p_group_id UUID, p_member_id UUID, p_role TEXT)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-BEGIN
-  PERFORM private.require_halaqa_member(p_group_id, uid);
-  IF NOT EXISTS (
-    SELECT 1 FROM public.halaqa_groups WHERE id = p_group_id AND kind = 'invite' AND created_by = uid
-  ) THEN
-    RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
-  END IF;
-  IF p_role IS NULL OR p_role NOT IN ('member', 'teacher') THEN
-    RAISE EXCEPTION 'invalid_role';
-  END IF;
-  PERFORM private.require_halaqa_member(p_group_id, p_member_id);
-  UPDATE public.halaqa_members SET role = p_role WHERE group_id = p_group_id AND user_id = p_member_id;
-  IF p_role <> 'teacher' THEN
-    DELETE FROM public.halaqa_sabaq_assignments WHERE group_id = p_group_id AND teacher_id = p_member_id;
-  END IF;
-END;
-$$;
-
--- SOC-07: the week's shared goal is a total, with no individual ranking. Only members who share
--- their consistency contribute, so a total can never expose a member who chose not to share.
--- The target is five wird days per contributing member.
-CREATE OR REPLACE FUNCTION private.halaqa_goal(target_group UUID, week_start DATE)
-RETURNS JSONB
-LANGUAGE sql
-STABLE
-SET search_path = ''
-AS $$
-  WITH contributors AS (
-    SELECT m.user_id FROM public.halaqa_members AS m
-    WHERE m.group_id = target_group AND m.left_at IS NULL AND m.share_consistency
-  )
-  SELECT jsonb_build_object(
-    'week_start', to_char(week_start, 'YYYY-MM-DD'),
-    'contributors', (SELECT count(*) FROM contributors),
-    'target', 5 * (SELECT count(*) FROM contributors),
-    'wird_days', (
-      SELECT count(*) FROM public.habit_days AS h
-      JOIN contributors AS c ON c.user_id = h.user_id
-      WHERE h.status IN ('done', 'made_up', 'earned_back')
-        AND h.local_date >= to_char(week_start, 'YYYY-MM-DD')
-        AND h.local_date < to_char(week_start + 7, 'YYYY-MM-DD')
-        AND h.local_date <= to_char((now() AT TIME ZONE 'UTC')::DATE + 1, 'YYYY-MM-DD')
-    )
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.get_halaqa_goal(p_group_id UUID, p_today TEXT)
-RETURNS JSONB
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  today DATE := private.checked_local_date(p_today);
-BEGIN
-  PERFORM private.require_halaqa_member(p_group_id, uid);
-  RETURN private.halaqa_goal(p_group_id, date_trunc('week', today)::DATE);
-END;
-$$;
-
--- The group view. Members see each other's wird days this week, current streak and juz completions
--- only where each member shared them (SOC-02). Never mistakes, grades or recordings.
-CREATE OR REPLACE FUNCTION public.get_halaqa_detail(p_group_id UUID, p_today TEXT)
-RETURNS JSONB
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  today DATE := private.checked_local_date(p_today);
-  week_start DATE := date_trunc('week', today)::DATE;
-  sender_day DATE := private.member_today(uid);
-  mine public.halaqa_members;
-BEGIN
-  mine := private.require_halaqa_member(p_group_id, uid);
-  RETURN jsonb_build_object(
-    'group', private.halaqa_summary(p_group_id, uid),
-    'goal', private.halaqa_goal(p_group_id, week_start),
-    'members', (
-      SELECT COALESCE(jsonb_agg(member ORDER BY (member->>'role') = 'teacher' DESC, member->>'name'), '[]'::JSONB)
-      FROM (
-        SELECT jsonb_build_object(
-          'user_id', p.id,
-          'name', private.member_name(p.id),
-          'username', p.username,
-          -- A minor has no photo (ETH-07), even if one were ever stored.
-          'avatar_url', CASE WHEN NOT private.is_minor(p.id) THEN p.avatar_url END,
-          'role', m.role,
-          'is_me', m.user_id = uid,
-          'week', CASE WHEN m.share_consistency OR m.user_id = uid THEN private.week_wird_days(m.user_id, week_start) END,
-          'streak', CASE WHEN m.share_consistency OR m.user_id = uid
-            THEN private.habit_streak(m.user_id, private.member_today(m.user_id)) END,
-          'juz_completions', CASE WHEN m.share_juz OR m.user_id = uid THEN private.juz_completions(m.user_id) END,
-          'encouraged_today', private.encouraged_today(p_group_id, uid, sender_day, m.user_id),
-          'teacher_view', mine.role = 'teacher' AND m.user_id <> uid
-            AND (m.share_plan_with_teachers OR m.share_grades_with_teachers)
-        ) AS member
-        FROM public.halaqa_members AS m
-        JOIN public.profiles AS p ON p.id = m.user_id
-        WHERE m.group_id = p_group_id AND m.left_at IS NULL
-      ) AS members
-    ),
-    'encouraged_today', private.encouraged_today(p_group_id, uid, sender_day),
-    'received', (
-      SELECT COALESCE(jsonb_agg(jsonb_build_object(
-        'id', e.id,
-        -- A minor who has left this matched halaqa is not named to the strangers in it (ETH-07).
-        'from_name', CASE WHEN mine.kind = 'matched' AND private.is_minor(e.from_user) THEN NULL
-          ELSE private.member_name(e.from_user) END,
-        'template_id', e.template_id,
-        'body', e.body,
-        'created_at', e.created_at
-      ) ORDER BY e.created_at DESC), '[]'::JSONB)
-      FROM (
-        SELECT * FROM public.halaqa_encouragements AS recent
-        WHERE recent.group_id = p_group_id AND recent.to_user = uid AND recent.created_at > now() - INTERVAL '7 days'
-        ORDER BY recent.created_at DESC
-        LIMIT 20
-      ) AS e
-    )
-  );
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.send_halaqa_encouragement(
-  p_group_id UUID,
-  p_to_user UUID,
-  p_template_id TEXT,
-  p_body TEXT,
-  p_today TEXT
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  today DATE := private.checked_local_date(p_today);
-  group_kind TEXT;
-  sender_day DATE;
-  clean_body TEXT := NULLIF(btrim(COALESCE(p_body, '')), '');
-  new_id UUID;
-BEGIN
-  -- The sender's and recipient's profiles rows first, in key-share mode, before any halaqa row:
-  -- deleting either account locks its profile and then cascades to the group (as creator) and the
-  -- memberships, so a send that held those rows and only key-shared the profiles at its insert
-  -- would deadlock with it.
-  PERFORM 1 FROM public.profiles WHERE id IN (uid, p_to_user) ORDER BY id FOR KEY SHARE;
-  -- The group row, then the sender's membership row: the order leave_halaqa and the joins use, so a
-  -- send and a leave cannot deadlock. Membership is checked under both locks, so a sender who is
-  -- leaving cannot send, and concurrent sends by one sender see each other.
-  SELECT kind INTO group_kind FROM public.halaqa_groups WHERE id = p_group_id AND deleted_at IS NULL FOR SHARE;
-  PERFORM 1 FROM public.halaqa_members
-  WHERE group_id = p_group_id AND user_id = uid AND left_at IS NULL
-  FOR UPDATE;
-  IF group_kind IS NULL OR NOT FOUND THEN
-    RAISE EXCEPTION 'not_a_member' USING ERRCODE = '42501';
-  END IF;
-  IF p_to_user IS NULL OR p_to_user = uid THEN
-    RAISE EXCEPTION 'invalid_recipient';
-  END IF;
-  BEGIN
-    PERFORM private.require_halaqa_member(p_group_id, p_to_user);
-  EXCEPTION WHEN insufficient_privilege THEN
-    RAISE EXCEPTION 'invalid_recipient';
-  END;
-  IF clean_body IS NOT NULL AND group_kind <> 'invite' THEN
-    RAISE EXCEPTION 'free_text_invite_only';
-  END IF;
-  IF p_template_id IS NULL AND clean_body IS NULL THEN
-    RAISE EXCEPTION 'invalid_template';
-  END IF;
-  sender_day := private.member_today(uid);
-  IF private.encouraged_today(p_group_id, uid, sender_day) THEN
-    RAISE EXCEPTION 'already_encouraged_today';
-  END IF;
-  BEGIN
-    INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, body, local_date, sent_on)
-    VALUES (p_group_id, uid, p_to_user, p_template_id, clean_body, to_char(today, 'YYYY-MM-DD'), sender_day)
-    RETURNING id INTO new_id;
-  EXCEPTION
-    WHEN check_violation THEN RAISE EXCEPTION 'invalid_template';
-    WHEN unique_violation THEN RAISE EXCEPTION 'already_encouraged_today';
-  END;
-  RETURN jsonb_build_object('id', new_id);
-END;
-$$;
-
--- 5.8.2 group_encouragement: what the caller received in the last 7 days in the halaqas they are
--- still in, oldest first by (created_at, id), one page of at most 100 after the cursor the previous
--- page ended on; `more` says whether another page follows. The app reads every page at each check
--- (lib/halaqa/api.ts), so a burst larger than a page is listed in full, and so is a send that commits
--- after a later one. The device acknowledges ids instead of keeping a time watermark. checked_at is
--- the server's time, for pruning acknowledged ids by age.
-CREATE OR REPLACE FUNCTION public.get_received_encouragements(
-  p_after_created_at TIMESTAMPTZ DEFAULT NULL,
-  p_after_id UUID DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  page_size CONSTANT INTEGER := 100;
-  page JSONB;
-BEGIN
-  IF (p_after_created_at IS NULL) <> (p_after_id IS NULL) THEN
-    RAISE EXCEPTION 'invalid_cursor';
-  END IF;
-  -- One row past the page tells whether another page follows; it is not returned.
-  SELECT COALESCE(jsonb_agg(jsonb_build_object('id', listed.id, 'created_at', listed.created_at)
-    ORDER BY listed.created_at, listed.id), '[]'::JSONB)
-  INTO page
-  FROM (
-    SELECT e.id, e.created_at FROM public.halaqa_encouragements AS e
-    WHERE e.to_user = uid AND e.created_at > now() - INTERVAL '7 days'
-      AND (p_after_created_at IS NULL OR (e.created_at, e.id) > (p_after_created_at, p_after_id))
-      AND EXISTS (
-        SELECT 1 FROM public.halaqa_members AS m
-        JOIN public.halaqa_groups AS g ON g.id = m.group_id AND g.deleted_at IS NULL
-        WHERE m.group_id = e.group_id AND m.user_id = uid AND m.left_at IS NULL
-      )
-    ORDER BY e.created_at, e.id
-    LIMIT page_size + 1
-  ) AS listed;
-  RETURN jsonb_build_object(
-    'items', page - page_size,
-    'more', jsonb_array_length(page) > page_size,
-    'checked_at', now()
-  );
-END;
-$$;
-
--- SOC-03: a member's next sabaq from a teacher counts while both are still in the halaqa, the teacher
--- still teaches there and the member still shares their plan with teachers. Leaving, a change of role
--- and withdrawn sharing also delete it; this check keeps a read right while one of those commits.
-CREATE OR REPLACE FUNCTION private.live_sabaq_assignments(learner UUID)
-RETURNS SETOF public.halaqa_sabaq_assignments
-LANGUAGE sql
-STABLE
-SET search_path = ''
-AS $$
-  SELECT a.*
-  FROM public.halaqa_sabaq_assignments AS a
-  JOIN public.halaqa_groups AS g ON g.id = a.group_id AND g.deleted_at IS NULL
-  JOIN public.halaqa_members AS lm ON lm.group_id = a.group_id AND lm.user_id = a.learner_id
-    AND lm.left_at IS NULL AND lm.share_plan_with_teachers
-  JOIN public.halaqa_members AS tm ON tm.group_id = a.group_id AND tm.user_id = a.teacher_id
-    AND tm.left_at IS NULL AND tm.role = 'teacher'
-  WHERE a.learner_id = learner;
-$$;
-
-CREATE OR REPLACE FUNCTION private.sabaq_assignment_json(assignment public.halaqa_sabaq_assignments)
-RETURNS JSONB
-LANGUAGE sql
-STABLE
-SET search_path = ''
-AS $$
-  SELECT jsonb_build_object(
-    'group_id', assignment.group_id,
-    'group_name', (SELECT g.name FROM public.halaqa_groups AS g WHERE g.id = assignment.group_id),
-    'teacher_name', private.member_name(assignment.teacher_id),
-    'page', assignment.page,
-    'from_line', assignment.from_line,
-    'to_line', assignment.to_line,
-    'assigned_at', assignment.assigned_at
-  );
-$$;
-
--- SOC-03: a teacher sees a member's plan and tiers, and recent grades and mistake-inbox count, each
--- only with that member's consent in this halaqa, with the next sabaq a teacher set. Null sections
--- were not shared.
-CREATE OR REPLACE FUNCTION public.get_halaqa_teacher_view(p_group_id UUID, p_member_id UUID, p_today TEXT)
-RETURNS JSONB
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  today DATE := private.checked_local_date(p_today);
-  mine public.halaqa_members;
-  theirs public.halaqa_members;
-BEGIN
-  mine := private.require_halaqa_member(p_group_id, uid);
-  IF mine.role <> 'teacher' OR p_member_id = uid THEN
-    RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
-  END IF;
-  theirs := private.require_halaqa_member(p_group_id, p_member_id);
-  RETURN jsonb_build_object(
-    'name', private.member_name(p_member_id),
-    'plan', CASE WHEN theirs.share_plan_with_teachers THEN jsonb_build_object(
-      'hifz_plan', (
-        SELECT s.value FROM public.user_settings AS s
-        WHERE s.user_id = p_member_id AND s.key = 'hifz_plan' AND s.deleted_at IS NULL
-      ),
-      'tiers', (
-        SELECT COALESCE(jsonb_object_agg(t.tier, t.cards), '{}'::JSONB)
-        FROM (
-          SELECT c.tier, count(*) AS cards FROM public.study_cards AS c
-          WHERE c.user_id = p_member_id AND c.deleted_at IS NULL AND c.tier IS NOT NULL
-          GROUP BY c.tier
-        ) AS t
-      ),
-      'sabaq_assignment', (
-        SELECT private.sabaq_assignment_json(a) FROM private.live_sabaq_assignments(p_member_id) AS a
-        WHERE a.group_id = p_group_id
-      )
-    ) END,
-    'grades', CASE WHEN theirs.share_grades_with_teachers THEN jsonb_build_object(
-      'recent', (
-        SELECT COALESCE(jsonb_agg(jsonb_build_object(
-          'card_id', l.card_id,
-          'rating', l.rating,
-          'grader', l.grader,
-          'support_level', l.support_level,
-          'local_date', l.local_date,
-          'reviewed_at', l.reviewed_at
-        ) ORDER BY l.reviewed_at DESC), '[]'::JSONB)
-        FROM (
-          SELECT * FROM public.study_log AS recent
-          WHERE recent.user_id = p_member_id
-          ORDER BY recent.reviewed_at DESC
-          LIMIT 20
-        ) AS l
-      ),
-      -- The inbox keeps open mistakes for 28 days (4.6).
-      'mistake_inbox_count', (
-        SELECT count(*) FROM public.recitation_errors AS e
-        WHERE e.user_id = p_member_id AND e.resolved_at IS NULL AND e.deleted_at IS NULL
-          AND e.local_date >= to_char(today - 28, 'YYYY-MM-DD')
-      )
-    ) END
-  );
-END;
-$$;
-
--- SOC-03: a teacher sets a member's next sabaq, replacing any earlier one in this halaqa, while the member
--- shares their plan with teachers. Both profiles are key-shared first, as send_halaqa_encouragement does,
--- since deleting an account locks its profile and then cascades to its memberships. Then the group is
--- locked as leaving locks it, then both memberships, so a concurrent leave, change of role or withdrawn
--- sharing either commits first and refuses this, or waits and then deletes what this wrote.
-CREATE OR REPLACE FUNCTION public.set_halaqa_sabaq_assignment(
-  p_group_id UUID,
-  p_member_id UUID,
-  p_page INTEGER,
-  p_from_line INTEGER,
-  p_to_line INTEGER
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  saved public.halaqa_sabaq_assignments;
-BEGIN
-  PERFORM 1 FROM public.profiles WHERE id IN (uid, p_member_id) ORDER BY id FOR KEY SHARE;
-  PERFORM 1 FROM public.halaqa_groups WHERE id = p_group_id AND deleted_at IS NULL FOR SHARE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'not_a_member' USING ERRCODE = '42501';
-  END IF;
-  PERFORM 1 FROM public.halaqa_members
-  WHERE group_id = p_group_id AND user_id = uid AND left_at IS NULL AND role = 'teacher'
-  FOR SHARE;
-  IF NOT FOUND OR p_member_id IS NULL OR p_member_id = uid THEN
-    RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
-  END IF;
-  PERFORM 1 FROM public.halaqa_members
-  WHERE group_id = p_group_id AND user_id = p_member_id AND left_at IS NULL AND share_plan_with_teachers
-  FOR SHARE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'plan_not_shared' USING ERRCODE = '42501';
-  END IF;
-  IF p_page IS NULL OR p_from_line IS NULL OR p_to_line IS NULL OR p_page NOT BETWEEN 1 AND 604
-    OR p_from_line NOT BETWEEN 1 AND 15 OR p_to_line NOT BETWEEN p_from_line AND 15 THEN
-    RAISE EXCEPTION 'invalid_assignment';
-  END IF;
-  INSERT INTO public.halaqa_sabaq_assignments (group_id, learner_id, teacher_id, page, from_line, to_line)
-  VALUES (p_group_id, p_member_id, uid, p_page, p_from_line, p_to_line)
-  ON CONFLICT (group_id, learner_id) DO UPDATE SET
-    teacher_id = EXCLUDED.teacher_id,
-    page = EXCLUDED.page,
-    from_line = EXCLUDED.from_line,
-    to_line = EXCLUDED.to_line,
-    assigned_at = now()
-  RETURNING * INTO saved;
-  RETURN private.sabaq_assignment_json(saved);
-END;
-$$;
-
--- SOC-03: any teacher of the halaqa clears a member's next sabaq, whatever the member shares.
-CREATE OR REPLACE FUNCTION public.clear_halaqa_sabaq_assignment(p_group_id UUID, p_member_id UUID)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-  mine public.halaqa_members;
-BEGIN
-  mine := private.require_halaqa_member(p_group_id, uid);
-  IF mine.role <> 'teacher' THEN
-    RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
-  END IF;
-  DELETE FROM public.halaqa_sabaq_assignments WHERE group_id = p_group_id AND learner_id = p_member_id;
-END;
-$$;
-
--- SOC-03: the caller's latest next sabaq from a teacher in any of their halaqas, or null.
-CREATE OR REPLACE FUNCTION public.get_my_sabaq_assignment()
-RETURNS JSONB
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  uid UUID := private.require_user();
-BEGIN
-  RETURN (
-    SELECT private.sabaq_assignment_json(a)
-    FROM private.live_sabaq_assignments(uid) AS a
-    ORDER BY a.assigned_at DESC, a.group_id
-    LIMIT 1
   );
 END;
 $$;
@@ -3716,8 +2742,6 @@ DECLARE
   today DATE := private.checked_local_date(p_today);
   clean_nickname TEXT := NULLIF(btrim(COALESCE(p_nickname, '')), '');
   minor BOOLEAN := p_is_minor;
-  -- Whether recording minority here leaves a matched halaqa, for the screen to say so (ETH-07).
-  leaves_matched BOOLEAN := false;
 BEGIN
   PERFORM private.check_bands(p_level_band, p_pace_band, p_utc_offset_minutes);
   PERFORM private.check_week_start(p_week_start);
@@ -3737,13 +2761,6 @@ BEGIN
   IF private.is_minor(uid) IS DISTINCT FROM p_expected_minor THEN
     RAISE EXCEPTION 'privacy_changed';
   END IF;
-  -- Read under the halaqa lock lock_minor_change took, so no matched join can slip in after it.
-  IF minor THEN
-    leaves_matched := EXISTS (
-      SELECT 1 FROM public.halaqa_members AS m
-      WHERE m.user_id = uid AND m.kind = 'matched' AND m.left_at IS NULL
-    );
-  END IF;
   INSERT INTO public.profile_privacy (user_id, board_joined, board_nickname, is_minor, board_week_start,
     board_level_band, board_pace_band, board_utc_offset_minutes, board_enrolled_week, updated_at)
   VALUES (uid, true, clean_nickname, minor, p_week_start, p_level_band, p_pace_band, p_utc_offset_minutes,
@@ -3759,8 +2776,7 @@ BEGIN
     board_enrolled_week = GREATEST(public.profile_privacy.board_enrolled_week, EXCLUDED.board_enrolled_week),
     board_waiting = false,
     updated_at = EXCLUDED.updated_at;
-  RETURN public.get_board(p_level_band, p_pace_band, p_utc_offset_minutes, p_today, p_week_start)
-    || jsonb_build_object('left_matched', leaves_matched);
+  RETURN public.get_board(p_level_band, p_pace_band, p_utc_offset_minutes, p_today, p_week_start);
 END;
 $$;
 
@@ -3820,17 +2836,6 @@ REVOKE ALL ON FUNCTION
   private.board_week(DATE, INTEGER),
   private.match_tier(TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, TEXT, INTEGER),
   private.member_name(UUID),
-  private.halaqa_active_count(UUID),
-  private.require_halaqa_member(UUID, UUID),
-  private.check_halaqa_limit(UUID),
-  private.lock_halaqa_user(UUID),
-  private.halaqa_leave(UUID, UUID),
-  private.encouraged_today(UUID, UUID, DATE, UUID),
-  private.halaqa_summary(UUID, UUID),
-  private.new_invite_code(),
-  private.halaqa_goal(UUID, DATE),
-  private.live_sabaq_assignments(UUID),
-  private.sabaq_assignment_json(public.halaqa_sabaq_assignments),
   private.board_cohort_size(UUID),
   private.board_choose_cohort(DATE, TEXT, TEXT, INTEGER, UUID),
   private.board_place(UUID, DATE, TEXT, TEXT, INTEGER),
@@ -3849,21 +2854,6 @@ REVOKE ALL ON FUNCTION
   public.get_profile_privacy(),
   public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN),
   public.get_profile_summary(UUID),
-  public.get_my_halaqas(),
-  public.create_invite_halaqa(TEXT, BOOLEAN),
-  public.join_halaqa_by_code(TEXT),
-  public.leave_halaqa(UUID),
-  public.join_matched_halaqa(TEXT, TEXT, INTEGER),
-  public.set_halaqa_sharing(UUID, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN),
-  public.set_halaqa_member_role(UUID, UUID, TEXT),
-  public.get_halaqa_goal(UUID, TEXT),
-  public.get_halaqa_detail(UUID, TEXT),
-  public.send_halaqa_encouragement(UUID, UUID, TEXT, TEXT, TEXT),
-  public.get_received_encouragements(TIMESTAMPTZ, UUID),
-  public.get_halaqa_teacher_view(UUID, UUID, TEXT),
-  public.set_halaqa_sabaq_assignment(UUID, UUID, INTEGER, INTEGER, INTEGER),
-  public.clear_halaqa_sabaq_assignment(UUID, UUID),
-  public.get_my_sabaq_assignment(),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.join_board(TEXT, BOOLEAN, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),
@@ -3880,21 +2870,6 @@ GRANT EXECUTE ON FUNCTION
   public.get_profile_privacy(),
   public.set_profile_privacy(BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN),
   public.get_profile_summary(UUID),
-  public.get_my_halaqas(),
-  public.create_invite_halaqa(TEXT, BOOLEAN),
-  public.join_halaqa_by_code(TEXT),
-  public.leave_halaqa(UUID),
-  public.join_matched_halaqa(TEXT, TEXT, INTEGER),
-  public.set_halaqa_sharing(UUID, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN),
-  public.set_halaqa_member_role(UUID, UUID, TEXT),
-  public.get_halaqa_goal(UUID, TEXT),
-  public.get_halaqa_detail(UUID, TEXT),
-  public.send_halaqa_encouragement(UUID, UUID, TEXT, TEXT, TEXT),
-  public.get_received_encouragements(TIMESTAMPTZ, UUID),
-  public.get_halaqa_teacher_view(UUID, UUID, TEXT),
-  public.set_halaqa_sabaq_assignment(UUID, UUID, INTEGER, INTEGER, INTEGER),
-  public.clear_halaqa_sabaq_assignment(UUID, UUID),
-  public.get_my_sabaq_assignment(),
   public.get_board(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.refresh_board_bands(TEXT, TEXT, INTEGER, TEXT, INTEGER),
   public.join_board(TEXT, BOOLEAN, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, INTEGER),

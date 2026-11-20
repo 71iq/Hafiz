@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { SocialErrorText, SocialToggleRow, socialRowStyle } from "@/components/social/SocialControls";
+import { SocialToggleRow, socialRowStyle } from "@/components/social/SocialControls";
 import { Button } from "@/components/ui/Button";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
@@ -10,9 +10,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { boardKeys } from "@/lib/board/api";
 import { useStrings } from "@/lib/i18n/useStrings";
 import {
-  fetchLegacyHalaqaIds,
   fetchProfilePrivacy,
-  leaveLegacyHalaqas,
   ProfilePrivacyChangedError,
   profilePrivacyKeys,
   saveProfilePrivacy,
@@ -25,17 +23,16 @@ import { captureSocialOwner, requireSocialOwner } from "@/lib/social/owner";
 type Visibility = Pick<ProfilePrivacy, "showStreak" | "showJuzCompletions" | "isMinor">;
 
 /**
- * Settings, Privacy and sharing (SOC-01, ETH-07): what the public profile shows, the under-18 setting,
- * and a way out of halaqas an earlier version joined, whose members and teachers still read what was
- * shared. Mount it only while open, so each open reads the stored choices again.
+ * Settings, Privacy and sharing (SOC-01, ETH-07): what the public profile shows and the under-18
+ * setting. Mount it only while open, so each open reads the stored choices again.
  *
  * ETH-07: saving sends the minority the form loaded, which the server compares. A cached copy can
  * predate another device changing it, so the profile choices appear only after a read that completed
  * while the sheet is open. When the stored values change, the drafts start again from them.
  *
- * Save and Leave act at once. Save closes the sheet with "Saved" and the app uses the new choices
- * while the server stores them; a refusal restores the stored choices and says so through `onNotice`,
- * which outlives the sheet. Leaving halaqas shows them left while the request runs.
+ * Save acts at once. It closes the sheet with "Saved" and the app uses the new choices while the
+ * server stores them; a refusal restores the stored choices and says so through `onNotice`, which
+ * outlives the sheet.
  */
 export function ProfilePrivacySheet({
   userId,
@@ -71,24 +68,9 @@ export function ProfilePrivacySheet({
       current.visibility ? { ...current, visibility: { ...current.visibility, [key]: value } } : current,
     );
 
-  const halaqas = useQuery({
-    queryKey: profilePrivacyKeys.legacyHalaqas(userId),
-    queryFn: () => fetchLegacyHalaqaIds(requireSocialOwner(userId)),
-    retry: false,
-    networkMode: "always",
-    refetchOnMount: "always",
-  });
 
-  // Each action runs once per press; the sheet's own state is set only while it is open.
+  // Save runs once per press.
   const saving = useRef(false);
-  const leaving = useRef(false);
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   const save = () => {
     if (!visibility || !loaded || !privacy.data || saving.current) return;
@@ -108,8 +90,6 @@ export function ProfilePrivacySheet({
         if (saved.leftBoard) onNotice(s.socialSavedLeftBoard);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: key }),
-          // Recording minority leaves matched halaqas on the server.
-          queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.legacyHalaqas(userId) }),
           saved.leftBoard ? queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) }) : null,
           // Recording minority clears the photo on the server, so the signed-in profile reloads.
           saved.isMinor ? useAuthStore.getState().fetchProfile() : null,
@@ -128,37 +108,9 @@ export function ProfilePrivacySheet({
     );
   };
 
-  const [confirmLeave, setConfirmLeave] = useState(false);
-  const [left, setLeft] = useState(false);
-  const [leaveError, setLeaveError] = useState<string | null>(null);
-  const leave = () => {
-    if (leaving.current) return;
-    const owner = captureSocialOwner(userId);
-    if (!owner) return;
-    leaving.current = true;
-    setLeft(true);
-    setConfirmLeave(false);
-    setLeaveError(null);
-    const settle = () => {
-      leaving.current = false;
-      void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.legacyHalaqas(userId) });
-    };
-    leaveLegacyHalaqas(owner).then(settle, (error: unknown) => {
-      settle();
-      if (!owner.isCurrent()) return;
-      const message = `${s.legacyHalaqaStillIn} ${socialFailureMessage(error, s)}`;
-      if (!mounted.current) {
-        onNotice(message);
-        return;
-      }
-      setLeft(false);
-      setLeaveError(message);
-    });
-  };
 
   const startButton = { alignSelf: isRTL ? "flex-end" : "flex-start" } as const;
   const outline = "h-11 px-4 border border-warm-300 dark:border-neutral-700";
-  const inHalaqa = (halaqas.data?.length ?? 0) > 0;
 
   return (
     <ResponsiveSheet open onClose={onClose} maxWidth={560} maxHeight="88%">
@@ -218,73 +170,6 @@ export function ProfilePrivacySheet({
             ))}
           </View>
         )}
-
-        {/* Shown only to someone an earlier version left in a halaqa, or whose list could not be read. */}
-        {inHalaqa || left || (halaqas.isError && !halaqas.isFetching) ? (
-          <View className="mt-4 gap-2 border-t border-warm-200 pt-4 dark:border-neutral-800">
-            <Text variant="title-md" accessibilityRole="header">
-              {s.legacyHalaqaTitle}
-            </Text>
-            {left ? (
-              <Text variant="body-sm" className="text-warm-700 dark:text-neutral-300" accessibilityLiveRegion="polite">
-                {s.legacyHalaqaLeft}
-              </Text>
-            ) : inHalaqa ? (
-              <>
-                <Text variant="body-sm" className="text-warm-700 dark:text-neutral-300">
-                  {confirmLeave ? s.legacyHalaqaConfirm : s.legacyHalaqaBody}
-                </Text>
-                {leaveError ? <SocialErrorText message={leaveError} /> : null}
-                {confirmLeave ? (
-                  <View className="gap-3" style={socialRowStyle(isRTL)}>
-                    <Button
-                      variant="ghost"
-                      className="flex-1"
-                      label={s.legacyHalaqaKeep}
-                      onPress={() => setConfirmLeave(false)}
-                    />
-                    <Button
-                      variant="destructive"
-                      className="flex-1"
-                      label={s.legacyHalaqaConfirmLeave}
-                      onPress={leave}
-                    />
-                  </View>
-                ) : (
-                  <View style={startButton}>
-                    <Button
-                      variant="outline"
-                      className={outline}
-                      label={s.legacyHalaqaLeave}
-                      onPress={() => {
-                        setLeaveError(null);
-                        setConfirmLeave(true);
-                      }}
-                    />
-                  </View>
-                )}
-              </>
-            ) : (
-              <View className="gap-2">
-                <Text
-                  variant="body-sm"
-                  className="text-warm-700 dark:text-neutral-300"
-                  accessibilityLiveRegion="polite"
-                >
-                  {socialFailureMessage(halaqas.error, s)}
-                </Text>
-                <View style={startButton}>
-                  <Button
-                    variant="outline"
-                    className={outline}
-                    label={s.socialTryAgain}
-                    onPress={() => void halaqas.refetch()}
-                  />
-                </View>
-              </View>
-            )}
-          </View>
-        ) : null}
       </OverlayBody>
       <OverlayFooter isRTL={isRTL} className="px-5 pb-5">
         {/* The footer is a row: this column takes its width, so the buttons' row has a width for

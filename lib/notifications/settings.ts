@@ -36,8 +36,8 @@ export const LOCAL_KEYS = {
   optInPrompts: "notif_optin_prompts",
   backoff: "notif_backoff",
   remindLater: "notif_remind_later",
-  // notif_group_pending held Halaqa encouragement batches. Halaqa is removed for now, so nothing reads or
-  // writes it, and rows already stored are left as they are (lib/database/sync.ts keeps them on restore).
+  // notif_group_pending held Halaqa encouragement batches. Halaqa is gone from the app and the server, so
+  // nothing reads or writes it, and rows already stored are left as they are (lib/database/sync.ts).
   ramadanOffer: "notif_ramadan_offer",
   bannerDismissed: "notif_banner_dismissed",
 } as const;

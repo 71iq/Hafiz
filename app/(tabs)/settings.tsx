@@ -848,7 +848,7 @@ export default function SettingsScreen() {
                   </View>
                 </Pressable>
                 <AccountSyncCard />
-                {/* Public profile choices, the under-18 setting and halaqas from an earlier version (SOC-01, ETH-07). */}
+                {/* Public profile choices and the under-18 setting (SOC-01, ETH-07). */}
                 {configured ? (
                   <View className="mb-4">
                     <SettingsLinkRow

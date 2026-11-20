@@ -810,9 +810,10 @@ async function readReplacedLocalState(db: DatabaseExecutor): Promise<ReplacedLoc
  * check, today's extras and pending reminder follow-ups. Rebuilt from the restored account.
  *
  * Halaqa encouragement rows from earlier builds (notif_group_pending and the per-account
- * device_halaqa_encouragements_acked:* keys) stay untouched. Halaqa is removed for now and nothing
- * reads them, but each names its account, and keeping them lets a returning Halaqa resume without
- * announcing old encouragement twice.
+ * device_halaqa_encouragements_acked:* keys) stay untouched. Nothing reads or writes them, and the
+ * server rows they point to were dropped with Halaqa (migration 20261120120000), so they can never
+ * show anything again. They are not built from the restored account, and removing them would need a
+ * cleanup write on every device for rows that do nothing.
  */
 const ACCOUNT_DERIVED_DEVICE_KEYS = new Set([
   "device_hifz_today_plan",
