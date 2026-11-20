@@ -52,7 +52,7 @@ npm run format writes across the project. Prefer targeted formatting for scoped 
 
 ## Production
 
-Before infrastructure, deployment or database operations, read docs/hetzner-migration.md and the relevant deploy/hetzner/ files. Production is a static Expo export served by Caddy with its own self-hosted Supabase stack. Keep database, storage, keys and service configuration separate from ElPsyCongroo. Former Vercel and Supabase Cloud projects are retired. Follow the private administrator procedure rather than old cloud links or invented CLI workflows. Keep secret keys server-side and use only intended public values in client bundles.
+Before infrastructure, deployment or database operations, read docs/hetzner-migration.md and the relevant deploy/hetzner/ files. Production is a static Expo export served by Caddy with its own self-hosted Supabase stack. Keep database, storage, keys and service configuration separate from ElPsyCongroo. Former Vercel and Supabase Cloud projects are retired. Follow the private administrator procedure rather than old cloud links or invented CLI workflows. Keep secret keys server-side and use only intended public values in client bundles. A file in supabase/migrations runs against the production database on the next deploy after it reaches main. Merging one is a production schema change: it needs the owner's authorization, must work inside one transaction, and must keep the current web and released Android versions working. Change the schema with a new file; the deploy never reruns an applied one.
 
 ## Verification and delivery
 

@@ -214,6 +214,37 @@ fails, it restores the previous link. Five releases remain under
 `/opt/hafiz/releases`. A repeated deployment of the active commit checks
 health and exits without replacing it.
 
+Database migrations apply during the web deploy. Before the swap,
+`hafiz-promote` asks GitHub whether the release commit is on `main`, lists
+`supabase/migrations` at that commit and compares the file names with
+`hafiz_deploy.migrations`. It downloads each unrecorded file from GitHub and
+checks it against the listed git blob ID, so the deploy key can trigger only SQL
+already on `main` and cannot supply any. It dumps the database to
+`/var/backups/hafiz/migrations`, keeping ten dumps, then runs each file in name
+order as `postgres`, in its own transaction with a 10-second lock timeout, a
+5-minute statement timeout, its history row and a PostgREST schema reload.
+`postgres` owns the application's tables and functions; a superuser would own
+what it created and run its SECURITY DEFINER code as superuser. One exception,
+`public.user_word_meanings`, is owned by `supabase_admin`, so a migration that
+alters it fails until its owner changes. A failed migration rolls back, stops
+the deploy and leaves the current web live. Its database output goes to a
+root-only log in the same folder, because Actions logs on this public
+repository are public and an error can quote row values. Earlier migrations in
+the batch stay applied, and so do migrations under a web health rollback, so
+each migration must keep the current web and released Android versions working.
+A file must not manage its own transaction, which also rules out
+`CREATE INDEX CONCURRENTLY`. Fix a failure with a new commit on `main`. A
+repeated deployment of the active commit also applies pending migrations.
+
+History keys on the whole file name: eight early files use three-digit
+prefixes and two share `006`. `deploy/hetzner/migration-history.sql` creates the
+table. Before automation, every file had been applied by hand, and several
+would be harmful to replay: `001` restores the old signup trigger, `002` and
+`20261107190000` restore public read policies, and the learning-consistency
+migration recreates Halaqa. The 26 files present on 2026-11-20 are therefore
+recorded as a baseline with the note `applied by hand before 2026-11-20`.
+Without the table, `hafiz-promote` stops rather than replaying everything.
+
 Public CI variables are `EXPO_PUBLIC_SUPABASE_URL`,
 `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_QF_USER_AUTH_ENABLED`,
 `EXPO_PUBLIC_QF_CONTENT_ENABLED`, `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED`,
@@ -223,8 +254,8 @@ standings need weekly groups of at least five, so it waits until enough people
 use Hafiz. Its server functions keep running, and setting the variable to
 `true` shows it in the next build. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
 `HAFIZ_HETZNER_KNOWN_HOSTS`. Server secrets never enter the web build or Git.
-Infrastructure, database migrations and Edge Function source changes require
-an administrator deployment. The web deploy key cannot modify them.
+Infrastructure and Edge Function source changes require an administrator
+deployment. The web deploy key cannot modify them.
 
 ## Staging and cutover
 
@@ -409,6 +440,6 @@ were deleted on 15 October. Recovery uses retained VM and local backups.
 The previous apex A record was `216.198.79.1`.
 
 The ignored Supabase CLI link still names the deleted source cloud project. Do
-not use `supabase db push --linked` for production. Apply reviewed migrations
-through Hafiz's private VM database connection. Do not rerun the private
+not use `supabase db push --linked` for production. Production migrations apply
+through the web deploy, as described under Automatic releases. Do not rerun the private
 bootstrap credential generator against an existing stack.
