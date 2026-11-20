@@ -9,7 +9,6 @@ import {
   toggleCommentLike,
   toggleLike,
 } from "@/lib/reflections/api";
-import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 
 const mockFrom = jest.fn();
 const mockRpc = jest.fn();
@@ -243,9 +242,9 @@ describe("missing-object errors name the exact compatibility target", () => {
 });
 
 describe("reflection writes go through the server functions", () => {
-  it.each([true, false])("creates a reflection with the visibility the composer showed (%s)", async (promised) => {
+  it("creates a public reflection", async () => {
     results = [{ data: reflection("new") }];
-    await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content", promised)).resolves.toMatchObject({
+    await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content")).resolves.toMatchObject({
       id: "new",
     });
     expect(mockFrom).not.toHaveBeenCalled();
@@ -257,7 +256,6 @@ describe("reflection writes go through the server functions", () => {
       p_juz_start: 1,
       p_juz_end: 1,
       p_content: "safe content",
-      p_private: promised,
     });
     expect(builders[0].calls[0]).toEqual([
       "select",
@@ -265,9 +263,9 @@ describe("reflection writes go through the server functions", () => {
     ]);
   });
 
-  it("adds a comment with the visibility the comment input showed", async () => {
+  it("adds a public comment", async () => {
     results = [{ data: comment("new") }];
-    await expect(addComment("viewer", "post", "safe comment", true)).resolves.toMatchObject({
+    await expect(addComment("viewer", "post", "safe comment")).resolves.toMatchObject({
       id: "new",
       user_has_liked: false,
     });
@@ -275,22 +273,15 @@ describe("reflection writes go through the server functions", () => {
       p_user_id: "viewer",
       p_reflection_id: "post",
       p_content: "safe comment",
-      p_private: true,
     });
   });
 
-  it("reports a refused privacy promise as its own error and passes other errors through", async () => {
-    results = [{ data: null, error: { code: "P0001", message: "privacy_changed" } }];
-    await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content", true)).rejects.toBeInstanceOf(
-      ReflectionPrivacyChangedError,
-    );
-    results = [{ data: null, error: { code: "P0001", message: "privacy_changed" } }];
-    await expect(addComment("viewer", "post", "safe comment", true)).rejects.toBeInstanceOf(
-      ReflectionPrivacyChangedError,
-    );
-    const other = { code: "P0001", message: "reflection_not_found" };
-    results = [{ data: null, error: other }];
-    await expect(addComment("viewer", "post", "safe comment", false)).rejects.toBe(other);
+  it("passes a refused write through", async () => {
+    const refused = { code: "P0001", message: "reflection_not_found" };
+    results = [{ data: null, error: refused }];
+    await expect(addComment("viewer", "post", "safe comment")).rejects.toBe(refused);
+    results = [{ data: null, error: refused }];
+    await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content")).rejects.toBe(refused);
   });
 
   it("likes and unlikes through the server functions with the requested state", async () => {
@@ -318,9 +309,7 @@ describe("reflection writes go through the server functions", () => {
 });
 
 it("creation refuses an already retired caller before calling the server", async () => {
-  await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content", false, () => false)).rejects.toThrow(
-    "superseded",
-  );
+  await expect(createReflection("viewer", 2, 1, 2, 1, 1, "safe content", () => false)).rejects.toThrow("superseded");
   expect(mockFrom).not.toHaveBeenCalled();
   expect(mockRpc).not.toHaveBeenCalled();
   expect(builders).toHaveLength(0);

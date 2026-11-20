@@ -87,7 +87,7 @@ jest.mock("@/lib/leaderboard/api", () => ({
 }));
 jest.mock("@/lib/profile/privacy", () => ({
   fetchProfileSummary: async () => null,
-  fetchProfilePrivacy: async () => ({ boardJoined: false, boardNickname: null, showStreak: false, showJuzCompletions: false, isMinor: false }),
+  fetchProfilePrivacy: async () => ({ boardJoined: false, boardNickname: null, showStreak: false, showJuzCompletions: false }),
   profilePrivacyKeys: {
     summary: (viewer: string | null, target: string) => ["profileSummary", viewer, target],
     mine: (userId: string | null) => ["profilePrivacy", userId ?? "signed-out"],

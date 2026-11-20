@@ -10,7 +10,6 @@ const SOCIAL_REJECTION_CODES = [
   "not_authenticated",
   "invalid_local_date",
   "invalid_bands",
-  "nickname_required",
   "invalid_nickname",
   "invalid_privacy",
   "invalid_week_start",

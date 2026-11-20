@@ -11,30 +11,25 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { SocialErrorText, SocialToggleRow, useSocialAccent } from "./SocialControls";
 
 /**
- * BRD-04 and BRD-07: the Board is off until joined here, after a note on intention citing Bukhari 1.
- * A nickname is optional, and required for under 18s, who never appear with a photo.
+ * BRD-04: the Board is off until joined here, after a note on intention citing Bukhari 1. A nickname
+ * is optional, and no photo shows under one.
  */
 export function BoardJoin({
   initialNickname,
-  initialIsMinor,
   pending,
   error,
   onJoin,
 }: {
   initialNickname: string | null;
-  initialIsMinor: boolean;
   pending: boolean;
   error: string | null;
-  onJoin: (choice: { nickname: string | null; isMinor: boolean }) => void;
+  onJoin: (choice: { nickname: string | null }) => void;
 }) {
   const s = useStrings();
   const { accent, muted } = useSocialAccent();
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [useNickname, setUseNickname] = useState(initialNickname !== null || initialIsMinor);
+  const [nicknameOn, setNicknameOn] = useState(initialNickname !== null);
   const [nickname, setNickname] = useState(initialNickname ?? "");
-  const [isMinor, setIsMinor] = useState(initialIsMinor);
-  const nicknameRequired = isMinor;
-  const nicknameOn = useNickname || nicknameRequired;
   const chosenNickname = nicknameOn ? normalizeBoardNickname(nickname) : null;
   const nicknameValid = nicknameOn ? chosenNickname !== null && isValidBoardNickname(chosenNickname) : true;
 
@@ -67,18 +62,11 @@ export function BoardJoin({
 
       <View className="gap-1">
         <SocialToggleRow
-          label={s.boardMinorToggle}
-          hint={s.boardMinorHint}
-          value={isMinor}
-          onValueChange={setIsMinor}
-          disabled={pending}
-        />
-        <SocialToggleRow
           label={s.boardNicknameToggle}
           hint={s.boardNicknameHint}
           value={nicknameOn}
-          onValueChange={setUseNickname}
-          disabled={pending || nicknameRequired}
+          onValueChange={setNicknameOn}
+          disabled={pending}
         />
         {nicknameOn ? (
           <View className="gap-2 pt-1">
@@ -104,7 +92,7 @@ export function BoardJoin({
         label={s.boardJoin}
         disabled={pending || !nicknameValid}
         accessibilityState={{ disabled: pending || !nicknameValid, busy: pending }}
-        onPress={() => onJoin({ nickname: chosenNickname, isMinor })}
+        onPress={() => onJoin({ nickname: chosenNickname })}
       />
     </Card>
   );

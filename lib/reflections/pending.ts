@@ -21,7 +21,7 @@ export type PendingComment = Readonly<{
   comment: ReflectionComment;
 }>;
 /** A draft whose post failed after its editor closed, offered again when that editor opens. */
-export type RecoveredDraft = Readonly<{ content: string; failure: "post" | "privacy" }>;
+export type RecoveredDraft = Readonly<{ content: string; failure: "post" }>;
 
 type State = Readonly<{
   likes: ReadonlyMap<string, LikeOverlay>;

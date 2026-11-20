@@ -86,7 +86,7 @@ const scopedRoots = [
   "reflectionFeed",
   "reflections",
   "reflectionComments",
-  // A count includes the viewer's own private reflections (ETH-07), so it goes with the account.
+  // Kept per viewer like the other reflection reads, so it goes with the account.
   "reflectionCount",
   "currentUserPublicAchievementUnlocks",
 ] as const;

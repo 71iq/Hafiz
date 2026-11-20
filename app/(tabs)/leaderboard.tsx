@@ -14,7 +14,7 @@ import { isBoardEnabled } from "@/lib/board/config";
 import { useDatabase } from "@/lib/database/provider";
 import { useLocalToday } from "@/lib/habit/use-day-boundary";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
-import { fetchProfilePrivacy, ProfilePrivacyChangedError, profilePrivacyKeys } from "@/lib/profile/privacy";
+import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { useSettings } from "@/lib/settings/context";
 import { socialFailureMessage } from "@/lib/social/messages";
 import { requireSocialOwner } from "@/lib/social/owner";
@@ -100,23 +100,11 @@ function BoardContent({ userId }: { userId: string }) {
       if (!inputs.data) throw new Error("Board inputs are not ready");
       await joinBoard({ ...choice, inputs: inputs.data, today }, requireSocialOwner(userId));
     },
-    onSuccess: async (_result, choice) => {
+    onSuccess: async () => {
       setRetryChoice(null);
-      await Promise.all([
-        refresh(),
-        reloadPrivacy(),
-        // ETH-07: joining as a minor clears the photo on the server, so the signed-in profile reloads.
-        choice.isMinor ? useAuthStore.getState().fetchProfile() : null,
-      ]);
+      await Promise.all([refresh(), reloadPrivacy()]);
     },
     onError: (error, choice) => {
-      if (error instanceof ProfilePrivacyChangedError) {
-        // Another device changed the age setting. The form reloads from the stored choice.
-        setRetryChoice(null);
-        setJoinError(s.socialErrorPrivacyChanged);
-        void reloadPrivacy();
-        return;
-      }
       setRetryChoice(choice);
       setJoinError(socialFailureMessage(error, s));
     },
@@ -144,7 +132,7 @@ function BoardContent({ userId }: { userId: string }) {
           refreshing={board.isRefetching}
           onRefresh={() => {
             void refresh();
-            // The stored age choice is read again with the rest of the screen.
+            // The stored nickname is read again with the rest of the screen.
             if (view?.status === "not_joined") void reloadPrivacy();
           }}
         />
@@ -176,7 +164,7 @@ function BoardContent({ userId }: { userId: string }) {
         ) : offline ? (
           <SocialNotice icon={CloudOff} message={s.socialOfflineEmpty} />
         ) : (
-          // Mounted afresh on each reconnect, so it reads the stored choice again. Join stays off
+          // Mounted afresh on each reconnect, so it reads the stored nickname again. Join stays off
           // until a Leave on its way has finished, so the two reach the server in order.
           <BoardJoinSection
             userId={userId}
@@ -203,13 +191,11 @@ function BoardContent({ userId }: { userId: string }) {
   );
 }
 
-type BoardJoinChoice = { nickname: string | null; isMinor: boolean; expectedMinor: boolean };
+type BoardJoinChoice = { nickname: string | null };
 
 /**
- * ETH-07: the join form starts from the account's stored age choice and sends it back as the value it
- * loaded, which the server compares. A cached copy can predate another device recording minority, so
- * the form appears only after a read that completed while this section is mounted, and gives way to
- * the skeleton while a read runs and to a retry after one fails.
+ * The join form, started from the nickname an earlier join stored, or from a failed join's choice.
+ * It waits for the account's privacy to load and offers a retry when that fails.
  */
 function BoardJoinSection({
   userId,
@@ -221,7 +207,7 @@ function BoardJoinSection({
   userId: string;
   pending: boolean;
   error: string | null;
-  /** A failed join's choices, shown again while the stored age choice is still the one it loaded. */
+  /** A failed join's choice, shown again so the form comes back as the person left it. */
   retryChoice: BoardJoinChoice | null;
   onJoin: (choice: BoardJoinChoice) => void;
 }) {
@@ -235,14 +221,7 @@ function BoardJoinSection({
     refetchOnMount: "always",
   });
 
-  // ETH-07: the form starts only from a read that succeeded since the section opened, never from a
-  // cached copy. After that it stays through later refetches and their failures, so a typed nickname
-  // is kept: joining sends the minority the form loaded, and the server refuses it if that changed
-  // since (privacy_changed). New stored values restart the form through its key.
-  const [verified, setVerified] = useState(false);
-  const readSinceOpen = privacy.isFetchedAfterMount && privacy.isSuccess && !privacy.isFetching;
-  if (readSinceOpen && !verified) setVerified(true);
-  const stored = (verified || readSinceOpen) && privacy.data ? privacy.data : null;
+  const stored = privacy.data;
   if (!stored) {
     if (privacy.isError && !privacy.isFetching) {
       return (
@@ -255,19 +234,14 @@ function BoardJoinSection({
     }
     return <BoardJoinSkeleton label={s.loading} />;
   }
-  // ETH-07: a failed join's choices come back only while the stored age choice is the one that join
-  // loaded; once another device records a change, the form starts from the stored choice again.
-  const retry = retryChoice && retryChoice.expectedMinor === stored.isMinor ? retryChoice : null;
-  const initial = retry ?? { nickname: stored.boardNickname, isMinor: stored.isMinor };
   return (
     <BoardJoin
-      // A change to the stored choices, or a failed join, starts the form again from them.
-      key={`${stored.isMinor}:${stored.boardNickname ?? ""}:${JSON.stringify(retry)}`}
-      initialNickname={initial.nickname}
-      initialIsMinor={initial.isMinor}
+      // A change to the stored nickname, or a failed join, starts the form again from it.
+      key={`${stored.boardNickname ?? ""}:${JSON.stringify(retryChoice)}`}
+      initialNickname={retryChoice ? retryChoice.nickname : stored.boardNickname}
       pending={pending}
       error={error}
-      onJoin={(choice) => onJoin({ ...choice, expectedMinor: stored.isMinor })}
+      onJoin={onJoin}
     />
   );
 }

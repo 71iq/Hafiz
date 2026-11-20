@@ -1,12 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { boardRead, boardViewSchema, fetchBoard, joinBoard } from "@/lib/board/api";
 import { strings } from "@/lib/i18n/strings";
-import {
-  deleteOwnAvatarFiles,
-  fetchProfileSummary,
-  ProfilePrivacyChangedError,
-  saveProfilePrivacy,
-} from "@/lib/profile/privacy";
+import { fetchProfileSummary, saveProfilePrivacy } from "@/lib/profile/privacy";
 import { loadWithSocialCache } from "@/lib/social/cache";
 import { socialFailureMessage } from "@/lib/social/messages";
 import { captureSocialOwner, requireSocialOwner } from "@/lib/social/owner";
@@ -20,11 +15,6 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 const mockRpc = jest.fn<Promise<{ data: unknown; error: unknown }>, [string, Record<string, unknown>]>();
 const mockHeaders: Record<string, string> = {};
 let mockConfigured = true;
-// The avatars bucket: stored paths, and every list or remove call with the bearer it was sent with.
-const mockAvatarFiles = new Set<string>();
-const mockStorageCalls: { op: "list" | "remove"; bucket: string; auth: string | undefined; folder?: string }[] = [];
-let mockRemoveRefused = false;
-let mockOnRemove: () => void = () => undefined;
 // The store and the shared client's session are separate, as in the app: a switch can reach one first.
 let mockAuth: FakeAuthState;
 let mockClientSession: FakeAuthState["session"];
@@ -36,38 +26,6 @@ jest.mock("@/lib/supabase", () => ({
     rpc: (fn: string, args: Record<string, unknown>) =>
       require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
     auth: { getSession: async () => ({ data: { session: mockClientSession }, error: null }) },
-    storage: {
-      from: (bucket: string) => {
-        const headers: Record<string, string> = {};
-        const files = {
-          setHeader: (name: string, value: string) => {
-            headers[name] = value;
-            return files;
-          },
-          // As Storage lists: the folder's own files with ids, nested folders once each with a null id,
-          // by name, a page at a time.
-          list: async (folder: string, options: { limit: number; offset?: number }) => {
-            mockStorageCalls.push({ op: "list", bucket, auth: headers.Authorization, folder });
-            const entries = new Map<string, string | null>();
-            for (const path of mockAvatarFiles) {
-              if (!path.startsWith(`${folder}/`)) continue;
-              const [name, ...rest] = path.slice(folder.length + 1).split("/");
-              entries.set(name, rest.length > 0 ? null : `id-${path}`);
-            }
-            const page = [...entries].sort(([a], [b]) => a.localeCompare(b)).slice(options.offset ?? 0, (options.offset ?? 0) + options.limit);
-            return { data: page.map(([name, id]) => ({ id, name })), error: null };
-          },
-          remove: async (paths: string[]) => {
-            mockStorageCalls.push({ op: "remove", bucket, auth: headers.Authorization });
-            mockOnRemove();
-            if (mockRemoveRefused) return { data: [], error: null };
-            for (const path of paths) mockAvatarFiles.delete(path);
-            return { data: paths.map((name) => ({ name })), error: null };
-          },
-        };
-        return files;
-      },
-    },
   },
 }));
 jest.mock("@/lib/auth/store", () => ({ useAuthStore: { getState: () => mockAuth } }));
@@ -98,10 +56,6 @@ beforeEach(async () => {
   mockRpc.mockReset();
   for (const key of Object.keys(mockHeaders)) delete mockHeaders[key];
   mockConfigured = true;
-  mockAvatarFiles.clear();
-  mockStorageCalls.length = 0;
-  mockRemoveRefused = false;
-  mockOnRemove = () => undefined;
   signIn(signedIn(USER));
   await AsyncStorage.clear();
 });
@@ -130,26 +84,20 @@ describe("board adapter", () => {
     expect(boardViewSchema.safeParse({ status: "ready", week_start: "2026-11-09" }).success).toBe(false);
   });
 
-  it("sends the minor flag and nickname with the bands; the server computes every score", async () => {
+  it("sends the nickname with the bands; the server computes every score", async () => {
     mockRpc.mockResolvedValue({ data: { status: "gathering", week_start: "2026-11-09", member_count: 1, min_members: 5 }, error: null });
-    await joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner());
+    await joinBoard({ nickname: "Little Star", inputs, today: "2026-11-13" }, owner());
     const [fn, args] = mockRpc.mock.calls[0];
     expect(fn).toBe("join_board");
-    expect(args).toMatchObject({
+    expect(args).toEqual({
       p_nickname: "Little Star",
-      p_is_minor: true,
-      p_expected_minor: false,
       p_level_band: "juz_amma",
+      p_pace_band: "light",
+      p_utc_offset_minutes: 180,
+      p_today: "2026-11-13",
       p_week_start: 6,
     });
-    expect(Object.keys(args).some((key) => /score|point|cohort/.test(key))).toBe(false);
-  });
-
-  it("reports a join refused for a changed age setting as its own error (ETH-07)", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { message: "privacy_changed", code: "P0001" } });
-    await expect(
-      joinBoard({ nickname: null, isMinor: false, expectedMinor: false, inputs, today: "2026-11-13" }, owner()),
-    ).rejects.toBeInstanceOf(ProfilePrivacyChangedError);
+    expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
   });
 });
 
@@ -186,157 +134,21 @@ describe("profile summary (SOC-01)", () => {
   });
 });
 
-describe("a minor's photo (ETH-07)", () => {
-  const privacy = (isMinor: boolean) => ({
-    data: { board_joined: false, board_nickname: null, show_streak: false, show_juz_completions: false, is_minor: isMinor, left_board: false },
-    error: null,
-  });
-
-  it("deletes the account's own photo files before it records minority, as that account", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/2.png`).add(`${OTHER}/3.jpg`);
-    mockRpc.mockImplementation(async () => {
-      // By the time minority is recorded, nothing is left to publish.
-      expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
-      return privacy(true);
+describe("profile privacy (SOC-01)", () => {
+  it("saves the two profile choices as the account and returns what the server stored", async () => {
+    // The server still reports is_minor = false for released apps; this app does not read it.
+    mockRpc.mockResolvedValue({
+      data: { board_joined: true, board_nickname: "Little Star", show_streak: true, show_juz_completions: false, is_minor: false },
+      error: null,
     });
-    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
-    expect([...mockAvatarFiles]).toEqual([`${OTHER}/3.jpg`]);
-    // The pass before the save, and the one after it, which finds nothing left with one request.
-    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "remove", "list"]);
-    expect(mockStorageCalls.every((call) => call.bucket === "avatars" && bearerSubject(call.auth) === USER)).toBe(true);
-  });
-
-  it("does not record minority when a photo could not be deleted, so the save can be retried", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRemoveRefused = true;
-    mockRpc.mockResolvedValue(privacy(true));
-    await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
-    ).rejects.toMatchObject({ failure: { kind: "failed" } });
-    expect(mockRpc).not.toHaveBeenCalled();
-  });
-
-  it("removes a photo uploaded while minority was being recorded, once it is recorded", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockImplementation(async () => {
-      // Another device uploads before the server starts refusing this account's uploads.
-      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
-      return privacy(true);
+    await expect(saveProfilePrivacy({ showStreak: true, showJuzCompletions: false }, owner())).resolves.toEqual({
+      boardJoined: true,
+      boardNickname: "Little Star",
+      showStreak: true,
+      showJuzCompletions: false,
     });
-    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner());
-    expect([...mockAvatarFiles]).toEqual([]);
-  });
-
-  it("keeps a recorded save when the pass after it fails", async () => {
-    mockRpc.mockImplementation(async () => {
-      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
-      mockRemoveRefused = true;
-      return privacy(true);
-    });
-    await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
-    ).resolves.toMatchObject({ isMinor: true });
-  });
-
-  it("leaves an adult's photos alone and turns profile visibility off as asked", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockResolvedValue(privacy(false));
-    await saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: false, expectedMinor: false }, owner());
-    expect(mockStorageCalls).toEqual([]);
-    expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", {
-      p_show_streak: false,
-      p_show_juz_completions: false,
-      p_is_minor: false,
-      p_expected_minor: false,
-    });
+    expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", { p_show_streak: true, p_show_juz_completions: false });
     expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
-  });
-
-  it("sends the minority the form loaded and reports a refusal for a changed setting as its own error", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockResolvedValue({ data: null, error: { message: "privacy_changed", code: "P0001" } });
-    // The form still shows a minor, but another device withdrew it: the adult's photo is not deleted.
-    await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: true }, owner()),
-    ).rejects.toBeInstanceOf(ProfilePrivacyChangedError);
-    expect([...mockAvatarFiles]).toEqual([`${USER}/1.jpg`]);
-  });
-
-  it("says when recording minority took the account off the Board (BRD-07)", async () => {
-    mockRpc.mockResolvedValue({ data: { ...privacy(true).data, board_joined: false, left_board: true }, error: null });
-    await expect(
-      saveProfilePrivacy({ showStreak: false, showJuzCompletions: false, isMinor: true, expectedMinor: false }, owner()),
-    ).resolves.toMatchObject({ isMinor: true, boardJoined: false, leftBoard: true });
-  });
-
-  it("deletes photos in nested folders too", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`).add(`${USER}/old/2.jpg`).add(`${USER}/old/deeper/3.png`).add(`${OTHER}/old/4.jpg`);
-    await expect(deleteOwnAvatarFiles(owner())).resolves.toBe(3);
-    expect([...mockAvatarFiles]).toEqual([`${OTHER}/old/4.jpg`]);
-    expect(mockStorageCalls.filter((call) => call.op === "list").map((call) => call.folder)).toEqual([
-      USER,
-      `${USER}/old`,
-      `${USER}/old/deeper`,
-    ]);
-  });
-
-  it("deletes more files than one listing page", async () => {
-    for (let i = 0; i < 150; i += 1) mockAvatarFiles.add(`${USER}/${String(i).padStart(3, "0")}.jpg`);
-    await expect(deleteOwnAvatarFiles(owner())).resolves.toBe(150);
-    expect(mockAvatarFiles.size).toBe(0);
-    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list", "list", "remove", "remove"]);
-  });
-
-  it("costs one list request when nothing is stored", async () => {
-    await expect(deleteOwnAvatarFiles(owner())).resolves.toBe(0);
-    expect(mockStorageCalls.map((call) => call.op)).toEqual(["list"]);
-  });
-
-  it("stops before deleting once the account changed", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    const listing = deleteOwnAvatarFiles(owner());
-    signIn(signedIn(OTHER));
-    await expect(listing).rejects.toMatchObject({ failure: { kind: "account_changed" } });
-    expect(mockAvatarFiles.has(`${USER}/1.jpg`)).toBe(true);
-    expect(mockStorageCalls.some((call) => call.op === "remove")).toBe(false);
-  });
-
-  const gathering = { data: { status: "gathering", week_start: "2026-11-09", member_count: 1, min_members: 5 }, error: null };
-  const inputs = boardInputs;
-
-  it("deletes them before joining the board as a minor, and once more after", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockImplementation(async (fn: string) => {
-      // The pass after joining reads the account's privacy before it deletes what it found.
-      if (fn === "get_profile_privacy") return privacy(true);
-      expect(mockAvatarFiles.size).toBe(0);
-      mockAvatarFiles.add(`${USER}/from-another-device.jpg`);
-      return gathering;
-    });
-    await joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner());
-    expect(mockAvatarFiles.size).toBe(0);
-  });
-
-  it("keeps a photo uploaded as an adult on another device since the join recorded minority", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRpc.mockImplementation(async (fn: string) => {
-      if (fn === "get_profile_privacy") return privacy(false);
-      // Meanwhile another device withdrew minority and uploaded a photo.
-      mockAvatarFiles.add(`${USER}/adult-elsewhere.jpg`);
-      return gathering;
-    });
-    await joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner());
-    expect([...mockAvatarFiles]).toEqual([`${USER}/adult-elsewhere.jpg`]);
-  });
-
-  it("does not join the board as a minor when a photo could not be deleted", async () => {
-    mockAvatarFiles.add(`${USER}/1.jpg`);
-    mockRemoveRefused = true;
-    mockRpc.mockResolvedValue(gathering);
-    await expect(
-      joinBoard({ nickname: "Little Star", isMinor: true, expectedMinor: false, inputs, today: "2026-11-13" }, owner()),
-    ).rejects.toMatchObject({ failure: { kind: "failed" } });
-    expect(mockRpc).not.toHaveBeenCalled();
   });
 });
 
@@ -403,9 +215,9 @@ describe("remote error causes", () => {
   });
 
   it("shows a Board refusal by its cause, in the reader's language", () => {
-    const error = { code: "P0001", message: "nickname_required" };
-    expect(socialFailureOf(error)).toEqual({ kind: "rejected", code: "nickname_required" });
-    expect(socialFailureMessage(error, strings.ar)).toBe(strings.ar.socialErrorNicknameRequired);
+    const error = { code: "P0001", message: "invalid_nickname" };
+    expect(socialFailureOf(error)).toEqual({ kind: "rejected", code: "invalid_nickname" });
+    expect(socialFailureMessage(error, strings.ar)).toBe(strings.ar.socialErrorNickname);
     expect(socialFailureMessage({ message: "upstream exploded" }, strings.en)).toBe(strings.en.socialErrorGeneric);
   });
 });

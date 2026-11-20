@@ -4,9 +4,7 @@ import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { ChevronDown, Flag, Heart, Send, Trash2 } from "lucide-react-native";
 import { router } from "expo-router";
 import { captureAuthReturn } from "@/lib/auth/return-origin";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
-import { requireSocialOwner } from "@/lib/social/owner";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
@@ -99,15 +97,6 @@ export function CommentsSheet({
   const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
-  // ETH-07: a stated minor's comments are visible only to them, read from the cache the app-wide
-  // minor check keeps (useMinorPhotoCleanup). A comment carries what this screen showed, so a copy
-  // made stale by another device cannot publish it.
-  const ownPrivacy = useQuery({
-    queryKey: profilePrivacyKeys.mine(user?.id ?? null),
-    queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
-    enabled: false,
-  });
-  const isMinor = ownPrivacy.data?.isMinor === true;
   const [sort, setSort] = useState<ReflectionCommentSort>("oldest");
   const [sortOpen, setSortOpen] = useState(false);
   // The input's text, also kept in a ref so two submit events before a render send it once.
@@ -121,19 +110,17 @@ export function CommentsSheet({
   const { begin, retire } = useReflectionMutationScope(JSON.stringify(reflectionId), user?.id);
   // Each failure shows where the person acted: the first load at the top, loading more beside its
   // button, and posting or liking above the input.
-  const [failure, setFailure] = useState<"load" | "more" | "post" | "privacy" | "like" | "auth" | null>(null);
+  const [failure, setFailure] = useState<"load" | "more" | "post" | "like" | "auth" | null>(null);
   const error =
     failure === "load" || failure === "more"
       ? s.commentLoadFailed
       : failure === "post"
         ? s.commentPostFailed
-        : failure === "privacy"
-          ? s.commentPrivacyChanged
-          : failure === "like"
-            ? s.reflectionLikeFailed
-            : failure === "auth"
-              ? s.reflectionFeedAuthRequired
-              : null;
+        : failure === "like"
+          ? s.reflectionLikeFailed
+          : failure === "auth"
+            ? s.reflectionFeedAuthRequired
+            : null;
   // Expanded long comments and the comment whose full date is showing, per reflection.
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [clampedIds, setClampedIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -246,11 +233,11 @@ export function CommentsSheet({
   const handleSubmit = useCallback(() => {
     const submitted = textRef.current;
     if (!user || !reflectionId || isPendingId(reflectionId) || !submitted.trim()) return;
-    const sent = postComment({ viewerId: user.id, reflectionId, draft: submitted, promisedPrivate: isMinor });
+    const sent = postComment({ viewerId: user.id, reflectionId, draft: submitted });
     if (!sent) return;
     setText("");
     setFailure(null);
-  }, [user, reflectionId, isMinor, postComment, setText]);
+  }, [user, reflectionId, postComment, setText]);
 
   const handleLoadMore = useCallback(async () => {
     if (!reflectionId || !commentsQuery.hasNextPage) return;
@@ -648,7 +635,7 @@ export function CommentsSheet({
             )}
           </OverlayBody>
 
-          {error && (failure === "auth" || (user && (failure === "post" || failure === "privacy" || failure === "like"))) ? (
+          {error && (failure === "auth" || (user && (failure === "post" || failure === "like"))) ? (
             <Text
               accessibilityRole="alert"
               className="mx-5 mb-2 text-red-600 dark:text-red-400"
@@ -661,20 +648,6 @@ export function CommentsSheet({
               }}
             >
               {error}
-            </Text>
-          ) : user && isMinor ? (
-            <Text
-              className="mx-5 mb-2"
-              style={{
-                fontFamily: "Manrope_400Regular",
-                fontSize: 12,
-                lineHeight: 18,
-                color: isDark ? "#a3a3a3" : "#6E5A47",
-                ...textStartStyle(isRTL),
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {s.reflectionMinorPrivate}
             </Text>
           ) : null}
           {user ? (

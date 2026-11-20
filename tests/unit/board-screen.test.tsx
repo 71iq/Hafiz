@@ -65,17 +65,6 @@ jest.mock("@/lib/supabase", () => ({
     rpc: (fn: string, args: Record<string, unknown>) =>
       require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
     auth: { getSession: async () => ({ data: { session: mockAuth.session }, error: null }) },
-    // Joining as a minor first deletes the account's stored photos; this account has none.
-    storage: {
-      from: () => {
-        const files = {
-          setHeader: () => files,
-          list: async () => ({ data: [], error: null }),
-          remove: async () => ({ data: [], error: null }),
-        };
-        return files;
-      },
-    },
   },
 }));
 jest.mock("@/lib/social/queries", () => ({
@@ -92,6 +81,7 @@ const privacy = {
   board_nickname: null,
   show_streak: false,
   show_juz_completions: false,
+  // Still sent for released apps; this app does not read it.
   is_minor: false,
 };
 const ready = {
@@ -105,13 +95,12 @@ const ready = {
   ],
 };
 
-// The account's privacy as an earlier read on this device left it in the cache: an adult.
-const cachedAdult = {
+// The account's privacy as an earlier read on this device left it in the cache.
+const cachedPrivacy = {
   boardJoined: false,
   boardNickname: null,
   showStreak: false,
   showJuzCompletions: false,
-  isMinor: false,
 };
 
 const queryClients: QueryClient[] = [];
@@ -219,44 +208,47 @@ describe("Board tab", () => {
     });
     expect(bearerSubject(mockHeaders.Authorization)).toBe(USER);
 
+    // No age question: anyone joins the same way.
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
+    expect(screen.getByRole("switch", { name: strings.en.boardNicknameToggle })).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
     await waitFor(() =>
-      expect(mockRpc).toHaveBeenCalledWith(
-        "join_board",
-        expect.objectContaining({ p_nickname: null, p_is_minor: false, p_expected_minor: false }),
-      ),
+      expect(mockRpc).toHaveBeenCalledWith("join_board", {
+        p_nickname: null,
+        p_level_band: "juz_4_15",
+        p_pace_band: "half_page",
+        p_utc_offset_minutes: 120,
+        p_today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        p_week_start: 1,
+      }),
     );
     expect(await screen.findByText(strings.en.boardGatheringTitle)).toBeTruthy();
   });
 
-  it("waits for the stored age choice before offering Join, then keeps a minor's choice (ETH-07)", async () => {
+  it("waits for the stored nickname before offering Join, then starts the form from it", async () => {
     signIn(USER);
     const base = mockRpc.getMockImplementation()!;
     let releasePrivacy: (() => void) | undefined;
     mockRpc.mockImplementation(async (fn, args) => {
       if (fn !== "get_profile_privacy") return base(fn, args);
       await new Promise<void>((resolve) => (releasePrivacy = resolve));
-      return { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null };
+      return { data: { ...privacy, board_nickname: "Little Star" }, error: null };
     });
     const screen = renderScreen();
     await waitFor(() => expect(releasePrivacy).toBeDefined());
-    // Joining now would send "not under 18" and clear the stored choice.
     expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
-    expect(screen.queryByText(strings.en.boardIntentionTitle)).toBeNull();
+    expect(screen.getByLabelText(strings.en.loading)).toBeTruthy();
 
     releasePrivacy!();
     expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
-    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
     fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
     await waitFor(() =>
-      expect(mockRpc).toHaveBeenCalledWith(
-        "join_board",
-        expect.objectContaining({ p_nickname: "Little Star", p_is_minor: true, p_expected_minor: true }),
-      ),
+      expect(mockRpc).toHaveBeenCalledWith("join_board", expect.objectContaining({ p_nickname: "Little Star" })),
     );
   });
 
-  it("offers a retry instead of Join when the stored age choice cannot be read (ETH-07)", async () => {
+  it("offers a retry instead of Join when the stored choices cannot be read", async () => {
     signIn(USER);
     const base = mockRpc.getMockImplementation()!;
     let privacyFails = true;
@@ -265,7 +257,7 @@ describe("Board tab", () => {
       if (fn !== "get_profile_privacy") return base(fn, args);
       if (privacyFails) return { data: null, error: { message: "synthetic privacy failure" } };
       await new Promise<void>((resolve) => (releaseRetry = resolve));
-      return { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null };
+      return { data: { ...privacy, board_nickname: "Little Star" }, error: null };
     });
     const screen = renderScreen();
     const retry = await screen.findByRole("button", { name: strings.en.socialTryAgain });
@@ -280,50 +272,47 @@ describe("Board tab", () => {
     expect(screen.getByLabelText(strings.en.loading)).toBeTruthy();
     releaseRetry!();
     expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
-    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
   });
 
-  it("reads the stored age choice again when the Board opens, even with a fresh cached copy (ETH-07)", async () => {
+  it("shows the form from a cached copy at once and reads the stored nickname again", async () => {
     signIn(USER);
     const base = mockRpc.getMockImplementation()!;
     let releasePrivacy: (() => void) | undefined;
     mockRpc.mockImplementation(async (fn, args) => {
       if (fn !== "get_profile_privacy") return base(fn, args);
       await new Promise<void>((resolve) => (releasePrivacy = resolve));
-      // Another device recorded minority after this device cached its copy.
-      return { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null };
+      // Another device joined under a nickname after this device cached its copy.
+      return { data: { ...privacy, board_nickname: "Little Star" }, error: null };
     });
     const screen = renderScreen({
       staleTime: Infinity,
-      seed: (client) => client.setQueryData(profilePrivacyKeys.mine(USER), cachedAdult),
+      seed: (client) => client.setQueryData(profilePrivacyKeys.mine(USER), cachedPrivacy),
     });
+    expect(await screen.findByRole("button", { name: strings.en.boardJoin })).toBeTruthy();
     await waitFor(() => expect(releasePrivacy).toBeDefined());
-    // Joining from the cached copy would send "not under 18".
-    expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
-    expect(screen.getByLabelText(strings.en.loading)).toBeTruthy();
 
     releasePrivacy!();
-    expect(await screen.findByText(strings.en.boardIntentionTitle)).toBeTruthy();
-    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
+    await waitFor(() => expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star"));
   });
 
-  it("keeps Join hidden when the read of the stored age choice fails, even with a cached copy (ETH-07)", async () => {
+  it("keeps the cached form when reading the stored choices again fails", async () => {
     signIn(USER);
     const base = mockRpc.getMockImplementation()!;
     mockRpc.mockImplementation(async (fn, args) =>
       fn === "get_profile_privacy" ? { data: null, error: { message: "synthetic privacy failure" } } : base(fn, args),
     );
-    const screen = renderScreen({ seed: (client) => client.setQueryData(profilePrivacyKeys.mine(USER), cachedAdult) });
-    expect(await screen.findByRole("button", { name: strings.en.socialTryAgain })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: strings.en.boardJoin })).toBeNull();
-    expect(mockRpc.mock.calls.map(([fn]) => fn)).not.toContain("join_board");
+    const screen = renderScreen({ seed: (client) => client.setQueryData(profilePrivacyKeys.mine(USER), cachedPrivacy) });
+    expect(await screen.findByRole("button", { name: strings.en.boardJoin })).toBeTruthy();
+    await waitFor(() => expect(mockRpc.mock.calls.map(([fn]) => fn)).toContain("get_profile_privacy"));
+    expect(screen.queryByRole("button", { name: strings.en.socialTryAgain })).toBeNull();
   });
 
   it("keeps the form and a typed nickname while the stored choices are read again unchanged", async () => {
     signIn(USER);
     const screen = renderScreen();
     await screen.findByText(strings.en.boardIntentionTitle);
-    fireEvent.press(screen.getByRole("switch", { name: strings.en.boardMinorToggle }));
+    fireEvent.press(screen.getByRole("switch", { name: strings.en.boardNicknameToggle }));
     fireEvent.changeText(screen.getByLabelText(strings.en.boardNicknameLabel), "Little Star");
     const base = mockRpc.getMockImplementation()!;
     let releasePrivacy: (() => void) | undefined;
@@ -337,14 +326,13 @@ describe("Board tab", () => {
       void client.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
     });
     await waitFor(() => expect(releasePrivacy).toBeDefined());
-    // The form stays while the read runs: a stale join is refused by the server (privacy_changed).
+    // The form stays while the read runs.
     expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
     await act(async () => {
       releasePrivacy!();
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
-    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
   });
 
   it("starts the form again from stored choices that changed on another device", async () => {
@@ -353,9 +341,7 @@ describe("Board tab", () => {
     await screen.findByText(strings.en.boardIntentionTitle);
     const base = mockRpc.getMockImplementation()!;
     mockRpc.mockImplementation(async (fn, args) =>
-      fn === "get_profile_privacy"
-        ? { data: { ...privacy, is_minor: true, board_nickname: "Little Star" }, error: null }
-        : base(fn, args),
+      fn === "get_profile_privacy" ? { data: { ...privacy, board_nickname: "Little Star" }, error: null } : base(fn, args),
     );
     const client = queryClients[queryClients.length - 1];
     await act(async () => {
@@ -363,75 +349,22 @@ describe("Board tab", () => {
     });
     // Query notifies on its own tick, so wait for the restart rather than asserting at once.
     await waitFor(() => expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star"));
-    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
   });
 
-  it("says the age setting changed on another device and reloads it when the join is refused (ETH-07)", async () => {
-    signIn(USER);
-    const base = mockRpc.getMockImplementation()!;
-    let stored: Record<string, unknown> = privacy;
-    mockRpc.mockImplementation(async (fn, args) => {
-      if (fn === "get_profile_privacy") return { data: stored, error: null };
-      if (fn === "join_board") {
-        // Another device recorded minority after this form loaded.
-        stored = { ...privacy, is_minor: true, board_nickname: "Little Star" };
-        return { data: null, error: { message: "privacy_changed", code: "P0001" } };
-      }
-      return base(fn, args);
-    });
-    const screen = renderScreen();
-    await screen.findByText(strings.en.boardIntentionTitle);
-    fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
-
-    expect(await screen.findByText(strings.en.socialErrorPrivacyChanged)).toBeTruthy();
-    expect(mockRpc).toHaveBeenCalledWith("join_board", expect.objectContaining({ p_is_minor: false, p_expected_minor: false }));
-    expect(mockRpc.mock.calls.filter(([fn]) => fn === "get_profile_privacy")).toHaveLength(2);
-    // The form now starts from the reloaded choice.
-    expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({ checked: true });
-    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
-  });
-
-  it("shows the changed-setting message in Arabic", async () => {
-    mockSettings.isRTL = true;
-    mockSettings.uiLanguage = "ar";
-    signIn(USER);
-    const base = mockRpc.getMockImplementation()!;
-    mockRpc.mockImplementation(async (fn, args) =>
-      fn === "join_board" ? { data: null, error: { message: "privacy_changed", code: "P0001" } } : base(fn, args),
-    );
-    const screen = renderScreen();
-    await screen.findByText(strings.ar.boardIntentionTitle);
-    fireEvent.press(screen.getByRole("button", { name: strings.ar.boardJoin }));
-    expect(await screen.findByText(strings.ar.socialErrorPrivacyChanged)).toBeTruthy();
-  });
-
-  it("requires a nickname from a reader under 18 (BRD-07)", async () => {
+  it("joins under a trimmed nickname, and only once it is long enough", async () => {
     signIn(USER);
     const screen = renderScreen();
     await screen.findByText(strings.en.boardIntentionTitle);
 
-    fireEvent.press(screen.getByRole("switch", { name: strings.en.boardMinorToggle }));
-    const join = screen.getByRole("button", { name: strings.en.boardJoin });
-    expect(join.props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.press(screen.getByRole("switch", { name: strings.en.boardNicknameToggle }));
+    expect(screen.getByRole("button", { name: strings.en.boardJoin }).props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.changeText(screen.getByLabelText(strings.en.boardNicknameLabel), "Li");
+    expect(screen.getByRole("button", { name: strings.en.boardJoin }).props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.changeText(screen.getByLabelText(strings.en.boardNicknameLabel), "  Little   Star ");
     fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
     await waitFor(() =>
-      expect(mockRpc).toHaveBeenCalledWith(
-        "join_board",
-        expect.objectContaining({ p_nickname: "Little Star", p_is_minor: true, p_expected_minor: false }),
-      ),
+      expect(mockRpc).toHaveBeenCalledWith("join_board", expect.objectContaining({ p_nickname: "Little Star" })),
     );
-  });
-
-  it("joins as a reader under 18 and closes the join form (ETH-07)", async () => {
-    signIn(USER);
-    const screen = renderScreen();
-    await screen.findByText(strings.en.boardIntentionTitle);
-    fireEvent.press(screen.getByRole("switch", { name: strings.en.boardMinorToggle }));
-    fireEvent.changeText(screen.getByLabelText(strings.en.boardNicknameLabel), "Little Star");
-    fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
-    await waitFor(() => expect(mockRpc).toHaveBeenCalledWith("join_board", expect.anything()));
-    await waitFor(() => expect(screen.queryByText(strings.en.boardIntentionTitle)).toBeNull());
   });
 
   it("shows standings with name, points and streak, and leaves in one tap (BRD-05, BRD-04)", async () => {
@@ -480,33 +413,6 @@ describe("Board tab", () => {
     expect(mockRpc).toHaveBeenCalledWith("join_board", expect.objectContaining({ p_nickname: "Little Star" }));
     await act(async () => answerJoin({ data: null, error: { code: "XX000", message: "synthetic failure" } }));
     expect(await screen.findByText(strings.en.socialErrorGeneric, {}, { timeout: 5000 })).toBeTruthy();
-    expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
-  });
-
-  it("does not bring back a failed join's choices once another device records the account as under 18 (ETH-07)", async () => {
-    signIn(USER);
-    const base = mockRpc.getMockImplementation()!;
-    let stored: Record<string, unknown> = privacy;
-    mockRpc.mockImplementation(async (fn, args) => {
-      if (fn === "get_profile_privacy") return { data: stored, error: null };
-      if (fn === "join_board") return { data: null, error: { code: "XX000", message: "synthetic failure" } };
-      return base(fn, args);
-    });
-    const screen = renderScreen();
-    await screen.findByText(strings.en.boardIntentionTitle);
-    fireEvent.press(screen.getByRole("button", { name: strings.en.boardJoin }));
-    expect(await screen.findByText(strings.en.socialErrorGeneric, {}, { timeout: 5000 })).toBeTruthy();
-    // Another device records minority with a nickname; the Board reads the stored choice again.
-    stored = { ...privacy, is_minor: true, board_nickname: "Little Star" };
-    const active = queryClients.at(-1)!;
-    await act(async () => {
-      await active.invalidateQueries({ queryKey: profilePrivacyKeys.mine(USER) });
-    });
-    await waitFor(() =>
-      expect(screen.getByRole("switch", { name: strings.en.boardMinorToggle }).props.accessibilityState).toMatchObject({
-        checked: true,
-      }),
-    );
     expect(screen.getByLabelText(strings.en.boardNicknameLabel).props.value).toBe("Little Star");
   });
 

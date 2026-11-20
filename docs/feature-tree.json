@@ -1417,7 +1417,7 @@
       "children": [
         {
           "id": "board.join",
-          "title": "Intention, nickname and minor choice, join",
+          "title": "Intention, nickname choice, join",
           "kind": "widget",
           "cases": ["BOARD-02"],
           "uses": ["shared.overlay"],
@@ -1692,7 +1692,7 @@
           "children": [
             {
               "id": "settings.account.privacy",
-              "title": "Privacy and sharing: profile visibility, under 18",
+              "title": "Privacy and sharing: profile visibility",
               "kind": "widget",
               "cases": ["SET-20"],
               "uses": ["shared.overlay"],

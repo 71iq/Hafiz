@@ -91,7 +91,7 @@ describe("RF-192 reflection rows from the server", () => {
   it("reports a created reflection that comes back malformed as saved but unreadable", async () => {
     results = [{ data: reflection({ ayah_start: "255" }) }];
 
-    await expect(createReflection("author", 2, 255, 255, 3, 3, "A sanitized reflection", false)).rejects.toBeInstanceOf(
+    await expect(createReflection("author", 2, 255, 255, 3, 3, "A sanitized reflection")).rejects.toBeInstanceOf(
       SavedRowUnreadableError,
     );
   });
@@ -112,8 +112,6 @@ describe("RF-192 reflection rows from the server", () => {
   it("reports an added comment that comes back malformed as saved but unreadable", async () => {
     results = [{ data: comment({ id: null }) }];
 
-    await expect(addComment("author", "r1", "A sanitized comment", false)).rejects.toBeInstanceOf(
-      SavedRowUnreadableError,
-    );
+    await expect(addComment("author", "r1", "A sanitized comment")).rejects.toBeInstanceOf(SavedRowUnreadableError);
   });
 });

@@ -3,7 +3,6 @@ import { socialFailureOf, type SocialRejectionCode } from "@/lib/social/remote";
 
 const REJECTION_MESSAGES: Partial<Record<SocialRejectionCode, keyof UIStrings>> = {
   invalid_nickname: "socialErrorNickname",
-  nickname_required: "socialErrorNicknameRequired",
   invalid_local_date: "socialErrorDate",
 };
 
@@ -24,6 +23,6 @@ export function socialFailureMessage(error: unknown, s: UIStrings): string {
       return key ? s[key] : s.socialErrorGeneric;
     }
     case "failed":
-      return failure.message === "avatar_delete_incomplete" ? s.socialErrorPhotoNotRemoved : s.socialErrorGeneric;
+      return s.socialErrorGeneric;
   }
 }

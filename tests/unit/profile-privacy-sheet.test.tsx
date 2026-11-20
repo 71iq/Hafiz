@@ -44,16 +44,6 @@ jest.mock("@/lib/supabase", () => ({
     rpc: (fn: string, args: Record<string, unknown>) =>
       require("./social-test-auth").rpcBuilder(mockRpc(fn, args), mockHeaders),
     auth: { getSession: async () => ({ data: { session: mockAuth.session }, error: null }) },
-    storage: {
-      from: () => {
-        const files = {
-          setHeader: () => files,
-          list: async () => ({ data: [], error: null }),
-          remove: async () => ({ data: [], error: null }),
-        };
-        return files;
-      },
-    },
   },
 }));
 
@@ -62,6 +52,7 @@ const publicStreak = {
   board_nickname: null,
   show_streak: true,
   show_juz_completions: true,
+  // Still sent for released apps; this app does not read it.
   is_minor: false,
 };
 
@@ -77,7 +68,6 @@ beforeEach(() => {
             ...publicStreak,
             show_streak: args.p_show_streak,
             show_juz_completions: args.p_show_juz_completions,
-            left_board: false,
           },
           error: null,
         };
@@ -133,8 +123,6 @@ describe("Privacy and sharing (SET-20)", () => {
     expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", {
       p_show_streak: false,
       p_show_juz_completions: false,
-      p_is_minor: false,
-      p_expected_minor: false,
     });
     expect(view.onClose).toHaveBeenCalled();
   });
@@ -159,11 +147,12 @@ describe("Privacy and sharing (SET-20)", () => {
     );
   });
 
-  // Halaqa and its server tables are gone, so the sheet no longer asks about halaqas from an earlier version.
-  it("reads only the profile choices", async () => {
+  // Halaqa and the under-18 setting are gone, so the sheet shows only the two profile choices.
+  it("reads and shows only the profile choices", async () => {
     const view = renderSheet();
     await waitFor(() => expect(view.getByText(en.profileShowStreak)).toBeTruthy(), { timeout: 5000 });
     expect(new Set(mockRpc.mock.calls.map(([fn]) => fn))).toEqual(new Set(["get_profile_privacy"]));
+    expect(view.getAllByRole("switch")).toHaveLength(2);
   });
 
 });

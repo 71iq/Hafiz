@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { deleteAvatarFilesAfterMinority, deleteOwnAvatarFiles, profilePrivacyWriteError } from "@/lib/profile/privacy";
 import type { SocialOwner } from "@/lib/social/owner";
 import {
   callSocialRpc,
@@ -16,7 +15,7 @@ import type { SocialBands } from "@/lib/social/bands";
  * Board service adapter (spec 5.7.2). Opt-in weekly cohorts of about 30 people. The server places the
  * caller and computes every score from synced wird days (PTS-02, SB-04); the client only reports its
  * bands and its week start (BRD-01, STR-28). Standings carry no user ids, and never show a photo under
- * a nickname or for a minor (BRD-07).
+ * a nickname.
  */
 const BOARD_NICKNAME_MIN = 3;
 export const BOARD_NICKNAME_MAX = 20;
@@ -117,33 +116,17 @@ export function isValidBoardNickname(nickname: string | null): boolean {
   return nickname === null || (nickname.length >= BOARD_NICKNAME_MIN && nickname.length <= BOARD_NICKNAME_MAX);
 }
 
-/**
- * Joining sets the account's minority (ETH-07). `expectedMinor` is the
- * value the form loaded, and the server refuses the join with ProfilePrivacyChangedError when the
- * stored value differs, so a form loaded before another device recorded minority cannot clear it.
- * Recording minority deletes the stored photo files before the join is sent, which is not sent when
- * that fails, and once more after.
- */
+/** Joins the Board, under `nickname` when given (BRD-04), and returns the caller's board. */
 export async function joinBoard(
-  input: { nickname: string | null; isMinor: boolean; expectedMinor: boolean; inputs: BoardInputs; today: string },
+  input: { nickname: string | null; inputs: BoardInputs; today: string },
   owner: SocialOwner,
 ): Promise<BoardView> {
-  if (input.isMinor && !input.expectedMinor) await deleteOwnAvatarFiles(owner);
   const raw = await callSocialRpcRaw(
     "join_board",
-    {
-      p_nickname: input.nickname,
-      p_is_minor: input.isMinor,
-      p_expected_minor: input.expectedMinor,
-      ...boardArgs(input.inputs, input.today),
-    },
+    { p_nickname: input.nickname, ...boardArgs(input.inputs, input.today) },
     owner,
-  ).catch((error: unknown) => {
-    throw profilePrivacyWriteError(error);
-  });
-  const view = parseSocialPayload(boardViewSchema, raw);
-  if (input.isMinor) await deleteAvatarFilesAfterMinority(owner);
-  return view;
+  );
+  return parseSocialPayload(boardViewSchema, raw);
 }
 
 /** Stores the latest bands for the weekly pass (8.13). A no-op on the server for users off the board. */

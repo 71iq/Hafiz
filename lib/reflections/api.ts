@@ -8,7 +8,6 @@ import type {
   ReflectionJuzRange,
 } from "./types";
 import { parseCommentRow, parseCommentRows, parseReflectionRow, parseReflectionRows, parseSavedRow } from "./rows";
-import { reflectionWriteError } from "./errors";
 import { normalizeFeedSort } from "./types";
 
 const PAGE_SIZE = 5;
@@ -219,14 +218,10 @@ export async function fetchReflectionCount(surah: number, ayah: number): Promise
 }
 
 // Reflections, comments and likes are written only through server functions, which lock in the same
-// order as minority changes and account deletion. Each names the account it writes for, and the
-// server refuses it when another account is signed in by then.
+// order as account deletion. Each names the account it writes for, and the server refuses it when
+// another account is signed in by then.
 
-/**
- * Create a new reflection. `promisedPrivate` is whether the composer told the author it is visible only
- * to them (ETH-07). The server refuses such a post with ReflectionPrivacyChangedError once the account
- * is no longer marked as under 18, so stale privacy on this device never publishes it.
- */
+/** Create a new reflection. */
 export async function createReflection(
   userId: string,
   surah: number,
@@ -235,7 +230,6 @@ export async function createReflection(
   juzStart: number,
   juzEnd: number,
   content: string,
-  promisedPrivate: boolean,
   canContinue: () => boolean = () => true,
 ): Promise<Reflection> {
   if (!canContinue()) throw new Error("Reflection creation superseded");
@@ -248,12 +242,11 @@ export async function createReflection(
       p_juz_start: juzStart,
       p_juz_end: juzEnd,
       p_content: content,
-      p_private: promisedPrivate,
     })
     .select(REFLECTION_SELECT)
     .single();
 
-  if (error) throw reflectionWriteError(error);
+  if (error) throw error;
   return parseSavedRow("reflection", parseReflectionRow, data);
 }
 
@@ -308,24 +301,14 @@ export async function fetchComments(
   return { ...result, data: await attachUserCommentLikes(result.data, userId) };
 }
 
-/** Add a comment to a reflection. `promisedPrivate` works as in createReflection. */
-export async function addComment(
-  userId: string,
-  reflectionId: string,
-  content: string,
-  promisedPrivate: boolean,
-): Promise<ReflectionComment> {
+/** Add a comment to a reflection. */
+export async function addComment(userId: string, reflectionId: string, content: string): Promise<ReflectionComment> {
   const { data, error } = await supabase
-    .rpc("add_reflection_comment", {
-      p_user_id: userId,
-      p_reflection_id: reflectionId,
-      p_content: content,
-      p_private: promisedPrivate,
-    })
+    .rpc("add_reflection_comment", { p_user_id: userId, p_reflection_id: reflectionId, p_content: content })
     .select(COMMENT_SELECT)
     .single();
 
-  if (error) throw reflectionWriteError(error);
+  if (error) throw error;
   return { ...parseSavedRow("comment", parseCommentRow, data), user_has_liked: false };
 }
 

@@ -6,12 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
-import { useAuthStore } from "@/lib/auth/store";
-import { boardKeys } from "@/lib/board/api";
 import { useStrings } from "@/lib/i18n/useStrings";
 import {
   fetchProfilePrivacy,
-  ProfilePrivacyChangedError,
   profilePrivacyKeys,
   saveProfilePrivacy,
   type ProfilePrivacy,
@@ -20,15 +17,15 @@ import { useSettings } from "@/lib/settings/context";
 import { socialFailureMessage } from "@/lib/social/messages";
 import { captureSocialOwner, requireSocialOwner } from "@/lib/social/owner";
 
-type Visibility = Pick<ProfilePrivacy, "showStreak" | "showJuzCompletions" | "isMinor">;
+type Visibility = Pick<ProfilePrivacy, "showStreak" | "showJuzCompletions">;
 
 /**
- * Settings, Privacy and sharing (SOC-01, ETH-07): what the public profile shows and the under-18
- * setting. Mount it only while open, so each open reads the stored choices again.
+ * Settings, Privacy and sharing (SOC-01): what the public profile shows. Mount it only while open, so
+ * each open reads the stored choices again.
  *
- * ETH-07: saving sends the minority the form loaded, which the server compares. A cached copy can
- * predate another device changing it, so the profile choices appear only after a read that completed
- * while the sheet is open. When the stored values change, the drafts start again from them.
+ * Saving writes both choices, and a cached copy can predate another device changing one, so they
+ * appear only after a read that completed while the sheet is open. When the stored values change, the
+ * drafts start again from them.
  *
  * Save acts at once. It closes the sheet with "Saved" and the app uses the new choices while the
  * server stores them; a refusal restores the stored choices and says so through `onNotice`, which
@@ -59,10 +56,10 @@ export function ProfilePrivacySheet({
   if (readSinceOpen && !verified) setVerified(true);
   const fresh: Visibility | null = (verified || readSinceOpen) && privacy.data ? privacy.data : null;
 
-  const freshKey = fresh ? `${fresh.isMinor}:${fresh.showStreak}:${fresh.showJuzCompletions}` : null;
-  const [draft, setDraft] = useState({ key: freshKey, loaded: fresh, visibility: fresh });
-  if (draft.key !== freshKey) setDraft({ key: freshKey, loaded: fresh, visibility: fresh });
-  const { loaded, visibility } = draft.key === freshKey ? draft : { loaded: fresh, visibility: fresh };
+  const freshKey = fresh ? `${fresh.showStreak}:${fresh.showJuzCompletions}` : null;
+  const [draft, setDraft] = useState({ key: freshKey, visibility: fresh });
+  if (draft.key !== freshKey) setDraft({ key: freshKey, visibility: fresh });
+  const visibility = draft.key === freshKey ? draft.visibility : fresh;
   const setVisible = (key: keyof Visibility) => (value: boolean) =>
     setDraft((current) =>
       current.visibility ? { ...current, visibility: { ...current.visibility, [key]: value } } : current,
@@ -73,7 +70,7 @@ export function ProfilePrivacySheet({
   const saving = useRef(false);
 
   const save = () => {
-    if (!visibility || !loaded || !privacy.data || saving.current) return;
+    if (!visibility || !privacy.data || saving.current) return;
     const owner = captureSocialOwner(userId);
     if (!owner) return;
     saving.current = true;
@@ -83,27 +80,17 @@ export function ProfilePrivacySheet({
     queryClient.setQueryData(key, shown);
     onNotice(s.socialSaved);
     onClose();
-    saveProfilePrivacy({ ...visibility, expectedMinor: loaded.isMinor }, owner).then(
-      async (saved) => {
+    saveProfilePrivacy(visibility, owner).then(
+      async () => {
         if (!owner.isCurrent()) return;
-        // Recording minority can take a Board member without a nickname off the Board.
-        if (saved.leftBoard) onNotice(s.socialSavedLeftBoard);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: key }),
-          saved.leftBoard ? queryClient.invalidateQueries({ queryKey: boardKeys.all(userId) }) : null,
-          // Recording minority clears the photo on the server, so the signed-in profile reloads.
-          saved.isMinor ? useAuthStore.getState().fetchProfile() : null,
-        ]);
+        await queryClient.invalidateQueries({ queryKey: key });
       },
       (error: unknown) => {
         // The stored choices still apply: show them again and read them back.
         if (queryClient.getQueryData(key) === shown) queryClient.setQueryData(key, before);
         void queryClient.invalidateQueries({ queryKey: key });
         if (!owner.isCurrent()) return;
-        // ETH-07: another device changed the age setting; the person checks it and saves again.
-        const reason =
-          error instanceof ProfilePrivacyChangedError ? s.socialErrorPrivacyChanged : socialFailureMessage(error, s);
-        onNotice(`${s.privacyNotSaved} ${reason}`);
+        onNotice(`${s.privacyNotSaved} ${socialFailureMessage(error, s)}`);
       },
     );
   };
@@ -123,21 +110,13 @@ export function ProfilePrivacySheet({
           <>
             <SocialToggleRow
               label={s.profileShowStreak}
-              value={visibility.showStreak && !visibility.isMinor}
+              value={visibility.showStreak}
               onValueChange={setVisible("showStreak")}
-              disabled={visibility.isMinor}
             />
             <SocialToggleRow
               label={s.profileShowJuz}
-              value={visibility.showJuzCompletions && !visibility.isMinor}
+              value={visibility.showJuzCompletions}
               onValueChange={setVisible("showJuzCompletions")}
-              disabled={visibility.isMinor}
-            />
-            <SocialToggleRow
-              label={s.profileIsMinor}
-              hint={s.profileIsMinorHint}
-              value={visibility.isMinor}
-              onValueChange={setVisible("isMinor")}
             />
           </>
         ) : privacy.isError && !privacy.isFetching ? (
@@ -155,16 +134,16 @@ export function ProfilePrivacySheet({
             </View>
           </View>
         ) : (
-          // Placeholder rows where the three choices will be, so the sheet does not jump when they load.
+          // Placeholder rows where the two choices will be, so the sheet does not jump when they load.
           <View
             accessible
             accessibilityLabel={s.privacyLoading}
             accessibilityState={{ busy: true }}
             className="gap-3 pt-1"
           >
-            {[0, 1, 2].map((index) => (
+            {[0, 1].map((index) => (
               <View key={index} className="items-center justify-between gap-3 py-2" style={socialRowStyle(isRTL)}>
-                <SkeletonText width={index === 2 ? "40%" : "55%"} lineHeight={14} />
+                <SkeletonText width="55%" lineHeight={14} />
                 <Skeleton width={44} height={26} borderRadius={13} />
               </View>
             ))}

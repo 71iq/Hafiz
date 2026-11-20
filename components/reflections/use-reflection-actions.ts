@@ -7,7 +7,6 @@ import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { createId } from "@/lib/id";
 import { findJuzForAyah, loadMushafIndex } from "@/lib/mushaf/position";
-import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import {
   addComment,
   createReflection,
@@ -21,7 +20,6 @@ import {
   removeDeletedComment,
   removeDeletedReflection,
 } from "@/lib/reflections/cache";
-import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
 import {
   addPendingComment,
   addPendingPost,
@@ -54,7 +52,6 @@ function ownAuthor(viewerId: string): Reflection["profiles"] {
  * caller's to clear. When the server returns the comment it replaces the shown one and `onSaved`
  * runs. A failure removes it, `onRemoved` lowers the count again, and the draft goes back to the open
  * input for this reflection, or waits for it with a notice (lib/reflections/pending.ts).
- * `promisedPrivate` is what the input told the author (ETH-07); the server refuses a stale promise.
  */
 export function usePostComment({
   onAdded,
@@ -69,17 +66,7 @@ export function usePostComment({
   const queryClient = useQueryClient();
   const notice = useOptionalOperationNotice();
   return useCallback(
-    ({
-      viewerId,
-      reflectionId,
-      draft,
-      promisedPrivate,
-    }: {
-      viewerId: string;
-      reflectionId: string;
-      draft: string;
-      promisedPrivate: boolean;
-    }): boolean => {
+    ({ viewerId, reflectionId, draft }: { viewerId: string; reflectionId: string; draft: string }): boolean => {
       const content = draft.trim();
       const isCurrent = captureViewerLease(viewerId);
       if (!content || !isCurrent) return false;
@@ -103,7 +90,7 @@ export function usePostComment({
       onAdded(reflectionId);
       const refreshComments = () =>
         void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflectionId) });
-      addComment(viewerId, reflectionId, content, promisedPrivate).then(
+      addComment(viewerId, reflectionId, content).then(
         (saved) => {
           replacePendingComment(token, isCurrent() ? { token, viewerId, status: "saved", comment: saved } : null);
           if (!isCurrent()) return;
@@ -112,10 +99,6 @@ export function usePostComment({
         },
         (error: unknown) => {
           replacePendingComment(token, null);
-          const privacyChanged = error instanceof ReflectionPrivacyChangedError;
-          // The account is no longer a minor on the server: reload its privacy so the note goes away,
-          // and post nothing until the person sends again.
-          if (privacyChanged) void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(viewerId) });
           if (!isCurrent()) return;
           // Posted, but the reply could not be read: the refetch shows it instead of a duplicate retry.
           if (error instanceof SavedRowUnreadableError) {
@@ -125,14 +108,15 @@ export function usePostComment({
           }
           console.warn("[Comments] Failed to add:", error);
           onRemoved(reflectionId);
-          const failure = privacyChanged ? "privacy" : "post";
-          if (!offerRecoveredDraft(pendingKeys.commentDraft(viewerId, reflectionId), { content: draft, failure }))
-            notice(privacyChanged ? s.commentPrivacyChanged : s.commentPostFailedDraftKept);
+          if (
+            !offerRecoveredDraft(pendingKeys.commentDraft(viewerId, reflectionId), { content: draft, failure: "post" })
+          )
+            notice(s.commentPostFailedDraftKept);
         },
       );
       return true;
     },
-    [onAdded, onRemoved, onSaved, queryClient, notice, s.commentPrivacyChanged, s.commentPostFailedDraftKept],
+    [onAdded, onRemoved, onSaved, queryClient, notice, s.commentPostFailedDraftKept],
   );
 }
 
@@ -140,8 +124,7 @@ export function usePostComment({
  * Publishes a reflection at once: it shows at the top of its ayah and of the feed, with a "posted"
  * notice, while the request runs. When the server returns it, the saved row replaces the shown one and
  * the lists refetch. A failure removes it and returns the draft to the composer for this ayah range,
- * or keeps it for the next time the composer opens, with a notice. `promisedPrivate` works as in
- * usePostComment.
+ * or keeps it for the next time the composer opens, with a notice.
  */
 export function usePostReflection() {
   const s = useStrings();
@@ -155,14 +138,12 @@ export function usePostReflection() {
       ayahStart,
       ayahEnd,
       draft,
-      promisedPrivate,
     }: {
       viewerId: string;
       surah: number;
       ayahStart: number;
       ayahEnd: number;
       draft: string;
-      promisedPrivate: boolean;
     }): boolean => {
       const content = draft.trim();
       const isCurrent = captureViewerLease(viewerId);
@@ -217,7 +198,6 @@ export function usePostReflection() {
             Math.min(juzStart, juzEnd),
             Math.max(juzStart, juzEnd),
             content,
-            promisedPrivate,
             isCurrent,
           );
           replacePendingPost(token, isCurrent() ? { token, viewerId, status: "saved", reflection: saved } : null);
@@ -233,10 +213,6 @@ export function usePostReflection() {
           refreshLists();
         } catch (error) {
           replacePendingPost(token, null);
-          const privacyChanged = error instanceof ReflectionPrivacyChangedError;
-          // The account is no longer a minor on the server: reload its privacy so the composer stops
-          // promising privacy, and post nothing until the person submits again.
-          if (privacyChanged) void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(viewerId) });
           if (!isCurrent()) return;
           // Posted, but the reply could not be read: refresh instead of offering a duplicate retry.
           if (error instanceof SavedRowUnreadableError) {
@@ -245,15 +221,13 @@ export function usePostReflection() {
           }
           // Server details stay in the log; the person sees a plain message.
           console.warn("[WriteReflection] Failed to post:", error);
-          const failure = privacyChanged ? "privacy" : "post";
           const key = pendingKeys.reflectionDraft(viewerId, { surah, ayahStart, ayahEnd });
-          if (!offerRecoveredDraft(key, { content: draft, failure }))
-            notice(privacyChanged ? s.reflectionPrivacyChanged : s.reflectionPostFailedDraftKept);
+          if (!offerRecoveredDraft(key, { content: draft, failure: "post" })) notice(s.reflectionPostFailedDraftKept);
         }
       })();
       return true;
     },
-    [db, queryClient, notice, s.reflectionPosted, s.reflectionPrivacyChanged, s.reflectionPostFailedDraftKept],
+    [db, queryClient, notice, s.reflectionPosted, s.reflectionPostFailedDraftKept],
   );
 }
 

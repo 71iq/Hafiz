@@ -43,9 +43,9 @@ describe("pending reflection writes", () => {
   it("keeps every failed draft for an editor and hands them back oldest first", () => {
     const key = pendingKeys.reflectionDraft(VIEWER, { surah: 2, ayahStart: 1, ayahEnd: 1 });
     expect(offerRecoveredDraft(key, { content: "First draft", failure: "post" })).toBe(false);
-    expect(offerRecoveredDraft(key, { content: "Second draft", failure: "privacy" })).toBe(false);
+    expect(offerRecoveredDraft(key, { content: "Second draft", failure: "post" })).toBe(false);
     expect(takeRecoveredDraft(key)).toEqual({ content: "First draft", failure: "post" });
-    expect(takeRecoveredDraft(key)).toEqual({ content: "Second draft", failure: "privacy" });
+    expect(takeRecoveredDraft(key)).toEqual({ content: "Second draft", failure: "post" });
     expect(takeRecoveredDraft(key)).toBeNull();
     // Drafts stay with their own account and target.
     offerRecoveredDraft(key, { content: "Mine", failure: "post" });

@@ -11,9 +11,6 @@ import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { formatNumber } from "@/lib/i18n/count";
 import { pendingKeys, takeRecoveredDraft, useDraftAdopter, type RecoveredDraft } from "@/lib/reflections/pending";
 import { useDatabase } from "@/lib/database/provider";
-import { useQuery } from "@tanstack/react-query";
-import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
-import { requireSocialOwner } from "@/lib/social/owner";
 import { router } from "expo-router";
 import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -55,15 +52,6 @@ export function WriteReflectionSheet({
   const s = useStrings();
   const db = useDatabase();
   const user = useAuthStore((s) => s.user);
-  // ETH-07: a stated minor's reflections and comments are visible only to them. The account's own
-  // privacy comes from the cache the app-wide minor check keeps (useMinorPhotoCleanup). The post
-  // carries what this screen showed, so a copy made stale by another device cannot publish it.
-  const ownPrivacy = useQuery({
-    queryKey: profilePrivacyKeys.mine(user?.id ?? null),
-    queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
-    enabled: false,
-  });
-  const isMinor = ownPrivacy.data?.isMinor === true;
   // The draft, also kept in a ref so two Post presses before a render publish it once.
   const [content, setContentState] = useState("");
   const contentRef = useRef("");
@@ -72,7 +60,7 @@ export function WriteReflectionSheet({
     setContentState(next);
   }, []);
   const [failure, setFailure] = useState<RecoveredDraft["failure"] | null>(null);
-  const error = failure === "post" ? s.reflectionPostFailed : failure === "privacy" ? s.reflectionPrivacyChanged : null;
+  const error = failure === "post" ? s.reflectionPostFailed : null;
   const [privateNoteOpen, setPrivateNoteOpen] = useState(false);
   const [contentHeight, setContentHeight] = useState(INPUT_MIN_HEIGHT);
   const { retire } = useReflectionMutationScope(JSON.stringify([open, surah, ayahStart, ayahEnd]), user?.id, db);
@@ -118,14 +106,14 @@ export function WriteReflectionSheet({
     const draft = contentRef.current,
       length = draft.trim().length;
     if (!open || !user || length < REFLECTION_MIN_LENGTH || length > REFLECTION_MAX_LENGTH) return;
-    const sent = postReflection({ viewerId: user.id, surah, ayahStart, ayahEnd, draft, promisedPrivate: isMinor });
+    const sent = postReflection({ viewerId: user.id, surah, ayahStart, ayahEnd, draft });
     if (!sent) return;
     retire();
     setContent("");
     setFailure(null);
     onClose();
     onSuccess?.();
-  }, [open, user, surah, ayahStart, ayahEnd, isMinor, postReflection, retire, setContent, onClose, onSuccess]);
+  }, [open, user, surah, ayahStart, ayahEnd, postReflection, retire, setContent, onClose, onSuccess]);
 
   const closeNow = useCallback(() => {
     if (!retire()) return;
@@ -217,7 +205,7 @@ export function WriteReflectionSheet({
                   if (failure) setFailure(null);
                 }}
                 accessibilityLabel={s.reflectionWriteTitle}
-                placeholder={isMinor ? s.reflectionPlaceholderPrivate : s.reflectionPlaceholder}
+                placeholder={s.reflectionPlaceholder}
                 placeholderTextColor={mutedColor}
                 multiline
                 maxLength={REFLECTION_MAX_LENGTH}
@@ -289,25 +277,22 @@ export function WriteReflectionSheet({
                 </View>
               ) : null}
 
-              {/* Who sees this post, beside the action that publishes it. The minor-private promise
-                  waits while a "privacy changed" message would contradict it. */}
-              {failure !== "privacy" ? (
-                <Text
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 12,
-                    lineHeight: 18,
-                    // A readable tone (about 6:1 and 7:1), not the placeholder's: this line tells the
-                    // writer who can see what they write.
-                    color: helperColor,
-                    marginBottom: 8,
-                    ...textStartStyle(isRTL),
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                >
-                  {isMinor ? s.reflectionMinorPrivate : s.reflectionAudiencePublic}
-                </Text>
-              ) : null}
+              {/* Who sees this post, beside the action that publishes it. */}
+              <Text
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 12,
+                  lineHeight: 18,
+                  // A readable tone (about 6:1 and 7:1), not the placeholder's: this line tells the
+                  // writer who can see what they write.
+                  color: helperColor,
+                  marginBottom: 8,
+                  ...textStartStyle(isRTL),
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {s.reflectionAudiencePublic}
+              </Text>
 
               <Pressable
                 accessibilityRole="button"

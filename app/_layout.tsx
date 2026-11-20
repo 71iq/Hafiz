@@ -22,7 +22,6 @@ import { useReminderResponses, useReminderScheduling } from "@/lib/notifications
 import { useWidgetPublishing } from "@/lib/widget/use-widget-publishing";
 import { useWidgetTaps } from "@/lib/widget/tap";
 import { useBoardBandRefresh } from "@/lib/board/refresh";
-import { useMinorPhotoCleanup } from "@/lib/profile/use-minor-photo-cleanup";
 import { ErrorBoundary as ScopedErrorBoundary, RouteErrorFallback } from "@/components/ui/ErrorBoundary";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { strings } from "@/lib/i18n/strings";
@@ -119,12 +118,6 @@ function BoardBandRefreshRunner() {
   return null;
 }
 
-/** ETH-07: a minor account's leftover photo files are removed once per app session. */
-function MinorPhotoCleanup() {
-  useMinorPhotoCleanup();
-  return null;
-}
-
 function DatabaseNoticeBoundary({ children }: { children: React.ReactNode }) {
   const { db, isReady } = useDatabaseStatus();
   return <OperationNoticeProvider ready={Boolean(db && isReady)}>{children}</OperationNoticeProvider>;
@@ -189,7 +182,6 @@ export default function RootLayout() {
                 <ReminderLifecycle />
                 <WidgetLifecycle />
                 <BoardBandRefresh />
-                <MinorPhotoCleanup />
                 <AuthRedirectReturn />
                 <AppUpdateHost />
                 <Stack

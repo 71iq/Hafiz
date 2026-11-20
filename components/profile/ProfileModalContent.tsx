@@ -33,8 +33,7 @@ import { neutralProfileName } from "@/lib/profile/identity";
 import { useSyncRestorePause } from "@/lib/sync/restore-consent";
 import { DiscardChangesDialog, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
 import { useOptionalOperationNotice } from "@/components/ui/OperationNoticeProvider";
-import { fetchProfilePrivacy, fetchProfileSummary, profilePrivacyKeys } from "@/lib/profile/privacy";
-import { requireSocialOwner } from "@/lib/social/owner";
+import { fetchProfileSummary, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { socialFailureOf } from "@/lib/social/remote";
@@ -336,15 +335,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     // A read cut short by a sign-in or sign-out is retried for the new viewer, not shown as an error.
     retry: (count, error) => socialFailureOf(error).kind === "account_changed" && count < 2,
   });
-
-  // ETH-07: a person who said they are under 18 has no profile photo, and the server refuses uploads.
-  const ownPrivacyQuery = useQuery({
-    queryKey: profilePrivacyKeys.mine(user?.id ?? null),
-    queryFn: () => fetchProfilePrivacy(requireSocialOwner(user?.id ?? "")),
-    enabled: isOwnProfile && !!user && isSupabaseConfigured(),
-    staleTime: 1000 * 60,
-  });
-  const photosOff = ownPrivacyQuery.data?.isMinor === true;
 
   const close = useCallback(() => {
     if (!editScope.origin.isCurrent() || !editScope.owner.isCurrent()) return;
@@ -968,21 +958,15 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                     marginTop: 4,
                   }}
                 >
-                  {photosOff ? (
-                    <Text style={{ fontSize: 13, color: isDark ? "#a3a3a3" : "#6b6157", ...textStartStyle(isRTL) }}>
-                      {s.profilePhotoMinorNote}
-                    </Text>
-                  ) : (
-                    <ProfileEditActionButton
-                      icon={Camera}
-                      label={s.profileChangePhoto}
-                      color={isDark ? "#5eead4" : "#003638"}
-                      borderColor={isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.16)"}
-                      disabled={authLoading}
-                      isRTL={isRTL}
-                      onPress={handlePickAvatar}
-                    />
-                  )}
+                  <ProfileEditActionButton
+                    icon={Camera}
+                    label={s.profileChangePhoto}
+                    color={isDark ? "#5eead4" : "#003638"}
+                    borderColor={isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.16)"}
+                    disabled={authLoading}
+                    isRTL={isRTL}
+                    onPress={handlePickAvatar}
+                  />
                   {avatarPreviewUrl ? (
                     <ProfileEditActionButton
                       icon={Trash2}
