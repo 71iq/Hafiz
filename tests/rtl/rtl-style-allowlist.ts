@@ -6,6 +6,11 @@ export type RtlStyleAllowlistEntry = {
 
 export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
   {
+    file: "components/mushaf/AyahDetailModal.tsx",
+    pattern: /^\s*textAlign: "left",$/,
+    reason: "The English tafsir paragraph follows its source language in either interface language.",
+  },
+  {
     file: "app/(tabs)/mushaf.tsx",
     pattern: /left|right|marginLeft|marginRight|borderLeftWidth|borderRightWidth/,
     reason: "Reader route contains full-width overlays, page-spread coordinates, and Quran-specific geometry for later Playwright coverage.",

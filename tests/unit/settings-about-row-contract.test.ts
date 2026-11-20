@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const source = fs.readFileSync(path.join(process.cwd(), "app/(tabs)/settings.tsx"), "utf8");
+const source = fs.readFileSync(path.join(process.cwd(), "components/settings/SettingsLinkRow.tsx"), "utf8");
 
 describe("settings about row contract", () => {
   it("keeps About links as one horizontal row on phone", () => {
