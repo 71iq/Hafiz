@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Disposable check of supabase/migrations/20261113120000_learning_consistency.sql. Starts its own
-# network-less Supabase Postgres containers with synthetic users, never touches production or any other
-# container, and removes each container when it is done.
+# Disposable check of supabase/migrations/20261113120000_learning_consistency.sql and
+# 20261120120000_drop_halaqa.sql. Starts its own network-less Supabase Postgres containers with synthetic
+# users, never touches production or any other container, and removes each container when it is done.
 #
-# 1. Migration path: schema.sql at BASE_REF, the review-aggregate migrations it lacks, then this
-#    migration. Runs learning_consistency.test.sql there (merge parity, RLS as several users, every RPC),
-#    then learning_consistency_races.sh (two-session races on the board, halaqa and encouragement locks).
+# 1. Migration path: schema.sql at BASE_REF, the review-aggregate migrations it lacks, then
+#    20261113120000. drop_halaqa.test.sql writes Halaqa rows, the drop migration runs twice in single
+#    transactions, and drop_halaqa.test.sql checks the result. Then learning_consistency.test.sql (merge
+#    parity, RLS as several users, every RPC) and learning_consistency_races.sh (two-session races on
+#    the board, minority and reflection locks). 20261117213000 is not applied: it replaces
+#    public.handle_new_user, an auth trigger function that schema.sql does not carry.
 # 2. Parity: a second pristine container built from the current schema.sql must dump the same public,
 #    private and rls schemas, including privileges, and the same storage policies.
 #
@@ -56,9 +59,10 @@ SQL
 }
 
 pg() { local name="$1"; shift; docker exec -i "$name" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q "$@"; }
-# Applies a file quietly but still shows warnings and errors.
+# Applies a file quietly but still shows warnings and errors. Extra arguments go to psql.
 apply() {
-  docker exec -i -e PGOPTIONS='-c client_min_messages=warning' "$1" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q >/dev/null
+  local name="$1"; shift
+  docker exec -i -e PGOPTIONS='-c client_min_messages=warning' "$name" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q "$@" >/dev/null
 }
 
 dump() {
@@ -81,6 +85,15 @@ for migration in \
   apply "$MIGRATED" <"$ROOT/supabase/migrations/$migration"
   echo "applied $migration"
 done
+
+echo "== drop_halaqa over existing Halaqa rows"
+pg "$MIGRATED" -v phase=before <"$ROOT/supabase/tests/drop_halaqa.test.sql" >/dev/null
+# Twice, as production would run it once and a second run must change nothing.
+for run in first second; do
+  apply "$MIGRATED" --single-transaction <"$ROOT/supabase/migrations/20261120120000_drop_halaqa.sql"
+  echo "applied 20261120120000_drop_halaqa.sql ($run run)"
+done
+pg "$MIGRATED" -v phase=after <"$ROOT/supabase/tests/drop_halaqa.test.sql" >/dev/null
 dump "$MIGRATED" >"$WORK/migrated.sql"
 
 echo "== SQL tests"

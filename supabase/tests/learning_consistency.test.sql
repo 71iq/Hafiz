@@ -1,5 +1,6 @@
--- Tests for 20261113120000_learning_consistency.sql. Run by run-learning-consistency.sh as postgres in a
--- disposable database with synthetic users. Any failed assertion raises and stops psql.
+-- Tests for 20261113120000_learning_consistency.sql as changed by 20261120120000_drop_halaqa.sql. Run by
+-- run-learning-consistency.sh as postgres in a disposable database with synthetic users. Any failed
+-- assertion raises and stops psql.
 \set ON_ERROR_STOP 1
 \set QUIET 1
 \pset pager off
@@ -136,20 +137,16 @@ BEGIN
   PERFORM hz_test.eq('definer functions pin search_path', (
     SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
     WHERE n.nspname IN ('public', 'private', 'rls') AND p.prosecdef
-      AND p.proname IN ('get_board', 'join_board', 'leave_board', 'get_my_halaqas', 'create_invite_halaqa',
-        'join_halaqa_by_code', 'leave_halaqa', 'join_matched_halaqa', 'set_halaqa_sharing', 'set_halaqa_member_role',
-        'get_halaqa_goal', 'get_halaqa_detail', 'send_halaqa_encouragement', 'get_halaqa_teacher_view',
-        'get_profile_privacy', 'set_profile_privacy', 'get_profile_summary', 'halaqa_shares_with_me',
-        'habit_days_before_write', 'profile_identity_visible', 'caller_is_minor', 'get_received_encouragements',
-        'refresh_board_bands', 'requeue_board_after_wird_day', 'set_halaqa_sabaq_assignment',
-        'clear_halaqa_sabaq_assignment', 'get_my_sabaq_assignment')
+      AND p.proname IN ('get_board', 'join_board', 'leave_board', 'get_profile_privacy', 'set_profile_privacy',
+        'get_profile_summary', 'habit_days_before_write', 'profile_identity_visible', 'caller_is_minor',
+        'refresh_board_bands', 'requeue_board_after_wird_day')
       AND NOT (COALESCE(p.proconfig, '{}') @> ARRAY['search_path=""'])
   ), 0::BIGINT);
   PERFORM hz_test.eq('every definer function above exists', (
     SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
     WHERE p.prosecdef AND (n.nspname, p.proname) IN (('rls', 'profile_identity_visible'), ('rls', 'caller_is_minor'),
-      ('public', 'get_received_encouragements'), ('public', 'refresh_board_bands'), ('private', 'requeue_board_after_wird_day'))
-  ), 5::BIGINT);
+      ('public', 'refresh_board_bands'), ('private', 'requeue_board_after_wird_day'))
+  ), 4::BIGINT);
   -- Finding 8 (second review): the RLS helpers live outside public, which is the only schema PostgREST
   -- serves as RPCs, so no endpoint reveals who is a minor.
   PERFORM hz_test.eq('no public RLS helper', (
@@ -170,18 +167,23 @@ BEGIN
   ), 0::BIGINT);
   -- Finding 16: the weekly pass finds pending users through an index.
   PERFORM hz_test.eq('board pending index', to_regclass('public.idx_profile_privacy_board_pending') IS NOT NULL, true);
-  -- Finding 9: one active matched halaqa per user is a constraint.
-  PERFORM hz_test.eq('one matched membership index', (
-    SELECT indisunique FROM pg_index WHERE indexrelid = 'public.idx_halaqa_members_one_matched'::regclass
-  ), true);
-  -- Finding 11: the caller's date no longer decides the one-a-day limit.
-  PERFORM hz_test.eq('no unique key on the caller date', (
-    SELECT count(*) FROM pg_constraint WHERE conrelid = 'public.halaqa_encouragements'::regclass AND contype = 'u'
+  -- 20261120120000_drop_halaqa.sql: no Halaqa table, function or policy is left, review_partners
+  -- went with them, and only the owner reads achievement unlocks.
+  PERFORM hz_test.eq('no Halaqa tables', (
+    SELECT count(*) FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace
+    WHERE n.nspname IN ('public', 'private', 'rls') AND (c.relname ILIKE '%halaqa%' OR c.relname ILIKE '%review_partner%')
   ), 0::BIGINT);
-  -- Finding 5 (second review): one send per group, sender and server-derived calendar day.
-  PERFORM hz_test.eq('unique key on the server day', (
-    SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indexrelid = 'public.idx_halaqa_encouragements_sender_day'::regclass
-  ), 'CREATE UNIQUE INDEX idx_halaqa_encouragements_sender_day ON public.halaqa_encouragements USING btree (group_id, from_user, sent_on)');
+  PERFORM hz_test.eq('no Halaqa functions', (
+    SELECT count(*) FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
+    WHERE n.nspname IN ('public', 'private', 'rls')
+      AND (p.proname ILIKE '%halaqa%' OR p.prosrc ILIKE '%halaqa%' OR p.prosrc ILIKE '%review_partner%'
+        OR p.proname IN ('get_received_encouragements', 'get_my_sabaq_assignment', 'encouraged_today',
+          'new_invite_code', 'live_sabaq_assignments', 'sabaq_assignment_json'))
+  ), 0::BIGINT);
+  PERFORM hz_test.eq('achievement unlocks have only the owner read policy', (
+    SELECT string_agg(policyname, ', ' ORDER BY policyname) FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'achievement_unlocks' AND cmd = 'SELECT'
+  ), 'Users can read own achievement unlocks');
   -- Ninth review, finding 5: the board pass reads pending users in the index's order, user id last,
   -- so it stops after its batch instead of sorting every pending row.
   PERFORM hz_test.eq('board pending index ends with user id', (
@@ -350,8 +352,6 @@ BEGIN
   PERFORM hz_test.eq('other user sees no surah progress', (SELECT count(*) FROM public.public_surah_progress), 0::BIGINT);
   PERFORM hz_test.eq('other user sees no privacy rows', (SELECT count(*) FROM public.profile_privacy), 0::BIGINT);
   UPDATE public.habit_days SET full_met = true WHERE user_id = '00000000-0000-4000-8000-00000000000b';
-  PERFORM hz_test.expect_error('SELECT * FROM public.halaqa_groups', 'permission denied');
-  PERFORM hz_test.expect_error('SELECT * FROM public.halaqa_members', 'permission denied');
   PERFORM hz_test.expect_error('SELECT * FROM public.board_members', 'permission denied');
   PERFORM hz_test.expect_error($q$INSERT INTO public.board_cohorts (week_start, level_band, pace_band, utc_offset_band)
     VALUES (date_trunc('week', now())::date, 'starting', 'light', 0)$q$, 'permission denied');
@@ -386,500 +386,23 @@ BEGIN
   PERFORM hz_test.expect_error('SELECT * FROM public.public_surah_progress', 'permission denied');
   PERFORM hz_test.expect_error('SELECT * FROM public.profile_privacy', 'permission denied');
   PERFORM hz_test.expect_error($q$SELECT public.get_board('starting', 'light', 0, '2026-11-13', 1)$q$, 'permission denied');
-  PERFORM hz_test.expect_error('SELECT public.get_my_halaqas()', 'permission denied');
+  -- Halaqa RPCs are gone, so an earlier app that still calls one gets an error, not data.
+  PERFORM hz_test.expect_error('SELECT public.get_my_halaqas()', 'does not exist');
   -- Finding 8 (second review): the profiles policy helper is no RPC anon can call.
   PERFORM hz_test.expect_error($q$SELECT public.profile_identity_visible('00000000-0000-4000-8000-00000000000b')$q$,
     'does not exist');
 END $$;
 RESET ROLE;
 
--- ─── 4. Invite halaqa, sharing, encouragement, teacher view ──────────────────
 CREATE TABLE hz_test.state (key TEXT PRIMARY KEY, value TEXT);
 GRANT SELECT, INSERT, UPDATE ON hz_test.state TO anon, authenticated;
 
-SELECT hz_test.login('00000000-0000-4000-8000-00000000000a');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  created JSONB;
-BEGIN
-  created := public.create_invite_halaqa('  Family halaqa  ', true);
-  PERFORM hz_test.eq('name trimmed', created->>'name', 'Family halaqa');
-  PERFORM hz_test.eq('creator is teacher', created->>'role', 'teacher');
-  PERFORM hz_test.eq('invite code shape', (created->>'invite_code') ~ '^[A-HJ-NP-Z2-9]{8}$', true);
-  INSERT INTO hz_test.state VALUES ('group', created->>'id'), ('code', created->>'invite_code');
-  PERFORM hz_test.expect_error($q$SELECT public.create_invite_halaqa('   ')$q$, 'invalid_name');
-END $$;
-RESET ROLE;
-
-SELECT hz_test.login('00000000-0000-4000-8000-00000000000b');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  joined JSONB;
-  code TEXT := (SELECT value FROM hz_test.state WHERE key = 'code');
-BEGIN
-  PERFORM hz_test.expect_error($q$SELECT public.join_halaqa_by_code('NOTACODE')$q$, 'invalid_code');
-  joined := public.join_halaqa_by_code(lower(code));
-  PERFORM hz_test.eq('joined as member', joined->>'role', 'member');
-  PERFORM hz_test.eq('two members', (joined->>'member_count')::INTEGER, 2);
-  PERFORM hz_test.eq('joining twice is idempotent', (public.join_halaqa_by_code(code)->>'member_count')::INTEGER, 2);
-  PERFORM hz_test.eq('consistency shared by default', (joined->>'share_consistency')::BOOLEAN, true);
-  PERFORM hz_test.eq('teacher sharing off by default', (joined->>'share_plan_with_teachers')::BOOLEAN, false);
-  PERFORM hz_test.eq('listed in my halaqas', jsonb_array_length(public.get_my_halaqas()), 1);
-END $$;
-RESET ROLE;
-
--- B's week: a wird day, an excused day with a flag, and a grace day. Only the wird day is visible.
+-- B's week: a wird day, an excused day with a flag, and a grace day, read by the streak checks below.
 SELECT hz_test.day('00000000-0000-4000-8000-00000000000b', hz_test.week_start(), 'done', NULL, true, true, true);
 SELECT hz_test.day('00000000-0000-4000-8000-00000000000b', hz_test.week_start() + 1, NULL, 'illness', true);
 SELECT hz_test.day('00000000-0000-4000-8000-00000000000b', hz_test.week_start() + 2, 'grace', NULL, true);
 
-SELECT hz_test.login('00000000-0000-4000-8000-00000000000a');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  gid UUID := (SELECT value FROM hz_test.state WHERE key = 'group')::UUID;
-  detail JSONB;
-  member_b JSONB;
-  goal JSONB;
-BEGIN
-  detail := public.get_halaqa_detail(gid, hz_test.today_text());
-  SELECT m INTO member_b FROM jsonb_array_elements(detail->'members') AS m WHERE m->>'username' = 'member_b';
-  PERFORM hz_test.eq('teacher listed first', detail->'members'->0->>'role', 'teacher');
-  PERFORM hz_test.eq('week dots: wird, excused and grace show alike as no wird', member_b->'week',
-    '[true, false, false, false, false, false, false]'::JSONB);
-  PERFORM hz_test.eq('juz completions shared', (member_b->>'juz_completions')::INTEGER, 1);
-  PERFORM hz_test.eq('no reasons in the payload', position('illness' IN detail::TEXT), 0);
-  PERFORM hz_test.eq('no grades in the payload', detail ? 'grades', false);
-  PERFORM hz_test.eq('teacher view not offered without consent', (member_b->>'teacher_view')::BOOLEAN, false);
-  goal := public.get_halaqa_goal(gid, hz_test.today_text());
-  PERFORM hz_test.eq('goal counts wird days of sharing members', (goal->>'wird_days')::INTEGER, 1);
-  PERFORM hz_test.eq('goal target is five per contributor', (goal->>'target')::INTEGER, 10);
-  PERFORM hz_test.eq('goal has no per-member breakdown', goal ? 'members', false);
-  -- Co-member reads B's shared juz completion, but not B's other badges.
-  PERFORM hz_test.eq('co-member reads shared juz badge only',
-    (SELECT string_agg(achievement_id, ',') FROM public.achievement_unlocks
-      WHERE user_id = '00000000-0000-4000-8000-00000000000b'), 'juz_30_completed');
-  PERFORM hz_test.eq('co-member cannot read surah progress',
-    (SELECT count(*) FROM public.public_surah_progress WHERE user_id = '00000000-0000-4000-8000-00000000000b'), 0::BIGINT);
-  -- Teacher view without consent returns nothing private.
-  detail := public.get_halaqa_teacher_view(gid, '00000000-0000-4000-8000-00000000000b', hz_test.today_text());
-  PERFORM hz_test.eq('plan hidden without consent', detail->'plan', 'null'::JSONB);
-  PERFORM hz_test.eq('grades hidden without consent', detail->'grades', 'null'::JSONB);
-  -- Encouragement: one per day per group, fixed templates, free text allowed in invite halaqas.
-  PERFORM public.send_halaqa_encouragement(gid, '00000000-0000-4000-8000-00000000000b', 'ease', NULL, hz_test.today_text());
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'keep_going', NULL, %L)$q$,
-    gid, '00000000-0000-4000-8000-00000000000b', hz_test.today_text()), 'already_encouraged_today');
-  -- Finding 11: yesterday's or tomorrow's date (both valid somewhere on Earth) opens no second send.
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'keep_going', NULL, %L)$q$,
-    gid, '00000000-0000-4000-8000-00000000000b', hz_test.d(hz_test.utc_today() + 1)), 'already_encouraged_today');
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'keep_going', NULL, %L)$q$,
-    gid, '00000000-0000-4000-8000-00000000000b', hz_test.d(hz_test.utc_today() - 1)), 'already_encouraged_today');
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'ease', NULL, %L)$q$,
-    gid, '00000000-0000-4000-8000-00000000000a', hz_test.today_text()), 'invalid_recipient');
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'ease', NULL, %L)$q$,
-    gid, '00000000-0000-4000-8000-00000000000c', hz_test.today_text()), 'invalid_recipient');
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'ease', NULL, '2001-01-01')$q$,
-    gid, '00000000-0000-4000-8000-00000000000b'), 'invalid_local_date');
-  PERFORM hz_test.eq('marked as encouraged today', (
-    SELECT (m->>'encouraged_today')::BOOLEAN FROM jsonb_array_elements(public.get_halaqa_detail(gid, hz_test.today_text())->'members') AS m
-    WHERE m->>'username' = 'member_b'), true);
-END $$;
-RESET ROLE;
-
-SELECT hz_test.login('00000000-0000-4000-8000-00000000000b');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  gid UUID := (SELECT value FROM hz_test.state WHERE key = 'group')::UUID;
-  detail JSONB;
-  inbox JSONB;
-BEGIN
-  detail := public.get_halaqa_detail(gid, hz_test.today_text());
-  PERFORM hz_test.eq('encouragement received', detail->'received'->0->>'template_id', 'ease');
-  PERFORM hz_test.eq('sender named', detail->'received'->0->>'from_name', 'Teacher A');
-  -- The notification inbox lists ids the device acknowledges, not a time watermark.
-  inbox := public.get_received_encouragements();
-  PERFORM hz_test.eq('inbox lists the encouragement', inbox->'items',
-    jsonb_build_array(jsonb_build_object('id', detail->'received'->0->'id', 'created_at', detail->'received'->0->'created_at')));
-  PERFORM hz_test.eq('inbox reports server time', (inbox->>'checked_at')::TIMESTAMPTZ IS NOT NULL, true);
-  INSERT INTO hz_test.state VALUES ('first_encouragement', detail->'received'->0->>'id');
-  PERFORM public.send_halaqa_encouragement(gid, '00000000-0000-4000-8000-00000000000a', NULL, 'Jazakum Allahu khayran', hz_test.today_text());
-  PERFORM hz_test.expect_error(format($q$SELECT public.get_halaqa_teacher_view(%L, %L, %L)$q$,
-    gid, '00000000-0000-4000-8000-00000000000a', hz_test.today_text()), 'not_allowed');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_member_role(%L, %L, 'teacher')$q$,
-    gid, '00000000-0000-4000-8000-00000000000b'), 'not_allowed');
-  -- B shares plan and grades with teachers, and stops sharing consistency.
-  PERFORM public.set_halaqa_sharing(gid, false, true, true, true);
-END $$;
-RESET ROLE;
-
--- Finding 9 (second review): a send that commits after a later one carries an earlier created_at. A
--- watermark already past it would never return it; the 7-day id list does. Rows older than 7 days
--- are not listed.
-INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, local_date, sent_on, created_at)
-SELECT value::UUID, '00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000b', 'dua',
-  hz_test.d(hz_test.utc_today() - 1), hz_test.utc_today() - 1,
-  (SELECT created_at FROM public.halaqa_encouragements WHERE id = (SELECT value FROM hz_test.state WHERE key = 'first_encouragement')::UUID)
-    - INTERVAL '1 hour'
-FROM hz_test.state WHERE key = 'group';
-INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, local_date, sent_on, created_at)
-SELECT value::UUID, '00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000b', 'dua',
-  hz_test.d(hz_test.utc_today() - 9), hz_test.utc_today() - 9, now() - INTERVAL '8 days'
-FROM hz_test.state WHERE key = 'group';
-SELECT hz_test.login('00000000-0000-4000-8000-00000000000b');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  inbox JSONB := public.get_received_encouragements();
-  items JSONB := inbox->'items';
-BEGIN
-  PERFORM hz_test.eq('late commit is listed', jsonb_array_length(items), 2);
-  PERFORM hz_test.eq('oldest first', items->1->>'id', (SELECT value FROM hz_test.state WHERE key = 'first_encouragement'));
-  PERFORM hz_test.eq('a single page', (inbox->>'more')::BOOLEAN, false);
-  PERFORM hz_test.eq('older than 7 days is not listed', (
-    SELECT count(*) FROM jsonb_array_elements(items) AS i WHERE (i->>'created_at')::TIMESTAMPTZ < now() - INTERVAL '7 days'
-  ), 0::BIGINT);
-END $$;
-RESET ROLE;
-
--- Third review, finding 5: the inbox pages the whole 7-day window by a (created_at, id) cursor, so
--- more arrivals than one page are all listed and the oldest is never stuck behind the newest. 230
--- encouragements, three sharing the time that falls on the first page boundary.
-SELECT hz_test.make_user(('00000000-0000-4000-8007-' || lpad(i::TEXT, 12, '0'))::UUID, 'inbox_user_' || i, NULL)
-FROM generate_series(1, 2) AS i;
-SELECT hz_test.login('00000000-0000-4000-8007-000000000001');
-SET ROLE authenticated;
-DO $$
-BEGIN
-  INSERT INTO hz_test.state VALUES ('inbox_code', public.create_invite_halaqa('Busy inbox')->>'invite_code');
-  PERFORM hz_test.login('00000000-0000-4000-8007-000000000002');
-  INSERT INTO hz_test.state VALUES ('inbox_group', public.join_halaqa_by_code((SELECT value FROM hz_test.state WHERE key = 'inbox_code'))->>'id');
-END $$;
-RESET ROLE;
-INSERT INTO public.halaqa_encouragements (group_id, from_user, to_user, template_id, local_date, sent_on, created_at)
-SELECT (SELECT value FROM hz_test.state WHERE key = 'inbox_group')::UUID, '00000000-0000-4000-8007-000000000001',
-  '00000000-0000-4000-8007-000000000002', 'dua', hz_test.d(hz_test.utc_today() - i), hz_test.utc_today() - i,
-  now() - (CASE WHEN i BETWEEN 129 AND 131 THEN 130 ELSE i END) * INTERVAL '30 seconds'
-FROM generate_series(1, 230) AS i;
-INSERT INTO hz_test.state
-SELECT 'inbox_oldest', id FROM public.halaqa_encouragements
-WHERE to_user = '00000000-0000-4000-8007-000000000002' ORDER BY created_at, id LIMIT 1;
-SELECT hz_test.login('00000000-0000-4000-8007-000000000002');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  page JSONB := public.get_received_encouragements();
-  item JSONB;
-  pages INTEGER := 0;
-  seen UUID[] := '{}';
-  last_at TIMESTAMPTZ;
-  last_id UUID;
-BEGIN
-  PERFORM hz_test.eq('a page holds 100', jsonb_array_length(page->'items'), 100);
-  PERFORM hz_test.eq('another page follows', (page->>'more')::BOOLEAN, true);
-  LOOP
-    pages := pages + 1;
-    FOR item IN SELECT value FROM jsonb_array_elements(page->'items') LOOP
-      IF last_at IS NOT NULL AND NOT (((item->>'created_at')::TIMESTAMPTZ, (item->>'id')::UUID) > (last_at, last_id)) THEN
-        RAISE EXCEPTION 'inbox pages out of cursor order at %', item;
-      END IF;
-      last_at := (item->>'created_at')::TIMESTAMPTZ;
-      last_id := (item->>'id')::UUID;
-      seen := seen || last_id;
-    END LOOP;
-    EXIT WHEN NOT (page->>'more')::BOOLEAN OR pages >= 10;
-    page := public.get_received_encouragements(last_at, last_id);
-  END LOOP;
-  PERFORM hz_test.eq('three pages', pages, 3);
-  PERFORM hz_test.eq('every encouragement listed once', (SELECT count(DISTINCT id) FROM unnest(seen) AS id), 230::BIGINT);
-  PERFORM hz_test.eq('no encouragement listed twice', cardinality(seen), 230);
-  PERFORM hz_test.eq('the oldest is listed first', seen[1], (SELECT value FROM hz_test.state WHERE key = 'inbox_oldest')::UUID);
-  PERFORM hz_test.expect_error('SELECT public.get_received_encouragements(now(), NULL)', 'invalid_cursor');
-END $$;
-RESET ROLE;
-
-SELECT hz_test.login('00000000-0000-4000-8000-00000000000a');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  gid UUID := (SELECT value FROM hz_test.state WHERE key = 'group')::UUID;
-  detail JSONB;
-  member_b JSONB;
-  view JSONB;
-BEGIN
-  detail := public.get_halaqa_detail(gid, hz_test.today_text());
-  SELECT m INTO member_b FROM jsonb_array_elements(detail->'members') AS m WHERE m->>'username' = 'member_b';
-  PERFORM hz_test.eq('unshared week hidden', member_b->'week', 'null'::JSONB);
-  PERFORM hz_test.eq('unshared streak hidden', member_b->'streak', 'null'::JSONB);
-  PERFORM hz_test.eq('teacher view offered with consent', (member_b->>'teacher_view')::BOOLEAN, true);
-  PERFORM hz_test.eq('goal leaves out unshared members', (detail->'goal'->>'contributors')::INTEGER, 1);
-  PERFORM hz_test.eq('goal total leaves out unshared days', (detail->'goal'->>'wird_days')::INTEGER, 0);
-  view := public.get_halaqa_teacher_view(gid, '00000000-0000-4000-8000-00000000000b', hz_test.today_text());
-  PERFORM hz_test.eq('plan shared', view->'plan'->>'hifz_plan', '{"new_per_day":0.5}');
-  PERFORM hz_test.eq('tiers shared', view->'plan'->'tiers'->>'sabqi', '1');
-  PERFORM hz_test.eq('recent grades shared', jsonb_array_length(view->'grades'->'recent'), 2);
-  PERFORM hz_test.eq('mistake inbox count shared', (view->'grades'->>'mistake_inbox_count')::INTEGER, 1);
-END $$;
-RESET ROLE;
-
--- SOC-03: a teacher's next sabaq for a member who shares their plan with teachers. It ends when the
--- member stops sharing, a teacher clears it, the teacher stops teaching or either of them leaves.
-SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000d', 'teacher_d', 'Teacher D', NULL);
-SET ROLE authenticated;
-DO $$
-DECLARE
-  gid UUID := (SELECT value FROM hz_test.state WHERE key = 'group')::UUID;
-  code TEXT := (SELECT value FROM hz_test.state WHERE key = 'code');
-  a UUID := '00000000-0000-4000-8000-00000000000a';
-  b UUID := '00000000-0000-4000-8000-00000000000b';
-  d UUID := '00000000-0000-4000-8000-00000000000d';
-  saved JSONB;
-  mine JSONB;
-BEGIN
-  PERFORM hz_test.login(a);
-  saved := public.set_halaqa_sabaq_assignment(gid, b, 582, 3, 9);
-  PERFORM hz_test.eq('assignment saved', saved->>'page', '582');
-  PERFORM hz_test.eq('assignment names its teacher', saved->>'teacher_name', 'Teacher A');
-  PERFORM hz_test.eq('teacher view shows the assignment',
-    public.get_halaqa_teacher_view(gid, b, hz_test.today_text())->'plan'->'sabaq_assignment'->>'from_line', '3');
-  PERFORM public.set_halaqa_sabaq_assignment(gid, b, 1, 1, 15);
-  PERFORM hz_test.eq('a new assignment replaces the last',
-    public.get_halaqa_teacher_view(gid, b, hz_test.today_text())->'plan'->'sabaq_assignment'->>'page', '1');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 0, 1, 15)$q$, gid, b), 'invalid_assignment');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 605, 1, 15)$q$, gid, b), 'invalid_assignment');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 0, 15)$q$, gid, b), 'invalid_assignment');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 16)$q$, gid, b), 'invalid_assignment');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 9, 3)$q$, gid, b), 'invalid_assignment');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, NULL, 1, 3)$q$, gid, b), 'invalid_assignment');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid, a), 'not_allowed');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid,
-    '00000000-0000-4000-8000-00000000000c'), 'plan_not_shared');
-  PERFORM hz_test.expect_error($q$SELECT count(*) FROM public.halaqa_sabaq_assignments$q$, 'permission denied');
-
-  -- B reads it, and cannot set, clear or read the table.
-  PERFORM hz_test.login(b);
-  mine := public.get_my_sabaq_assignment();
-  PERFORM hz_test.eq('learner reads the assignment', mine->>'page' || ':' || (mine->>'from_line') || '-' || (mine->>'to_line'), '1:1-15');
-  PERFORM hz_test.eq('learner reads the halaqa and teacher', (mine->>'group_name') || '/' || (mine->>'teacher_name'), 'Family halaqa/Teacher A');
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid, a), 'not_allowed');
-  PERFORM hz_test.expect_error(format($q$SELECT public.clear_halaqa_sabaq_assignment(%L, %L)$q$, gid, b), 'not_allowed');
-  PERFORM hz_test.expect_error($q$SELECT count(*) FROM public.halaqa_sabaq_assignments$q$, 'permission denied');
-  -- Withdrawing plan sharing ends it, and sharing again does not bring it back.
-  PERFORM public.set_halaqa_sharing(gid, false, true, false, true);
-  PERFORM hz_test.eq('withdrawn sharing ends the assignment', public.get_my_sabaq_assignment(), NULL::JSONB);
-  PERFORM public.set_halaqa_sharing(gid, false, true, true, true);
-  PERFORM hz_test.eq('sharing again brings none back', public.get_my_sabaq_assignment(), NULL::JSONB);
-
-  -- A teacher clears it.
-  PERFORM hz_test.login(a);
-  PERFORM public.set_halaqa_sabaq_assignment(gid, b, 2, 1, 8);
-  PERFORM public.clear_halaqa_sabaq_assignment(gid, b);
-  PERFORM hz_test.eq('cleared assignment gone from the teacher view',
-    public.get_halaqa_teacher_view(gid, b, hz_test.today_text())->'plan'->'sabaq_assignment', 'null'::JSONB);
-
-  -- D teaches, assigns, and is made a member again: the assignment ends.
-  PERFORM hz_test.login(d);
-  PERFORM public.join_halaqa_by_code(code);
-  PERFORM public.set_halaqa_sharing(gid, true, true, true, false);
-  PERFORM hz_test.expect_error(format($q$SELECT public.set_halaqa_sabaq_assignment(%L, %L, 1, 1, 15)$q$, gid, b), 'not_allowed');
-  PERFORM hz_test.login(a);
-  PERFORM public.set_halaqa_member_role(gid, d, 'teacher');
-  PERFORM hz_test.login(d);
-  PERFORM public.set_halaqa_sabaq_assignment(gid, b, 3, 2, 6);
-  PERFORM hz_test.login(b);
-  PERFORM hz_test.eq('second teacher''s assignment', public.get_my_sabaq_assignment()->>'teacher_name', 'Teacher D');
-  PERFORM hz_test.login(a);
-  PERFORM public.set_halaqa_member_role(gid, d, 'member');
-  PERFORM hz_test.login(b);
-  PERFORM hz_test.eq('a teacher made a member takes their assignment', public.get_my_sabaq_assignment(), NULL::JSONB);
-
-  -- A assigns D, then D leaves: the assignment ends with the membership.
-  PERFORM hz_test.login(a);
-  PERFORM public.set_halaqa_sabaq_assignment(gid, d, 4, 1, 15);
-  PERFORM hz_test.login(d);
-  PERFORM hz_test.eq('member reads their assignment', public.get_my_sabaq_assignment()->>'page', '4');
-  PERFORM public.leave_halaqa(gid);
-  PERFORM hz_test.eq('leaving ends the assignment', public.get_my_sabaq_assignment(), NULL::JSONB);
-END $$;
-RESET ROLE;
-
-DO $$
-BEGIN
-  PERFORM hz_test.eq('ended assignments are deleted, not hidden',
-    (SELECT count(*) FROM public.halaqa_sabaq_assignments), 0::BIGINT);
-END $$;
-
-SELECT hz_test.login('00000000-0000-4000-8000-00000000000c');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  gid UUID := (SELECT value FROM hz_test.state WHERE key = 'group')::UUID;
-BEGIN
-  PERFORM hz_test.expect_error(format($q$SELECT public.get_halaqa_detail(%L, %L)$q$, gid, hz_test.today_text()), 'not_a_member');
-  PERFORM hz_test.expect_error(format($q$SELECT public.get_halaqa_teacher_view(%L, %L, %L)$q$,
-    gid, '00000000-0000-4000-8000-00000000000b', hz_test.today_text()), 'not_a_member');
-  PERFORM hz_test.expect_error(format($q$SELECT public.leave_halaqa(%L)$q$, gid), 'not_a_member');
-END $$;
-RESET ROLE;
-
--- Group cap of 50 and a member limit of 10 halaqas.
-SELECT hz_test.make_user(('00000000-0000-4000-8001-' || lpad(i::TEXT, 12, '0'))::UUID, 'cap_user_' || i, NULL)
-FROM generate_series(1, 49) AS i;
-SET ROLE authenticated;
-DO $$
-DECLARE
-  code TEXT := (SELECT value FROM hz_test.state WHERE key = 'code');
-  i INTEGER;
-BEGIN
-  FOR i IN 1 .. 48 LOOP
-    PERFORM hz_test.login(('00000000-0000-4000-8001-' || lpad(i::TEXT, 12, '0'))::UUID);
-    PERFORM public.join_halaqa_by_code(code);
-  END LOOP;
-  PERFORM hz_test.login('00000000-0000-4000-8001-000000000049');
-  PERFORM hz_test.expect_error(format($q$SELECT public.join_halaqa_by_code(%L)$q$, code), 'halaqa_full');
-  FOR i IN 1 .. 10 LOOP
-    PERFORM public.create_invite_halaqa('Group ' || i);
-  END LOOP;
-  PERFORM hz_test.expect_error($q$SELECT public.create_invite_halaqa('One too many')$q$, 'halaqa_limit');
-  -- Leaving frees a place.
-  PERFORM hz_test.login('00000000-0000-4000-8001-000000000001');
-  PERFORM public.leave_halaqa((SELECT value FROM hz_test.state WHERE key = 'group')::UUID);
-  PERFORM hz_test.login('00000000-0000-4000-8000-00000000000c');
-  PERFORM hz_test.eq('joins after a member leaves', (public.join_halaqa_by_code(code)->>'member_count')::INTEGER, 50);
-  PERFORM public.leave_halaqa((SELECT value FROM hz_test.state WHERE key = 'group')::UUID);
-END $$;
-RESET ROLE;
-
--- ─── 5. Matched halaqas (SOC-04, MAT-01..03) ─────────────────────────────────
-SELECT hz_test.make_user(('00000000-0000-4000-8002-' || lpad(i::TEXT, 12, '0'))::UUID, 'match_user_' || i, NULL)
-FROM generate_series(1, 6) AS i;
-INSERT INTO public.profile_privacy (user_id, is_minor) VALUES ('00000000-0000-4000-8002-000000000006', true);
-SET ROLE authenticated;
-DO $$
-DECLARE
-  first_group JSONB;
-  g JSONB;
-BEGIN
-  PERFORM hz_test.login('00000000-0000-4000-8002-000000000001');
-  first_group := public.join_matched_halaqa('juz_amma', 'light', 180);
-  PERFORM hz_test.eq('matched halaqa has no code', first_group->'invite_code', 'null'::JSONB);
-  PERFORM hz_test.eq('matched join is idempotent', public.join_matched_halaqa('juz_amma', 'light', 180)->>'id', first_group->>'id');
-  PERFORM hz_test.login('00000000-0000-4000-8002-000000000002');
-  PERFORM hz_test.eq('same bands share a halaqa', public.join_matched_halaqa('juz_amma', 'light', 120)->>'id', first_group->>'id');
-  PERFORM hz_test.login('00000000-0000-4000-8002-000000000003');
-  PERFORM hz_test.eq('adjacent level widens into a small halaqa', public.join_matched_halaqa('juz_4_15', 'page_plus', 300)->>'id', first_group->>'id');
-  PERFORM hz_test.login('00000000-0000-4000-8002-000000000004');
-  g := public.join_matched_halaqa('hafiz', 'light', 180);
-  PERFORM hz_test.eq('distant level starts a new halaqa', g->>'id' <> first_group->>'id', true);
-  PERFORM hz_test.login('00000000-0000-4000-8002-000000000005');
-  g := public.join_matched_halaqa('juz_amma', 'light', -300);
-  PERFORM hz_test.eq('distant zone starts a new halaqa', g->>'id' <> first_group->>'id', true);
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, NULL, 'free text', %L)$q$,
-    first_group->>'id', '00000000-0000-4000-8002-000000000001', hz_test.today_text()), 'not_a_member');
-  PERFORM hz_test.login('00000000-0000-4000-8002-000000000002');
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, NULL, 'free text', %L)$q$,
-    first_group->>'id', '00000000-0000-4000-8002-000000000001', hz_test.today_text()), 'free_text_invite_only');
-  PERFORM hz_test.expect_error(format($q$SELECT public.send_halaqa_encouragement(%L, %L, 'not_a_template', NULL, %L)$q$,
-    first_group->>'id', '00000000-0000-4000-8002-000000000001', hz_test.today_text()), 'invalid_template');
-  PERFORM public.send_halaqa_encouragement((first_group->>'id')::UUID, '00000000-0000-4000-8002-000000000001', 'together', NULL, hz_test.today_text());
-  -- A re-match never returns the user to the halaqa they left.
-  PERFORM public.leave_halaqa((first_group->>'id')::UUID);
-  g := public.join_matched_halaqa('juz_amma', 'light', 120);
-  PERFORM hz_test.eq('re-match finds another halaqa', g->>'id' <> first_group->>'id', true);
-  PERFORM hz_test.expect_error($q$SELECT public.join_matched_halaqa('juz_amma', 'warp', 0)$q$, 'invalid_bands');
-  PERFORM hz_test.login('00000000-0000-4000-8002-000000000006');
-  PERFORM hz_test.expect_error($q$SELECT public.join_matched_halaqa('juz_amma', 'light', 180)$q$, 'minor_not_allowed');
-  INSERT INTO hz_test.state VALUES ('matched_group', first_group->>'id');
-END $$;
-RESET ROLE;
-
--- Finding 9: the database itself refuses a second active matched halaqa, and a member row always
--- carries its group's kind.
-DO $$
-DECLARE
-  other_group UUID := (SELECT group_id FROM public.halaqa_members WHERE user_id = '00000000-0000-4000-8002-000000000004');
-BEGIN
-  PERFORM hz_test.expect_error(format($q$INSERT INTO public.halaqa_members (group_id, kind, user_id)
-    VALUES (%L, 'matched', '00000000-0000-4000-8002-000000000001')$q$, other_group), 'idx_halaqa_members_one_matched');
-  PERFORM hz_test.expect_error(format($q$INSERT INTO public.halaqa_members (group_id, kind, user_id)
-    VALUES (%L, 'invite', '00000000-0000-4000-8002-000000000001')$q$, other_group), 'halaqa_members_group_kind_fkey');
-END $$;
-
--- Finding 18: the inbox lists encouragements only from halaqas the reader is still in.
-SELECT hz_test.login('00000000-0000-4000-8002-000000000001');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  gid UUID := (SELECT value FROM hz_test.state WHERE key = 'matched_group')::UUID;
-BEGIN
-  PERFORM hz_test.eq('inbox lists an active halaqa', jsonb_array_length(public.get_received_encouragements()->'items'), 1);
-  PERFORM public.leave_halaqa(gid);
-  PERFORM hz_test.eq('inbox skips a left halaqa', public.get_received_encouragements()->'items', '[]'::JSONB);
-END $$;
-RESET ROLE;
-
--- Finding 5 (second review): the limit is one send per calendar day of the sender, by the server's
--- clock in their stored zone, not one per 20 hours.
-SELECT hz_test.make_user(('00000000-0000-4000-8005-' || lpad(i::TEXT, 12, '0'))::UUID, 'enc_user_' || i, NULL)
-FROM generate_series(1, 2) AS i;
-SELECT hz_test.login('00000000-0000-4000-8005-000000000001');
-SET ROLE authenticated;
-DO $$
-BEGIN
-  INSERT INTO hz_test.state VALUES ('enc_code', public.create_invite_halaqa('Daily limit')->>'invite_code');
-  PERFORM hz_test.login('00000000-0000-4000-8005-000000000002');
-  INSERT INTO hz_test.state VALUES ('enc_group', public.join_halaqa_by_code((SELECT value FROM hz_test.state WHERE key = 'enc_code'))->>'id');
-  PERFORM hz_test.login('00000000-0000-4000-8005-000000000001');
-  PERFORM public.send_halaqa_encouragement((SELECT value FROM hz_test.state WHERE key = 'enc_group')::UUID,
-    '00000000-0000-4000-8005-000000000002', 'ease', NULL, hz_test.today_text());
-END $$;
-RESET ROLE;
--- The first send was 21 hours ago, earlier the same day.
-UPDATE public.halaqa_encouragements SET created_at = now() - INTERVAL '21 hours'
-WHERE from_user = '00000000-0000-4000-8005-000000000001';
-CREATE FUNCTION hz_test.send_enc() RETURNS JSONB LANGUAGE sql AS $$
-  SELECT public.send_halaqa_encouragement((SELECT value FROM hz_test.state WHERE key = 'enc_group')::UUID,
-    '00000000-0000-4000-8005-000000000002', 'dua', NULL, hz_test.today_text())
-$$;
-GRANT EXECUTE ON FUNCTION hz_test.send_enc() TO authenticated;
-SET ROLE authenticated;
-DO $$
-BEGIN
-  PERFORM hz_test.expect_error('SELECT hz_test.send_enc()', 'already_encouraged_today');
-END $$;
-RESET ROLE;
--- A send on a later day of the sender's (a stored zone further east) still counts as today.
-UPDATE public.halaqa_encouragements SET sent_on = sent_on + 1 WHERE from_user = '00000000-0000-4000-8005-000000000001';
-SET ROLE authenticated;
-DO $$
-BEGIN
-  PERFORM hz_test.expect_error('SELECT hz_test.send_enc()', 'already_encouraged_today');
-END $$;
-RESET ROLE;
--- Yesterday's send, three hours ago, leaves today open. The day comes from the sender's stored zone.
-UPDATE public.halaqa_encouragements SET sent_on = sent_on - 2, created_at = now() - INTERVAL '3 hours'
-WHERE from_user = '00000000-0000-4000-8005-000000000001';
-INSERT INTO public.habit_days (user_id, local_date, earned_status, minimum_met, tz, created_at, updated_at)
-VALUES ('00000000-0000-4000-8005-000000000001', hz_test.d(hz_test.utc_today() - 20), 'done', true, 'Pacific/Kiritimati',
-  now(), now());
-SET ROLE authenticated;
-DO $$
-DECLARE
-  sent UUID := (hz_test.send_enc()->>'id')::UUID;
-BEGIN
-  PERFORM hz_test.expect_error('SELECT hz_test.send_enc()', 'already_encouraged_today');
-  INSERT INTO hz_test.state VALUES ('enc_sent', sent);
-END $$;
-RESET ROLE;
-DO $$
-BEGIN
-  PERFORM hz_test.eq('day from the stored zone', (
-    SELECT sent_on FROM public.halaqa_encouragements WHERE id = (SELECT value FROM hz_test.state WHERE key = 'enc_sent')::UUID
-  ), (now() AT TIME ZONE 'Pacific/Kiritimati')::DATE);
-END $$;
-
+-- ─── 4. Board (BRD-01..08, PTS-02, SB-03, SB-04) ────────────────────────────
 DO $$
 BEGIN
   -- MAT-03: the match rule is a pure function.
@@ -898,7 +421,6 @@ BEGIN
   PERFORM hz_test.eq('offset band +14 h', private.offset_band(840), 7);
 END $$;
 
--- ─── 6. Board (BRD-01..08, PTS-02, SB-03, SB-04) ────────────────────────────
 SELECT hz_test.make_user(('00000000-0000-4000-8003-' || lpad(i::TEXT, 12, '0'))::UUID, 'board_user_' || i,
   'Board ' || i, 'https://example.invalid/board' || i || '.png')
 FROM generate_series(1, 40) AS i;
@@ -1277,7 +799,7 @@ BEGIN
   ), 'juz_amma');
 END $$;
 
--- ─── 7. Profile visibility (SOC-01, ETH-07) ──────────────────────────────────
+-- ─── 5. Profile visibility (SOC-01, ETH-07) ──────────────────────────────────
 -- The streak algorithm is checked above; here only who may see it.
 INSERT INTO hz_test.state
   SELECT 'b_streak', private.habit_streak('00000000-0000-4000-8000-00000000000b', hz_test.utc_today())::TEXT;
@@ -1294,9 +816,12 @@ SELECT hz_test.login('00000000-0000-4000-8000-00000000000a');
 SET ROLE authenticated;
 DO $$
 BEGIN
-  -- B stopped sharing consistency with the halaqa but still shares juz completions.
-  PERFORM hz_test.eq('co-member sees shared juz only', public.get_profile_summary('00000000-0000-4000-8000-00000000000b'),
-    '{"streak": null, "juz_completed": [30]}'::JSONB);
+  -- No group shares anything any more: a signed-in user sees only what B made public, so nothing yet.
+  PERFORM hz_test.eq('a signed-in user sees nothing private', public.get_profile_summary('00000000-0000-4000-8000-00000000000b'),
+    '{"streak": null, "juz_completed": null}'::JSONB);
+  PERFORM hz_test.eq('and reads none of B''s badges', (
+    SELECT count(*) FROM public.achievement_unlocks WHERE user_id = '00000000-0000-4000-8000-00000000000b'
+  ), 0::BIGINT);
 END $$;
 RESET ROLE;
 
@@ -1447,113 +972,44 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- SOC-02: halaqa co-members still see the minor's name and what they shared, through the RPCs.
+-- ETH-07: a minor's summary is hidden from every other signed-in user, A included.
 SELECT hz_test.login('00000000-0000-4000-8000-00000000000a');
 SET ROLE authenticated;
 DO $$
-DECLARE
-  gid UUID := (SELECT value FROM hz_test.state WHERE key = 'group')::UUID;
 BEGIN
-  PERFORM hz_test.eq('co-member sees the minor in the halaqa', (
-    SELECT m->>'name' FROM jsonb_array_elements(public.get_halaqa_detail(gid, hz_test.today_text())->'members') AS m
-    WHERE m->>'user_id' = '00000000-0000-4000-8000-00000000000b'
-  ), 'Member B');
-  PERFORM hz_test.eq('co-member still sees what the minor shared', public.get_profile_summary('00000000-0000-4000-8000-00000000000b'),
-    '{"streak": null, "juz_completed": [30]}'::JSONB);
-  PERFORM hz_test.eq('co-member cannot read the identity row directly', (
+  PERFORM hz_test.eq('another user gets no summary for a minor', public.get_profile_summary('00000000-0000-4000-8000-00000000000b'),
+    NULL::JSONB);
+  PERFORM hz_test.eq('another user cannot read the identity row', (
     SELECT count(*) FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000b'
   ), 0::BIGINT);
 END $$;
 RESET ROLE;
 
--- Third review, finding 3: recording minority leaves matched halaqas, whose members are strangers,
--- the way leaving does, and keeps invite halaqas. 8006-1 is in a matched halaqa with 8006-2 and an
--- invite halaqa with 8006-3; 8006-4 is alone in a matched halaqa and joins the board as a minor.
+-- Recording minority clears the photo whichever path records it: 8006-1 through the privacy
+-- settings, 8006-4 by joining the board as a minor. 8006-2 stays an adult and keeps theirs.
 SELECT hz_test.make_user(('00000000-0000-4000-8006-' || lpad(i::TEXT, 12, '0'))::UUID, 'third_user_' || i, 'Third ' || i,
   'https://example.invalid/third' || i || '.png')
 FROM generate_series(1, 4) AS i;
 SET ROLE authenticated;
 DO $$
-DECLARE
-  matched JSONB;
-  invite JSONB;
-  detail JSONB;
-  member JSONB;
 BEGIN
   PERFORM hz_test.login('00000000-0000-4000-8006-000000000001');
-  matched := public.join_matched_halaqa('juz_16_29', 'maintenance', 600);
-  invite := public.create_invite_halaqa('Third family');
-  PERFORM hz_test.login('00000000-0000-4000-8006-000000000002');
-  PERFORM hz_test.eq('a stranger is matched into the halaqa',
-    public.join_matched_halaqa('juz_16_29', 'maintenance', 600)->>'id', matched->>'id');
-  PERFORM hz_test.login('00000000-0000-4000-8006-000000000003');
-  PERFORM public.join_halaqa_by_code(invite->>'invite_code');
-  PERFORM hz_test.login('00000000-0000-4000-8006-000000000001');
-  PERFORM public.send_halaqa_encouragement((matched->>'id')::UUID, '00000000-0000-4000-8006-000000000002', 'together',
-    NULL, hz_test.today_text());
-  PERFORM public.set_profile_privacy(false, false, true, false);
-  PERFORM hz_test.eq('only the invite halaqa stays', (
-    SELECT string_agg(h->>'id', ',') FROM jsonb_array_elements(public.get_my_halaqas()) AS h
-  ), invite->>'id');
-  PERFORM hz_test.expect_error(format($q$SELECT public.get_halaqa_detail(%L, %L)$q$, matched->>'id', hz_test.today_text()),
-    'not_a_member');
-
-  -- The stranger keeps the encouragement but no longer sees who the minor is.
-  PERFORM hz_test.login('00000000-0000-4000-8006-000000000002');
-  detail := public.get_halaqa_detail((matched->>'id')::UUID, hz_test.today_text());
-  PERFORM hz_test.eq('the matched halaqa counts the stranger alone', (detail->'group'->>'member_count')::INTEGER, 1);
-  PERFORM hz_test.eq('the encouragement stays', jsonb_array_length(detail->'received'), 1);
-  PERFORM hz_test.eq('without the sender''s name', detail->'received'->0->'from_name', 'null'::JSONB);
-  PERFORM hz_test.eq('no minor id in the matched halaqa', position('00000000-0000-4000-8006-000000000001' IN detail::TEXT), 0);
-  PERFORM hz_test.eq('no minor username in the matched halaqa', position('third_user_1' IN detail::TEXT), 0);
-  PERFORM hz_test.eq('no minor name in the matched halaqa', position('Third 1' IN detail::TEXT), 0);
-
-  -- The invite halaqa keeps the minor, without a photo.
-  PERFORM hz_test.login('00000000-0000-4000-8006-000000000003');
-  SELECT m INTO member FROM jsonb_array_elements(public.get_halaqa_detail((invite->>'id')::UUID, hz_test.today_text())->'members') AS m
-  WHERE m->>'username' = 'third_user_1';
-  PERFORM hz_test.eq('the invite halaqa keeps the minor', member->>'name', 'Third 1');
-  PERFORM hz_test.eq('the invite halaqa shows no photo of the minor', member->'avatar_url', 'null'::JSONB);
-  INSERT INTO hz_test.state VALUES ('third_invite', invite->>'id');
-
-  -- Joining the board as a minor leaves a matched halaqa too, and closes it once it is empty.
+  PERFORM hz_test.eq('minority is recorded', public.set_profile_privacy(false, false, true, false)->>'is_minor', 'true');
   PERFORM hz_test.login('00000000-0000-4000-8006-000000000004');
-  matched := public.join_matched_halaqa('starting', 'maintenance', -720);
-  INSERT INTO hz_test.state VALUES ('third_alone', matched->>'id');
   PERFORM public.join_board('Quiet Kid', true, false, 'starting', 'maintenance', -720, hz_test.today_text(), 0);
-  PERFORM hz_test.eq('a board minor keeps no matched halaqa', public.get_my_halaqas(), '[]'::JSONB);
+  PERFORM hz_test.eq('a board minor is recorded', public.get_profile_privacy()->>'is_minor', 'true');
 END $$;
 RESET ROLE;
 DO $$
 BEGIN
-  PERFORM hz_test.eq('an emptied matched halaqa is closed', (
-    SELECT deleted_at IS NOT NULL FROM public.halaqa_groups WHERE id = (SELECT value FROM hz_test.state WHERE key = 'third_alone')::UUID
-  ), true);
   PERFORM hz_test.eq('both minors have no photo', (
     SELECT count(*) FROM public.profiles
     WHERE id IN ('00000000-0000-4000-8006-000000000001', '00000000-0000-4000-8006-000000000004') AND avatar_url IS NOT NULL
   ), 0::BIGINT);
+  PERFORM hz_test.eq('an adult keeps their photo', (
+    SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8006-000000000002'
+  ), 'https://example.invalid/third2.png');
 END $$;
-
--- Third review, finding 2, defense in depth: even a photo stored for a minor by mistake (here with
--- the profile trigger switched off) never reaches another member.
-ALTER TABLE public.profiles DISABLE TRIGGER profiles_minor_photo;
-UPDATE public.profiles SET avatar_url = 'https://example.invalid/stored-by-mistake.png'
-WHERE id = '00000000-0000-4000-8006-000000000001';
-ALTER TABLE public.profiles ENABLE TRIGGER profiles_minor_photo;
-SELECT hz_test.login('00000000-0000-4000-8006-000000000003');
-SET ROLE authenticated;
-DO $$
-BEGIN
-  PERFORM hz_test.eq('a stored photo of a minor is not returned', (
-    SELECT m->'avatar_url'
-    FROM jsonb_array_elements(public.get_halaqa_detail((SELECT value FROM hz_test.state WHERE key = 'third_invite')::UUID,
-      hz_test.today_text())->'members') AS m
-    WHERE m->>'username' = 'third_user_1'
-  ), 'null'::JSONB);
-END $$;
-RESET ROLE;
-UPDATE public.profiles SET avatar_url = NULL WHERE id = '00000000-0000-4000-8006-000000000001';
 
 -- Eighth review, finding 3: under 18s appear on the Board only under a nickname (BRD-07), and the
 -- sharing settings have no nickname field. Recording minority for a Board member without one never
@@ -1979,35 +1435,23 @@ BEGIN
   PERFORM hz_test.eq('account deletion keeps every count exact', hz_test.count_drift(), 'none');
 END $$;
 
--- Sixth review, finding 2: join_board says whether joining as a minor left a matched halaqa, decided
--- in its own transaction, so the screen can confirm it without reading halaqas first.
+-- join_board returns the Board view and nothing about halaqas. The 1.0.2 app reads left_matched as
+-- optional and the current app does not read it.
 SELECT hz_test.make_user(('00000000-0000-4000-8020-' || lpad(i::TEXT, 12, '0'))::UUID, 'board_minor_' || i, 'Board minor ' || i)
 FROM generate_series(1, 2) AS i;
-SELECT hz_test.login('00000000-0000-4000-8020-000000000001');
 SET ROLE authenticated;
 DO $$
+DECLARE
+  joined JSONB;
 BEGIN
-  PERFORM public.join_matched_halaqa('juz_amma', 'light', 180);
-  PERFORM hz_test.eq('joining as a minor reports leaving the matched halaqa',
-    public.join_board('Small Star', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'true');
-END $$;
-RESET ROLE;
--- Clients cannot read memberships directly; the owner checks that it really ended.
-DO $$
-BEGIN
-  PERFORM hz_test.eq('and the matched membership has ended', (
-    SELECT count(*) FROM public.halaqa_members
-    WHERE user_id = '00000000-0000-4000-8020-000000000001' AND kind = 'matched' AND left_at IS NULL
-  ), 0::BIGINT);
-END $$;
-SELECT hz_test.login('00000000-0000-4000-8020-000000000002');
-SET ROLE authenticated;
-DO $$
-BEGIN
-  PERFORM hz_test.eq('an adult join reports no matched halaqa left',
-    public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
-  PERFORM hz_test.eq('a minor join without a matched halaqa reports none',
-    public.join_board('Other Star', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1)->>'left_matched', 'false');
+  PERFORM hz_test.login('00000000-0000-4000-8020-000000000001');
+  joined := public.join_board('Small Star', true, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM hz_test.eq('a minor join has no left_matched', joined ? 'left_matched', false);
+  PERFORM hz_test.eq('the minor is on the Board under a nickname', public.get_profile_privacy()->>'board_nickname', 'Small Star');
+  PERFORM hz_test.login('00000000-0000-4000-8020-000000000002');
+  joined := public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
+  PERFORM hz_test.eq('an adult join has no left_matched', joined ? 'left_matched', false);
+  PERFORM hz_test.eq('the adult is on the Board', public.get_profile_privacy()->>'board_joined', 'true');
 END $$;
 RESET ROLE;
 
@@ -2321,46 +1765,7 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Eighth review, finding 2: deleting a halaqa creator's account clears created_by, and the surviving
--- members' list still says false, not null, for is_creator, so the app can read it. 8050-1 creates an
--- invite halaqa that 8050-2 joins, then deletes their account.
-SELECT hz_test.make_user(('00000000-0000-4000-8050-' || lpad(i::TEXT, 12, '0'))::UUID, 'creator_user_' || i, 'Creator ' || i)
-FROM generate_series(1, 2) AS i;
-SET ROLE authenticated;
-DO $$
-DECLARE
-  invite JSONB;
-BEGIN
-  PERFORM hz_test.login('00000000-0000-4000-8050-000000000001');
-  invite := public.create_invite_halaqa('Creator leaves');
-  PERFORM hz_test.eq('eighth: the creator is marked', invite->'is_creator', 'true'::JSONB);
-  INSERT INTO hz_test.state VALUES ('creator_group', invite->>'id');
-  PERFORM hz_test.login('00000000-0000-4000-8050-000000000002');
-  PERFORM public.join_halaqa_by_code(invite->>'invite_code');
-END $$;
-RESET ROLE;
-DELETE FROM auth.users WHERE id = '00000000-0000-4000-8050-000000000001';
-DO $$
-BEGIN
-  PERFORM hz_test.eq('eighth: the halaqa stays without a creator', (
-    SELECT (created_by IS NULL)::TEXT || '/' || (deleted_at IS NULL)::TEXT FROM public.halaqa_groups
-    WHERE id = (SELECT value FROM hz_test.state WHERE key = 'creator_group')::UUID
-  ), 'true/true');
-END $$;
-SELECT hz_test.login('00000000-0000-4000-8050-000000000002');
-SET ROLE authenticated;
-DO $$
-DECLARE
-  halaqas JSONB := public.get_my_halaqas();
-BEGIN
-  PERFORM hz_test.eq('eighth: the member still lists the halaqa', jsonb_array_length(halaqas), 1);
-  PERFORM hz_test.eq('eighth: is_creator is false, not null', halaqas->0->'is_creator', 'false'::JSONB);
-  PERFORM hz_test.eq('eighth: the detail reads too', public.get_halaqa_detail(
-    (SELECT value FROM hz_test.state WHERE key = 'creator_group')::UUID, hz_test.today_text())->'group'->'is_creator', 'false'::JSONB);
-END $$;
-RESET ROLE;
-
--- ─── 8. Card merge: the schedule by review time, the rest by row time ────────
+-- ─── 6. Card merge: the schedule by review time, the rest by row time ────────
 -- Device B grades a card Again at 09:03. Device A, offline with the 08:00 schedule, suspends it at
 -- 09:05 (a unit switch writes the whole row). Whichever upload arrives first, the server ends with
 -- B's schedule and A's suspension.

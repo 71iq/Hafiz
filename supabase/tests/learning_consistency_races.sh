@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Two-session race tests for 20261113120000_learning_consistency.sql. run-learning-consistency.sh
+# Two-session race tests for 20261113120000_learning_consistency.sql, as changed by
+# 20261120120000_drop_halaqa.sql, which removed Halaqa and its races. run-learning-consistency.sh
 # calls this with its disposable, network-less container after learning_consistency.test.sql.
 #
 # Each race holds the lock a fixed function must wait on, starts the competing sessions, and only
@@ -141,95 +142,6 @@ check "left user is off the board" \
 check "left user has no active cohort" \
   "$(admin -c "SELECT count(*) FROM public.board_members WHERE user_id = '$(uid 1)' AND left_at IS NULL")" 0
 
-# ─── Finding 9: two matched joins by one user make one membership ─────────────
-# The controller holds the global matching lock. With the per-user lock, the first request waits on
-# the matching lock and the second on the user lock; the second then finds the first's membership.
-rm -f "$WORK"/*
-controller matched "SELECT pg_advisory_xact_lock(hashtextextended('hafiz:matched-halaqa', 0));" 2
-wait_for_controller matched
-session matched_1 "$(uid 2)" "SELECT public.join_matched_halaqa('juz_amma', 'light', 180)->>'id';"
-session matched_2 "$(uid 2)" "SELECT public.join_matched_halaqa('juz_amma', 'light', 180)->>'id';"
-wait
-check "first matched join finished" "$(tail -1 "$WORK/matched_1")" ok
-check "second matched join finished" "$(tail -1 "$WORK/matched_2")" ok
-check "both joins return the same halaqa" "$(head -1 "$WORK/matched_1")" "$(head -1 "$WORK/matched_2")"
-check "one active matched membership" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE user_id = '$(uid 2)' AND kind = 'matched' AND left_at IS NULL")" 1
-
-# ─── Finding 10: a join that is committing keeps the group alive ───────────────
-# User 3 is the only member. User 4 joins by code and holds its transaction open until the leave is
-# blocked; leaving must wait on the group row and then count the new member.
-rm -f "$WORK"/*
-CODE="$(as_user "$(uid 3)" "SELECT public.create_invite_halaqa('Race group')->>'invite_code';" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
-GROUP="$(admin -c "SELECT id FROM public.halaqa_groups WHERE invite_code = '$CODE'")"
-session join_hold "$(uid 4)" "BEGIN;
-SELECT public.join_halaqa_by_code('$CODE')->>'member_count';
-RESET ROLE;
-DO \$\$ BEGIN
-  FOR i IN 1 .. 200 LOOP
-      PERFORM pg_stat_clear_snapshot();
-    EXIT WHEN (SELECT count(*) FROM pg_stat_activity WHERE application_name = 'race_leave' AND wait_event_type = 'Lock') >= 1;
-    PERFORM pg_sleep(0.05);
-  END LOOP;
-END \$\$;
-COMMIT;"
-admin -c "DO \$\$ BEGIN
-  FOR i IN 1 .. 200 LOOP
-      PERFORM pg_stat_clear_snapshot();
-    EXIT WHEN EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = 'race_join_hold' AND query LIKE 'DO %');
-    PERFORM pg_sleep(0.05);
-  END LOOP;
-END \$\$;" >/dev/null
-session leave "$(uid 3)" "SELECT public.leave_halaqa('$GROUP');"
-wait
-check "join finished" "$(tail -1 "$WORK/join_hold")" ok
-check "leave finished" "$(tail -1 "$WORK/leave")" ok
-check "group not deleted under a new member" \
-  "$(admin -c "SELECT deleted_at IS NULL FROM public.halaqa_groups WHERE id = '$GROUP'")" t
-check "the joiner is an active member" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE group_id = '$GROUP' AND left_at IS NULL")" 1
-
-# ─── Finding 11: two sends at once, with different dates, make one ────────────
-# Users 4 (sender) and 5, 6 share the race group. The controller holds the sender's membership row;
-# both sends wait on it, and the second then sees the first.
-rm -f "$WORK"/*
-for n in 5 6; do
-  as_user "$(uid "$n")" "SELECT public.join_halaqa_by_code('$CODE');" |
-    docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
-done
-YESTERDAY="$(admin -c "SELECT to_char((now() AT TIME ZONE 'UTC')::DATE - 1, 'YYYY-MM-DD')")"
-TOMORROW="$(admin -c "SELECT to_char((now() AT TIME ZONE 'UTC')::DATE + 1, 'YYYY-MM-DD')")"
-controller send "SELECT 1 FROM public.halaqa_members WHERE group_id = '$GROUP' AND user_id = '$(uid 4)' FOR UPDATE;" 2
-wait_for_controller send
-session send_1 "$(uid 4)" "SELECT public.send_halaqa_encouragement('$GROUP', '$(uid 5)', 'ease', NULL, '$YESTERDAY');"
-session send_2 "$(uid 4)" "SELECT public.send_halaqa_encouragement('$GROUP', '$(uid 6)', 'dua', NULL, '$TOMORROW');"
-wait
-check "one send refused as already sent" \
-  "$(cat "$WORK/send_1" "$WORK/send_2" | grep -c 'already_encouraged_today' || true)" 1
-check "one encouragement stored" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE group_id = '$GROUP' AND from_user = '$(uid 4)'")" 1
-
-# ─── Second review, finding 11: a send and a leave by one member cannot deadlock ─────
-# User 5 sends to user 6 while leaving the group. The controller holds user 5's membership row. The
-# send takes the group row before that membership row, as leaving does, so the send waits on the
-# membership row while holding the group and the leave waits on the group. A send that locked the
-# membership row first and the group only at its insert would deadlock with the leave here.
-rm -f "$WORK"/*
-controller send_leave "SELECT 1 FROM public.halaqa_members WHERE group_id = '$GROUP' AND user_id = '$(uid 5)' FOR UPDATE;" 2
-wait_for_controller send_leave
-session sl_send "$(uid 5)" "SELECT public.send_halaqa_encouragement('$GROUP', '$(uid 6)', 'ease', NULL, '$TODAY');"
-wait_for_waiters 1
-session sl_leave "$(uid 5)" "SELECT public.leave_halaqa('$GROUP');"
-wait
-check "no deadlock" "$(cat "$WORK"/sl_send "$WORK"/sl_leave | grep -c 'deadlock detected' || true)" 0
-check "send finished" "$(tail -1 "$WORK/sl_send")" ok
-check "leave finished" "$(tail -1 "$WORK/sl_leave")" ok
-check "the send is stored" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE group_id = '$GROUP' AND from_user = '$(uid 5)'")" 1
-check "the sender has left" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE group_id = '$GROUP' AND user_id = '$(uid 5)' AND left_at IS NULL")" 0
-
 # Waits until the race session named `name` runs its holding DO block.
 wait_for_hold() {
   admin -c "DO \$\$ BEGIN
@@ -265,43 +177,6 @@ check "photo update finished" "$(tail -1 "$WORK/photo_hold")" ok
 check "minority write finished" "$(tail -1 "$WORK/photo_minor")" ok
 check "recorded as a minor" "$(admin -c "SELECT is_minor FROM public.profile_privacy WHERE user_id = '$(uid 7)'")" t
 check "the minor has no photo" "$(admin -c "SELECT avatar_url IS NULL FROM public.profiles WHERE id = '$(uid 7)'")" t
-
-# ─── Third review, finding 3: a matched join racing a minority write leaves no matched membership ─
-# User 8 is an adult. The controller holds their halaqa lock; the matched join waits on it, and so
-# does the minority write once it holds the profile row. Whichever goes first, the user ends as a
-# minor without a matched halaqa: a join that commits first is left by the minority write, and a join
-# after it reads the minority and is refused. A minority write that neither took the halaqa lock nor
-# left matched halaqas would leave the minor matched with strangers.
-rm -f "$WORK"/*
-controller minor_join "SELECT pg_advisory_xact_lock(hashtextextended('hafiz:halaqa-user:$(uid 8)', 0));" 2
-wait_for_controller minor_join
-session mj_join "$(uid 8)" "SELECT public.join_matched_halaqa('juz_amma', 'light', 180)->>'id';"
-wait_for_waiters 1
-session mj_minor "$(uid 8)" "SELECT public.set_profile_privacy(false, false, true, false)->>'is_minor';"
-wait
-check "minority write finished" "$(tail -1 "$WORK/mj_minor")" ok
-check "the join committed first or was refused as a minor" \
-  "$(if [ "$(tail -1 "$WORK/mj_join")" = ok ] || grep -q minor_not_allowed "$WORK/mj_join"; then echo yes; else echo no; fi)" yes
-check "recorded as a minor" "$(admin -c "SELECT is_minor FROM public.profile_privacy WHERE user_id = '$(uid 8)'")" t
-check "no matched membership" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE user_id = '$(uid 8)' AND kind = 'matched' AND left_at IS NULL")" 0
-
-# The other order: the minority write holds user 9's halaqa lock while it waits for their
-# profile_privacy row, which the controller holds. A matched join that starts meanwhile waits on the
-# halaqa lock and then reads the committed minority. A join that checked minority before taking the
-# lock would pass as an adult and join after the minority write had committed.
-rm -f "$WORK"/*
-admin -c "INSERT INTO public.profile_privacy (user_id) VALUES ('$(uid 9)')" >/dev/null
-controller minor_first "SELECT 1 FROM public.profile_privacy WHERE user_id = '$(uid 9)' FOR UPDATE;" 2
-wait_for_controller minor_first
-session mf_minor "$(uid 9)" "SELECT public.set_profile_privacy(false, false, true, false)->>'is_minor';"
-wait_for_waiters 1
-session mf_join "$(uid 9)" "SELECT public.join_matched_halaqa('juz_amma', 'light', 180)->>'id';"
-wait
-check "minority write finished" "$(tail -1 "$WORK/mf_minor")" ok
-check "the join is refused" "$(grep -c minor_not_allowed "$WORK/mf_join" || true)" 1
-check "no matched membership" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE user_id = '$(uid 9)' AND kind = 'matched' AND left_at IS NULL")" 0
 
 # Counts the race outputs that report a deadlock.
 deadlocks() { cat "$WORK"/* | grep -c 'deadlock detected' || true; }
@@ -412,54 +287,6 @@ check "deletion finished" "$(tail -1 "$WORK/dp_delete")" ok
 check "the deleted account left no placement" "$(admin -c "SELECT count(*) FROM public.board_members WHERE user_id = '$(uid 12)'")" 0
 check "the reader is still placed" \
   "$(admin -c "SELECT count(*) FROM public.board_members WHERE user_id = '$(uid 11)' AND left_at IS NULL")" 1
-
-# ─── Fourth review, finding 8: deleting an account while it sends encouragement ────────────────
-# User 15 sends to user 14, who created the group. The controller holds halaqa_encouragements in
-# SHARE mode, so the send waits at its insert while holding the group row and its own membership row,
-# and user 15's deletion starts then. The send key-shared both profiles first, so the deletion waits
-# on user 15's profile until the send commits. A send that reached the profile only through its
-# insert's foreign key would wait on the deleted profile while the deletion waits on the membership
-# row it cascades to.
-rm -f "$WORK"/*
-DCODE="$(as_user "$(uid 14)" "SELECT public.create_invite_halaqa('Deletion race')->>'invite_code';" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
-DGROUP="$(admin -c "SELECT id FROM public.halaqa_groups WHERE invite_code = '$DCODE'")"
-as_user "$(uid 15)" "SELECT public.join_halaqa_by_code('$DCODE');" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
-controller del_send "LOCK TABLE public.halaqa_encouragements IN SHARE MODE;" 2
-wait_for_controller del_send
-session ds_send "$(uid 15)" "SELECT public.send_halaqa_encouragement('$DGROUP', '$(uid 14)', 'ease', NULL, '$TODAY');"
-wait_for_waiters 1
-admin_session ds_delete "DELETE FROM auth.users WHERE id = '$(uid 15)';"
-wait
-check "no deadlock between a send and the sender's deletion" "$(deadlocks)" 0
-check "send finished" "$(tail -1 "$WORK/ds_send")" ok
-check "deletion finished" "$(tail -1 "$WORK/ds_delete")" ok
-check "the sender's membership and encouragement went with the account" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_members WHERE user_id = '$(uid 15)'")/$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE from_user = '$(uid 15)'")" 0/0
-
-# The recipient's side: user 17 sends to user 16, who created the group, while user 16's deletion
-# clears the group's creator. Without the key-share lock on the recipient's profile, the deletion
-# would wait on the group row the send holds while the send's insert waits on the deleted profile.
-rm -f "$WORK"/*
-RCODE="$(as_user "$(uid 16)" "SELECT public.create_invite_halaqa('Recipient race')->>'invite_code';" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
-RGROUP="$(admin -c "SELECT id FROM public.halaqa_groups WHERE invite_code = '$RCODE'")"
-as_user "$(uid 17)" "SELECT public.join_halaqa_by_code('$RCODE');" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
-controller del_recipient "LOCK TABLE public.halaqa_encouragements IN SHARE MODE;" 2
-wait_for_controller del_recipient
-session dr_send "$(uid 17)" "SELECT public.send_halaqa_encouragement('$RGROUP', '$(uid 16)', 'ease', NULL, '$TODAY');"
-wait_for_waiters 1
-admin_session dr_delete "DELETE FROM auth.users WHERE id = '$(uid 16)';"
-wait
-check "no deadlock between a send and the recipient's deletion" "$(deadlocks)" 0
-check "send finished" "$(tail -1 "$WORK/dr_send")" ok
-check "deletion finished" "$(tail -1 "$WORK/dr_delete")" ok
-check "the group stays for the sender without a creator" \
-  "$(admin -c "SELECT (created_by IS NULL)::TEXT || '/' || (deleted_at IS NULL)::TEXT FROM public.halaqa_groups WHERE id = '$RGROUP'")" true/true
-check "the encouragement went with the recipient" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_encouragements WHERE to_user = '$(uid 16)'")" 0
 
 # ─── Fifth review, finding 1: a withdrawal in flight cannot let a promised-private write publish ──
 # User 20 is a minor. Another device withdraws minority in a transaction that stays open until this
@@ -646,87 +473,5 @@ check "the card has B's review and A's suspension" \
   "$(admin -c "SELECT concat_ws('/', state, reps, lapses, to_char(last_review AT TIME ZONE 'UTC', 'HH24:MI'),
     to_char(suspended_at AT TIME ZONE 'UTC', 'HH24:MI'), to_char(updated_at AT TIME ZONE 'UTC', 'HH24:MI'))
     FROM public.study_cards WHERE user_id = '$(uid 26)' AND id = '5:1'")" "3/4/1/09:03/09:05/09:05"
-
-# ─── SOC-03: a teacher's next sabaq cannot outlive withdrawn plan sharing ─────
-# User 30 teaches a halaqa that user 31 shares their plan with. User 31 withdraws sharing in a
-# transaction that stays open until the teacher's assignment is blocked. The assignment locks the
-# member's row FOR SHARE, so it waits, then reads the withdrawal and is refused. One that read the
-# sharing without the lock would store an assignment that sharing the plan again would bring back.
-rm -f "$WORK"/*
-admin >/dev/null <<SQL
-INSERT INTO auth.users (id, email) VALUES ('$(uid 30)', 'race30@example.invalid'), ('$(uid 31)', 'race31@example.invalid');
-INSERT INTO public.profiles (id, username) VALUES ('$(uid 30)', 'race_user_30'), ('$(uid 31)', 'race_user_31');
-SQL
-SABAQ_CODE="$(as_user "$(uid 30)" "SELECT public.create_invite_halaqa('Sabaq race', true)->>'invite_code';" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA)"
-SABAQ_GROUP="$(admin -c "SELECT id FROM public.halaqa_groups WHERE invite_code = '$SABAQ_CODE'")"
-as_user "$(uid 31)" "SELECT public.join_halaqa_by_code('$SABAQ_CODE');
-SELECT public.set_halaqa_sharing('$SABAQ_GROUP', true, true, true, false);" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
-session sabaq_withdraw "$(uid 31)" "BEGIN;
-SELECT public.set_halaqa_sharing('$SABAQ_GROUP', true, true, false, false) IS NOT NULL;
-RESET ROLE;
-DO \$\$ BEGIN
-  FOR i IN 1 .. 200 LOOP
-    PERFORM pg_stat_clear_snapshot();
-    EXIT WHEN (SELECT count(*) FROM pg_stat_activity WHERE application_name = 'race_sabaq_assign' AND wait_event_type = 'Lock') >= 1;
-    PERFORM pg_sleep(0.05);
-  END LOOP;
-END \$\$;
-COMMIT;"
-wait_for_hold sabaq_withdraw
-session sabaq_assign "$(uid 30)" "SELECT public.set_halaqa_sabaq_assignment('$SABAQ_GROUP', '$(uid 31)', 582, 3, 9) IS NOT NULL;"
-wait
-check "withdrawal finished" "$(tail -1 "$WORK/sabaq_withdraw")" ok
-check "the assignment is refused" "$(grep -c plan_not_shared "$WORK/sabaq_assign" || true)" 1
-check "no assignment stored" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_sabaq_assignments WHERE learner_id = '$(uid 31)'")" 0
-
-# ─── SOC-03: an assignment and the member leaving cannot deadlock ──────────────
-# User 31 shares again and leaves while the teacher assigns. The controller holds user 31's membership
-# row. The assignment takes the group row before the memberships, as leaving does, so it waits on the
-# membership row holding the group and the leave waits on the group. An assignment that locked the
-# memberships first and the group only at its insert would deadlock with the leave here. Leaving then
-# deletes the assignment that committed first.
-rm -f "$WORK"/*
-as_user "$(uid 31)" "SELECT public.set_halaqa_sharing('$SABAQ_GROUP', true, true, true, false);" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
-controller sabaq_leave "SELECT 1 FROM public.halaqa_members WHERE group_id = '$SABAQ_GROUP' AND user_id = '$(uid 31)' FOR UPDATE;" 2
-wait_for_controller sabaq_leave
-session sq_assign "$(uid 30)" "SELECT public.set_halaqa_sabaq_assignment('$SABAQ_GROUP', '$(uid 31)', 582, 3, 9) IS NOT NULL;"
-wait_for_waiters 1
-session sq_leave "$(uid 31)" "SELECT public.leave_halaqa('$SABAQ_GROUP');"
-wait
-check "no deadlock" "$(cat "$WORK"/sq_assign "$WORK"/sq_leave | grep -c 'deadlock detected' || true)" 0
-check "assignment finished" "$(tail -1 "$WORK/sq_assign")" ok
-check "leave finished" "$(tail -1 "$WORK/sq_leave")" ok
-check "leaving deleted the assignment" \
-  "$(admin -c "SELECT count(*) FROM public.halaqa_sabaq_assignments WHERE learner_id = '$(uid 31)'")" 0
-
-# ─── SOC-03: an assignment and deleting the learner's account cannot deadlock ─────
-# User 32 shares their plan in user 30's halaqa. The controller holds user 32's membership row; the
-# assignment waits on it, and the account deletion starts then. The assignment key-shared both
-# profiles first, so the deletion waits on the profile until the assignment commits, then cascades
-# and removes the assignment with the membership. An assignment that reached the profiles only at its
-# insert would wait on the deleted profile while the deletion waits on the membership it holds.
-rm -f "$WORK"/*
-admin >/dev/null <<SQL
-INSERT INTO auth.users (id, email) VALUES ('$(uid 32)', 'race32@example.invalid');
-INSERT INTO public.profiles (id, username) VALUES ('$(uid 32)', 'race_user_32');
-SQL
-as_user "$(uid 32)" "SELECT public.join_halaqa_by_code('$SABAQ_CODE');
-SELECT public.set_halaqa_sharing('$SABAQ_GROUP', true, true, true, false);" |
-  docker exec -i "$C" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null
-controller sabaq_delete "SELECT 1 FROM public.halaqa_members WHERE group_id = '$SABAQ_GROUP' AND user_id = '$(uid 32)' FOR UPDATE;" 2
-wait_for_controller sabaq_delete
-session sd_assign "$(uid 30)" "SELECT public.set_halaqa_sabaq_assignment('$SABAQ_GROUP', '$(uid 32)', 582, 3, 9) IS NOT NULL;"
-wait_for_waiters 1
-admin_session sd_delete "DELETE FROM auth.users WHERE id = '$(uid 32)';"
-wait
-check "no deadlock between an assignment and account deletion" "$(deadlocks)" 0
-check "assignment finished" "$(tail -1 "$WORK/sd_assign")" ok
-check "deletion finished" "$(tail -1 "$WORK/sd_delete")" ok
-check "the account is gone with its assignment" \
-  "$(admin -c "SELECT count(*) FROM public.profiles WHERE id = '$(uid 32)'")/$(admin -c "SELECT count(*) FROM public.halaqa_sabaq_assignments WHERE learner_id = '$(uid 32)'")" 0/0
 
 echo "learning_consistency_races.sh: all races passed"
