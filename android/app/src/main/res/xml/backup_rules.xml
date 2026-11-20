@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. Keep in step with data_extraction_rules.xml.
+     AsyncStorage (databases/RKStorage) holds the Supabase sign-in session. A restored copy would sign
+     a new phone into the account with the old phone's refresh token, so the user signs in again
+     instead. Its other keys are caches rebuilt at start. Progress lives in files/SQLite and is
+     backed up. -->
+<full-backup-content>
+  <exclude domain="database" path="RKStorage" />
+  <exclude domain="database" path="RKStorage-journal" />
+  <exclude domain="database" path="RKStorage-wal" />
+  <exclude domain="database" path="RKStorage-shm" />
+</full-backup-content>

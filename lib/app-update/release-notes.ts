@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.7": {
+    en: [
+      "Hafiz no longer requests camera, microphone or draw-over-other-apps permissions.",
+      "Restoring Hafiz from a phone backup no longer restores your sign-in. Sign in again to sync your progress.",
+      "The weekly consistency Board is hidden until more people use Hafiz.",
+    ],
+    ar: [
+      "لم يعد حافظ يطلب أذونات الكاميرا أو الميكروفون أو الظهور فوق التطبيقات الأخرى.",
+      "لم تعد استعادة حافظ من نسخة احتياطية للهاتف تستعيد تسجيل دخولك. سجّل الدخول مجددًا لمزامنة تقدّمك.",
+      "أُخفيت لوحة المواظبة الأسبوعية حتى يزداد عدد مستخدمي حافظ.",
+    ],
+  },
   "1.0.6": {
     en: [
       "Hafiz is now about a third of its previous download size.",

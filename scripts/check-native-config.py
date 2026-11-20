@@ -58,6 +58,24 @@ def check(root):
     predictive = expo["android"]["predictiveBackGestureEnabled"]
     require(isinstance(predictive, bool) and application.get(ANDROID + "enableOnBackInvokedCallback") == str(predictive).lower(), "Android predictive back differs from app.json")
     require(application.get(ANDROID + "supportsRtl") == "true", "Android RTL support must remain enabled")
+    # AsyncStorage (databases/RKStorage) holds the sign-in session, which must not travel in a backup.
+    def excludes_session(reference, sections):
+        match = re.fullmatch(r"@xml/([a-z0-9_]+)", reference or "")
+        path = resources / ("xml/" + match[1] + ".xml") if match else None
+        if not path or not path.is_file():
+            return False
+        rules = ET.parse(path).getroot()
+        return all(
+            section is not None
+            and any(item.get("domain") == "database" and item.get("path") == "RKStorage" for item in section.findall("exclude"))
+            for section in ([rules] if sections is None else [rules.find(name) for name in sections])
+        )
+
+    require(
+        excludes_session(application.get(ANDROID + "fullBackupContent"), None)
+        and excludes_session(application.get(ANDROID + "dataExtractionRules"), ["cloud-backup", "device-transfer"]),
+        "Android backups must exclude the AsyncStorage sign-in session",
+    )
     declared = {item.get(ANDROID + "name") for item in ET.parse(native / "AndroidManifest.xml").getroot().findall("uses-permission")}
     for permission in expo["android"].get("permissions", []):
         require(permission in declared, "Android manifest lacks app.json permission " + permission)

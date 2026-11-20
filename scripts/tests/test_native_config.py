@@ -121,6 +121,24 @@ class NativeOwnershipTests(unittest.TestCase):
         p.write_text(p.read_text().replace('supportsRtl="true"', 'supportsRtl="false"'))
         self.assertTrue(checker.check(self.root))
 
+    def test_backup_rules_keep_excluding_the_session_store(self):
+        manifest = self.root / "android/app/src/main/AndroidManifest.xml"
+        xml = self.root / "android/app/src/main/res/xml"
+        cases = [
+            (manifest, ' android:fullBackupContent="@xml/backup_rules"', ""),
+            (manifest, ' android:dataExtractionRules="@xml/data_extraction_rules"', ""),
+            (xml / "backup_rules.xml", 'path="RKStorage" ', 'path="other" '),
+            (xml / "data_extraction_rules.xml", "device-transfer>", "device-transfer-old>"),
+        ]
+        for path, original, replacement in cases:
+            with self.subTest(file=path.name, original=original):
+                text = path.read_text()
+                self.assertIn(original, text)
+                path.write_text(text.replace(original, replacement))
+                self.assertTrue(checker.check(self.root))
+                path.write_text(text)
+                self.assertEqual(checker.check(self.root), [])
+
     def test_cli_rejects_malformed_native_xml(self):
         (self.root / "android/app/src/main/AndroidManifest.xml").write_text("<broken")
         result = subprocess.run(["python3", "-B", str(MODULE_PATH), "--root", str(self.root)], text=True, capture_output=True)
