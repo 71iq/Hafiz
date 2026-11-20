@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.6": {
+    en: [
+      "Hafiz is now about a third of its previous download size.",
+      "The Mushaf opens in the Modern font, in dark themes too. To read in Classic, download it once from Settings.",
+      "Al-Muyassar and Fi Zilal are included. Other tafsirs download when you choose them and then work offline.",
+    ],
+    ar: [
+      "أصبح حجم تنزيل حافظ نحو ثلث حجمه السابق.",
+      "يفتح المصحف بالخط الحديث، وفي المظهر الداكن أيضًا. للقراءة بالخط التقليدي نزّله مرة واحدة من الإعدادات.",
+      "التفسير الميسر وفي ظلال القرآن مضمّنان. تُنزَّل التفاسير الأخرى عند اختيارها ثم تعمل دون اتصال.",
+    ],
+  },
   "1.0.5": {
     en: [
       "Add the Hafiz widget to your Android home screen to see your streak and today's wird.",
