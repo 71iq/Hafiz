@@ -46,6 +46,7 @@ jest.mock("@/lib/supabase", () => ({
     return result;
   },
   signOutOwnedSession: (owner: AuthOwner, session: Session | null) => mockRuntime.signOut(owner, session),
+  requestPasswordResetEmail: (email: string, redirectTo: string) => mockRuntime.requestPasswordReset(email, redirectTo),
   supabase: {
     get auth() {
       return mockRuntime.auth;

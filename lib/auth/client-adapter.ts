@@ -23,6 +23,8 @@ type Options = {
   fetch: typeof fetch;
   autoRefreshToken: boolean;
   detectSessionInUrl: boolean;
+  /** The SDK's default, implicit, when omitted. */
+  flowType?: "pkce" | "implicit";
 };
 export function createOwnedAuthClient(options: Options) {
   const shared = createSharedStorage(options.storage, (work) =>
@@ -52,6 +54,7 @@ export function createOwnedAuthClient(options: Options) {
       autoRefreshToken: options.autoRefreshToken,
       persistSession: true,
       detectSessionInUrl: options.detectSessionInUrl,
+      flowType: options.flowType,
     },
     global: { fetch: options.fetch },
   });
@@ -189,6 +192,9 @@ export function createOwnedAuthClient(options: Options) {
           autoRefreshToken: false,
           persistSession: true,
           detectSessionInUrl: false,
+          // A web signup stores its PKCE verifier under the main key (see alias above), where the
+          // main client finds it when the confirmation link returns with a code.
+          flowType: options.flowType,
           fetch: (input, init) => {
             if (commandActive && !owned.canDispatch())
               return Promise.resolve(

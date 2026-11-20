@@ -121,6 +121,20 @@ export function signOutOwnedSession(owner: AuthOwner, session: Session | null) {
   return ownedRuntime().signOut(owner, session);
 }
 
+/** Sends a reset email whose link works on any device. */
+export function requestPasswordResetEmail(email: string, redirectTo: string) {
+  void supabase.auth;
+  if (!_runtime) throw new Error("Supabase not configured");
+  return _runtime.requestPasswordReset(email, redirectTo);
+}
+
+/** Opens a reset link's session apart from the app's own session. Null when it names no account. */
+export function openPasswordRecovery(tokens: { access_token: string; refresh_token: string }) {
+  void supabase.auth;
+  if (!_runtime) throw new Error("Supabase not configured");
+  return _runtime.openPasswordRecovery(tokens);
+}
+
 export function restoreOwnedSession(
   owner: AuthOwner,
   session: Session | null,
