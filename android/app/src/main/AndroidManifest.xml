@@ -6,9 +6,13 @@
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
+  <!-- Hafiz picks a profile photo from the library and only plays audio. The image picker and audio
+       libraries declare the camera and the microphone for features the app does not have. The
+       draw-over-apps permission React Native's debug overlay needs stays in src/debug. -->
+  <uses-permission android:name="android.permission.CAMERA" tools:node="remove"/>
+  <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>

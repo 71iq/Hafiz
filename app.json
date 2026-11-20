@@ -26,6 +26,7 @@
       "package": "com.anonymous.hafiz",
       "versionCode": 7,
       "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
+      "blockedPermissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"],
       "intentFilters": [
         {
           "action": "VIEW",
