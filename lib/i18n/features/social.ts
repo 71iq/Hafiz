@@ -42,6 +42,7 @@ export const socialStrings = {
     socialCancel: "Cancel",
     socialSave: "Save",
     socialSaved: "Saved",
+    privacyNotSaved: "Your privacy choices were not saved.",
     socialSavedLeftBoard: "Saved. Because you are under 18, you have left the Board. You can join again with a nickname.",
     legacyHalaqaTitle: "Halaqas from an earlier version",
     legacyHalaqaBody:
@@ -52,6 +53,7 @@ export const socialStrings = {
     legacyHalaqaConfirmLeave: "Leave",
     legacyHalaqaKeep: "Keep",
     legacyHalaqaLeft: "You have left your halaqas. They no longer see your progress.",
+    legacyHalaqaStillIn: "You are still in your halaqas.",
 
     boardTitle: "Board",
     boardSubtitle: "A small weekly group of people at a similar level, ranked by consistency.",
@@ -74,6 +76,7 @@ export const socialStrings = {
       "You'll appear under a nickname, without a photo.",
     boardJoin: "Join this week's Board",
     boardLeave: "Leave the Board",
+    boardStillJoined: "You are still on the Board.",
     boardWeekOf: "Week of {{date}}",
     boardGatheringTitle: "Your group is forming",
     boardGatheringBody: "People in your group so far: {{n}}. Standings appear once at least {{min}} have joined.",
@@ -117,6 +120,7 @@ export const socialStrings = {
     socialCancel: "إلغاء",
     socialSave: "حفظ",
     socialSaved: "حُفظ",
+    privacyNotSaved: "لم تُحفظ اختياراتك في الخصوصية.",
     socialSavedLeftBoard: "حُفظ. ولأن عمرك دون الثامنة عشرة غادرتَ اللوحة، ويمكنك الانضمام إليها مجددًا بلقب.",
     legacyHalaqaTitle: "الحلقات من إصدار سابق",
     legacyHalaqaBody:
@@ -126,6 +130,7 @@ export const socialStrings = {
     legacyHalaqaConfirmLeave: "غادر",
     legacyHalaqaKeep: "إبقاء",
     legacyHalaqaLeft: "غادرتَ حلقاتك، ولم يعد أعضاؤها يرون تقدّمك.",
+    legacyHalaqaStillIn: "ما زلت في حلقاتك.",
 
     boardTitle: "اللوحة",
     boardSubtitle: "مجموعة أسبوعية صغيرة من أشخاص في مستوى قريب، مرتبة بحسب المواظبة.",
@@ -146,6 +151,7 @@ export const socialStrings = {
       "ستظهر بلقب ودون صورة.",
     boardJoin: "انضم إلى لوحة هذا الأسبوع",
     boardLeave: "غادر اللوحة",
+    boardStillJoined: "ما زلت في اللوحة.",
     boardWeekOf: "أسبوع {{date}}",
     boardGatheringTitle: "مجموعتك تتشكّل",
     boardGatheringBody: "عدد من في مجموعتك حتى الآن: {{n}}. يظهر الترتيب حين ينضم {{min}} على الأقل.",

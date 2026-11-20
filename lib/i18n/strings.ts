@@ -741,6 +741,8 @@ export const strings = {
     profileSave: "Save profile",
     profileSaved: "Profile updated",
     profileSaveFailed: "Could not update profile",
+    profileSaveFailedDraftKept:
+      "Your profile was not updated. Your changes are kept in Edit profile, so you can try again.",
     profilePhotoFailed: "Could not update profile photo",
     profilePhotoPermissionDenied: "Photo library permission is required to choose a profile photo.",
     profileDisplayNamePlaceholder: "Name shown to others",
@@ -814,6 +816,8 @@ export const strings = {
     qfManualSync: "Sync now",
     qfSyncComplete: "Quran Foundation sync complete",
     qfSyncFailed: "Quran Foundation sync failed",
+    qfDisconnectFailed: "Could not disconnect Quran Foundation. Try again.",
+    qfDisconnect: "Disconnect Quran Foundation",
     qfAuthCallbackLoading: "Completing Quran Foundation connection...",
     qfAuthCallbackFailed: "Quran Foundation connection failed",
     // Leaderboard
@@ -1608,6 +1612,7 @@ export const strings = {
     profileSave: "حفظ الملف",
     profileSaved: "تم تحديث الملف",
     profileSaveFailed: "تعذر تحديث الملف",
+    profileSaveFailedDraftKept: "لم يُحدَّث ملفك. احتفظنا بتعديلاتك في «تعديل الملف» لتحاول مجددًا.",
     profilePhotoFailed: "تعذر تحديث صورة الملف",
     profilePhotoPermissionDenied: "يلزم إذن مكتبة الصور لاختيار صورة للملف.",
     profileDisplayNamePlaceholder: "الاسم الذي يظهر للآخرين",
@@ -1681,6 +1686,8 @@ export const strings = {
     qfManualSync: "زامن الآن",
     qfSyncComplete: "اكتملت مزامنة Quran Foundation",
     qfSyncFailed: "فشلت مزامنة Quran Foundation",
+    qfDisconnectFailed: "تعذر قطع الاتصال بـ Quran Foundation. حاول مجددًا.",
+    qfDisconnect: "قطع الاتصال بـ Quran Foundation",
     qfAuthCallbackLoading: "جارٍ إكمال اتصال Quran Foundation...",
     qfAuthCallbackFailed: "فشل اتصال Quran Foundation",
     // Leaderboard

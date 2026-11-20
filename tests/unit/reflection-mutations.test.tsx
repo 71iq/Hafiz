@@ -7,6 +7,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { MoreHorizontal } from "lucide-react-native";
 import { DirectionProvider } from "@/lib/ui/direction";
+import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import { useAuthStore } from "@/lib/auth/store";
 import { ReflectionCard } from "@/components/reflections/ReflectionCard";
 import { CommentsSheet } from "@/components/reflections/CommentsSheet";
@@ -22,7 +23,8 @@ import {
   toggleCommentLike,
   toggleLike,
 } from "@/lib/reflections/api";
-import { resetSentReportsForTests } from "@/components/reflections/use-reflection-actions";
+import { resetLikeSendersForTests } from "@/components/reflections/use-optimistic-like";
+import { resetPendingReflectionWritesForTests } from "@/lib/reflections/pending";
 import type { Reflection, ReflectionComment } from "@/lib/reflections/types";
 import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
@@ -189,7 +191,9 @@ function wrapper({ children }: { children: ReactNode }) {
           insets: { top: 0, left: 0, right: 0, bottom: 0 },
         }}
       >
-        <DirectionProvider dir={mockLocale === "ar" ? "rtl" : "ltr"}>{children}</DirectionProvider>
+        <DirectionProvider dir={mockLocale === "ar" ? "rtl" : "ltr"}>
+          <OperationNoticeProvider ready>{children}</OperationNoticeProvider>
+        </DirectionProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
@@ -233,7 +237,8 @@ beforeEach(() => {
   jest.mocked(reportReflection).mockResolvedValue();
   jest.mocked(deleteReflection).mockResolvedValue(true);
   jest.mocked(deleteReflectionComment).mockResolvedValue(true);
-  resetSentReportsForTests();
+  resetPendingReflectionWritesForTests();
+  resetLikeSendersForTests();
   jest.mocked(loadMushafIndex).mockResolvedValue(index);
   jest.mocked(recordAchievementEvent).mockResolvedValue();
 });
@@ -273,7 +278,49 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       writingDirection: locale === "ar" ? "rtl" : "ltr",
     });
   });
-  it("admits one same-turn like and restores retry after failure", async () => {
+  it("answers every like tap at once, stays pressable and sends only the latest choice", async () => {
+    const first = deferred(false),
+      changed = jest.fn();
+    jest.mocked(toggleLike).mockReturnValueOnce(first.promise);
+    const view = render(
+      <ReflectionCard reflection={post()} variant="feed" onLikeToggled={changed} onCommentsPress={jest.fn()} />,
+      { wrapper },
+    );
+    fireEvent.press(view.getByText(commentCount(11)));
+    expect(view.getByText(commentCount(12))).toBeTruthy();
+    expect(button(view.getByText(commentCount(12))).props.disabled).toBeFalsy();
+    // Two more taps while the first request runs: unlike, then like again. Nothing else is sent yet.
+    fireEvent.press(view.getByText(commentCount(12)));
+    expect(view.getByText(commentCount(11))).toBeTruthy();
+    fireEvent.press(view.getByText(commentCount(11)));
+    expect(view.getByText(commentCount(12))).toBeTruthy();
+    expect(toggleLike).toHaveBeenCalledTimes(1);
+    expect(toggleLike).toHaveBeenCalledWith(user(1).id, "post", false);
+    first.resolve(true);
+    await flush();
+    // The server already holds the last choice, so the burst cost one request.
+    expect(toggleLike).toHaveBeenCalledTimes(1);
+    expect(view.getByText(commentCount(12))).toBeTruthy();
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(changed).toHaveBeenLastCalledWith("post", true, 1);
+  });
+  it("sends the latest choice after the running request when a burst ends elsewhere", async () => {
+    const first = deferred(false);
+    jest.mocked(toggleLike).mockReturnValueOnce(first.promise);
+    const view = render(
+      <ReflectionCard reflection={post()} variant="feed" onLikeToggled={jest.fn()} onCommentsPress={jest.fn()} />,
+      { wrapper },
+    );
+    twice(view.getByText(commentCount(11)));
+    expect(view.getByText(commentCount(11))).toBeTruthy();
+    expect(toggleLike).toHaveBeenCalledTimes(1);
+    first.resolve(true);
+    await flush();
+    expect(toggleLike).toHaveBeenCalledTimes(2);
+    expect(toggleLike).toHaveBeenLastCalledWith(user(1).id, "post", true);
+    expect(view.getByText(commentCount(11))).toBeTruthy();
+  });
+  it("a failed like shows the last choice the server accepted, with an error, and can be tapped again", async () => {
     const pending = deferred(false),
       changed = jest.fn();
     jest.mocked(toggleLike).mockReturnValueOnce(pending.promise);
@@ -281,8 +328,7 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       <ReflectionCard reflection={post()} variant="feed" onLikeToggled={changed} onCommentsPress={jest.fn()} />,
       { wrapper },
     );
-    twice(view.getByText(commentCount(11)));
-    expect(toggleLike).toHaveBeenCalledTimes(1);
+    fireEvent.press(view.getByText(commentCount(11)));
     expect(view.getByText(commentCount(12))).toBeTruthy();
     pending.reject(new Error("synthetic like rejected"));
     await flush();
@@ -290,12 +336,12 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     expect(view.getByText(strings[locale].reflectionLikeFailed)).toBeTruthy();
     expect(changed).not.toHaveBeenCalled();
     fireEvent.press(view.getByText(commentCount(11)));
+    expect(view.queryByText(strings[locale].reflectionLikeFailed)).toBeNull();
     await flush();
     expect(toggleLike).toHaveBeenCalledTimes(2);
-    expect(changed).toHaveBeenCalledTimes(1);
     expect(changed).toHaveBeenLastCalledWith("post", true, 1);
   });
-  it("failed like restores fresh canonical counts instead of subtracting from them", async () => {
+  it("a pending like follows a refreshed count and a failure shows the refreshed count", async () => {
     const pending = deferred(false),
       changed = jest.fn();
     jest.mocked(toggleLike).mockReturnValue(pending.promise);
@@ -311,13 +357,15 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     fireEvent.press(view.getByText(commentCount(11)));
     view.rerender(screen(30));
     await flush();
+    // The refreshed list does not have this like yet, so it shows on top of the new count.
+    expect(view.getByText(commentCount(31))).toBeTruthy();
     pending.reject(new Error("synthetic like rejected"));
     await flush();
     expect(view.getByText(commentCount(30))).toBeTruthy();
     expect(view.queryByText(commentCount(29))).toBeNull();
     expect(changed).not.toHaveBeenCalled();
   });
-  it("admits one comment across duplicate Enter events and keeps it after close/reopen", async () => {
+  it("shows a sent comment at once, sends it once across duplicate Enter events and keeps it after close/reopen", async () => {
     const pending = deferred(comment("new")),
       added = jest.fn();
     jest.mocked(addComment).mockReturnValue(pending.promise);
@@ -334,16 +382,39 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     });
     expect(addComment).toHaveBeenCalledTimes(1);
     expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "New comment", false);
+    // Before the server answers: the input is clear, the comment shows and the count rose.
+    expect(input.props.value).toBe("");
+    expect(view.getAllByText("New comment").length).toBeGreaterThan(0);
+    expect(added).toHaveBeenCalledTimes(1);
+    expect(added).toHaveBeenCalledWith("post");
     jest.mocked(fetchComments).mockResolvedValue({ data: [comment(), comment("new")], hasMore: false });
     pending.resolve(comment("new"));
     await flush();
     expect(added).toHaveBeenCalledTimes(1);
     view.rerender(screen(null));
     view.rerender(screen("post"));
-    await waitFor(() => expect(view.getByText("Synthetic new")).toBeTruthy());
-    expect(fetchComments).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(view.getAllByText("Synthetic new").length).toBeGreaterThan(0));
+    expect(view.queryAllByText("New comment")).toHaveLength(0);
   });
-  it("serializes each comment like independently before React updates busy state", async () => {
+  it("a sending comment takes no like or menu until the server names it", async () => {
+    const pending = deferred(comment("new"));
+    jest.mocked(addComment).mockReturnValue(pending.promise);
+    const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
+      wrapper,
+    });
+    await waitFor(() => expect(view.getByText("Synthetic comment")).toBeTruthy());
+    const menus = view.UNSAFE_getAllByType(MoreHorizontal).length;
+    const input = view.getByPlaceholderText(strings[locale].reflectionAddComment);
+    fireEvent.changeText(input, "Sending comment");
+    fireEvent(input, "submitEditing");
+    const likes = view.getAllByLabelText(strings[locale].likeComment);
+    expect(likes).toHaveLength(3);
+    expect(likes[2].props.accessibilityState?.disabled ?? button(likes[2]).props.disabled).toBe(true);
+    expect(view.UNSAFE_getAllByType(MoreHorizontal)).toHaveLength(menus);
+    pending.resolve(comment("new"));
+    await flush();
+  });
+  it("sends each comment's like on its own and keeps both pressable", async () => {
     const one = deferred(false),
       two = deferred(true);
     jest.mocked(toggleCommentLike).mockReturnValueOnce(one.promise).mockReturnValueOnce(two.promise);
@@ -358,11 +429,16 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       pressOne();
       pressTwo();
     });
+    // The first comment's double tap is a like and an unlike; the server gets the like first.
     expect(toggleCommentLike).toHaveBeenCalledTimes(2);
+    expect(view.getByText(commentCount(17))).toBeTruthy();
+    expect(view.getByText(commentCount(30))).toBeTruthy();
+    expect(button(view.getByText(commentCount(30))).props.disabled).toBeFalsy();
     one.reject(new Error("first like rejected"));
     two.resolve(true);
     await flush();
     expect(view.getByText(commentCount(17))).toBeTruthy();
+    expect(view.getByText(commentCount(30))).toBeTruthy();
     expect(view.getByText(strings[locale].reflectionLikeFailed)).toBeTruthy();
     // The like error shows above the input, below the comments, where the person is looking.
     const tree = JSON.stringify(view.toJSON());
@@ -370,7 +446,7 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     expect(likeError).toBeGreaterThan(tree.indexOf("Synthetic second"));
     expect(likeError).toBeLessThan(tree.indexOf(strings[locale].reflectionAddComment));
   });
-  it("admits one public post before the Mushaf index finishes loading", async () => {
+  it("closes on Post at once and publishes once, before the Mushaf index finishes loading", async () => {
     const pending = deferred(index);
     jest.mocked(loadMushafIndex).mockReturnValue(pending.promise);
     const close = jest.fn(),
@@ -384,6 +460,11 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       "  Synthetic public reflection  ",
     );
     twice(view.getByText(strings[locale].reflectionSubmit));
+    // The person sees it done before anything reaches the server.
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(success).toHaveBeenCalledTimes(1);
+    expect(view.getByText(strings[locale].reflectionPosted)).toBeTruthy();
+    expect(view.getByPlaceholderText(strings[locale].reflectionPlaceholder).props.value).toBe("");
     expect(loadMushafIndex).toHaveBeenCalledTimes(1);
     pending.resolve(index);
     await flush();
@@ -400,8 +481,6 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
       expect.any(Function),
     );
     expect(recordAchievementEvent).toHaveBeenCalledTimes(1);
-    expect(close).toHaveBeenCalledTimes(1);
-    expect(success).toHaveBeenCalledTimes(1);
   });
   it("tells an account under 18 that its reflections are visible only to it (ETH-07)", async () => {
     const sheet = <WriteReflectionSheet open surah={2} ayahStart={1} ayahEnd={1} onClose={jest.fn()} />;
@@ -419,18 +498,18 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     expect(minor.getByText(strings[locale].reflectionMinorPrivate)).toBeTruthy();
     expect(minor.getByPlaceholderText(strings[locale].reflectionPlaceholderPrivate)).toBeTruthy();
   });
-  it("sends the privacy the composer promised and posts nothing when the account is no longer a minor (ETH-07)", async () => {
+  it("sends the privacy the composer promised and brings the draft back when the account is no longer a minor (ETH-07)", async () => {
     const privacyKey = profilePrivacyKeys.mine(user(1).id);
     client.setQueryData(privacyKey, minorPrivacy);
     jest.mocked(createReflection).mockRejectedValue(new ReflectionPrivacyChangedError());
-    const close = jest.fn(),
-      success = jest.fn();
-    const view = render(
-      <WriteReflectionSheet open surah={2} ayahStart={1} ayahEnd={2} onClose={close} onSuccess={success} />,
-      { wrapper },
-    );
+    const close = jest.fn();
+    // The parent keeps this composer open, so the draft returns to it rather than waiting.
+    const view = render(<WriteReflectionSheet open surah={2} ayahStart={1} ayahEnd={2} onClose={close} />, {
+      wrapper,
+    });
     fireEvent.changeText(view.getByPlaceholderText(strings[locale].reflectionPlaceholderPrivate), "A private thought");
     fireEvent.press(view.getByText(strings[locale].reflectionSubmit));
+    expect(close).toHaveBeenCalledTimes(1);
     await flush();
     expect(createReflection).toHaveBeenCalledWith(user(1).id, 2, 1, 2, 3, 3, "A private thought", true, expect.any(Function));
     expect(view.getByText(strings[locale].reflectionPrivacyChanged).props.accessibilityRole).toBe("alert");
@@ -438,16 +517,18 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     expect(view.queryByText(strings[locale].reflectionMinorPrivate)).toBeNull();
     expect(client.getQueryState(privacyKey)?.isInvalidated).toBe(true);
     expect(view.getByDisplayValue("A private thought")).toBeTruthy();
-    expect(close).not.toHaveBeenCalled();
-    expect(success).not.toHaveBeenCalled();
     expect(recordAchievementEvent).not.toHaveBeenCalled();
   });
-  it("sends the privacy the comment input promised and posts nothing when the account is no longer a minor (ETH-07)", async () => {
+  it("sends the privacy the comment input promised and brings the comment back when the account is no longer a minor (ETH-07)", async () => {
     const privacyKey = profilePrivacyKeys.mine(user(1).id);
     client.setQueryData(privacyKey, minorPrivacy);
     jest.mocked(addComment).mockRejectedValue(new ReflectionPrivacyChangedError());
-    const added = jest.fn();
-    const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={added} />, { wrapper });
+    const added = jest.fn(),
+      removed = jest.fn();
+    const view = render(
+      <CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={added} onCommentRemoved={removed} />,
+      { wrapper },
+    );
     await waitFor(() => expect(view.getByText("Synthetic comment")).toBeTruthy());
     expect(view.getByText(strings[locale].reflectionMinorPrivate)).toBeTruthy();
     const input = view.getByPlaceholderText(strings[locale].reflectionAddComment);
@@ -461,29 +542,25 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     expect(view.queryByText(strings[locale].commentPostFailed)).toBeNull();
     expect(client.getQueryState(privacyKey)?.isInvalidated).toBe(true);
     expect(view.getByDisplayValue("A private comment")).toBeTruthy();
-    expect(added).not.toHaveBeenCalled();
+    // The count rose when it showed and fell when it was taken back.
+    expect(added).toHaveBeenCalledTimes(1);
+    expect(removed).toHaveBeenCalledTimes(1);
   });
-  it("does not dispatch a public post after its index wait loses the source", async () => {
+  it("does not dispatch a public post after the account changes during its index wait", async () => {
     const pending = deferred(index);
     jest.mocked(loadMushafIndex).mockReturnValue(pending.promise);
-    const close = jest.fn();
-    const screen = (ayah: number) => (
-      <WriteReflectionSheet open surah={2} ayahStart={ayah} ayahEnd={ayah} onClose={close} />
-    );
-    const view = render(screen(1), { wrapper });
-    fireEvent.changeText(
-      view.getByPlaceholderText(strings[locale].reflectionPlaceholder),
-      "Synthetic public reflection",
-    );
+    const view = render(<WriteReflectionSheet open surah={2} ayahStart={1} ayahEnd={1} onClose={jest.fn()} />, {
+      wrapper,
+    });
+    fireEvent.changeText(view.getByPlaceholderText(strings[locale].reflectionPlaceholder), "Synthetic public reflection");
     fireEvent.press(view.getByText(strings[locale].reflectionSubmit));
-    view.rerender(screen(2));
+    act(() => activate(2));
     pending.resolve(index);
     await flush();
     expect(createReflection).not.toHaveBeenCalled();
     expect(recordAchievementEvent).not.toHaveBeenCalled();
-    expect(close).not.toHaveBeenCalled();
   });
-  it("old like cleanup cannot clear a new account's busy lease or publish its failure", async () => {
+  it("a like from an earlier account neither shows nor reports in the next account's view", async () => {
     const old = deferred(false),
       newer = deferred(true),
       changed = jest.fn();
@@ -495,12 +572,14 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
     fireEvent.press(view.getByText(commentCount(11)));
     act(() => activate(2));
     await flush();
+    expect(view.getByText(commentCount(11))).toBeTruthy();
     fireEvent.press(view.getByText(commentCount(11)));
     expect(toggleLike).toHaveBeenCalledTimes(2);
+    expect(toggleLike).toHaveBeenLastCalledWith(user(2).id, "post", false);
     old.reject(new Error("old account error"));
     await flush();
     expect(view.queryByText(strings[locale].reflectionLikeFailed)).toBeNull();
-    expect(button(view.getByText(commentCount(12))).props.disabled).toBe(true);
+    expect(view.getByText(commentCount(12))).toBeTruthy();
     newer.resolve(true);
     await flush();
     expect(changed).toHaveBeenCalledTimes(1);
@@ -508,31 +587,44 @@ describe.each(["en", "ar"] as const)("community writes in %s phone", (locale) =>
   });
 });
 
-it.each(["account", "ABA", "target", "close", "database", "unmount"] as const)(
-  "issued public-post reply cannot publish after %s retirement",
+it.each(["account", "ABA"] as const)("a post's reply after an %s change publishes nothing", async (retirement) => {
+  mockLocale = "en";
+  const pending = deferred(post("new"));
+  jest.mocked(createReflection).mockReturnValue(pending.promise);
+  const invalidate = jest.spyOn(client, "invalidateQueries");
+  const view = render(<WriteReflectionSheet open surah={2} ayahStart={1} ayahEnd={1} onClose={jest.fn()} />, {
+    wrapper,
+  });
+  fireEvent.changeText(view.getByPlaceholderText(strings.en.reflectionPlaceholder), "Original synthetic draft");
+  fireEvent.press(view.getByText(strings.en.reflectionSubmit));
+  await waitFor(() => expect(createReflection).toHaveBeenCalledTimes(1));
+  act(() => activate(2));
+  if (retirement === "ABA") act(() => activate(1));
+  fireEvent.changeText(view.getByPlaceholderText(strings.en.reflectionPlaceholder), "Current replacement draft");
+  expect(jest.mocked(createReflection).mock.calls[0][8]?.()).toBe(false);
+  pending.resolve(post("new"));
+  await flush();
+  expect(recordAchievementEvent).not.toHaveBeenCalled();
+  expect(invalidate).not.toHaveBeenCalled();
+  expect(view.getByPlaceholderText(strings.en.reflectionPlaceholder).props.value).toBe("Current replacement draft");
+});
+
+it.each(["target", "close", "database", "unmount"] as const)(
+  "a post keeps going after its composer's %s, since it belongs to the account",
   async (retirement) => {
     mockLocale = "en";
-    const pending = deferred(post("new")),
-      close = jest.fn(),
-      success = jest.fn();
+    const pending = deferred(post("new"));
     jest.mocked(createReflection).mockReturnValue(pending.promise);
     const invalidate = jest.spyOn(client, "invalidateQueries");
     const screen = (ayah = 1, open = true) => (
-      <WriteReflectionSheet open={open} surah={2} ayahStart={ayah} ayahEnd={ayah} onClose={close} onSuccess={success} />
+      <WriteReflectionSheet open={open} surah={2} ayahStart={ayah} ayahEnd={ayah} onClose={jest.fn()} />
     );
     const view = render(screen(), { wrapper });
     fireEvent.changeText(view.getByPlaceholderText(strings.en.reflectionPlaceholder), "Original synthetic draft");
     fireEvent.press(view.getByText(strings.en.reflectionSubmit));
     await waitFor(() => expect(createReflection).toHaveBeenCalledTimes(1));
-    if (retirement === "account" || retirement === "ABA") {
-      act(() => activate(2));
-      if (retirement === "ABA") act(() => activate(1));
-    }
     if (retirement === "target") view.rerender(screen(2));
     if (retirement === "close") {
-      // The typed draft asks before closing; Discard completes the close and retires the post.
-      fireEvent.press(view.getByTestId("close-sheet"));
-      fireEvent.press(view.getByText(strings.en.discardChangesConfirm));
       view.rerender(screen(1, false));
       view.rerender(screen());
     }
@@ -543,19 +635,17 @@ it.each(["account", "ABA", "target", "close", "database", "unmount"] as const)(
     if (retirement === "unmount") view.unmount();
     if (retirement !== "unmount")
       fireEvent.changeText(view.getByPlaceholderText(strings.en.reflectionPlaceholder), "Current replacement draft");
-    expect(jest.mocked(createReflection).mock.calls[0][8]?.()).toBe(false);
+    expect(jest.mocked(createReflection).mock.calls[0][8]?.()).toBe(true);
     pending.resolve(post("new"));
     await flush();
-    expect(recordAchievementEvent).not.toHaveBeenCalled();
-    expect(invalidate).not.toHaveBeenCalled();
-    expect(success).not.toHaveBeenCalled();
-    expect(close).toHaveBeenCalledTimes(retirement === "close" ? 1 : 0);
+    expect(recordAchievementEvent).toHaveBeenCalledTimes(1);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: keys.feed.all });
     if (retirement !== "unmount")
       expect(view.getByPlaceholderText(strings.en.reflectionPlaceholder).props.value).toBe("Current replacement draft");
   },
 );
 
-it("public-post failure retains its draft, enables editing and retries with the same source", async () => {
+it("a failed post brings its draft back to the open composer with Try again", async () => {
   mockLocale = "ar";
   const pending = deferred(post("new")),
     close = jest.fn();
@@ -564,20 +654,40 @@ it("public-post failure retains its draft, enables editing and retries with the 
   const draft = "Synthetic retained draft";
   fireEvent.changeText(view.getByPlaceholderText(strings.ar.reflectionPlaceholder), draft);
   fireEvent.press(view.getByText(strings.ar.reflectionSubmit));
+  expect(close).toHaveBeenCalledTimes(1);
   await waitFor(() => expect(createReflection).toHaveBeenCalledTimes(1));
-  expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.editable).toBe(false);
   pending.reject(new Error("synthetic post rejected"));
   await flush();
   // Server details go to the log; the person sees the plain message with Try again.
   expect(view.getByText(strings.ar.reflectionPostFailed)).toBeTruthy();
   expect(view.queryByText("synthetic post rejected")).toBeNull();
-  expect(view.getByText(strings.ar.sharedTryAgain)).toBeTruthy();
   expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.value).toBe(draft);
-  expect(view.getByPlaceholderText(strings.ar.reflectionPlaceholder).props.editable).toBe(true);
-  fireEvent.press(view.getByText(strings.ar.reflectionSubmit));
+  // Returned to the open composer, so no separate notice repeats it.
+  expect(view.queryByText(strings.ar.reflectionPostFailedDraftKept)).toBeNull();
+  fireEvent.press(view.getByText(strings.ar.sharedTryAgain));
   await flush();
   expect(createReflection).toHaveBeenCalledTimes(2);
-  expect(close).toHaveBeenCalledTimes(1);
+  expect(close).toHaveBeenCalledTimes(2);
+});
+
+it("a post that fails after its composer closed says so and offers its draft when the composer opens again", async () => {
+  mockLocale = "en";
+  const pending = deferred(post("new"));
+  jest.mocked(createReflection).mockReturnValueOnce(pending.promise);
+  const screen = (open: boolean) => (
+    <WriteReflectionSheet open={open} surah={2} ayahStart={1} ayahEnd={2} onClose={jest.fn()} />
+  );
+  const view = render(screen(true), { wrapper });
+  fireEvent.changeText(view.getByPlaceholderText(strings.en.reflectionPlaceholder), "Kept synthetic draft");
+  fireEvent.press(view.getByText(strings.en.reflectionSubmit));
+  view.rerender(screen(false));
+  await waitFor(() => expect(createReflection).toHaveBeenCalledTimes(1));
+  pending.reject(new Error("synthetic post rejected"));
+  await flush();
+  expect(view.getByText(strings.en.reflectionPostFailedDraftKept)).toBeTruthy();
+  view.rerender(screen(true));
+  expect(view.getByPlaceholderText(strings.en.reflectionPlaceholder).props.value).toBe("Kept synthetic draft");
+  expect(view.getByText(strings.en.reflectionPostFailed)).toBeTruthy();
 });
 
 it.each(["en", "ar"] as const)(
@@ -655,7 +765,7 @@ it("refreshes the feed and ayah counts when posting from the standalone comments
   expect(invalidate).toHaveBeenCalledWith({ queryKey: keys.reflections.all });
 });
 
-it("comment likes restore new canonical query rows after failure and invalidate only that post on success", async () => {
+it("comment likes follow new canonical rows, restore them after failure and invalidate only that post on success", async () => {
   mockLocale = "en";
   const pending = deferred(false);
   jest.mocked(toggleCommentLike).mockReturnValueOnce(pending.promise);
@@ -674,7 +784,8 @@ it("comment likes restore new canonical query rows after failure and invalidate 
       pageParams: [0],
     }),
   );
-  await waitFor(() => expect(view.getByText(commentCount(30))).toBeTruthy());
+  // The new rows do not have this like yet, so it shows on top of them.
+  await waitFor(() => expect(view.getByText(commentCount(31))).toBeTruthy());
   pending.reject(new Error("like rejected"));
   await flush();
   expect(view.getByText(commentCount(30))).toBeTruthy();
@@ -685,7 +796,7 @@ it("comment likes restore new canonical query rows after failure and invalidate 
   expect(client.getQueryState(other)?.isInvalidated).toBe(false);
 });
 
-it("a comment completion after closed ABA cannot clear a new draft, append or invalidate", async () => {
+it("a comment sent before its sheet closed still posts and leaves the new draft alone", async () => {
   mockLocale = "en";
   const pending = deferred(comment("new")),
     added = jest.fn();
@@ -698,33 +809,67 @@ it("a comment completion after closed ABA cannot clear a new draft, append or in
   view.rerender(screen(null));
   view.rerender(screen("post"));
   fireEvent.changeText(view.getByPlaceholderText(strings.en.reflectionAddComment), "New draft");
+  // Still shown in the reopened sheet while it sends.
+  expect(view.getAllByText("Old draft").length).toBeGreaterThan(0);
   const invalidate = jest.spyOn(client, "invalidateQueries");
   pending.resolve(comment("new"));
   await flush();
-  expect(added).not.toHaveBeenCalled();
-  expect(invalidate).not.toHaveBeenCalled();
-  expect(view.queryByText("Synthetic new")).toBeNull();
+  expect(added).toHaveBeenCalledTimes(1);
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: keys.comments.forReflection("post") });
+  expect(view.getAllByText("Synthetic new").length).toBeGreaterThan(0);
   expect(view.getByPlaceholderText(strings.en.reflectionAddComment).props.value).toBe("New draft");
 });
 
-it("a failed comment retains its draft and retries without duplicate writes", async () => {
+it("a comment from an earlier account is dropped without touching the next account's sheet", async () => {
+  mockLocale = "en";
+  const pending = deferred(comment("new")),
+    removed = jest.fn();
+  jest.mocked(addComment).mockReturnValue(pending.promise);
+  const view = render(
+    <CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} onCommentRemoved={removed} />,
+    { wrapper },
+  );
+  await waitFor(() => expect(view.getByText("Synthetic comment")).toBeTruthy());
+  fireEvent.changeText(view.getByPlaceholderText(strings.en.reflectionAddComment), "Old account draft");
+  fireEvent(view.getByPlaceholderText(strings.en.reflectionAddComment), "submitEditing");
+  act(() => activate(2));
+  await flush();
+  expect(view.queryAllByText("Old account draft")).toHaveLength(0);
+  pending.reject(new Error("old account comment rejected"));
+  await flush();
+  expect(removed).not.toHaveBeenCalled();
+  expect(view.getByPlaceholderText(strings.en.reflectionAddComment).props.value).toBe("");
+  expect(view.queryByText(strings.en.commentPostFailed)).toBeNull();
+});
+
+it("a failed comment leaves the list, brings its text back and retries", async () => {
   mockLocale = "ar";
   const pending = deferred(comment("new")),
-    added = jest.fn();
+    added = jest.fn(),
+    removed = jest.fn();
   jest.mocked(addComment).mockReturnValueOnce(pending.promise);
-  const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={added} />, { wrapper });
+  const view = render(
+    <CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={added} onCommentRemoved={removed} />,
+    { wrapper },
+  );
   await waitFor(() => expect(view.getByText("Synthetic comment")).toBeTruthy());
   const input = view.getByPlaceholderText(strings.ar.reflectionAddComment);
   fireEvent.changeText(input, "Synthetic draft");
   fireEvent(input, "submitEditing");
+  expect(input.props.value).toBe("");
+  expect(view.getAllByText("Synthetic draft").length).toBeGreaterThan(0);
   pending.reject(new Error("comment rejected"));
   await flush();
+  expect(view.queryAllByText("Synthetic draft").filter((node) => node.props.value === undefined)).toHaveLength(0);
   expect(input.props.value).toBe("Synthetic draft");
   expect(view.getByText(strings.ar.commentPostFailed)).toBeTruthy();
+  expect(added).toHaveBeenCalledTimes(1);
+  expect(removed).toHaveBeenCalledTimes(1);
   fireEvent(input, "submitEditing");
   await flush();
   expect(addComment).toHaveBeenCalledTimes(2);
-  expect(added).toHaveBeenCalledTimes(1);
+  expect(added).toHaveBeenCalledTimes(2);
+  expect(removed).toHaveBeenCalledTimes(1);
 });
 
 it("confirmed unlike updates only the affected ayahs and feed caches", async () => {
@@ -761,7 +906,7 @@ async function pickMenuItem(view: ReturnType<typeof render>, label: string, trig
 }
 const ownPost = (id = "post") => ({ ...post(id), user_id: user(1).id });
 
-it("reports after a confirmation, admits one request, keeps the dialog through failure and then shows Reported", async () => {
+it("reports after a confirmation, shows Reported at once, and takes it back with a notice when the report fails", async () => {
   mockLocale = "en";
   const pending = deferred<void>(undefined);
   jest.mocked(reportReflection).mockReturnValueOnce(pending.promise);
@@ -776,18 +921,23 @@ it("reports after a confirmation, admits one request, keeps the dialog through f
   twice(view.getByText(strings.en.reflectionReportConfirm));
   expect(reportReflection).toHaveBeenCalledTimes(1);
   expect(reportReflection).toHaveBeenCalledWith(user(1).id, "post");
+  // Closed and confirmed before the server answers.
+  expect(view.queryByText(strings.en.reflectionReportBody)).toBeNull();
+  expect(view.getByText(strings.en.reflectionReportSent)).toBeTruthy();
+  fireEvent.press(view.UNSAFE_getByType(MoreHorizontal));
+  expect(button(view.getByText(strings.en.reflectionReported)).props.disabled).toBe(true);
   pending.reject(new Error("report rejected"));
   await flush();
   expect(view.getByText(strings.en.reflectionReportFailed)).toBeTruthy();
-  fireEvent.press(view.getByText(strings.en.sharedTryAgain));
+  await pickMenuItem(view, strings.en.reflectionReportAction);
+  fireEvent.press(view.getByText(strings.en.reflectionReportConfirm));
   await flush();
   expect(reportReflection).toHaveBeenCalledTimes(2);
-  expect(view.queryByText(strings.en.reflectionReportBody)).toBeNull();
   fireEvent.press(view.UNSAFE_getByType(MoreHorizontal));
   expect(button(view.getByText(strings.en.reflectionReported)).props.disabled).toBe(true);
 });
 
-it("an owned reflection offers Delete with cascade copy and removes it from caches only after the server confirms", async () => {
+it("an owned reflection offers Delete with cascade copy, leaves at once and is removed from caches once the server confirms", async () => {
   mockLocale = "en";
   const pending = deferred(false),
     gone = jest.fn();
@@ -818,7 +968,11 @@ it("an owned reflection offers Delete with cascade copy and removes it from cach
   twice(view.getByText(strings.en.reflectionDeleteConfirm));
   expect(deleteReflection).toHaveBeenCalledTimes(1);
   expect(deleteReflection).toHaveBeenCalledWith(user(1).id, "post");
-  // Nothing is discarded before the server answers.
+  // Gone from the screen before the server answers; the caches change only after it does.
+  expect(view.queryByText(source.content)).toBeNull();
+  expect(view.queryByText(strings.en.reflectionDeleteBody)).toBeNull();
+  expect(view.getByText(strings.en.reflectionDeleted)).toBeTruthy();
+  expect(gone).toHaveBeenCalledWith(source);
   expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toHaveLength(2);
   pending.resolve(true);
   await flush();
@@ -828,11 +982,10 @@ it("an owned reflection offers Delete with cascade copy and removes it from cach
   expect(client.getQueryData<{ data: Reflection[] }>(ayah)?.data).toEqual([]);
   expect(client.getQueryData(comments)).toBeUndefined();
   expect(client.getQueryState(count)?.isInvalidated).toBe(true);
-  expect(gone).toHaveBeenCalledWith(source);
-  expect(view.queryByText(strings.en.reflectionDeleteBody)).toBeNull();
+  expect(view.queryByText(source.content)).toBeNull();
 });
 
-it("a false delete result keeps the record, refreshes and never claims deletion", async () => {
+it("a false delete result keeps it gone and refreshes the lists", async () => {
   mockLocale = "en";
   jest.mocked(deleteReflection).mockResolvedValueOnce(false);
   const source = ownPost();
@@ -845,28 +998,40 @@ it("a false delete result keeps the record, refreshes and never claims deletion"
   await pickMenuItem(view, strings.en.reflectionDeleteAction);
   fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
   await flush();
-  expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toEqual([source]);
   expect(client.getQueryState(feed)?.isInvalidated).toBe(true);
-  expect(view.queryByText(strings.en.reflectionDeleted)).toBeNull();
+  expect(view.queryByText(source.content)).toBeNull();
+  expect(view.queryByText(strings.en.reflectionDeleteFailed)).toBeNull();
 });
 
-it("a failed delete keeps the confirmation, its error and the record, and retries", async () => {
+it("a failed delete brings the reflection back, refreshes the lists that dropped it and says so", async () => {
   mockLocale = "en";
   jest.mocked(deleteReflection).mockRejectedValueOnce(new Error("synthetic delete failure"));
   const source = ownPost();
   const feed = keys.feed.list({ filter: { type: "all" }, sort: "newest", viewerId: user(1).id, searchTerm: "" });
+  const ayah = keys.reflections.firstPage({ surah: 2, ayah: 1, viewerId: user(1).id });
   client.setQueryData(feed, { pages: [{ data: [source], hasMore: false }], pageParams: [0] });
+  client.setQueryData(ayah, { data: [source], hasMore: false });
+  const gone = jest.fn();
   const view = render(
-    <ReflectionCard reflection={source} variant="feed" onLikeToggled={jest.fn()} onCommentsPress={jest.fn()} />,
+    <ReflectionCard
+      reflection={source}
+      variant="feed"
+      onLikeToggled={jest.fn()}
+      onCommentsPress={jest.fn()}
+      onGone={gone}
+    />,
     { wrapper },
   );
   await pickMenuItem(view, strings.en.reflectionDeleteAction);
   fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
+  expect(view.queryByText(source.content)).toBeNull();
   await flush();
+  expect(view.getByText(source.content)).toBeTruthy();
   expect(view.getByText(strings.en.reflectionDeleteFailed)).toBeTruthy();
-  expect(view.getByText(strings.en.reflectionDeleteBody)).toBeTruthy();
   expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toEqual([source]);
-  fireEvent.press(view.getByText(strings.en.sharedTryAgain));
+  expect(client.getQueryState(ayah)?.isInvalidated).toBe(true);
+  await pickMenuItem(view, strings.en.reflectionDeleteAction);
+  fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
   await flush();
   expect(deleteReflection).toHaveBeenCalledTimes(2);
   expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(feed)?.pages[0].data).toEqual([]);
@@ -893,12 +1058,14 @@ it("a delete that completes after an account switch changes nothing in the new a
   await pickMenuItem(view, strings.en.reflectionDeleteAction);
   fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
   expect(deleteReflection).toHaveBeenCalledWith(user(1).id, "post");
+  expect(gone).toHaveBeenCalledTimes(1);
   act(() => activate(2));
+  // Another account sees the reflection; the hidden entry belongs to the first account.
+  expect(view.getByText(source.content)).toBeTruthy();
   pending.resolve(true);
   await flush();
   expect(client.getQueryData<{ pages: { data: Reflection[] }[] }>(otherFeed)?.pages[0].data).toEqual([source]);
   expect(client.getQueryState(otherFeed)?.isInvalidated).toBe(false);
-  expect(gone).not.toHaveBeenCalled();
 });
 
 it("an own comment offers Delete through the comment RPC; another's offers Report reflection for the parent", async () => {
@@ -937,22 +1104,46 @@ it("an own comment offers Delete through the comment RPC; another's offers Repor
   await waitFor(() => expect(view.queryAllByText("Synthetic mine")).toHaveLength(0));
 });
 
-it("a false comment delete does not lower the count and the comment list refreshes", async () => {
+it("a false comment delete keeps the comment gone and refreshes the list", async () => {
   mockLocale = "en";
-  const removed = jest.fn();
+  const removed = jest.fn(),
+    added = jest.fn();
   jest.mocked(deleteReflectionComment).mockResolvedValueOnce(false);
   jest.mocked(fetchComments).mockResolvedValue({ data: [{ ...comment("mine"), user_id: user(1).id }], hasMore: false });
   const view = render(
-    <CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} onCommentRemoved={removed} />,
+    <CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={added} onCommentRemoved={removed} />,
     { wrapper },
   );
   await waitFor(() => expect(view.getByText("Synthetic mine")).toBeTruthy());
   const calls = jest.mocked(fetchComments).mock.calls.length;
   await pickMenuItem(view, strings.en.commentDeleteAction, 0);
   fireEvent.press(view.getByText(strings.en.reflectionDeleteConfirm));
+  expect(removed).toHaveBeenCalledTimes(1);
   await flush();
-  expect(removed).not.toHaveBeenCalled();
+  expect(added).not.toHaveBeenCalled();
+  expect(view.queryAllByText("Synthetic mine")).toHaveLength(0);
   expect(jest.mocked(fetchComments).mock.calls.length).toBeGreaterThan(calls);
+});
+
+it("a failed comment delete brings the comment and its count back and says so", async () => {
+  mockLocale = "ar";
+  const removed = jest.fn(),
+    added = jest.fn();
+  jest.mocked(deleteReflectionComment).mockRejectedValueOnce(new Error("synthetic comment delete failure"));
+  jest.mocked(fetchComments).mockResolvedValue({ data: [{ ...comment("mine"), user_id: user(1).id }], hasMore: false });
+  const view = render(
+    <CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={added} onCommentRemoved={removed} />,
+    { wrapper },
+  );
+  await waitFor(() => expect(view.getByText("Synthetic mine")).toBeTruthy());
+  await pickMenuItem(view, strings.ar.commentDeleteAction, 0);
+  fireEvent.press(view.getByText(strings.ar.reflectionDeleteConfirm));
+  expect(view.queryAllByText("Synthetic mine")).toHaveLength(0);
+  expect(removed).toHaveBeenCalledTimes(1);
+  await flush();
+  expect(view.getAllByText("Synthetic mine").length).toBeGreaterThan(0);
+  expect(added).toHaveBeenCalledTimes(1);
+  expect(view.getByText(strings.ar.commentDeleteFailed)).toBeTruthy();
 });
 
 it("an old callback cannot capture a new account before React commits its replacement render", () => {
@@ -993,10 +1184,10 @@ it("same-user session replacement removes the prior optimistic comment preview",
   await flush();
 });
 
-it("a confirmed comment like rebases fresh counts before another press", async () => {
+it("a confirmed comment like holds until the list shows it, then the next press unlikes", async () => {
   mockLocale = "en";
   const pending = deferred(true),
-    refetch = deferred({ data: [comment("comment", 31)], hasMore: false });
+    refetch = deferred({ data: [{ ...comment("comment", 31), user_has_liked: true }], hasMore: false });
   jest.mocked(toggleCommentLike).mockReturnValueOnce(pending.promise);
   const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
     wrapper,
@@ -1009,15 +1200,17 @@ it("a confirmed comment like rebases fresh counts before another press", async (
       pageParams: [0],
     }),
   );
-  await waitFor(() => expect(view.getByText(commentCount(30))).toBeTruthy());
+  await waitFor(() => expect(view.getByText(commentCount(31))).toBeTruthy());
   jest.mocked(fetchComments).mockReturnValue(refetch.promise);
   pending.resolve(true);
   await flush();
   expect(view.getByText(commentCount(31))).toBeTruthy();
-  fireEvent.press(view.getByText(commentCount(31)));
-  expect(toggleCommentLike).toHaveBeenLastCalledWith(user(1).id, "comment", true);
+  refetch.resolve({ data: [{ ...comment("comment", 31), user_has_liked: true }], hasMore: false });
   await flush();
-  refetch.resolve({ data: [comment("comment", 30)], hasMore: false });
+  expect(view.getByText(commentCount(31))).toBeTruthy();
+  fireEvent.press(view.getByText(commentCount(31)));
+  expect(view.getByText(commentCount(30))).toBeTruthy();
+  expect(toggleCommentLike).toHaveBeenLastCalledWith(user(1).id, "comment", true);
   await flush();
 });
 

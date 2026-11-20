@@ -17,6 +17,23 @@ type Scope = {
   pending: Map<string, object>;
 };
 
+/**
+ * An account-scoped check for a write the screen already showed as done. Its outcome must still reach
+ * the person after the card or sheet that started it closes, so it ends only when another account or
+ * session takes over. Null when `viewerId` is not the signed-in account any more (a captured old
+ * callback), so nothing is sent for it.
+ */
+export function captureViewerLease(viewerId: string): (() => boolean) | null {
+  const state = useAuthStore.getState();
+  if (state.user?.id !== viewerId) return null;
+  const session = sessionKey(state.session),
+    owner = authCommands.captureOwner();
+  return () =>
+    owner.isCurrent() &&
+    useAuthStore.getState().user?.id === viewerId &&
+    sessionKey(useAuthStore.getState().session) === session;
+}
+
 // Community writes and manual pages share admission, but each operation owns its busy state.
 export function useReflectionMutationScope(key: string, viewerId?: string, database?: unknown) {
   const session = useAuthStore((state) => sessionKey(state.session));

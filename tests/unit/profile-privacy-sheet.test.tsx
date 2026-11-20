@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ProfilePrivacySheet } from "@/components/settings/ProfilePrivacySheet";
 import { strings } from "@/lib/i18n/strings";
+import { profilePrivacyKeys } from "@/lib/profile/privacy";
 import { signedIn, type FakeAuthState } from "./social-test-auth";
 
 const mockSettings = {
@@ -117,7 +118,7 @@ function renderSheet() {
       </QueryClientProvider>
     </SafeAreaProvider>,
   );
-  return { ...view, onClose, onNotice };
+  return { ...view, onClose, onNotice, client };
 }
 
 const en = strings.en;
@@ -129,7 +130,14 @@ describe("Privacy and sharing (SET-20)", () => {
     fireEvent.press(view.getByRole("switch", { name: en.profileShowStreak }));
     fireEvent.press(view.getByRole("switch", { name: en.profileShowJuz }));
     fireEvent.press(view.getByRole("button", { name: en.socialSave }));
-    await waitFor(() => expect(view.onNotice).toHaveBeenCalledWith(en.socialSaved));
+    // Closed and confirmed at once, with the new choices in use while the server stores them.
+    expect(view.onNotice).toHaveBeenCalledWith(en.socialSaved);
+    expect(view.onClose).toHaveBeenCalledTimes(1);
+    expect(view.client.getQueryData(profilePrivacyKeys.mine(USER))).toMatchObject({
+      showStreak: false,
+      showJuzCompletions: false,
+    });
+    await waitFor(() => expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", expect.anything()));
     expect(mockRpc).toHaveBeenCalledWith("set_profile_privacy", {
       p_show_streak: false,
       p_show_juz_completions: false,
@@ -137,6 +145,26 @@ describe("Privacy and sharing (SET-20)", () => {
       p_expected_minor: false,
     });
     expect(view.onClose).toHaveBeenCalled();
+  });
+
+  it("restores the stored choices and says they were not saved when the server refuses", async () => {
+    const base = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation(async (fn, args) =>
+      fn === "set_profile_privacy"
+        ? { data: null, error: { code: "XX000", message: "synthetic failure" } }
+        : base(fn, args),
+    );
+    const view = renderSheet();
+    await waitFor(() => expect(view.getByText(en.profileShowStreak)).toBeTruthy(), { timeout: 5000 });
+    fireEvent.press(view.getByRole("switch", { name: en.profileShowStreak }));
+    fireEvent.press(view.getByRole("button", { name: en.socialSave }));
+    expect(view.onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(view.onNotice).toHaveBeenLastCalledWith(`${en.privacyNotSaved} ${en.socialErrorGeneric}`),
+    );
+    await waitFor(() =>
+      expect(view.client.getQueryData(profilePrivacyKeys.mine(USER))).toMatchObject({ showStreak: true }),
+    );
   });
 
   it("does not mention halaqas to someone who is in none", async () => {
@@ -154,8 +182,25 @@ describe("Privacy and sharing (SET-20)", () => {
     expect(view.getByText(en.legacyHalaqaConfirm)).toBeTruthy();
     expect(mockRpc.mock.calls.some(([fn]) => fn === "leave_halaqa")).toBe(false);
     fireEvent.press(view.getByRole("button", { name: en.legacyHalaqaConfirmLeave }));
+    // Shown as left before the server answers.
+    expect(view.getByText(en.legacyHalaqaLeft)).toBeTruthy();
+    await waitFor(() => expect(mockRpc).toHaveBeenCalledWith("leave_halaqa", { p_group_id: GROUP }));
     await waitFor(() => expect(view.getByText(en.legacyHalaqaLeft)).toBeTruthy());
-    expect(mockRpc).toHaveBeenCalledWith("leave_halaqa", { p_group_id: GROUP });
     expect(view.queryByRole("button", { name: en.legacyHalaqaLeave })).toBeNull();
+  });
+
+  it("brings the halaqas back with the reason when leaving them fails", async () => {
+    halaqaIds = [GROUP];
+    const base = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation(async (fn, args) =>
+      fn === "leave_halaqa" ? { data: null, error: { code: "XX000", message: "synthetic failure" } } : base(fn, args),
+    );
+    const view = renderSheet();
+    await waitFor(() => expect(view.getByText(en.legacyHalaqaBody)).toBeTruthy(), { timeout: 5000 });
+    fireEvent.press(view.getByRole("button", { name: en.legacyHalaqaLeave }));
+    fireEvent.press(view.getByRole("button", { name: en.legacyHalaqaConfirmLeave }));
+    expect(view.getByText(en.legacyHalaqaLeft)).toBeTruthy();
+    expect(await view.findByText(`${en.legacyHalaqaStillIn} ${en.socialErrorGeneric}`)).toBeTruthy();
+    expect(view.getByText(en.legacyHalaqaBody)).toBeTruthy();
   });
 });

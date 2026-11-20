@@ -1,4 +1,5 @@
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { authCommands } from "@/lib/auth/commands";
 import { useAuthStore } from "@/lib/auth/store";
 import type { Profile } from "@/lib/auth/types";
 
@@ -180,6 +181,54 @@ it("preserves existing atomic local signout", async () => {
   activate(session("a"), profile("a"));
   await useAuthStore.getState().signOut();
   expect(useAuthStore.getState()).toMatchObject({ user: null, session: null, profile: null, isLoading: false });
+});
+
+it("keeps the account until its sign-out's turn in the auth queue, so no read goes out with a removed account's token", async () => {
+  activate(session("a"), profile("a"));
+  let release: () => void = () => undefined;
+  const earlier = authCommands.transition(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const ended = useAuthStore.getState().signOut();
+  await flush();
+  expect(useAuthStore.getState().user?.id).toBe("a");
+  expect(mockSignOut).not.toHaveBeenCalled();
+  release();
+  await earlier;
+  await flush();
+  expect(useAuthStore.getState().user).toBeNull();
+  expect(mockSignOut).toHaveBeenCalledTimes(1);
+  await ended;
+});
+
+it("signs out on this device at once and ignores a session the SDK renews before removing it", async () => {
+  await useAuthStore.getState().initialize();
+  activate(session("a"), profile("a"));
+  let finishSignOut: (value: { error: null }) => void = () => undefined;
+  mockSignOut.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishSignOut = resolve;
+      }),
+  );
+  const ended = useAuthStore.getState().signOut();
+  await flush();
+  // Before the SDK answers, every screen already reads a signed-out device.
+  expect(mockSignOut).toHaveBeenCalledTimes(1);
+  expect(useAuthStore.getState()).toMatchObject({ user: null, session: null, profile: null, isLoading: false });
+  if (!mockListener) throw new Error("No listener");
+  mockListener("TOKEN_REFRESHED", session("a"));
+  expect(useAuthStore.getState().user).toBeNull();
+  mockListener("SIGNED_OUT", null);
+  finishSignOut({ error: null });
+  await ended;
+  expect(useAuthStore.getState()).toMatchObject({ user: null, session: null, sessionEnded: false });
+  // Once the sign-out has finished, a later sign-in is published as usual.
+  mockListener("SIGNED_IN", session("b"));
+  expect(useAuthStore.getState().user?.id).toBe("b");
 });
 
 it.each<Route>(["password", "restore"])("preserves current profile on failed $route", async (route) => {

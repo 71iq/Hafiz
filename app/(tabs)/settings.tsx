@@ -336,9 +336,10 @@ export default function SettingsScreen() {
     s.qfNeedsReauth,
   ]);
 
-  const handleLogout = useCallback(async () => {
-    await signOut();
+  // The account leaves the screen at once; the server request that ends the session runs behind it.
+  const handleLogout = useCallback(() => {
     setLogoutDialogVisible(false);
+    void signOut();
   }, [signOut]);
 
   const handleQfConnect = useCallback(async () => {
@@ -371,22 +372,29 @@ export default function SettingsScreen() {
     }
   }, [captureAccount, router, s.qfConnectionFailed, s.qfConnectionStarted]);
 
-  const handleQfDisconnect = useCallback(async () => {
+  // Disconnect shows at once; a refusal puts back the status shown before and says so. It does not
+  // read the status again, since a read that fails offline would also say "disconnected".
+  const handleQfDisconnect = useCallback(() => {
     const isCurrentAccount = captureAccount();
-    setQfBusy(true);
-    setQfMessage(null);
-    try {
-      await disconnectQfUser();
-      await refreshQfStatus();
-      if (!isCurrentAccount()) return;
-      setQfStatus("disconnected");
-      setQfMessage(s.qfDisconnected);
-    } catch (err) {
-      if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfSyncFailed);
-    } finally {
-      setQfBusy(false);
-    }
-  }, [captureAccount, refreshQfStatus, s.qfDisconnected, s.qfSyncFailed]);
+    const previous = qfStatus;
+    // A status read that started earlier cannot put "Connected" back.
+    latestQfStatusRequest.current += 1;
+    setQfStatus("disconnected");
+    setQfMessage(s.qfDisconnected);
+    void (async () => {
+      try {
+        const result = await disconnectQfUser();
+        if (!result.ok) throw new Error(result.message);
+        if (isCurrentAccount()) await refreshQfStatus();
+      } catch (err) {
+        if (!isCurrentAccount()) return;
+        console.warn("[Settings] Quran Foundation disconnect failed:", err);
+        latestQfStatusRequest.current += 1;
+        setQfStatus(previous);
+        setQfMessage(s.qfDisconnectFailed);
+      }
+    })();
+  }, [captureAccount, qfStatus, refreshQfStatus, s.qfDisconnected, s.qfDisconnectFailed]);
 
   const handleQfManualSync = useCallback(async () => {
     const isCurrentAccount = captureAccount();
@@ -918,6 +926,8 @@ export default function SettingsScreen() {
                           </Pressable>
                           <Pressable
                             onPress={handleQfDisconnect}
+                            accessibilityRole="button"
+                            accessibilityLabel={s.qfDisconnect}
                             disabled={qfBusy}
                             className="h-10 w-10 items-center justify-center rounded-full bg-surface-high dark:bg-surface-dark-high"
                             style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}

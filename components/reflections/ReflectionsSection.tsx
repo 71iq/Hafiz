@@ -1,5 +1,5 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { ActivityIndicator, View, Text, Pressable } from "react-native";
 import { ChevronDown, ChevronUp, PenLine, MessageSquare } from "lucide-react-native";
 import { router, type Href } from "expo-router";
@@ -15,6 +15,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fetchReflections, fetchReflectionCount } from "@/lib/reflections/api";
 import { formatCompactCount } from "@/lib/reflections/format";
+import { isPendingId, settleListedPosts, usePendingPosts } from "@/lib/reflections/pending";
 import { ReflectionCard } from "./ReflectionCard";
 import { CommentsSheet } from "./CommentsSheet";
 import { WriteReflectionSheet } from "./WriteReflectionSheet";
@@ -98,6 +99,20 @@ function ReflectionsSectionContent({
     [loadedReflections, firstPage?.data],
   );
   const hasMore = loadedHasMore ?? firstPage?.hasMore ?? false;
+  // The viewer's new posts on this ayah show first, before the server lists them.
+  const coversAyah = useCallback(
+    (row: Reflection) => row.surah === surah && row.ayah_start <= ayah && row.ayah_end >= ayah,
+    [surah, ayah],
+  );
+  const ownPosts = usePendingPosts(user?.id, coversAyah);
+  const shownReflections = useMemo(() => {
+    const listed = new Set(allReflections.map((row) => row.id));
+    return [...ownPosts.filter((row) => !listed.has(row.id)), ...allReflections];
+  }, [ownPosts, allReflections]);
+  const shownCount = count + ownPosts.filter((row) => isPendingId(row.id)).length;
+  useEffect(() => {
+    settleListedPosts(user?.id, new Set(allReflections.map((row) => row.id)));
+  }, [allReflections, user?.id]);
 
   const handleLoadMore = useCallback(async () => {
     if (!hasMore || isFetching) return;
@@ -146,9 +161,15 @@ function ReflectionsSectionContent({
     [firstPage?.data],
   );
 
+  // A comment's count steps from the rows shown when it is called, not when the callback was made:
+  // a failed comment or delete calls it again later to undo its first step.
+  const shownRows = useRef(allReflections);
+  useLayoutEffect(() => {
+    shownRows.current = allReflections;
+  }, [allReflections]);
   const adjustCommentCount = useCallback(
     (reflectionId: string, step: 1 | -1) => {
-      const base = allReflections.find((row) => row.id === reflectionId)?.comments_count;
+      const base = shownRows.current.find((row) => row.id === reflectionId)?.comments_count;
       setAllReflections((prev) =>
         (prev ?? firstPage?.data ?? []).map((row) =>
           row.id === reflectionId && row.comments_count === base
@@ -157,7 +178,7 @@ function ReflectionsSectionContent({
         ),
       );
     },
-    [allReflections, firstPage?.data],
+    [firstPage?.data],
   );
   const handleCommentAdded = useCallback(
     (reflectionId: string) => adjustCommentCount(reflectionId, 1),
@@ -167,7 +188,7 @@ function ReflectionsSectionContent({
     (reflectionId: string) => adjustCommentCount(reflectionId, -1),
     [adjustCommentCount],
   );
-  // After the author's delete settles the row leaves this list; the shared caches refetch it.
+  // When the author deletes it the row leaves this list; a failed delete refetches it back.
   const handleReflectionGone = useCallback(
     (gone: Reflection) => {
       setAllReflections((prev) => (prev ?? firstPage?.data ?? []).filter((row) => row.id !== gone.id));
@@ -198,13 +219,13 @@ function ReflectionsSectionContent({
             >
               {s.reflections}
             </Text>
-            {count > 0 && (
+            {shownCount > 0 && (
               <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-2.5 py-1">
                 <Text
                   className="text-primary-accent dark:text-primary-bright"
                   style={{ fontFamily: "Manrope_700Bold", fontSize: 10 }}
                 >
-                  {formatCompactCount(count, uiLanguage)}
+                  {formatCompactCount(shownCount, uiLanguage)}
                 </Text>
               </View>
             )}
@@ -228,7 +249,7 @@ function ReflectionsSectionContent({
           >
             {s.reflectionsDisclaimer}
           </Text>
-          {reflectionsError && allReflections.length > 0 ? (
+          {reflectionsError && shownReflections.length > 0 ? (
             // A failed refresh keeps the last page on screen and says it may be out of date.
             <Text
               accessibilityLiveRegion="polite"
@@ -238,9 +259,9 @@ function ReflectionsSectionContent({
               {offline ? s.reflectionsOffline : s.reflectionsRefreshFailed}
             </Text>
           ) : null}
-          {isLoading ? (
+          {isLoading && shownReflections.length === 0 ? (
             <ReflectionsSkeleton isDark={isDark} />
-          ) : reflectionsError && allReflections.length === 0 ? (
+          ) : reflectionsError && shownReflections.length === 0 ? (
             <EmptyState
               icon={MessageSquare}
               title={offline ? s.reflectionsOffline : s.reflectionLoadFailed}
@@ -248,10 +269,10 @@ function ReflectionsSectionContent({
               onAction={() => refetchReflections()}
               isDark={isDark}
             />
-          ) : allReflections.length === 0 ? (
+          ) : shownReflections.length === 0 ? (
             <EmptyState icon={MessageSquare} title={s.reflectionEmpty} subtitle={s.reflectionBeFirst} isDark={isDark} />
           ) : (
-            allReflections.map((r) => (
+            shownReflections.map((r) => (
               <ReflectionCard
                 key={r.id}
                 reflection={r}

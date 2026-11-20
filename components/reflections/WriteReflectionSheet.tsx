@@ -1,9 +1,7 @@
-import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
-import { useState, useCallback, useLayoutEffect } from "react";
-import { View, Text, Pressable, ActivityIndicator, useWindowDimensions } from "react-native";
+import { useState, useCallback, useLayoutEffect, useRef } from "react";
+import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { DiscardChangesDialog, isEditableTextDirty, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
-import { useOptionalOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { Input } from "@/components/ui/Input";
 import { AyahTextPreview, useAyahEditorContext } from "@/components/notes/AyahEditorPreview";
 import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
@@ -11,19 +9,16 @@ import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { formatNumber } from "@/lib/i18n/count";
-import { createReflection } from "@/lib/reflections/api";
-import { SavedRowUnreadableError } from "@/lib/reflections/rows";
-import { ReflectionPrivacyChangedError } from "@/lib/reflections/errors";
+import { pendingKeys, takeRecoveredDraft, useDraftAdopter, type RecoveredDraft } from "@/lib/reflections/pending";
 import { useDatabase } from "@/lib/database/provider";
-import { recordAchievementEvent } from "@/lib/achievements/queries";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { fetchProfilePrivacy, profilePrivacyKeys } from "@/lib/profile/privacy";
 import { requireSocialOwner } from "@/lib/social/owner";
 import { router } from "expo-router";
 import { captureAuthReturn } from "@/lib/auth/return-origin";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useReflectionMutationScope } from "./use-mutation-scope";
-import { findJuzForAyah, loadMushafIndex } from "@/lib/mushaf/position";
+import { usePostReflection } from "./use-reflection-actions";
 import { textStartStyle } from "@/lib/ui/direction";
 
 export const REFLECTION_MIN_LENGTH = 10;
@@ -39,6 +34,7 @@ type Props = {
   ayahStart: number;
   ayahEnd: number;
   ayahPreview?: string; // text reference like "Al-Baqarah 2:255"
+  /** After Post: the reflection shows at once and the sheet has closed while the server saves it. */
   onSuccess?: () => void;
   /** Called after this sheet closes for a navigation, so a sheet that contains it can close too. */
   onNavigate?: () => void;
@@ -58,9 +54,7 @@ export function WriteReflectionSheet({
   const { width, height } = useWindowDimensions();
   const s = useStrings();
   const db = useDatabase();
-  const showNotice = useOptionalOperationNotice();
   const user = useAuthStore((s) => s.user);
-  const queryClient = useQueryClient();
   // ETH-07: a stated minor's reflections and comments are visible only to them. The account's own
   // privacy comes from the cache the app-wide minor check keeps (useMinorPhotoCleanup). The post
   // carries what this screen showed, so a copy made stale by another device cannot publish it.
@@ -70,23 +64,40 @@ export function WriteReflectionSheet({
     enabled: false,
   });
   const isMinor = ownPrivacy.data?.isMinor === true;
-  const [content, setContent] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // The draft, also kept in a ref so two Post presses before a render publish it once.
+  const [content, setContentState] = useState("");
+  const contentRef = useRef("");
+  const setContent = useCallback((next: string) => {
+    contentRef.current = next;
+    setContentState(next);
+  }, []);
+  const [failure, setFailure] = useState<RecoveredDraft["failure"] | null>(null);
+  const error = failure === "post" ? s.reflectionPostFailed : failure === "privacy" ? s.reflectionPrivacyChanged : null;
   const [privateNoteOpen, setPrivateNoteOpen] = useState(false);
   const [contentHeight, setContentHeight] = useState(INPUT_MIN_HEIGHT);
-  const { begin, pending, retire } = useReflectionMutationScope(
-    JSON.stringify([open, surah, ayahStart, ayahEnd]),
-    user?.id,
-    db,
+  const { retire } = useReflectionMutationScope(JSON.stringify([open, surah, ayahStart, ayahEnd]), user?.id, db);
+  const postReflection = usePostReflection();
+  // A post that failed after this sheet closed comes back here, with its reason, when the input is empty.
+  const draftKey = open && user ? pendingKeys.reflectionDraft(user.id, { surah, ayahStart, ayahEnd }) : null;
+  const adoptDraft = useCallback(
+    (draft: RecoveredDraft) => {
+      if (contentRef.current.trim()) return false;
+      setContent(draft.content);
+      setFailure(draft.failure);
+      return true;
+    },
+    [setContent],
   );
-  const submitting = pending.has("submit");
-  // A new target, account or database starts empty. An account change clears the draft without
-  // asking, so a guest or another account never inherits it.
+  useDraftAdopter(draftKey, adoptDraft);
+  // A new target, account or database starts empty, or from its failed draft. An account change
+  // clears the draft without asking, so a guest or another account never inherits it.
   useLayoutEffect(() => {
     setContent("");
-    setError(null);
+    setFailure(null);
     setPrivateNoteOpen(false);
-  }, [open, surah, ayahStart, ayahEnd, user?.id, db]);
+    const draft = draftKey ? takeRecoveredDraft(draftKey) : null;
+    if (draft) adoptDraft(draft);
+  }, [open, surah, ayahStart, ayahEnd, user?.id, db, draftKey, setContent, adoptDraft]);
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 640);
@@ -101,96 +112,27 @@ export function WriteReflectionSheet({
   const ayah = useAyahEditorContext({ surah, ayahStart, ayahEnd }, open);
   const reference = ayah.reference ?? ayahPreview;
 
-  const handleSubmit = useCallback(async () => {
-    if (!open || !user || !isValid) return;
-    const lease = begin("submit");
-    if (!lease) return;
-    setError(null);
-    const finishPosted = () => {
-      // Invalidate reflection queries for this ayah range
-      for (let a = ayahStart; a <= ayahEnd; a++) {
-        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.ayah({ surah, ayah: a }) });
-        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.countAyah({ surah, ayah: a }) });
-      }
-      queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
-      setContent("");
-      onClose();
-      onSuccess?.();
-      showNotice(s.reflectionPosted);
-    };
-    try {
-      const mushafIndex = await loadMushafIndex(db);
-      if (!lease.isCurrent()) return;
-      const juzStart = findJuzForAyah(mushafIndex, surah, ayahStart);
-      const juzEnd = findJuzForAyah(mushafIndex, surah, ayahEnd);
-      const reflection = await createReflection(
-        user.id,
-        surah,
-        ayahStart,
-        ayahEnd,
-        Math.min(juzStart, juzEnd),
-        Math.max(juzStart, juzEnd),
-        content.trim(),
-        isMinor,
-        lease.isCurrent,
-      );
-      if (!lease.isCurrent()) return;
-      recordAchievementEvent(db, {
-        type: "public_reflection_created",
-        reflectionId: reflection.id,
-        surah,
-        ayahStart,
-        ayahEnd,
-        createdAt: reflection.created_at,
-      }).catch(console.warn);
-      finishPosted();
-    } catch (error) {
-      const privacyChanged = error instanceof ReflectionPrivacyChangedError;
-      // The account is no longer a minor on the server: reload its privacy so this screen stops
-      // promising privacy, and post nothing until the person submits again.
-      if (privacyChanged) void queryClient.invalidateQueries({ queryKey: profilePrivacyKeys.mine(user.id) });
-      if (!lease.isCurrent()) return;
-      if (error instanceof SavedRowUnreadableError) {
-        // Posted, but the reply could not be read: refresh instead of offering a duplicate retry.
-        finishPosted();
-        return;
-      }
-      if (privacyChanged) {
-        setError(s.reflectionPrivacyChanged);
-        return;
-      }
-      // Server details stay in the log; the person sees a plain message beside Try again.
-      console.warn("[WriteReflection] Failed to post:", error);
-      setError(s.reflectionPostFailed);
-    } finally {
-      lease.release();
-    }
-  }, [
-    open,
-    user,
-    isValid,
-    begin,
-    surah,
-    ayahStart,
-    ayahEnd,
-    content,
-    isMinor,
-    queryClient,
-    onClose,
-    onSuccess,
-    showNotice,
-    db,
-    s.reflectionPosted,
-    s.reflectionPostFailed,
-    s.reflectionPrivacyChanged,
-  ]);
+  // Post publishes at once: the sheet closes and the reflection shows while the server saves it.
+  // A failure brings the draft back to this sheet (lib/reflections/pending.ts).
+  const handleSubmit = useCallback(() => {
+    const draft = contentRef.current,
+      length = draft.trim().length;
+    if (!open || !user || length < REFLECTION_MIN_LENGTH || length > REFLECTION_MAX_LENGTH) return;
+    const sent = postReflection({ viewerId: user.id, surah, ayahStart, ayahEnd, draft, promisedPrivate: isMinor });
+    if (!sent) return;
+    retire();
+    setContent("");
+    setFailure(null);
+    onClose();
+    onSuccess?.();
+  }, [open, user, surah, ayahStart, ayahEnd, isMinor, postReflection, retire, setContent, onClose, onSuccess]);
 
   const closeNow = useCallback(() => {
     if (!retire()) return;
     setContent("");
-    setError(null);
+    setFailure(null);
     onClose();
-  }, [onClose, retire]);
+  }, [onClose, retire, setContent]);
 
   const { guard, dialogProps } = useDiscardGuard(dirty);
   const handleClose = useCallback(() => guard(closeNow), [closeNow, guard]);
@@ -213,9 +155,8 @@ export function WriteReflectionSheet({
     <Pressable
       accessibilityRole="button"
       onPress={() => setPrivateNoteOpen(true)}
-      disabled={submitting}
       className="min-h-11 items-center justify-center rounded-full border border-warm-300 px-5 py-2.5 dark:border-neutral-700"
-      style={({ pressed }) => ({ opacity: submitting ? 0.5 : pressed ? 0.8 : 1 })}
+      style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
     >
       <Text
         className="text-charcoal dark:text-neutral-200"
@@ -270,11 +211,10 @@ export function WriteReflectionSheet({
           ) : (
             <>
               <Input
-                editable={!submitting}
                 value={content}
                 onChangeText={(next) => {
                   setContent(next);
-                  if (error) setError(null);
+                  if (failure) setFailure(null);
                 }}
                 accessibilityLabel={s.reflectionWriteTitle}
                 placeholder={isMinor ? s.reflectionPlaceholderPrivate : s.reflectionPlaceholder}
@@ -325,7 +265,7 @@ export function WriteReflectionSheet({
                   >
                     {error}
                   </Text>
-                  {error === s.reflectionPostFailed ? (
+                  {failure === "post" ? (
                     <View
                       className="flex-wrap gap-2"
                       style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
@@ -333,7 +273,7 @@ export function WriteReflectionSheet({
                       <Pressable
                         accessibilityRole="button"
                         onPress={handleSubmit}
-                        disabled={submitting || !isValid}
+                        disabled={!isValid}
                         className="min-h-11 items-center justify-center rounded-full bg-surface-high px-5 py-2.5 dark:bg-surface-dark-high"
                       >
                         <Text
@@ -351,7 +291,7 @@ export function WriteReflectionSheet({
 
               {/* Who sees this post, beside the action that publishes it. The minor-private promise
                   waits while a "privacy changed" message would contradict it. */}
-              {error !== s.reflectionPrivacyChanged ? (
+              {failure !== "privacy" ? (
                 <Text
                   style={{
                     fontFamily: "Manrope_400Regular",
@@ -371,17 +311,16 @@ export function WriteReflectionSheet({
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ disabled: !isValid || submitting, busy: submitting }}
+                accessibilityState={{ disabled: !isValid }}
                 onPress={handleSubmit}
-                disabled={!isValid || submitting}
+                disabled={!isValid}
                 className="min-h-11 flex-row items-center justify-center gap-2 rounded-full bg-primary-accent px-5 py-2.5 dark:bg-primary-bright"
                 style={({ pressed }) => ({
-                  opacity: !isValid || submitting ? 0.5 : pressed ? 0.8 : 1,
+                  opacity: !isValid ? 0.5 : pressed ? 0.8 : 1,
                 })}
               >
-                {submitting ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
                 <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, color: "#FFFFFF" }}>
-                  {submitting ? s.reflectionPosting : s.reflectionSubmit}
+                  {s.reflectionSubmit}
                 </Text>
               </Pressable>
             </>
