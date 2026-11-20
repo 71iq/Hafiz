@@ -1,9 +1,7 @@
 package app.hafizquran.content
 
 import android.net.Uri
-import android.system.ErrnoException
 import android.system.Os
-import android.system.OsConstants
 import com.github.luben.zstd.ZstdInputStream
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.functions.Coroutine
@@ -15,6 +13,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
+import java.io.RandomAccessFile
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -87,6 +86,35 @@ class ReaderContentModule : Module() {
     check(total == size.toLong() && actual == sha256) { "Content did not match the release manifest" }
   }
 
+  private fun seedDatabase(directory: String, name: String) {
+    require(name == "hafiz.db")
+    val dir = File(directory).canonicalFile
+    require(dir == File(context.filesDir, "SQLite").canonicalFile)
+    val target = File(dir, name)
+    if (target.exists()) return
+    dir.mkdirs()
+    // Multiple React contexts can share a process. The file lock also covers another process
+    // opening the database. Android permits atomic rename here but denies hard links.
+    synchronized(seedLock) {
+      RandomAccessFile(File(dir, ".seed.lock"), "rw").use { lockFile ->
+        lockFile.channel.lock().use {
+          if (target.exists()) return
+          val temp = File(dir, ".seed.part")
+          try {
+            unpack("data/quran.db").use { input -> temp.outputStream().use { input.copyTo(it) } }
+            Os.rename(temp.path, target.path)
+          } finally {
+            temp.delete()
+          }
+        }
+      }
+    }
+  }
+
+  companion object {
+    private val seedLock = Any()
+  }
+
   override fun definition() = ModuleDefinition {
     Name("HafizReaderContent")
 
@@ -117,26 +145,6 @@ class ReaderContentModule : Module() {
         bytes.toString("UTF-8")
       }
     }
-    AsyncFunction("seedDatabase") { directory: String, name: String ->
-      require(name == "hafiz.db")
-      val dir = File(directory).canonicalFile
-      require(dir == File(context.filesDir, "SQLite").canonicalFile)
-      val target = File(dir, name)
-      if (!target.exists()) {
-        dir.mkdirs()
-        val temp = File.createTempFile("seed-", ".part", dir)
-        try {
-          unpack("data/quran.db").use { input -> temp.outputStream().use { input.copyTo(it) } }
-          // Publish a complete seed only if no other app context already owns the database.
-          try {
-            Os.link(temp.path, target.path)
-          } catch (e: ErrnoException) {
-            if (e.errno != OsConstants.EEXIST) throw e
-          }
-        } finally {
-          temp.delete()
-        }
-      }
-    }
+    AsyncFunction("seedDatabase") { directory: String, name: String -> seedDatabase(directory, name) }
   }
 }
