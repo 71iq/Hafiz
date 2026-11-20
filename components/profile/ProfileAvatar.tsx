@@ -1,8 +1,12 @@
 import { Image, Text, View } from "react-native";
 import { UserRound } from "lucide-react-native";
+import { trustedAvatarUrl } from "@/lib/profile/avatar";
 
 type ProfileAvatarProps = {
+  /** The saved profile photo. Only a file in the app's own avatars bucket is loaded. */
   avatarUrl?: string | null;
+  /** A photo the person just picked on this device, shown before it is uploaded. */
+  localPreviewUri?: string | null;
   name: string;
   size?: number;
   isDark?: boolean;
@@ -32,7 +36,7 @@ export function avatarInitial(name: string): string | null {
  * shared mascot would stand for many people on the Board, and would stay visible to someone who
  * turned Zayt off. The name is always written beside the avatar, so the avatar is decorative.
  */
-export function ProfileAvatar({ avatarUrl, name, size = 48, isDark = false }: ProfileAvatarProps) {
+export function ProfileAvatar({ avatarUrl, localPreviewUri, name, size = 48, isDark = false }: ProfileAvatarProps) {
   const backgroundColor = isDark ? "#003638" : "#00595B";
   const foreground = isDark ? "#CCFBF1" : "#FFFFFF";
   const sharedStyle = {
@@ -42,7 +46,8 @@ export function ProfileAvatar({ avatarUrl, name, size = 48, isDark = false }: Pr
     backgroundColor,
   };
 
-  if (avatarUrl) return <Image source={{ uri: avatarUrl }} style={sharedStyle} />;
+  const photo = localPreviewUri ?? trustedAvatarUrl(avatarUrl);
+  if (photo) return <Image source={{ uri: photo }} style={sharedStyle} />;
 
   const initial = avatarInitial(name);
   return (

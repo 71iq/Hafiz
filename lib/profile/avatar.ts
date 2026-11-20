@@ -17,6 +17,23 @@ const ALLOWED_AVATAR_TYPES = new Set(Object.keys(EXTENSION_BY_MIME));
 
 export type AvatarProblem = "type" | "size" | "unreadable";
 
+/** A stored photo's path inside the bucket, exactly as uploadProfileAvatar names it. */
+const AVATAR_OBJECT_PATH = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\/[0-9]+\.(?:jpg|png|webp|gif)$/i;
+let avatarBucketUrl: string | null = null;
+
+/**
+ * The profile photo address to load, or null when it is not a file in this project's avatars bucket.
+ * profiles.avatar_url is text its owner can set to any address through the API, and the feed,
+ * comments, the Board and profiles show it to other people. Loading it as given would send each
+ * reader's device to a server the author chose.
+ */
+export function trustedAvatarUrl(url: string | null | undefined): string | null {
+  if (!url || !isSupabaseConfigured()) return null;
+  avatarBucketUrl ??= supabase.storage.from(AVATAR_BUCKET).getPublicUrl("").data.publicUrl;
+  if (!url.startsWith(avatarBucketUrl)) return null;
+  return AVATAR_OBJECT_PATH.test(url.slice(avatarBucketUrl.length)) ? url : null;
+}
+
 function avatarTypeOf(asset: Pick<ImagePickerAsset, "mimeType" | "fileName">): string | null {
   if (asset.mimeType) return asset.mimeType.toLowerCase();
   const extension = asset.fileName?.split(".").pop()?.toLowerCase();

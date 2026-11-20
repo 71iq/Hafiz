@@ -915,7 +915,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               }}
             >
               <ProfileAvatar
-                avatarUrl={avatarPreviewUrl}
+                avatarUrl={avatarRemovalDraft ? null : profile?.avatar_url}
+                localPreviewUri={avatarRemovalDraft ? null : avatarDraft?.uri}
                 name={displayName}
                 size={isPhone ? EDIT_PROFILE_AVATAR_SIZE_PHONE : EDIT_PROFILE_AVATAR_SIZE}
                 isDark={isDark}
