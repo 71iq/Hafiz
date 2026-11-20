@@ -207,28 +207,30 @@ function normalizeDeckReviewSettings(value: unknown, fallback?: DeckReviewSettin
   };
 }
 
-async function readLegacyReviewSettings(db: DatabaseExecutor): Promise<DeckReviewSettings> {
-  const [dailyLimitRow, testModesRow, wordModesRow] = await Promise.all([
-    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'daily_review_limit'"),
-    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'flashcard_test_modes'"),
-    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'word_flashcard_test_modes'"),
-  ]);
+const LEGACY_REVIEW_LIMIT_KEY = "daily_review_limit";
+const LEGACY_TEST_MODES_KEY = "flashcard_test_modes";
+const LEGACY_WORD_TEST_MODES_KEY = "word_flashcard_test_modes";
+
+/** The review settings from before decks had their own, read from the stored setting values. */
+function legacyReviewSettings(stored: ReadonlyMap<string, string>): DeckReviewSettings {
   let testModes: TestMode[] = DEFAULT_ENABLED_MODES;
   let wordTestModes: WordTestMode[] = DEFAULT_WORD_TEST_MODES;
+  const testModesValue = stored.get(LEGACY_TEST_MODES_KEY);
+  const wordModesValue = stored.get(LEGACY_WORD_TEST_MODES_KEY);
 
-  if (testModesRow?.value) {
+  if (testModesValue) {
     try {
-      testModes = normalizeModeList<TestMode>(JSON.parse(testModesRow.value), ALL_TEST_MODES, DEFAULT_ENABLED_MODES);
+      testModes = normalizeModeList<TestMode>(JSON.parse(testModesValue), ALL_TEST_MODES, DEFAULT_ENABLED_MODES);
     } catch {}
   }
-  if (wordModesRow?.value) {
+  if (wordModesValue) {
     try {
-      wordTestModes = normalizeModeList<WordTestMode>(JSON.parse(wordModesRow.value), ALL_WORD_TEST_MODES, DEFAULT_WORD_TEST_MODES);
+      wordTestModes = normalizeModeList<WordTestMode>(JSON.parse(wordModesValue), ALL_WORD_TEST_MODES, DEFAULT_WORD_TEST_MODES);
     } catch {}
   }
 
   return {
-    dailyReviewLimit: clampReviewLimit(dailyLimitRow?.value),
+    dailyReviewLimit: clampReviewLimit(stored.get(LEGACY_REVIEW_LIMIT_KEY)),
     newCardsLimit: DEFAULT_DECK_NEW_CARD_LIMIT,
     requestRetention: DEFAULT_DECK_REQUEST_RETENTION,
     maximumInterval: DEFAULT_DECK_MAXIMUM_INTERVAL,
@@ -248,17 +250,21 @@ export async function readDeckReviewSettings(
   db: DatabaseExecutor,
   deckId: string | null | undefined
 ): Promise<DeckReviewSettings> {
-  const fallback = await readLegacyReviewSettings(db);
-  if (!deckId) return fallback;
-
-  const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = ?",
-    [deckReviewSettingsKey(deckId)]
+  // One read for the three shared settings and this deck's own. Home and Flashcards ask for every
+  // deck's settings, and four reads per deck were a quarter of those screens' database calls.
+  const deckKey = deckId ? deckReviewSettingsKey(deckId) : null;
+  const keys = [LEGACY_REVIEW_LIMIT_KEY, LEGACY_TEST_MODES_KEY, LEGACY_WORD_TEST_MODES_KEY, ...(deckKey ? [deckKey] : [])];
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    `SELECT key, value FROM user_settings WHERE key IN (${keys.map(() => "?").join(", ")})`,
+    keys
   );
-  if (!row?.value) return fallback;
+  const stored = new Map(rows.map((row) => [row.key, row.value]));
+  const fallback = legacyReviewSettings(stored);
+  const deckValue = deckKey ? stored.get(deckKey) : undefined;
+  if (!deckValue) return fallback;
 
   try {
-    return normalizeDeckReviewSettings(JSON.parse(row.value), fallback);
+    return normalizeDeckReviewSettings(JSON.parse(deckValue), fallback);
   } catch {
     return fallback;
   }

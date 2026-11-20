@@ -156,17 +156,23 @@ function smartDeckFilterKey(deckId: SmartDeckId): string {
   return `smart_deck_filter_${deckId}`;
 }
 
-async function readFilterSetting(db: DatabaseExecutor, key: string): Promise<BuiltInDeckFilter | null> {
-  const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = ?",
-    [key]
+/** The first of `keys`, in order, that holds a readable filter. One read covers every key. */
+async function readFirstFilterSetting(db: DatabaseExecutor, keys: string[]): Promise<BuiltInDeckFilter | null> {
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    `SELECT key, value FROM user_settings WHERE key IN (${keys.map(() => "?").join(", ")})`,
+    keys
   );
-  if (!row?.value) return null;
-  try {
-    return normalizeSmartDeckFilter(JSON.parse(row.value));
-  } catch {
-    return null;
+  const stored = new Map(rows.map((row) => [row.key, row.value]));
+  for (const key of keys) {
+    const value = stored.get(key);
+    if (!value) continue;
+    try {
+      return normalizeSmartDeckFilter(JSON.parse(value));
+    } catch {
+      // An unreadable filter is skipped, as if it were not set.
+    }
   }
+  return null;
 }
 
 function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
@@ -211,8 +217,13 @@ export async function readSmartDeckFilter(
   db: DatabaseExecutor,
   deckId: SmartDeckId
 ): Promise<BuiltInDeckFilter> {
-  return await readFilterSetting(db, smartDeckFilterKey(deckId))
-    ?? await readDefaultDeckFilter(db);
+  return (
+    (await readFirstFilterSetting(db, [
+      smartDeckFilterKey(deckId),
+      ALL_DECKS_FILTER_KEY,
+      smartDeckFilterKey(SMART_DECK_IDS.retention),
+    ])) ?? { type: "all" }
+  );
 }
 
 export async function writeSmartDeckFilter(
@@ -234,9 +245,11 @@ export async function putSmartDeckFilter(
 }
 
 async function readDefaultDeckFilter(db: DatabaseExecutor): Promise<BuiltInDeckFilter> {
-  return await readFilterSetting(db, ALL_DECKS_FILTER_KEY)
-    ?? await readFilterSetting(db, smartDeckFilterKey(SMART_DECK_IDS.retention))
-    ?? { type: "all" };
+  return (
+    (await readFirstFilterSetting(db, [ALL_DECKS_FILTER_KEY, smartDeckFilterKey(SMART_DECK_IDS.retention)])) ?? {
+      type: "all",
+    }
+  );
 }
 
 export async function writeAllDecksFilter(
@@ -1329,6 +1342,14 @@ async function getSmartDeckDueRows(
 
 async function getLiveStudyCardIds(db: DatabaseExecutor, ids: string[]): Promise<Set<string>> {
   const live = new Set<string>();
+  // A deck over the whole Quran has thousands of candidates. Reading every live id once and keeping
+  // the candidates replaces one statement per 800 of them; the answer is a set, so order is not at stake.
+  if (ids.length > SQLITE_PARAM_BATCH) {
+    const wanted = new Set(ids);
+    const rows = await db.getAllAsync<{ id: string }>("SELECT id FROM study_cards WHERE deleted_at IS NULL");
+    for (const row of rows) if (wanted.has(row.id)) live.add(row.id);
+    return live;
+  }
   for (const chunk of chunks(ids, SQLITE_PARAM_BATCH)) {
     const placeholders = chunk.map(() => "?").join(",");
     const rows = await db.getAllAsync<{ id: string }>(
