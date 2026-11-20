@@ -178,6 +178,32 @@ describe("database bridge message boundary", () => {
     mockOpenDatabaseAsync.mockResolvedValue(hostDb);
   });
 
+  it("shares preparation across overlapping Android roots and waits for the last close before reopening", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    let finish!: () => void;
+    mockInitializeDatabase.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
+    const first = render(<DatabaseProvider><StatusProbe onStatus={() => {}} /></DatabaseProvider>);
+    await waitFor(() => expect(mockInitializeDatabase).toHaveBeenCalledTimes(1));
+    const status = jest.fn();
+    const second = render(<DatabaseProvider><StatusProbe onStatus={status} /></DatabaseProvider>);
+    await first.unmountAsync();
+    await act(async () => finish());
+    await waitFor(() => expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ isReady: true })));
+    expect(mockInitializeDatabase).toHaveBeenCalledTimes(1);
+    expect(hostDb.closeAsync).not.toHaveBeenCalled();
+
+    let finishClose!: () => void;
+    hostDb.closeAsync.mockReturnValueOnce(new Promise<void>((resolve) => { finishClose = resolve; }));
+    await second.unmountAsync();
+    await waitFor(() => expect(hostDb.closeAsync).toHaveBeenCalledTimes(1));
+    const third = render(<DatabaseProvider><StatusProbe onStatus={status} /></DatabaseProvider>);
+    await flushMessages();
+    expect(mockInitializeDatabase).toHaveBeenCalledTimes(1);
+    await act(async () => finishClose());
+    await waitFor(() => expect(mockInitializeDatabase).toHaveBeenCalledTimes(2));
+    await third.unmountAsync();
+  });
+
   afterEach(() => {
     jest.useRealTimers();
     FakeBroadcastChannel.reset();
