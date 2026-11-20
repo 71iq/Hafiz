@@ -8,17 +8,11 @@ Prioritize shipped-app bugs and data safety. Dev/build-only advisories remain gr
 
 ## Current audit
 
-On 2026-11-08 (RF090, after RF200) `npm audit` reports 36 package findings: 7 high, 20 moderate, 9 low and zero critical, from 12 direct advisories. Package counts include parents that only inherit a finding.
+On 2026-11-20 the lockfile audit fell from 27 affected packages to 19. Two high and 17 moderate findings remain. npm counts parent packages that inherit a finding. The remaining advisories reach the Expo CLI through its copy of Zod 3.25.76, and build and lint tools through glob and minimatch.
 
-| Package                                 | Advisory                                               | Where it runs                                                              | Decision                                                                                                                                                                          |
-| --------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| zod 4.3.6                               | GHSA-mrhx-c7xc-m3w5, high                              | shipped app (sync, leaderboard, reflections, Quran Foundation, auth forms) | fixed in RF200 (4.6.7); the remaining 3.25.76 copy belongs to `@expo/cli`                                                                                                         |
-| decode-uri-component 0.2.2              | GHSA-qr28-fpjm-wq7f high, GHSA-vcc3-ghjq-m6fr moderate | shipped app, through expo-router's query-string URL parsing                | residual: a crafted link can slow URL parsing in the user's own app; the fix needs expo-router 58 (RF197). query-string 7 cannot take decode-uri-component 0.4, which is ESM-only |
-| postcss 8.5.15, postcss-selector-parser | GHSA-r28c-9q8g-f849 high and others                    | build time (Tailwind and NativeWind compile)                               | dev/build only; low priority under the policy above                                                                                                                               |
-| form-data 4.0.5                         | GHSA-hmw2-7cc7-3qxx high                               | tests only (jsdom)                                                         | dev only                                                                                                                                                                          |
-| @babel/core, deepmerge, glob, minimatch | low and moderate                                       | build and CLI tooling                                                      | dev/build only                                                                                                                                                                    |
+The shipped Expo Router uses query-string 7.1.3. Its scoped override selects decode-uri-component 0.5.1, and its one-line patch reads the decoder's ESM default export. Keep both together until the router upgrades its parser. `npm run test:dependency-security` exercises encoded links through the router's installed copy.
 
-No other shipped-app path is affected. Remaining fixes for build tooling come with the Expo SDK upgrade (RF197) or routine dev-dependency updates.
+Compatible lockfile updates also resolved the reported advisories in Babel core, form-data, node-forge, PostCSS and postcss-selector-parser. The app continues to use Zod 4.6.7.
 
 ## Original vulnerability
 
