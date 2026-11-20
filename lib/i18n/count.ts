@@ -126,6 +126,12 @@ export function formatJuz(n: number, language: Language): string {
 }
 
 const POINTS: ArabicForms = { one: "نقطة واحدة", two: "نقطتان", few: "نقاط", many: "نقطة" };
+const NOTES: ArabicForms = { one: "ملاحظة واحدة", two: "ملاحظتان", few: "ملاحظات", many: "ملاحظة" };
+
+export function formatNotes(n: number, language: Language): string {
+  if (language === "ar") return arabicCount(n, NOTES);
+  return n === 1 ? "1 note" : `${n.toLocaleString("en")} notes`;
+}
 
 /** Board points: "1 point", "12 points", "نقطتان", "١٢ نقطة". */
 export function formatPoints(n: number, language: Language): string {

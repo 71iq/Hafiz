@@ -12,6 +12,7 @@ import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { toArabicNumber } from "@/lib/arabic";
+import { formatNotes } from "@/lib/i18n/count";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import {
   deletePrivateNote,
@@ -121,10 +122,7 @@ export function ProfileNotesManager() {
     };
   }, [db, trimmedQuery, reloadToken]);
 
-  const countLabel = useMemo(
-    () => interpolate(s.profileNotesCount, { n: isRTL ? toArabicNumber(notes.length) : notes.length }),
-    [isRTL, notes.length, s.profileNotesCount]
-  );
+  const countLabel = formatNotes(notes.length, uiLanguage);
   const previewNotes = useMemo(() => notes.slice(0, PROFILE_NOTES_PREVIEW_LIMIT), [notes]);
   const hasMoreNotes = notes.length > previewNotes.length;
   const listedNotes = useMemo(() => sortNotes(trimmedQuery ? results ?? [] : notes, sort), [notes, results, sort, trimmedQuery]);
