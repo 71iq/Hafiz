@@ -94,6 +94,10 @@ for run in first second; do
   echo "applied 20261120120000_drop_halaqa.sql ($run run)"
 done
 pg "$MIGRATED" -v phase=after <"$ROOT/supabase/tests/drop_halaqa.test.sql" >/dev/null
+# Profile limits (scripts/supabase-probes/profile-limits.sh covers their behaviour). Its sign-up
+# companion, 20261120185900, replaces handle_new_user and is skipped like 20261117213000.
+apply "$MIGRATED" --single-transaction <"$ROOT/supabase/migrations/20261120190000_profile_field_limits.sql"
+echo "applied 20261120190000_profile_field_limits.sql"
 dump "$MIGRATED" >"$WORK/migrated.sql"
 
 echo "== SQL tests"

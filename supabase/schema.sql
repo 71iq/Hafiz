@@ -4,6 +4,9 @@
 -- ============================================================
 
 -- ─── Profiles ────────────────────────────────────────────────
+-- Other people see these fields, so the limits the app enforces hold on the server too
+-- (20261120190000_profile_field_limits.sql). A photo is a file in the owner's own folder of an avatars
+-- bucket; private.avatar_public_prefix below pins the bucket's host.
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   username TEXT UNIQUE NOT NULL CHECK (length(username) BETWEEN 3 AND 20),
@@ -11,7 +14,13 @@ CREATE TABLE IF NOT EXISTS profiles (
   avatar_url TEXT,
   bio TEXT CHECK (bio IS NULL OR char_length(bio) <= 280),
   country TEXT CHECK (country IS NULL OR char_length(country) <= 80),
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT profiles_username_format CHECK (username ~ '^[A-Za-z0-9_]{3,20}$'),
+  CONSTRAINT profiles_display_name_length CHECK (display_name IS NULL OR char_length(display_name) <= 60),
+  CONSTRAINT profiles_avatar_url_own_file CHECK (
+    avatar_url IS NULL
+    OR avatar_url ~ ('^https?://[^/?#@]+/storage/v1/object/public/avatars/' || id::text || '/[0-9]{1,20}\.(jpg|png|webp|gif)$')
+  )
 );
 
 -- ─── Study Cards (synced from local SQLite) ──────────────────
@@ -1551,6 +1560,44 @@ $$;
 DROP TRIGGER IF EXISTS profiles_minor_photo ON public.profiles;
 CREATE TRIGGER profiles_minor_photo BEFORE INSERT OR UPDATE OF avatar_url ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION private.profiles_minor_photo();
+
+-- The avatars bucket's public URL for this deployment, for example
+-- https://api.hafizquran.app/storage/v1/object/public/avatars/. A CHECK cannot read configuration,
+-- so this row pins the photo host; profiles_avatar_url_own_file checks the rest of the address.
+-- Without a row any host passes, which keeps local and test databases working. Production has the
+-- row. It is data, so backups carry it.
+CREATE TABLE IF NOT EXISTS private.avatar_public_prefix (
+  only_row BOOLEAN PRIMARY KEY DEFAULT true CHECK (only_row),
+  prefix TEXT NOT NULL CHECK (prefix ~ '^https://[^/?#@]+/storage/v1/object/public/avatars/$')
+);
+REVOKE ALL ON private.avatar_public_prefix FROM PUBLIC, anon, authenticated;
+
+-- Runs after profiles_minor_photo (triggers fire in name order), so a minor's photo is already cleared.
+CREATE OR REPLACE FUNCTION private.profiles_photo_host()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  expected TEXT;
+BEGIN
+  IF NEW.avatar_url IS NULL THEN
+    RETURN NEW;
+  END IF;
+  SELECT prefix INTO expected FROM private.avatar_public_prefix;
+  IF expected IS NOT NULL AND left(NEW.avatar_url, char_length(expected)) <> expected THEN
+    RAISE EXCEPTION 'A profile photo must be in this project''s avatars bucket'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.profiles_photo_host() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS profiles_photo_host ON public.profiles;
+CREATE TRIGGER profiles_photo_host BEFORE INSERT OR UPDATE OF avatar_url ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION private.profiles_photo_host();
 
 -- ETH-07: like and comment counts are public, so they count only likes and comments that others can
 -- read: never one written privately, and never a current minor's (private.activity_public). A single

@@ -154,13 +154,13 @@ wait_for_hold() {
 }
 
 # ─── Third review, finding 2: a photo update in flight cannot outlive a minority write ──────────
-# User 7 is an adult without a photo. Their own session sets an outside photo URL and holds its
+# User 7 is an adult without a photo. Their own session sets a photo URL and holds its
 # transaction open until the minority write is blocked. Recording minority locks the profile row
 # first, so it waits for the photo update and then clears the photo that update committed. A write
 # that only cleared photos it could already see would skip the row and leave the minor's photo.
 rm -f "$WORK"/*
 session photo_hold "$(uid 7)" "BEGIN;
-UPDATE public.profiles SET avatar_url = 'https://example.invalid/race7.png' WHERE id = '$(uid 7)';
+UPDATE public.profiles SET avatar_url = 'https://example.invalid/storage/v1/object/public/avatars/$(uid 7)/1.png' WHERE id = '$(uid 7)';
 RESET ROLE;
 DO \$\$ BEGIN
   FOR i IN 1 .. 200 LOOP

@@ -51,6 +51,11 @@ RETURNS VOID LANGUAGE sql AS $$
   INSERT INTO public.profiles (id, username, display_name, avatar_url) VALUES (uid, username, display_name, avatar);
 $$;
 
+-- A photo address the profile limits accept: a file in the owner's own avatars folder.
+CREATE FUNCTION hz_test.photo(uid UUID) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
+  SELECT 'https://example.invalid/storage/v1/object/public/avatars/' || uid || '/1.png'
+$$;
+
 -- A recorded wird day, written as the server would store it (status derived by the trigger).
 CREATE FUNCTION hz_test.day(uid UUID, day DATE, earned TEXT, reason TEXT DEFAULT NULL,
   minimum_met BOOLEAN DEFAULT true, full_met BOOLEAN DEFAULT false, manzil BOOLEAN DEFAULT false)
@@ -106,8 +111,8 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA hz_test TO anon, authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA hz_test TO authenticated;
 
 -- Synthetic users.
-SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000a', 'teacher_a', 'Teacher A', 'https://example.invalid/a.png');
-SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000b', 'member_b', 'Member B', 'https://example.invalid/b.png');
+SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000a', 'teacher_a', 'Teacher A', hz_test.photo('00000000-0000-4000-8000-00000000000a'));
+SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000b', 'member_b', 'Member B', hz_test.photo('00000000-0000-4000-8000-00000000000b'));
 SELECT hz_test.make_user('00000000-0000-4000-8000-00000000000c', 'outsider_c', 'Outsider C', NULL);
 SELECT hz_test.make_user('00000000-0000-4000-8000-0000000000aa', 'merge_user', NULL, NULL);
 
@@ -422,7 +427,7 @@ BEGIN
 END $$;
 
 SELECT hz_test.make_user(('00000000-0000-4000-8003-' || lpad(i::TEXT, 12, '0'))::UUID, 'board_user_' || i,
-  'Board ' || i, 'https://example.invalid/board' || i || '.png')
+  'Board ' || i, hz_test.photo(('00000000-0000-4000-8003-' || lpad(i::TEXT, 12, '0'))::UUID))
 FROM generate_series(1, 40) AS i;
 -- Board 1: 3 points (minimum, full and manzil on one day); last week's and future days never count.
 SELECT hz_test.day('00000000-0000-4000-8003-000000000001', hz_test.week_start(), 'done', NULL, true, true, true);
@@ -522,7 +527,11 @@ BEGIN
   board := public.join_board(NULL, false, false, 'juz_amma', 'light', 180, hz_test.today_text(), 1);
   PERFORM hz_test.eq('five members: standings', board->>'status', 'ready');
   PERFORM hz_test.eq('five rows', jsonb_array_length(board->'standings'), 5);
-  PERFORM hz_test.eq('no user ids in standings', position('00000000-0000-4000' IN board::TEXT), 0);
+  -- A photo address names its owner's folder (lib/profile/avatar.ts), so it carries the account id;
+  -- the profile limits require that layout. Every other field must leave the id out.
+  PERFORM hz_test.eq('no user ids in standings apart from photo addresses', position('00000000-0000-4000' IN (
+    SELECT jsonb_agg(s - 'avatar_url')::TEXT FROM jsonb_array_elements(board->'standings') AS s
+  ) || (board - 'standings')::TEXT), 0);
   PERFORM hz_test.eq('no reasons in standings', position('travel' IN board::TEXT), 0);
   SELECT s INTO me FROM jsonb_array_elements(board->'standings') AS s WHERE s->>'name' = 'Little Star';
   PERFORM hz_test.eq('minor under nickname without photo', me->'avatar_url', 'null'::JSONB);
@@ -531,7 +540,7 @@ BEGIN
   PERFORM hz_test.eq('nickname hides the photo', me->'avatar_url', 'null'::JSONB);
   PERFORM hz_test.eq('excused days score 0', (me->>'points')::INTEGER, 0);
   SELECT s INTO me FROM jsonb_array_elements(board->'standings') AS s WHERE s->>'name' = 'Board 1';
-  PERFORM hz_test.eq('display name with photo', me->>'avatar_url', 'https://example.invalid/board1.png');
+  PERFORM hz_test.eq('display name with photo', me->>'avatar_url', hz_test.photo('00000000-0000-4000-8003-000000000001'));
   PERFORM hz_test.eq('top rank shared on a tie', (me->>'rank')::INTEGER, 1);
   SELECT s INTO me FROM jsonb_array_elements(board->'standings') AS s WHERE s->>'name' = 'Board 4';
   PERFORM hz_test.eq('server streak', (me->>'streak')::INTEGER, 4);
@@ -861,7 +870,7 @@ DO $$
 BEGIN
   PERFORM hz_test.eq('a minor''s photo is cleared', (SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000b'), NULL::TEXT);
   PERFORM hz_test.eq('an adult keeps their photo', (SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000000a'),
-    'https://example.invalid/a.png');
+    hz_test.photo('00000000-0000-4000-8000-00000000000a'));
   PERFORM hz_test.eq('joining the board as a minor clears the photo too', (
     SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8003-000000000003'
   ), NULL::TEXT);
@@ -988,7 +997,7 @@ RESET ROLE;
 -- Recording minority clears the photo whichever path records it: 8006-1 through the privacy
 -- settings, 8006-4 by joining the board as a minor. 8006-2 stays an adult and keeps theirs.
 SELECT hz_test.make_user(('00000000-0000-4000-8006-' || lpad(i::TEXT, 12, '0'))::UUID, 'third_user_' || i, 'Third ' || i,
-  'https://example.invalid/third' || i || '.png')
+  hz_test.photo(('00000000-0000-4000-8006-' || lpad(i::TEXT, 12, '0'))::UUID))
 FROM generate_series(1, 4) AS i;
 SET ROLE authenticated;
 DO $$
@@ -1008,7 +1017,7 @@ BEGIN
   ), 0::BIGINT);
   PERFORM hz_test.eq('an adult keeps their photo', (
     SELECT avatar_url FROM public.profiles WHERE id = '00000000-0000-4000-8006-000000000002'
-  ), 'https://example.invalid/third2.png');
+  ), hz_test.photo('00000000-0000-4000-8006-000000000002'));
 END $$;
 
 -- Eighth review, finding 3: under 18s appear on the Board only under a nickname (BRD-07), and the
