@@ -116,11 +116,8 @@ it.each(["/", "/home", "/auth/login"])(
     await f.runtime.auth.initialize();
     expect((await f.runtime.auth.getSession()).data.session).toBeNull();
     expect(f.values.has(KEY)).toBe(false);
+    // The SDK rejects the fragment before asking the server who the token belongs to.
     expect(f.requests).toEqual([]);
-    // The tokens leave the address unused; the path, query and router state stay.
-    expect(f.location.hash).toBe("");
-    expect(f.location.pathname + f.location.search).toBe(path + "?keep=1");
-    expect(f.history.replaceState).toHaveBeenCalledWith({ marker: "router-state" }, "", path + "?keep=1");
   },
 );
 
@@ -194,10 +191,10 @@ it("web reset emails stay on the implicit flow so they work on another device", 
   expect([...f.values.keys()]).toEqual([]);
 });
 
-it("the reset route leaves its link tokens for the isolated recovery session", async () => {
+it("the reset route keeps its link tokens out of the app's session", async () => {
   const f = open("/auth/reset-password" + fragment(session(2), "&type=recovery"));
   await f.runtime.auth.initialize();
-  expect(f.location.hash).not.toBe("");
+  expect(f.requests).toEqual([]);
   expect(f.values.has(KEY)).toBe(false);
 
   const recovery = await f.runtime.openPasswordRecovery({

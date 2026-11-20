@@ -47,14 +47,6 @@ function browserStorage(): SupportedStorage | null {
     return null;
   }
 }
-// Implicit-flow tokens in an address are never installed on the web, so a link cannot sign a
-// visitor into another account. Drop them unused so they leave the address bar and history.
-function discardSessionFragment() {
-  if (typeof window === "undefined" || typeof window.location?.hash !== "string" || !window.history) return;
-  const values = new URLSearchParams(window.location.hash.slice(1));
-  if (!values.has("access_token") && !values.has("refresh_token")) return;
-  window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
-}
 export function createRootAuthRuntime(options: Options) {
   const storageKey = options.storageKey || `sb-${new URL(options.url).hostname.split(".")[0]}-auth-token`;
   const persistent = options.isWeb ? browserStorage() : options.nativeStorage;
@@ -72,14 +64,14 @@ export function createRootAuthRuntime(options: Options) {
   const supportsOwnedCommands = !options.isWeb || !!channel;
   // The reset route reads its own link tokens into an isolated recovery session (openPasswordRecovery).
   // Other web routes exchange a PKCE code only with the verifier this browser saved when it started
-  // that sign-in, Google or an email confirmation. Native keeps the implicit flow: its OAuth tokens
-  // return to the browser session the app opened, and native URL detection stays off.
+  // that sign-in, Google or an email confirmation, and reject token fragments (app/+html.tsx removes
+  // them from the address). Native keeps the implicit flow: its OAuth tokens return to the browser
+  // session the app opened, and native URL detection stays off.
   const resetRoute =
     options.isWeb &&
     typeof window !== "undefined" &&
     typeof window.location?.pathname === "string" &&
     window.location.pathname.replace(/\/+$/, "").endsWith("/auth/reset-password");
-  if (options.isWeb && !resetRoute) discardSessionFragment();
   const fetchImpl = options.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init));
   const runtime = createOwnedAuthClient({
     url: options.url,

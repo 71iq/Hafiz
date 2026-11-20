@@ -75,3 +75,50 @@ test.describe("strict route smoke", () => {
     await expect(sharedPage.getByRole("button", { name: "2:255", exact: true })).toBeInViewport();
   });
 });
+
+test("a link carrying another account's session tokens does not sign the visitor in", async ({ browser }) => {
+  const context = await browser.newContext();
+  const userId = "00000000-0000-4000-8000-0000000000aa";
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+  const token = [
+    encode({ alg: "HS256", typ: "JWT" }),
+    encode({ sub: userId, session_id: "10000000-0000-4000-8000-0000000000aa", exp: expiresAt, role: "authenticated" }),
+    "c3ludGhldGlj",
+  ].join(".");
+  // The export may point at a real API. Nothing reaches it: the user lookup answers as it would for a
+  // valid token, and every other request is refused.
+  const userLookups: string[] = [];
+  await context.route(
+    (url) => /\/(auth|rest|storage|functions)\/v1\//.test(url.pathname),
+    async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/auth/v1/user")) {
+        userLookups.push(url.pathname);
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ id: userId, aud: "authenticated", app_metadata: {}, user_metadata: {} }),
+        });
+      } else await route.abort();
+    },
+  );
+  const page = await context.newPage();
+  try {
+    await page.goto(
+      `/privacy#access_token=${token}&refresh_token=synthetic&expires_in=3600&expires_at=${expiresAt}&token_type=bearer`,
+      { waitUntil: "domcontentloaded" },
+    );
+    await expect(page.getByText("Privacy", { exact: false }).first()).toBeVisible({ timeout: 60_000 });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
+    expect(page.url()).not.toContain("access_token");
+    const stored = await page.evaluate(() =>
+      Object.keys(localStorage)
+        .filter((key) => key.endsWith("-auth-token"))
+        .map((key) => localStorage.getItem(key)),
+    );
+    expect(stored).toEqual([]);
+    expect(userLookups).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
