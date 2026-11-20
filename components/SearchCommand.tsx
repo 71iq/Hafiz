@@ -1016,8 +1016,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
       dismissOnBackdrop
       maxWidth={900}
       maxHeight={modalHeight}
+      phoneSheetHeight="max"
     >
-      <View className="flex-1" style={{ height: modalHeight, maxHeight: modalHeight }}>
+      <View style={isPhone ? { flex: 1, minHeight: 0 } : { height: modalHeight }}>
         {/* The Cancel button below is the one close control, so the header carries only the title. */}
         <OverlayHeader title={s.searchTitle} isRTL={isRTL} />
 
