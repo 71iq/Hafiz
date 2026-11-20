@@ -19,6 +19,10 @@ Bundled Quran text, fonts, translations, tafsir, tajweed, morphology, layout dat
 - Tajweed rule descriptions: adapted from educational tajweed references and bundled in `assets/data/tajweed-rules-en.json` and `assets/data/tajweed-rules-ar.json`.
 - Reasons of revelation data: sourced from `mostafaahmed97/asbab-al-nuzul-dataset`, MIT License.
 
+## Android compression
+
+The Android reader uses Zstandard and zstd-jni. Their original BSD license texts are included under `assets/licenses/` in the APK.
+
 ## Attribution Principle
 
 When redistributing Hafiz, keep this notice, the MIT license, and any source-specific notices required by the bundled datasets and fonts. Do not remove attribution for Quranic text, fonts, translations, tafsir, tajweed, morphology, or other third-party materials.

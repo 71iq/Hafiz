@@ -49,7 +49,7 @@ import {
   type QuranMarkerStyle,
   type ViewMode,
 } from "@/lib/settings/context";
-import { isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
+import { classicFontCopy, isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
 import { useDatabase } from "@/lib/database/provider";
 import { WirdSettingsSection } from "@/components/habit/WirdSettingsSection";
 import { ReminderSettingsSection } from "@/components/notifications/ReminderSettingsSection";
@@ -135,6 +135,7 @@ export default function SettingsScreen() {
     setViewMode,
     quranFontStyle,
     quranRenderFontStyle,
+    classicDownloadState,
     setQuranFontStyle,
     quranMarkerStyle,
     setQuranMarkerStyle,
@@ -147,6 +148,7 @@ export default function SettingsScreen() {
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
+  const classic = classicFontCopy(s, classicDownloadState, quranRenderFontStyle === "qcf2" && quranFontStyle !== "qcf2");
   const appReleaseRows = useAppReleaseRows();
   const appVersion = installedAppVersion();
   // The installed Android app downloads its own updates; the QA build, web and iOS do not.
@@ -534,7 +536,7 @@ export default function SettingsScreen() {
                   onValueChange={(font) => setQuranFontStyle(styleForBaseFont(font, quranFontStyle))}
                   accessibilityLabel={s.quranFontLabel}
                   items={[
-                    { value: "qcf2", label: s.quranFontQcf2 },
+                    { value: "qcf2", label: classic.label },
                     { value: "v4", label: s.quranFontV4 },
                   ]}
                 />
@@ -544,7 +546,7 @@ export default function SettingsScreen() {
                 className="text-warm-400 dark:text-neutral-400"
                 style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
               >
-                {quranRenderFontStyle !== quranFontStyle ? `${s.quranFontChoiceHint} ${s.quranFontDarkFallback}` : s.quranFontChoiceHint}
+                {classic.hint}
               </Text>
 
               <SwitchRow

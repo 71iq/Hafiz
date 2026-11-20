@@ -1,8 +1,7 @@
-import * as Font from "expo-font";
+import type { QuranPageFontStyle } from "./page-style";
+import { registerFont } from "./register-font";
+import { registerPageFont } from "./register-page-font";
 import { Platform } from "react-native";
-import { QPC_V2_FONTS } from "./qpc-v2-fonts";
-import { QPC_V4_TAJWEED_FONTS } from "./qpc-v4-tajweed-fonts";
-import { selectQpcV4PlainPalette } from "./qpc-v4-plain-palette";
 
 const loadedFonts = new Set<string>();
 const inFlight = new Map<string, Promise<void>>();
@@ -11,7 +10,7 @@ const SURAH_NAME_FONT_FAMILY = "v4-surah-name";
 const SURAH_NAME_FONT = require("../../assets/fonts/surah-names/surah_names_v4.ttf");
 const QURAN_COMMON_FONT_FAMILY = "QuranCommon";
 const QURAN_COMMON_FONT = require("../../assets/fonts/quran-common/quran-common.ttf");
-export type QuranPageFontStyle = "qcf2" | "v4" | "v4-tajweed";
+export type { QuranPageFontStyle } from "./page-style";
 export type QuranMarkerStyle = "auto" | "light" | "dark" | "sepia";
 const SURAH_NAME_BISMILLAH_GLYPHS = "\uFC9A \uFC9B \uFC9E \uFCA4";
 const SURAH_NAME_GLYPHS: Record<number, string> = {
@@ -141,16 +140,13 @@ function qpcV4TajweedFontName(page: number): string {
 }
 
 function isQpcV4Style(style: QuranPageFontStyle): boolean {
-  return style === "v4" || style === "v4-tajweed";
-}
-
-function usesAndroidPlainPalette(style: QuranPageFontStyle): boolean {
-  return Platform.OS === "android" && style === "v4";
+  return style !== "qcf2";
 }
 
 export function quranPageFontName(style: QuranPageFontStyle, page: number): string {
   if (!isQpcV4Style(style)) return qpcFontName(page);
-  return usesAndroidPlainPalette(style) ? `p${page}-v4-plain` : qpcV4TajweedFontName(page);
+  if (Platform.OS === "android") return `p${page}-${style}`;
+  return qpcV4TajweedFontName(page);
 }
 
 export function surahNameFontName(): string {
@@ -323,126 +319,20 @@ export function quranPageMarkerFontPaletteStyle(
   };
 }
 
-/**
- * Load a QCF2 font on web using the native FontFace API with display: 'swap'.
- *
- * expo-font creates @font-face rules with font-display: auto, which gives
- * the browser discretion over when (or if) to swap in the loaded font.
- * For QCF2's Private Use Area codepoints this is fatal — the browser renders
- * Arabic Presentation Form fallback glyphs (letter pairs like "بي", "تر")
- * and may never swap to the real font.
- *
- * By using FontFace directly with display:'swap', the browser immediately
- * uses the custom font as soon as it's loaded — no post-hoc CSS patching needed.
- */
-async function loadFontWeb(name: string, asset: any): Promise<void> {
-  let uri: string;
-  if (typeof asset === "string") {
-    uri = asset;
-  } else {
-    const { Asset } = await import("expo-asset");
-    const mod = Asset.fromModule(asset);
-    await mod.downloadAsync();
-    uri = mod.localUri || mod.uri;
-  }
-
-  const fontFace = new FontFace(name, `url("${uri}")`, { display: "swap" });
-  (document.fonts as any).add(fontFace);
-  await fontFace.load();
-}
-
-/** Load the QPC V2 font for a specific page. No-op if already loaded.
- *  Concurrent calls for the same page share one Promise. */
-async function loadQpcFont(page: number): Promise<void> {
-  const name = qpcFontName(page);
-  if (loadedFonts.has(name)) return;
-
-  // Share in-flight Promise so concurrent callers don't duplicate work
-  const existing = inFlight.get(name);
-  if (existing) return existing;
-
-  const asset = QPC_V2_FONTS[page];
-  if (!asset) {
-    console.warn(`[QPC V2] No font asset for page ${page}`);
-    return;
-  }
-
-  const promise = (async () => {
-    try {
-      if (Platform.OS === "web" && typeof document !== "undefined") {
-        await loadFontWeb(name, asset);
-      } else {
-        await Font.loadAsync({ [name]: asset });
-      }
-      loadedFonts.add(name);
-    } finally {
-      inFlight.delete(name);
-    }
-  })();
-
-  inFlight.set(name, promise);
-  return promise;
-}
-
-async function loadAndroidPlainFont(name: string, moduleId: number): Promise<void> {
-  const { Asset } = await import("expo-asset");
-  const { File, Paths } = await import("expo-file-system");
-  const { localUri } = await Asset.fromModule(moduleId).downloadAsync();
-  if (!localUri) throw new Error(`Bundled font ${name} is unavailable`);
-
-  const contents = await new File(localUri).bytes();
-  selectQpcV4PlainPalette(contents);
-  const file = new File(Paths.cache, `${name}.ttf`);
-  file.create({ overwrite: true });
-  try {
-    file.write(contents);
-    await Font.loadAsync(name, file.uri);
-  } finally {
-    // Android maps the font into its Typeface at registration. The cache copy is disposable.
-    try {
-      file.delete();
-    } catch {}
-  }
-}
-
-async function loadQpcV4Font(style: QuranPageFontStyle, page: number): Promise<void> {
+export function loadQuranPageFont(style: QuranPageFontStyle, page: number): Promise<void> {
+  if (!Number.isInteger(page) || page < 1 || page > 604) return Promise.reject(new Error("Invalid Mushaf page"));
   const name = quranPageFontName(style, page);
-  if (loadedFonts.has(name)) {
-    ensureQpcV4PaletteCss(page, name);
-    return;
-  }
-
+  if (loadedFonts.has(name)) return Promise.resolve();
   const existing = inFlight.get(name);
   if (existing) return existing;
-
-  const asset = QPC_V4_TAJWEED_FONTS[page];
-  if (!asset) {
-    console.warn(`[QPC V4 Tajweed] No font asset for page ${page}`);
-    return;
-  }
-
-  const promise = (async () => {
-    try {
-      if (Platform.OS === "web" && typeof document !== "undefined") {
-        await loadFontWeb(name, asset);
-      } else if (usesAndroidPlainPalette(style) && typeof asset === "number") {
-        await loadAndroidPlainFont(name, asset);
-      } else {
-        await Font.loadAsync({ [name]: asset });
-      }
+  const promise = registerPageFont(name, style, page)
+    .then(() => {
+      if (isQpcV4Style(style)) ensureQpcV4PaletteCss(page, name);
       loadedFonts.add(name);
-      ensureQpcV4PaletteCss(page, name);
-    } finally {
-      inFlight.delete(name);
-    }
-  })();
-
+    })
+    .finally(() => inFlight.delete(name));
   inFlight.set(name, promise);
   return promise;
-}
-
-export async function loadQuranPageFont(style: QuranPageFontStyle, page: number): Promise<void> {
-  return isQpcV4Style(style) ? loadQpcV4Font(style, page) : loadQpcFont(page);
 }
 
 export function isQuranPageFontLoaded(style: QuranPageFontStyle, page: number): boolean {
@@ -457,11 +347,7 @@ export async function loadSurahNameFont(): Promise<void> {
 
   const promise = (async () => {
     try {
-      if (Platform.OS === "web" && typeof document !== "undefined") {
-        await loadFontWeb(SURAH_NAME_FONT_FAMILY, SURAH_NAME_FONT);
-      } else {
-        await Font.loadAsync({ [SURAH_NAME_FONT_FAMILY]: SURAH_NAME_FONT });
-      }
+      await registerFont(SURAH_NAME_FONT_FAMILY, SURAH_NAME_FONT);
       loadedFonts.add(SURAH_NAME_FONT_FAMILY);
     } finally {
       inFlight.delete(SURAH_NAME_FONT_FAMILY);
@@ -483,11 +369,7 @@ export async function loadQuranCommonFont(): Promise<void> {
   if (existing) return existing;
 
   const promise = (async () => {
-    if (Platform.OS === "web" && typeof document !== "undefined") {
-      await loadFontWeb(QURAN_COMMON_FONT_FAMILY, QURAN_COMMON_FONT);
-    } else {
-      await Font.loadAsync({ [QURAN_COMMON_FONT_FAMILY]: QURAN_COMMON_FONT });
-    }
+    await registerFont(QURAN_COMMON_FONT_FAMILY, QURAN_COMMON_FONT);
     loadedFonts.add(QURAN_COMMON_FONT_FAMILY);
     inFlight.delete(QURAN_COMMON_FONT_FAMILY);
   })();

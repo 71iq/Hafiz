@@ -1,7 +1,6 @@
 const SFNT_CHECKSUM = 0xb1b0afba;
 const CPAL_TAG = 0x4350414c;
 const HEAD_TAG = 0x68656164;
-const PLAIN_PALETTE = 3;
 
 function findTable(view: DataView, tag: number) {
   const tableCount = view.getUint16(4);
@@ -29,8 +28,8 @@ function checksum(view: DataView, offset: number, length: number): number {
   return sum;
 }
 
-/** Selects the font's bundled plain palette in a disposable copy for Android's font loader. */
-export function selectQpcV4PlainPalette(bytes: Uint8Array): void {
+/** Selects an existing font palette in a disposable copy for Android's font loader. */
+export function selectQpcV4Palette(bytes: Uint8Array, index: number): void {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (view.byteLength < 12 || view.getUint32(0) !== 0x00010000 || 12 + view.getUint16(4) * 16 > view.byteLength) {
     throw new Error("Invalid QPC V4 TrueType font");
@@ -38,18 +37,18 @@ export function selectQpcV4PlainPalette(bytes: Uint8Array): void {
   const { entry, offset, length } = findTable(view, CPAL_TAG);
   const head = findTable(view, HEAD_TAG);
   const defaultPalette = offset + 12;
-  const plainPalette = defaultPalette + PLAIN_PALETTE * 2;
+  const selectedPalette = defaultPalette + index * 2;
   if (
-    plainPalette + 2 > offset + length ||
-    view.getUint16(offset + 4) <= PLAIN_PALETTE ||
+    !Number.isInteger(index) || index < 0 || selectedPalette + 2 > offset + length ||
+    view.getUint16(offset + 4) <= index ||
     head.length < 12
   ) {
-    throw new Error("QPC V4 font is missing its plain palette");
+    throw new Error("QPC V4 font is missing the requested palette");
   }
 
-  // Android selects palette zero. Point it at the existing monochrome colors and marker colors.
+  // Android selects palette zero. Point it at the chosen colors.
   // The glyphs, their layers and every other palette keep their original bytes.
-  view.setUint16(defaultPalette, view.getUint16(plainPalette));
+  view.setUint16(defaultPalette, view.getUint16(selectedPalette));
   view.setUint32(entry + 4, checksum(view, offset, length));
   const adjustment = head.offset + 8;
   view.setUint32(adjustment, 0);

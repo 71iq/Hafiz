@@ -18,6 +18,9 @@ import { importTranslation, TranslationImportCancelled } from "@/lib/translation
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-foundation/recitations";
 import { DirectionProvider } from "@/lib/ui/direction";
+import { classicInstalled, downloadClassic } from "@/lib/fonts/classic-download";
+import type { ClassicDownloadState } from "./quran-font-choice";
+import { resolvePageFontStyle, type QuranFontStyle, type QuranPageFontStyle } from "@/lib/fonts/page-style";
 import type { QuranMarkerStyle as QuranMarkerStylePreference } from "@/lib/fonts/loader";
 import { DEFAULT_TAFSIR_SOURCE, isAvailableTafsirSourceId, type TafsirSourceId } from "@/lib/tafsir/sources";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
@@ -109,7 +112,8 @@ export type ThemeColors = {
 };
 export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
-export type QuranFontStyle = "qcf2" | "v4" | "v4-tajweed";
+export type { QuranFontStyle } from "@/lib/fonts/page-style";
+const DEFAULT_QURAN_FONT: QuranFontStyle = Platform.OS === "android" ? "v4" : "qcf2";
 export type QuranMarkerStyle = QuranMarkerStylePreference;
 export type UILanguage = "en" | "ar";
 export type TafseerSource = TafsirSourceId;
@@ -208,13 +212,9 @@ type SettingsContextType = {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   quranFontStyle: QuranFontStyle;
-  /**
-   * The page font style to draw with. The V4 fonts are colour fonts whose base glyphs carry a fixed
-   * black palette entry, which Android draws regardless of text colour, so in dark themes native
-   * draws V4 choices with the QCF2 font instead of black text on a dark page. Web recolours the
-   * palette and keeps the choice. Settings pickers show quranFontStyle, the user's choice.
-   */
-  quranRenderFontStyle: QuranFontStyle;
+  /** Includes the palette registered with the native font manager. */
+  quranRenderFontStyle: QuranPageFontStyle;
+  classicDownloadState: ClassicDownloadState;
   setQuranFontStyle: (style: QuranFontStyle) => void;
   quranMarkerStyle: QuranMarkerStyle;
   setQuranMarkerStyle: (style: QuranMarkerStyle) => void;
@@ -288,8 +288,9 @@ const SettingsContext = createContext<SettingsContextType>({
   themeColors: THEME_COLORS.white,
   viewMode: "verse",
   setViewMode: () => {},
-  quranFontStyle: "qcf2",
-  quranRenderFontStyle: "qcf2",
+  quranFontStyle: DEFAULT_QURAN_FONT,
+  quranRenderFontStyle: DEFAULT_QURAN_FONT,
+  classicDownloadState: Platform.OS === "android" ? "available" : "ready",
   setQuranFontStyle: () => {},
   quranMarkerStyle: "auto",
   setQuranMarkerStyle: () => {},
@@ -571,7 +572,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
   const [theme, setThemeState] = useState<ThemeMode>(readCachedThemeMode);
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
-  const [quranFontStyle, setQuranFontStyleState] = useState<QuranFontStyle>("qcf2");
+  const [preferredQuranFont, setQuranFontStyleState] = useState<QuranFontStyle>(DEFAULT_QURAN_FONT);
+  const [classicDownloadState, setClassicDownloadState] = useState<ClassicDownloadState>(
+    () => classicInstalled() ? "ready" : "available",
+  );
+  // On upgrade an old Classic preference may predate the downloadable pack.
+  // Keep reading offline in V4 until the user explicitly installs it.
+  const quranFontStyle = preferredQuranFont === "qcf2" && classicDownloadState !== "ready" ? "v4" : preferredQuranFont;
+  const fontIntent = useRef(0);
+  const classicDownload = useRef<Promise<void> | null>(null);
+  useEffect(() => () => { fontIntent.current++; }, []);
   const [quranMarkerStyle, setQuranMarkerStyleState] = useState<QuranMarkerStyle>("auto");
   const [showAyahMarkers, setShowAyahMarkersState] = useState(true);
   const [markSimilarVerses, setMarkSimilarVersesState] = useState(true);
@@ -964,7 +974,26 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setQuranFontStyle = useCallback(
-    (style: QuranFontStyle) => {
+    async (style: QuranFontStyle) => {
+      const intent = ++fontIntent.current;
+      if (style === "qcf2" && !classicInstalled()) {
+        if (!classicDownload.current) {
+          setClassicDownloadState(0);
+          classicDownload.current = downloadClassic(setClassicDownloadState)
+            .then(() => setClassicDownloadState("ready"))
+            .catch((error: unknown) => {
+              setClassicDownloadState("failed");
+              throw error;
+            })
+            .finally(() => { classicDownload.current = null; });
+        }
+        try {
+          await classicDownload.current;
+        } catch {
+          return;
+        }
+        if (intent !== fontIntent.current) return;
+      }
       const previous = latestValues.current.quranFontStyle;
       setQuranFontStyleState(style);
       persist(
@@ -1299,8 +1328,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const accountPromoDismissed = isAccountPromoDismissed(accountPromoDismissedAt);
 
   const isRTL = uiLanguage === "ar";
-  const quranRenderFontStyle: QuranFontStyle =
-    Platform.OS !== "web" && isDark && quranFontStyle !== "qcf2" ? "qcf2" : quranFontStyle;
+  const quranRenderFontStyle = resolvePageFontStyle(quranFontStyle, isDark);
 
   return (
     <SettingsContext.Provider
@@ -1319,6 +1347,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setViewMode,
         quranFontStyle,
         quranRenderFontStyle,
+        classicDownloadState,
         setQuranFontStyle,
         quranMarkerStyle,
         setQuranMarkerStyle,

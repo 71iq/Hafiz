@@ -717,7 +717,7 @@
         },
         {
           "id": "reader.settings",
-          "title": "Reader settings: theme, font (Classic/Modern, Tajweed), marker, size",
+          "title": "Reader settings: theme, Modern font, downloadable Android Classic font, Tajweed, marker, size",
           "kind": "widget",
           "cases": ["SET-03", "SET-04", "SET-05", "SET-06"],
           "uses": ["shared.overlay", "shared.tafsirpicker"],

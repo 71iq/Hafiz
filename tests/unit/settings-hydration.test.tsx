@@ -20,6 +20,13 @@ type SettingsFixture = {
   runAsync: jest.Mock<Promise<RunResult>, [string, readonly unknown[] | undefined]>;
 };
 
+const mockClassicInstalled = jest.fn(() => true);
+const mockDownloadClassic = jest.fn<Promise<void>, [(pages: number) => void]>();
+jest.mock("@/lib/fonts/classic-download", () => ({
+  classicInstalled: () => mockClassicInstalled(),
+  downloadClassic: (progress: (pages: number) => void) => mockDownloadClassic(progress),
+}));
+
 const mockSetColorScheme = jest.fn<void, [string]>();
 const mockImportTranslation = jest.fn<Promise<void>, [unknown, string, unknown?]>(() => Promise.resolve());
 const mockEnqueueSync = jest.fn<Promise<void>, [unknown, ...unknown[]]>(() => Promise.resolve());
@@ -95,6 +102,7 @@ describe("settings ayah-marker hydration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsReady = true;
+    mockClassicInstalled.mockReturnValue(true);
     jest.replaceProperty(Platform, "OS", "web");
     windowGetItem.mockReturnValue(null);
     Object.defineProperty(globalThis, "window", {
@@ -110,6 +118,38 @@ describe("settings ayah-marker hydration", () => {
     } else {
       Reflect.deleteProperty(globalThis, "window");
     }
+  });
+
+  it("reads offline in V4 after upgrading a Classic preference, and retries a failed font download", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    mockClassicInstalled.mockReturnValue(false);
+    const fixture = createFixture();
+    fixture.settings.set("quran_font_style", "qcf2");
+    fixture.settings.set("theme", "amoled");
+    const { result } = await renderLoadedSettings(fixture);
+    expect(result.current.quranRenderFontStyle).toBe("v4-dark");
+    expect(mockDownloadClassic).not.toHaveBeenCalled();
+
+    mockDownloadClassic.mockRejectedValueOnce(new Error("offline"));
+    await act(async () => { await result.current.setQuranFontStyle("qcf2"); });
+    expect(result.current.classicDownloadState).toBe("failed");
+    expect(result.current.quranRenderFontStyle).toBe("v4-dark");
+
+    let finish!: () => void;
+    mockDownloadClassic.mockImplementationOnce((progress) => {
+      progress(42);
+      return new Promise(resolve => { finish = resolve; });
+    });
+    act(() => { void result.current.setQuranFontStyle("qcf2"); });
+    expect(result.current.classicDownloadState).toBe(42);
+    act(() => { void result.current.setQuranFontStyle("v4-tajweed"); });
+    mockClassicInstalled.mockReturnValue(true);
+    await act(async () => { finish(); });
+    expect(result.current.classicDownloadState).toBe("ready");
+    expect(result.current.quranRenderFontStyle).toBe("v4-tajweed-dark");
+    await act(async () => { await result.current.setQuranFontStyle("qcf2"); });
+    expect(result.current.quranRenderFontStyle).toBe("qcf2");
+    expect(mockDownloadClassic).toHaveBeenCalledTimes(2);
   });
 
   it.each(["web", "android"] as const)(
@@ -180,6 +220,7 @@ describe("shared settings provider across database readiness", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsReady = true;
+    mockClassicInstalled.mockReturnValue(true);
     jest.replaceProperty(Platform, "OS", "android");
   });
   afterEach(() => {
@@ -213,6 +254,7 @@ describe("shared settings provider across database readiness", () => {
     second.settings.set("ui_language", "en");
     mockUseDatabase.mockReturnValue(second);
     mockIsReady = true;
+    mockClassicInstalled.mockReturnValue(true);
     rendered.rerender({});
     await waitFor(() => expect(rendered.result.current.isLoaded).toBe(true));
     expect(rendered.result.current.uiLanguage).toBe("en");
@@ -246,6 +288,7 @@ describe("device-only preferences (C05)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsReady = true;
+    mockClassicInstalled.mockReturnValue(true);
     jest.replaceProperty(Platform, "OS", "android");
   });
   afterEach(() => {
@@ -361,6 +404,7 @@ describe("device-only preferences (C05)", () => {
 describe("W14 settings write feedback and translation choice", () => {
   beforeEach(() => {
     mockIsReady = true;
+    mockClassicInstalled.mockReturnValue(true);
     mockImportTranslation.mockReset().mockResolvedValue();
   });
 
@@ -433,6 +477,7 @@ describe("failed setting writes restore the last committed value (C03)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsReady = true;
+    mockClassicInstalled.mockReturnValue(true);
     jest.replaceProperty(Platform, "OS", "android");
   });
   afterEach(() => {

@@ -30,7 +30,6 @@ const DatabaseContext = createContext<DatabaseContextType>({
   retry: () => {},
 });
 
-const quranDbAsset = require("../../assets/data/quran.db");
 const CHANNEL_NAME = "hafiz-db-bridge";
 const LOCK_NAME = "hafiz-db-host";
 const DATABASE_NAME = "hafiz.db";
@@ -300,7 +299,7 @@ function createDatabaseStore() {
       for (let index = 1; index <= OPEN_MAX_ATTEMPTS; index++) {
         if (!isActive()) return;
         try {
-          await importBundledDatabase(DATABASE_NAME, quranDbAsset);
+          await importBundledDatabase(DATABASE_NAME);
           if (!isActive()) return;
           const raw = await openDatabaseAsync(DATABASE_NAME, { useNewConnection: true });
           const owner = createConnectionOwner(raw, (failure) => {

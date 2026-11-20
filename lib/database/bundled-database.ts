@@ -9,7 +9,7 @@ const QURAN_AYAH_COUNT = 6236;
  * good). A database without the complete Quran text is copied again. User data is only written after
  * setup succeeds, so a database that fails this check holds none.
  */
-export async function importBundledDatabase(databaseName: string, assetId: number): Promise<void> {
+export async function importBundledDatabase(databaseName: string, assetId: number = require("../../assets/data/quran.db")): Promise<void> {
   await importDatabaseFromAssetAsync(databaseName, { assetId });
   if (await hasCompleteQuranText(databaseName)) return;
   console.warn("[Database] The stored Quran database is incomplete; copying it again.");

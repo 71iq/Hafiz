@@ -13,7 +13,7 @@ import {
 } from "@/lib/reflection-journey/schema";
 import { TAFSIR_SOURCES, type TafsirSourceConfig, type TafsirSourceId } from "@/lib/tafsir/sources";
 import surahEnglishNameRows from "../../assets/data/surah-english-names.json";
-import { nativeRequires, nativeTafseerRequires, nativeTafsirSourceLoader } from "./native-loaders";
+import { loadNativeData, loadNativeTafseer, nativeTafsirSourceLoader } from "./native-loaders";
 
 // Platform-specific native asset loaders live in native-loaders.*.
 
@@ -34,8 +34,7 @@ async function doLoad(filename: string): Promise<any> {
     const resp = await fetch(`/data/${filename}`);
     return resp.json();
   }
-  const loader = nativeRequires[filename];
-  return loader ? loader() : null;
+  return loadNativeData(filename);
 }
 
 function loadData(filename: string): Promise<any> {
@@ -51,8 +50,7 @@ async function doLoadTafseerFile(surahNumber: number): Promise<any> {
     const resp = await fetch(`/data/tafseer/${surahNumber}.json`);
     return resp.json();
   }
-  const loader = nativeTafseerRequires[surahNumber];
-  return loader ? loader() : null;
+  return loadNativeTafseer(surahNumber);
 }
 
 function loadTafseerFile(surahNumber: number): Promise<any> {

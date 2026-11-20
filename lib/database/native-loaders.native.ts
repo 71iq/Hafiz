@@ -1626,3 +1626,6 @@ export function nativeTafsirSourceLoader(source: TafsirSourceId, surahNumber: nu
   if (source === "jalalayn-en") return nativeJalalaynEnRequires[surahNumber] ?? null;
   return null;
 }
+
+export const loadNativeData = (name: string) => nativeRequires[name]?.() ?? null;
+export const loadNativeTafseer = (surah: number) => nativeTafseerRequires[surah]?.() ?? null;
