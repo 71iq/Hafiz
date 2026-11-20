@@ -526,7 +526,7 @@ export function CommentsSheet({
                       <Pressable
                         onPress={() => openProfile(c.user_id)}
                         accessibilityRole="button"
-                        className="min-w-0"
+                        className="min-w-0 flex-1"
                         style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
                       >
                         <ProfileIdentity
@@ -548,7 +548,6 @@ export function CommentsSheet({
                         onReveal={(show) => setDateRevealId((current) => (show ? c.id : current === c.id ? null : current))}
                         color={mutedColor}
                       />
-                      {user ? <View className="flex-1" /> : null}
                       {user ? (
                         <View>
                           <DropdownMenu
@@ -660,6 +659,8 @@ export function CommentsSheet({
                       <Pressable
                         accessibilityRole="button"
                         onPress={() => handleCommentLike(c)}
+                        accessibilityLabel={c.user_has_liked ? s.removeCommentLike : s.likeComment}
+                        accessibilityValue={{ text: formatNumber(c.likes_count ?? 0, uiLanguage) }}
                         disabled={pending.has("like:" + c.id)}
                         className={`items-center gap-1 rounded-full px-2 py-1 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
                         style={({ pressed }) => ({

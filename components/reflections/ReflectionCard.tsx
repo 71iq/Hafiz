@@ -228,11 +228,11 @@ export function ReflectionCard({
         }}
       >
         <View className={`${rowClassName} items-center justify-between mb-2`} style={rowFlexStyle}>
-          <View className={`${rowClassName} items-center gap-2`} style={rowFlexStyle}>
+          <View className={`${rowClassName} min-w-0 flex-1 items-center gap-2`} style={rowFlexStyle}>
             <Pressable
               onPress={openProfile}
               accessibilityRole="button"
-              className="min-w-0"
+              className="min-w-0 flex-1"
               style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
             >
               <ProfileIdentity
@@ -314,6 +314,9 @@ export function ReflectionCard({
         >
           <Pressable
             onPress={handleLike}
+            accessibilityRole="button"
+            accessibilityLabel={liked ? s.removeReflectionLike : s.likeReflection}
+            accessibilityValue={{ text: formatCompactCount(likesCount, uiLanguage) }}
             disabled={likeBusy}
             className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
             style={({ pressed }) => ({
@@ -332,6 +335,9 @@ export function ReflectionCard({
 
           <Pressable
             onPress={() => onCommentsPress(reflection.id)}
+            accessibilityRole="button"
+            accessibilityLabel={s.reflectionComments}
+            accessibilityValue={{ text: formatCompactCount(reflection.comments_count, uiLanguage) }}
             className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
             style={({ pressed }) => ({
               ...rowFlexStyle,
