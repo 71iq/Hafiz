@@ -41,7 +41,7 @@ type Props = {
   onClose: () => void;
   /** Called after this sheet closes for a navigation, so a sheet that contains it can close too. */
   onNavigate?: () => void;
-  onCommentAdded: (reflectionId: string) => void;
+  onCommentAdded?: (reflectionId: string) => void;
   /** After the server confirmed deleting one of the viewer's comments, so the count shown drops by one. */
   onCommentRemoved?: (reflectionId: string) => void;
   /** After the author's delete of the shown reflection settled; the sheet has already closed. */
@@ -133,12 +133,17 @@ export function CommentsSheet({
   }, [retire, onClose]);
   // Comments have no report of their own: "Report reflection" reports the parent, and says so.
   const parentReport = useReportReflection(reflection ?? null);
+  // A sheet reopened after login has no parent list to adjust in place.
+  const refreshParentCounts = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
+    void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.all });
+  }, [queryClient]);
   const removeLocalComment = useCallback(
     (removed: ReflectionComment, deleted: boolean) => {
       setLocalComments((prev) => prev.filter((row) => row.id !== removed.id));
-      if (deleted) onCommentRemoved?.(removed.reflection_id);
+      if (deleted) (onCommentRemoved ?? refreshParentCounts)(removed.reflection_id);
     },
-    [onCommentRemoved],
+    [onCommentRemoved, refreshParentCounts],
   );
   const commentRemoval = useDeleteComment(reflectionId, removeLocalComment);
   // A typed comment asks before any intentional close or switch away from this reflection.
@@ -223,7 +228,7 @@ export function CommentsSheet({
     const finishPosted = () => {
       setText((current) => (current === submitted ? "" : current));
       void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflectionId) });
-      onCommentAdded(reflectionId);
+      (onCommentAdded ?? refreshParentCounts)(reflectionId);
     };
     try {
       const comment = await addComment(user.id, reflectionId, submitted.trim(), isMinor);
@@ -250,7 +255,7 @@ export function CommentsSheet({
     } finally {
       lease.release();
     }
-  }, [user, reflectionId, text, isMinor, begin, onCommentAdded, queryClient]);
+  }, [user, reflectionId, text, isMinor, begin, onCommentAdded, queryClient, refreshParentCounts]);
 
   const handleLoadMore = useCallback(async () => {
     if (!reflectionId || !commentsQuery.hasNextPage) return;

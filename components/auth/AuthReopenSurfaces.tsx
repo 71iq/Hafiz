@@ -63,7 +63,6 @@ export function AuthReopenSurfaces({ surface }: { surface: "mushaf" | "feed" }) 
         <CommentsSheet
           reflectionId={shownComments.reflectionId}
           onClose={() => setComments(null)}
-          onCommentAdded={() => {}}
         />
       ) : null}
     </>

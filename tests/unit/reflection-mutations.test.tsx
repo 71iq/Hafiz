@@ -644,6 +644,17 @@ it("comments preserve newly typed text while a prior submitted snapshot finishes
   expect(addComment).toHaveBeenCalledWith(user(1).id, "post", "Submitted draft", false);
 });
 
+it("refreshes the feed and ayah counts when posting from the standalone comments sheet", async () => {
+  const invalidate = jest.spyOn(client, "invalidateQueries");
+  jest.mocked(addComment).mockResolvedValueOnce(comment("new"));
+  const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} />, { wrapper });
+  const input = await view.findByPlaceholderText(strings.en.reflectionAddComment);
+  fireEvent.changeText(input, "A comment after signing in");
+  fireEvent(input, "submitEditing");
+  await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: keys.feed.all }));
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: keys.reflections.all });
+});
+
 it("comment likes restore new canonical query rows after failure and invalidate only that post on success", async () => {
   mockLocale = "en";
   const pending = deferred(false);
