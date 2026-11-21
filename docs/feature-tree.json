@@ -1113,7 +1113,7 @@
       "children": [
         {
           "id": "homewidget.layouts",
-          "title": "Widget providers, compact and full-size Zayt layouts",
+          "title": "Widget providers, tile, single-row and 4 by 2 layouts with scene and plain modes",
           "kind": "widget",
           "cases": ["WIDGET-01"],
           "uses": [],
@@ -1122,7 +1122,7 @@
         },
         {
           "id": "homewidget.states",
-          "title": "Widget states, Zayt scenes, milestone turn and TalkBack label",
+          "title": "Widget states, sky bands, streak flame, Zayt stills, blink and earned-day clips, TalkBack label",
           "kind": "widget",
           "cases": ["WIDGET-02"],
           "uses": ["wird.settle", "wird.makeup", "wird.earnback", "home.hifzplan", "wird.zayt"],

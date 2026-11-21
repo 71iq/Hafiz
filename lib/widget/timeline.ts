@@ -4,10 +4,11 @@ import type { DayClock } from "@/lib/notifications/clock";
 import { makeUpCutoff } from "@/lib/notifications/day-times";
 import { createHabitProjector } from "@/lib/notifications/habit-projection";
 import type { DayPrayerTimes } from "@/lib/prayer/times";
-import { describeWidgetEntry, type WidgetPlanFacts } from "@/lib/widget/copy";
+import { describeWidgetEntry, WIDGET_BAND_MINUTES, type WidgetPlanFacts } from "@/lib/widget/copy";
 import type { WidgetAppearance } from "@/lib/widget/palette";
 import {
   WIDGET_HORIZON_DAYS,
+  WIDGET_MAX_ENTRIES,
   WIDGET_TIMELINE_VERSION,
   type WidgetEntry,
   type WidgetEntryContent,
@@ -32,13 +33,14 @@ export type WidgetBuildInput = Readonly<{
 function sameContent(a: WidgetEntryContent, b: WidgetEntryContent): boolean {
   return (
     a.state === b.state &&
-    a.marker === b.marker &&
+    a.scene === b.scene &&
+    a.pose === b.pose &&
+    a.flame === b.flame &&
+    a.tier === b.tier &&
     a.count === b.count &&
-    a.countCaption === b.countCaption &&
-    a.headline === b.headline &&
-    a.detail === b.detail &&
+    a.line === b.line &&
     a.note === b.note &&
-    a.image === b.image &&
+    a.week.every((day, index) => day.mark === b.week[index].mark && day.label === b.week[index].label) &&
     a.contentDescription === b.contentDescription &&
     a.tap === b.tap
   );
@@ -47,7 +49,8 @@ function sameContent(a: WidgetEntryContent, b: WidgetEntryContent): boolean {
 /**
  * Spec 7.2: the next 7 local days for a person who does nothing more, as entries that start at each
  * instant the widget can change: now, each local midnight, each make-up cutoff (where yesterday's
- * window closes and grace settles), each evening band start, and when more review comes due today.
+ * window closes and grace settles), each evening band start, the sky's other band changes (noon,
+ * 16:00, 22:00 and 23:00) and when more review comes due today.
  * lib/habit's projection applies every streak rule; this only words the result. Pure.
  */
 export function buildWidgetTimeline(input: WidgetBuildInput): WidgetTimeline {
@@ -63,6 +66,7 @@ export function buildWidgetTimeline(input: WidgetBuildInput): WidgetTimeline {
       clock.at(date, 0).getTime(),
       makeUpCutoff({ clock, prayers }, addDays(date, -1)).getTime(),
       input.eveningStartsAt(date).getTime(),
+      ...WIDGET_BAND_MINUTES.map((minutes) => clock.at(date, minutes).getTime()),
     );
   }
   if (input.plan.moreDueAt) candidates.push(input.plan.moreDueAt.getTime());
@@ -71,10 +75,16 @@ export function buildWidgetTimeline(input: WidgetBuildInput): WidgetTimeline {
   const projector = createHabitProjector({ habit: input.habit, clock, prayers }, today);
   const entries: WidgetEntry[] = [];
   let previous: WidgetEntryContent | null = null;
+  // A full entry list ends the timeline early, at the change it has no room for.
+  let end = expiresAt;
   for (const startsAt of instants) {
     const at = new Date(startsAt);
     const content = describeWidgetEntry(projector(clock.dateOf(at), at), at, input);
     if (previous && sameContent(previous, content)) continue;
+    if (entries.length === WIDGET_MAX_ENTRIES) {
+      end = startsAt;
+      break;
+    }
     entries.push({ startsAt, ...content });
     previous = content;
   }
@@ -82,7 +92,7 @@ export function buildWidgetTimeline(input: WidgetBuildInput): WidgetTimeline {
   return {
     version: WIDGET_TIMELINE_VERSION,
     generatedAt: nowMs,
-    expiresAt,
+    expiresAt: end,
     timeZone: input.timeZone,
     language: input.language,
     direction: input.language === "ar" ? "rtl" : "ltr",

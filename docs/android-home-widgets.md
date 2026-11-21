@@ -1,70 +1,95 @@
 # Hafiz Android home-screen widgets
 
-A glance at the home screen should answer two questions. How is today's wird going? Where can I pick it up? Zayt makes the answer recognizable on both widget sizes. The words and tap destination also work with the character hidden.
+A glance at the home screen should answer two questions. Does today count yet? How much of today is left? The flame beside the number answers the first. The sky behind Zayt answers the second. The words and tap destination still work with Zayt hidden.
+
+## Concept
+
+Zayt is a drop of olive oil, the fuel of a lamp. The streak is the flame beside the number. The background is the sky over an olive grove, and it follows the person's local day. As today runs out the sky darkens, and Zayt's own light becomes the main light in the scene. Urgency comes from the sky and from how much Zayt's light matters in it. Zayt's face never shows it. When today counts, the scene turns gold, by night too, and the widget needs no words.
+
+The flame is the only fire in the Zayt system. The owner asked for it on 2026-11-21. It never appears on or around Zayt, and Zayt never holds anything. The other character rules in the Zayt spec still apply: no sad, worried or sleeping face, no pose that resembles worship, and closed eyes only in a short blink.
 
 ## What we learned from Duolingo
 
-The signed Android app `com.duolingo` 6.106.5 (2503) declares a 2×1 and a 4×2 home-screen streak widget. REA package and method inspection found separate small and medium scene lists, 16 named widget states, 85 small art presets, 74 medium art presets and 26 native animation layouts. Presets include still illustrations. The medium layouts can also carry calendar marks. One concrete small-widget path selects a coffee illustration with a native animated-vector eyelid effect that repeats every 2.1 seconds. These are capabilities in the downloaded app. Live rollout and device playback were outside the static inspection. [Duolingo's account of designing the widget](https://blog.duolingo.com/widget-feature) · [Android app](https://play.google.com/store/apps/details?id=com.duolingo)
+The signed Android app `com.duolingo` 6.106.5 (2503) declares a 2×1 and a 4×2 streak widget. Static REA inspection found a local rules engine. Each refresh works out a state from the streak, today's practice, a freeze and the local hour, in bands of 0 to 16, 16 to 20, 20 to 22 and 22 to 24. It then picks one of 85 small or 74 medium art presets at random, avoiding presets already shown that day, and holds the pick for 2 hours early in the day and 30 minutes late at night. The count is white until the day's practice and orange after it. Backgrounds are baked gradients that darken towards midnight, and some late scenes loop a 2.1 second eye animation. Its urgency comes from Duo's distress: crying, melting, burning and angry eyes. [Duolingo's account of designing the widget](https://blog.duolingo.com/widget-feature) · [Android app](https://play.google.com/store/apps/details?id=com.duolingo)
 
-Hafiz borrows two choices from that design. Give the small widget a character people can recognize, and give different moments different silhouettes. Hafiz already knows the person's local wird, review queue, evening boundary and pause settings. Those determine the scene. All art comes from the Hafiz Zayt studio.
+Hafiz keeps the time bands, the darkening sky, the colour change of the count and the slow idle blink. It refuses the distress. Its bands follow the person's evening start, and its widget knows the local wird, review queue, make-up cutoff and pause, so it changes exactly at those moments instead of at the next hourly refresh. All art comes from the Hafiz Zayt studio.
 
 ## Picker, placement and resizing
 
-Android offers **Hafiz streak** at 2×1 and **Hafiz wird** at 4×2. Both use the same data and respond to the space the launcher actually gives them. A larger grid cell on one launcher can select a different layout than the same nominal cell on another. Android 12 and later receive the size alternatives together. Earlier versions use the dimensions in the widget options.
+Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both use the same data and resize down to a single row. Android 12 and later receive every size at once and pick the largest layout that fits. Earlier versions use the dimensions in the widget options, trying the rows below from the top.
 
-| Available space, dp | Visible content |
-| --- | --- |
-| 110×40, tiny | Zayt and the streak count. When there is no count, show the status headline. |
-| 200×40, strip | Zayt and count beside the headline, which can wrap to two lines. |
-| 110×96, compact | Zayt beside the count and its caption, with the headline on the next row. |
-| 250×110, short wird | Larger Zayt next to the status marker, count and headline. |
-| 250×190, expanded wird | Larger Zayt, marker, count, headline, detail and one relevant plan or grace note. |
+| Available space, dp | Layout                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 250×190             | Wide: flame and count, one line, the week row and the plan or grace note at the start, Zayt at full height at the end. |
+| 250×110             | The wide layout without the week row and note.                                                                         |
+| 110×100             | Tile: flame and count centred at the top, one line below, Zayt filling the rest with the feet just cut by the edge.    |
+| 150×64              | Short: flame, count and line at the start; a tall Zayt at the end looks up from the bottom edge.                       |
+| 150×40              | Strip: one row with the line beside the count, and Zayt looking up.                                                    |
+| 100×40              | Tiny: flame with the count, or the line when there is no count, and Zayt looking up.                                   |
 
-When multiple layouts fit, the order is expanded wird, short wird, compact, strip, tiny. In the three smaller layouts Zayt takes the marker's place. Turning off **Show Zayt** restores the marker there and gives the larger layouts their art space back. An expired or unavailable timeline always gets the neutral text-only layout.
+With **Show Zayt** on, the background is the scene. With it off, each layout shows a plain card in the app's theme, the System theme following the launcher's day or night colours. An expired or unreadable timeline gets the neutral text layout.
 
-The launcher picker shows a sample. **Settings → General → Home screen widget** uses the current local state for the native pin dialog where the launcher supports it. The existing one-time, post-session offer keeps its place behind rest, encouragement and reminder prompts. Placement and dismissal are device choices.
+The launcher picker shows a sample done day. **Settings → General → Home screen widget** uses the current local state for the native pin dialog where the launcher supports it. The one-time, post-session offer keeps its place behind rest, encouragement and reminder prompts.
 
-## State and action
+## Count, flame and line
 
-Each row uses the same habit projection and review-left rules as Home. In the table, **Wird** means the page review for a page plan and the ayah review otherwise. If onboarding or a review session is already in progress, the existing navigation guard preserves it.
+The count is the streak length, 0 included. On a scene it turns the flame's colour once today counts. The flame is lit once today counts, an outline with an ember while the streak waits for today, and an empty outline at 0. Paused days show the outline. A lit flame grows through seven stages, at 7, 14, 30, 50, 100 and 365 days, gaining a glow, a second tongue, a white-hot core and glints of light.
 
-| State | Message | Zayt | Tap |
-| --- | --- | --- | --- |
-| Begin | Invitation to begin the first wird | Welcome wave | Home |
-| Fresh start | Begin a new streak | Welcome wave | Wird |
-| Open day | Today's wird is open | Standing, eyes open | Wird |
-| Open evening | There is still time today | Steady inner light | Wird |
-| Make-up available | A make-up is available until the local cutoff | Welcome wave | Wird |
-| Earning back, open | Today's step in earning back a streak | Warm smile | Wird |
-| Earning back, today done | Today counts toward earning it back | Open arms after the rebound | Home |
-| Done | Today's minimum is complete | Daily shimmer | Home |
-| Safe, review left | Streak is safe and review is still due | Warm smile | Wird |
-| Milestone | Today's completion reached a streak milestone | Landing cheer and sparks | Wird if review remains, otherwise Home |
-| Kept | Streak kept for today | Seated | Home |
-| Paused | Pause and its end date | Seated | Home |
+The line is short. A done day has none, since the lit flame and the gold scene already say it. With Show numbers off the count is hidden, so a done day says "Done today".
 
-The evening illustration starts at Hafiz's reminder boundary, 20 minutes after Isha, capped at 22:45, or 21:00 when prayer times are unavailable. The make-up deadline is the existing local cutoff. These state changes do not send a notification. The widget never displays Quran text, an excuse category, a disappointed face or a warning that implies the character is waiting for the person.
+The 4×2 widget at full height adds a week row: the last seven days with today last, each under its weekday letter. A recited day is a small lit flame, a day kept by grace, an excuse or a pause is a soft dot, today's open day is the ember, and any other day is an empty ring. Nothing marks a day as missed.
+
+## State, sky and Zayt
+
+Each entry uses the same habit projection and review-left rules as Home. **Wird** means the page review for a page plan and the ayah review otherwise. An onboarding or review session already in progress keeps its place.
+
+While today is open the sky follows these bands. Dusk starts at Hafiz's reminder boundary, 20 minutes after Isha, capped at 22:45, or 21:00 without prayer times. A late evening start skips dusk.
+
+| Band        | From          | Scene             | Zayt                         | Line                  |
+| ----------- | ------------- | ----------------- | ---------------------------- | --------------------- |
+| Morning     | 00:00         | Pale blue to gold | Standing, eyes open          | Today's wird awaits   |
+| Midday      | 12:00         | Clear blue        | Waving                       | Keep it going         |
+| Golden hour | 16:00         | Amber             | Warm smile                   | Time for today's wird |
+| Dusk        | Evening start | Rose and violet   | Inner light risen            | Still time today      |
+| Night       | 22:00         | Indigo, stars     | Arms open, with its own halo | Before midnight       |
+| Last hour   | 23:00         | Nearly black      | Glowing brightest            | Last hour of today    |
+
+| State                    | Scene                     | Zayt             | Line                  | Tap                                    |
+| ------------------------ | ------------------------- | ---------------- | --------------------- | -------------------------------------- |
+| Begin                    | Dawn, or night after dusk | Wave, or glowing | Start your streak     | Home                                   |
+| Fresh start              | Dawn, or night after dusk | Wave, or glowing | Begin a new streak    | Wird                                   |
+| Open day                 | By band                   | By band          | By band               | Wird                                   |
+| Make-up available        | Dawn                      | Wave             | Make up by the cutoff | Wird                                   |
+| Earning back, open       | By band                   | By band          | Earning back: n of 3  | Wird                                   |
+| Earning back, today done | Sunrise, or gold night    | Arms open        | Today counts: n of 3  | Home                                   |
+| Done                     | Gold, or gold night       | Shimmer          | None                  | Home                                   |
+| Safe, review left        | Gold, or gold night       | Warm smile       | Review left today     | Wird                                   |
+| Milestone                | Gold burst                | Milestone still  | None, or review left  | Wird if review remains, otherwise Home |
+| Kept                     | Calm                      | Seated           | Streak kept for today | Home                                   |
+| Paused                   | Calm                      | Seated           | Paused until the date | Home                                   |
+
+The widget never displays Quran text, an excuse category, a sad face or a warning that implies the character is waiting for the person. These changes send no notification.
 
 ## Motion and event ownership
 
-A completed, locally committed review can carry an actual wird progress event. If its streak length is a milestone, the widget lifecycle remembers it in memory for that local day. The first background transition consumes it. The ordinary seven-day timeline still publishes as soon as progress changes. At backgrounding, Hafiz sends a fresh timeline plus a one-time native motion request. The renderer plays it only if the selected entry still says milestone, Zayt is visible, a widget is placed and system animator duration scale is above zero.
+Standing stills blink slowly about every 4 and 6 seconds, two blinks with unequal gaps. The seated and celebrating stills never close their eyes. On the night and last-hour skies, the waiting flame's ember glows and settles every two seconds. Each is a frame list on an indeterminate ProgressBar inside the widget's RemoteViews, so the launcher runs it and Hafiz never wakes to animate.
 
-The clip is a 1.6-second, silent, in-place turn and landing. All sizes share the same 17 samples. A host-native progress drawable plays the one-shot frame sequence; Hafiz never wakes the app for individual frames. The last drawing is the milestone still. Five seconds after publication, one follow-up refresh reads the latest state and replaces the temporary drawable with static art. The extra time lets a busy launcher finish drawing the landing. Actual display timing depends on the launcher. The widget may already be settled by the time someone looks at it.
+A completed, locally committed review can carry a wird progress event: the minimum met, a day made up or a streak earned back. The widget lifecycle remembers it in memory for that local day and the first background transition consumes it. At backgrounding, Hafiz sends a fresh timeline with a one-time celebration request. Native plays the clip that the entry now showing calls for: the A07 turn on a milestone or the A06 hop on a done day. Other states keep the blink. Each clip ends on the entry's own still. Five seconds after publication, one follow-up refresh reads the latest state and returns to the blink. Actual display timing depends on the launcher.
 
-A new install, pin, resize, startup, clock change, sync or account restore can display the current milestone still. None of those actions creates a locally earned event. A second trip to the launcher that day does not repeat an already consumed event. Changing accounts or restoring local data discards a pending event. Ordinary completions, late evenings, paused days and grace days use stills. There is no sound, haptic feedback or continuous animation.
+A new install, pin, resize, startup, clock change, sync or account restore shows the current still and blink. None of those creates a locally earned event, and a second trip to the launcher that day does not repeat one. Changing accounts or restoring local data discards a pending event. With system animations off, every widget is still. There is no sound or haptic feedback.
 
 ## Offline use, privacy and accessibility
 
-Hafiz calculates up to seven local days from on-device data and publishes a bounded timeline into Android's app-private, no-backup storage. Both widgets choose the current entry from that timeline while the app is closed. They refresh around midnight, the make-up cutoff, the evening boundary and later review becoming due. Android may defer scheduled work. After expiry, unreadable data or a time-zone mismatch, the widget says to open Hafiz and omits personal figures.
+Hafiz calculates up to seven local days from on-device data and publishes a bounded timeline into Android's app-private, no-backup storage. The widget chooses the current entry from it while the app is closed, and wakes at each sky band, midnight, the make-up cutoff, the evening start and later review coming due. Android may defer scheduled work. A timeline that would pass 64 entries ends early, and the widget asks for Hafiz to be opened at that point. After expiry, unreadable data or a time-zone mismatch, the widget says to open Hafiz and omits personal figures. A version 1 timeline stored before an update still renders in the new look, with a midday sky for open days, until Hafiz publishes again.
 
-**Show numbers** controls the streak length, day counts and plan figures in the copy and TalkBack label. A useful cutoff time or pause date can still appear. **Show Zayt** controls every personal widget render and its dynamic pin preview. The launcher's generic catalog artwork is a design sample. English and Arabic use their own strings, digits and reading direction. The artwork stays upright with the same waving hand. Fixed white, beige, dark and AMOLED themes follow the app. System mode uses the launcher's day or night palette.
+**Show numbers** controls the streak length, day counts and plan figures in the text and TalkBack label. The flame's stage still shows. A useful cutoff time or pause date can still appear. **Show Zayt** controls the scene and Zayt in every personal render and its pin preview. The launcher's generic catalog artwork is a design sample. English and Arabic use their own strings, digits and reading direction. Arabic moves the text to the right and Zayt to the left, and Zayt still waves with the same hand.
 
-The entire card is one tap target and one TalkBack description. The character, frame sequence and status marker are decorative. Turning off system animations displays the milestone still. No layout needs a new permission, account, network request or remote widget service.
+The entire card is one tap target and one TalkBack description, which keeps the full sentences: the streak, the state and its detail, and the note. The scene, Zayt, the frames and the flame are decorative.
 
 ## Art and acceptance
 
-The wave, shimmer, rebound and milestone come from A04, A06, A08 and A07 in the reviewed Zayt studio revision `278afa4b`. The existing standing, warm, glow and seated stills supply the other poses. The widget packages the drawings it needs as Android resources. To reproduce the new resources, run `node scripts/render-widget-art.mjs /path/to/studio/zayt/animations` from the app checkout. [Zayt studio revision](https://github.com/71iq/Hafiz/commit/278afa4b38f036980358c656a9090526f4fc6aaa)
+The art comes from the Zayt studio's widget export on the `feat/zayt-widget-art` branch: twelve scenes in a square and a wide crop, twelve stills, eight blink frames and the done and milestone clips. To reproduce the Android resources, run `node scripts/render-widget-art.mjs /path/to/studio/zayt/widget/out` from the app checkout. It copies the files and writes the frame lists and their ProgressBar layouts. The flame icons are vector drawables in `android/app/src/main/res/drawable`. `tests/unit/widget-resources.test.ts` checks that every scene, pose and flame JavaScript can send has its resources and is accepted by the Kotlin parser.
 
-Acceptance covers both picker entries, all five sizes, the twelve states, both directions, fixed and system themes, Zayt off, numbers off, reduced motion, expired data and tap routing. On a native widget host, observe a real sequence of different frames on an eligible milestone, then the final still. Repeat with an ordinary refresh, an app return and reduced motion. Read the Arabic headline and check the start edge at narrow widths. Check that the text, destination and accessible label remain useful with no art.
+Acceptance covers both picker entries, all six layouts, every state and band, both directions, fixed and System themes with Zayt off, numbers off, reduced motion, expired data and tap routing. On a native widget host, watch the blink, a done hop and a milestone turn end on their stills, then repeat with reduced motion. Read the Arabic line and check the start edge at narrow widths. Check that the text, destination and accessible label remain useful with no art.
 
-This specification covers Android home-screen widgets. An iOS WidgetKit implementation, a lock-screen surface, a weekly calendar and additional animation families would each need a separate product decision.
+This specification covers Android home-screen widgets. An iOS WidgetKit implementation and a lock-screen surface would each need a separate product decision.

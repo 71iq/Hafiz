@@ -5,7 +5,7 @@ import { WIDGET_MAX_BYTES, WIDGET_MAX_SPAN_MS, type WidgetEntry, type WidgetTime
 
 const FIXTURES = path.resolve(__dirname, "../fixtures/widget");
 const readFixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(FIXTURES, name), "utf8"));
-const valid = () => readFixture("timeline-v1-valid.json") as WidgetTimeline;
+const valid = () => readFixture("timeline-v2-valid.json") as WidgetTimeline;
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 type MutableTimeline = Mutable<Omit<WidgetTimeline, "entries">> & { entries: Mutable<WidgetEntry>[] };
@@ -27,14 +27,15 @@ describe("widget timeline fixtures", () => {
   });
 
   it("rejects the invalid fixtures as named", () => {
-    expect(accepts(readFixture("timeline-v1-invalid-order.json"))).toBe(false);
-    expect(accepts(readFixture("timeline-v1-invalid-version.json"))).toBe(false);
+    expect(accepts(readFixture("timeline-v2-invalid-order.json"))).toBe(false);
+    expect(accepts(readFixture("timeline-v2-invalid-version.json"))).toBe(false);
   });
 });
 
 describe("widget timeline validation (spec 7.4)", () => {
   const cases: [string, (timeline: MutableTimeline & Record<string, unknown>) => void][] = [
-    ["version 2", (t) => Object.assign(t, { version: 2 })],
+    ["version 1", (t) => Object.assign(t, { version: 1 })],
+    ["version 3", (t) => Object.assign(t, { version: 3 })],
     ["an unknown top-level key", (t) => Object.assign(t, { extra: true })],
     ["an unknown entry key", (t) => Object.assign(t.entries[0], { extra: true })],
     ["no entries", (t) => (t.entries = [])],
@@ -60,12 +61,22 @@ describe("widget timeline validation (spec 7.4)", () => {
     ["colors with the System theme", (t) => (t.colorMode = "system")],
     ["no colors with a fixed theme", (t) => (t.colors = null)],
     ["a direction that does not match the language", (t) => (t.direction = "rtl")],
-    ["a count without a caption", (t) => (t.entries[0].countCaption = null)],
-    ["a headline of 49 characters", (t) => (t.entries[0].headline = "x".repeat(49))],
-    ["a control character", (t) => (t.entries[0].detail = "line\nbreak")],
+    ["neither a count nor a line", (t) => Object.assign(t.entries[0], { count: null, line: null })],
+    ["a line of 49 characters", (t) => (t.entries[0].line = "x".repeat(49))],
+    ["a control character", (t) => (t.entries[0].line = "line\nbreak")],
     ["a DEL character", (t) => (t.entries[0].note = "note\u007F")],
     ["a time zone with a space", (t) => (t.timeZone = "Asia/Riyadh City")],
-    ["an unknown image", (t) => Object.assign(t.entries[0], { image: "wave" })],
+    ["an unknown scene", (t) => Object.assign(t.entries[0], { scene: "noon" })],
+    ["an unknown pose", (t) => Object.assign(t.entries[0], { pose: "cheer" })],
+    ["an unknown flame", (t) => Object.assign(t.entries[0], { flame: "frozen" })],
+    ["a tier above 6", (t) => Object.assign(t.entries[0], { tier: 7 })],
+    ["a fractional tier", (t) => Object.assign(t.entries[0], { tier: 1.5 })],
+    ["a version 1 field", (t) => Object.assign(t.entries[0], { headline: "Today's wird awaits" })],
+    ["a week of six days", (t) => (t.entries[0].week = t.entries[0].week.slice(1))],
+    [
+      "an unknown day mark",
+      (t) => Object.assign(t.entries[0], { week: t.entries[0].week.map((day) => ({ ...day, mark: "missed" })) }),
+    ],
     ["an unknown tap", (t) => Object.assign(t.entries[0], { tap: "settings" })],
     ["an unknown state", (t) => Object.assign(t.entries[0], { state: "frozen" })],
   ];
@@ -86,8 +97,7 @@ describe("widget timeline validation (spec 7.4)", () => {
       t.entries = Array.from({ length: 64 }, (_, index) => ({
         ...first,
         startsAt: t.generatedAt + index * 60_000,
-        headline: "ح".repeat(48),
-        detail: "ح".repeat(120),
+        line: "ح".repeat(48),
         note: "ح".repeat(80),
         contentDescription: "ح".repeat(400),
       }));

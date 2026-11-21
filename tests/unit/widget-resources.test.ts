@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { WIDGET_PALETTES } from "@/lib/widget/palette";
+import { WIDGET_FLAMES, WIDGET_MAX_TIER, WIDGET_POSES, WIDGET_SCENES, WIDGET_STATES } from "@/lib/widget/types";
 
 const root = path.resolve(__dirname, "../..");
 const res = path.join(root, "android/app/src/main/res");
@@ -54,8 +55,6 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
         "hafiz_widget_medium_description",
         "hafiz_widget_open_app",
         "hafiz_widget_preview_count",
-        "hafiz_widget_preview_caption",
-        "hafiz_widget_preview_headline",
       ]),
     );
     for (const name of widgetNames(arabic)) {
@@ -65,17 +64,51 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
     expect(arabic.get("hafiz_widget_medium_label")).toBe("وِرد حافظ");
   });
 
-  it("ships byte-identical copies of the Zayt stills", () => {
-    const copies = {
-      rest: "assets/zayt/S/A01_rest_pose.webp",
-      warm: "assets/zayt/S/warm_smile_poster.webp",
-      glow: "assets/zayt/S/A07_milestone_glow_poster.webp",
-      sit: "assets/zayt/S/A11_rest_sit_poster.webp",
-    };
-    for (const [image, source] of Object.entries(copies)) {
-      const copy = fs.readFileSync(path.join(res, `drawable-nodpi/hafiz_widget_zayt_${image}.webp`));
-      expect([image, copy.equals(fs.readFileSync(path.join(root, source)))]).toEqual([image, true]);
+  it("has a sky in both crops for every scene and a still for every pose, each named in WidgetArt.kt", () => {
+    const kotlin = fs.readFileSync(
+      path.join(root, "android/app/src/main/java/com/anonymous/hafiz/widget/WidgetArt.kt"),
+      "utf8",
+    );
+    const art = (name: string) => fs.existsSync(path.join(res, `drawable-nodpi/${name}.webp`));
+    for (const scene of WIDGET_SCENES) {
+      for (const crop of ["sq", "wide"]) {
+        const name = `hafiz_widget_scene_${scene}_${crop}`;
+        expect([name, art(name), kotlin.includes(`R.drawable.${name}`)]).toEqual([name, true, true]);
+      }
     }
+    for (const pose of WIDGET_POSES) {
+      const name = `hafiz_widget_zayt_${pose}`;
+      expect([name, art(name), kotlin.includes(`R.drawable.${name}`)]).toEqual([name, true, true]);
+    }
+    for (const layout of kotlin.matchAll(/R\.layout\.(hafiz_widget_motion_\w+)/g)) {
+      expect([layout[1], fs.existsSync(path.join(res, `layout/${layout[1]}.xml`))]).toEqual([layout[1], true]);
+    }
+    const flames = [...Array.from({ length: WIDGET_MAX_TIER + 1 }, (_, tier) => `lit_t${tier}`), "unlit", "out"];
+    for (const flame of flames) {
+      const name = `hafiz_widget_flame_${flame}`;
+      expect([
+        name,
+        fs.existsSync(path.join(res, `drawable/${name}.xml`)),
+        kotlin.includes(`R.drawable.${name}`),
+      ]).toEqual([name, true, true]);
+    }
+  });
+
+  it("lets the Kotlin parser accept exactly the states, scenes, poses and flames JavaScript sends", () => {
+    const kotlin = fs.readFileSync(
+      path.join(root, "android/app/src/main/java/com/anonymous/hafiz/widget/WidgetTimeline.kt"),
+      "utf8",
+    );
+    const set = (name: string) => {
+      const match = new RegExp(`val ${name} = setOf\\(([^)]*)\\)`).exec(kotlin);
+      if (!match) throw new Error(`No ${name} in WidgetTimeline.kt`);
+      return [...match[1].matchAll(/"([a-z_]+)"/g)].map((value) => value[1]).sort();
+    };
+    expect(set("STATES")).toEqual([...WIDGET_STATES].sort());
+    expect(set("SCENES")).toEqual([...WIDGET_SCENES].sort());
+    expect(set("POSES")).toEqual([...WIDGET_POSES].sort());
+    expect(set("FLAMES")).toEqual([...WIDGET_FLAMES].sort());
+    expect(kotlin).toContain(`const val MAX_TIER = ${WIDGET_MAX_TIER}`);
   });
 
   it("declares the three receivers unexported, boot completed and no exact alarms", () => {
@@ -99,13 +132,13 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
     const expected = {
       small: {
         "android:minWidth": "110dp",
-        "android:minHeight": "40dp",
+        "android:minHeight": "110dp",
         "android:targetCellWidth": "2",
-        "android:targetCellHeight": "1",
-        "android:minResizeWidth": "110dp",
+        "android:targetCellHeight": "2",
+        "android:minResizeWidth": "100dp",
         "android:minResizeHeight": "40dp",
         "android:maxResizeWidth": "400dp",
-        "android:maxResizeHeight": "110dp",
+        "android:maxResizeHeight": "300dp",
       },
       medium: {
         "android:minWidth": "250dp",

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A wide one-row widget: Zayt or the marker beside the count and headline. -->
+<!-- 150 x 40 dp and up: one row with the line beside the count, Zayt looking up from the bottom edge.
+     Shared by both modes. With Show Zayt on, widget_scene shows the sky and widget_art holds Zayt; the
+     renderer sets every color. With it off, widget_scene is the theme card and widget_art is gone. -->
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"
@@ -7,12 +9,11 @@
     android:layout_height="match_parent"
     android:layoutDirection="locale">
     <ImageView
-        android:id="@+id/widget_bg"
+        android:id="@+id/widget_scene"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:src="@drawable/hafiz_widget_bg"
-        android:scaleType="fitXY"
-        android:tint="@color/hafiz_widget_surface"
+        android:src="@drawable/hafiz_widget_card"
+        android:scaleType="centerCrop"
         android:importantForAccessibility="no"/>
     <LinearLayout
         android:id="@+id/widget_content"
@@ -20,53 +21,79 @@
         android:layout_height="match_parent"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp"
+        android:paddingStart="10dp"
         android:importantForAccessibility="noHideDescendants">
-        <FrameLayout
-            android:id="@+id/widget_art"
-            android:layout_width="30dp"
-            android:layout_height="36dp"
-            android:importantForAccessibility="noHideDescendants"/>
-        <ImageView
-            android:id="@+id/widget_marker"
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:src="@drawable/hafiz_widget_marker_open"
-            android:tint="@color/hafiz_widget_accent"
-            android:importantForAccessibility="no"/>
-        <TextView
-            android:id="@+id/widget_count"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:fontFamily="sans-serif"
-            android:textSize="20sp"
-            android:textColor="@color/hafiz_widget_accent_text"
-            android:textAlignment="viewStart"
-            android:breakStrategy="high_quality"
-            android:hyphenationFrequency="none"
-            android:ellipsize="end"
-            android:lineSpacingExtra="2dp"
-            android:maxLines="1"
-            android:textStyle="bold"
-            android:includeFontPadding="false"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <FrameLayout
+                android:layout_width="18dp"
+                android:layout_height="18dp">
+                <ImageView
+                    android:id="@+id/widget_flame"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/hafiz_widget_flame_unlit"
+                    android:importantForAccessibility="no"/>
+                <FrameLayout
+                    android:id="@+id/widget_flame_motion"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone"/>
+            </FrameLayout>
+            <TextView
+                android:id="@+id/widget_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif"
+                android:textSize="20sp"
+                android:textColor="@color/hafiz_widget_accent_text"
+                android:textAlignment="viewStart"
+                android:breakStrategy="high_quality"
+                android:hyphenationFrequency="none"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
         <TextView
-            android:id="@+id/widget_headline"
+            android:id="@+id/widget_line"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
             android:fontFamily="sans-serif-medium"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textColor="@color/hafiz_widget_text_primary"
             android:textAlignment="viewStart"
             android:breakStrategy="high_quality"
             android:hyphenationFrequency="none"
             android:ellipsize="end"
-            android:lineSpacingExtra="2dp"
-            android:maxLines="2"/>
+            android:maxLines="2"
+            android:layout_marginStart="8dp"/>
+        <FrameLayout
+            android:id="@+id/widget_art"
+            android:layout_width="67dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="6dp"
+            android:importantForAccessibility="noHideDescendants">
+            <ImageView
+                android:id="@+id/widget_zayt"
+                android:layout_width="67dp"
+                android:layout_height="80dp"
+                android:layout_marginTop="-8dp"
+                android:layout_gravity="top"
+                android:scaleType="fitCenter"
+                android:importantForAccessibility="no"/>
+            <FrameLayout
+                android:id="@+id/widget_motion"
+                android:layout_width="67dp"
+                android:layout_height="80dp"
+                android:layout_marginTop="-8dp"
+                android:layout_gravity="top"
+                android:visibility="gone"/>
+        </FrameLayout>
     </LinearLayout>
 </FrameLayout>

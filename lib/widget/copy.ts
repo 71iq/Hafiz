@@ -1,11 +1,20 @@
-import type { LocalDate } from "@/lib/habit/dates";
-import { isStreakMilestone } from "@/lib/habit/milestones";
+import { addDays, weekdayOf, type LocalDate } from "@/lib/habit/dates";
+import { isStreakMilestone, streakTier } from "@/lib/habit/milestones";
 import { formatDays, formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { formatClockMinutesForDisplay, type DayClock } from "@/lib/notifications/clock";
+import type { HabitDay } from "@/lib/habit/types";
 import type { HabitProjection } from "@/lib/notifications/habit-projection";
-import type { WidgetEntryContent, WidgetImage, WidgetMarker, WidgetState, WidgetTap } from "@/lib/widget/types";
+import type {
+  WidgetDayMark,
+  WidgetEntryContent,
+  WidgetFlame,
+  WidgetPose,
+  WidgetScene,
+  WidgetState,
+  WidgetTap,
+} from "@/lib/widget/types";
 
 /** Spec 4.4: today's plan facts, read once per build. */
 export type WidgetPlanFacts = Readonly<{
@@ -34,49 +43,108 @@ export type WidgetCopyInput = Readonly<{
 
 type Language = "en" | "ar";
 
-const MARKERS: Record<WidgetState, WidgetMarker> = {
-  begin: "begin",
-  fresh_start: "begin",
-  open_day: "open",
-  open_evening: "open",
-  make_up: "open",
-  earn_back_open: "open",
-  earn_back_done: "done",
-  done: "done",
-  safe: "done",
-  milestone: "done",
-  kept: "kept",
-  paused: "paused",
+/** The part of the local day an entry falls in. It picks the sky, not the streak rules. */
+export type WidgetBand = "morning" | "day" | "golden" | "dusk" | "night" | "midnight";
+
+const NOON = 12 * 60;
+const GOLDEN_HOUR = 16 * 60;
+const NIGHT = 22 * 60;
+const LAST_HOUR = 23 * 60;
+
+/** Wall-clock minutes at which the band can change, besides the evening start. */
+export const WIDGET_BAND_MINUTES: readonly number[] = [NOON, GOLDEN_HOUR, NIGHT, LAST_HOUR];
+
+/** Spec 4.6: the sky follows the local day; the evening start (spec 4.5) opens dusk. */
+export function widgetBandAt(at: Date, clock: DayClock, eveningStartsAt: (date: LocalDate) => Date): WidgetBand {
+  const minutes = clock.minutesOf(at);
+  if (minutes >= LAST_HOUR) return "midnight";
+  if (minutes >= NIGHT) return "night";
+  if (at.getTime() >= eveningStartsAt(clock.dateOf(at)).getTime()) return "dusk";
+  if (minutes >= GOLDEN_HOUR) return "golden";
+  if (minutes >= NOON) return "day";
+  return "morning";
+}
+
+const OPEN_ART: Record<WidgetBand, readonly [WidgetScene, WidgetPose]> = {
+  morning: ["morning", "rest"],
+  day: ["day", "wave"],
+  golden: ["golden", "warm"],
+  dusk: ["dusk", "glow"],
+  night: ["night", "open_halo"],
+  midnight: ["midnight", "glow_halo"],
 };
 
-// v1 image values remain readable by older APKs. The current Android renderer uses the
-// explicit widget state to refine these base poses and null as the Show Zayt opt-out.
-const IMAGES: Record<WidgetState, WidgetImage> = {
-  begin: "rest",
-  fresh_start: "rest",
-  open_day: "rest",
-  open_evening: "rest",
-  make_up: "rest",
-  earn_back_open: "rest",
-  earn_back_done: "warm",
-  done: "warm",
-  safe: "warm",
-  milestone: "glow",
-  kept: "sit",
-  paused: "sit",
-};
+/**
+ * Spec 4.6: the scene and Zayt's still. While today is open the sky darkens towards midnight and
+ * Zayt's own light grows; urgency never shows on Zayt's face. Done days turn gold, by night too.
+ */
+export function widgetArt(state: WidgetState, band: WidgetBand): readonly [WidgetScene, WidgetPose] {
+  const dark = band === "dusk" || band === "night" || band === "midnight";
+  switch (state) {
+    case "begin":
+    case "fresh_start":
+      return dark ? ["night", "glow_halo"] : ["dawn", "wave"];
+    case "make_up":
+      return ["dawn", "wave"];
+    case "open_day":
+    case "open_evening":
+    case "earn_back_open":
+      return OPEN_ART[band];
+    case "earn_back_done":
+      return dark ? ["radiant_night", "open_halo"] : ["sunrise", "open"];
+    case "done":
+      return dark ? ["radiant_night", "shimmer_halo"] : ["radiant", "shimmer"];
+    case "safe":
+      return dark ? ["radiant_night", "warm_halo"] : ["radiant", "warm"];
+    case "milestone":
+      return ["milestone", "milestone"];
+    case "kept":
+    case "paused":
+      return ["calm", "sit"];
+    default: {
+      const unknown: never = state;
+      throw new Error(`Unknown widget state ${String(unknown)}`);
+    }
+  }
+}
 
-/** States that show the streak length as their count (spec 4.2). */
-const COUNTED: ReadonlySet<WidgetState> = new Set<WidgetState>([
-  "open_day",
-  "open_evening",
-  "make_up",
-  "done",
-  "safe",
-  "milestone",
-  "kept",
-  "paused",
-]);
+/** Statuses that mean the wird was recited for that day. Grace, excuses and pauses keep a day without it. */
+const RECITED: ReadonlySet<HabitDay["status"]> = new Set<HabitDay["status"]>(["done", "made_up", "earned_back"]);
+
+/**
+ * Spec 4.7: the week row of the 4 by 2 widget, oldest first and today last. A day with nothing is an
+ * empty ring, never a cross: the row shows what was kept, not what was missed.
+ */
+export function widgetWeek(
+  days: readonly HabitDay[],
+  today: LocalDate,
+  todayLit: boolean,
+  language: Language,
+): readonly { mark: WidgetDayMark; label: string }[] {
+  const statuses = new Map(days.map((day) => [day.localDate, day.status]));
+  // Sunday first. Fixed letters rather than Intl, whose narrow weekdays vary by engine.
+  const letters = strings[language].widgetWeekdayLetters.split(" ");
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(today, index - 6);
+    const status = statuses.get(date);
+    const mark: WidgetDayMark =
+      date === today
+        ? status && !RECITED.has(status)
+          ? "kept"
+          : todayLit
+            ? "lit"
+            : "open"
+        : status === undefined
+          ? "empty"
+          : RECITED.has(status)
+            ? "lit"
+            : "kept";
+    return { mark, label: letters[weekdayOf(date)] };
+  });
+}
+
+/** Today already counts towards the streak in these states, so the flame is lit. */
+const LIT: ReadonlySet<WidgetState> = new Set<WidgetState>(["earn_back_done", "done", "safe", "milestone", "kept"]);
 
 type Note = "graceUsed" | "plan" | "graceHeld" | "longest";
 
@@ -173,8 +241,12 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
   const plan = planAt(input.plan, clock, at);
   const state = stateOf(projection, at, input, plan.reviewLeft);
 
-  const length = "length" in h ? h.length : 0;
-  const count = showNumbers && COUNTED.has(state) && length > 0 ? formatNumber(length, language) : null;
+  // The streak as it stands, including 0 before the first wird and after a break (spec 4.2).
+  const length = snapshot.streak.length;
+  const count = showNumbers ? formatNumber(length, language) : null;
+  const flame: WidgetFlame = length === 0 ? "out" : LIT.has(state) ? "lit" : "unlit";
+  const band = widgetBandAt(at, clock, input.eveningStartsAt);
+  const [scene, pose] = widgetArt(state, band);
   const time = h.kind === "make_up_open" ? formatClockMinutesForDisplay(clock.minutesOf(h.cutoff), language) : "";
   const earnBack = h.kind === "earn_back" ? h.earnBack : null;
   const earnBackValues = earnBack
@@ -288,13 +360,15 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
 
   return {
     state,
-    marker: MARKERS[state],
+    scene,
+    pose: input.showZayt ? pose : null,
+    flame,
+    tier: streakTier(length),
     count,
-    countCaption: count === null ? null : s.widgetCountCaption,
-    headline,
-    detail,
+    // With no count and nothing else to say, the line still tells a done day apart.
+    line: lineFor(state, band, language, headline, plan.reviewLeft) ?? (count === null ? s.widgetLineDone : null),
     note,
-    image: input.showZayt ? IMAGES[state] : null,
+    week: widgetWeek(projection.days, clock.dateOf(at), LIT.has(state) && length > 0, language),
     contentDescription: joinSentences([
       s.appName,
       count === null ? null : interpolate(s.habitStreakCount, { days: formatDays(length, language) }),
@@ -304,4 +378,53 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
     ]),
     tap,
   };
+}
+
+/**
+ * Spec 4.2: the one short line beside the count. Open days say how much of the day is left; a done
+ * day says nothing, because the lit flame and the gold scene already do. `headline` is the spoken
+ * headline, reused where it is already short.
+ */
+function lineFor(
+  state: WidgetState,
+  band: WidgetBand,
+  language: Language,
+  headline: string,
+  reviewLeft: boolean,
+): string | null {
+  const s = strings[language];
+  switch (state) {
+    case "begin":
+      return s.widgetLineBegin;
+    case "fresh_start":
+      return s.widgetFreshStartHeadline;
+    case "open_day":
+    case "open_evening": {
+      const lines: Record<WidgetBand, string> = {
+        morning: s.widgetOpenHeadline,
+        day: s.widgetLineDay,
+        golden: s.widgetLineGolden,
+        dusk: s.notifTitleLate,
+        night: s.widgetLineNight,
+        midnight: s.widgetLineMidnight,
+      };
+      return lines[band];
+    }
+    case "make_up":
+    case "earn_back_open":
+    case "earn_back_done":
+    case "kept":
+    case "paused":
+      return headline;
+    case "safe":
+      return s.widgetLineSafe;
+    case "milestone":
+      return reviewLeft ? s.widgetLineSafe : null;
+    case "done":
+      return null;
+    default: {
+      const unknown: never = state;
+      throw new Error(`Unknown widget state ${String(unknown)}`);
+    }
+  }
 }

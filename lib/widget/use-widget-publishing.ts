@@ -3,7 +3,6 @@ import { AppState } from "react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
-import { isStreakMilestone } from "@/lib/habit/milestones";
 import { deviceZoneKey, localDateOf } from "@/lib/habit/dates";
 import { useLocalToday } from "@/lib/habit/use-day-boundary";
 import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
@@ -37,9 +36,10 @@ export function useWidgetPublishing(): void {
 
   useEffect(() => {
     if (!active || !db) return;
-    // A committed grade can earn a milestone while the launcher is covered by Hafiz.
-    // Consume it on the first return to the home screen. Nothing is persisted or reconstructed.
-    let milestoneDay: string | null = null;
+    // A committed grade can complete today's wird, make up a day, earn a streak back or reach a
+    // milestone while the launcher is covered by Hafiz. Consume it on the first return to the home
+    // screen, where native plays the clip the current entry calls for. Nothing is persisted.
+    let earnedDay: string | null = null;
     let owner = new AbortController();
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     const cancelSettle = () => {
@@ -61,8 +61,8 @@ export function useWidgetPublishing(): void {
         zone = deviceZoneKey();
         publish();
       } else if (state === "background") {
-        const earnedHere = milestoneDay === localDateOf(new Date());
-        milestoneDay = null;
+        const earnedHere = earnedDay === localDateOf(new Date());
+        earnedDay = null;
         cancelSettle();
         void publishWidget(db, earnedHere ? owner.signal : undefined);
       }
@@ -74,7 +74,7 @@ export function useWidgetPublishing(): void {
       publish();
     }, ZONE_CHECK_MS);
     const unsubscribeReview = subscribeReviewActivity((wird) => {
-      if (wird && wird.kind !== "none" && isStreakMilestone(wird.length)) milestoneDay = localDateOf(new Date());
+      if (wird && wird.kind !== "none") earnedDay = localDateOf(new Date());
       settleThenPublish();
     });
     const unsubscribeHabit = subscribeHabitChanged(settleThenPublish);
@@ -83,7 +83,7 @@ export function useWidgetPublishing(): void {
         summary.pulled > 0 || summary.localDataReplaced || summary.accountRestored || summary.restoreCompleted;
       if (changed) {
         if (summary.localDataReplaced || summary.accountRestored || summary.restoreCompleted) {
-          milestoneDay = null;
+          earnedDay = null;
           owner.abort();
           owner = new AbortController();
         }

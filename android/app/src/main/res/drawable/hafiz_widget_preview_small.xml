@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Picker preview before Android 12: the widget's shape and Zayt, without text. -->
+<!-- Picker preview before Android 12: the done-day tile without text. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-  <item>
-    <shape android:shape="rectangle">
-      <solid android:color="#FFF8FAFC"/>
-      <corners android:radius="16dp"/>
-      <size android:width="130dp" android:height="64dp"/>
-    </shape>
-  </item>
-  <item android:drawable="@drawable/hafiz_widget_zayt_shimmer" android:gravity="start|center_vertical" android:start="14dp" android:width="36dp" android:height="45dp"/>
+  <item android:width="120dp" android:height="120dp" android:drawable="@drawable/hafiz_widget_scene_radiant_sq"/>
+  <item android:width="62dp" android:height="74dp" android:gravity="bottom|center_horizontal" android:bottom="0dp" android:drawable="@drawable/hafiz_widget_zayt_shimmer"/>
+  <item android:width="18dp" android:height="18dp" android:gravity="top|center_horizontal" android:top="12dp" android:drawable="@drawable/hafiz_widget_flame_lit_t1"/>
 </layer-list>

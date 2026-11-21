@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Picker preview before Android 12: the widget's shape and Zayt, without text. -->
+<!-- Picker preview before Android 12: the done-day 4 x 2 without text. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-  <item>
-    <shape android:shape="rectangle">
-      <solid android:color="#FFF8FAFC"/>
-      <corners android:radius="16dp"/>
-      <size android:width="276dp" android:height="140dp"/>
-    </shape>
-  </item>
-  <item android:drawable="@drawable/hafiz_widget_zayt_shimmer" android:gravity="start|top" android:start="18dp" android:top="18dp" android:width="64dp" android:height="80dp"/>
+  <item android:width="250dp" android:height="120dp" android:drawable="@drawable/hafiz_widget_scene_radiant_wide"/>
+  <item android:width="88dp" android:height="106dp" android:gravity="bottom|end" android:end="10dp" android:drawable="@drawable/hafiz_widget_zayt_shimmer"/>
+  <item android:width="26dp" android:height="26dp" android:gravity="top|start" android:start="16dp" android:top="16dp" android:drawable="@drawable/hafiz_widget_flame_lit_t1"/>
 </layer-list>

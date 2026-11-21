@@ -19,16 +19,22 @@ data class WidgetColors(
   val accentText: Int,
 )
 
+/** One day of the 4 by 2 widget's week row. */
+data class WidgetDay(val mark: String, val label: String)
+
 data class WidgetEntry(
   val startsAt: Long,
   val state: String,
-  val marker: String,
+  val scene: String,
+  /** Null when Show Zayt is off. */
+  val pose: String?,
+  val flame: String,
+  val tier: Int,
   val count: String?,
-  val countCaption: String?,
-  val headline: String,
-  val detail: String?,
+  val line: String?,
   val note: String?,
-  val image: String?,
+  /** Seven days, oldest first, or empty for a version 1 timeline. */
+  val week: List<WidgetDay>,
   val contentDescription: String,
   val tap: String,
 )
@@ -48,7 +54,10 @@ data class WidgetTimeline(
 class InvalidTimelineException(val reason: String) : Exception(reason)
 
 object WidgetLimits {
-  const val VERSION = 1
+  const val VERSION = 2
+  /** A version 1 timeline stored before an upgrade still renders until Hafiz next publishes. */
+  const val LEGACY_VERSION = 1
+  const val MAX_TIER = 6
   const val MAX_ENTRIES = 64
   const val MAX_BYTES = 65_536
   const val MAX_SPAN_MS = 7L * 86_400_000L + 2L * 3_600_000L
@@ -58,16 +67,30 @@ object WidgetLimits {
     "begin", "fresh_start", "open_day", "open_evening", "make_up", "earn_back_open",
     "earn_back_done", "done", "safe", "milestone", "kept", "paused",
   )
-  val MARKERS = setOf("begin", "open", "done", "kept", "paused")
-  val IMAGES = setOf("rest", "warm", "glow", "sit")
+  val SCENES = setOf(
+    "dawn", "morning", "day", "golden", "dusk", "night", "midnight", "sunrise", "radiant", "radiant_night", "milestone", "calm",
+  )
+  val POSES = setOf(
+    "rest", "warm", "wave", "glow", "open", "shimmer", "milestone", "sit", "glow_halo", "open_halo", "warm_halo", "shimmer_halo",
+  )
+  val FLAMES = setOf("lit", "unlit", "out")
+  val DAY_MARKS = setOf("lit", "kept", "open", "empty")
+  const val WEEK_DAYS = 7
   val TAPS = setOf("wird", "home")
+  val LIT_STATES = setOf("earn_back_done", "done", "safe", "milestone", "kept")
 }
 
 object WidgetTimelineParser {
   private val TOP_KEYS = setOf("version", "generatedAt", "expiresAt", "timeZone", "language", "direction", "colorMode", "colors", "entries")
   private val ENTRY_KEYS = setOf(
+    "startsAt", "state", "scene", "pose", "flame", "tier", "count", "line", "note", "week", "contentDescription", "tap",
+  )
+  private val DAY_KEYS = setOf("mark", "label")
+  private val LEGACY_ENTRY_KEYS = setOf(
     "startsAt", "state", "marker", "count", "countCaption", "headline", "detail", "note", "image", "contentDescription", "tap",
   )
+  private val LEGACY_MARKERS = setOf("begin", "open", "done", "kept", "paused")
+  private val LEGACY_IMAGES = setOf("rest", "warm", "glow", "sit")
   private val COLOR_KEYS = setOf("surface", "textPrimary", "textSecondary", "accent", "accentText")
   private val COLOR = Regex("^#[0-9A-F]{6}$")
   private val TIME_ZONE = Regex("^[A-Za-z0-9_+\\-/:]+$")
@@ -80,7 +103,9 @@ object WidgetTimelineParser {
     exactKeys(root, TOP_KEYS, "keys")
 
     // Rule 1.
-    if (integer(root["version"], "version") != WidgetLimits.VERSION.toLong()) fail("version")
+    val version = integer(root["version"], "version")
+    if (version != WidgetLimits.VERSION.toLong() && version != WidgetLimits.LEGACY_VERSION.toLong()) fail("version")
+    val legacy = version == WidgetLimits.LEGACY_VERSION.toLong()
     // Rule 2.
     val generatedAt = instant(root["generatedAt"])
     val expiresAt = instant(root["expiresAt"])
@@ -105,7 +130,10 @@ object WidgetTimelineParser {
     // Rules 3, 7, 8 and 9.
     val list = root["entries"] as? List<*> ?: fail("entries")
     if (list.isEmpty() || list.size > WidgetLimits.MAX_ENTRIES) fail("entries")
-    val entries = list.map { parseEntry(it as? Map<*, *> ?: fail("entry")) }
+    val entries = list.map {
+      val map = it as? Map<*, *> ?: fail("entry")
+      if (legacy) parseLegacyEntry(map) else parseEntry(map)
+    }
     if (entries[0].startsAt != generatedAt) fail("first")
     for (index in 1 until entries.size) {
       if (entries[index].startsAt <= entries[index - 1].startsAt) fail("order")
@@ -128,25 +156,77 @@ object WidgetTimelineParser {
 
   private fun parseEntry(map: Map<*, *>): WidgetEntry {
     exactKeys(map, ENTRY_KEYS, "entryKeys")
+    val tier = integer(map["tier"], "tier")
+    if (tier < 0 || tier > WidgetLimits.MAX_TIER) fail("tier")
+    val count = text(map["count"], 12, nullable = true, reason = "count")
+    val line = text(map["line"], 48, nullable = true, reason = "line")
+    if (count == null && line == null) fail("line")
+    return WidgetEntry(
+      startsAt = instant(map["startsAt"]),
+      state = enumValue(map["state"], WidgetLimits.STATES, "state"),
+      scene = enumValue(map["scene"], WidgetLimits.SCENES, "scene"),
+      pose = if (map["pose"] == null) null else enumValue(map["pose"], WidgetLimits.POSES, "pose"),
+      flame = enumValue(map["flame"], WidgetLimits.FLAMES, "flame"),
+      tier = tier.toInt(),
+      count = count,
+      line = line,
+      note = text(map["note"], 80, nullable = true, reason = "note"),
+      week = parseWeek(map["week"]),
+      contentDescription = text(map["contentDescription"], 400, nullable = false, reason = "description")!!,
+      tap = enumValue(map["tap"], WidgetLimits.TAPS, "tap"),
+    )
+  }
+
+  private fun parseWeek(value: Any?): List<WidgetDay> {
+    val list = value as? List<*> ?: fail("week")
+    if (list.size != WidgetLimits.WEEK_DAYS) fail("week")
+    return list.map {
+      val day = it as? Map<*, *> ?: fail("week")
+      exactKeys(day, DAY_KEYS, "week")
+      WidgetDay(enumValue(day["mark"], WidgetLimits.DAY_MARKS, "week"), text(day["label"], 3, nullable = false, reason = "week")!!)
+    }
+  }
+
+  /**
+   * A version 1 entry, validated by its own rules and shown in the version 2 look. It has no time of
+   * day, so open days get the midday sky until Hafiz publishes again.
+   */
+  private fun parseLegacyEntry(map: Map<*, *>): WidgetEntry {
+    exactKeys(map, LEGACY_ENTRY_KEYS, "entryKeys")
     val state = enumValue(map["state"], WidgetLimits.STATES, "state")
-    val marker = enumValue(map["marker"], WidgetLimits.MARKERS, "marker")
-    val image = if (map["image"] == null) null else enumValue(map["image"], WidgetLimits.IMAGES, "image")
-    val tap = enumValue(map["tap"], WidgetLimits.TAPS, "tap")
+    enumValue(map["marker"], LEGACY_MARKERS, "marker")
+    val image = if (map["image"] == null) null else enumValue(map["image"], LEGACY_IMAGES, "image")
     val count = text(map["count"], 12, nullable = true, reason = "count")
     val caption = text(map["countCaption"], 24, nullable = true, reason = "caption")
     if ((count == null) != (caption == null)) fail("caption")
+    text(map["detail"], 120, nullable = true, reason = "detail")
+    val (scene, pose) = when (state) {
+      "begin", "fresh_start", "make_up" -> "dawn" to "wave"
+      "open_evening" -> "dusk" to "glow"
+      "earn_back_done" -> "sunrise" to "open"
+      "done" -> "radiant" to "shimmer"
+      "safe" -> "radiant" to "warm"
+      "milestone" -> "milestone" to "milestone"
+      "kept", "paused" -> "calm" to "sit"
+      else -> "day" to "wave"
+    }
     return WidgetEntry(
       startsAt = instant(map["startsAt"]),
       state = state,
-      marker = marker,
+      scene = scene,
+      pose = if (image == null) null else pose,
+      flame = when {
+        state == "begin" || state == "fresh_start" -> "out"
+        state in WidgetLimits.LIT_STATES -> "lit"
+        else -> "unlit"
+      },
+      tier = 0,
       count = count,
-      countCaption = caption,
-      headline = text(map["headline"], 48, nullable = false, reason = "headline")!!,
-      detail = text(map["detail"], 120, nullable = true, reason = "detail"),
+      line = text(map["headline"], 48, nullable = false, reason = "headline"),
       note = text(map["note"], 80, nullable = true, reason = "note"),
-      image = image,
+      week = emptyList(),
       contentDescription = text(map["contentDescription"], 400, nullable = false, reason = "description")!!,
-      tap = tap,
+      tap = enumValue(map["tap"], WidgetLimits.TAPS, "tap"),
     )
   }
 

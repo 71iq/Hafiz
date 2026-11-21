@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- "Hafiz streak": the streak and whether today is done. Rendered by widget/WidgetRenderer.kt. -->
+<!-- "Hafiz streak": the streak and Zayt in the sky of the moment, a 2 x 2 tile that also resizes down to one row. Rendered by widget/WidgetRenderer.kt. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="110dp"
-    android:minHeight="40dp"
+    android:minHeight="110dp"
     android:targetCellWidth="2"
-    android:targetCellHeight="1"
-    android:minResizeWidth="110dp"
+    android:targetCellHeight="2"
+    android:minResizeWidth="100dp"
     android:minResizeHeight="40dp"
     android:maxResizeWidth="400dp"
-    android:maxResizeHeight="110dp"
+    android:maxResizeHeight="300dp"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="3600000"
     android:initialLayout="@layout/hafiz_widget_message"

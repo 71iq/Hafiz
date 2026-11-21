@@ -4,7 +4,7 @@
  * (WidgetTimelineParser in android/app/src/main/java/com/anonymous/hafiz/widget/WidgetTimeline.kt),
  * stores the JSON and renders the entry active now. A new field needs a version bump on both sides.
  */
-export const WIDGET_TIMELINE_VERSION = 1;
+export const WIDGET_TIMELINE_VERSION = 2;
 export const WIDGET_HORIZON_DAYS = 7;
 export const WIDGET_MAX_ENTRIES = 64;
 export const WIDGET_MAX_BYTES = 65_536;
@@ -14,6 +14,8 @@ export const WIDGET_MAX_SPAN_MS = 7 * 86_400_000 + 2 * 3_600_000;
 export const WIDGET_MIN_INSTANT = 1_577_836_800_000;
 /** 2100-01-01T00:00:00Z */
 export const WIDGET_MAX_INSTANT = 4_102_444_800_000;
+/** Streak stages from lib/habit/milestones streakTier: 0 below 7 days, 6 from 365. */
+export const WIDGET_MAX_TIER = 6;
 
 export const WIDGET_STATES = [
   "begin",
@@ -29,14 +31,52 @@ export const WIDGET_STATES = [
   "kept",
   "paused",
 ] as const;
-export const WIDGET_MARKERS = ["begin", "open", "done", "kept", "paused"] as const;
-export const WIDGET_IMAGES = ["rest", "warm", "glow", "sit"] as const;
+/** The background: the sky over the olive grove for this moment of the person's local day. */
+export const WIDGET_SCENES = [
+  "dawn",
+  "morning",
+  "day",
+  "golden",
+  "dusk",
+  "night",
+  "midnight",
+  "sunrise",
+  "radiant",
+  "radiant_night",
+  "milestone",
+  "calm",
+] as const;
+/** Zayt's still. The _halo poses carry their own light for the night scenes. */
+export const WIDGET_POSES = [
+  "rest",
+  "warm",
+  "wave",
+  "glow",
+  "open",
+  "shimmer",
+  "milestone",
+  "sit",
+  "glow_halo",
+  "open_halo",
+  "warm_halo",
+  "shimmer_halo",
+] as const;
+/** The streak icon: lit once today counts, unlit while the streak waits for today, out at zero. */
+export const WIDGET_FLAMES = ["lit", "unlit", "out"] as const;
 export const WIDGET_TAPS = ["wird", "home"] as const;
+/** One day in the 4 by 2 widget's week row: recited, kept without recitation, today still open, or nothing. */
+export const WIDGET_DAY_MARKS = ["lit", "kept", "open", "empty"] as const;
+export const WIDGET_WEEK_DAYS = 7;
 
 export type WidgetState = (typeof WIDGET_STATES)[number];
-export type WidgetMarker = (typeof WIDGET_MARKERS)[number];
-export type WidgetImage = (typeof WIDGET_IMAGES)[number];
+export type WidgetScene = (typeof WIDGET_SCENES)[number];
+export type WidgetPose = (typeof WIDGET_POSES)[number];
+export type WidgetFlame = (typeof WIDGET_FLAMES)[number];
 export type WidgetTap = (typeof WIDGET_TAPS)[number];
+export type WidgetDayMark = (typeof WIDGET_DAY_MARKS)[number];
+
+/** A day of the week row: its mark and its one-letter weekday in the interface language. */
+export type WidgetWeekDay = Readonly<{ mark: WidgetDayMark; label: string }>;
 
 /** "#RRGGBB", upper case. */
 export type WidgetColors = Readonly<{
@@ -51,15 +91,20 @@ export type WidgetEntry = Readonly<{
   /** Epoch ms. The entry lasts until the next entry's startsAt, the last one until expiresAt. */
   startsAt: number;
   state: WidgetState;
-  marker: WidgetMarker;
-  /** The streak length in the interface's digits, or null when no count is shown. */
+  scene: WidgetScene;
+  /** Null when Show Zayt is off: the widget then uses the app theme's plain card. */
+  pose: WidgetPose | null;
+  flame: WidgetFlame;
+  /** 0 to WIDGET_MAX_TIER, the lit flame's streak stage. */
+  tier: number;
+  /** The streak length in the interface's digits, "0" included, or null when Show numbers is off. */
   count: string | null;
-  /** Non-null exactly when count is non-null. */
-  countCaption: string | null;
-  headline: string;
-  detail: string | null;
+  /** One short line beside the count, or null when the art and the lit flame say it. */
+  line: string | null;
+  /** The plan or grace note for the larger layouts, or null. */
   note: string | null;
-  image: WidgetImage | null;
+  /** The last 7 local days, oldest first and today last, for the 4 by 2 widget. */
+  week: readonly WidgetWeekDay[];
   contentDescription: string;
   tap: WidgetTap;
 }>;
