@@ -199,7 +199,7 @@ describe("widget timeline example (spec 7.3)", () => {
         line: "Keep it going",
         note: "3 pages left, about 15 minutes",
         contentDescription:
-          "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+          "Hafiz. Streak: 12 days. Keep it going. A short review today keeps your streak. 3 pages left, about 15 minutes.",
         tap: "wird",
       },
       {
@@ -213,7 +213,7 @@ describe("widget timeline example (spec 7.3)", () => {
         line: "Time for today's wird",
         note: "3 pages left, about 15 minutes",
         contentDescription:
-          "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+          "Hafiz. Streak: 12 days. Time for today's wird. A short review today keeps your streak. 3 pages left, about 15 minutes.",
         tap: "wird",
       },
       {

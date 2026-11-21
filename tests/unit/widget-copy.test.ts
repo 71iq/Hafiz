@@ -381,6 +381,37 @@ describe("the widget's sky bands (spec 4.6)", () => {
   });
 });
 
+describe("review findings: today's recitation, restored days and the spoken line", () => {
+  it("lights the flame and today's mark when today was recited while yesterday awaits a make-up", () => {
+    const { projection, at } = projectionFor("make_up", DISTINCT);
+    const recited: HabitProjection = {
+      snapshot: {
+        ...projection.snapshot,
+        streak: { ...projection.snapshot.streak, doneToday: true, todayStatus: "done" },
+      },
+      days: [{ localDate: D, status: "done", fullMet: false }],
+    };
+    const entry = describeWidgetEntry(recited, at, {
+      clock: CLOCK,
+      eveningStartsAt: EVENING_STARTS,
+      plan: { date: D, plan: "none", reviewLeft: false, pagesLeft: 0, minutesLeft: 0, moreDueAt: null },
+      language: "en",
+      showZayt: true,
+      showNumbers: true,
+    });
+    expect([entry.state, entry.flame, entry.week[6].mark]).toEqual(["make_up", "lit", "lit"]);
+  });
+
+  it("speaks the line the screen shows in the last hour, in both languages", () => {
+    for (const language of ["en", "ar"] as const) {
+      const entry = describe1("open_evening", DISTINCT, language, true, undefined, 23 * 60 + 20);
+      expect(entry.line).toBe(strings[language].widgetLineMidnight);
+      expect(entry.contentDescription).toContain(strings[language].widgetLineMidnight);
+      expect(entry.contentDescription).not.toContain(strings[language].notifTitleLate);
+    }
+  });
+});
+
 describe("the 4 by 2 widget's week row (spec 4.7)", () => {
   const day = (localDate: LocalDate, status: "done" | "made_up" | "earned_back" | "excused" | "paused" | "grace") => ({
     localDate,
@@ -402,6 +433,10 @@ describe("the 4 by 2 widget's week row (spec 4.7)", () => {
     );
     expect(week.map((entry) => entry.mark)).toEqual(["lit", "kept", "empty", "lit", "kept", "empty", "open"]);
     expect(week.map((entry) => entry.label).join("")).toBe("TWTFSSM");
+  });
+
+  it("shows a day restored by earn-back as kept, not recited", () => {
+    expect(widgetWeek([day("2026-11-21", "earned_back")], D, false, "en")[4].mark).toBe("kept");
   });
 
   it("lights today once it counts, keeps an excused today, and writes Arabic weekday letters", () => {

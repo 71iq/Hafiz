@@ -4,7 +4,7 @@ import { formatDays, formatMinutes, formatNumber, formatPages } from "@/lib/i18n
 import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { formatClockMinutesForDisplay, type DayClock } from "@/lib/notifications/clock";
-import type { HabitDay } from "@/lib/habit/types";
+import { RECITED_STATUSES, type HabitDay } from "@/lib/habit/types";
 import type { HabitProjection } from "@/lib/notifications/habit-projection";
 import type {
   WidgetDayMark,
@@ -108,12 +108,10 @@ export function widgetArt(state: WidgetState, band: WidgetBand): readonly [Widge
   }
 }
 
-/** Statuses that mean the wird was recited for that day. Grace, excuses and pauses keep a day without it. */
-const RECITED: ReadonlySet<HabitDay["status"]> = new Set<HabitDay["status"]>(["done", "made_up", "earned_back"]);
-
 /**
- * Spec 4.7: the week row of the 4 by 2 widget, oldest first and today last. A day with nothing is an
- * empty ring, never a cross: the row shows what was kept, not what was missed.
+ * Spec 4.7: the week row of the 4 by 2 widget, oldest first and today last. A recited day is a flame,
+ * a day kept by grace, an excuse, a pause or earn-back is a dot, and a day with nothing is an empty
+ * ring, never a cross: the row shows what was kept, not what was missed.
  */
 export function widgetWeek(
   days: readonly HabitDay[],
@@ -127,18 +125,18 @@ export function widgetWeek(
   return Array.from({ length: 7 }, (_, index) => {
     const date = addDays(today, index - 6);
     const status = statuses.get(date);
+    // A recorded status wins, so a day recited on another device shows lit even while the headline
+    // asks to make up yesterday. Days earned back were restored, not recited (RECITED_STATUSES).
     const mark: WidgetDayMark =
-      date === today
-        ? status && !RECITED.has(status)
-          ? "kept"
+      status !== undefined
+        ? RECITED_STATUSES.has(status)
+          ? "lit"
+          : "kept"
+        : date !== today
+          ? "empty"
           : todayLit
             ? "lit"
-            : "open"
-        : status === undefined
-          ? "empty"
-          : RECITED.has(status)
-            ? "lit"
-            : "kept";
+            : "open";
     return { mark, label: letters[weekdayOf(date)] };
   });
 }
@@ -244,7 +242,9 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
   // The streak as it stands, including 0 before the first wird and after a break (spec 4.2).
   const length = snapshot.streak.length;
   const count = showNumbers ? formatNumber(length, language) : null;
-  const flame: WidgetFlame = length === 0 ? "out" : LIT.has(state) ? "lit" : "unlit";
+  // Lit once today counts: by the state, or by today's own recitation while yesterday awaits a make-up.
+  const todayLit = length > 0 && (LIT.has(state) || snapshot.streak.doneToday);
+  const flame: WidgetFlame = length === 0 ? "out" : todayLit ? "lit" : "unlit";
   const band = widgetBandAt(at, clock, input.eveningStartsAt);
   const [scene, pose] = widgetArt(state, band);
   const time = h.kind === "make_up_open" ? formatClockMinutesForDisplay(clock.minutesOf(h.cutoff), language) : "";
@@ -271,11 +271,11 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
       detail = s.widgetFreshStartDetail;
       break;
     case "open_day":
-      headline = s.widgetOpenHeadline;
+      headline = openLine(band, s);
       detail = s.habitAtRisk;
       break;
     case "open_evening":
-      headline = s.notifTitleLate;
+      headline = openLine(band, s);
       detail = s.widgetEveningDetail;
       break;
     case "make_up":
@@ -366,9 +366,9 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
     tier: streakTier(length),
     count,
     // With no count and nothing else to say, the line still tells a done day apart.
-    line: lineFor(state, band, language, headline, plan.reviewLeft) ?? (count === null ? s.widgetLineDone : null),
+    line: lineFor(state, language, headline, plan.reviewLeft) ?? (count === null ? s.widgetLineDone : null),
     note,
-    week: widgetWeek(projection.days, clock.dateOf(at), LIT.has(state) && length > 0, language),
+    week: widgetWeek(projection.days, clock.dateOf(at), todayLit, language),
     contentDescription: joinSentences([
       s.appName,
       count === null ? null : interpolate(s.habitStreakCount, { days: formatDays(length, language) }),
@@ -383,15 +383,27 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
 /**
  * Spec 4.2: the one short line beside the count. Open days say how much of the day is left; a done
  * day says nothing, because the lit flame and the gold scene already do. `headline` is the spoken
- * headline, reused where it is already short.
+ * headline, reused where it is already short, so TalkBack reads what the screen shows.
  */
-function lineFor(
-  state: WidgetState,
-  band: WidgetBand,
-  language: Language,
-  headline: string,
-  reviewLeft: boolean,
-): string | null {
+/** The open day's line by the sky band: calm in the morning, the time left as midnight nears. */
+function openLine(band: WidgetBand, s: (typeof strings)[Language]): string {
+  switch (band) {
+    case "morning":
+      return s.widgetOpenHeadline;
+    case "day":
+      return s.widgetLineDay;
+    case "golden":
+      return s.widgetLineGolden;
+    case "dusk":
+      return s.notifTitleLate;
+    case "night":
+      return s.widgetLineNight;
+    case "midnight":
+      return s.widgetLineMidnight;
+  }
+}
+
+function lineFor(state: WidgetState, language: Language, headline: string, reviewLeft: boolean): string | null {
   const s = strings[language];
   switch (state) {
     case "begin":
@@ -399,17 +411,7 @@ function lineFor(
     case "fresh_start":
       return s.widgetFreshStartHeadline;
     case "open_day":
-    case "open_evening": {
-      const lines: Record<WidgetBand, string> = {
-        morning: s.widgetOpenHeadline,
-        day: s.widgetLineDay,
-        golden: s.widgetLineGolden,
-        dusk: s.notifTitleLate,
-        night: s.widgetLineNight,
-        midnight: s.widgetLineMidnight,
-      };
-      return lines[band];
-    }
+    case "open_evening":
     case "make_up":
     case "earn_back_open":
     case "earn_back_done":

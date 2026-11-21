@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Each widget layout under three IDs: the scene with Zayt, the plain card in a fixed app theme, and
      the plain card in the launcher's day or night colors. A distinct ID forces reinflation when the
-     mode changes; reapplying a view would keep its previous tint, image and colors. The short 4 x 2
-     shares the wide layout with its note hidden. -->
+     mode changes; reapplying a view would keep its previous tint, image and colors. -->
 <resources>
     <item type="layout" name="hafiz_widget_wide_plain">@layout/hafiz_widget_wide</item>
     <item type="layout" name="hafiz_widget_wide_plain_system">@layout/hafiz_widget_wide</item>
-    <item type="layout" name="hafiz_widget_wide_short">@layout/hafiz_widget_wide</item>
-    <item type="layout" name="hafiz_widget_wide_short_plain">@layout/hafiz_widget_wide</item>
-    <item type="layout" name="hafiz_widget_wide_short_plain_system">@layout/hafiz_widget_wide</item>
+    <item type="layout" name="hafiz_widget_wide_roomy_plain">@layout/hafiz_widget_wide_roomy</item>
+    <item type="layout" name="hafiz_widget_wide_roomy_plain_system">@layout/hafiz_widget_wide_roomy</item>
     <item type="layout" name="hafiz_widget_tile_plain">@layout/hafiz_widget_tile</item>
     <item type="layout" name="hafiz_widget_tile_plain_system">@layout/hafiz_widget_tile</item>
     <item type="layout" name="hafiz_widget_short_plain">@layout/hafiz_widget_short</item>
