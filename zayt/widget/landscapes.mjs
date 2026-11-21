@@ -22,7 +22,7 @@ export async function landscapes(page, bounds) {
         [scene, crop, width, height],
       );
       const pixels = await sharp(Buffer.from(png, "base64")).removeAlpha().raw().toBuffer();
-      grade(pixels, width, height, crop, inks[scene], skies[scene][2], bounds[scene][crop], scene);
+      grade(pixels, width, height, crop, inks[scene], skies[scene][2], bounds[crop], scene);
       await sharp(pixels, { raw: { width, height, channels: 3 } })
         .webp({ quality: 89, effort: 6, smartSubsample: true })
         .toFile(path.join(art, sceneName(scene, crop)));

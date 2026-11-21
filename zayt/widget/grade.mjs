@@ -15,24 +15,20 @@ function opacity(distance, feather) {
   return t * t * (3 - 2 * t);
 }
 export function grade(rgb, w, h, crop, inks, horizon, bounds, scene) {
-  const regions = textRegions(w, h, crop, bounds);
-  const masks = ["primary", "secondary"].map((role) => latitudeCoverage(regions, h, role));
+  const regions = textRegions(w, h, bounds);
+  const mask = latitudeCoverage(regions, h, "ink");
   const dark = inkLight(inks[0]) > 0.45;
   // Reserve a little headroom for the final 4:2:0 encode and resampling.
+  const targets = [8.7, 5.35, 3.3];
   const limits = inks.map((ink, i) =>
-    dark ? (inkLight(ink) + 0.05) / (i ? 5.25 : 8.05) - 0.05 : (inkLight(ink) + 0.05) * (i ? 5.25 : 8.05) - 0.05,
+    dark ? (inkLight(ink) + 0.05) / targets[i] - 0.05 : (inkLight(ink) + 0.05) * targets[i] - 0.05,
   );
+  const limit = dark ? Math.min(...limits) : Math.max(...limits);
   const fog = [1, 3, 5].map((i) => linearLight[Math.round(255 * 0.72 + parseInt(horizon.slice(i, i + 2), 16) * 0.28)]);
   const fogLight = fog[0] * 0.2126 + fog[1] * 0.7152 + fog[2] * 0.0722;
   const lightSource = lightPosition(scene, crop);
-  const lastInkRow = ["primary", "secondary"].map((role) =>
-    Math.max(...regions.filter((region) => region.role === role).map((region) => region.rect[3])),
-  );
-  // A gradually rising exposure towards the horizon keeps the sky continuous.
-  // The shoulder stays within each role's ceiling through its last ink row.
-  const exposure = Array.from({ length: h }, (_, y) =>
-    Math.min(...limits.map((limit, j) => limit + 5 * Math.max(0, (y - lastInkRow[j]) / h) ** 2)),
-  );
+  const lastInkRow = Math.max(...regions.filter((r) => r.role === "ink").map((r) => r.rect[3]));
+  const exposure = Array.from({ length: h }, (_, y) => limit + 5 * Math.max(0, (y - lastInkRow) / h) ** 2);
   for (let n = 0; n < w * h; n++) {
     const i = n * 3,
       light = luminance(rgb[i], rgb[i + 1], rgb[i + 2]);
@@ -41,7 +37,7 @@ export function grade(rgb, w, h, crop, inks, horizon, bounds, scene) {
     // Keep the isolated sun or moon luminous where it clears both locale
     // columns. It receives the same atmospheric falloff in either direction.
     let emitter = 0;
-    if (dark && lightSource.radius) {
+    if (dark && lightSource.radius && y > lastInkRow + h * 0.008) {
       const distance = Math.hypot((n % w) - w * lightSource.x, y - h * lightSource.y) / (h * lightSource.radius);
       // The ridge occludes the setting sun. Its dark foreground pixels must
       // keep the land exposure even inside the celestial disc's projection.
@@ -50,21 +46,24 @@ export function grade(rgb, w, h, crop, inks, horizon, bounds, scene) {
     }
     if (dark) {
       const ceiling = exposure[y],
-        knee = 0.4 * ceiling;
+        knee = (scene === "dawn_red" ? 0.78 : 0.4) * ceiling;
       if (light > knee) {
         const above = light - knee,
           range = ceiling - knee;
-        const mapped = knee + (range * above) / (range + above);
+        const mapped =
+          scene === "dawn_red"
+            ? knee + (range * Math.log1p((9 * above) / (1 - knee))) / Math.log(10)
+            : knee + (range * above) / (range + above);
         next = light + (mapped - light) * (1 - emitter);
       }
     } else {
-      for (const [j, limit] of limits.entries()) {
-        const alpha = opacity(masks[j][y], h * 0.14),
-          shoulder = 0.115;
-        if (!alpha || light >= limit + shoulder) continue;
-        const mapped = limit + shoulder * Math.exp((light - limit - shoulder) / shoulder);
-        next = Math.max(next, light + alpha * (mapped - light));
-      }
+      const alpha = opacity(mask[y], h * 0.14);
+      if (!alpha) continue;
+      // Keep the ordering and separation of shadow tones in the grove.
+      // A hard floor turns the trees and the hillside into one grey band.
+      const shoulder = 0.32;
+      const mapped = limit + shoulder * Math.exp((light - limit - shoulder) / shoulder);
+      if (light < limit + shoulder) next = light + alpha * (mapped - light);
     }
     if (Math.abs(next - light) < 0.00001) continue;
     for (let c = 0; c < 3; c++) {

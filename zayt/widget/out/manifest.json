@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "baseStudioCommit": "278afa4b38f036980358c656a9090526f4fc6aaa",
-  "runtimeBudgetBytes": 4500000,
-  "runtimeBytes": 4429407,
+  "runtimeBudgetBytes": 5300000,
+  "runtimeBytes": 5054446,
   "spriteCanvas": {
     "width": 600,
     "height": 720,
@@ -13,480 +13,897 @@
     "dawn": {
       "inkPrimary": "#182C30",
       "inkSecondary": "#293E3E",
+      "inkLit": "#9A3412",
       "minimumContrast": {
-        "primary": 8.43,
-        "secondary": 4.85
+        "primary": 8.65,
+        "secondary": 6.73,
+        "lit": 4.34,
+        "weekLabels": 6.78
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_dawn_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.82,
-              "x": 56,
-              "y": 56
+              "ratio": 8.85,
+              "x": 259,
+              "y": 670
             },
             "secondary": {
-              "ratio": 7.12,
-              "x": 596,
-              "y": 548
+              "ratio": 6.89,
+              "x": 259,
+              "y": 670
+            },
+            "lit": {
+              "ratio": 4.44,
+              "x": 259,
+              "y": 670
             }
-          }
+          },
+          "brightAccents": [
+            {
+              "x": 0.13,
+              "y": 0.795,
+              "radius": 0.033
+            }
+          ]
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_dawn_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.43,
-              "x": 1472,
-              "y": 248
+              "ratio": 8.65,
+              "x": 475,
+              "y": 508
             },
             "secondary": {
-              "ratio": 4.85,
-              "x": 195,
-              "y": 427
+              "ratio": 6.73,
+              "x": 475,
+              "y": 508
+            },
+            "lit": {
+              "ratio": 4.34,
+              "x": 475,
+              "y": 508
+            },
+            "weekLabels": {
+              "ratio": 6.78,
+              "x": 523,
+              "y": 440
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "morning": {
       "inkPrimary": "#173039",
       "inkSecondary": "#263E40",
+      "inkLit": "#9A3412",
       "minimumContrast": {
-        "primary": 8.7,
-        "secondary": 4.85
+        "primary": 8.53,
+        "secondary": 7.01,
+        "lit": 4.5,
+        "weekLabels": 7.01
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_morning_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.7,
-              "x": 875,
-              "y": 61
+              "ratio": 8.77,
+              "x": 86,
+              "y": 635
             },
             "secondary": {
-              "ratio": 7.77,
-              "x": 652,
-              "y": 187
+              "ratio": 7.22,
+              "x": 86,
+              "y": 635
+            },
+            "lit": {
+              "ratio": 4.63,
+              "x": 86,
+              "y": 635
             }
-          }
+          },
+          "brightAccents": []
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_morning_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.92,
-              "x": 16,
-              "y": 44
+              "ratio": 8.53,
+              "x": 1259,
+              "y": 412
             },
             "secondary": {
-              "ratio": 4.85,
-              "x": 1110,
-              "y": 540
+              "ratio": 7.01,
+              "x": 1259,
+              "y": 412
+            },
+            "lit": {
+              "ratio": 4.5,
+              "x": 1259,
+              "y": 412
+            },
+            "weekLabels": {
+              "ratio": 7.01,
+              "x": 1259,
+              "y": 412
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "day": {
       "inkPrimary": "#142D35",
       "inkSecondary": "#203E45",
+      "inkLit": "#9A3412",
       "minimumContrast": {
-        "primary": 8.16,
-        "secondary": 5.06
+        "primary": 8.4,
+        "secondary": 6.66,
+        "lit": 4.26,
+        "weekLabels": 6.66
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_day_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.16,
-              "x": 883,
-              "y": 272
+              "ratio": 8.64,
+              "x": 695,
+              "y": 644
             },
             "secondary": {
-              "ratio": 6.7,
-              "x": 740,
-              "y": 317
+              "ratio": 6.85,
+              "x": 695,
+              "y": 644
+            },
+            "lit": {
+              "ratio": 4.38,
+              "x": 695,
+              "y": 644
             }
-          }
+          },
+          "brightAccents": []
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_day_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.64,
-              "x": 0,
-              "y": 44
+              "ratio": 8.4,
+              "x": 835,
+              "y": 427
             },
             "secondary": {
-              "ratio": 5.06,
-              "x": 1311,
-              "y": 442
+              "ratio": 6.66,
+              "x": 835,
+              "y": 427
+            },
+            "lit": {
+              "ratio": 4.26,
+              "x": 835,
+              "y": 427
+            },
+            "weekLabels": {
+              "ratio": 6.66,
+              "x": 835,
+              "y": 427
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "golden": {
       "inkPrimary": "#34251C",
       "inkSecondary": "#473327",
+      "inkLit": "#9A3412",
       "minimumContrast": {
-        "primary": 8.6,
-        "secondary": 4.92
+        "primary": 8.7,
+        "secondary": 7.02,
+        "lit": 4.32,
+        "weekLabels": 7.04
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_golden_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.6,
-              "x": 717,
-              "y": 47
+              "ratio": 8.91,
+              "x": 748,
+              "y": 678
             },
             "secondary": {
-              "ratio": 7.37,
-              "x": 512,
-              "y": 186
+              "ratio": 7.18,
+              "x": 748,
+              "y": 678
+            },
+            "lit": {
+              "ratio": 4.42,
+              "x": 748,
+              "y": 678
             }
-          }
+          },
+          "brightAccents": []
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_golden_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.65,
-              "x": 72,
-              "y": 48
+              "ratio": 8.7,
+              "x": 1131,
+              "y": 547
             },
             "secondary": {
-              "ratio": 4.92,
-              "x": 87,
-              "y": 435
+              "ratio": 7.02,
+              "x": 1131,
+              "y": 547
+            },
+            "lit": {
+              "ratio": 4.32,
+              "x": 1131,
+              "y": 547
+            },
+            "weekLabels": {
+              "ratio": 7.04,
+              "x": 1000,
+              "y": 425
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "dusk": {
       "inkPrimary": "#FFF9EF",
       "inkSecondary": "#F9E9EA",
+      "inkLit": "#FFC94D",
       "minimumContrast": {
-        "primary": 8.14,
-        "secondary": 5.32
+        "primary": 8.19,
+        "secondary": 7.3,
+        "lit": 5.6,
+        "weekLabels": 7.3
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_dusk_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.61,
-              "x": 11,
-              "y": 377
+              "ratio": 8.2,
+              "x": 719,
+              "y": 627
             },
             "secondary": {
-              "ratio": 5.57,
-              "x": 380,
-              "y": 583
+              "ratio": 7.31,
+              "x": 719,
+              "y": 627
+            },
+            "lit": {
+              "ratio": 5.61,
+              "x": 719,
+              "y": 627
             }
-          }
+          },
+          "brightAccents": [
+            {
+              "x": 0.28,
+              "y": 0.799,
+              "radius": 0.035
+            }
+          ]
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_dusk_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.14,
-              "x": 1098,
-              "y": 310
+              "ratio": 8.19,
+              "x": 518,
+              "y": 452
             },
             "secondary": {
-              "ratio": 5.32,
-              "x": 1218,
-              "y": 464
+              "ratio": 7.3,
+              "x": 518,
+              "y": 452
+            },
+            "lit": {
+              "ratio": 5.6,
+              "x": 518,
+              "y": 452
+            },
+            "weekLabels": {
+              "ratio": 7.3,
+              "x": 518,
+              "y": 452
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "night": {
       "inkPrimary": "#FFF9ED",
       "inkSecondary": "#F2EAF7",
+      "inkLit": "#FFC94D",
       "minimumContrast": {
-        "primary": 7.69,
-        "secondary": 5.61
+        "primary": 8.34,
+        "secondary": 7.45,
+        "lit": 5.71,
+        "weekLabels": 7.45
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_night_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 7.69,
-              "x": 816,
-              "y": 227
+              "ratio": 8.46,
+              "x": 520,
+              "y": 643
             },
             "secondary": {
-              "ratio": 5.87,
-              "x": 410,
-              "y": 542
+              "ratio": 7.56,
+              "x": 520,
+              "y": 643
+            },
+            "lit": {
+              "ratio": 5.79,
+              "x": 520,
+              "y": 643
             }
-          }
+          },
+          "brightAccents": [
+            {
+              "x": 0.15,
+              "y": 0.79,
+              "radius": 0.028
+            }
+          ]
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_night_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 7.84,
-              "x": 1299,
-              "y": 99
+              "ratio": 8.34,
+              "x": 660,
+              "y": 419
             },
             "secondary": {
-              "ratio": 5.61,
-              "x": 227,
-              "y": 465
+              "ratio": 7.45,
+              "x": 660,
+              "y": 419
+            },
+            "lit": {
+              "ratio": 5.71,
+              "x": 660,
+              "y": 419
+            },
+            "weekLabels": {
+              "ratio": 7.45,
+              "x": 660,
+              "y": 419
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "midnight": {
       "inkPrimary": "#FFFAED",
       "inkSecondary": "#D6DBEA",
+      "inkLit": "#FFC94D",
       "minimumContrast": {
-        "primary": 8.22,
-        "secondary": 6.01
+        "primary": 8.9,
+        "secondary": 6.7,
+        "lit": 6.05,
+        "weekLabels": 6.7
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_midnight_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.37,
-              "x": 489,
-              "y": 307
+              "ratio": 9,
+              "x": 639,
+              "y": 644
             },
             "secondary": {
-              "ratio": 6.01,
-              "x": 226,
-              "y": 448
+              "ratio": 6.78,
+              "x": 639,
+              "y": 644
+            },
+            "lit": {
+              "ratio": 6.13,
+              "x": 639,
+              "y": 644
             }
-          }
+          },
+          "brightAccents": []
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_midnight_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.22,
-              "x": 637,
-              "y": 68
+              "ratio": 8.9,
+              "x": 953,
+              "y": 432
             },
             "secondary": {
-              "ratio": 6.37,
-              "x": 1444,
-              "y": 341
+              "ratio": 6.7,
+              "x": 953,
+              "y": 432
+            },
+            "lit": {
+              "ratio": 6.05,
+              "x": 953,
+              "y": 432
+            },
+            "weekLabels": {
+              "ratio": 6.7,
+              "x": 953,
+              "y": 432
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "sunrise": {
       "inkPrimary": "#32232F",
       "inkSecondary": "#44333C",
+      "inkLit": "#9A3412",
       "minimumContrast": {
-        "primary": 8.52,
-        "secondary": 4.79
+        "primary": 8.62,
+        "secondary": 6.84,
+        "lit": 4.25,
+        "weekLabels": 6.84
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_sunrise_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.52,
-              "x": 172,
-              "y": 54
+              "ratio": 8.75,
+              "x": 874,
+              "y": 655
             },
             "secondary": {
-              "ratio": 7.21,
-              "x": 624,
-              "y": 186
+              "ratio": 6.95,
+              "x": 874,
+              "y": 655
+            },
+            "lit": {
+              "ratio": 4.31,
+              "x": 874,
+              "y": 655
             }
-          }
+          },
+          "brightAccents": [
+            {
+              "x": 0.8,
+              "y": 0.8,
+              "radius": 0.037
+            }
+          ]
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_sunrise_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.76,
-              "x": 296,
-              "y": 56
+              "ratio": 8.62,
+              "x": 1005,
+              "y": 415
             },
             "secondary": {
-              "ratio": 4.79,
-              "x": 1145,
-              "y": 553
+              "ratio": 6.84,
+              "x": 1005,
+              "y": 415
+            },
+            "lit": {
+              "ratio": 4.25,
+              "x": 1005,
+              "y": 415
+            },
+            "weekLabels": {
+              "ratio": 6.84,
+              "x": 1005,
+              "y": 415
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "radiant": {
       "inkPrimary": "#342B19",
       "inkSecondary": "#443723",
+      "inkLit": "#9A3412",
       "minimumContrast": {
-        "primary": 10.6,
-        "secondary": 4.89
+        "primary": 8.48,
+        "secondary": 7.03,
+        "lit": 4.44,
+        "weekLabels": 7.03
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_radiant_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 10.6,
-              "x": 11,
-              "y": 55
+              "ratio": 8.59,
+              "x": 226,
+              "y": 635
             },
             "secondary": {
-              "ratio": 7.42,
-              "x": 551,
-              "y": 602
+              "ratio": 7.12,
+              "x": 226,
+              "y": 635
+            },
+            "lit": {
+              "ratio": 4.5,
+              "x": 226,
+              "y": 635
             }
-          }
+          },
+          "brightAccents": []
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_radiant_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 10.8,
-              "x": 213,
-              "y": 46
+              "ratio": 8.48,
+              "x": 1234,
+              "y": 432
             },
             "secondary": {
-              "ratio": 4.89,
-              "x": 1340,
-              "y": 417
+              "ratio": 7.03,
+              "x": 1234,
+              "y": 432
+            },
+            "lit": {
+              "ratio": 4.44,
+              "x": 1234,
+              "y": 432
+            },
+            "weekLabels": {
+              "ratio": 7.03,
+              "x": 1234,
+              "y": 432
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "radiant_night": {
       "inkPrimary": "#FFF8E5",
       "inkSecondary": "#F4E6D1",
+      "inkLit": "#FFC94D",
       "minimumContrast": {
-        "primary": 7.91,
-        "secondary": 5.44
+        "primary": 8.08,
+        "secondary": 6.97,
+        "lit": 5.59,
+        "weekLabels": 6.97
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_radiant_night_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 7.92,
-              "x": 465,
-              "y": 311
+              "ratio": 8.24,
+              "x": 631,
+              "y": 643
             },
             "secondary": {
-              "ratio": 5.44,
-              "x": 506,
-              "y": 582
+              "ratio": 7.11,
+              "x": 631,
+              "y": 643
+            },
+            "lit": {
+              "ratio": 5.71,
+              "x": 631,
+              "y": 643
             }
-          }
+          },
+          "brightAccents": []
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_radiant_night_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 7.91,
-              "x": 29,
-              "y": 75
+              "ratio": 8.08,
+              "x": 647,
+              "y": 436
             },
             "secondary": {
-              "ratio": 5.49,
-              "x": 850,
-              "y": 412
+              "ratio": 6.97,
+              "x": 647,
+              "y": 436
+            },
+            "lit": {
+              "ratio": 5.59,
+              "x": 647,
+              "y": 436
+            },
+            "weekLabels": {
+              "ratio": 6.97,
+              "x": 647,
+              "y": 436
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "milestone": {
       "inkPrimary": "#302317",
       "inkSecondary": "#44321F",
+      "inkLit": "#9A3412",
       "minimumContrast": {
-        "primary": 8.36,
-        "secondary": 4.93
+        "primary": 8.5,
+        "secondary": 6.8,
+        "lit": 4.07,
+        "weekLabels": 6.82
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_milestone_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.36,
-              "x": 116,
-              "y": 256
+              "ratio": 8.6,
+              "x": 109,
+              "y": 626
             },
             "secondary": {
-              "ratio": 6.05,
-              "x": 502,
-              "y": 602
+              "ratio": 6.89,
+              "x": 109,
+              "y": 626
+            },
+            "lit": {
+              "ratio": 4.12,
+              "x": 109,
+              "y": 626
             }
-          }
+          },
+          "brightAccents": [
+            {
+              "x": 0.1,
+              "y": 0.78,
+              "radius": 0.008333333333333333
+            },
+            {
+              "x": 0.18,
+              "y": 0.81,
+              "radius": 0.005
+            },
+            {
+              "x": 0.83,
+              "y": 0.77,
+              "radius": 0.006666666666666667
+            },
+            {
+              "x": 0.92,
+              "y": 0.84,
+              "radius": 0.01
+            }
+          ]
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_milestone_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.54,
-              "x": 388,
-              "y": 48
+              "ratio": 8.5,
+              "x": 35,
+              "y": 424
             },
             "secondary": {
-              "ratio": 4.93,
-              "x": 122,
-              "y": 418
+              "ratio": 6.8,
+              "x": 35,
+              "y": 424
+            },
+            "lit": {
+              "ratio": 4.07,
+              "x": 35,
+              "y": 424
+            },
+            "weekLabels": {
+              "ratio": 6.82,
+              "x": 111,
+              "y": 414
             }
-          }
+          },
+          "brightAccents": []
         }
       }
     },
     "calm": {
       "inkPrimary": "#272D3A",
       "inkSecondary": "#373D49",
+      "inkLit": "#9A3412",
       "minimumContrast": {
-        "primary": 8.35,
-        "secondary": 5.83
+        "primary": 8.6,
+        "secondary": 6.8,
+        "lit": 4.55,
+        "weekLabels": 6.8
       },
       "crops": {
         "sq": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_calm_sq.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.35,
-              "x": 24,
-              "y": 47
+              "ratio": 8.72,
+              "x": 488,
+              "y": 618
             },
             "secondary": {
-              "ratio": 6.77,
-              "x": 634,
-              "y": 324
+              "ratio": 6.89,
+              "x": 488,
+              "y": 618
+            },
+            "lit": {
+              "ratio": 4.62,
+              "x": 488,
+              "y": 618
             }
-          }
+          },
+          "brightAccents": []
         },
         "wide": {
           "file": "res/drawable-nodpi/hafiz_widget_scene_calm_wide.webp",
           "contrast": {
             "primary": {
-              "ratio": 8.45,
-              "x": 24,
-              "y": 44
+              "ratio": 8.6,
+              "x": 376,
+              "y": 435
             },
             "secondary": {
-              "ratio": 5.83,
-              "x": 12,
-              "y": 409
+              "ratio": 6.8,
+              "x": 376,
+              "y": 435
+            },
+            "lit": {
+              "ratio": 4.55,
+              "x": 376,
+              "y": 435
+            },
+            "weekLabels": {
+              "ratio": 6.8,
+              "x": 376,
+              "y": 435
             }
-          }
+          },
+          "brightAccents": []
+        }
+      }
+    },
+    "dawn_rose": {
+      "inkPrimary": "#34232B",
+      "inkSecondary": "#50313C",
+      "inkLit": "#9A3412",
+      "minimumContrast": {
+        "primary": 8.69,
+        "secondary": 6.69,
+        "lit": 4.29,
+        "weekLabels": 6.69
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_dawn_rose_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.91,
+              "x": 451,
+              "y": 659
+            },
+            "secondary": {
+              "ratio": 6.86,
+              "x": 451,
+              "y": 659
+            },
+            "lit": {
+              "ratio": 4.41,
+              "x": 451,
+              "y": 659
+            }
+          },
+          "brightAccents": [
+            {
+              "x": 0.13,
+              "y": 0.795,
+              "radius": 0.033
+            }
+          ]
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_dawn_rose_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.69,
+              "x": 719,
+              "y": 448
+            },
+            "secondary": {
+              "ratio": 6.69,
+              "x": 719,
+              "y": 448
+            },
+            "lit": {
+              "ratio": 4.29,
+              "x": 719,
+              "y": 448
+            },
+            "weekLabels": {
+              "ratio": 6.69,
+              "x": 719,
+              "y": 448
+            }
+          },
+          "brightAccents": []
+        }
+      }
+    },
+    "dawn_red": {
+      "inkPrimary": "#FFF8E8",
+      "inkSecondary": "#FAE6D9",
+      "inkLit": "#FFC94D",
+      "minimumContrast": {
+        "primary": 8.26,
+        "secondary": 7.24,
+        "lit": 5.71,
+        "weekLabels": 7.24
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_dawn_red_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.72,
+              "x": 91,
+              "y": 303
+            },
+            "secondary": {
+              "ratio": 7.64,
+              "x": 91,
+              "y": 303
+            },
+            "lit": {
+              "ratio": 6.03,
+              "x": 91,
+              "y": 303
+            }
+          },
+          "brightAccents": [
+            {
+              "x": 0.13,
+              "y": 0.795,
+              "radius": 0.033
+            }
+          ]
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_dawn_red_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.26,
+              "x": 1430,
+              "y": 421
+            },
+            "secondary": {
+              "ratio": 7.24,
+              "x": 1430,
+              "y": 421
+            },
+            "lit": {
+              "ratio": 5.71,
+              "x": 1430,
+              "y": 421
+            },
+            "weekLabels": {
+              "ratio": 7.24,
+              "x": 1430,
+              "y": 421
+            }
+          },
+          "brightAccents": []
         }
       }
     }
@@ -562,17 +979,17 @@
     },
     {
       "path": "loops.json",
-      "bytes": 3611,
-      "sha256": "0c082a29c6733b3d7e1f2392ce7dde385fe94ee7946435d1ea07934307dedd22"
+      "bytes": 5619,
+      "sha256": "12c0eed417956789161cf23684fe270c36287f0daeed24a8fe474e7cabcac6b1"
     },
     {
       "path": "manifest.json",
-      "bytes": 54033
+      "bytes": 72712
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_calm_sq.webp",
-      "bytes": 20410,
-      "sha256": "a450e166814fa035588d047b4e40a4dd4fae2f5b76d8b14c5263e91c98020560",
+      "bytes": 14560,
+      "sha256": "1dc7f5cbfdfbfb62b4c95ddec9164db1380f7291bd22f7b95e7816e4627cdccf",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -580,8 +997,44 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_calm_wide.webp",
-      "bytes": 21278,
-      "sha256": "630a0f4f0f60ca1f5f944f9b4b67020ed9eebdfb42c3028e1b6b44db981f56d2",
+      "bytes": 7906,
+      "sha256": "9b939b90724c1735966fe67b53148b07a5fad95a2c46aa6b50473146a97b60c4",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_dawn_red_sq.webp",
+      "bytes": 20252,
+      "sha256": "bf00474ee49ae2ef5ed8643ee5563915f6c6114fe86a2ea97e9a7e0d543d6dbf",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_dawn_red_wide.webp",
+      "bytes": 16060,
+      "sha256": "fa7eecec035c1c90389f529e3bf7b55c49a51a31f268113c29985448a25b25e7",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_dawn_rose_sq.webp",
+      "bytes": 15732,
+      "sha256": "6f71cb72c662f65e3b8f8f83be9655f33b98099792b55ae5cf3d78fcc4d56332",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_dawn_rose_wide.webp",
+      "bytes": 7648,
+      "sha256": "756ab7221b4e2026558d72728a29706d3d3511749220918ad23a36047152aded",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -589,8 +1042,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_dawn_sq.webp",
-      "bytes": 23732,
-      "sha256": "4bbb144fc20c0ed031f9d38e5cee498e03b688d433a7d805f3755caf38331da9",
+      "bytes": 18460,
+      "sha256": "d3f3b6464a95356f92daf318b5fa0c697f42136181ff1d057268dfd2543300e3",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -598,8 +1051,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_dawn_wide.webp",
-      "bytes": 16086,
-      "sha256": "909c2334955ff81950420686c2193328a18b608aadaa195d6e459eb2f97775d4",
+      "bytes": 8406,
+      "sha256": "e2af9e9edd36f4dbdccb0be70232d1579266e7049345657b9d25b14112bc79b4",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -607,8 +1060,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_day_sq.webp",
-      "bytes": 27892,
-      "sha256": "54280157c77dfe4375684a97195b732ca170c239e7e713ce7c11882a4a9d609c",
+      "bytes": 20556,
+      "sha256": "12f3621702356ad96d65dc6b3c31a3a7cf96a9cfffc2129344a2ba86055cab66",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -616,8 +1069,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_day_wide.webp",
-      "bytes": 20828,
-      "sha256": "5c018a0112a9b5e31d51903f3796073bdfc39676953f0fee46946be1a18a1275",
+      "bytes": 12940,
+      "sha256": "aa7f1d3fc5249d356cd914690073e4a46243e20b201557b4cd0403741c656162",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -625,8 +1078,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_dusk_sq.webp",
-      "bytes": 20170,
-      "sha256": "aedb0bc309471bbf9c65036d1cb8a4a2aea6371dedb22fa0ce22f07a21ad4ec8",
+      "bytes": 16826,
+      "sha256": "051f48d2561ae8b52f546f9614019138bfa6baf2afc4639842ab69c1db082b44",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -634,8 +1087,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_dusk_wide.webp",
-      "bytes": 17190,
-      "sha256": "e380107f6e193eaa8d06f2c57b3c53fb005700fefdeb9463bb8d6799ab32b043",
+      "bytes": 14500,
+      "sha256": "259ce8386b51cc736fb82e6f42816f4dd5f26ebf965cde29311cd293c459ac44",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -643,8 +1096,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_golden_sq.webp",
-      "bytes": 24766,
-      "sha256": "7e2378dce8efc3dfea202983dfc85a39d0ecde581a41475fe0b1d623811a0213",
+      "bytes": 19600,
+      "sha256": "917a40d9f031bf709d74c0190f33628feefa32a5eaaaacb5bbe59b191bf3fc94",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -652,8 +1105,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_golden_wide.webp",
-      "bytes": 20456,
-      "sha256": "508bf7d15e17c8a399d2262118350cf1cecfdf4aa032c284ecb61915f41ae2da",
+      "bytes": 12740,
+      "sha256": "afbb66cc1a57ed1357565fb6957e88bb64f24c80b170a7f73baca6f9d46cf085",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -661,8 +1114,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_midnight_sq.webp",
-      "bytes": 11910,
-      "sha256": "33e76dc08ec945a9b78a4ccf9c5dac093d8bfed6c4becd25104cfac65e1aa8b6",
+      "bytes": 11198,
+      "sha256": "667bc66e70d4b2a476961bf63def9d81f8703f83b9c6d5cbdd66f5023576cb18",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -670,8 +1123,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_midnight_wide.webp",
-      "bytes": 13626,
-      "sha256": "1c61a434ca90c310458ebd577aaff4332c663201efc53d64003471182a14c268",
+      "bytes": 13008,
+      "sha256": "85b4cb0b9ca1d42195c087893ddb38fadc7738caa0a86a526a96c13ced7ab4d3",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -679,8 +1132,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_milestone_sq.webp",
-      "bytes": 27604,
-      "sha256": "17432d41c4ada0c48b1bac7e0b10bd951600ec25a02cbf67a51d8b07f77694a1",
+      "bytes": 22630,
+      "sha256": "39b78680d98a8e14e1ad386d465470d727ea8136f6cc210d1e1f391b2bf93982",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -688,8 +1141,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_milestone_wide.webp",
-      "bytes": 29884,
-      "sha256": "6095afb77c7d757d5be5ec25a37fa8d45c6bf886d33370a54eeb80b34e3157b2",
+      "bytes": 15884,
+      "sha256": "85f5862aae851bdf0bb7819e8d27fd7d71aeca7125fea5d39e74c82574a8a638",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -697,8 +1150,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_morning_sq.webp",
-      "bytes": 25236,
-      "sha256": "90d9b95d0eadca7c45f62f67ba287489da2b8932aa0ee0d66aa2d7a7754c9d27",
+      "bytes": 19102,
+      "sha256": "87599dab69531e3bccf7b8a27bb455903b7ef85604ecdb432c87d6debc290ca2",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -706,8 +1159,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_morning_wide.webp",
-      "bytes": 20068,
-      "sha256": "018448ba0730180b45726026279b62ffd6d9e2c7468f89880fe553492dfd968b",
+      "bytes": 12070,
+      "sha256": "adcfa705b8e9c98c95c81a55f8132d65188950db2a32a540a0017fbe2b4da1d3",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -715,8 +1168,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_night_sq.webp",
-      "bytes": 15004,
-      "sha256": "c01cd19f6437200ab686747a597d1d216050f0836465fbb751babdcc50674d3e",
+      "bytes": 12158,
+      "sha256": "59f065bb572bb0e6cfb70f4da267dc3e3f60beb3c708b6ba75ae3cd00246c856",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -724,8 +1177,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_night_wide.webp",
-      "bytes": 13738,
-      "sha256": "1c2b3208554718e21bbcc5b15b528030fad23137610ea07edd4f9d7150f66f31",
+      "bytes": 10184,
+      "sha256": "d68e773bb690cd0cf7779b955e70cedef68b6303452d8704e5280e8a1ccf357d",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -733,8 +1186,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_radiant_night_sq.webp",
-      "bytes": 22698,
-      "sha256": "936c4f4ff2a727ff23dce1f73db7dba09bcbf65a4a632fed8264846b033de18e",
+      "bytes": 18476,
+      "sha256": "048a0abc0ef55c0f65cd56ee4125403082850bc54f010414f3d4be133b341ccd",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -742,8 +1195,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_radiant_night_wide.webp",
-      "bytes": 22538,
-      "sha256": "83d6ce58b2550b685d4481500274285bc4f0448aa795febea788d6c4fab7fb1a",
+      "bytes": 14744,
+      "sha256": "2899f712296684e74f5b0191d55b739b1e5ab62b598a7da33eb8caeb866a2102",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -751,8 +1204,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_radiant_sq.webp",
-      "bytes": 24754,
-      "sha256": "548f63b506b2850587156cef461f50595bccb27eaa699d8938a2186670426340",
+      "bytes": 21182,
+      "sha256": "1254d1f347f10b6de907f43b9e7dc1940f39c4868d30ad16308e10a3d131225c",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -760,8 +1213,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_radiant_wide.webp",
-      "bytes": 25662,
-      "sha256": "a7718fc27424aa9c1c102349f0e39d4729d7d80b69cebdf688d96a5a3abb0be7",
+      "bytes": 15068,
+      "sha256": "792a1fa8335ec2e44a899b00c5b5f90a6ae2ca98d2b5376f56f7b451bede14ba",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -769,8 +1222,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_sunrise_sq.webp",
-      "bytes": 25702,
-      "sha256": "6d02aac71082f6e7595bd17d3d8d7299835c297c30a16a70f8693a8d96099317",
+      "bytes": 20682,
+      "sha256": "73fc5c697cd325c432af2c1a40d9a0dd81e5ab34c858d95464d0b56c09273a9d",
       "width": 900,
       "height": 900,
       "codec": "VP8",
@@ -778,8 +1231,8 @@
     },
     {
       "path": "res/drawable-nodpi/hafiz_widget_scene_sunrise_wide.webp",
-      "bytes": 21378,
-      "sha256": "db7bd64da76bbb051111f8c7d4c32af3fdd4bad20f275c3375499e8e33e66f71",
+      "bytes": 13376,
+      "sha256": "722f8f85d084de8aa40c0c85cda795c9fc4f45d8ed60b7334e7f116689114ea6",
       "width": 1500,
       "height": 600,
       "codec": "VP8",
@@ -1209,6 +1662,141 @@
       "alpha": true
     },
     {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic.webp",
+      "bytes": 20282,
+      "sha256": "7233cf5fd8fea775cf5869a7edc1830e5aa496fa0f3264bba7d6925a91ac804a",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_halo.webp",
+      "bytes": 40946,
+      "sha256": "3b690f0debe070ed519ceb63a2afe04cf65c657f3bf0d451ab952b47b58c0062",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_halo_loop_00.webp",
+      "bytes": 40946,
+      "sha256": "3b690f0debe070ed519ceb63a2afe04cf65c657f3bf0d451ab952b47b58c0062",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_halo_loop_01.webp",
+      "bytes": 44094,
+      "sha256": "fb7ea8167af08ef5b0c7338d3348764468d3de28c5d34dc3c4f65dbb9d8f15d5",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_halo_loop_02.webp",
+      "bytes": 38322,
+      "sha256": "9f692d9ce8f691987eb85bab79c38e42a1c9b5630fe4807f0d14dfce6109b332",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_halo_loop_03.webp",
+      "bytes": 45118,
+      "sha256": "847b35ccfd56481a748388f6d728709eb0e1d6e90c14856c2f45a4cc3a5e9781",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_loop_00.webp",
+      "bytes": 20282,
+      "sha256": "7233cf5fd8fea775cf5869a7edc1830e5aa496fa0f3264bba7d6925a91ac804a",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_loop_01.webp",
+      "bytes": 20346,
+      "sha256": "ad2bfe01f90a01280eddd9a32e6a37afc2d7e5cfc823dce9ca602c767e2ca08f",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_loop_02.webp",
+      "bytes": 19618,
+      "sha256": "577324b653839a051431674aeadac109dec469f2c408e3c98a1281be2265eac1",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_frantic_loop_03.webp",
+      "bytes": 20328,
+      "sha256": "ea6ea3d53abdea187a4a7d94261d35ab97a12de37ebe38030b9a5ac8dca3d401",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_fretful.webp",
+      "bytes": 17066,
+      "sha256": "c2e03c6f2307fdce15f9715a125b1de716b7457a85b1706792cb0802e147682c",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_fretful_loop_00.webp",
+      "bytes": 17066,
+      "sha256": "c2e03c6f2307fdce15f9715a125b1de716b7457a85b1706792cb0802e147682c",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_fretful_loop_01.webp",
+      "bytes": 17442,
+      "sha256": "661ae4b2110922b3c0dd2e715833ad523136bcb95e655caa73277bfcc3cbf233",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_fretful_loop_02.webp",
+      "bytes": 17030,
+      "sha256": "0c93825ca3758d5baa01719386c6447960d690fa2b489bdd7ff84ba351f8468e",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_fretful_loop_03.webp",
+      "bytes": 17768,
+      "sha256": "0939100cbd150fcfb38dd7ea0431f4f0cdaaf7d0876e2f523c7b2b92fd1b735b",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
       "path": "res/drawable-nodpi/hafiz_widget_zayt_glow.webp",
       "bytes": 23352,
       "sha256": "ff6a4e27c8e7167bc10fea755a9c84e8014577251f54667fc8c9ed62eb9fffcb",
@@ -1338,6 +1926,96 @@
       "path": "res/drawable-nodpi/hafiz_widget_zayt_milestone.webp",
       "bytes": 23132,
       "sha256": "9e2ba48baab52def3ebbedbd81692865a4d56941be24d3143459f9df4bc2c6e5",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous.webp",
+      "bytes": 18876,
+      "sha256": "dc6735c0d06bd2f532880b02aa76068ddb40ef06b4b1ef9dc117245f8a4700e9",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_halo.webp",
+      "bytes": 39838,
+      "sha256": "7d6893b6951c22533d7e5a038d824235cf1fbe7f8137cd09ed3f25fe9543e9cd",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_halo_loop_00.webp",
+      "bytes": 39838,
+      "sha256": "7d6893b6951c22533d7e5a038d824235cf1fbe7f8137cd09ed3f25fe9543e9cd",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_halo_loop_01.webp",
+      "bytes": 39702,
+      "sha256": "b5287bf41ff4c561bc839798b23a76291ea0b7ffda4fda5cb2a935581aa9018d",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_halo_loop_02.webp",
+      "bytes": 40144,
+      "sha256": "9c6d4a1ca85dd7ddbd804872f398a5f4fb05db3c99a0055fa823cea215189c1c",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_halo_loop_03.webp",
+      "bytes": 39786,
+      "sha256": "0ccc192659912b8eaf8bbcc87da3318a8fc5efa91cdcac3cbcf88af4246b4991",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_loop_00.webp",
+      "bytes": 18876,
+      "sha256": "dc6735c0d06bd2f532880b02aa76068ddb40ef06b4b1ef9dc117245f8a4700e9",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_loop_01.webp",
+      "bytes": 18784,
+      "sha256": "55255786f920bcb4d26eb4b648ed2261df1927661c11bf94fe8761521fe2b866",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_loop_02.webp",
+      "bytes": 19284,
+      "sha256": "0108d2d8e7095720b9f4411b7486dddbcd0ba2d7dc8255ffc3680d1fb6a4cda9",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_nervous_loop_03.webp",
+      "bytes": 19232,
+      "sha256": "de49813f2df9ac697ed1ce80f76777a38ab47b756d69a65f4e15f57a68ef59d3",
       "width": 600,
       "height": 720,
       "codec": "VP8",
@@ -1832,74 +2510,102 @@
   ],
   "reviewFiles": [
     {
-      "path": "../review/states.png",
-      "bytes": 6871701,
-      "sha256": "a9b9ae6c98d576a52523dde7c6a3e6034aa19ac3c2edd2bf1f14932e9eee1931",
-      "width": 2856,
-      "height": 7251
-    },
-    {
-      "path": "../review/states-ar.png",
-      "bytes": 6879950,
-      "sha256": "c56b4eb70855fd3bddb60582646157de64f1237487b2bc6dedb43bb96999b78d",
-      "width": 2856,
-      "height": 7251
-    },
-    {
       "path": "../review/day.png",
-      "bytes": 1082120,
-      "sha256": "7f061c97167720cbb1c00870cf2a8b638a409b6f7eecee2448fa4d2f22c43a00",
+      "bytes": 977683,
+      "sha256": "cce3035e294819ab95dc2e539c84c465ad65957f133875b3384cce0637aff09b",
       "width": 2130,
       "height": 1221
     },
     {
       "path": "../review/thumbs.png",
-      "bytes": 386936,
-      "sha256": "9eea26bd1529208168be2e4473dd91046875c8ca9a9af8ffc8353dc360129d1f",
+      "bytes": 381617,
+      "sha256": "68b8c38ff927888c61a3709952cd779c25665ed3304bdf37e15107df14419c74",
       "width": 1392,
-      "height": 615
+      "height": 858
     },
     {
       "path": "../review/flames.png",
-      "bytes": 327978,
-      "sha256": "77c1f5c650b7c49c861f1512963f89afc2f3556fb5809c97be21c49c5a05cfe0",
+      "bytes": 316072,
+      "sha256": "f6d2140c0be2a69c02163c5658a55779c384fadbafaf92b9e18206302b416af9",
       "width": 2124,
       "height": 807
     },
     {
       "path": "../review/home.png",
-      "bytes": 1156733,
-      "sha256": "83b0bcc81547838726842128754bf547442c26ad10af29720364a29cf920422c",
+      "bytes": 1024973,
+      "sha256": "33114f10f6fb6dd10a100f7ab1369df89e1fffa5edeb49267c3dba9f7c44a4c2",
       "width": 2160,
       "height": 2340
     },
     {
       "path": "../review/sizes.png",
-      "bytes": 802324,
-      "sha256": "a6e6ed1416c0651ac290a2912c1148fd52e12059a301b8523aa2cfbbed373eaf",
+      "bytes": 699276,
+      "sha256": "2ca8ba7d9cb905e49cbbf70bc6cbd5ee9657d8ebc289c1186445dff3f132fbc1",
       "width": 2112,
       "height": 1347
     },
     {
+      "path": "../review/states.png",
+      "bytes": 5406336,
+      "sha256": "6284a668c5a3c046b139263d8e2e24e71270a2f6e1a97e95e4279ea2b08d3507",
+      "width": 2856,
+      "height": 7251
+    },
+    {
+      "path": "../review/states-ar.png",
+      "bytes": 5462812,
+      "sha256": "05e95a7f66a02bafc474af4da2346ccaa71c30930be253e080a6d1a08ffd9fc3",
+      "width": 2856,
+      "height": 7251
+    },
+    {
       "path": "../review/ladder.png",
-      "bytes": 1168387,
-      "sha256": "3613021f153b1d5ec65d35b2530c596d173fc1efd1b769471e68a4e7e32972f4",
+      "bytes": 1068465,
+      "sha256": "9e264a2ed284e489829b259551e7fb70de216ac68c8c128f065e004af2d69c41",
       "width": 2136,
       "height": 1290
     },
     {
       "path": "../review/faces.png",
-      "bytes": 1878543,
-      "sha256": "62041ebaf40f847d5430db2523058a22391a90251df14b5218eab98e0a5bb08b",
+      "bytes": 1782859,
+      "sha256": "9cf2b0e631382e2c103f4143136c2b46af45299059cff3b676f0ebe565d15c7d",
       "width": 2034,
       "height": 1980
     },
     {
       "path": "../review/loops.png",
-      "bytes": 1674685,
-      "sha256": "ebd08f0176f4a183e7028b85dfa6773517043e669070449dee93b11a47ee43c3",
+      "bytes": 1612762,
+      "sha256": "6ba5a45eee9b630b57a73d9d49704e06ef38ea991be3790d709fc49157aeee4b",
       "width": 1716,
       "height": 3396
+    },
+    {
+      "path": "../review/ladder-v3.png",
+      "bytes": 1649686,
+      "sha256": "6630be0b5076e18898b58b173e9426ccc24bdf1c9c9f484355c6e57bf4d14440",
+      "width": 3204,
+      "height": 1911
+    },
+    {
+      "path": "../review/faces-v3.png",
+      "bytes": 927447,
+      "sha256": "19c9c22bb48c27a4ca109a7f67bdcdd77cebbd4ad78c5953964bbf79ed247654",
+      "width": 1386,
+      "height": 1512
+    },
+    {
+      "path": "../review/loops-v3.png",
+      "bytes": 1224165,
+      "sha256": "bfcc4faf69f80188e576240526d6aad8af357b6c82691b0eef980a1394680de3",
+      "width": 1716,
+      "height": 2046
+    },
+    {
+      "path": "../review/night-wide.png",
+      "bytes": 22056390,
+      "sha256": "16b067c5f34274b83680b75aa4fcbe43e1dec34480fb8f373b7eef3095169aec",
+      "width": 6204,
+      "height": 18564
     }
   ]
 }

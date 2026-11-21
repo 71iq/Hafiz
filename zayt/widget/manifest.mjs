@@ -3,10 +3,11 @@ import path from "node:path";
 import assert from "node:assert/strict";
 import { sharp, sha, save } from "../studio/common.mjs";
 import { art, out, review, sceneName, spriteName } from "./paths.mjs";
-import { inks } from "./scenes.mjs";
-import { measure } from "./contrast.mjs";
+import { inks, lightPosition, brightGlints } from "./scenes.mjs";
+import { measure, textRegions } from "./contrast.mjs";
 import { blinks, nightPoses, stills } from "./sprites.mjs";
 
+import { sheetNames } from "./review.mjs";
 import { loopTiming, urgencyHalos, urgencyPoses } from "./urgency.mjs";
 
 const read = (file) => fs.readFileSync(file);
@@ -105,20 +106,40 @@ export async function manifest(bounds, verifyOnly = false) {
         item = await entry(file);
       assert.deepEqual([item.width, item.height, item.alpha, item.codec], [w, h, false, "VP8"]);
       const rgb = await sharp(read(file)).removeAlpha().raw().toBuffer();
-      const contrast = measure(rgb, w, h, crop, colors, bounds[scene][crop]);
+      const regions = textRegions(w, h, bounds[crop]);
+      const light = lightPosition(scene, crop);
+      const accents = [...(light.radius ? [light] : []), ...brightGlints(scene, crop)];
+      for (const accent of accents) {
+        const x = w * accent.x,
+          y = h * accent.y,
+          r = h * accent.radius + 2;
+        assert(
+          regions.every(
+            ({ rect: [x0, y0, x1, y1] }) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(y0 - y, 0, y - y1)) > r,
+          ),
+          scene + " " + crop + " disc or glint crosses an ink band",
+        );
+      }
+      const contrast = measure(rgb, w, h, colors, regions);
       assert(
-        contrast.primary.ratio >= 7 && contrast.secondary.ratio >= 4.5,
+        contrast.primary.ratio >= 7.6 &&
+          contrast.secondary.ratio >= 4.7 &&
+          contrast.lit.ratio >= 3 &&
+          (crop === "sq" || contrast.weekLabels.ratio >= 4.7),
         scene + " " + crop + " " + JSON.stringify(contrast),
       );
-      crops[crop] = { file: item.path, contrast };
+      crops[crop] = { file: item.path, contrast, brightAccents: accents };
       files.push(item);
     }
     scenes[scene] = {
       inkPrimary: colors[0],
       inkSecondary: colors[1],
+      inkLit: colors[2],
       minimumContrast: {
         primary: Math.min(crops.sq.contrast.primary.ratio, crops.wide.contrast.primary.ratio),
         secondary: Math.min(crops.sq.contrast.secondary.ratio, crops.wide.contrast.secondary.ratio),
+        lit: Math.min(crops.sq.contrast.lit.ratio, crops.wide.contrast.lit.ratio),
+        weekLabels: crops.wide.contrast.weekLabels.ratio,
       },
       crops,
     };
@@ -174,7 +195,7 @@ export async function manifest(bounds, verifyOnly = false) {
     ["clips.json", "flame", "loops.json", "res"],
   );
   const reviewFiles = [];
-  for (const name of ["states", "states-ar", "day", "thumbs", "flames", "home", "sizes", "ladder", "faces", "loops"]) {
+  for (const name of sheetNames) {
     reviewFiles.push(await entry(path.join(review, name + ".png")));
   }
   const manifestFile = { path: "manifest.json", bytes: 0 };
@@ -182,7 +203,7 @@ export async function manifest(bounds, verifyOnly = false) {
   const result = {
     schemaVersion: 1,
     baseStudioCommit: "278afa4b38f036980358c656a9090526f4fc6aaa",
-    runtimeBudgetBytes: 4500000,
+    runtimeBudgetBytes: 5300000,
     runtimeBytes: 0,
     spriteCanvas: { width: 600, height: 720, feetBaselineY: 704 },
     idleBlinkClosedMs: 250,

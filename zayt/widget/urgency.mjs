@@ -1,8 +1,19 @@
 import { rest } from "../studio/poses.mjs";
 import { faceArt } from "./expressions.mjs";
 
-export const urgencyPoses = ["eager", "impatient", "worried", "anxious", "panicked", "relieved", "lonely"];
-export const urgencyHalos = ["worried", "anxious", "panicked", "relieved"];
+export const urgencyPoses = [
+  "eager",
+  "impatient",
+  "worried",
+  "anxious",
+  "panicked",
+  "relieved",
+  "lonely",
+  "fretful",
+  "nervous",
+  "frantic",
+];
+export const urgencyHalos = ["worried", "anxious", "panicked", "relieved", "nervous", "frantic"];
 
 // Each first drawing doubles as the reduced-motion poster. The short beats
 // settle back onto it, leaving most of each cycle still.
@@ -13,6 +24,9 @@ export const loopTiming = {
   anxious: [2020, 125, 145, 130],
   panicked: [1900, 150, 155, 145],
   lonely: [3200, 120, 250, 160],
+  fretful: [2060, 310, 250, 220],
+  nervous: [2000, 140, 125, 160],
+  frantic: [1850, 115, 95, 135],
 };
 
 export function urgencyDrawing(name, i = 0) {
@@ -59,6 +73,45 @@ export function urgencyDrawing(name, i = 0) {
       pose.leaf = [10.7, 6.7, 15.7, 9.7][i];
       pose.glow = 0.43;
       face.lookX = -3;
+      break;
+    case "fretful":
+      pose.torsoLean = [-0.16, -0.06, 0.13, 0.03][i];
+      pose.leaf = [14, 6, -10, -2][i];
+      pose.arms = [
+        [65, 15],
+        [49, 18],
+        [18, 57],
+        [36, 35],
+      ][i];
+      pose.tapFoot = i < 2 ? 0 : 1;
+      pose.tap = [0.14, 0.03, 0.14, 0.03][i];
+      pose.glow = 0.19;
+      face.lookX = [13, 8, -1, 0][i];
+      break;
+    case "nervous":
+      pose.onToes = true;
+      pose.height = 0.97;
+      pose.width = 1.035;
+      pose.arms = [15, 18];
+      pose.torsoLean = [0.052, 0.08, 0.015, 0.065][i];
+      pose.leaf = [-4, -8, 1, -5][i];
+      pose.glow = 0.43;
+      face.lookX = [-15, 16, 13, -9][i];
+      break;
+    case "frantic":
+      pose.arms = [
+        [37, 48],
+        [48, 55],
+        [34, 31],
+        [56, 47],
+      ][i];
+      pose.reach = 1.22;
+      pose.root[1] = [0, 0.29, 0, 0.37][i];
+      pose.height = [1, 1.025, 0.91, 1.04][i];
+      pose.width = [1, 0.985, 1.055, 0.98][i];
+      pose.leaf = [0, 11, -15, 17][i];
+      pose.glow = 0.79;
+      face.lookY = -10;
       break;
     case "panicked":
       pose.arms = [

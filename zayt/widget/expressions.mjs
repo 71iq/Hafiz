@@ -29,6 +29,23 @@ const faces = {
     brows: ["M90 114 Q118 106 149 77", "M243 79 Q261 103 300 109"],
     lip: "M153 225 Q167 201 181 216 T204 215 Q214 200 227 213 T246 210",
   },
+  fretful: {
+    eyes: [125, 270, 159, 31, 32, 0.83],
+    lids: [0.08, 0.19],
+    brows: ["M94 132 Q119 129 151 99", "M244 101 Q268 119 297 117"],
+    lip: "M166 232 Q184 203 213 213 Q229 218 240 223",
+  },
+  nervous: {
+    eyes: [126, 269, 154, 40, 45, 0.76],
+    brows: ["M87 114 Q121 100 147 78", "M246 82 Q271 109 307 107"],
+    lip: "M153 223 Q164 200 179 216 T203 216 Q213 201 224 213 T246 211",
+  },
+  frantic: {
+    eyes: [133, 267, 147, 49, 53, 0.55],
+    brows: ["M90 90 Q110 52 153 60", "M246 54 Q280 45 310 82"],
+    mouth: "M177 234 C178 215 195 203 210 206 C225 209 232 227 223 244 C214 259 177 257 177 234Z",
+    tongue: "M184 244 Q203 233 221 241 C215 254 190 257 184 244Z",
+  },
   panicked: {
     eyes: [136, 264, 148, 46, 53, 0.56],
     brows: ["M93 91 C105 86 122 60 153 56", "M245 58 C272 51 284 74 305 81"],
@@ -88,7 +105,13 @@ export function faceArt(name, { lookX = 0, lookY = 0, blink = 0, drip = 0 } = {}
   const face = faces[name];
   const [left, right, cy, rx, ry, pupil] = face.eyes;
   let drawing = face.brows
-    .map((d) => stroke(d, ["worried", "anxious", "panicked"].includes(name) ? 8.5 : 7.5, "#62401e"))
+    .map((d) =>
+      stroke(
+        d,
+        ["worried", "anxious", "panicked", "fretful", "nervous", "frantic"].includes(name) ? 8.5 : 7.5,
+        "#62401e",
+      ),
+    )
     .join("");
   for (const [i, cx] of [left, right].entries()) {
     drawing += eye(cx, cy, rx, ry, pupil, face.lids?.[i] || 0, lookX, lookY, blink, i);
@@ -96,6 +119,7 @@ export function faceArt(name, { lookX = 0, lookY = 0, blink = 0, drip = 0 } = {}
   drawing += face.mouth ? fill(face.mouth, "url(#smile)") + fill(face.tongue, "#bc7562") : stroke(face.lip, 7);
   if (name === "worried") drawing += bead(326 + 13 * drip, 118 + drip * 55, 1.14 - 0.14 * drip, -14);
   if (name === "anxious") drawing += bead(325, 110, 1.03, -15) + bead(57, 142, 0.78, 12);
+  if (name === "nervous") drawing += bead(62, 106, 1.1, 17) + bead(334, 142, 0.93, -12);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 400 300">${definitions}${drawing}</svg>`;
   return "data:image/svg+xml," + encodeURIComponent(svg);
 }

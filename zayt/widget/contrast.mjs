@@ -9,9 +9,9 @@ export const luminance = (r, g, b) => linearLight[r] * 0.2126 + linearLight[g] *
 export const inkLight = (s) => luminance(...[1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)));
 const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 
-// Bounds include the shaped glyphs and a filter margin in both locales.
+// Project the reserved ink bands, including a filter margin in both locales.
 // Coordinates start in the widget; square artwork serves square tiles.
-export function textRegions(w, h, crop, bounds) {
+export function textRegions(w, h, bounds) {
   const source = w / h,
     result = [];
   function transform(r, rect) {
@@ -25,10 +25,7 @@ export function textRegions(w, h, crop, bounds) {
       (h - height) / 2 + y1 * height,
     ];
   }
-  for (const { role, layout, rtl, rect } of bounds) {
-    // Protect the whole row for a changing count and all wide captions.
-    const fullRow = role === "primary" || (crop === "wide" && layout !== "note");
-    const area = fullRow ? [0, rect[1], 1, rect[3]] : rect;
+  for (const { role, rect: area } of bounds) {
     // At narrower aspects only X varies; at wider aspects only Y varies.
     // Each continuous sweep therefore occupies its endpoint envelope.
     const sorted = [...new Set([1, source, 5])].sort((a, b) => a - b);
@@ -37,8 +34,6 @@ export function textRegions(w, h, crop, bounds) {
         b = transform(sorted[i + 1], area);
       result.push({
         role,
-        layout,
-        rtl,
         rect: [
           Math.max(0, Math.floor(Math.min(a[0], b[0])) - 1),
           Math.max(0, Math.floor(Math.min(a[1], b[1])) - 1),
@@ -51,14 +46,20 @@ export function textRegions(w, h, crop, bounds) {
   return result;
 }
 
-export function measure(pixels, w, h, crop, inks, bounds) {
-  const regions = textRegions(w, h, crop, bounds);
+export function measure(pixels, w, h, inks, regions) {
   const results = {};
-  for (const [i, role] of ["primary", "secondary"].entries()) {
-    const ink = inkLight(inks[i]),
+  for (const [role, color, maskRole] of [
+    ["primary", inks[0], "ink"],
+    ["secondary", inks[1], "ink"],
+    ["lit", inks[2], "ink"],
+    ["weekLabels", inks[1], "weekLabels"],
+  ]) {
+    const boxes = regions.filter((z) => z.role === maskRole);
+    if (!boxes.length) continue;
+    const ink = inkLight(color),
       target = { ratio: Infinity, x: 0, y: 0 };
     const mask = new Uint8Array(w * h);
-    for (const box of regions.filter((z) => z.role === role)) {
+    for (const box of boxes) {
       const [x0, y0, x1, y1] = box.rect;
       for (let y = y0; y < y1; y++) mask.fill(1, y * w + x0, y * w + x1);
     }

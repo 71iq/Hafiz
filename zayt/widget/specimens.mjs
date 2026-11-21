@@ -34,3 +34,25 @@ export const ladder = [
   ["Done late", "radiant_night", "relieved_halo", 13, "lit_t1", "", "", "#FFD09A"],
   ["After a break", "dawn", "lonely", 0, "out", "Start again today"],
 ];
+
+export const newFaces = {
+  fretful: "dusk",
+  nervous_halo: "night",
+  frantic_halo: "midnight",
+  nervous: "dawn_red",
+  frantic: "dawn_red",
+};
+
+// Keep the daytime pairs on the same sky and compare both make-up faces on
+// their own morning light. Copy is the v2 review fixture at each urgency level.
+export const ladderPairs = [
+  ["Calm morning", "morning", "rest", "wave", ladder[0][5]],
+  ["Calm day", "day", "eager", "wave", ladder[0][5]],
+  ["Nudge", "golden", "impatient", "warm", ladder[1][5]],
+  ["Urgent", "dusk", "worried", "fretful", ladder[2][5]],
+  ["Critical", "night", "anxious_halo", "nervous_halo", ladder[3][5]],
+  ["Last hour", "midnight", "panicked_halo", "frantic_halo", ladder[4][5]],
+  ["Make-up · urgent", "dawn_rose", "worried", "fretful", ladder[2][5]],
+  ["Make-up · critical", "dawn_red", "anxious", "nervous", ladder[3][5]],
+  ["Make-up · last hour", "dawn_red", "panicked", "frantic", ladder[4][5]],
+];

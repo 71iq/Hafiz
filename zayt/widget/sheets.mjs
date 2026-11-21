@@ -1,8 +1,9 @@
+import { wideExamples, columns, wideRows } from "./layouts.mjs";
 import { inks, skies } from "./scenes.mjs";
-import { states, ladder, layoutSizes, isTile } from "./specimens.mjs";
+import { states, ladder, layoutSizes, isTile, newFaces, ladderPairs } from "./specimens.mjs";
 
 const images = new Map();
-let measuring = null;
+
 export async function loadImages(entries) {
   await Promise.all(
     entries.map(async ([name, url]) => {
@@ -35,18 +36,7 @@ function text(ctx, str, x, y, size, ink, opts = {}) {
   ctx.textBaseline = "middle";
   ctx.fillStyle = ink;
   ctx.font = weight + " " + size + "px " + (rtl ? "NotoSansArabic" : "Roboto");
-  if (measuring) {
-    const m = ctx.measureText(str);
-    measuring.push({
-      ink,
-      rect: [
-        x - m.actualBoundingBoxLeft - 1,
-        y - m.actualBoundingBoxAscent - 1,
-        x + m.actualBoundingBoxRight + 1,
-        y + m.actualBoundingBoxDescent + 1,
-      ],
-    });
-  } else ctx.fillText(str, x, y);
+  ctx.fillText(str, x, y);
   ctx.restore();
 }
 function round(ctx, x, y, w, h, r, fill) {
@@ -99,82 +89,67 @@ function wrap(ctx, message, width, maxLines, font) {
 function tile(ctx, x, y, row, layout, rtl = false, dimensions = layoutSizes[layout], cropFeet = 8) {
   const [, scene, pose, count, flame, en, ar, countInk] = row,
     [w, h] = dimensions;
-  const tileMode = isTile(layout),
-    wide = layout === "wide" || layout === "medium";
-  const tiny = layout === "tiny",
-    short = layout === "short",
-    line = rtl ? ar : en;
-  const [primary, secondary] = inks[scene];
-  const pad = tileMode ? 12 : wide ? 14 : tiny ? 8 : 10,
-    iconSize = tileMode ? 22 : wide ? 28 : tiny ? 18 : 20;
-  const numSize = tileMode ? 26 : wide ? 34 : tiny ? 20 : 22,
-    lineSize = tileMode ? 13 : wide ? 15 : 12;
+  if (!isTile(layout)) {
+    const kind = { wide: "roomy", medium: "short", short: "short", tiny: "tiny" }[layout];
+    wideCard(ctx, x, y, row, kind, w, h, rtl);
+    return;
+  }
+  const line = rtl ? ar : en;
+  const [primary] = inks[scene];
+  const pad = 12,
+    iconSize = 22,
+    numSize = 26,
+    lineSize = 13;
   const font = rtl ? "NotoSansArabic" : "Roboto";
   ctx.save();
   ctx.translate(x, y);
   ctx.beginPath();
   ctx.roundRect(0, 0, w, h, Math.min(23, h * 0.23));
   ctx.clip();
-  if (!measuring) cover(ctx, images.get("scene_" + scene + "_" + (tileMode ? "sq" : "wide")), w, h);
+  cover(ctx, images.get("scene_" + scene + "_sq"), w, h);
   const countText = rtl ? new Intl.NumberFormat("ar-EG").format(count) : String(count);
   ctx.font = "700 " + numSize + "px " + font;
   const numWidth = ctx.measureText(countText).width,
-    gap = wide ? 6 : 3,
+    gap = 3,
     group = iconSize + numWidth + gap;
-  const groupX = tileMode ? (w - group) / 2 : rtl ? w - pad - group : pad;
-  const groupY = tileMode ? pad + numSize * 0.5 : wide ? pad + numSize * 0.54 : tiny ? h / 2 : pad + numSize * 0.55;
-  const tx = tileMode ? w / 2 : rtl ? w - pad : pad;
-  const align = tileMode ? "center" : rtl ? "right" : "left";
-  const lineWidth = tileMode ? w - 2 * pad : wide ? w * 0.53 : short ? w - 57 : 0;
-  const lines = tiny || !line ? [] : wrap(ctx, line, lineWidth, short ? 1 : 2, "400 " + lineSize + "px " + font);
+  const groupX = (w - group) / 2,
+    groupY = pad + numSize * 0.5;
+  const lines = line ? wrap(ctx, line, w - 2 * pad, 2, "400 " + lineSize + "px " + font) : [];
   const leading = rtl ? lineSize * 1.38 : lineSize * 1.16;
   const lineY = groupY + numSize * 0.53 + lineSize * 0.6 + 1;
   const copyEnd = lines.length ? lineY + (lines.length - 1) * leading + lineSize * 0.6 : groupY + numSize * 0.54;
   // The studio has 16% clear sky above the sprig. Place its visible bounding box,
   // not the empty canvas, against the text and foot-crop lines.
   const sprite = images.get("zayt_" + pose);
-  let drawH, drawW, drawX, drawY;
-  const baseline = 704 / 720,
-    standingHeight = (704 - 120) / 720;
-  if (tileMode) {
-    drawH = (h + cropFeet - copyEnd - 2) / standingHeight;
-    drawW = (drawH * 5) / 6;
-    drawX = (w - drawW) / 2;
-    drawY = h + cropFeet - drawH * baseline;
-  } else if (wide) {
-    drawH = (h + 6 - 10) / standingHeight;
-    drawW = (drawH * 5) / 6;
-    drawY = h + 6 - drawH * baseline;
-    const center = rtl ? w * 0.255 : w * 0.745;
-    drawX = center - drawW * 0.5;
-  } else {
-    drawH = tiny ? 72 : 104;
-    drawW = (drawH * 5) / 6;
-    const center = rtl ? (tiny ? 24 : 34) : w - (tiny ? 24 : 34);
-    drawX = center - drawW * 0.5;
-    // Lift the transparent headroom so the bottom crop clears the seated smile, too.
-    drawY = tiny ? -5 : -11;
-  }
-  if (!measuring) ctx.drawImage(sprite, drawX, drawY, drawW, drawH);
+  const drawH = ((h + cropFeet - copyEnd - 2) * 720) / 584;
+  const drawW = (drawH * 5) / 6;
+  const drawX = (w - drawW) / 2,
+    drawY = h + cropFeet - (drawH * 704) / 720;
+  ctx.drawImage(sprite, drawX, drawY, drawW, drawH);
   const iconX = rtl ? groupX + numWidth + gap : groupX;
-  if (!measuring && flame === "waiting") {
+  if (flame === "waiting") {
     icon(ctx, "out", iconX, groupY - iconSize * 0.5, iconSize, primary);
-    const ember = { day: "#99602B", golden: "#BD4D16", dusk: "#FFAB52", night: "#FF9657", midnight: "#FF7158" };
+    const ember = {
+      day: "#99602B",
+      golden: "#BD4D16",
+      dusk: "#FFAB52",
+      night: "#FF9657",
+      midnight: "#FF7158",
+      morning: "#99602B",
+      dawn_rose: "#AD5028",
+      dawn_red: "#FF985A",
+    };
     ctx.fillStyle = ember[scene];
     ctx.beginPath();
     ctx.ellipse(iconX + iconSize * 0.51, groupY + iconSize * 0.22, 1.7, 2.2, 0.3, 0, Math.PI * 2);
     ctx.fill();
-  } else if (!measuring) icon(ctx, flame, iconX, groupY - iconSize * 0.5, iconSize, primary);
-  else if (["unlit", "out"].includes(flame))
-    measuring.push({ ink: primary, rect: [iconX, groupY - iconSize * 0.5, iconX + iconSize, groupY + iconSize * 0.5] });
+  } else icon(ctx, flame, iconX, groupY - iconSize * 0.5, iconSize, primary);
   text(ctx, countText, rtl ? groupX + numWidth : groupX + iconSize + gap, groupY + 0.3, numSize, countInk ?? primary, {
     weight: 700,
     rtl,
     align: rtl ? "right" : "left",
   });
-  lines.forEach((s, i) => text(ctx, s, tx, lineY + i * leading, lineSize, secondary, { rtl, align }));
-  if (layout === "wide" && !["radiant", "radiant_night", "milestone", "calm"].includes(scene))
-    text(ctx, rtl ? "صفحتان اليوم" : "2 pages today", tx, h - pad - 6, 12, secondary, { rtl, align });
+  lines.forEach((s, i) => text(ctx, s, w / 2, lineY + i * leading, lineSize, primary, { rtl, align: "center" }));
   ctx.restore();
 }
 function headings(ctx, title, sub) {
@@ -235,6 +210,7 @@ function specimen(c, x, y, scene, resource, height, headroom = 0) {
   c.restore();
 }
 function poseScene(pose) {
+  if (newFaces[pose]) return newFaces[pose];
   const base = pose.replace("_halo", "");
   return ladder.find((row) => row[2].replace("_halo", "") === base)[1];
 }
@@ -256,23 +232,24 @@ function facesSheet() {
   }
   return c;
 }
-function loopsSheet(loops) {
+function loopsSheet(loops, headroom = 12) {
   const entries = Object.entries(loops);
-  const c = sheet(572, 52 + entries.length * 120);
+  const stride = 108 + headroom;
+  const c = sheet(572, 52 + entries.length * stride);
   headings(c, "Loop frames");
   for (const [i, [pose, frames]] of entries.entries()) {
-    const y = 43 + i * 120;
+    const y = 43 + i * stride;
     text(c, pose.replace("_", " · "), 14, y + 43, 11, paper);
     for (const [j, frame] of frames.entries()) {
       const x = 126 + j * 110;
-      specimen(c, x, y, poseScene(pose), frame.file.replace("hafiz_widget_", "").replace(".webp", ""), 80, 12);
-      text(c, frame.durationMs + " ms", x, y + 107, 9, soft);
+      specimen(c, x, y, poseScene(pose), frame.file.replace("hafiz_widget_", "").replace(".webp", ""), 80, headroom);
+      text(c, frame.durationMs + " ms", x, y + 95 + headroom, 9, soft);
     }
   }
   return c;
 }
 function thumbsSheet() {
-  const c = sheet(464, 205);
+  const c = sheet(464, 40 + Math.ceil(Object.keys(skies).length / 6) * 82);
   headings(c, "The olive grove at 60 dp");
   for (const [i, scene] of Object.keys(skies).entries()) {
     const x = 13 + (i % 6) * 75,
@@ -535,6 +512,34 @@ function homeSheet() {
   phone(c, 360, true);
   return c;
 }
+function ladderV3Sheet() {
+  const c = sheet(1068, 637);
+  headings(c, "Time left to keep the streak");
+  for (const [i, [level, scene, first, second, line]] of ladderPairs.entries()) {
+    const x = 14 + (i % 3) * 354,
+      y = 62 + Math.floor(i / 3) * 194;
+    text(c, level, x, y - 12, 13, paper, { weight: 700 });
+    for (const [j, pose] of [first, second].entries()) {
+      tile(c, x + j * 167, y, [level, scene, pose, 12, "waiting", line], "tile", false, layoutSizes.tile, 8);
+      text(c, pose.replace("_halo", ""), x + j * 167, y + 169, 10, soft);
+    }
+  }
+  return c;
+}
+
+function facesV3Sheet() {
+  const c = sheet(462, 504);
+  headings(c, "New faces at 60 and 120 dp");
+  for (const [i, [pose, scene]] of Object.entries(newFaces).entries()) {
+    const x = 14 + (i % 2) * 228,
+      y = 56 + Math.floor(i / 2) * 150;
+    text(c, pose.replace("_", " · "), x, y - 10, 11, soft);
+    specimen(c, x, y + 60, scene, "zayt_" + pose, 60);
+    specimen(c, x + 73, y, scene, "zayt_" + pose, 120);
+  }
+  return c;
+}
+
 export function makeSheet(name, loops) {
   const c = {
     states: () => statesSheet(false),
@@ -542,7 +547,10 @@ export function makeSheet(name, loops) {
     day: daySheet,
     ladder: ladderSheet,
     faces: facesSheet,
-    loops: () => loopsSheet(loops),
+    loops: () => loopsSheet(Object.fromEntries(Object.entries(loops).filter(([pose]) => !newFaces[pose]))),
+    "ladder-v3": ladderV3Sheet,
+    "faces-v3": facesV3Sheet,
+    "loops-v3": () => loopsSheet(Object.fromEntries(Object.entries(loops).filter(([pose]) => newFaces[pose])), 18),
     thumbs: thumbsSheet,
     flames: flamesSheet,
     home: homeSheet,
@@ -551,36 +559,113 @@ export function makeSheet(name, loops) {
   return c.canvas.toDataURL().split(",")[1];
 }
 
-// Capture the painted bounds using the same font shaping, directions, baselines and
-// wrapping as the sheets. Include the allowed one- or two-line copy area even when
-// a reward specimen has no line, so each scene supplies usable secondary ink.
-export function textBounds() {
-  const ctx = document.createElement("canvas").getContext("2d");
-  const result = {};
-  for (const row of states) {
-    const scene = row[1],
-      [primary] = inks[scene];
-    const copy = row[5] ? row : [...row.slice(0, 5), "Review left today", "بقيت مراجعة اليوم"];
-    const groups = (result[scene] ??= { sq: [], wide: [] });
-    for (const layout of ["tile", "wide", "medium", "short", "tiny"]) {
-      const sizes = isTile(layout) ? Array.from({ length: 81 }, (_, i) => [110 + i, 110 + i]) : [layoutSizes[layout]];
-      for (const [w, h] of sizes)
-        for (const rtl of [false, true]) {
-          measuring = [];
-          tile(ctx, 0, 0, copy, layout, rtl, [w, h]);
-          for (const { ink, rect } of measuring) {
-            // Ink at the bottom only occurs on the tall layout.
-            const note = layout === "wide" && rect[1] > h * 0.7;
-            groups[isTile(layout) ? "sq" : "wide"].push({
-              role: ink === primary ? "primary" : "secondary",
-              layout: note ? "note" : layout,
-              rtl,
-              rect: [rect[0] / w, rect[1] / h, rect[2] / w, rect[3] / h],
-            });
-          }
-          measuring = null;
+function wideCard(ctx, x, y, row, kind, w, h, rtl, outline = false) {
+  const [, scene, pose, count, flame, en, ar] = row;
+  const [primary, secondary, lit] = inks[scene];
+  const m = columns(kind, w, h);
+  const align = rtl ? "right" : "left",
+    font = rtl ? "NotoSansArabic" : "Roboto";
+  const countText = rtl ? new Intl.NumberFormat("ar-EG").format(count) : String(count);
+  const inlineCount = m.flame + 4 + m.number * 1.25;
+  const available = m.end - m.inset - (m.horizontal ? inlineCount + 8 : 0);
+  const line = kind === "compact" || kind === "tiny" ? "" : rtl ? ar : en;
+  const lines = line ? wrap(ctx, line, available, 2, "400 " + m.line + "px " + font) : [];
+  const rows = wideRows(kind, w, h, { rtl, count: true, lines: lines.length, week: m.tall });
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, Math.min(16, h * 0.23));
+  ctx.clip();
+  cover(ctx, images.get("scene_" + scene + "_wide"), w, h);
+  if (m.artWidth) {
+    const artH = (m.artWidth * 6) / 5;
+    ctx.drawImage(
+      images.get("zayt_" + pose),
+      rtl ? m.artEnd : w - m.artEnd - m.artWidth,
+      h + (m.tall ? 8 : 6) - artH,
+      m.artWidth,
+      artH,
+    );
+  }
+  for (const {
+    role,
+    rect: [left, top, right, bottom],
+  } of rows) {
+    const start = rtl ? right : left;
+    const mid = (top + bottom) / 2;
+    if (role === "count") {
+      icon(ctx, flame, rtl ? start - m.flame : start, mid - m.flame / 2, m.flame, primary);
+      text(
+        ctx,
+        countText,
+        start + (rtl ? -1 : 1) * (m.flame + 4),
+        mid,
+        m.number,
+        flame.startsWith("lit") ? lit : primary,
+        { rtl, align, weight: 700 },
+      );
+    } else if (role === "line") {
+      const leading = m.line * (rtl ? 1.55 : 1.22);
+      lines.forEach((s, i) =>
+        text(ctx, s, start, mid + (i - (lines.length - 1) / 2) * leading, m.line, primary, { rtl, align }),
+      );
+    } else {
+      const labels = rtl ? "ح ن ث ر خ ج س" : "S M T W T F S";
+      labels.split(" ").forEach((label, i) => {
+        const cx = left + ((right - left) * ((rtl ? 6 - i : i) + 0.5)) / 7;
+        if (role === "weekLabels") text(ctx, label, cx, mid, 10, secondary, { rtl, align: "center" });
+        else if ([0, 2, 3, 5, 6].includes(i)) {
+          icon(ctx, i === 6 ? "out" : "lit_t0", cx - 7, mid - 7, 14, primary);
+        } else {
+          ctx.beginPath();
+          ctx.arc(cx, mid, 3.4, 0, Math.PI * 2);
+          ctx.strokeStyle = secondary;
+          ctx.lineWidth = 1;
+          ctx.stroke();
         }
+      });
+    }
+    if (outline) {
+      ctx.strokeStyle = primary;
+      ctx.globalAlpha = 0.66;
+      ctx.lineWidth = 0.65;
+      ctx.setLineDash(role.startsWith("week") ? [1, 1.5] : [4, 2]);
+      ctx.strokeRect(left, top, right - left, bottom - top);
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
     }
   }
-  return result;
+  ctx.restore();
+}
+
+// Assemble the large sheet from 3× bands so Chromium never needs the full
+// contact sheet as a single canvas. Both locales see the identical painting.
+export function collisionBand(scene) {
+  const c = sheet(2068, 442);
+  const pose =
+    { night: "nervous_halo", midnight: "frantic_halo", dawn_rose: "fretful", dawn_red: "nervous" }[scene] ??
+    states.find((r) => r[1] === scene)[2];
+  const row = ["", scene, pose, 12, "out", "Under 2 hours left!", "بقي أقل من ساعتين!"];
+  const positions = [
+    [0, 42],
+    [410, 42],
+    [750, 42],
+    [0, 281],
+    [260, 329],
+    [750, 231],
+    [410, 247],
+    [601, 385],
+    [601, 324],
+    [830, 336],
+  ];
+  for (const [j, rtl] of [false, true].entries()) {
+    const origin = 12 + j * 1035;
+    text(c, scene.replace("_", " ") + (rtl ? "    Arabic" : "    English"), origin, 12, 13, paper, { weight: 700 });
+    for (const [i, [kind, w, h]] of wideExamples.entries()) {
+      const [px, py] = positions[i];
+      text(c, w + " × " + h + (kind === "compact" ? "  compact" : ""), origin + px, py - 7, 9, soft);
+      wideCard(c, origin + px, py, row, kind, w, h, rtl, true);
+    }
+  }
+  return c.canvas.toDataURL().split(",")[1];
 }

@@ -12,8 +12,11 @@ export const skies = {
   radiant_night: ["#252847", "#454057", "#a77449", "#ffd38c"],
   milestone: ["#e6a04e", "#ffc169", "#ffe897", "#fff7be"],
   calm: ["#bbb7da", "#d6cde4", "#bde0d5", "#eef1e9"],
+  dawn_rose: ["#c28f9d", "#f6b1b0", "#fc9187", "#ffdab6"],
+  dawn_red: ["#30253b", "#59283f", "#a71b32", "#ffd9a0"],
 };
 const land = {
+  dawn_red: ["#85404a", "#75414f", "#604452", "#434650", "#2f4148", "#926b62"],
   dawn: ["#b7aba8", "#a3afa1", "#82a69a", "#669588", "#477d73", "#94b099"],
   morning: ["#b5c2a2", "#a7bd99", "#90ad82", "#82ac84", "#5d8f73", "#cbd3a1"],
   day: ["#8ab8b1", "#81b4a3", "#67a594", "#66a381", "#488b74", "#b2d09a"],
@@ -44,38 +47,58 @@ const places = {
   calm: [0.18, 0.63, 0, 3.7, 4],
 };
 export const inks = {
-  dawn: ["#182C30", "#293E3E"],
-  morning: ["#173039", "#263E40"],
-  day: ["#142D35", "#203E45"],
-  golden: ["#34251C", "#473327"],
-  dusk: ["#FFF9EF", "#F9E9EA"],
-  night: ["#FFF9ED", "#F2EAF7"],
-  midnight: ["#FFFAED", "#D6DBEA"],
-  sunrise: ["#32232F", "#44333C"],
-  radiant: ["#342B19", "#443723"],
-  radiant_night: ["#FFF8E5", "#F4E6D1"],
-  milestone: ["#302317", "#44321F"],
-  calm: ["#272D3A", "#373D49"],
+  dawn: ["#182C30", "#293E3E", "#9A3412"],
+  morning: ["#173039", "#263E40", "#9A3412"],
+  day: ["#142D35", "#203E45", "#9A3412"],
+  golden: ["#34251C", "#473327", "#9A3412"],
+  dusk: ["#FFF9EF", "#F9E9EA", "#FFC94D"],
+  night: ["#FFF9ED", "#F2EAF7", "#FFC94D"],
+  midnight: ["#FFFAED", "#D6DBEA", "#FFC94D"],
+  sunrise: ["#32232F", "#44333C", "#9A3412"],
+  radiant: ["#342B19", "#443723", "#9A3412"],
+  radiant_night: ["#FFF8E5", "#F4E6D1", "#FFC94D"],
+  milestone: ["#302317", "#44321F", "#9A3412"],
+  calm: ["#272D3A", "#373D49", "#9A3412"],
+  dawn_rose: ["#34232B", "#50313C", "#9A3412"],
+  dawn_red: ["#FFF8E8", "#FAE6D9", "#FFC94D"],
 };
 
+const terrain = (scene) => (scene.startsWith("dawn_") ? "dawn" : scene);
+
 export function lightPosition(scene, crop) {
-  const [sx, sy, radius] = places[scene];
-  if (crop === "wide" && scene === "night") return { x: 0.504, y: 0.722, radius: 0.03 };
-  if (crop === "wide" && scene === "dusk") return { x: 0.493, y: 0.741, radius: 0.028 };
-  return {
-    x: crop === "wide" && !radius && scene !== "calm" && scene !== "midnight" ? 0.7 : sx,
-    y: sy,
-    radius: radius / 600,
-  };
+  const family = terrain(scene);
+  const [sx, sy] = places[family];
+  // Wide layouts can use either end for text, and a short two-line strip can
+  // fill its height. Paint broad light from the source, without a hard disc.
+  if (crop === "wide") return { x: sx, y: sy, radius: 0 };
+  const lowSun = {
+    dawn: [0.13, 0.795, 0.033],
+    night: [0.15, 0.79, 0.028],
+    dusk: [0.28, 0.799, 0.035],
+    sunrise: [0.8, 0.8, 0.037],
+  }[family];
+  if (lowSun) return { x: lowSun[0], y: lowSun[1], radius: lowSun[2] };
+  return { x: sx, y: sy, radius: 0 };
+}
+
+export function brightGlints(scene, crop) {
+  if (scene !== "milestone" || crop !== "sq") return [];
+  return [
+    [0.1, 0.78, 5],
+    [0.18, 0.81, 3],
+    [0.83, 0.77, 4],
+    [0.92, 0.84, 6],
+  ].map(([x, y, r]) => ({ x, y, radius: r / 600 }));
 }
 
 export function paintGrove(canvas, scene, crop) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const H = 600,
     W = (canvas.width / canvas.height) * H;
+  const family = terrain(scene);
   const sky = skies[scene],
-    earth = land[scene];
-  const [, , , phase, clouds] = places[scene];
+    earth = land[scene] ?? land[family];
+  const [, , , phase, clouds] = places[family];
   const night = ["night", "midnight", "radiant_night"].includes(scene),
     dark = night || scene === "dusk";
   const beam = ["sunrise", "radiant", "milestone", "radiant_night"].includes(scene);
@@ -84,7 +107,7 @@ export function paintGrove(canvas, scene, crop) {
   const X = W * light.x,
     Y = H * light.y,
     radius = light.radius * H;
-  let seed = 81027 + Object.keys(skies).indexOf(scene) * 837;
+  let seed = 81027 + Object.keys(skies).indexOf(family) * 837;
   const rnd = () => (seed = (Math.imul(1664525, seed) + 1013904223) >>> 0) / 4294967296;
   const hex = (s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
@@ -158,7 +181,14 @@ export function paintGrove(canvas, scene, crop) {
     [1, sky[2]],
   ]);
   ctx.fillRect(0, 0, W, H);
-  mist(X, Y, W * 0.82, H * 0.61, sky[3], dark ? 0.2 : 0.42);
+  mist(X, Y, W * 0.82, H * 0.61, sky[3], scene === "dawn_red" ? 0.055 : dark ? 0.2 : 0.42);
+  if (scene === "dawn_red") {
+    mist(X, H * 0.695, W * 0.87, H * 0.17, "#cb2337", 0.67);
+    // A bank of sunrise light stretches across the eastern valley. The soft
+    // upper edge stays well above the skyline in both compositions.
+    mist(X, H * 0.7, W * 0.74, H * 0.1, "#e35448", 0.75);
+    mist(X, H * 0.685, W * 0.46, H * 0.04, "#f58a66", 0.68);
+  }
   if (scene === "midnight") {
     // Light hangs low in the valley, behind the ridge and the trees.
     mist(W * 0.54, H * 0.72, W * 0.87, H * 0.18, "#9b3946", 0.58);
@@ -194,21 +224,19 @@ export function paintGrove(canvas, scene, crop) {
       ctx.restore();
     }
   }
-  if (night || scene === "milestone") {
-    if (scene === "midnight") ctx.globalAlpha = 0.94;
-    const count = scene === "midnight" ? 14 : scene === "milestone" ? 20 : 37;
+  if (night) {
+    const count = scene === "midnight" ? 14 : 37;
     for (let i = 0; i < count * (wide ? 1.55 : 1); i++) {
       const x = rnd() * W,
-        y = (night ? 0.09 + rnd() * 0.53 : 0.23 + rnd() * 0.47) * H;
-      if (night && Math.hypot(x - X, y - Y) < radius * 1.85) continue;
-      const r = scene === "milestone" ? 2.6 + rnd() * 5 : 1 + rnd() * 1.5;
-      if (i % 4 === 0 || !night) glint(x, y, r * (night ? 1.65 : 1), sky[3], night ? 0.53 : 0.8);
-      else disc(x, y, r * 0.7, color(sky[3], 0.3 + rnd() * 0.34));
+        y = (0.09 + rnd() * 0.53) * H;
+      if (Math.hypot(x - X, y - Y) < radius * 1.85) continue;
+      // Matte pinpoints remain part of the sky at night. Sharp, four-point
+      // reward glints have a separate checked placement on the square painting.
+      disc(x, y, 0.82 + rnd() * 1.23, color(sky[3], 0.17 + (i % 3) * 0.045));
     }
-    ctx.globalAlpha = 1;
   }
   if (radius) {
-    mist(X, Y, radius * 5.5, radius * 4.3, sky[3], night ? 0.16 : 0.61);
+    mist(X, Y, radius * 5.5, radius * 4.3, sky[3], night ? 0.16 : scene === "dawn_red" ? 0.34 : 0.61);
     disc(
       X,
       Y,
@@ -218,6 +246,8 @@ export function paintGrove(canvas, scene, crop) {
         [1, blend(sky[3], sky[2], night ? 0.35 : 0.19, 0.97)],
       ]),
     );
+  } else if (places[family][2]) {
+    mist(X, Y, H * 0.35, H * 0.18, sky[3], night ? 0.09 : scene === "dawn_red" ? 0.085 : 0.29);
   } else if (beam) mist(X, Y, W * 0.52, H * 0.4, sky[3], 0.87);
 
   // Long wind-sheared bands sit behind a few rounded, hand-modelled cloud banks.
@@ -300,13 +330,16 @@ export function paintGrove(canvas, scene, crop) {
       t = phase + u * (wide ? 5.1 : 3.5);
     const base = [0.705, 0.747, 0.807, 0.88, 0.99][row];
     const relief = [0.043, 0.036, 0.041, 0.052, 0.062][row];
-    return (
-      H *
-      (base +
-        (wide && scene === "night" && row < 2 ? 0.087 * Math.exp(-(((u - 0.504) / 0.11) ** 2)) : 0) +
-        relief * (Math.sin(t * 1.61 + row * 1.9) + 0.43 * Math.sin(2.9 * t + row)) +
-        (row < 2 ? 0.004 * Math.sin(t * 12 + row) + 0.002 * Math.sin(t * 29) : 0))
-    );
+    const ridgeY =
+      base +
+      relief * (Math.sin(t * 1.61 + row * 1.9) + 0.43 * Math.sin(2.9 * t + row)) +
+      (row < 2 ? 0.004 * Math.sin(t * 12 + row) + 0.002 * Math.sin(t * 29) : 0);
+    if (!radius || row > 2) return H * ridgeY;
+    // Open the same shallow valley in all three dawns. Nearer slopes must
+    // stay below the distant ridge or they swallow the newly risen sun.
+    const valley = Math.exp(-(((u - light.x) / 0.16) ** 2));
+    const valleyY = light.y + (family === "night" ? 0.052 : 0.001) + row * 0.027;
+    return H * (ridgeY + Math.max(0, valleyY - ridgeY) * valley);
   }
   function ridge(row) {
     ctx.beginPath();
@@ -438,7 +471,7 @@ export function paintGrove(canvas, scene, crop) {
     radiant_night: [0.12, 2.25],
     milestone: [0.91, 2.05],
     calm: [0.86, 2.42],
-  }[scene];
+  }[family];
   const tx = W * sentinel[0],
     ty = hill(3, tx) + 29;
   leaf(
@@ -498,6 +531,7 @@ export function paintGrove(canvas, scene, crop) {
   }
   bough(-2, H - 5, 1, wide ? 1.65 : 1.33);
   bough(W + 4, H + 7, -1, wide ? 1.72 : 1.53);
+  for (const point of brightGlints(scene, crop)) glint(W * point.x, H * point.y, H * point.radius, sky[3], 0.88);
   // Fine, deterministic pigment granulation breaks up the long sky gradients.
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < data.data.length; i += 4) {

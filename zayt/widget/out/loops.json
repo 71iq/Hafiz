@@ -160,5 +160,95 @@
       "file": "hafiz_widget_zayt_lonely_loop_03.webp",
       "durationMs": 160
     }
+  ],
+  "fretful": [
+    {
+      "file": "hafiz_widget_zayt_fretful_loop_00.webp",
+      "durationMs": 2060
+    },
+    {
+      "file": "hafiz_widget_zayt_fretful_loop_01.webp",
+      "durationMs": 310
+    },
+    {
+      "file": "hafiz_widget_zayt_fretful_loop_02.webp",
+      "durationMs": 250
+    },
+    {
+      "file": "hafiz_widget_zayt_fretful_loop_03.webp",
+      "durationMs": 220
+    }
+  ],
+  "nervous": [
+    {
+      "file": "hafiz_widget_zayt_nervous_loop_00.webp",
+      "durationMs": 2000
+    },
+    {
+      "file": "hafiz_widget_zayt_nervous_loop_01.webp",
+      "durationMs": 140
+    },
+    {
+      "file": "hafiz_widget_zayt_nervous_loop_02.webp",
+      "durationMs": 125
+    },
+    {
+      "file": "hafiz_widget_zayt_nervous_loop_03.webp",
+      "durationMs": 160
+    }
+  ],
+  "nervous_halo": [
+    {
+      "file": "hafiz_widget_zayt_nervous_halo_loop_00.webp",
+      "durationMs": 2000
+    },
+    {
+      "file": "hafiz_widget_zayt_nervous_halo_loop_01.webp",
+      "durationMs": 140
+    },
+    {
+      "file": "hafiz_widget_zayt_nervous_halo_loop_02.webp",
+      "durationMs": 125
+    },
+    {
+      "file": "hafiz_widget_zayt_nervous_halo_loop_03.webp",
+      "durationMs": 160
+    }
+  ],
+  "frantic": [
+    {
+      "file": "hafiz_widget_zayt_frantic_loop_00.webp",
+      "durationMs": 1850
+    },
+    {
+      "file": "hafiz_widget_zayt_frantic_loop_01.webp",
+      "durationMs": 115
+    },
+    {
+      "file": "hafiz_widget_zayt_frantic_loop_02.webp",
+      "durationMs": 95
+    },
+    {
+      "file": "hafiz_widget_zayt_frantic_loop_03.webp",
+      "durationMs": 135
+    }
+  ],
+  "frantic_halo": [
+    {
+      "file": "hafiz_widget_zayt_frantic_halo_loop_00.webp",
+      "durationMs": 1850
+    },
+    {
+      "file": "hafiz_widget_zayt_frantic_halo_loop_01.webp",
+      "durationMs": 115
+    },
+    {
+      "file": "hafiz_widget_zayt_frantic_halo_loop_02.webp",
+      "durationMs": 95
+    },
+    {
+      "file": "hafiz_widget_zayt_frantic_halo_loop_03.webp",
+      "durationMs": 135
+    }
   ]
 }

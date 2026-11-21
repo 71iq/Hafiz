@@ -333,6 +333,8 @@ export function buildRig(scene) {
     root.rotation.set(0, pose.spin || 0, pose.lean || 0, "ZXY");
     torso.scale.set(pose.width, pose.height, 1 / (pose.width * pose.height));
     torso.position.y = 0.19 * (1 - pose.height) - 0.177 * pose.sit;
+    if (pose.onToes) torso.position.y += 0.11;
+    torso.position.z = pose.onToes ? 0.1 : 0;
     body.uniforms.breathHeight.value = pose.breathHeight || 0;
     body.uniforms.baseWidth.value = pose.baseWidth || 0;
     sprig.position.y = 2.731 + 2.55 * (pose.breathHeight || 0);
@@ -359,7 +361,12 @@ export function buildRig(scene) {
       foot.rotation.y = sign * (0.27 + 0.22 * pose.feet);
       foot.rotation.x = -0.35 * pose.feet;
       foot.position.set(sign * (0.33 + 0.2 * pose.feet), 0.16 + 0.034 * pose.feet, 0.17 + 0.48 * pose.feet);
-      if (index === 1 && pose.tap) {
+      if (pose.onToes) {
+        // Roll the long axis heel-up. Keep the tip in contact with the floor.
+        foot.rotation.x = 0.98;
+        foot.position.set(sign * 0.25, 0.222, 0.19);
+      }
+      if (index === (pose.tapFoot ?? 1) && pose.tap) {
         foot.position.y += pose.tap;
         foot.rotation.z += pose.tap * 2;
       }
