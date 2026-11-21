@@ -50,7 +50,7 @@ object WidgetWork {
   }
 
   /** Reads the store, renders every placed widget and arms the next boundary alarm, or cancels it. */
-  fun refresh(context: Context, playMilestone: Boolean = false) {
+  fun refresh(context: Context, celebrate: Boolean = false) {
     val manager = AppWidgetManager.getInstance(context)
     val ids = smallIds(context, manager) + mediumIds(context, manager)
     val timeline = WidgetStore.readTimeline(context)
@@ -61,14 +61,20 @@ object WidgetWork {
       WidgetSelector.select(timeline, System.currentTimeMillis(), TimeZone.getDefault())
     }
     if (selection is WidgetSelection.Neutral && selection.reason != "missing") WidgetLog.reason("select", selection.reason)
-    val animate = playMilestone && ids.isNotEmpty() && selection is WidgetSelection.Entry &&
-      selection.entry.state == "milestone" && selection.entry.image != null &&
-      Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
-    WidgetRenderer.renderAll(context, manager, ids, timeline, selection, appearance, animate)
-    if (animate) {
-      // Replace the host's transient progress drawable with the identical last still. Read the
-      // current timeline again in case settings, account or today's state changed. Leave the
-      // one-shot on its final frame briefly so a busy launcher has time to display the landing.
+    // Turning off system animations leaves every widget still (spec 8.3).
+    val animations = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+    val entry = (selection as? WidgetSelection.Entry)?.entry
+    val celebrating = celebrate && animations && ids.isNotEmpty() && entry?.pose != null && WidgetArt.celebration(entry) != null
+    val motion = when {
+      celebrating -> WidgetRenderer.Motion.CELEBRATE
+      animations -> WidgetRenderer.Motion.IDLE
+      else -> WidgetRenderer.Motion.NONE
+    }
+    WidgetRenderer.renderAll(context, manager, ids, timeline, selection, appearance, motion)
+    if (celebrating) {
+      // Replace the one-shot with the resting blink, which starts from the clip's last drawing. Read
+      // the current timeline again in case settings, account or today's state changed. Leave the
+      // clip on its final frame briefly so a busy launcher has time to display the landing.
       executor.schedule({ refresh(context) }, 5, TimeUnit.SECONDS)
     }
     if (ids.isNotEmpty() && selection is WidgetSelection.Entry) {

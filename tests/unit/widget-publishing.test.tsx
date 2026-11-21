@@ -146,6 +146,22 @@ describe("useWidgetPublishing triggers (spec 6.5)", () => {
     expect(publishWidget).toHaveBeenCalledTimes(1);
   });
 
+  it("asks for a celebration after any day earned here, but not after a grade that earned nothing", () => {
+    mount();
+    act(() => emitReviewActivity({ kind: "none" }));
+    act(() => appStateListener!("background"));
+    expect(publishWidget).toHaveBeenLastCalledWith(mockDb, undefined);
+    for (const wird of [
+      { kind: "minimum_met", length: 5 },
+      { kind: "made_up", madeUpDay: "2026-11-22", length: 6 },
+      { kind: "earned_back", length: 13, restoredDays: 2 },
+    ] as const) {
+      act(() => emitReviewActivity(wird));
+      act(() => appStateListener!("background"));
+      expect(publishWidget).toHaveBeenLastCalledWith(mockDb, expect.objectContaining({ aborted: false }));
+    }
+  });
+
   it("carries a locally earned milestone through foreground refreshes and consumes it on one background", () => {
     mount();
     act(() => emitReviewActivity({ kind: "minimum_met", length: 7 }));

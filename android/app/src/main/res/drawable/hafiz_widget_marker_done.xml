@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Today is done: a solid disc with a check mark cut out, so it differs from open in shape. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-  <path android:fillColor="#FF0D9488" android:fillType="evenOdd" android:pathData="M2,12a10,10 0,1 0,20 0a10,10 0,1 0,-20 0Z M6.9,12.2L8.3,10.8L10.7,13.2L15.7,8.2L17.1,9.6L10.7,16Z"/>
-</vector>

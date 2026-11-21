@@ -48,9 +48,9 @@ class HafizWidgetModule(reactContext: ReactApplicationContext) : ReactContextBas
   fun publishTimeline(json: String, promise: Promise) = publish(json, false, promise)
 
   @ReactMethod
-  fun publishEarnedMilestone(json: String, promise: Promise) = publish(json, true, promise)
+  fun publishCelebration(json: String, promise: Promise) = publish(json, true, promise)
 
-  private fun publish(json: String, playMilestone: Boolean, promise: Promise) {
+  private fun publish(json: String, celebrate: Boolean, promise: Promise) {
     val context = reactApplicationContext.applicationContext
     WidgetWork.executor.execute {
       try {
@@ -64,7 +64,7 @@ class HafizWidgetModule(reactContext: ReactApplicationContext) : ReactContextBas
           return@execute
         }
         WidgetStore.save(context, json, timeline)
-        WidgetWork.refresh(context, playMilestone)
+        WidgetWork.refresh(context, celebrate)
         promise.resolve(placementMap())
       } catch (error: Exception) {
         WidgetLog.failure("publish", error)

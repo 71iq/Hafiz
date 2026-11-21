@@ -1,15 +1,19 @@
 import { z } from "zod";
 import {
-  WIDGET_IMAGES,
-  WIDGET_MARKERS,
+  WIDGET_DAY_MARKS,
+  WIDGET_FLAMES,
   WIDGET_MAX_BYTES,
   WIDGET_MAX_ENTRIES,
   WIDGET_MAX_INSTANT,
   WIDGET_MAX_SPAN_MS,
+  WIDGET_MAX_TIER,
   WIDGET_MIN_INSTANT,
+  WIDGET_POSES,
+  WIDGET_SCENES,
   WIDGET_STATES,
   WIDGET_TAPS,
   WIDGET_TIMELINE_VERSION,
+  WIDGET_WEEK_DAYS,
   type WidgetTimeline,
 } from "@/lib/widget/types";
 
@@ -51,17 +55,20 @@ const entrySchema = z
   .strictObject({
     startsAt: instant,
     state: z.enum(WIDGET_STATES),
-    marker: z.enum(WIDGET_MARKERS),
+    scene: z.enum(WIDGET_SCENES),
+    pose: z.enum(WIDGET_POSES).nullable(),
+    flame: z.enum(WIDGET_FLAMES),
+    tier: z.number().int().min(0).max(WIDGET_MAX_TIER),
     count: text(1, 12).nullable(),
-    countCaption: text(1, 24).nullable(),
-    headline: text(1, 48),
-    detail: text(1, 120).nullable(),
+    line: text(1, 48).nullable(),
     note: text(1, 80).nullable(),
-    image: z.enum(WIDGET_IMAGES).nullable(),
+    week: z
+      .array(z.strictObject({ mark: z.enum(WIDGET_DAY_MARKS), label: text(1, 3) }))
+      .length(WIDGET_WEEK_DAYS),
     contentDescription: text(1, 400),
     tap: z.enum(WIDGET_TAPS),
   })
-  .refine((entry) => (entry.count === null) === (entry.countCaption === null), "count and caption");
+  .refine((entry) => entry.count !== null || entry.line !== null, "count or line");
 
 export const widgetTimelineSchema = z
   .strictObject({

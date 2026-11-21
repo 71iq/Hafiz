@@ -34,11 +34,11 @@ function serialized<T>(work: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function runPublish(db: AppDatabase, milestone?: AbortSignal): Promise<WidgetPublishResult> {
+async function runPublish(db: AppDatabase, celebration?: AbortSignal): Promise<WidgetPublishResult> {
   const now = new Date();
   if (!widgetPlatform.supported) return { status: "unsupported" };
   const options = latestOptions;
-  if (!options || milestone?.aborted) return { status: "waiting" };
+  if (!options || celebration?.aborted) return { status: "waiting" };
   let json: string;
   try {
     const input = await loadWidgetInput(db, { now, ...options });
@@ -48,15 +48,15 @@ async function runPublish(db: AppDatabase, milestone?: AbortSignal): Promise<Wid
     }
     json = serializeWidgetTimeline(timeline);
   } catch (error) {
-    if (milestone?.aborted) return { status: "waiting" };
+    if (celebration?.aborted) return { status: "waiting" };
     // Never log the timeline itself: it holds the person's streak and plan.
     console.warn("[Widget] Could not publish:", error);
     await widgetPlatform.clear().catch((clearError: unknown) => console.warn("[Widget] Could not clear:", clearError));
     return { status: "failed" };
   }
   try {
-    if (milestone?.aborted) return { status: "waiting" };
-    return { status: "published", placement: await widgetPlatform.publish(json, Boolean(milestone)) };
+    if (celebration?.aborted) return { status: "waiting" };
+    return { status: "published", placement: await widgetPlatform.publish(json, Boolean(celebration)) };
   } catch (error) {
     // Native rejected it (E_WIDGET_INVALID) and has already cleared its stored timeline.
     console.warn("[Widget] Could not publish:", error);
@@ -71,9 +71,9 @@ async function runPublish(db: AppDatabase, milestone?: AbortSignal): Promise<Wid
  * today's state at once. Any failure clears the widget to its neutral state rather than leave a
  * possibly stale one.
  */
-export function publishWidget(db: AppDatabase, milestone?: AbortSignal): Promise<WidgetPublishResult> {
+export function publishWidget(db: AppDatabase, celebration?: AbortSignal): Promise<WidgetPublishResult> {
   // A new local event must get its own ordered update, even if a silent refresh is already queued.
-  if (milestone) return serialized(() => runPublish(db, milestone));
+  if (celebration) return serialized(() => runPublish(db, celebration));
   if (queued) return queued;
   const run: Promise<WidgetPublishResult> = serialized(() => {
     if (queued === run) queued = null;

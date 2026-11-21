@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The plain card when Show Zayt is off. The System theme's day and night surface; a fixed app
+     theme tints it with the renderer's color filter. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="@color/hafiz_widget_surface"/>
+  <corners android:radius="@dimen/hafiz_widget_radius"/>
+</shape>

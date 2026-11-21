@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A day with nothing recorded in the week row: an empty ring, never a cross. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="14dp" android:height="14dp" android:viewportWidth="14" android:viewportHeight="14">
+  <path android:fillColor="@color/hafiz_widget_text_secondary" android:fillAlpha="0.55" android:fillType="evenOdd" android:pathData="M3,7a4,4 0,1 0,8 0a4,4 0,1 0,-8 0Z M4.4,7a2.6,2.6 0,1 0,5.2 0a2.6,2.6 0,1 0,-5.2 0Z"/>
+</vector>

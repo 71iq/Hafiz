@@ -128,9 +128,7 @@ function at(timeline: WidgetTimeline, instant: Date): WidgetEntry {
 }
 
 const entryTexts = (entry: WidgetEntry) =>
-  [entry.count, entry.countCaption, entry.headline, entry.detail, entry.note, entry.contentDescription].filter(
-    (value): value is string => value !== null,
-  );
+  [entry.count, entry.line, entry.note, entry.contentDescription].filter((value): value is string => value !== null);
 
 /** Spec 7.3: Monday 09:00 in Asia/Riyadh, a 12-day streak, a page plan with 3 pages left, one grace day held. */
 function exampleInput(): WidgetBuildInput {
@@ -149,15 +147,15 @@ const FIXTURES = path.resolve(__dirname, "../fixtures/widget");
 describe("widget timeline example (spec 7.3)", () => {
   it("matches the checked-in fixture byte for byte", () => {
     const timeline = buildWidgetTimeline(exampleInput());
-    const fixture = fs.readFileSync(path.join(FIXTURES, "timeline-v1-valid.json"), "utf8");
+    const fixture = fs.readFileSync(path.join(FIXTURES, "timeline-v2-valid.json"), "utf8");
     expect(fixture).toBe(`${JSON.stringify(timeline, null, 2)}\n`);
     expect(serializeWidgetTimeline(timeline)).toBe(JSON.stringify(JSON.parse(fixture)));
   });
 
-  it("starts with the four entries the spec shows", () => {
+  it("starts with the morning, midday, golden-hour and dusk entries of an open day", () => {
     const timeline = buildWidgetTimeline(exampleInput());
     expect(timeline).toMatchObject({
-      version: 1,
+      version: 2,
       generatedAt: 1795413600000,
       expiresAt: 1795986000000,
       timeZone: "Asia/Riyadh",
@@ -172,17 +170,48 @@ describe("widget timeline example (spec 7.3)", () => {
         accentText: "#0F766E",
       },
     });
-    expect(timeline.entries.slice(0, 4)).toEqual([
+    // Recited on each of the six days before today; today is still open.
+    expect(timeline.entries[0].week.map((day) => day.mark).join(" ")).toBe("lit lit lit lit lit lit open");
+    expect(timeline.entries[0].week.map((day) => day.label).join("")).toBe("TWTFSSM");
+    expect(timeline.entries.slice(0, 4).map(({ week: _week, ...entry }) => entry)).toEqual([
       {
         startsAt: 1795413600000,
         state: "open_day",
-        marker: "open",
+        scene: "morning",
+        pose: "rest",
+        flame: "unlit",
+        tier: 1,
         count: "12",
-        countCaption: "day streak",
-        headline: "Today's wird awaits",
-        detail: "A short review today keeps your streak",
+        line: "Today's wird awaits",
         note: "3 pages left, about 15 minutes",
-        image: "rest",
+        contentDescription:
+          "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+        tap: "wird",
+      },
+      {
+        startsAt: 1795424400000,
+        state: "open_day",
+        scene: "day",
+        pose: "wave",
+        flame: "unlit",
+        tier: 1,
+        count: "12",
+        line: "Keep it going",
+        note: "3 pages left, about 15 minutes",
+        contentDescription:
+          "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+        tap: "wird",
+      },
+      {
+        startsAt: 1795438800000,
+        state: "open_day",
+        scene: "golden",
+        pose: "warm",
+        flame: "unlit",
+        tier: 1,
+        count: "12",
+        line: "Time for today's wird",
+        note: "3 pages left, about 15 minutes",
         contentDescription:
           "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
         tap: "wird",
@@ -190,43 +219,15 @@ describe("widget timeline example (spec 7.3)", () => {
       {
         startsAt: 1795456800000,
         state: "open_evening",
-        marker: "open",
+        scene: "dusk",
+        pose: "glow",
+        flame: "unlit",
+        tier: 1,
         count: "12",
-        countCaption: "day streak",
-        headline: "Still time today",
-        detail: "A short review before the day ends keeps your streak.",
+        line: "Still time today",
         note: "3 pages left, about 15 minutes",
-        image: "rest",
         contentDescription:
           "Hafiz. Streak: 12 days. Still time today. A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
-        tap: "wird",
-      },
-      {
-        startsAt: 1795467600000,
-        state: "make_up",
-        marker: "open",
-        count: "12",
-        countCaption: "day streak",
-        headline: "Make up by 12:30 PM",
-        detail: "Yesterday's wird can still be made up before 12:30 PM",
-        note: "Grace days: 1",
-        image: "rest",
-        contentDescription:
-          "Hafiz. Streak: 12 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
-        tap: "wird",
-      },
-      {
-        startsAt: 1795512600000,
-        state: "open_day",
-        marker: "open",
-        count: "13",
-        countCaption: "day streak",
-        headline: "Today's wird awaits",
-        detail: "A short review today keeps your streak",
-        note: "A grace day kept your streak",
-        image: "rest",
-        contentDescription:
-          "Hafiz. Streak: 13 days. Today's wird awaits. A short review today keeps your streak. A grace day kept your streak.",
         tap: "wird",
       },
     ]);
@@ -238,14 +239,19 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     const timeline = buildWidgetTimeline(input({ days: days("done", "2026-11-19", D), now: CLOCK.at(D, 15 * 60) }));
     const next = addDays(D, 1);
     const after = addDays(D, 2);
-    expect(at(timeline, CLOCK.at(D, 15 * 60))).toMatchObject({ state: "done", count: "5", tap: "home", image: "warm" });
+    expect(at(timeline, CLOCK.at(D, 15 * 60))).toMatchObject({
+      state: "done",
+      count: "5",
+      tap: "home",
+      pose: "shimmer",
+    });
     expect(at(timeline, CLOCK.at(next, 0))).toMatchObject({ state: "open_day", count: "5" });
     expect(timeline.entries.some((entry) => entry.startsAt === CLOCK.at(next, 0).getTime())).toBe(true);
     expect(at(timeline, CLOCK.at(next, 21 * 60))).toMatchObject({ state: "open_evening", count: "5" });
     expect(at(timeline, CLOCK.at(after, 0))).toMatchObject({
       state: "make_up",
       count: "5",
-      headline: "Make up by 12:30 PM",
+      line: "Make up by 12:30 PM",
     });
     expect(at(timeline, CLOCK.at(after, 12 * 60 + 30))).toMatchObject({
       state: "open_day",
@@ -263,8 +269,8 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     expect(dhuhr).not.toBe(CLOCK.at(next, 12 * 60 + 30).getTime());
     const makeUp = at(timeline, CLOCK.at(next, 0));
     expect(makeUp.state).toBe("make_up");
-    expect(makeUp.headline).toMatch(/[٠-٩]/);
-    expect(makeUp.headline).not.toMatch(/[0-9]/);
+    expect(makeUp.line).toMatch(/[٠-٩]/);
+    expect(makeUp.line).not.toMatch(/[0-9]/);
     expect(timeline.entries.some((entry) => entry.startsAt === dhuhr && entry.state === "open_day")).toBe(true);
     expect(at(timeline, new Date(dhuhr - 1)).state).toBe("make_up");
     expect(at(timeline, new Date(dhuhr)).state).toBe("open_day");
@@ -275,7 +281,8 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     const without = buildWidgetTimeline(input({ days: days("done", "2026-11-21", "2026-11-22") }));
     expect(at(without, cutoff)).toMatchObject({
       state: "fresh_start",
-      count: null,
+      count: "0",
+      flame: "out",
       note: "Longest: 2 days",
       tap: "wird",
     });
@@ -287,19 +294,21 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     });
   });
 
-  it("4. shows a pause as one merged entry until it ends, then the same count", () => {
+  it("4. shows a pause until it ends, one entry a day as the week row moves, then the same count", () => {
     const timeline = buildWidgetTimeline(
       input({ days: days("done", "2026-11-20", "2026-11-22"), pause: { start: D, end: "2026-11-25" } }),
     );
     const thursday = CLOCK.at("2026-11-26", 0).getTime();
     const paused = timeline.entries.filter((entry) => entry.startsAt < thursday);
-    expect(paused).toHaveLength(1);
+    // Monday to Wednesday: the line and count stay; only the week row gains a kept day.
+    expect(paused).toHaveLength(3);
+    expect(paused[2].week.slice(4).map((day) => day.mark)).toEqual(["kept", "kept", "kept"]);
     expect(paused[0]).toMatchObject({
       state: "paused",
-      marker: "paused",
+      scene: "calm",
       count: "3",
-      headline: "Paused until Nov 25",
-      image: "sit",
+      line: "Paused until Nov 25",
+      pose: "sit",
       tap: "home",
     });
     expect(timeline.entries.find((entry) => entry.startsAt === thursday)).toMatchObject({
@@ -310,7 +319,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     const arabic = buildWidgetTimeline(
       input({ days: days("done", "2026-11-20", "2026-11-22"), pause: { start: D, end: "2026-11-25" }, language: "ar" }),
     );
-    expect(arabic.entries[0].headline).toMatch(/^متوقفة حتى ٢٥ /);
+    expect(arabic.entries[0].line).toMatch(/^متوقفة حتى ٢٥ /);
   });
 
   it("5. shows an excuse stored for tomorrow as a kept day, never named", () => {
@@ -320,8 +329,9 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
       );
       expect(at(timeline, CLOCK.at("2026-11-24", 9 * 60))).toMatchObject({
         state: "kept",
-        marker: "kept",
-        image: "sit",
+        scene: "calm",
+        pose: "sit",
+        flame: "lit",
         tap: "home",
       });
       for (const entry of timeline.entries) {
@@ -339,19 +349,21 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     const open = buildWidgetTimeline(input({ days: [...broken, ...days("done", "2026-11-22", "2026-11-22")] }));
     expect(open.entries[0]).toMatchObject({
       state: "earn_back_open",
-      marker: "open",
-      count: null,
-      headline: "Earning back: 1 of 3",
-      detail: "Recite today to keep earning back your 10-day streak.",
+      flame: "unlit",
+      count: "1",
+      line: "Earning back: 1 of 3",
       tap: "wird",
     });
+    expect(open.entries[0].contentDescription).toContain("Recite today to keep earning back your 10-day streak.");
 
     const counted = buildWidgetTimeline(input({ days: [...broken, ...days("done", "2026-11-22", D)] }));
     expect(counted.entries[0]).toMatchObject({
       state: "earn_back_done",
-      marker: "done",
-      headline: "Today counts: 2 of 3",
-      image: "warm",
+      scene: "sunrise",
+      pose: "open",
+      flame: "lit",
+      count: "2",
+      line: "Today counts: 2 of 3",
       tap: "home",
     });
 
@@ -362,31 +374,29 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     const plain = buildWidgetTimeline(
       input({ days: [...broken, ...days("done", "2026-11-22", "2026-11-22")], showNumbers: false }),
     );
-    expect(plain.entries[0]).toMatchObject({
-      state: "earn_back_open",
-      count: null,
-      headline: "Bring your streak back",
-      detail: "Recite on 3 days to bring your streak back.",
-    });
+    expect(plain.entries[0]).toMatchObject({ state: "earn_back_open", count: null, line: "Bring your streak back" });
+    expect(plain.entries[0].contentDescription).toContain("Recite on 3 days to bring your streak back.");
   });
 
-  it("7. marks a milestone with the glow image, and keeps the done copy without numbers", () => {
+  it("7. marks a milestone with its own scene and stage, and keeps a line without numbers", () => {
     const streak = days("done", "2026-11-17", D);
-    expect(buildWidgetTimeline(input({ days: streak })).entries[0]).toMatchObject({
+    const milestone = buildWidgetTimeline(input({ days: streak })).entries[0];
+    expect(milestone).toMatchObject({
       state: "milestone",
-      headline: "7 days of wird",
-      detail: "Wird done for today",
-      image: "glow",
+      scene: "milestone",
+      pose: "milestone",
+      flame: "lit",
+      tier: 1,
       count: "7",
+      line: null,
       tap: "home",
     });
-    expect(buildWidgetTimeline(input({ days: streak, showNumbers: false })).entries[0]).toMatchObject({
-      state: "milestone",
-      headline: "Wird done for today",
-      detail: "See you tomorrow, in sha' Allah",
-      image: "glow",
-      count: null,
-    });
+    expect(milestone.contentDescription).toBe(
+      "Hafiz. Streak: 7 days. 7 days of wird. Wird done for today. Grace days: 1.",
+    );
+    const plain = buildWidgetTimeline(input({ days: streak, showNumbers: false })).entries[0];
+    expect(plain).toMatchObject({ state: "milestone", pose: "milestone", count: null, line: "Done today" });
+    expect(plain.contentDescription).toBe("Hafiz. Wird done for today. See you tomorrow, in sha' Allah.");
   });
 
   it("8. starts the evening band at the streak-at-risk time", () => {
@@ -435,7 +445,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     expect(at(done, CLOCK.at(D, 9 * 60))).toMatchObject({ state: "done", tap: "home" });
     expect(at(done, moreDueAt)).toMatchObject({
       state: "safe",
-      headline: "Streak safe for today",
+      line: "Review left today",
       tap: "wird",
       note: "Grace days: 1",
     });
@@ -476,12 +486,11 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
       moreDueAt: null,
     };
     const noZayt = buildWidgetTimeline(input({ days: history, plan, showZayt: false }));
-    for (const entry of noZayt.entries) expect(entry.image).toBeNull();
+    for (const entry of noZayt.entries) expect(entry.pose).toBeNull();
 
     const hidden = buildWidgetTimeline(input({ days: history, plan, showNumbers: false }));
     for (const entry of hidden.entries) {
       expect(entry.count).toBeNull();
-      expect(entry.countCaption).toBeNull();
       expect(entry.note ?? "").not.toMatch(/left, about|Grace days|Longest/);
       expect(entry.contentDescription).not.toMatch(/Streak: |\d+ days?/);
     }
@@ -551,22 +560,26 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
         },
       }),
     );
-    expect(timeline.entries.length).toBeLessThanOrEqual(23);
+    // Six sky bands a day, the make-up cutoff and the review coming due.
+    expect(timeline.entries.length).toBeLessThanOrEqual(52);
     expect(timeline.entries.length).toBeLessThanOrEqual(WIDGET_MAX_ENTRIES);
     expect(timeline.entries.some((entry) => entry.count === "٩٩٩٩")).toBe(true);
     expect(utf8Length(serializeWidgetTimeline(timeline))).toBeLessThanOrEqual(WIDGET_MAX_BYTES);
   });
 
-  it("15. merges a new person's days into one begin entry that opens Home", () => {
+  it("15. shows a new person 0 with an unlit flame, by dawn and after dusk, opening Home", () => {
     const timeline = buildWidgetTimeline(input({ days: [] }));
-    expect(timeline.entries).toHaveLength(1);
+    expect(new Set(timeline.entries.map((entry) => entry.state))).toEqual(new Set(["begin"]));
     expect(timeline.entries[0]).toMatchObject({
-      state: "begin",
-      marker: "begin",
-      count: null,
+      scene: "dawn",
+      pose: "wave",
+      flame: "out",
+      count: "0",
+      line: "Start your streak",
       tap: "home",
-      headline: "Begin your wird today",
     });
+    expect(at(timeline, CLOCK.at(D, 21 * 60))).toMatchObject({ scene: "night", pose: "glow_halo", count: "0" });
+    expect(at(timeline, CLOCK.at(addDays(D, 1), 9 * 60))).toMatchObject({ scene: "dawn", count: "0" });
   });
 
   it("16. writes Arabic right to left with Arabic-Indic digits only", () => {

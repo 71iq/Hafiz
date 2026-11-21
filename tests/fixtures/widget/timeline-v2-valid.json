@@ -1,0 +1,1308 @@
+{
+  "version": 2,
+  "generatedAt": 1795413600000,
+  "expiresAt": 1795986000000,
+  "timeZone": "Asia/Riyadh",
+  "language": "en",
+  "direction": "ltr",
+  "colorMode": "fixed",
+  "colors": {
+    "surface": "#F8FAFC",
+    "textPrimary": "#2D2D2D",
+    "textSecondary": "#3F3F46",
+    "accent": "#0D9488",
+    "accentText": "#0F766E"
+  },
+  "entries": [
+    {
+      "startsAt": 1795413600000,
+      "state": "open_day",
+      "scene": "morning",
+      "pose": "rest",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "12",
+      "line": "Today's wird awaits",
+      "note": "3 pages left, about 15 minutes",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "open",
+          "label": "M"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795424400000,
+      "state": "open_day",
+      "scene": "day",
+      "pose": "wave",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "12",
+      "line": "Keep it going",
+      "note": "3 pages left, about 15 minutes",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "open",
+          "label": "M"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795438800000,
+      "state": "open_day",
+      "scene": "golden",
+      "pose": "warm",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "12",
+      "line": "Time for today's wird",
+      "note": "3 pages left, about 15 minutes",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "open",
+          "label": "M"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795456800000,
+      "state": "open_evening",
+      "scene": "dusk",
+      "pose": "glow",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "12",
+      "line": "Still time today",
+      "note": "3 pages left, about 15 minutes",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "open",
+          "label": "M"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 12 days. Still time today. A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795460400000,
+      "state": "open_evening",
+      "scene": "night",
+      "pose": "open_halo",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "12",
+      "line": "Before midnight",
+      "note": "3 pages left, about 15 minutes",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "open",
+          "label": "M"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 12 days. Still time today. A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795464000000,
+      "state": "open_evening",
+      "scene": "midnight",
+      "pose": "glow_halo",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "12",
+      "line": "Last hour of today",
+      "note": "3 pages left, about 15 minutes",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "open",
+          "label": "M"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 12 days. Still time today. A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795467600000,
+      "state": "make_up",
+      "scene": "dawn",
+      "pose": "wave",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "12",
+      "line": "Make up by 12:30 PM",
+      "note": "Grace days: 1",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "empty",
+          "label": "M"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 12 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795512600000,
+      "state": "open_day",
+      "scene": "day",
+      "pose": "wave",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "13",
+      "line": "Keep it going",
+      "note": "A grace day kept your streak",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 13 days. Today's wird awaits. A short review today keeps your streak. A grace day kept your streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795525200000,
+      "state": "open_day",
+      "scene": "golden",
+      "pose": "warm",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "13",
+      "line": "Time for today's wird",
+      "note": "A grace day kept your streak",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 13 days. Today's wird awaits. A short review today keeps your streak. A grace day kept your streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795543200000,
+      "state": "open_evening",
+      "scene": "dusk",
+      "pose": "glow",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "13",
+      "line": "Still time today",
+      "note": "A grace day kept your streak",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 13 days. Still time today. A short review before the day ends keeps your streak. A grace day kept your streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795546800000,
+      "state": "open_evening",
+      "scene": "night",
+      "pose": "open_halo",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "13",
+      "line": "Before midnight",
+      "note": "A grace day kept your streak",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 13 days. Still time today. A short review before the day ends keeps your streak. A grace day kept your streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795550400000,
+      "state": "open_evening",
+      "scene": "midnight",
+      "pose": "glow_halo",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "13",
+      "line": "Last hour of today",
+      "note": "A grace day kept your streak",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "W"
+        },
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 13 days. Still time today. A short review before the day ends keeps your streak. A grace day kept your streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795554000000,
+      "state": "make_up",
+      "scene": "dawn",
+      "pose": "wave",
+      "flame": "unlit",
+      "tier": 1,
+      "count": "13",
+      "line": "Make up by 12:30 PM",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "open",
+          "label": "W"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 13 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795599000000,
+      "state": "earn_back_open",
+      "scene": "day",
+      "pose": "wave",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "open",
+          "label": "W"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795611600000,
+      "state": "earn_back_open",
+      "scene": "golden",
+      "pose": "warm",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "open",
+          "label": "W"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795629600000,
+      "state": "earn_back_open",
+      "scene": "dusk",
+      "pose": "glow",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "open",
+          "label": "W"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795633200000,
+      "state": "earn_back_open",
+      "scene": "night",
+      "pose": "open_halo",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "open",
+          "label": "W"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795636800000,
+      "state": "earn_back_open",
+      "scene": "midnight",
+      "pose": "glow_halo",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "T"
+        },
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "open",
+          "label": "W"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795640400000,
+      "state": "earn_back_open",
+      "scene": "morning",
+      "pose": "rest",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795683600000,
+      "state": "earn_back_open",
+      "scene": "day",
+      "pose": "wave",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795698000000,
+      "state": "earn_back_open",
+      "scene": "golden",
+      "pose": "warm",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795716000000,
+      "state": "earn_back_open",
+      "scene": "dusk",
+      "pose": "glow",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795719600000,
+      "state": "earn_back_open",
+      "scene": "night",
+      "pose": "open_halo",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795723200000,
+      "state": "earn_back_open",
+      "scene": "midnight",
+      "pose": "glow_halo",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Earning back: 0 of 3",
+      "note": null,
+      "week": [
+        {
+          "mark": "lit",
+          "label": "F"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "open",
+          "label": "T"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Earning back: 0 of 3. Recite today to keep earning back your 13-day streak.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795726800000,
+      "state": "fresh_start",
+      "scene": "dawn",
+      "pose": "wave",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Begin a new streak",
+      "note": "Longest: 13 days",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "open",
+          "label": "F"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Begin a new streak. One short review today starts it. Longest: 13 days.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795802400000,
+      "state": "fresh_start",
+      "scene": "night",
+      "pose": "glow_halo",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Begin a new streak",
+      "note": "Longest: 13 days",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "open",
+          "label": "F"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Begin a new streak. One short review today starts it. Longest: 13 days.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795813200000,
+      "state": "fresh_start",
+      "scene": "dawn",
+      "pose": "wave",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Begin a new streak",
+      "note": "Longest: 13 days",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "F"
+        },
+        {
+          "mark": "open",
+          "label": "S"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Begin a new streak. One short review today starts it. Longest: 13 days.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795888800000,
+      "state": "fresh_start",
+      "scene": "night",
+      "pose": "glow_halo",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Begin a new streak",
+      "note": "Longest: 13 days",
+      "week": [
+        {
+          "mark": "lit",
+          "label": "S"
+        },
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "F"
+        },
+        {
+          "mark": "open",
+          "label": "S"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Begin a new streak. One short review today starts it. Longest: 13 days.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795899600000,
+      "state": "fresh_start",
+      "scene": "dawn",
+      "pose": "wave",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Begin a new streak",
+      "note": "Longest: 13 days",
+      "week": [
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "F"
+        },
+        {
+          "mark": "empty",
+          "label": "S"
+        },
+        {
+          "mark": "open",
+          "label": "S"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Begin a new streak. One short review today starts it. Longest: 13 days.",
+      "tap": "wird"
+    },
+    {
+      "startsAt": 1795975200000,
+      "state": "fresh_start",
+      "scene": "night",
+      "pose": "glow_halo",
+      "flame": "out",
+      "tier": 0,
+      "count": "0",
+      "line": "Begin a new streak",
+      "note": "Longest: 13 days",
+      "week": [
+        {
+          "mark": "kept",
+          "label": "M"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "W"
+        },
+        {
+          "mark": "empty",
+          "label": "T"
+        },
+        {
+          "mark": "empty",
+          "label": "F"
+        },
+        {
+          "mark": "empty",
+          "label": "S"
+        },
+        {
+          "mark": "open",
+          "label": "S"
+        }
+      ],
+      "contentDescription": "Hafiz. Streak: 0 days. Begin a new streak. One short review today starts it. Longest: 13 days.",
+      "tap": "wird"
+    }
+  ]
+}
