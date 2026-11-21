@@ -7,6 +7,8 @@ import { inks } from "./scenes.mjs";
 import { measure } from "./contrast.mjs";
 import { blinks, nightPoses, stills } from "./sprites.mjs";
 
+import { loopTiming, urgencyHalos, urgencyPoses } from "./urgency.mjs";
+
 const read = (file) => fs.readFileSync(file);
 const relative = (file) => path.relative(out, file).split(path.sep).join("/");
 async function entry(file) {
@@ -53,6 +55,44 @@ export async function manifest(bounds, verifyOnly = false) {
     }
     assert(read(path.join(art, frames.at(-1).file)).equals(read(path.join(art, spriteName(end)))));
   }
+  const loops = JSON.parse(read(path.join(out, "loops.json")));
+  const expectedLoops = [];
+  for (const pose of urgencyPoses) {
+    for (const key of urgencyHalos.includes(pose) ? [pose, pose + "_halo"] : [pose]) {
+      const still = spriteName(key);
+      spriteFiles.push(still);
+      // Measure the opaque sprig and feet independently of the translucent halo and ground pool.
+      const alpha = await sharp(read(path.join(art, still)))
+        .extractChannel("alpha")
+        .raw()
+        .toBuffer();
+      const first = Math.floor(alpha.findIndex((a) => a >= 192) / 600);
+      const last = Math.floor(alpha.findLastIndex((a) => a >= 192) / 600);
+      assert(Math.abs(first - 120) <= 1 && last === 703, key + " differs from the standing registration");
+      const timing = loopTiming[pose];
+      if (!timing) continue;
+      expectedLoops.push(key);
+      const frames = loops[key];
+      assert.deepEqual(
+        frames.map((f) => f.durationMs),
+        timing,
+        key,
+      );
+      const total = timing.reduce((sum, ms) => sum + ms, 0);
+      assert(frames.length >= 3 && frames.length <= 5 && total >= 2000 && total <= 4000, key);
+      assert(timing[0] > total / 2, key + " must hold its poster for most of the loop");
+      const drawings = new Set();
+      for (const [i, f] of frames.entries()) {
+        assert.equal(f.file, spriteName(key + "_loop_" + String(i).padStart(2, "0")));
+        const data = read(path.join(art, f.file));
+        if (i === 0) assert(data.equals(read(path.join(art, still))), key + " first frame differs");
+        drawings.add(sha(data));
+        spriteFiles.push(f.file);
+      }
+      assert.equal(drawings.size, frames.length, key + " duplicate drawing");
+    }
+  }
+  assert.deepEqual(Object.keys(loops).sort(), expectedLoops.sort());
   const scenes = {},
     files = [];
   for (const [scene, colors] of Object.entries(inks)) {
@@ -125,16 +165,16 @@ export async function manifest(bounds, verifyOnly = false) {
     assert(svg.includes('viewBox="0 0 24 24"') && !/<(?:filter|mask|text|image)|stroke=/.test(svg));
     files.push(item);
   }
-  files.push(await entry(path.join(out, "clips.json")));
+  files.push(await entry(path.join(out, "clips.json")), await entry(path.join(out, "loops.json")));
   assert.deepEqual(
     fs
       .readdirSync(out)
       .filter((n) => n !== "manifest.json")
       .sort(),
-    ["clips.json", "flame", "res"],
+    ["clips.json", "flame", "loops.json", "res"],
   );
   const reviewFiles = [];
-  for (const name of ["states", "states-ar", "day", "thumbs", "flames", "home", "sizes"]) {
+  for (const name of ["states", "states-ar", "day", "thumbs", "flames", "home", "sizes", "ladder", "faces", "loops"]) {
     reviewFiles.push(await entry(path.join(review, name + ".png")));
   }
   const manifestFile = { path: "manifest.json", bytes: 0 };
@@ -142,7 +182,7 @@ export async function manifest(bounds, verifyOnly = false) {
   const result = {
     schemaVersion: 1,
     baseStudioCommit: "278afa4b38f036980358c656a9090526f4fc6aaa",
-    runtimeBudgetBytes: 4000000,
+    runtimeBudgetBytes: 4500000,
     runtimeBytes: 0,
     spriteCanvas: { width: 600, height: 720, feetBaselineY: 704 },
     idleBlinkClosedMs: 250,
@@ -157,7 +197,7 @@ export async function manifest(bounds, verifyOnly = false) {
     if (manifestFile.bytes === encoded.length) break;
     manifestFile.bytes = encoded.length;
   } while (true);
-  assert(result.runtimeBytes <= result.runtimeBudgetBytes, "Widget files exceed budget");
+  assert(result.runtimeBytes <= result.runtimeBudgetBytes, "Widget files exceed budget: " + result.runtimeBytes);
   const output = path.join(out, "manifest.json");
   if (verifyOnly) assert(read(output).equals(encoded), "Manifest differs from independently measured files");
   else save(output, encoded);
@@ -165,7 +205,7 @@ export async function manifest(bounds, verifyOnly = false) {
     result.files.length +
       " runtime files, " +
       result.runtimeBytes +
-      " bytes; all contrast, clip and blink checks passed.",
+      " bytes; all contrast, clip, loop and blink checks passed.",
   );
   return result;
 }

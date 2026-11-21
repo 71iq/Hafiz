@@ -159,6 +159,11 @@ export function paintGrove(canvas, scene, crop) {
   ]);
   ctx.fillRect(0, 0, W, H);
   mist(X, Y, W * 0.82, H * 0.61, sky[3], dark ? 0.2 : 0.42);
+  if (scene === "midnight") {
+    // Light hangs low in the valley, behind the ridge and the trees.
+    mist(W * 0.54, H * 0.72, W * 0.87, H * 0.18, "#9b3946", 0.58);
+    mist(W * 0.56, H * 0.715, W * 0.63, H * 0.081, "#d2594d", 0.34);
+  }
   if (beam) {
     // Broad, feathered crepuscular rays in the landscape. No ring or crown on the character.
     const rays = scene === "milestone" ? 11 : 7;
@@ -190,6 +195,7 @@ export function paintGrove(canvas, scene, crop) {
     }
   }
   if (night || scene === "milestone") {
+    if (scene === "midnight") ctx.globalAlpha = 0.94;
     const count = scene === "midnight" ? 14 : scene === "milestone" ? 20 : 37;
     for (let i = 0; i < count * (wide ? 1.55 : 1); i++) {
       const x = rnd() * W,
@@ -199,6 +205,7 @@ export function paintGrove(canvas, scene, crop) {
       if (i % 4 === 0 || !night) glint(x, y, r * (night ? 1.65 : 1), sky[3], night ? 0.53 : 0.8);
       else disc(x, y, r * 0.7, color(sky[3], 0.3 + rnd() * 0.34));
     }
+    ctx.globalAlpha = 1;
   }
   if (radius) {
     mist(X, Y, radius * 5.5, radius * 4.3, sky[3], night ? 0.16 : 0.61);

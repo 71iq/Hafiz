@@ -40,6 +40,7 @@ export function oilMaterial(body, reflection) {
       body: Number(body),
       oil: new THREE.Vector3(),
       reflection,
+      faceTexture: null,
       eyeOpen: 1,
       joy: 0,
       eyeArc: 0,
@@ -67,6 +68,9 @@ export function oilMaterial(body, reflection) {
       n=normalMatrix*norm; gl_Position=projectionMatrix*modelViewMatrix*vec4(surface,1.);}`,
     fragmentShader: `precision highp float;
     varying vec3 p; varying vec3 n;
+    #ifdef FACE_DECAL
+    uniform sampler2D faceTexture;
+    #endif
     uniform sampler2D reflection; uniform vec3 oil;
     uniform float body,joy,eyeArc,eyeOpen,eyeScale,browHeight,browTilt,mouthCurve,blush,highlight,glow,fillHeight,sweep,drift,chest;
     float sq(float x){return x*x;} float bell(vec2 v){return exp(-dot(v,v));}
@@ -117,6 +121,10 @@ export function oilMaterial(body, reflection) {
           c*=1.-vec3(.21,.32,.36)*chest*exp(-dot(nearArm,nearArm)/.012);
           vec2 cheek=vec2((abs(p.x)-.495)/.20,(p.y-.937)/.125);
           c=mix(c,vec3(.99,.48,.32),blush*.52*bell(cheek));
+          #ifdef FACE_DECAL
+          vec4 paint=texture2D(faceTexture,vec2((p.x+1.)*.5,(p.y-.45)/1.5));
+          c=mix(c,paint.rgb,paint.a);
+          #else
           vec2 eye=vec2(abs(p.x)-.39,p.y-1.096); float rad=.134*eyeScale;
           float ey=rad*(.095+.905*eyeOpen); vec2 uv=eye/vec2(rad,ey*1.055);
           float eyeMask=ink((length(uv)-1.)*min(rad,ey));
@@ -154,6 +162,7 @@ export function oilMaterial(body, reflection) {
             mouth=ink(opening-.008);
           }
           c=mix(c,mix(vec3(.235,.126,.035),vec3(.185,.077,.035),joy),mouth);
+          #endif
         }
       }
       float opacity=1.-.13*pow(1.-depth,3.); gl_FragColor=vec4(clamp(c,0.,1.)*opacity,opacity);

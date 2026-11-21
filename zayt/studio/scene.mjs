@@ -27,8 +27,14 @@ window.setup = (width, height) => {
     three: THREE.REVISION,
   };
 };
-window.sample = (pose, style) => {
-  apply(pose, style);
+window.sample = async (pose, style) => {
+  let faceImage;
+  if (style.faceArt) {
+    faceImage = new Image();
+    faceImage.src = style.faceArt;
+    await faceImage.decode();
+  }
+  apply(pose, style, faceImage);
   renderer.render(scene, camera);
   return renderer.domElement.toDataURL("image/png").split(",")[1];
 };

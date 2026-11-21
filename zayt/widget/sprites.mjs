@@ -6,6 +6,8 @@ import { bin, select, json, sharp, mkdir } from "../studio/common.mjs";
 import { hold, rest, sample } from "../studio/poses.mjs";
 import { art, out, spriteName } from "./paths.mjs";
 
+import { loopTiming, urgencyDrawing, urgencyHalos, urgencyPoses } from "./urgency.mjs";
+
 export const stills = ["rest", "warm", "wave", "glow", "open", "shimmer", "milestone", "sit"];
 export const nightPoses = ["glow", "open", "warm", "shimmer"];
 export const blinks = ["rest", "warm", "wave", "glow", "open", "glow_halo", "open_halo", "warm_halo"];
@@ -53,18 +55,19 @@ export async function sprites(work) {
   mkdir(art);
   mkdir(work);
   const clips = {};
+  const loops = {};
   await camera(async (capture) => {
-    async function render(name, pose, halo) {
+    async function render(name, pose, halo, faceArt) {
       const file = path.join(work, name + ".png");
       if (halo) pose.halo = 1;
-      await capture(size, pose, { variant: halo ? "dark" : "light" }, null, file);
+      await capture(size, pose, { variant: halo ? "dark" : "light", faceArt }, null, file);
       const input = halo ? await addPool(file) : file;
       execFileSync(path.join(bin, "cwebp"), [
         "-quiet",
         "-q",
-        "94",
+        faceArt ? "86" : "94",
         "-alpha_q",
-        "100",
+        faceArt ? "85" : "100",
         "-segments",
         "1",
         "-sns",
@@ -105,7 +108,27 @@ export async function sprites(work) {
         clips[clip].push({ file: spriteName(name), durationMs: (times[index + 1] ?? duration) - ms });
       }
     }
+    for (const name of urgencyPoses) {
+      for (const halo of urgencyHalos.includes(name) ? [false, true] : [false]) {
+        const key = halo ? name + "_halo" : name;
+        const still = urgencyDrawing(name);
+        await render(key, still.pose, halo, still.faceArt);
+        if (!loopTiming[name]) continue;
+        loops[key] = [];
+        for (const [index, durationMs] of loopTiming[name].entries()) {
+          const frame = key + "_loop_" + String(index).padStart(2, "0");
+          if (index === 0) {
+            fs.copyFileSync(path.join(art, spriteName(key)), path.join(art, spriteName(frame)));
+          } else {
+            const drawing = urgencyDrawing(name, index);
+            await render(frame, drawing.pose, halo, drawing.faceArt);
+          }
+          loops[key].push({ file: spriteName(frame), durationMs });
+        }
+      }
+    }
   });
+  json(path.join(out, "loops.json"), loops);
   await lockBlinks(work);
   json(path.join(out, "clips.json"), clips);
 }

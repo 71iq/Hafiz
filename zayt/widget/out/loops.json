@@ -1,0 +1,164 @@
+{
+  "eager": [
+    {
+      "file": "hafiz_widget_zayt_eager_loop_00.webp",
+      "durationMs": 2280
+    },
+    {
+      "file": "hafiz_widget_zayt_eager_loop_01.webp",
+      "durationMs": 110
+    },
+    {
+      "file": "hafiz_widget_zayt_eager_loop_02.webp",
+      "durationMs": 190
+    },
+    {
+      "file": "hafiz_widget_zayt_eager_loop_03.webp",
+      "durationMs": 120
+    }
+  ],
+  "impatient": [
+    {
+      "file": "hafiz_widget_zayt_impatient_loop_00.webp",
+      "durationMs": 2050
+    },
+    {
+      "file": "hafiz_widget_zayt_impatient_loop_01.webp",
+      "durationMs": 430
+    },
+    {
+      "file": "hafiz_widget_zayt_impatient_loop_02.webp",
+      "durationMs": 125
+    },
+    {
+      "file": "hafiz_widget_zayt_impatient_loop_03.webp",
+      "durationMs": 135
+    }
+  ],
+  "worried": [
+    {
+      "file": "hafiz_widget_zayt_worried_loop_00.webp",
+      "durationMs": 2180
+    },
+    {
+      "file": "hafiz_widget_zayt_worried_loop_01.webp",
+      "durationMs": 240
+    },
+    {
+      "file": "hafiz_widget_zayt_worried_loop_02.webp",
+      "durationMs": 250
+    },
+    {
+      "file": "hafiz_widget_zayt_worried_loop_03.webp",
+      "durationMs": 155
+    }
+  ],
+  "worried_halo": [
+    {
+      "file": "hafiz_widget_zayt_worried_halo_loop_00.webp",
+      "durationMs": 2180
+    },
+    {
+      "file": "hafiz_widget_zayt_worried_halo_loop_01.webp",
+      "durationMs": 240
+    },
+    {
+      "file": "hafiz_widget_zayt_worried_halo_loop_02.webp",
+      "durationMs": 250
+    },
+    {
+      "file": "hafiz_widget_zayt_worried_halo_loop_03.webp",
+      "durationMs": 155
+    }
+  ],
+  "anxious": [
+    {
+      "file": "hafiz_widget_zayt_anxious_loop_00.webp",
+      "durationMs": 2020
+    },
+    {
+      "file": "hafiz_widget_zayt_anxious_loop_01.webp",
+      "durationMs": 125
+    },
+    {
+      "file": "hafiz_widget_zayt_anxious_loop_02.webp",
+      "durationMs": 145
+    },
+    {
+      "file": "hafiz_widget_zayt_anxious_loop_03.webp",
+      "durationMs": 130
+    }
+  ],
+  "anxious_halo": [
+    {
+      "file": "hafiz_widget_zayt_anxious_halo_loop_00.webp",
+      "durationMs": 2020
+    },
+    {
+      "file": "hafiz_widget_zayt_anxious_halo_loop_01.webp",
+      "durationMs": 125
+    },
+    {
+      "file": "hafiz_widget_zayt_anxious_halo_loop_02.webp",
+      "durationMs": 145
+    },
+    {
+      "file": "hafiz_widget_zayt_anxious_halo_loop_03.webp",
+      "durationMs": 130
+    }
+  ],
+  "panicked": [
+    {
+      "file": "hafiz_widget_zayt_panicked_loop_00.webp",
+      "durationMs": 1900
+    },
+    {
+      "file": "hafiz_widget_zayt_panicked_loop_01.webp",
+      "durationMs": 150
+    },
+    {
+      "file": "hafiz_widget_zayt_panicked_loop_02.webp",
+      "durationMs": 155
+    },
+    {
+      "file": "hafiz_widget_zayt_panicked_loop_03.webp",
+      "durationMs": 145
+    }
+  ],
+  "panicked_halo": [
+    {
+      "file": "hafiz_widget_zayt_panicked_halo_loop_00.webp",
+      "durationMs": 1900
+    },
+    {
+      "file": "hafiz_widget_zayt_panicked_halo_loop_01.webp",
+      "durationMs": 150
+    },
+    {
+      "file": "hafiz_widget_zayt_panicked_halo_loop_02.webp",
+      "durationMs": 155
+    },
+    {
+      "file": "hafiz_widget_zayt_panicked_halo_loop_03.webp",
+      "durationMs": 145
+    }
+  ],
+  "lonely": [
+    {
+      "file": "hafiz_widget_zayt_lonely_loop_00.webp",
+      "durationMs": 3200
+    },
+    {
+      "file": "hafiz_widget_zayt_lonely_loop_01.webp",
+      "durationMs": 120
+    },
+    {
+      "file": "hafiz_widget_zayt_lonely_loop_02.webp",
+      "durationMs": 250
+    },
+    {
+      "file": "hafiz_widget_zayt_lonely_loop_03.webp",
+      "durationMs": 160
+    }
+  ]
+}

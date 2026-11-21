@@ -23,3 +23,14 @@ export const layoutSizes = {
   largeTile: [190, 190],
 };
 export const isTile = (layout) => ["tile", "smallTile", "largeTile"].includes(layout);
+
+export const ladder = [
+  ["Calm", "day", "eager", 12, "waiting", "Keep it going"],
+  ["Nudge", "golden", "impatient", 12, "waiting", "Keep your 12 days"],
+  ["Urgent", "dusk", "worried", 12, "waiting", "Save your 12 days"],
+  ["Critical", "night", "anxious_halo", 12, "waiting", "Under 2 hours left!"],
+  ["Last hour", "midnight", "panicked_halo", 12, "waiting", "Last hour!"],
+  ["Done", "radiant", "shimmer", 13, "lit_t1", "", "", "#763509"],
+  ["Done late", "radiant_night", "relieved_halo", 13, "lit_t1", "", "", "#FFD09A"],
+  ["After a break", "dawn", "lonely", 0, "out", "Start again today"],
+];

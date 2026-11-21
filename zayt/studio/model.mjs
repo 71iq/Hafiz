@@ -60,7 +60,7 @@ function armSurface() {
   geometry.setIndex(indices);
   return geometry;
 }
-function shapeArm(mesh, sign, angle, heart, reach) {
+function shapeArm(mesh, sign, angle, heart, reach, anchors) {
   const anchor = point([sign * 0.755, 1.006, 0.09]),
     axis = point([sign * Math.sin(angle), -Math.cos(angle), 0.23]).normalize();
   const knots = [
@@ -79,7 +79,9 @@ function shapeArm(mesh, sign, angle, heart, reach) {
     [-0.45, 0.72, 0.7],
     [0.003, 0.84, 0.772],
   ];
-  const curve = new THREE.CatmullRomCurve3(knots.map((v, i) => v.lerp(point(chest[i]), heart)));
+  const curve = new THREE.CatmullRomCurve3(
+    anchors ? anchors.map(point) : knots.map((v, i) => v.lerp(point(chest[i]), heart)),
+  );
   const coords = mesh.geometry.attributes.position;
   for (let row = 0; row <= armRings; row++) {
     const u = row / armRings,
@@ -314,7 +316,19 @@ export function buildRig(scene) {
       raise: 0.38 + random() * 0.07,
     };
   });
-  return (pose, style) => {
+  const faceTexture = new THREE.Texture();
+  return (pose, style, faceImage) => {
+    if (Boolean(body.defines.FACE_DECAL) !== Boolean(faceImage)) {
+      if (faceImage) body.defines.FACE_DECAL = 1;
+      else delete body.defines.FACE_DECAL;
+      body.needsUpdate = true;
+    }
+    if (faceImage) {
+      faceTexture.image = faceImage;
+      faceTexture.needsUpdate = true;
+      body.uniforms.faceTexture.value = faceTexture;
+    }
+    torso.rotation.z = pose.torsoLean || 0;
     root.position.set(...pose.root);
     root.rotation.set(0, pose.spin || 0, pose.lean || 0, "ZXY");
     torso.scale.set(pose.width, pose.height, 1 / (pose.width * pose.height));
@@ -345,12 +359,16 @@ export function buildRig(scene) {
       foot.rotation.y = sign * (0.27 + 0.22 * pose.feet);
       foot.rotation.x = -0.35 * pose.feet;
       foot.position.set(sign * (0.33 + 0.2 * pose.feet), 0.16 + 0.034 * pose.feet, 0.17 + 0.48 * pose.feet);
+      if (index === 1 && pose.tap) {
+        foot.position.y += pose.tap;
+        foot.rotation.z += pose.tap * 2;
+      }
     });
     arms.forEach((arm, index) => {
       const sign = index ? 1 : -1,
         angle = (pose.arms[index] * Math.PI) / 180,
         heart = index ? 0 : pose.chest;
-      shapeArm(arm, sign, angle, heart, pose.arms[index] === 29 ? 0 : pose.reach || 0);
+      shapeArm(arm, sign, angle, heart, pose.arms[index] === 29 ? 0 : pose.reach || 0, pose.armAnchors?.[index]);
     });
     halo.visible = style.variant === "dark" && pose.halo > 0;
     halo.material.uniforms.power.value = pose.halo * 0.28;

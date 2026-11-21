@@ -1,5 +1,5 @@
 import { inks, skies } from "./scenes.mjs";
-import { states, layoutSizes, isTile } from "./specimens.mjs";
+import { states, ladder, layoutSizes, isTile } from "./specimens.mjs";
 
 const images = new Map();
 let measuring = null;
@@ -96,8 +96,8 @@ function wrap(ctx, message, width, maxLines, font) {
   ctx.restore();
   return lines;
 }
-function tile(ctx, x, y, row, layout, rtl = false, dimensions = layoutSizes[layout]) {
-  const [, scene, pose, count, flame, en, ar] = row,
+function tile(ctx, x, y, row, layout, rtl = false, dimensions = layoutSizes[layout], cropFeet = 8) {
+  const [, scene, pose, count, flame, en, ar, countInk] = row,
     [w, h] = dimensions;
   const tileMode = isTile(layout),
     wide = layout === "wide" || layout === "medium";
@@ -137,10 +137,10 @@ function tile(ctx, x, y, row, layout, rtl = false, dimensions = layoutSizes[layo
   const baseline = 704 / 720,
     standingHeight = (704 - 120) / 720;
   if (tileMode) {
-    drawH = (h + 8 - copyEnd - 2) / standingHeight;
+    drawH = (h + cropFeet - copyEnd - 2) / standingHeight;
     drawW = (drawH * 5) / 6;
     drawX = (w - drawW) / 2;
-    drawY = h + 8 - drawH * baseline;
+    drawY = h + cropFeet - drawH * baseline;
   } else if (wide) {
     drawH = (h + 6 - 10) / standingHeight;
     drawW = (drawH * 5) / 6;
@@ -157,10 +157,17 @@ function tile(ctx, x, y, row, layout, rtl = false, dimensions = layoutSizes[layo
   }
   if (!measuring) ctx.drawImage(sprite, drawX, drawY, drawW, drawH);
   const iconX = rtl ? groupX + numWidth + gap : groupX;
-  if (!measuring) icon(ctx, flame, iconX, groupY - iconSize * 0.5, iconSize, primary);
+  if (!measuring && flame === "waiting") {
+    icon(ctx, "out", iconX, groupY - iconSize * 0.5, iconSize, primary);
+    const ember = { day: "#99602B", golden: "#BD4D16", dusk: "#FFAB52", night: "#FF9657", midnight: "#FF7158" };
+    ctx.fillStyle = ember[scene];
+    ctx.beginPath();
+    ctx.ellipse(iconX + iconSize * 0.51, groupY + iconSize * 0.22, 1.7, 2.2, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (!measuring) icon(ctx, flame, iconX, groupY - iconSize * 0.5, iconSize, primary);
   else if (["unlit", "out"].includes(flame))
     measuring.push({ ink: primary, rect: [iconX, groupY - iconSize * 0.5, iconX + iconSize, groupY + iconSize * 0.5] });
-  text(ctx, countText, rtl ? groupX + numWidth : groupX + iconSize + gap, groupY + 0.3, numSize, primary, {
+  text(ctx, countText, rtl ? groupX + numWidth : groupX + iconSize + gap, groupY + 0.3, numSize, countInk ?? primary, {
     weight: 700,
     rtl,
     align: rtl ? "right" : "left",
@@ -198,6 +205,69 @@ function daySheet() {
       y = 53 + Math.floor(i / 4) * 177;
     text(c, names[i], x, y - 8, 10, soft);
     tile(c, x, y, states[i + 1], "tile");
+  }
+  return c;
+}
+function ladderSheet() {
+  const c = sheet(712, 430);
+  headings(c, "Time left to keep the streak");
+  for (const [i, row] of ladder.entries()) {
+    const x = 14 + (i % 4) * 175,
+      y = 56 + Math.floor(i / 4) * 192;
+    text(c, row[0], x, y - 11, 11, soft);
+    tile(c, x, y, row, "tile", false, layoutSizes.tile, 12);
+  }
+  return c;
+}
+
+function specimen(c, x, y, scene, resource, height, headroom = 0) {
+  // Height on the sheet measures the registered character, including its sprig.
+  const side = height + 6 + headroom,
+    spriteH = (height * 720) / 584,
+    spriteW = (spriteH * 5) / 6;
+  c.save();
+  c.translate(x, y);
+  c.beginPath();
+  c.roundRect(0, 0, side, side, 8);
+  c.clip();
+  cover(c, images.get("scene_" + scene + "_sq"), side, side);
+  c.drawImage(images.get(resource), (side - spriteW) / 2, headroom + 3 - (spriteH * 120) / 720, spriteW, spriteH);
+  c.restore();
+}
+function poseScene(pose) {
+  const base = pose.replace("_halo", "");
+  return ladder.find((row) => row[2].replace("_halo", "") === base)[1];
+}
+function facesSheet() {
+  const c = sheet(678, 660);
+  headings(c, "Faces at 60 and 120 dp");
+  let i = 0;
+  for (const row of ladder) {
+    if (row[2] === "shimmer") continue;
+    const base = row[2].replace("_halo", "");
+    for (const pose of [base, base + "_halo"].filter((p) => images.has("zayt_" + p))) {
+      const x = 14 + (i % 3) * 222,
+        y = 56 + Math.floor(i / 3) * 152;
+      text(c, pose.replace("_", " · "), x, y - 10, 11, soft);
+      specimen(c, x, y + 60, poseScene(pose), "zayt_" + pose, 60);
+      specimen(c, x + 73, y, poseScene(pose), "zayt_" + pose, 120);
+      i++;
+    }
+  }
+  return c;
+}
+function loopsSheet(loops) {
+  const entries = Object.entries(loops);
+  const c = sheet(572, 52 + entries.length * 120);
+  headings(c, "Loop frames");
+  for (const [i, [pose, frames]] of entries.entries()) {
+    const y = 43 + i * 120;
+    text(c, pose.replace("_", " · "), 14, y + 43, 11, paper);
+    for (const [j, frame] of frames.entries()) {
+      const x = 126 + j * 110;
+      specimen(c, x, y, poseScene(pose), frame.file.replace("hafiz_widget_", "").replace(".webp", ""), 80, 12);
+      text(c, frame.durationMs + " ms", x, y + 107, 9, soft);
+    }
   }
   return c;
 }
@@ -465,11 +535,14 @@ function homeSheet() {
   phone(c, 360, true);
   return c;
 }
-export function makeSheet(name) {
+export function makeSheet(name, loops) {
   const c = {
     states: () => statesSheet(false),
     "states-ar": () => statesSheet(true),
     day: daySheet,
+    ladder: ladderSheet,
+    faces: facesSheet,
+    loops: () => loopsSheet(loops),
     thumbs: thumbsSheet,
     flames: flamesSheet,
     home: homeSheet,
