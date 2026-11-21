@@ -12,6 +12,7 @@ import {
   readOwnedSession,
   signInOwnedPassword,
   signUpOwnedPassword,
+  requestPasswordResetEmail,
 } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
@@ -473,9 +474,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (!isEmailAuthFlowsEnabled()) throw new Error("Password reset is temporarily unavailable.");
     const loading = beginAuthLoading();
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-        redirectTo: getPasswordResetRedirectTo(),
-      });
+      const { error } = await requestPasswordResetEmail(email.trim().toLowerCase(), getPasswordResetRedirectTo());
       if (error) throw error;
     } catch (err) {
       set({ error: errorMessage(err) ?? null });

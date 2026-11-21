@@ -54,6 +54,12 @@ export default function Root({ children }: { children: React.ReactNode }) {
             report as a policy violation on every page. It must run before the app bundle. */}
         <script dangerouslySetInnerHTML={{ __html: zodWithoutEvalScript }} />
 
+        {/* Web sign-in uses PKCE, so session tokens in an address fragment are never installed: a
+            link cannot sign a visitor into another account. This removes them before the router
+            reads the address, which would otherwise keep restoring them. The reset page reads its
+            own link into an isolated session (lib/auth/isolated-recovery.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: sessionFragmentScript }} />
+
         <script dangerouslySetInnerHTML={{ __html: startupThemeScript }} />
 
         {/* Allow the document body to overflow by 1px so mobile browsers
@@ -72,6 +78,17 @@ export default function Root({ children }: { children: React.ReactNode }) {
 }
 
 const zodWithoutEvalScript = `globalThis.__zod_globalConfig = { jitless: true };`;
+
+const sessionFragmentScript = `
+(function () {
+  try {
+    if (/\\/auth\\/reset-password\\/?$/.test(location.pathname)) return;
+    var values = new URLSearchParams(location.hash.slice(1));
+    if (!values.has("access_token") && !values.has("refresh_token")) return;
+    history.replaceState(history.state, "", location.pathname + location.search);
+  } catch (error) {}
+})();
+`;
 
 const urlBarHideStyles = `
 html {

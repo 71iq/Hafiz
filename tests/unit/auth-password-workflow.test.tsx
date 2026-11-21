@@ -45,8 +45,19 @@ const mockSignOut = jest.fn(async () => {
   if (mockSignOutChangesOwner) useAuthStore.setState({ user: null, session: null, profile: null });
   return mockSignOutPromise ?? { error: null };
 });
+type MockIsolated = {
+  userId: string;
+  updatePassword(password: string): Promise<void>;
+  finish(): Promise<void>;
+  discard(): void;
+};
+const mockOpenRecovery = jest.fn<Promise<MockIsolated | null>, [{ access_token: string; refresh_token: string }]>();
+const mockIsolatedUpdate = jest.fn<Promise<void>, [string]>();
+const mockIsolatedFinish = jest.fn<Promise<void>, []>();
+const mockIsolatedDiscard = jest.fn();
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
+  openPasswordRecovery: (tokens: { access_token: string; refresh_token: string }) => mockOpenRecovery(tokens),
   readOwnedSession: () => mockGetSession(),
   restoreOwnedSession: (_owner: unknown, _session: unknown, tokens: { access_token: string; refresh_token: string }) =>
     mockSetSession(tokens),
@@ -147,6 +158,14 @@ const session = (id: string): Session => ({
   expires_in: 3600,
 });
 
+function isolated(id: string): MockIsolated {
+  return {
+    userId: userId(id),
+    updatePassword: (password) => mockIsolatedUpdate(password),
+    finish: () => mockIsolatedFinish(),
+    discard: () => mockIsolatedDiscard(),
+  };
+}
 function activate(value: Session | null) {
   useAuthStore.setState({ user: value?.user ?? null, session: value, profile: null });
 }
@@ -195,6 +214,10 @@ beforeEach(() => {
   mockReplace.mockClear();
   mockSignOutPromise = null;
   mockSignOutChangesOwner = true;
+  mockOpenRecovery.mockReset();
+  mockIsolatedUpdate.mockReset().mockResolvedValue(undefined);
+  mockIsolatedFinish.mockReset().mockResolvedValue(undefined);
+  mockIsolatedDiscard.mockReset();
   jest.replaceProperty(Platform, "OS", "android");
 });
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -455,11 +478,27 @@ function webHash(hash: string) {
     },
   });
 }
+function tokens(value: Session) {
+  return { access_token: value.access_token, refresh_token: value.refresh_token };
+}
+function linkFor(value: Session) {
+  webHash(`#access_token=${value.access_token}&refresh_token=${value.refresh_token}`);
+}
+async function submitWeb() {
+  const screen = render(<ResetPasswordScreen />);
+  await waitFor(() => expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(false));
+  fireEvent.changeText(screen.getByLabelText(strings.en.authNewPassword), "synthetic-password");
+  fireEvent.changeText(screen.getByLabelText(strings.en.authConfirmPassword), "synthetic-password");
+  fireEvent.press(screen.getByTestId("submit"));
+  await waitFor(() => expect(mockIsolatedUpdate).toHaveBeenCalledTimes(1));
+  return screen;
+}
 it("web recovery missing tokens stays disabled without an SDK write", async () => {
   webHash("");
   const screen = render(<ResetPasswordScreen />);
   expect(screen.getByText(strings.en.authResetLinkInvalid)).toBeTruthy();
   expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(true);
+  expect(mockOpenRecovery).not.toHaveBeenCalled();
   expect(mockSetSession).not.toHaveBeenCalled();
   expect(mockUpdateUser).not.toHaveBeenCalled();
 });
@@ -481,80 +520,110 @@ it.each([
   expect(window.location.hash).toBe("");
   expect(mockSetParams).toHaveBeenCalledWith({ "#": "" });
   expect(window.location.search).toBe("?source=synthetic");
+  expect(mockOpenRecovery).not.toHaveBeenCalled();
   expect(mockGetSession).not.toHaveBeenCalled();
   expect(mockSetSession).not.toHaveBeenCalled();
   expect(mockUpdateUser).not.toHaveBeenCalled();
   expect(mockSignOut).not.toHaveBeenCalled();
   expect(mockReplace).not.toHaveBeenCalled();
 });
-it.each(["packet", "rejection"])("web recovery displays current SDK %s failure", async (outcome) => {
-  webHash("#access_token=synthetic-access&refresh_token=synthetic-refresh");
-  const error = new Error("current-recovery-error");
-  if (outcome === "packet") mockSetSession.mockResolvedValue({ data: { session: null }, error });
-  else mockSetSession.mockRejectedValue(error);
+it("web recovery displays a failed link check", async () => {
+  linkFor(session("a"));
+  mockOpenRecovery.mockRejectedValue(new Error("current-recovery-error"));
   const screen = render(<ResetPasswordScreen />);
   await waitFor(() => expect(screen.getByText(strings.en.authErrorGeneric)).toBeTruthy());
   expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(true);
-  expect(mockUpdateUser).not.toHaveBeenCalled();
+  expect(mockIsolatedUpdate).not.toHaveBeenCalled();
 });
-it("web recovery forwards URL tokens and completes a current reset", async () => {
+it("a web recovery link that names no account is invalid", async () => {
+  linkFor(session("a"));
+  mockOpenRecovery.mockResolvedValue(null);
+  const screen = render(<ResetPasswordScreen />);
+  await waitFor(() => expect(screen.getByText(strings.en.authResetLinkInvalid)).toBeTruthy());
+  expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(true);
+});
+it("web recovery completes in its isolated session and never signs this browser in", async () => {
   const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  mockSetSession.mockResolvedValue({ data: { session: a }, error: null });
-  mockUpdateUser.mockResolvedValue({ data: { user: user("a") }, error: null });
-  const screen = await submit();
+  linkFor(a);
+  mockOpenRecovery.mockResolvedValue(isolated("a"));
+  const screen = await submitWeb();
   await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/auth/login"));
-  expect(mockSetSession).toHaveBeenCalledWith({ access_token: a.access_token, refresh_token: a.refresh_token });
+  expect(mockOpenRecovery).toHaveBeenCalledWith(tokens(a));
+  expect(mockIsolatedUpdate).toHaveBeenCalledWith("synthetic-password");
+  expect(mockIsolatedFinish).toHaveBeenCalledTimes(1);
   expect(screen.getByText(strings.en.authPasswordUpdated)).toBeTruthy();
+  // The app's own session and store never held the link's account.
+  expect(mockSetSession).not.toHaveBeenCalled();
+  expect(mockUpdateUser).not.toHaveBeenCalled();
+  expect(mockSignOut).not.toHaveBeenCalled();
+  expect(useAuthStore.getState().session).toBeNull();
+});
+it("another account's reset link leaves this browser's signed-in account alone", async () => {
+  const b = session("b");
+  activate(b);
+  linkFor(session("a"));
+  mockOpenRecovery.mockResolvedValue(isolated("a"));
+  const screen = render(<ResetPasswordScreen />);
+  await waitFor(() => expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(false));
+  expect(useAuthStore.getState().session?.access_token).toBe(b.access_token);
+  fireEvent.changeText(screen.getByLabelText(strings.en.authNewPassword), "synthetic-password");
+  fireEvent.changeText(screen.getByLabelText(strings.en.authConfirmPassword), "synthetic-password");
+  fireEvent.press(screen.getByTestId("submit"));
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/auth/login"));
+  expect(mockIsolatedFinish).toHaveBeenCalledTimes(1);
+  expect(mockSignOut).not.toHaveBeenCalled();
+  expect(useAuthStore.getState().session?.access_token).toBe(b.access_token);
+});
+it("a completed reset also leaves the same account's session in this browser", async () => {
+  activate(session("a"));
+  linkFor(session("a"));
+  mockOpenRecovery.mockResolvedValue(isolated("a"));
+  await submitWeb();
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/auth/login"));
+  expect(mockIsolatedFinish).toHaveBeenCalledTimes(1);
+  expect(mockSignOut).toHaveBeenCalledTimes(1);
+  expect(useAuthStore.getState().session).toBeNull();
+});
+it("a failed local sign-out after a completed reset still reaches Login", async () => {
+  activate(session("a"));
+  mockSignOutChangesOwner = false;
+  mockSignOutPromise = Promise.resolve({ error: new Error("local-signout-error") });
+  linkFor(session("a"));
+  mockOpenRecovery.mockResolvedValue(isolated("a"));
+  await submitWeb();
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/auth/login"));
+});
+it.each(["update", "finish"] as const)("web recovery shows a failed %s and stays on the form", async (step) => {
+  linkFor(session("a"));
+  mockOpenRecovery.mockResolvedValue(isolated("a"));
+  (step === "update" ? mockIsolatedUpdate : mockIsolatedFinish).mockRejectedValue(new Error(`${step}-error`));
+  const screen = await submitWeb();
+  await waitFor(() => expect(screen.getByText(strings.en.authErrorGeneric)).toBeTruthy());
+  expect(mockReplace).not.toHaveBeenCalled();
 });
 it.each(["success", "rejection"])("unmounted web recovery suppresses late %s route continuation", async (outcome) => {
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  const pending = deferred<{ data: { session: Session | null }; error: Error | null }>();
-  mockSetSession.mockReturnValue(pending.promise);
+  linkFor(session("a"));
+  const pending = deferred<MockIsolated | null>();
+  mockOpenRecovery.mockReturnValue(pending.promise);
   const screen = render(<ResetPasswordScreen />);
-  await waitFor(() => expect(mockSetSession).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(mockOpenRecovery).toHaveBeenCalledTimes(1));
   screen.unmount();
   await act(async () => {
     if (outcome === "rejection") pending.reject(new Error("unmounted-recovery-error"));
-    else pending.resolve({ data: { session: a }, error: null });
+    else pending.resolve(isolated("a"));
   });
-  expect(mockUpdateUser).not.toHaveBeenCalled();
-  expect(mockSignOut).not.toHaveBeenCalled();
+  expect(mockIsolatedDiscard).toHaveBeenCalledTimes(outcome === "success" ? 1 : 0);
+  expect(mockIsolatedUpdate).not.toHaveBeenCalled();
   expect(mockReplace).not.toHaveBeenCalled();
 });
-it("later explicit auth intent keeps pending web recovery unready", async () => {
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  const pending = deferred<{ data: { session: Session | null }; error: Error | null }>();
-  mockSetSession.mockReturnValue(pending.promise);
+it("leaving a ready web recovery discards its isolated session", async () => {
+  linkFor(session("a"));
+  mockOpenRecovery.mockResolvedValue(isolated("a"));
   const screen = render(<ResetPasswordScreen />);
-  await waitFor(() => expect(mockSetSession).toHaveBeenCalledTimes(1));
-  const later = authCommands.transition(async () => undefined);
-  await act(async () => {
-    pending.resolve({ data: { session: a }, error: null });
-    await later;
-  });
-  expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(true);
-  expect(mockUpdateUser).not.toHaveBeenCalled();
-});
-it("external replacement keeps pending web recovery from restoring the old owner", async () => {
-  const a = session("a");
-  activate(a);
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  const pending = deferred<{ data: { session: Session | null }; error: Error | null }>();
-  mockSetSession.mockReturnValue(pending.promise);
-  const screen = render(<ResetPasswordScreen />);
-  await waitFor(() => expect(mockSetSession).toHaveBeenCalledTimes(1));
-  const b = session("b");
-  await act(async () => {
-    activate(b);
-    pending.resolve({ data: { session: a }, error: null });
-  });
-  expect({
-    token: useAuthStore.getState().session?.access_token,
-    disabled: screen.getByTestId("submit").props.accessibilityState.disabled,
-  }).toEqual({ token: b.access_token, disabled: true });
+  await waitFor(() => expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(false));
+  screen.unmount();
+  expect(mockIsolatedDiscard).toHaveBeenCalledTimes(1);
+  expect(mockIsolatedFinish).not.toHaveBeenCalled();
 });
 
 it("SDK signout error packet keeps the current reset route on its error state", async () => {
@@ -569,44 +638,12 @@ it("SDK signout error packet keeps the current reset route on its error state", 
   expect(useAuthStore.getState().user?.id).toBe(userId("a"));
 });
 
-it("unmounted queued web recovery never dispatches its SDK command", async () => {
-  const held = deferred<void>();
-  const blocker = authCommands.transition(() => held.promise);
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  mockSetSession.mockResolvedValue({ data: { session: a }, error: null });
-  const screen = render(<ResetPasswordScreen />);
-  screen.unmount();
-  await act(async () => {
-    held.resolve();
-    await blocker;
-    for (let i = 0; i < 20; i++) await Promise.resolve();
-  });
-  expect(mockSetSession).not.toHaveBeenCalled();
-  expect(mockUpdateUser).not.toHaveBeenCalled();
-  expect(mockReplace).not.toHaveBeenCalled();
-});
-
-it.each(["en", "ar"] as const)("unsupported web recovery uses the %s message and stays disabled", async (locale) => {
-  mockLocale = locale;
-  webHash("#access_token=synthetic-access&refresh_token=synthetic-refresh");
-  const error = Object.assign(new Error("Auth storage ownership is unavailable"), {
-    code: "auth_storage_lock_unavailable",
-  });
-  mockSetSession.mockRejectedValue(error);
-  const screen = render(<ResetPasswordScreen />);
-  await waitFor(() => expect(screen.getByText(strings[locale].authResetBrowserUnsupported)).toBeTruthy());
-  expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(true);
-  expect(mockReplace).not.toHaveBeenCalled();
-});
-
 it("web recovery removes URL tokens before the pending session command and preserves route history state", async () => {
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  const pending = deferred<{ data: { session: Session | null }; error: Error | null }>();
-  mockSetSession.mockReturnValue(pending.promise);
+  linkFor(session("a"));
+  const pending = deferred<MockIsolated | null>();
+  mockOpenRecovery.mockReturnValue(pending.promise);
   const screen = render(<ResetPasswordScreen />);
-  await waitFor(() => expect(mockSetSession).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(mockOpenRecovery).toHaveBeenCalledTimes(1));
   expect(window.history.replaceState).toHaveBeenCalledWith(
     { synthetic: "state" },
     "",
@@ -616,21 +653,20 @@ it("web recovery removes URL tokens before the pending session command and prese
   expect(mockSetParams).toHaveBeenCalledWith({ "#": "" });
   screen.unmount();
   await act(async () => {
-    pending.resolve({ data: { session: a }, error: null });
+    pending.resolve(isolated("a"));
   });
 });
 
 it("internal child replacement retains pending web recovery after URL cleanup", async () => {
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  const pending = deferred<{ data: { session: Session | null }; error: Error | null }>();
-  mockSetSession.mockReturnValue(pending.promise);
+  linkFor(session("a"));
+  const pending = deferred<MockIsolated | null>();
+  mockOpenRecovery.mockReturnValue(pending.promise);
   const screen = renderTree(
     <PasswordRecoveryProvider>
       <ResetPasswordScreen key="before" />
     </PasswordRecoveryProvider>,
   );
-  await waitFor(() => expect(mockSetSession).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(mockOpenRecovery).toHaveBeenCalledTimes(1));
   expect(window.location.hash).toBe("");
   screen.rerender(
     <PasswordRecoveryProvider>
@@ -638,10 +674,10 @@ it("internal child replacement retains pending web recovery after URL cleanup", 
     </PasswordRecoveryProvider>,
   );
   await act(async () => {
-    pending.resolve({ data: { session: a }, error: null });
+    pending.resolve(isolated("a"));
   });
   await waitFor(() => expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(false));
-  expect(mockSetSession).toHaveBeenCalledTimes(1);
+  expect(mockOpenRecovery).toHaveBeenCalledTimes(1);
 });
 it("internal child replacement keeps one issued password request busy", async () => {
   activate(session("a"));
@@ -686,12 +722,11 @@ it("genuine navigation beforeRemove revokes an issued password operation on the 
   expect(mockReplace).not.toHaveBeenCalled();
 });
 it("pathname exit with provider mounted suppresses pending recovery completion", async () => {
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  const pending = deferred<{ data: { session: Session | null }; error: Error | null }>();
-  mockSetSession.mockReturnValue(pending.promise);
+  linkFor(session("a"));
+  const pending = deferred<MockIsolated | null>();
+  mockOpenRecovery.mockReturnValue(pending.promise);
   const screen = render(<ResetPasswordScreen />);
-  await waitFor(() => expect(mockSetSession).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(mockOpenRecovery).toHaveBeenCalledTimes(1));
   mockPathname = "/auth/login";
   screen.rerender(
     <PasswordRecoveryProvider>
@@ -699,24 +734,21 @@ it("pathname exit with provider mounted suppresses pending recovery completion",
     </PasswordRecoveryProvider>,
   );
   await act(async () => {
-    pending.resolve({ data: { session: a }, error: null });
+    pending.resolve(isolated("a"));
   });
   expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(true);
-  expect(mockUpdateUser).not.toHaveBeenCalled();
+  expect(mockIsolatedDiscard).toHaveBeenCalledTimes(1);
+  expect(mockIsolatedUpdate).not.toHaveBeenCalled();
 });
-it("captured web tokens wait for auth initialization despite URL cleanup", async () => {
+it("web recovery opens its isolated session without waiting for auth start-up", async () => {
   const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
+  linkFor(a);
   useAuthStore.setState({ isInitialized: false });
-  mockSetSession.mockResolvedValue({ data: { session: a }, error: null });
+  mockOpenRecovery.mockResolvedValue(isolated("a"));
   const screen = render(<ResetPasswordScreen />);
   expect(window.location.hash).toBe("");
-  expect(mockSetSession).not.toHaveBeenCalled();
-  await act(async () => {
-    useAuthStore.setState({ isInitialized: true });
-  });
   await waitFor(() => expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(false));
-  expect(mockSetSession).toHaveBeenCalledWith({ access_token: a.access_token, refresh_token: a.refresh_token });
+  expect(mockOpenRecovery).toHaveBeenCalledWith(tokens(a));
 });
 
 async function prepareTwoRecoveryOwners() {
@@ -781,44 +813,6 @@ it("captured old recovery leave cannot cancel a later recovery", async () => {
   expect(mockReplace).toHaveBeenCalledWith("/auth/login");
 });
 
-it("waiting recovery yields to a newer explicit auth intent before initialization", async () => {
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  useAuthStore.setState({ isInitialized: false });
-  mockSetSession.mockResolvedValue({ data: { session: a }, error: null });
-  const screen = render(<ResetPasswordScreen />);
-  expect(window.location.hash).toBe("");
-  expect(mockSetSession).not.toHaveBeenCalled();
-  await act(async () => {
-    await authCommands.transition(async () => {
-      activate(session("b"));
-    });
-  });
-  await act(async () => {
-    useAuthStore.setState({ isInitialized: true });
-  });
-  expect(mockSetSession).not.toHaveBeenCalled();
-  expect(useAuthStore.getState().user?.id).toBe(user("b").id);
-  expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(true);
-});
-
-it("bootstrap restoration preserves the waiting recovery intent", async () => {
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  useAuthStore.setState({ isInitialized: false });
-  mockSetSession.mockResolvedValue({ data: { session: a }, error: null });
-  const screen = render(<ResetPasswordScreen />);
-  expect(mockSetSession).not.toHaveBeenCalled();
-  await act(async () => {
-    await authCommands.bootstrap(async () => {
-      activate(session("b"));
-      useAuthStore.setState({ isInitialized: true });
-    });
-  });
-  await waitFor(() => expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(false));
-  expect(mockSetSession).toHaveBeenCalledTimes(1);
-  expect(useAuthStore.getState().user?.id).toBe(user("a").id);
-});
 it("bootstrap retains original rejection and does not create an explicit intent", async () => {
   const current = authCommands.captureIntent();
   const error = new Error("original-bootstrap-error");
@@ -850,26 +844,25 @@ it("a queued bootstrap read does not silently cancel a current owned command", a
 });
 
 it("a different recovery link clears the previous form password draft", async () => {
-  const a = session("a");
-  webHash(`#access_token=${a.access_token}&refresh_token=${a.refresh_token}`);
-  mockSetSession.mockResolvedValue({ data: { session: a }, error: null });
+  linkFor(session("a"));
+  mockOpenRecovery.mockResolvedValue(isolated("a"));
   const screen = render(<ResetPasswordScreen />);
   await waitFor(() => expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(false));
   fireEvent.changeText(screen.getByLabelText(strings.en.authNewPassword), "previous-owner-password");
   fireEvent.changeText(screen.getByLabelText(strings.en.authConfirmPassword), "previous-owner-password");
-  const b = session("b");
-  webHash(`#access_token=${b.access_token}&refresh_token=${b.refresh_token}`);
-  mockSetSession.mockResolvedValue({ data: { session: b }, error: null });
+  linkFor(session("b"));
+  mockOpenRecovery.mockResolvedValue(isolated("b"));
   screen.rerender(
     <PasswordRecoveryProvider>
       <ResetPasswordScreen />
     </PasswordRecoveryProvider>,
   );
-  await waitFor(() => expect(mockSetSession).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(mockOpenRecovery).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(screen.getByTestId("submit").props.accessibilityState.disabled).toBe(false));
   expect(screen.getByLabelText(strings.en.authNewPassword).props.value).toBe("");
   expect(screen.getByLabelText(strings.en.authConfirmPassword).props.value).toBe("");
-  expect(mockUpdateUser).not.toHaveBeenCalled();
+  expect(mockIsolatedDiscard).toHaveBeenCalledTimes(1);
+  expect(mockIsolatedUpdate).not.toHaveBeenCalled();
 });
 it("an obsolete recovery form hides another owner's error and clears its draft without clearing global status", async () => {
   activate(session("a"));

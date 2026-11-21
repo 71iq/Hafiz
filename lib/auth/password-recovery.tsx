@@ -10,12 +10,13 @@ import {
 } from "react";
 import { Platform } from "react-native";
 import { useGlobalSearchParams, usePathname, useRouter } from "expo-router";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseConfigured, openPasswordRecovery } from "@/lib/supabase";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { preparePasswordRecovery, finishPasswordRecovery, useAuthStore } from "@/lib/auth/store";
 import { authCommands } from "@/lib/auth/commands";
 import { setAuthHandoffNotice } from "@/lib/auth/form-handoff";
 import type { AuthOwner } from "@/lib/auth/coordinator";
+import type { IsolatedRecovery } from "@/lib/auth/isolated-recovery";
 
 type RecoveryState =
   | { kind: "idle" | "preparing" | "invalid" | "superseded" | "saving" | "signing-out" | "finished" }
@@ -28,6 +29,8 @@ type Operation = {
   started: boolean;
   tokens: { access_token: string; refresh_token: string } | undefined;
   owner: AuthOwner | null;
+  // Web: the link's session, isolated from the app's own session.
+  isolated: IsolatedRecovery | null;
   busy: boolean;
   intentIsCurrent: () => boolean;
 };
@@ -61,6 +64,8 @@ export function PasswordRecoveryProvider({ children }: { children: ReactNode }) 
     if (current) {
       current.active = false;
       current.owner?.cancel();
+      current.isolated?.discard();
+      current.isolated = null;
       current.tokens = undefined;
       current.inputHash = "";
     }
@@ -118,11 +123,33 @@ export function PasswordRecoveryProvider({ children }: { children: ReactNode }) 
         tokens,
         started: false,
         owner: null,
+        isolated: null,
         busy: false,
         intentIsCurrent: authCommands.captureIntent(),
       };
       operation.current = current;
       setState({ kind: "preparing" });
+    }
+    if (current.tokens && !current.started) {
+      // A link's tokens never become the app's session, so they need neither auth start-up nor
+      // ownership of the app's session.
+      current.started = true;
+      const pending = current;
+      const tokens = current.tokens;
+      pending.tokens = undefined;
+      void openPasswordRecovery(tokens)
+        .then((isolated) => {
+          if (!isActive(pending)) {
+            isolated?.discard();
+            return;
+          }
+          pending.isolated = isolated;
+          setState(isolated ? { kind: "ready", error: null } : { kind: "invalid" });
+        })
+        .catch((error: unknown) => {
+          if (isActive(pending)) setState({ kind: "failed", error });
+        });
+      return;
     }
     if (!initialized || current.started) return;
     if (!current.intentIsCurrent()) {
@@ -163,6 +190,34 @@ export function PasswordRecoveryProvider({ children }: { children: ReactNode }) 
   const submit = useCallback(
     async (password: string) => {
       const current = expectedOperation;
+      const isolated = current?.isolated;
+      if (current && isolated) {
+        if (current.busy || !isActive(current)) return;
+        current.busy = true;
+        setState({ kind: "saving" });
+        try {
+          await isolated.updatePassword(password);
+          if (!isActive(current)) return;
+          setState({ kind: "signing-out" });
+          await isolated.finish();
+          // The reset ended every session of the account. If this browser was signed in to it,
+          // leave that session here too, as a reset always has. The password is already saved, so
+          // a failure here only leaves a session the server has ended.
+          if (useAuthStore.getState().user?.id.toLowerCase() === isolated.userId)
+            await finishPasswordRecovery(authCommands.captureOwner()).catch((error: unknown) =>
+              console.warn("[Auth] Local sign-out after password reset failed", error),
+            );
+          if (!isActive(current)) return;
+          setState({ kind: "finished" });
+          setAuthHandoffNotice("password-updated");
+          router.replace("/auth/login");
+        } catch (error: unknown) {
+          if (isActive(current)) setState({ kind: "ready", error });
+        } finally {
+          current.busy = false;
+        }
+        return;
+      }
       const owner = current?.owner;
       if (!current || !owner || current.busy || !isActive(current) || !owner.isCurrent()) return;
       current.busy = true;
