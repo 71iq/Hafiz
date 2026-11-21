@@ -121,7 +121,9 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
     for (const evening of [false, true]) {
       for (let day = 1; day <= 28; day += 1) {
         const date = `2026-11-${String(day).padStart(2, "0")}`;
-        for (const state of ["done", "milestone"] as const) poses.add(widgetArt(state, "none", evening, date)[1]);
+        for (const state of ["done", "milestone"] as const) {
+          for (const late of [false, true]) poses.add(widgetArt(state, "none", evening, date, late)[1]);
+        }
       }
     }
     for (const pose of poses) expect([pose, celebration.includes(`"${pose}" ->`)]).toEqual([pose, true]);

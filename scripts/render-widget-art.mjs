@@ -233,11 +233,13 @@ await writeFile(
   ),
 );
 // The waiting flame's ember as the day runs out (WidgetArt.waiting): warm from the nudge, pulsing
-// from two hours before, red in the last hour. Each is drawn with a white outline for dark skies
-// and a dark one for light skies, since frame lists cannot be tinted on every Android version.
+// from two hours before, red in the last hour. Each is drawn with a white outline for dark skies and
+// dark cards, a dark one for light skies and light cards, and the System theme's text color for its
+// plain card, since frame lists cannot be tinted on every Android version.
 for (const [outlineName, outlineColor] of [
   ["light", "#FFFFFFFF"],
   ["dark", "#FF1D2430"],
+  ["system", "@color/hafiz_widget_text_primary"],
 ]) {
   const outlined = outline.replace("@color/hafiz_widget_text_secondary", outlineColor);
   for (const [kind, low, high, glowColor, dimMs, brightMs] of [

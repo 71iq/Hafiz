@@ -1,8 +1,8 @@
 import type { AppDatabase } from "@/lib/database/types";
 import { getAyahReviewsDueToday, getNextEligibleReviewDate } from "@/lib/fsrs/queries";
 import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
-import { addDays, deviceTimeZone } from "@/lib/habit/dates";
-import { readHabitDays } from "@/lib/habit/queries";
+import { addDays, deviceTimeZone, type LocalDate } from "@/lib/habit/dates";
+import { readHabitDayRow, readHabitDays } from "@/lib/habit/queries";
 import { readHabitSettings } from "@/lib/habit/settings";
 import { loadTodayWird, reviewLeftToday, type TodayWird } from "@/lib/hifz/pages";
 import { countDueRemediation, nextRemediationAt } from "@/lib/hifz/remediation";
@@ -79,6 +79,24 @@ async function planFacts(
 }
 
 /**
+ * When today's wird was finished, or null when today is not done or the time is unknown. Today's row
+ * is created when the wird is done, so its creation time says when, merged across devices to the
+ * earliest. An excuse set first creates the row earlier; then the review session that earned the
+ * day says when.
+ */
+export async function todayFinishedAt(db: AppDatabase, today: LocalDate): Promise<Date | null> {
+  const row = await readHabitDayRow(db, today);
+  if (row?.earned_status !== "done") return null;
+  if (row.excuse_updated_at === null) return new Date(row.created_at);
+  if (row.source_session_id === null) return null;
+  const session = await db.getFirstAsync<{ updated_at: string }>(
+    "SELECT updated_at FROM review_sessions WHERE id = ?",
+    [row.source_session_id],
+  );
+  return session ? new Date(session.updated_at) : null;
+}
+
+/**
  * Spec 6.3: everything the widget timeline needs, read from the local database. loadTodayWird fixes
  * today's page list the first time it runs each day, the same write Home makes on its first load.
  * Nothing else is written; the projection settles the habit virtually.
@@ -86,16 +104,18 @@ async function planFacts(
 export async function loadWidgetInput(db: AppDatabase, options: WidgetLoadOptions): Promise<WidgetBuildInput> {
   const { now, language } = options;
   const clock = options.clock ?? deviceClock;
-  const [days, habitSettings, location, prefs, showNumbers, wird, remediationDue, nextRemediation] = await Promise.all([
-    readHabitDays(db),
-    readHabitSettings(db),
-    readPrayerLocation(db),
-    readReminderPrefs(db),
-    readWidgetShowNumbers(db),
-    loadTodayWird(db, now),
-    countDueRemediation(db, now),
-    nextRemediationAt(db, now),
-  ]);
+  const [days, habitSettings, location, prefs, showNumbers, wird, remediationDue, nextRemediation, finishedAt] =
+    await Promise.all([
+      readHabitDays(db),
+      readHabitSettings(db),
+      readPrayerLocation(db),
+      readReminderPrefs(db),
+      readWidgetShowNumbers(db),
+      loadTodayWird(db, now),
+      countDueRemediation(db, now),
+      nextRemediationAt(db, now),
+      todayFinishedAt(db, clock.dateOf(now)),
+    ]);
   const prayers = createPrayerTimesLookup(location);
   const plan = await planFacts(db, { now, clock, wird, remediationDue, nextRemediation });
   const dayTimes = { clock, prayers, anchor: prefs.anchor, ramadanAnchor: prefs.ramadanAnchor, isRamadan };
@@ -111,5 +131,6 @@ export async function loadWidgetInput(db: AppDatabase, options: WidgetLoadOption
     appearance: widgetAppearance(options.themeMode, options.effectiveTheme),
     showZayt: habitSettings.showZayt,
     showNumbers,
+    todayFinishedAt: finishedAt,
   };
 }

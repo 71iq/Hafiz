@@ -29,6 +29,7 @@ Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both u
 | 110×100           | Small tile: flame, count and Zayt, with no line so Zayt's face is never cut; with Zayt off, the plain tile keeps its line.                            |
 | 250×64 and 170×64 | Short: flame, count and line at the start; Zayt fills the height at the end, with only the twig tip and feet cut.                                     |
 | 210×40            | Strip: one row with the line beside the count, and Zayt filling the height.                                                                           |
+| 130×48            | Compact: a short 2×1 with the flame and count at the start and Zayt at the end, no line. With Zayt off, the strip's plain card.                       |
 | 100×40            | Tiny: the flame with the count, or the line when there is no count. No Zayt, so neither is cut.                                                       |
 
 Zayt's face sits low on the drop, so no layout crops more than the feet and the tip of the twig. Android 12 and later round every widget's corners. Before that, launchers do not, so the renderer draws the sky at the widget's reported size with the card's 16 dp radius.
@@ -39,17 +40,17 @@ The launcher picker shows a sample done day. **Settings → General → Home scr
 
 ## Count, flame and line
 
-The count is the streak length, 0 included. On a scene it turns the flame's colour once today counts. The flame is lit once today counts and an empty outline at 0. A lit flame grows through seven stages, at 7, 14, 30, 50, 100 and 365 days, gaining a glow, a second tongue, a white-hot core and glints of light. While the streak waits for today, the flame is an outline whose ember grows with the urgency: small while there is time, glowing warm from 8 hours left, pulsing from 4 hours left and pulsing red in the last hour. Paused days show the plain outline.
+The count is the streak length, 0 included. On a scene it turns the flame's colour once today counts. The flame is lit once today counts and an empty outline at 0. A lit flame grows through seven stages, at 7, 14, 30, 50, 100 and 365 days, gaining a glow, a second tongue, a white-hot core and glints of light. While the streak waits for today, the flame is an outline whose ember grows with the urgency: small while there is time, glowing warm from 8 hours left, pulsing from 4 hours left and pulsing red in the last hour. The plain cards show the same ember, so urgency still shows with Show Zayt off. Paused days show the plain outline.
 
 The line is short and follows the same urgency. A done day has none, since the lit flame and the gold scene already say it. With Show numbers off the count is hidden and no line names a figure, so a done day says "Done today". The plan and grace notes are spoken by TalkBack only.
 
-The 4×2 widget from 170 dp tall adds a week row: the last seven days with today last, each under its weekday letter. A recited day is a small lit flame, a day kept by grace, an excuse or a pause is a soft dot, today's open day is the ember, and any other day is an empty ring. Nothing marks a day as missed.
+The 4×2 widget from 130 dp tall adds a week row: the last seven days with today last, each under its weekday letter. A recited day is a small lit flame, a day kept by grace, an excuse or a pause is a soft dot, today's open day is the ember, and any other day is an empty ring. Nothing marks a day as missed.
 
 ## State, sky and Zayt
 
 Each entry uses the same habit projection and review-left rules as Home. **Wird** means the page review for a page plan and the ayah review otherwise. An onboarding or review session already in progress keeps its place.
 
-While today is open, urgency is the time left before local midnight. While yesterday can still be made up, it is the time left before the make-up cutoff: Dhuhr, or 12:30 without prayer times. Each level has two Zayt or line variants, and the widget picks one per level and day, so the faces change from day to day without flickering between refreshes.
+While today is open, urgency is the time left before local midnight. While yesterday can still be made up, it is the time left before the make-up cutoff: Dhuhr, or 12:30 without prayer times. Each level has two Zayt or line variants, and the widget picks one per level and day, so the faces change from day to day without flickering between refreshes. A level never shows the face the level before it showed that day.
 
 | Level    | Time left | Sky on an open day           | Zayt                                   | Line, numbers on                              | Motion              |
 | -------- | --------- | ---------------------------- | -------------------------------------- | --------------------------------------------- | ------------------- |
@@ -76,7 +77,7 @@ The make-up window keeps the dawn sky with the same faces and says "Make up by 1
 | Kept                     | Calm                          | Seated                                   | Streak kept for today                    | Home                                   |
 | Paused                   | Calm                          | Seated                                   | Paused until the date                    | Home                                   |
 
-The evening scenes for done and begin start at the evening start or 20:00, whichever comes first. The widget never displays Quran text, an excuse category or a count of days away. These changes send no notification.
+The evening scenes for done and begin start at the evening start or 20:00, whichever comes first. A late finish is one with under 4 hours left before midnight, read from when today's habit day was recorded, or from the review session that earned it when an excuse came first. The widget never displays Quran text, an excuse category or a count of days away. These changes send no notification.
 
 ## Motion and event ownership
 

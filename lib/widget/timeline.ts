@@ -28,6 +28,8 @@ export type WidgetBuildInput = Readonly<{
   appearance: WidgetAppearance;
   showZayt: boolean;
   showNumbers: boolean;
+  /** When today's wird was finished, for the relieved face after a late finish; null when unknown. */
+  todayFinishedAt: Date | null;
 }>;
 
 function sameContent(a: WidgetEntryContent, b: WidgetEntryContent): boolean {

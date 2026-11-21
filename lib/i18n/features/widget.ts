@@ -40,7 +40,8 @@ export const widgetStrings = {
     widgetLineUrgent: "Save your {{days}}",
     widgetLineUrgentPlain: "Save your streak",
     widgetLineUrgent2: "Your streak needs you",
-    widgetLineCritical: "Under 2 hours left!",
+    // A no-break space keeps "2 hours" together on a wrapped line.
+    widgetLineCritical: "Under 2\u00A0hours left!",
     widgetLineCritical2: "Hurry, {{days}} at stake",
     widgetLineCritical2Plain: "Hurry, your streak is at stake",
     widgetLineLast: "Last hour!",
