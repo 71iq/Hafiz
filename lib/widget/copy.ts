@@ -40,6 +40,8 @@ export type WidgetCopyInput = Readonly<{
   language: "en" | "ar";
   showZayt: boolean;
   showNumbers: boolean;
+  /** When today's wird was finished, or null when it is not done or the time is unknown. */
+  todayFinishedAt: Date | null;
 }>;
 
 type Language = "en" | "ar";
@@ -83,6 +85,11 @@ export function widgetDeadline(state: WidgetState, at: Date, clock: DayClock, ma
 
 type Level = Exclude<WidgetUrgency, "none">;
 
+const LEVELS: readonly Level[] = ["calm", "steady", "nudge", "urgent", "critical", "last"];
+
+/** A finish with this little of the day left earns the relieved face instead of the shimmer. */
+const LATE_LEVELS: ReadonlySet<Level> = new Set<Level>(["urgent", "critical", "last"]);
+
 /** The sky for an open day at each level, darkening towards the deadline. */
 const OPEN_SCENES: Record<Level, WidgetScene> = {
   calm: "morning",
@@ -117,11 +124,35 @@ const MAKE_UP_POSES: Record<Level, readonly WidgetPose[]> = {
   last: ["panicked"],
 };
 
-/** A stable pick for this date and level, so refreshes agree and the next level shows another face. */
+/**
+ * A stable pick among `count` options for this date and key, so every refresh agrees. FNV-1a with a
+ * final mix, so neighbouring dates and keys spread over the options independently; a running
+ * character sum would reduce to its parity with two options and flip every level together.
+ */
 export function widgetVariant(date: LocalDate, key: string, count: number): number {
-  let hash = 0;
-  for (const character of `${date}:${key}`) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return hash % count;
+  let hash = 0x811c9dc5;
+  for (const character of `${date}:${key}`) hash = Math.imul(hash ^ character.charCodeAt(0), 0x01000193);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
+  hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
+  return ((hash ^ (hash >>> 16)) >>> 0) % count;
+}
+
+/** Zayt's pose at `level`: one per level and day, never the pose the level before showed that day. */
+function ladderPose(
+  pools: Readonly<Record<Level, readonly WidgetPose[]>>,
+  level: Level,
+  date: LocalDate,
+  key: string,
+): WidgetPose {
+  let previous: WidgetPose | null = null;
+  for (const step of LEVELS) {
+    const fresh = pools[step].filter((pose) => pose !== previous);
+    const options = fresh.length > 0 ? fresh : pools[step];
+    const pose = options[widgetVariant(date, `${key}:${step}`, options.length)];
+    if (step === level) return pose;
+    previous = pose;
+  }
+  throw new Error(`Unknown urgency level ${level}`);
 }
 
 /** Evening for the done and begin scenes: from the evening start or 20:00, whichever comes first. */
@@ -129,31 +160,34 @@ function isEvening(at: Date, clock: DayClock, eveningStartsAt: (date: LocalDate)
   return clock.minutesOf(at) >= 20 * 60 || at.getTime() >= eveningStartsAt(clock.dateOf(at)).getTime();
 }
 
-/** Spec 4.6: the scene and Zayt's still for a state at this level and time. */
+/**
+ * Spec 4.6: the scene and Zayt's still for a state at this level and time. `finishedLate` is a done
+ * day finished with under four hours left, which earns the relieved face.
+ */
 export function widgetArt(
   state: WidgetState,
   urgency: WidgetUrgency,
   evening: boolean,
   date: LocalDate,
+  finishedLate = false,
 ): readonly [WidgetScene, WidgetPose] {
-  const pick = (poses: readonly WidgetPose[]) => poses[widgetVariant(date, urgency, poses.length)];
+  const level: Level = urgency === "none" ? "calm" : urgency;
   switch (state) {
     case "begin":
       return evening ? ["night", "glow_halo"] : ["dawn", "wave"];
     case "fresh_start":
       return ["dawn", "lonely"];
     case "make_up":
-      return ["dawn", pick(MAKE_UP_POSES[urgency === "none" ? "calm" : urgency])];
+      return ["dawn", ladderPose(MAKE_UP_POSES, level, date, "make_up")];
     case "open_day":
     case "open_evening":
-    case "earn_back_open": {
-      const level = urgency === "none" ? "calm" : urgency;
-      return [OPEN_SCENES[level], pick(OPEN_POSES[level])];
-    }
+    case "earn_back_open":
+      return [OPEN_SCENES[level], ladderPose(OPEN_POSES, level, date, "open")];
     case "earn_back_done":
       return evening ? ["radiant_night", "open_halo"] : ["sunrise", "open"];
     case "done":
-      return evening ? ["radiant_night", pick(["shimmer_halo", "relieved_halo"])] : ["radiant", "shimmer"];
+      if (finishedLate) return ["radiant_night", "relieved_halo"];
+      return evening ? ["radiant_night", "shimmer_halo"] : ["radiant", "shimmer"];
     case "safe":
       return evening ? ["radiant_night", "warm_halo"] : ["radiant", "warm"];
     case "milestone":
@@ -312,16 +346,24 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
   const date = clock.dateOf(at);
   const deadline = widgetDeadline(state, at, clock, h.kind === "make_up_open" ? h.cutoff : null);
   const urgency: WidgetUrgency = deadline ? widgetUrgencyAt(at, deadline) : "none";
-  const [scene, pose] = widgetArt(state, urgency, isEvening(at, clock, input.eveningStartsAt), date);
-  // Loss framing names the streak from the nudge on, when Show numbers is on (owner decision).
-  const days = showNumbers && length > 0 ? formatDays(length, language) : null;
-  const time = h.kind === "make_up_open" ? formatClockMinutesForDisplay(clock.minutesOf(h.cutoff), language) : "";
+  const [scene, pose] = widgetArt(
+    state,
+    urgency,
+    isEvening(at, clock, input.eveningStartsAt),
+    date,
+    isFinishedLate(input.todayFinishedAt, date, clock),
+  );
+  // Loss framing names the streak from the nudge on, when Show numbers is on (owner decision). The
+  // number stays on one line with its unit.
+  const days = showNumbers && length > 0 ? keepTogether(formatDays(length, language)) : null;
+  const time =
+    h.kind === "make_up_open" ? keepTogether(formatClockMinutesForDisplay(clock.minutesOf(h.cutoff), language)) : "";
   const earnBack = h.kind === "earn_back" ? h.earnBack : null;
   const earnBackValues = earnBack
     ? {
         done: formatNumber(earnBack.daysDone, language),
         n: formatNumber(earnBack.brokenLength, language),
-        days: formatDays(earnBack.brokenLength, language),
+        days: keepTogether(formatDays(earnBack.brokenLength, language)),
       }
     : { done: "", n: "", days: "" };
   const doneOrSafeHeadline = plan.reviewLeft ? s.widgetSafeHeadline : s.habitDoneToday;
@@ -463,11 +505,17 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
   };
 }
 
-/**
- * Spec 4.2: the one short line beside the count. Open days say how much of the day is left; a done
- * day says nothing, because the lit flame and the gold scene already do. `headline` is the spoken
- * headline, reused where it is already short, so TalkBack reads what the screen shows.
- */
+/** Joins a number and its unit with no-break spaces, so a wrapped line never leaves "days" alone. */
+function keepTogether(text: string): string {
+  return text.replace(/ /g, "\u00A0");
+}
+
+/** Today's wird was finished with under four hours left before midnight. */
+function isFinishedLate(finishedAt: Date | null, date: LocalDate, clock: DayClock): boolean {
+  if (finishedAt === null || clock.dateOf(finishedAt) !== date) return false;
+  return LATE_LEVELS.has(widgetUrgencyAt(finishedAt, clock.at(addDays(date, 1), 0)));
+}
+
 /**
  * The open day's line at each level: an invitation while there is time, then the streak at stake as
  * the deadline nears. Each level has two lines; one is picked per level and day.
@@ -494,6 +542,11 @@ function openLine(level: Level, date: LocalDate, s: (typeof strings)[Language], 
   return lines[widgetVariant(date, `line:${level}`, lines.length)];
 }
 
+/**
+ * Spec 4.2: the one short line beside the count. Open days say how much of the day is left; a done
+ * day says nothing, because the lit flame and the gold scene already do. `headline` is the spoken
+ * headline, reused where it is already short, so TalkBack reads what the screen shows.
+ */
 function lineFor(state: WidgetState, language: Language, headline: string, reviewLeft: boolean): string | null {
   const s = strings[language];
   switch (state) {

@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
@@ -24,9 +25,9 @@ import com.anonymous.hafiz.R
 import java.util.Locale
 
 /**
- * Builds the widget's RemoteViews (spec 3.3, 3.4 and 9.2). Both providers share five layouts, each
- * used in three modes: the scene with Zayt, and the plain card in a fixed app theme or in the
- * launcher's day or night colors. From Android 12 each widget gets every size at once, so the
+ * Builds the widget's RemoteViews (spec 3.3, 3.4 and 9.2). Both providers share the same sized
+ * layouts, each used in three modes: the scene with Zayt, and the plain card in a fixed app theme or
+ * in the launcher's day or night colors. From Android 12 each widget gets every size at once, so the
  * launcher switches layouts on resize without waking the app; before that the renderer picks one
  * from the size the launcher reports.
  */
@@ -65,6 +66,9 @@ object WidgetRenderer {
     WIDE_SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 250f, 64f, wideScene = true, weekView = false, art = true, lineWithCount = true),
     SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 170f, 64f, wideScene = true, weekView = false, art = true, lineWithCount = true),
     STRIP(R.layout.hafiz_widget_strip, R.layout.hafiz_widget_strip_plain, R.layout.hafiz_widget_strip_plain_system, 210f, 40f, wideScene = true, weekView = false, art = true, lineWithCount = true),
+    // A short 2 x 1, as on five-column launchers: the flame and count with Zayt at the end and no line.
+    // Without Zayt it is the strip's plain card, with the count or, with Show numbers off, the line.
+    COMPACT(R.layout.hafiz_widget_compact, R.layout.hafiz_widget_strip_plain, R.layout.hafiz_widget_strip_plain_system, 130f, 48f, wideScene = true, weekView = false, art = true, lineWithCount = false, lineBesideZayt = false),
     TINY(R.layout.hafiz_widget_tiny, R.layout.hafiz_widget_tiny_plain, R.layout.hafiz_widget_tiny_plain_system, 100f, 40f, wideScene = true, weekView = false, art = false, lineWithCount = false),
   }
 
@@ -115,7 +119,8 @@ object WidgetRenderer {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
           return RemoteViews(Bucket.entries.associate { SizeF(it.width, it.height) to entryViews(context, it, timeline, selection.entry, Motion.NONE) })
         }
-        return entryViews(context, if (kind == "medium") Bucket.WIDE_ROOMY else Bucket.TILE, timeline, selection.entry, Motion.NONE)
+        val bucket = if (kind == "medium") Bucket.WIDE_ROOMY else Bucket.TILE
+        return entryViews(context, bucket, timeline, selection.entry, Motion.NONE, SizeF(bucket.width, bucket.height))
       } catch (error: Exception) {
         WidgetLog.failure("preview", error)
       }
@@ -225,6 +230,10 @@ object WidgetRenderer {
     var flame = WidgetArt.flame(entry)
     var flameTint = 0
     var flameLoop: Int? = null
+    // The one-color flames' tints, at 0 and while waiting calmly; 0 keeps the System theme's own.
+    var outTint = 0
+    var waitTint = 0
+    var outline = WidgetArt.Outline.SYSTEM
     // Week row colors: label, open-day flame, kept and empty dots. 0 keeps the System theme's own.
     var weekColors = intArrayOf(0, 0, 0)
     if (pose != null) {
@@ -234,23 +243,28 @@ object WidgetRenderer {
       if (rounded != null) views.setImageViewBitmap(R.id.widget_scene, rounded) else views.setImageViewResource(R.id.widget_scene, scene)
       views.setTextColor(R.id.widget_count, if (entry.flame == "lit") ink.lit else ink.primary)
       views.setTextColor(R.id.widget_line, ink.primary)
-      when (entry.flame) {
-        "out" -> flameTint = ink.secondary
-        "unlit" -> {
-          // The ember grows with the time running out (spec 4.6).
-          val waiting = WidgetArt.waiting(entry.urgency, ink.light)
-          flame = waiting.drawable
-          if (waiting.tinted) flameTint = ink.primary
-          if (motion != Motion.NONE) flameLoop = waiting.loop
-        }
-      }
+      outTint = ink.secondary
+      waitTint = ink.primary
+      outline = if (ink.light) WidgetArt.Outline.LIGHT else WidgetArt.Outline.DARK
       weekColors = intArrayOf(ink.secondary, ink.primary, ink.secondary)
     } else if (colors != null) {
       views.setInt(R.id.widget_scene, "setColorFilter", colors.surface)
       views.setTextColor(R.id.widget_count, colors.accentText)
       views.setTextColor(R.id.widget_line, colors.textPrimary)
-      if (entry.flame != "lit") flameTint = if (entry.flame == "out") colors.textSecondary else colors.accent
+      outTint = colors.textSecondary
+      waitTint = colors.accent
+      outline = if (Color.luminance(colors.textPrimary) > 0.5f) WidgetArt.Outline.LIGHT else WidgetArt.Outline.DARK
       weekColors = intArrayOf(colors.textSecondary, colors.accent, colors.textSecondary)
+    }
+    when (entry.flame) {
+      "out" -> flameTint = outTint
+      "unlit" -> {
+        // The ember grows with the time running out (spec 4.6), with Zayt or without.
+        val waiting = WidgetArt.waiting(entry.urgency, outline)
+        flame = waiting.drawable
+        if (waiting.tinted) flameTint = waitTint
+        if (motion != Motion.NONE) flameLoop = waiting.loop
+      }
     }
     views.setImageViewResource(R.id.widget_flame, flame)
     // The System theme's unlit drawables carry the launcher's day or night color themselves.

@@ -118,6 +118,7 @@ function input(options: Options = {}): WidgetBuildInput {
     appearance: options.appearance ?? { colorMode: "fixed", colors: WIDGET_PALETTES.white },
     showZayt: options.showZayt ?? true,
     showNumbers: options.showNumbers ?? true,
+    todayFinishedAt: options.todayFinishedAt ?? null,
   };
 }
 
@@ -183,10 +184,10 @@ describe("widget timeline example (spec 7.3)", () => {
         flame: "unlit",
         tier: 1,
         count: "12",
-        line: "Wird time?",
+        line: "Today's wird awaits",
         note: "3 pages left, about 15 minutes",
         contentDescription:
-          "Hafiz. Streak: 12 days. Wird time? A short review today keeps your streak. 3 pages left, about 15 minutes.",
+          "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
         tap: "wird",
       },
       {
@@ -194,14 +195,14 @@ describe("widget timeline example (spec 7.3)", () => {
         state: "open_day",
         urgency: "steady",
         scene: "day",
-        pose: "wave",
+        pose: "eager",
         flame: "unlit",
         tier: 1,
         count: "12",
-        line: "Keep your streak going",
+        line: "Keep it going",
         note: "3 pages left, about 15 minutes",
         contentDescription:
-          "Hafiz. Streak: 12 days. Keep your streak going. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+          "Hafiz. Streak: 12 days. Keep it going. A short review today keeps your streak. 3 pages left, about 15 minutes.",
         tap: "wird",
       },
       {
@@ -213,10 +214,10 @@ describe("widget timeline example (spec 7.3)", () => {
         flame: "unlit",
         tier: 1,
         count: "12",
-        line: "Keep your 12 days",
+        line: "Keep your 12\u00A0days",
         note: "3 pages left, about 15 minutes",
         contentDescription:
-          "Hafiz. Streak: 12 days. Keep your 12 days. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+          "Hafiz. Streak: 12 days. Keep your 12\u00A0days. A short review today keeps your streak. 3 pages left, about 15 minutes.",
         tap: "wird",
       },
       {
@@ -228,10 +229,10 @@ describe("widget timeline example (spec 7.3)", () => {
         flame: "unlit",
         tier: 1,
         count: "12",
-        line: "Save your 12 days",
+        line: "Save your 12\u00A0days",
         note: "3 pages left, about 15 minutes",
         contentDescription:
-          "Hafiz. Streak: 12 days. Save your 12 days. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+          "Hafiz. Streak: 12 days. Save your 12\u00A0days. A short review today keeps your streak. 3 pages left, about 15 minutes.",
         tap: "wird",
       },
     ]);
@@ -255,7 +256,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     expect(at(timeline, CLOCK.at(after, 0))).toMatchObject({
       state: "make_up",
       count: "5",
-      line: "Make up by 12:30 PM",
+      line: "Make up by 12:30\u00A0PM",
     });
     expect(at(timeline, CLOCK.at(after, 12 * 60 + 30))).toMatchObject({
       state: "open_day",
@@ -599,7 +600,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
       for (const text of entryTexts(entry)) expect(text).not.toMatch(/[0-9]/);
     }
     expect(timeline.entries[0].contentDescription).toBe(
-      "حافظ. السلسلة: ١٢ يومًا. وقت الوِرد؟ مراجعة قصيرة اليوم تحفظ سلسلتك. بقي ٣ صفحات، نحو ١٥ دقيقة.",
+      "حافظ. السلسلة: ١٢ يومًا. وِرد اليوم بانتظارك. مراجعة قصيرة اليوم تحفظ سلسلتك. بقي ٣ صفحات، نحو ١٥ دقيقة.",
     );
   });
 });

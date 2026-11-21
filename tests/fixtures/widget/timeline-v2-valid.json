@@ -23,7 +23,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Wird time?",
+      "line": "Today's wird awaits",
       "note": "3 pages left, about 15 minutes",
       "week": [
         {
@@ -55,7 +55,7 @@
           "label": "M"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Wird time? A short review today keeps your streak. 3 pages left, about 15 minutes.",
+      "contentDescription": "Hafiz. Streak: 12 days. Today's wird awaits. A short review today keeps your streak. 3 pages left, about 15 minutes.",
       "tap": "wird"
     },
     {
@@ -63,11 +63,11 @@
       "state": "open_day",
       "urgency": "steady",
       "scene": "day",
-      "pose": "wave",
+      "pose": "eager",
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Keep your streak going",
+      "line": "Keep it going",
       "note": "3 pages left, about 15 minutes",
       "week": [
         {
@@ -99,7 +99,7 @@
           "label": "M"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Keep your streak going. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+      "contentDescription": "Hafiz. Streak: 12 days. Keep it going. A short review today keeps your streak. 3 pages left, about 15 minutes.",
       "tap": "wird"
     },
     {
@@ -111,7 +111,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Keep your 12 days",
+      "line": "Keep your 12 days",
       "note": "3 pages left, about 15 minutes",
       "week": [
         {
@@ -143,7 +143,7 @@
           "label": "M"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Keep your 12 days. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+      "contentDescription": "Hafiz. Streak: 12 days. Keep your 12 days. A short review today keeps your streak. 3 pages left, about 15 minutes.",
       "tap": "wird"
     },
     {
@@ -155,7 +155,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Save your 12 days",
+      "line": "Save your 12 days",
       "note": "3 pages left, about 15 minutes",
       "week": [
         {
@@ -187,7 +187,7 @@
           "label": "M"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Save your 12 days. A short review today keeps your streak. 3 pages left, about 15 minutes.",
+      "contentDescription": "Hafiz. Streak: 12 days. Save your 12 days. A short review today keeps your streak. 3 pages left, about 15 minutes.",
       "tap": "wird"
     },
     {
@@ -199,7 +199,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Save your 12 days",
+      "line": "Save your 12 days",
       "note": "3 pages left, about 15 minutes",
       "week": [
         {
@@ -231,7 +231,7 @@
           "label": "M"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Save your 12 days. A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
+      "contentDescription": "Hafiz. Streak: 12 days. Save your 12 days. A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
       "tap": "wird"
     },
     {
@@ -243,7 +243,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Under 2 hours left!",
+      "line": "Under 2 hours left!",
       "note": "3 pages left, about 15 minutes",
       "week": [
         {
@@ -275,7 +275,7 @@
           "label": "M"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Under 2 hours left! A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
+      "contentDescription": "Hafiz. Streak: 12 days. Under 2 hours left! A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
       "tap": "wird"
     },
     {
@@ -287,7 +287,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Now, or lose 12 days",
+      "line": "Last hour!",
       "note": "3 pages left, about 15 minutes",
       "week": [
         {
@@ -319,7 +319,7 @@
           "label": "M"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Now, or lose 12 days. A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
+      "contentDescription": "Hafiz. Streak: 12 days. Last hour! A short review before the day ends keeps your streak. 3 pages left, about 15 minutes.",
       "tap": "wird"
     },
     {
@@ -327,11 +327,11 @@
       "state": "make_up",
       "urgency": "calm",
       "scene": "dawn",
-      "pose": "rest",
+      "pose": "wave",
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Make up by 12:30 PM",
+      "line": "Make up by 12:30 PM",
       "note": "Grace days: 1",
       "week": [
         {
@@ -363,7 +363,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
+      "contentDescription": "Hafiz. Streak: 12 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
       "tap": "wird"
     },
     {
@@ -375,7 +375,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Make up by 12:30 PM",
+      "line": "Make up by 12:30 PM",
       "note": "Grace days: 1",
       "week": [
         {
@@ -407,7 +407,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
+      "contentDescription": "Hafiz. Streak: 12 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
       "tap": "wird"
     },
     {
@@ -419,7 +419,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Make up by 12:30 PM",
+      "line": "Make up by 12:30 PM",
       "note": "Grace days: 1",
       "week": [
         {
@@ -451,7 +451,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
+      "contentDescription": "Hafiz. Streak: 12 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
       "tap": "wird"
     },
     {
@@ -463,7 +463,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Last chance: 12:30 PM",
+      "line": "Last chance: 12:30 PM",
       "note": "Grace days: 1",
       "week": [
         {
@@ -495,7 +495,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
+      "contentDescription": "Hafiz. Streak: 12 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
       "tap": "wird"
     },
     {
@@ -507,7 +507,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Last chance: 12:30 PM",
+      "line": "Last chance: 12:30 PM",
       "note": "Grace days: 1",
       "week": [
         {
@@ -539,7 +539,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
+      "contentDescription": "Hafiz. Streak: 12 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
       "tap": "wird"
     },
     {
@@ -551,7 +551,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "12",
-      "line": "Last chance: 12:30 PM",
+      "line": "Last chance: 12:30 PM",
       "note": "Grace days: 1",
       "week": [
         {
@@ -583,7 +583,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 12 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
+      "contentDescription": "Hafiz. Streak: 12 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM. Grace days: 1.",
       "tap": "wird"
     },
     {
@@ -591,7 +591,7 @@
       "state": "open_day",
       "urgency": "steady",
       "scene": "day",
-      "pose": "eager",
+      "pose": "wave",
       "flame": "unlit",
       "tier": 1,
       "count": "13",
@@ -639,7 +639,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Don't break 13 days",
+      "line": "Keep your 13 days",
       "note": "A grace day kept your streak",
       "week": [
         {
@@ -671,7 +671,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Don't break 13 days. A short review today keeps your streak. A grace day kept your streak.",
+      "contentDescription": "Hafiz. Streak: 13 days. Keep your 13 days. A short review today keeps your streak. A grace day kept your streak.",
       "tap": "wird"
     },
     {
@@ -771,7 +771,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Hurry, 13 days at stake",
+      "line": "Hurry, 13 days at stake",
       "note": "A grace day kept your streak",
       "week": [
         {
@@ -803,7 +803,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Hurry, 13 days at stake. A short review before the day ends keeps your streak. A grace day kept your streak.",
+      "contentDescription": "Hafiz. Streak: 13 days. Hurry, 13 days at stake. A short review before the day ends keeps your streak. A grace day kept your streak.",
       "tap": "wird"
     },
     {
@@ -815,7 +815,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Last hour!",
+      "line": "Now, or lose 13 days",
       "note": "A grace day kept your streak",
       "week": [
         {
@@ -847,7 +847,7 @@
           "label": "T"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Last hour! A short review before the day ends keeps your streak. A grace day kept your streak.",
+      "contentDescription": "Hafiz. Streak: 13 days. Now, or lose 13 days. A short review before the day ends keeps your streak. A grace day kept your streak.",
       "tap": "wird"
     },
     {
@@ -859,7 +859,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Make up by 12:30 PM",
+      "line": "Make up by 12:30 PM",
       "note": null,
       "week": [
         {
@@ -891,7 +891,7 @@
           "label": "W"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
+      "contentDescription": "Hafiz. Streak: 13 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
       "tap": "wird"
     },
     {
@@ -899,11 +899,11 @@
       "state": "make_up",
       "urgency": "steady",
       "scene": "dawn",
-      "pose": "wave",
+      "pose": "eager",
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Make up by 12:30 PM",
+      "line": "Make up by 12:30 PM",
       "note": null,
       "week": [
         {
@@ -935,7 +935,7 @@
           "label": "W"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
+      "contentDescription": "Hafiz. Streak: 13 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
       "tap": "wird"
     },
     {
@@ -947,7 +947,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Make up by 12:30 PM",
+      "line": "Make up by 12:30 PM",
       "note": null,
       "week": [
         {
@@ -979,7 +979,7 @@
           "label": "W"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
+      "contentDescription": "Hafiz. Streak: 13 days. Make up by 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
       "tap": "wird"
     },
     {
@@ -991,7 +991,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Last chance: 12:30 PM",
+      "line": "Last chance: 12:30 PM",
       "note": null,
       "week": [
         {
@@ -1023,7 +1023,7 @@
           "label": "W"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
+      "contentDescription": "Hafiz. Streak: 13 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
       "tap": "wird"
     },
     {
@@ -1035,7 +1035,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Last chance: 12:30 PM",
+      "line": "Last chance: 12:30 PM",
       "note": null,
       "week": [
         {
@@ -1067,7 +1067,7 @@
           "label": "W"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
+      "contentDescription": "Hafiz. Streak: 13 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
       "tap": "wird"
     },
     {
@@ -1079,7 +1079,7 @@
       "flame": "unlit",
       "tier": 1,
       "count": "13",
-      "line": "Last chance: 12:30 PM",
+      "line": "Last chance: 12:30 PM",
       "note": null,
       "week": [
         {
@@ -1111,7 +1111,7 @@
           "label": "W"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 13 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
+      "contentDescription": "Hafiz. Streak: 13 days. Last chance: 12:30 PM. Yesterday's wird can still be made up before 12:30 PM.",
       "tap": "wird"
     },
     {
@@ -1119,7 +1119,7 @@
       "state": "earn_back_open",
       "urgency": "steady",
       "scene": "day",
-      "pose": "wave",
+      "pose": "eager",
       "flame": "out",
       "tier": 0,
       "count": "0",
@@ -1427,7 +1427,7 @@
       "state": "earn_back_open",
       "urgency": "nudge",
       "scene": "golden",
-      "pose": "warm",
+      "pose": "impatient",
       "flame": "out",
       "tier": 0,
       "count": "0",
@@ -1607,7 +1607,7 @@
       "flame": "out",
       "tier": 0,
       "count": "0",
-      "line": "Your wird misses you",
+      "line": "Start again today",
       "note": "Longest: 13 days",
       "week": [
         {
@@ -1639,7 +1639,7 @@
           "label": "F"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 0 days. Your wird misses you. One short review today starts it. Longest: 13 days.",
+      "contentDescription": "Hafiz. Streak: 0 days. Start again today. One short review today starts it. Longest: 13 days.",
       "tap": "wird"
     },
     {
@@ -1651,7 +1651,7 @@
       "flame": "out",
       "tier": 0,
       "count": "0",
-      "line": "Start again today",
+      "line": "Your wird misses you",
       "note": "Longest: 13 days",
       "week": [
         {
@@ -1683,7 +1683,7 @@
           "label": "S"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 0 days. Start again today. One short review today starts it. Longest: 13 days.",
+      "contentDescription": "Hafiz. Streak: 0 days. Your wird misses you. One short review today starts it. Longest: 13 days.",
       "tap": "wird"
     },
     {
@@ -1695,7 +1695,7 @@
       "flame": "out",
       "tier": 0,
       "count": "0",
-      "line": "Your wird misses you",
+      "line": "Start again today",
       "note": "Longest: 13 days",
       "week": [
         {
@@ -1727,7 +1727,7 @@
           "label": "S"
         }
       ],
-      "contentDescription": "Hafiz. Streak: 0 days. Your wird misses you. One short review today starts it. Longest: 13 days.",
+      "contentDescription": "Hafiz. Streak: 0 days. Start again today. One short review today starts it. Longest: 13 days.",
       "tap": "wird"
     }
   ]

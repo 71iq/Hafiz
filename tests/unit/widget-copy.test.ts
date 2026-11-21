@@ -9,6 +9,7 @@ import {
   describeWidgetEntry,
   formatWidgetDate,
   joinSentences,
+  widgetArt,
   widgetUrgencyAt,
   widgetVariant,
   widgetWeek,
@@ -141,6 +142,7 @@ function describe1(
   showNumbers: boolean,
   reviewLeft?: boolean,
   atMinutes?: number,
+  finishedAtMinutes?: number,
 ): WidgetEntryContent {
   const { projection, at: stateAt, reviewLeft: stateReviewLeft } = projectionFor(state, values);
   const at = atMinutes === undefined ? stateAt : CLOCK.at(D, atMinutes);
@@ -159,6 +161,7 @@ function describe1(
     language,
     showZayt: true,
     showNumbers,
+    todayFinishedAt: finishedAtMinutes === undefined ? null : CLOCK.at(D, finishedAtMinutes),
   });
   expect(entry.state).toBe(state);
   return entry;
@@ -291,7 +294,7 @@ describe("widget copy rules (spec 4.3)", () => {
   it("escalates an open day's sky, Zayt and line as midnight nears, and turns a done night gold", () => {
     const at = (minutes: number) =>
       describe1(minutes >= 21 * 60 ? "open_evening" : "open_day", DISTINCT, "en", true, undefined, minutes);
-    const days = "4,321 days";
+    const days = "4,321\u00A0days";
     const rows = [
       [9 * 60, "calm", "morning", ["rest", "wave"], [strings.en.widgetLineCalm, strings.en.widgetOpenHeadline]],
       [12 * 60 + 30, "steady", "day", ["eager", "wave"], [strings.en.widgetLineDay, strings.en.widgetLineSteady]],
@@ -310,25 +313,52 @@ describe("widget copy rules (spec 4.3)", () => {
       ]);
       expect([minutes, (lines as readonly string[]).includes(entry.line!)]).toEqual([minutes, true]);
     }
-    const doneLate = describe1("done", DISTINCT, "en", true, undefined, 22 * 60 + 30);
-    expect([doneLate.urgency, doneLate.scene, ["shimmer_halo", "relieved_halo"].includes(doneLate.pose!)]).toEqual([
-      "none",
-      "radiant_night",
-      true,
-    ]);
+    const doneLate = describe1("done", DISTINCT, "en", true, undefined, 22 * 60 + 30, 21 * 60);
+    expect([doneLate.urgency, doneLate.scene, doneLate.pose]).toEqual(["none", "radiant_night", "relieved_halo"]);
     const beginLate = describe1("begin", DISTINCT, "en", true, undefined, 21 * 60 + 30);
     expect([beginLate.scene, beginLate.pose]).toEqual(["night", "glow_halo"]);
   });
 
   it("counts the make-up window down to its cutoff, with a last chance from two hours before", () => {
     const at = (minutes: number) => describe1("make_up", DISTINCT, "en", true, undefined, minutes);
-    expect([at(8 * 60).urgency, at(8 * 60).line]).toEqual(["nudge", "Make up by 12:30 PM"]);
+    expect([at(8 * 60).urgency, at(8 * 60).line]).toEqual(["nudge", "Make up by 12:30\u00A0PM"]);
     expect([at(10 * 60).urgency, at(10 * 60).pose, at(10 * 60).line]).toEqual([
       "urgent",
       "worried",
-      "Last chance: 12:30 PM",
+      "Last chance: 12:30\u00A0PM",
     ]);
     expect([at(12 * 60).urgency, at(12 * 60).pose]).toEqual(["last", "panicked"]);
+  });
+
+  it("shows the relieved face only after a late finish, by night", () => {
+    const evening = (finishedAt?: number) =>
+      describe1("done", DISTINCT, "en", true, undefined, 23 * 60, finishedAt).pose;
+    // Under four hours left at the finish is late; 20:00 is exactly four hours before midnight.
+    expect([evening(7 * 60), evening(19 * 60 + 59), evening(20 * 60), evening(22 * 60 + 50)]).toEqual([
+      "shimmer_halo",
+      "shimmer_halo",
+      "relieved_halo",
+      "relieved_halo",
+    ]);
+    // An unknown finish, or a time from another day, is not late.
+    expect(evening()).toBe("shimmer_halo");
+    expect(evening(-60)).toBe("shimmer_halo");
+    // By day the done scene stays radiant; a milestone keeps its own still.
+    expect(describe1("done", DISTINCT, "en", true, undefined, 15 * 60, 9 * 60).pose).toBe("shimmer");
+    expect(describe1("milestone", DISTINCT, "en", true, undefined, 23 * 60, 22 * 60).pose).toBe("milestone");
+  });
+
+  it("never shows the face of the level before on the same day", () => {
+    const levels = ["calm", "steady", "nudge", "urgent", "critical", "last"] as const;
+    for (let offset = 0; offset < 60; offset += 1) {
+      const date = addDays(D, offset);
+      for (const state of ["open_day", "make_up"] as const) {
+        const poses = levels.map((level) => widgetArt(state, level, false, date)[1]);
+        for (let index = 1; index < poses.length; index += 1) {
+          expect([date, state, index, poses[index] === poses[index - 1]]).toEqual([date, state, index, false]);
+        }
+      }
+    }
   });
 
   it("names no figure in an urgent line when Show numbers is off", () => {
@@ -366,6 +396,7 @@ describe("widget copy rules (spec 4.3)", () => {
       language: "en",
       showZayt: false,
       showNumbers: true,
+      todayFinishedAt: null,
     });
     expect([plain.pose, plain.scene]).toEqual([null, "radiant"]);
   });
@@ -395,6 +426,12 @@ describe("the widget's urgency levels (spec 4.6)", () => {
     expect(widgetVariant(D, "calm", 2)).toBe(widgetVariant(D, "calm", 2));
     const picks = new Set(Array.from({ length: 14 }, (_, day) => widgetVariant(addDays(D, day), "calm", 2)));
     expect(picks).toEqual(new Set([0, 1]));
+    // Two levels with two options each do not flip together from day to day.
+    const together = Array.from({ length: 60 }, (_, day) => addDays(D, day)).filter(
+      (date) => widgetVariant(date, "open:urgent", 2) === widgetVariant(date, "open:critical", 2),
+    ).length;
+    expect(together).toBeGreaterThan(15);
+    expect(together).toBeLessThan(45);
   });
 });
 
@@ -415,6 +452,7 @@ describe("review findings: today's recitation, restored days and the spoken line
       language: "en",
       showZayt: true,
       showNumbers: true,
+      todayFinishedAt: null,
     });
     expect([entry.state, entry.flame, entry.week[6].mark]).toEqual(["make_up", "lit", "lit"]);
   });

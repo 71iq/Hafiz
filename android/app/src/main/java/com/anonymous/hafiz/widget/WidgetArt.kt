@@ -122,30 +122,44 @@ object WidgetArt {
       else -> null
     }
 
-  /** The waiting flame on a scene: what to draw, whether to tint it with the ink, and its loop if any. */
+  /** The waiting flame: what to draw, whether to tint it like the text, and its loop if any. */
   data class Waiting(val drawable: Int, val tinted: Boolean, val loop: Int?)
 
   /**
-   * Spec 4.6: while today waits, the flame's ember grows with the urgency. Calm days show the
-   * outline with a small ember, tinted like the text; from the nudge the ember glows warm, from two
-   * to four hours left it pulses, and in the last hour it pulses red. The ember frames carry their
-   * own colors, outlined to match a light or a dark sky.
+   * The ember frames' outline: white on dark skies and cards, dark on light ones, and the System
+   * theme's own text color on its plain card, which follows the launcher's day or night.
    */
-  fun waiting(urgency: String, light: Boolean): Waiting =
+  enum class Outline { LIGHT, DARK, SYSTEM }
+
+  /**
+   * Spec 4.6: while today waits, the flame's ember grows with the urgency, with Zayt or without.
+   * Calm days show the outline with a small ember, tinted like the text; from the nudge the ember
+   * glows warm, from two to four hours left it pulses, and in the last hour it pulses red. The ember
+   * frames carry their own colors, since frame lists cannot be tinted on every Android version.
+   */
+  fun waiting(urgency: String, outline: Outline): Waiting =
     when (urgency) {
       "nudge" ->
-        Waiting(if (light) R.drawable.hafiz_widget_flame_ember_light_dim else R.drawable.hafiz_widget_flame_ember_dark_dim, false, null)
+        Waiting(
+          when (outline) {
+            Outline.LIGHT -> R.drawable.hafiz_widget_flame_ember_light_dim
+            Outline.DARK -> R.drawable.hafiz_widget_flame_ember_dark_dim
+            Outline.SYSTEM -> R.drawable.hafiz_widget_flame_ember_system_dim
+          },
+          false,
+          null,
+        )
       "urgent", "critical" ->
-        if (light) {
-          Waiting(R.drawable.hafiz_widget_flame_ember_light_bright, false, R.layout.hafiz_widget_flame_ember_light)
-        } else {
-          Waiting(R.drawable.hafiz_widget_flame_ember_dark_bright, false, R.layout.hafiz_widget_flame_ember_dark)
+        when (outline) {
+          Outline.LIGHT -> Waiting(R.drawable.hafiz_widget_flame_ember_light_bright, false, R.layout.hafiz_widget_flame_ember_light)
+          Outline.DARK -> Waiting(R.drawable.hafiz_widget_flame_ember_dark_bright, false, R.layout.hafiz_widget_flame_ember_dark)
+          Outline.SYSTEM -> Waiting(R.drawable.hafiz_widget_flame_ember_system_bright, false, R.layout.hafiz_widget_flame_ember_system)
         }
       "last" ->
-        if (light) {
-          Waiting(R.drawable.hafiz_widget_flame_ember_red_light_bright, false, R.layout.hafiz_widget_flame_ember_red_light)
-        } else {
-          Waiting(R.drawable.hafiz_widget_flame_ember_red_dark_bright, false, R.layout.hafiz_widget_flame_ember_red_dark)
+        when (outline) {
+          Outline.LIGHT -> Waiting(R.drawable.hafiz_widget_flame_ember_red_light_bright, false, R.layout.hafiz_widget_flame_ember_red_light)
+          Outline.DARK -> Waiting(R.drawable.hafiz_widget_flame_ember_red_dark_bright, false, R.layout.hafiz_widget_flame_ember_red_dark)
+          Outline.SYSTEM -> Waiting(R.drawable.hafiz_widget_flame_ember_red_system_bright, false, R.layout.hafiz_widget_flame_ember_red_system)
         }
       else -> Waiting(R.drawable.hafiz_widget_flame_unlit, true, null)
     }

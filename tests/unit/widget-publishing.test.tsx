@@ -253,6 +253,7 @@ function stubInput(language: "en" | "ar", now: Date): WidgetBuildInput {
     appearance: { colorMode: "system" },
     showZayt: true,
     showNumbers: true,
+    todayFinishedAt: null,
   };
 }
 
