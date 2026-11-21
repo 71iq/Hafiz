@@ -34,6 +34,9 @@ data class WidgetPlacementCounts(val small: Int, val medium: Int) {
  * never race, so a render always reads a whole stored timeline.
  */
 object WidgetWork {
+  /** How long a one-shot stays in place before the resting blink returns. */
+  private const val CELEBRATION_HOLD_SECONDS = 12L
+
   val executor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { runnable ->
     Thread(runnable, "HafizWidget").apply { isDaemon = true }
   }
@@ -73,9 +76,10 @@ object WidgetWork {
     WidgetRenderer.renderAll(context, manager, ids, timeline, selection, appearance, motion)
     if (celebrating) {
       // Replace the one-shot with the resting blink, which starts from the clip's last drawing. Read
-      // the current timeline again in case settings, account or today's state changed. Leave the
-      // clip on its final frame briefly so a busy launcher has time to display the landing.
-      executor.schedule({ refresh(context) }, 5, TimeUnit.SECONDS)
+      // the current timeline again in case settings, account or today's state changed. A launcher
+      // decodes every frame before the clip starts; on a slow one that took 7 s, so the clip keeps
+      // its final drawing, the entry's still, until well after it can have played.
+      executor.schedule({ refresh(context) }, CELEBRATION_HOLD_SECONDS, TimeUnit.SECONDS)
     }
     if (ids.isNotEmpty() && selection is WidgetSelection.Entry) {
       WidgetScheduler.schedule(context, selection.nextBoundary)

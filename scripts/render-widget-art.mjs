@@ -6,6 +6,7 @@
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 
 const source = process.argv[2];
 if (!source) throw new Error("Pass the studio's zayt/widget/out directory.");
@@ -72,7 +73,19 @@ for (const dir of [drawable, layout]) {
 }
 const exported = path.join(source, "res", "drawable-nodpi");
 const files = (await readdir(exported)).filter((file) => /^hafiz_widget_(zayt|scene)_[a-z0-9_]+\.webp$/.test(file));
-for (const file of files) await copyFile(path.join(exported, file), path.join(art, file));
+// A launcher decodes every frame of a one-shot before it plays, and holds them all while it does.
+// Clip frames are packed at two thirds of the still's size; each clip still ends on the full still.
+const CLIP_FRAME = /^hafiz_widget_zayt_(done|done_halo|turn)_\d{2}\.webp$/;
+for (const file of files) {
+  if (CLIP_FRAME.test(file)) {
+    await sharp(path.join(exported, file))
+      .resize({ width: 400, height: 480 })
+      .webp({ quality: 86, alphaQuality: 100, effort: 6 })
+      .toFile(path.join(art, file));
+  } else {
+    await copyFile(path.join(exported, file), path.join(art, file));
+  }
+}
 const names = new Set(files.map((file) => file.replace(/\.webp$/, "")));
 const need = (name) => {
   if (!names.has(name)) throw new Error(`The export has no ${name}.webp`);
