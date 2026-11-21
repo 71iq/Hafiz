@@ -103,7 +103,9 @@
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="-8dp"
             android:importantForAccessibility="noHideDescendants">
-            <!-- Wraps the still exactly, so a frame list in widget_motion gets the same box. -->
+            <!-- Wraps the still exactly, so a frame list in widget_motion gets the same box. FrameLayout
+                 measures match_parent children again at its final size only when it has two or more, so the
+                 empty widget_motion_pair is what stretches the frame list to the still. -->
             <FrameLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -122,6 +124,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:visibility="gone"/>
+                <FrameLayout
+                    android:id="@+id/widget_motion_pair"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"/>
             </FrameLayout>
         </FrameLayout>
     </LinearLayout>
