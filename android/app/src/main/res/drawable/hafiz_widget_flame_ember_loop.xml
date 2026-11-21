@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- The ember of an unlit flame glowing and settling on the night and last-hour scenes. -->
-<animation-list xmlns:android="http://schemas.android.com/apk/res/android" android:oneshot="false">
-    <item android:drawable="@drawable/hafiz_widget_flame_ember_dim" android:duration="1100"/>
-    <item android:drawable="@drawable/hafiz_widget_flame_ember_bright" android:duration="900"/>
-</animation-list>

@@ -1,8 +1,9 @@
 // Packages the Zayt widget art into Android resources.
 // Usage: node scripts/render-widget-art.mjs /path/to/studio/zayt/widget/out
 // The source is the studio's widget export (branch feat/zayt-widget-art, zayt/widget/README.md). It
-// holds res/drawable-nodpi/*.webp with the final names, and clips.json with each clip's frames as
-// { "done": [{ "file": "hafiz_widget_zayt_done_00.webp", "durationMs": 110 }, ...], ... }.
+// holds res/drawable-nodpi/*.webp with the final names, clips.json with each one-shot's frames as
+// { "done": [{ "file": "hafiz_widget_zayt_done_00.webp", "durationMs": 110 }, ...], ... }, and
+// loops.json with each urgency pose's idle loop in the same format.
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +16,7 @@ const art = path.join(res, "drawable-nodpi");
 const drawable = path.join(res, "drawable");
 const layout = path.join(res, "layout");
 
-/** Poses with a slow-blink frame (WidgetArt.blink). Seated and celebrating stills have none. */
+/** Calm poses with a slow-blink frame (WidgetArt.idle). The urgency poses bring their own loops. */
 const BLINKING = ["rest", "warm", "wave", "glow", "open", "glow_halo", "open_halo", "warm_halo"];
 /** One-shot clips by resource name: the export's clip and the still it ends on (WidgetArt.celebration). */
 const CLIPS = {
@@ -104,6 +105,21 @@ for (const pose of BLINKING) {
   );
 }
 
+// The urgency faces' idle loops: a bounce, a foot tap, a drip, a tremble (WidgetArt.idle).
+const loops = JSON.parse(await readFile(path.join(source, "loops.json"), "utf8"));
+for (const [pose, frames] of Object.entries(loops)) {
+  if (!Array.isArray(frames) || frames.length < 2) throw new Error(`loops.json has no frames for ${pose}`);
+  const items = frames.map(({ file, durationMs }) => [need(file.replace(/\.webp$/, "")), durationMs]);
+  await writeFile(
+    path.join(drawable, `hafiz_widget_anim_loop_${pose}.xml`),
+    list(`Zayt's idle loop, ${pose}.`, false, items),
+  );
+  await writeFile(
+    path.join(layout, `hafiz_widget_motion_loop_${pose}.xml`),
+    motion(`Runs hafiz_widget_anim_loop_${pose} on the launcher.`, `hafiz_widget_anim_loop_${pose}`),
+  );
+}
+
 const clips = JSON.parse(await readFile(path.join(source, "clips.json"), "utf8"));
 for (const [clip, [exported, still]] of Object.entries(CLIPS)) {
   const frames = clips[exported];
@@ -118,7 +134,7 @@ for (const [clip, [exported, still]] of Object.entries(CLIPS)) {
   );
 }
 console.log(
-  `Copied ${files.length} files; wrote ${BLINKING.length} blink loops and ${Object.keys(CLIPS).length} clips.`,
+  `Copied ${files.length} files; wrote ${BLINKING.length} blinks, ${Object.keys(loops).length} loops and ${Object.keys(CLIPS).length} clips.`,
 );
 
 // Streak flames: the export's SVGs become VectorDrawables. They use only filled paths, an evenodd
@@ -214,23 +230,44 @@ await writeFile(
       `  <path android:fillColor="@color/hafiz_widget_accent" android:pathData="${emberData}"/>\n`,
   ),
 );
-// The night skies' ember loop, drawn in white ink with a warm ember (hafiz_widget_flame_ember_loop).
-const white = outline.replace("@color/hafiz_widget_text_secondary", "#FFFFFFFF");
-await writeFile(
-  path.join(drawable, "hafiz_widget_flame_ember_dim.xml"),
-  vector(
-    "The waiting flame on a night sky, ember low.",
-    white + `  <path android:fillColor="#CCF59E2B" android:pathData="${emberData}"/>\n`,
-  ),
-);
-await writeFile(
-  path.join(drawable, "hafiz_widget_flame_ember_bright.xml"),
-  vector(
-    "The waiting flame on a night sky, ember glowing.",
-    glow(12.2, 17.6, 6.5, "#80FFB547") +
-      white +
-      `  <path android:fillColor="#FFFFC45C" android:pathData="${emberData}"/>\n`,
-    true,
-  ),
-);
+// The waiting flame's ember as the day runs out (WidgetArt.waiting): warm from the nudge, pulsing
+// from two hours before, red in the last hour. Each is drawn with a white outline for dark skies
+// and a dark one for light skies, since frame lists cannot be tinted on every Android version.
+for (const [outlineName, outlineColor] of [
+  ["light", "#FFFFFFFF"],
+  ["dark", "#FF1D2430"],
+]) {
+  const outlined = outline.replace("@color/hafiz_widget_text_secondary", outlineColor);
+  for (const [kind, low, high, glowColor, dimMs, brightMs] of [
+    ["", "#CCF59E2B", "#FFFFC45C", "#80FFB547", 1100, 900],
+    ["red_", "#CCE5482A", "#FFFF5A36", "#99FF4D2E", 600, 500],
+  ]) {
+    const name = `hafiz_widget_flame_ember_${kind}${outlineName}`;
+    await writeFile(
+      path.join(drawable, `${name}_dim.xml`),
+      vector(
+        "The waiting flame, ember low.",
+        outlined + `  <path android:fillColor="${low}" android:pathData="${emberData}"/>\n`,
+      ),
+    );
+    await writeFile(
+      path.join(drawable, `${name}_bright.xml`),
+      vector(
+        "The waiting flame, ember glowing.",
+        glow(12.2, 17.6, 6.5, glowColor) +
+          outlined +
+          `  <path android:fillColor="${high}" android:pathData="${emberData}"/>\n`,
+        true,
+      ),
+    );
+    await writeFile(
+      path.join(drawable, `${name}_loop.xml`),
+      list(`The waiting flame's ember pulsing${kind ? " red" : ""}.`, false, [
+        [`${name}_dim`, dimMs],
+        [`${name}_bright`, brightMs],
+      ]),
+    );
+    await writeFile(path.join(layout, `${name}.xml`), motion(`Runs ${name}_loop on the launcher.`, `${name}_loop`));
+  }
+}
 console.log("Wrote the streak flames.");

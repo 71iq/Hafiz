@@ -36,25 +36,23 @@ object WidgetRenderer {
     val height: Float,
     /** The wide crop of the sky; the tile uses the square one. */
     val wideScene: Boolean,
-    /** The layout has the week row and note views; the week row shows whenever it does. */
+    /** The layout has the week row. */
     val weekView: Boolean,
-    /** The plan or grace note fits below the week row. */
-    val note: Boolean,
     /** Zayt has room here; the tiny layout keeps its width for the count or the line. */
     val art: Boolean,
     /** The line shows beside a count; where it does not, only a missing count brings it back. */
     val lineWithCount: Boolean,
   ) {
-    WIDE_ROOMY(R.layout.hafiz_widget_wide_roomy, R.layout.hafiz_widget_wide_roomy_plain, R.layout.hafiz_widget_wide_roomy_plain_system, 320f, 170f, wideScene = true, weekView = true, note = true, art = true, lineWithCount = true),
-    WIDE(R.layout.hafiz_widget_wide, R.layout.hafiz_widget_wide_plain, R.layout.hafiz_widget_wide_plain_system, 250f, 170f, wideScene = true, weekView = true, note = false, art = true, lineWithCount = true),
-    TILE(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 130f, 130f, wideScene = false, weekView = false, note = false, art = true, lineWithCount = true),
+    WIDE_ROOMY(R.layout.hafiz_widget_wide_roomy, R.layout.hafiz_widget_wide_roomy_plain, R.layout.hafiz_widget_wide_roomy_plain_system, 320f, 170f, wideScene = true, weekView = true, art = true, lineWithCount = true),
+    WIDE(R.layout.hafiz_widget_wide, R.layout.hafiz_widget_wide_plain, R.layout.hafiz_widget_wide_plain_system, 250f, 170f, wideScene = true, weekView = true, art = true, lineWithCount = true),
+    TILE(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 130f, 130f, wideScene = false, weekView = false, art = true, lineWithCount = true),
     // Below 130 dp a two-line line would leave Zayt a sliver, so the smallest tile keeps the count and Zayt.
-    TILE_SMALL(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 110f, 100f, wideScene = false, weekView = false, note = false, art = true, lineWithCount = false),
+    TILE_SMALL(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 110f, 100f, wideScene = false, weekView = false, art = true, lineWithCount = false),
     // A wide, short widget looks like a long 2 x 1: Zayt looks up from the bottom edge.
-    WIDE_SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 250f, 64f, wideScene = true, weekView = false, note = false, art = true, lineWithCount = true),
-    SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 170f, 64f, wideScene = true, weekView = false, note = false, art = true, lineWithCount = true),
-    STRIP(R.layout.hafiz_widget_strip, R.layout.hafiz_widget_strip_plain, R.layout.hafiz_widget_strip_plain_system, 210f, 40f, wideScene = true, weekView = false, note = false, art = true, lineWithCount = true),
-    TINY(R.layout.hafiz_widget_tiny, R.layout.hafiz_widget_tiny_plain, R.layout.hafiz_widget_tiny_plain_system, 100f, 40f, wideScene = true, weekView = false, note = false, art = false, lineWithCount = false),
+    WIDE_SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 250f, 64f, wideScene = true, weekView = false, art = true, lineWithCount = true),
+    SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 170f, 64f, wideScene = true, weekView = false, art = true, lineWithCount = true),
+    STRIP(R.layout.hafiz_widget_strip, R.layout.hafiz_widget_strip_plain, R.layout.hafiz_widget_strip_plain_system, 210f, 40f, wideScene = true, weekView = false, art = true, lineWithCount = true),
+    TINY(R.layout.hafiz_widget_tiny, R.layout.hafiz_widget_tiny_plain, R.layout.hafiz_widget_tiny_plain_system, 100f, 40f, wideScene = true, weekView = false, art = false, lineWithCount = false),
   }
 
   /** What may move: nothing, the idle blink, or the blink after a one-shot clip earned this session. */
@@ -152,9 +150,11 @@ object WidgetRenderer {
     val views = RemoteViews(context.packageName, layout)
     views.setInt(android.R.id.background, "setLayoutDirection", if (timeline.rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR)
 
-    // Unlit and zero flames are one color, tinted like the text; a lit flame keeps its own colors.
-    // A color filter of 0 leaves the drawable as it is, clearing a tint from a reapplied view.
+    // A lit flame keeps its own colors; zero and calm waiting flames are one color, tinted like the
+    // text. A color filter of 0 leaves the drawable as it is, clearing a tint from a reapplied view.
+    var flame = WidgetArt.flame(entry)
     var flameTint = 0
+    var flameLoop: Int? = null
     // Week row colors: label, open-day flame, kept and empty dots. 0 keeps the System theme's own.
     var weekColors = intArrayOf(0, 0, 0)
     if (pose != null) {
@@ -162,33 +162,36 @@ object WidgetRenderer {
       views.setImageViewResource(R.id.widget_scene, WidgetArt.scene(entry.scene, bucket.wideScene))
       views.setTextColor(R.id.widget_count, if (entry.flame == "lit") ink.lit else ink.primary)
       views.setTextColor(R.id.widget_line, ink.primary)
-      if (bucket.weekView) views.setTextColor(R.id.widget_note, ink.secondary)
-      if (entry.flame != "lit") flameTint = if (entry.flame == "out") ink.secondary else ink.primary
+      when (entry.flame) {
+        "out" -> flameTint = ink.secondary
+        "unlit" -> {
+          // The ember grows with the time running out (spec 4.6).
+          val waiting = WidgetArt.waiting(entry.urgency, ink.light)
+          flame = waiting.drawable
+          if (waiting.tinted) flameTint = ink.primary
+          if (motion != Motion.NONE) flameLoop = waiting.loop
+        }
+      }
       weekColors = intArrayOf(ink.secondary, ink.primary, ink.secondary)
     } else if (colors != null) {
       views.setInt(R.id.widget_scene, "setColorFilter", colors.surface)
       views.setTextColor(R.id.widget_count, colors.accentText)
       views.setTextColor(R.id.widget_line, colors.textPrimary)
-      if (bucket.weekView) views.setTextColor(R.id.widget_note, colors.textSecondary)
       if (entry.flame != "lit") flameTint = if (entry.flame == "out") colors.textSecondary else colors.accent
       weekColors = intArrayOf(colors.textSecondary, colors.accent, colors.textSecondary)
     }
-    views.setImageViewResource(R.id.widget_flame, WidgetArt.flame(entry))
+    views.setImageViewResource(R.id.widget_flame, flame)
     // The System theme's unlit drawables carry the launcher's day or night color themselves.
     if (pose != null || colors != null) views.setInt(R.id.widget_flame, "setColorFilter", flameTint)
-    // On the night skies the waiting flame's ember glows and settles as the day ends.
     views.removeAllViews(R.id.widget_flame_motion)
-    val ember = motion != Motion.NONE && pose != null && WidgetArt.emberGlows(entry)
-    if (ember) views.addView(R.id.widget_flame_motion, RemoteViews(context.packageName, R.layout.hafiz_widget_flame_ember))
-    views.setViewVisibility(R.id.widget_flame_motion, if (ember) View.VISIBLE else View.GONE)
-    views.setViewVisibility(R.id.widget_flame, if (ember) View.INVISIBLE else View.VISIBLE)
+    flameLoop?.let { views.addView(R.id.widget_flame_motion, RemoteViews(context.packageName, it)) }
+    views.setViewVisibility(R.id.widget_flame_motion, if (flameLoop != null) View.VISIBLE else View.GONE)
+    views.setViewVisibility(R.id.widget_flame, if (flameLoop != null) View.INVISIBLE else View.VISIBLE)
 
     showText(views, R.id.widget_count, entry.count)
     showText(views, R.id.widget_line, if (!bucket.lineWithCount && entry.count != null) null else entry.line)
-    if (bucket.weekView) {
-      showText(views, R.id.widget_note, if (bucket.note) entry.note else null)
-      showWeek(views, entry.week, weekColors)
-    }
+    // The plan or grace note is spoken in the label only; the widget stays minimal (owner, 2026-11-21).
+    if (bucket.weekView) showWeek(views, entry.week, weekColors)
 
     val zayt = if (bucket.art) pose else null
     views.setViewVisibility(R.id.widget_art, if (zayt == null) View.GONE else View.VISIBLE)
@@ -228,8 +231,8 @@ object WidgetRenderer {
     views.removeAllViews(R.id.widget_motion)
     val moving = when (motion) {
       Motion.NONE -> null
-      Motion.IDLE -> WidgetArt.blink(pose)
-      Motion.CELEBRATE -> WidgetArt.celebration(entry) ?: WidgetArt.blink(pose)
+      Motion.IDLE -> WidgetArt.idle(pose)
+      Motion.CELEBRATE -> WidgetArt.celebration(entry) ?: WidgetArt.idle(pose)
     }
     if (moving == null) {
       views.setViewVisibility(R.id.widget_motion, View.GONE)

@@ -15,7 +15,10 @@ object WidgetArt {
    * crops: at least 7.6:1 for the primary ink and 4.7:1 for the secondary. `lit` is the count once
    * today counts, in the flame's color family; the digits are large and bold, so it needs 3:1.
    */
-  data class Ink(val primary: Int, val secondary: Int, val lit: Int)
+  data class Ink(val primary: Int, val secondary: Int, val lit: Int) {
+    /** Light text on a dark sky; picks the white-outlined ember frames. */
+    val light: Boolean get() = Color.luminance(primary) > 0.5f
+  }
 
   private fun color(hex: String): Int = Color.parseColor(hex)
 
@@ -64,14 +67,26 @@ object WidgetArt {
       "open_halo" -> R.drawable.hafiz_widget_zayt_open_halo
       "warm_halo" -> R.drawable.hafiz_widget_zayt_warm_halo
       "shimmer_halo" -> R.drawable.hafiz_widget_zayt_shimmer_halo
+      "eager" -> R.drawable.hafiz_widget_zayt_eager
+      "impatient" -> R.drawable.hafiz_widget_zayt_impatient
+      "worried" -> R.drawable.hafiz_widget_zayt_worried
+      "anxious" -> R.drawable.hafiz_widget_zayt_anxious
+      "panicked" -> R.drawable.hafiz_widget_zayt_panicked
+      "relieved" -> R.drawable.hafiz_widget_zayt_relieved
+      "lonely" -> R.drawable.hafiz_widget_zayt_lonely
+      "worried_halo" -> R.drawable.hafiz_widget_zayt_worried_halo
+      "anxious_halo" -> R.drawable.hafiz_widget_zayt_anxious_halo
+      "panicked_halo" -> R.drawable.hafiz_widget_zayt_panicked_halo
+      "relieved_halo" -> R.drawable.hafiz_widget_zayt_relieved_halo
       else -> R.drawable.hafiz_widget_zayt_wave
     }
 
   /**
-   * The looping slow blink for a pose, as a layout whose ProgressBar runs the frame list. Seated and
-   * celebrating poses have none: closed eyes there read as a doze or as basking (Zayt spec 5.6).
+   * A pose's idle loop, as a layout whose ProgressBar runs the frame list: the urgency faces' own
+   * movement (a bounce, a foot tap, a drip, a tremble) or the slow blink of the calm poses. Seated
+   * and celebrating stills have none.
    */
-  fun blink(pose: String): Int? =
+  fun idle(pose: String): Int? =
     when (pose) {
       "rest" -> R.layout.hafiz_widget_motion_blink_rest
       "warm" -> R.layout.hafiz_widget_motion_blink_warm
@@ -81,6 +96,15 @@ object WidgetArt {
       "glow_halo" -> R.layout.hafiz_widget_motion_blink_glow_halo
       "open_halo" -> R.layout.hafiz_widget_motion_blink_open_halo
       "warm_halo" -> R.layout.hafiz_widget_motion_blink_warm_halo
+      "eager" -> R.layout.hafiz_widget_motion_loop_eager
+      "impatient" -> R.layout.hafiz_widget_motion_loop_impatient
+      "worried" -> R.layout.hafiz_widget_motion_loop_worried
+      "anxious" -> R.layout.hafiz_widget_motion_loop_anxious
+      "panicked" -> R.layout.hafiz_widget_motion_loop_panicked
+      "lonely" -> R.layout.hafiz_widget_motion_loop_lonely
+      "worried_halo" -> R.layout.hafiz_widget_motion_loop_worried_halo
+      "anxious_halo" -> R.layout.hafiz_widget_motion_loop_anxious_halo
+      "panicked_halo" -> R.layout.hafiz_widget_motion_loop_panicked_halo
       else -> null
     }
 
@@ -97,8 +121,33 @@ object WidgetArt {
       else -> null
     }
 
-  /** The night skies use white ink, which the fixed-color ember frames are drawn for. */
-  fun emberGlows(entry: WidgetEntry): Boolean = entry.flame == "unlit" && (entry.scene == "night" || entry.scene == "midnight")
+  /** The waiting flame on a scene: what to draw, whether to tint it with the ink, and its loop if any. */
+  data class Waiting(val drawable: Int, val tinted: Boolean, val loop: Int?)
+
+  /**
+   * Spec 4.6: while today waits, the flame's ember grows with the urgency. Calm days show the
+   * outline with a small ember, tinted like the text; from the nudge the ember glows warm, from two
+   * to four hours left it pulses, and in the last hour it pulses red. The ember frames carry their
+   * own colors, outlined to match a light or a dark sky.
+   */
+  fun waiting(urgency: String, light: Boolean): Waiting =
+    when (urgency) {
+      "nudge" ->
+        Waiting(if (light) R.drawable.hafiz_widget_flame_ember_light_dim else R.drawable.hafiz_widget_flame_ember_dark_dim, false, null)
+      "urgent", "critical" ->
+        if (light) {
+          Waiting(R.drawable.hafiz_widget_flame_ember_light_bright, false, R.layout.hafiz_widget_flame_ember_light)
+        } else {
+          Waiting(R.drawable.hafiz_widget_flame_ember_dark_bright, false, R.layout.hafiz_widget_flame_ember_dark)
+        }
+      "last" ->
+        if (light) {
+          Waiting(R.drawable.hafiz_widget_flame_ember_red_light_bright, false, R.layout.hafiz_widget_flame_ember_red_light)
+        } else {
+          Waiting(R.drawable.hafiz_widget_flame_ember_red_dark_bright, false, R.layout.hafiz_widget_flame_ember_red_dark)
+        }
+      else -> Waiting(R.drawable.hafiz_widget_flame_unlit, true, null)
+    }
 
   fun day(mark: String): Int =
     when (mark) {
