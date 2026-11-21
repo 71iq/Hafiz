@@ -118,6 +118,7 @@ object WidgetArt {
       "milestone" -> R.layout.hafiz_widget_motion_milestone
       "shimmer" -> R.layout.hafiz_widget_motion_done
       "shimmer_halo" -> R.layout.hafiz_widget_motion_done_halo
+      "relieved_halo" -> R.layout.hafiz_widget_motion_done_relieved_halo
       else -> null
     }
 

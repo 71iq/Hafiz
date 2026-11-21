@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { widgetArt } from "@/lib/widget/copy";
 import { WIDGET_PALETTES } from "@/lib/widget/palette";
 import {
   WIDGET_FLAMES,
@@ -110,6 +111,22 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
     expect(roomy.replace('android:maxWidth="165dp"', 'android:maxWidth="112dp"')).toBe(regular);
   });
 
+  it("has a celebration clip for every pose a done day or milestone can show", () => {
+    const kotlin = fs.readFileSync(
+      path.join(root, "android/app/src/main/java/com/anonymous/hafiz/widget/WidgetArt.kt"),
+      "utf8",
+    );
+    const celebration = /fun celebration[\s\S]*?else -> null/.exec(kotlin)![0];
+    const poses = new Set<string>();
+    for (const evening of [false, true]) {
+      for (let day = 1; day <= 28; day += 1) {
+        const date = `2026-11-${String(day).padStart(2, "0")}`;
+        for (const state of ["done", "milestone"] as const) poses.add(widgetArt(state, "none", evening, date)[1]);
+      }
+    }
+    for (const pose of poses) expect([pose, celebration.includes(`"${pose}" ->`)]).toEqual([pose, true]);
+  });
+
   it("lets the Kotlin parser accept exactly the states, scenes, poses and flames JavaScript sends", () => {
     const kotlin = fs.readFileSync(
       path.join(root, "android/app/src/main/java/com/anonymous/hafiz/widget/WidgetTimeline.kt"),
@@ -159,11 +176,11 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
       },
       medium: {
         "android:minWidth": "250dp",
-        "android:minHeight": "110dp",
+        "android:minHeight": "130dp",
         "android:targetCellWidth": "4",
         "android:targetCellHeight": "2",
         "android:minResizeWidth": "250dp",
-        "android:minResizeHeight": "110dp",
+        "android:minResizeHeight": "130dp",
         "android:maxResizeWidth": "560dp",
         "android:maxResizeHeight": "300dp",
       },

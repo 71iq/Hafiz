@@ -424,6 +424,12 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
     if (note !== null) break;
   }
 
+  // With no count and nothing else to say, the line still tells a done day apart; the label then says
+  // it in place of the done headline, which means the same.
+  const ownLine = lineFor(state, language, headline, plan.reviewLeft);
+  const line = ownLine ?? (count === null ? s.widgetLineDone : null);
+  const spokenHeadline = ownLine === null && line !== null ? null : headline === line ? null : headline;
+
   const tap: WidgetTap =
     state === "milestone"
       ? plan.reviewLeft
@@ -441,14 +447,15 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
     flame,
     tier: streakTier(length),
     count,
-    // With no count and nothing else to say, the line still tells a done day apart.
-    line: lineFor(state, language, headline, plan.reviewLeft) ?? (count === null ? s.widgetLineDone : null),
+    line,
     note,
     week: widgetWeek(projection.days, clock.dateOf(at), todayLit, language),
+    // The label says the line the screen shows, then the headline when it adds something.
     contentDescription: joinSentences([
       s.appName,
       count === null ? null : interpolate(s.habitStreakCount, { days: formatDays(length, language) }),
-      headline,
+      line,
+      spokenHeadline,
       detail,
       note,
     ]),

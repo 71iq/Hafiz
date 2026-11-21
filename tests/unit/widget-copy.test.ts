@@ -419,6 +419,15 @@ describe("review findings: today's recitation, restored days and the spoken line
     expect([entry.state, entry.flame, entry.week[6].mark]).toEqual(["make_up", "lit", "lit"]);
   });
 
+  it("speaks the line the screen shows in every state, once, in both languages", () => {
+    for (const { language, state, entry } of everyEntry(DISTINCT)) {
+      if (entry.line === null) continue;
+      const where = `${language} ${state}`;
+      expect({ where, spoken: entry.contentDescription.includes(entry.line) }).toEqual({ where, spoken: true });
+      expect({ where, once: entry.contentDescription.split(entry.line).length - 1 }).toEqual({ where, once: 1 });
+    }
+  });
+
   it("speaks the line the screen shows in the last hour, in both languages", () => {
     for (const language of ["en", "ar"] as const) {
       const entry = describe1("open_evening", DISTINCT, language, true, undefined, 23 * 60 + 20);

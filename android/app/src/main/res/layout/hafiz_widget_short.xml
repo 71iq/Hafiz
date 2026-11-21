@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 170 x 64 dp and up, under 100 dp tall (a 2 x 1 on most phones), and wide short sizes from 250 x 64 dp:
-     Zayt looks up from the bottom edge.
+     Zayt fills the height at the end.
      Shared by both modes. With Show Zayt on, widget_scene shows the sky and widget_art holds Zayt; the
      renderer sets every color. With it off, widget_scene is the theme card and widget_art is gone. -->
 <FrameLayout
@@ -80,27 +80,40 @@
                 android:maxLines="2"
                 android:layout_marginTop="2dp"/>
         </LinearLayout>
+        <!-- Zayt follows the widget's height with only the twig tip and the feet cut, so the face, low on
+             the drop, always shows. The inner frame wraps the still, and the empty pair makes FrameLayout
+             measure the frame list at the still's own size. -->
         <FrameLayout
             android:id="@+id/widget_art"
-            android:layout_width="73dp"
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:layout_marginTop="-10dp"
+            android:layout_marginBottom="-6dp"
             android:layout_marginEnd="4dp"
             android:importantForAccessibility="noHideDescendants">
-            <ImageView
-                android:id="@+id/widget_zayt"
-                android:layout_width="73dp"
-                android:layout_height="88dp"
-                android:layout_marginTop="-9dp"
-                android:layout_gravity="top"
-                android:scaleType="fitCenter"
-                android:importantForAccessibility="no"/>
             <FrameLayout
-                android:id="@+id/widget_motion"
-                android:layout_width="73dp"
-                android:layout_height="88dp"
-                android:layout_marginTop="-9dp"
-                android:layout_gravity="top"
-                android:visibility="gone"/>
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom">
+                <ImageView
+                    android:id="@+id/widget_zayt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:adjustViewBounds="true"
+                    android:maxWidth="84dp"
+                    android:scaleType="fitCenter"
+                    android:importantForAccessibility="no"/>
+                <FrameLayout
+                    android:id="@+id/widget_motion"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone"/>
+                <FrameLayout
+                    android:id="@+id/widget_motion_pair"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"/>
+            </FrameLayout>
         </FrameLayout>
     </LinearLayout>
 </FrameLayout>

@@ -22,6 +22,8 @@ const BLINKING = ["rest", "warm", "wave", "glow", "open", "glow_halo", "open_hal
 const CLIPS = {
   done: ["done", "shimmer"],
   done_halo: ["done_halo", "shimmer_halo"],
+  // A late finish: the same hop, landing on the relieved brow wipe.
+  done_relieved_halo: ["done_halo", "relieved_halo"],
   milestone: ["turn", "milestone"],
 };
 /**
