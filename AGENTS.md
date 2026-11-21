@@ -22,6 +22,8 @@ Check the active branch and worktree before edits. Preserve the existing AppNavi
 
 Keep local reading independent of network services. Preserve sync IDs, timestamps, soft deletes and conflict semantics. Read the affected local schema, server policies and sync callers before changing persistence.
 
+Make user actions optimistic. Show the result immediately, before any request is validated: write locally first, then sync or call the server, reconcile with its response, and roll back with a visible, recoverable failure if it is rejected. Work toward this whenever you touch a flow that still waits on the network. Keep server authorization and account checks authoritative.
+
 Quran text, identifiers, verse/word positions, page mappings, Arabic assets, fonts and generated databases need explicit data-change authorization. Preserve licenses in NOTICE.md. Copy/share Unicode Quran text, not display glyph data such as text_qcf2. Preserve v2_page and page-font navigation. A page source replacement requires validation of all 604 pages. Runtime assets need native require maps, the Android pack list in scripts/pack-android-content.cjs and web copy/fetch handling.
 
 Android packs the Quran database, datasets and V4 pages into the APK. Classic pages and optional tafsirs download from hafizquran.app at the web export's content-hashed font paths and /data/tafsir-sources/, checked against hashes built into each APK. Released APKs keep requesting those paths, so the web deployment must keep serving those files unchanged.
@@ -60,7 +62,9 @@ Choose checks from package.json that can catch the actual regression. Documentat
 
 For visible behavior use ui-visual-verification, and for native behavior use react-native-skills. Exercise the affected state with sanitized fixtures. Report browser and native evidence separately. Device work must preserve the installed app and its data.
 
-Review the full scoped diff and preserve unrelated work. For completed product changes, commit and push the current branch unless the task or runbook says otherwise. Local agent-environment maintenance stays local unless publication is requested. Verify remote HEAD after a product push. Report changed behavior, checks and material unverified areas concisely.
+Review the full scoped diff and preserve unrelated work. When you finish a product task, commit it and push it to main, rebasing a task branch onto origin/main first, unless the task or runbook says otherwise. A push to main deploys the website, and a new migration still needs the authorization described under Production. Local agent-environment maintenance stays local unless publication is requested. Verify remote HEAD after a product push. Report changed behavior, checks and material unverified areas concisely.
+
+If the pushed work changes what ships in the Android app, release it. Hafiz has no over-the-air updates, so changes to app/, components/, lib/, assets/, native configuration or dependencies reach Android users only through a new APK. Web-only, server-only and documentation changes need no release. First confirm the published version's release commit is on main. If it is not, report that instead of releasing over it, since a release from main would drop its changes. Bump expo.version and expo.android.versionCode in app.json above https://hafizquran.app/downloads/android/latest.json, commit and push that to main, then run scripts/release-android.sh from a clean checkout of the pushed commit. Confirm latest.json then shows the new version and checksum.
 
 ## Safe development and documentation
 
