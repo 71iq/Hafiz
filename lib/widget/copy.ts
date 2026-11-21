@@ -49,6 +49,8 @@ const MARKERS: Record<WidgetState, WidgetMarker> = {
   paused: "paused",
 };
 
+// v1 image values remain readable by older APKs. The current Android renderer uses the
+// explicit widget state to refine these base poses and null as the Show Zayt opt-out.
 const IMAGES: Record<WidgetState, WidgetImage> = {
   begin: "rest",
   fresh_start: "rest",

@@ -23,17 +23,18 @@ import java.util.Locale
 object WidgetRenderer {
   private enum class Bucket(
     val layout: Int,
+    val systemLayout: Int,
     val width: Float,
     val height: Float,
     val caption: Boolean,
     val detail: Boolean,
-    val zayt: Boolean,
+    val inlineArt: Boolean,
   ) {
-    MEDIUM(R.layout.hafiz_widget_medium, 250f, 190f, caption = true, detail = true, zayt = true),
-    MEDIUM_SHORT(R.layout.hafiz_widget_medium_short, 250f, 110f, caption = true, detail = false, zayt = true),
-    COMPACT(R.layout.hafiz_widget_compact, 110f, 96f, caption = true, detail = false, zayt = false),
-    STRIP(R.layout.hafiz_widget_strip, 200f, 40f, caption = false, detail = false, zayt = false),
-    TINY(R.layout.hafiz_widget_tiny, 110f, 40f, caption = false, detail = false, zayt = false),
+    MEDIUM(R.layout.hafiz_widget_medium, R.layout.hafiz_widget_medium_system, 250f, 190f, caption = true, detail = true, inlineArt = false),
+    MEDIUM_SHORT(R.layout.hafiz_widget_medium_short, R.layout.hafiz_widget_medium_short_system, 250f, 110f, caption = true, detail = false, inlineArt = false),
+    COMPACT(R.layout.hafiz_widget_compact, R.layout.hafiz_widget_compact_system, 110f, 96f, caption = true, detail = false, inlineArt = true),
+    STRIP(R.layout.hafiz_widget_strip, R.layout.hafiz_widget_strip_system, 200f, 40f, caption = false, detail = false, inlineArt = true),
+    TINY(R.layout.hafiz_widget_tiny, R.layout.hafiz_widget_tiny_system, 110f, 40f, caption = false, detail = false, inlineArt = true),
   }
 
   private const val REQUEST_TAP_WIRD = 2001
@@ -47,10 +48,11 @@ object WidgetRenderer {
     timeline: WidgetTimeline?,
     selection: WidgetSelection,
     appearance: WidgetAppearance?,
+    playMilestone: Boolean = false,
   ) {
     for (id in ids) {
       try {
-        manager.updateAppWidget(id, viewsFor(context, manager.getAppWidgetOptions(id), timeline, selection, appearance))
+        manager.updateAppWidget(id, viewsFor(context, manager.getAppWidgetOptions(id), timeline, selection, appearance, playMilestone))
       } catch (error: Exception) {
         // The neutral view failed too: the widget keeps its previous view.
         WidgetLog.failure("render", error)
@@ -78,13 +80,14 @@ object WidgetRenderer {
     timeline: WidgetTimeline?,
     selection: WidgetSelection,
     appearance: WidgetAppearance?,
+    playMilestone: Boolean,
   ): RemoteViews {
     if (timeline != null && selection is WidgetSelection.Entry) {
       try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-          return RemoteViews(Bucket.entries.associate { SizeF(it.width, it.height) to entryViews(context, it, timeline, selection.entry) })
+          return RemoteViews(Bucket.entries.associate { SizeF(it.width, it.height) to entryViews(context, it, timeline, selection.entry, playMilestone) })
         }
-        return entryViews(context, bucketFor(context, options), timeline, selection.entry)
+        return entryViews(context, bucketFor(context, options), timeline, selection.entry, playMilestone)
       } catch (error: Exception) {
         WidgetLog.failure("entry", error)
       }
@@ -100,8 +103,8 @@ object WidgetRenderer {
     return Bucket.entries.firstOrNull { width >= it.width && height >= it.height } ?: Bucket.TINY
   }
 
-  private fun entryViews(context: Context, bucket: Bucket, timeline: WidgetTimeline, entry: WidgetEntry): RemoteViews {
-    val views = RemoteViews(context.packageName, bucket.layout)
+  private fun entryViews(context: Context, bucket: Bucket, timeline: WidgetTimeline, entry: WidgetEntry, playMilestone: Boolean = false): RemoteViews {
+    val views = RemoteViews(context.packageName, if (timeline.colors == null) bucket.systemLayout else bucket.layout)
     views.setInt(android.R.id.background, "setLayoutDirection", if (timeline.rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR)
     timeline.colors?.let { colors ->
       views.setInt(R.id.widget_bg, "setColorFilter", colors.surface)
@@ -124,14 +127,16 @@ object WidgetRenderer {
       showText(views, R.id.widget_detail, entry.detail)
       showText(views, R.id.widget_note, entry.note)
     }
-    if (bucket.zayt) {
-      val image = entry.image?.let(::zaytResource)
-      if (image == null) {
-        views.setViewVisibility(R.id.widget_zayt, View.GONE)
-      } else {
-        views.setImageViewResource(R.id.widget_zayt, image)
-        views.setViewVisibility(R.id.widget_zayt, View.VISIBLE)
-      }
+    val illustration = zaytResource(entry)
+    views.removeAllViews(R.id.widget_art)
+    views.setViewVisibility(R.id.widget_art, if (illustration == null) View.GONE else View.VISIBLE)
+    // In a single row Zayt occupies the marker's space. With Zayt off the status marker returns.
+    views.setViewVisibility(R.id.widget_marker, if (bucket.inlineArt && illustration != null) View.GONE else View.VISIBLE)
+    if (illustration != null) {
+      val moving = playMilestone && entry.state == "milestone"
+      val art = RemoteViews(context.packageName, if (moving) R.layout.hafiz_widget_art_motion else R.layout.hafiz_widget_art_still)
+      if (!moving) art.setImageViewResource(R.id.widget_zayt, illustration)
+      views.addView(R.id.widget_art, art)
     }
     views.setContentDescription(android.R.id.background, entry.contentDescription)
     views.setOnClickPendingIntent(android.R.id.background, tapIntent(context, entry.tap))
@@ -144,7 +149,8 @@ object WidgetRenderer {
    */
   private fun neutralViews(context: Context, appearance: WidgetAppearance?): RemoteViews {
     val localized = appearance?.let { localizedContext(context, it.language) } ?: context
-    val views = RemoteViews(context.packageName, R.layout.hafiz_widget_message)
+    val layout = if (appearance?.colors == null) R.layout.hafiz_widget_message_system else R.layout.hafiz_widget_message
+    val views = RemoteViews(context.packageName, layout)
     if (appearance != null) {
       views.setInt(
         android.R.id.background,
@@ -186,14 +192,21 @@ object WidgetRenderer {
       else -> R.drawable.hafiz_widget_marker_open
     }
 
-  private fun zaytResource(image: String): Int? =
-    when (image) {
-      "rest" -> R.drawable.hafiz_widget_zayt_rest
-      "warm" -> R.drawable.hafiz_widget_zayt_warm
-      "glow" -> R.drawable.hafiz_widget_zayt_glow
-      "sit" -> R.drawable.hafiz_widget_zayt_sit
-      else -> null
+  // v1 timelines already carry the state and nullable image. This also gives an installed
+  // widget its new illustration immediately after an upgrade, before Hafiz next opens.
+  private fun zaytResource(entry: WidgetEntry): Int? {
+    if (entry.image == null) return null
+    return when (entry.state) {
+      "begin", "fresh_start", "make_up" -> R.drawable.hafiz_widget_zayt_wave
+      "open_evening" -> R.drawable.hafiz_widget_zayt_glow
+      "earn_back_open", "safe" -> R.drawable.hafiz_widget_zayt_warm
+      "earn_back_done" -> R.drawable.hafiz_widget_zayt_rebound
+      "done" -> R.drawable.hafiz_widget_zayt_shimmer
+      "milestone" -> R.drawable.hafiz_widget_zayt_milestone
+      "kept", "paused" -> R.drawable.hafiz_widget_zayt_sit
+      else -> R.drawable.hafiz_widget_zayt_rest
     }
+  }
 
   /** Opens MainActivity with hafiz://widget?to=wird or ?to=home, which +native-intent routes. */
   private fun tapIntent(context: Context, tap: String): PendingIntent {

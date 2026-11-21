@@ -1113,7 +1113,7 @@
       "children": [
         {
           "id": "homewidget.layouts",
-          "title": "Widget providers, sizes and layouts",
+          "title": "Widget providers, compact and full-size Zayt layouts",
           "kind": "widget",
           "cases": ["WIDGET-01"],
           "uses": [],
@@ -1122,7 +1122,7 @@
         },
         {
           "id": "homewidget.states",
-          "title": "Widget states, copy, theme and TalkBack label",
+          "title": "Widget states, Zayt scenes, milestone turn and TalkBack label",
           "kind": "widget",
           "cases": ["WIDGET-02"],
           "uses": ["wird.settle", "wird.makeup", "wird.earnback", "home.hifzplan", "wird.zayt"],

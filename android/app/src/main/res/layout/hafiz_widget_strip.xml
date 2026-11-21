@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A wide one-row widget, 200 x 40 dp and up: marker, count and headline. -->
+<!-- A wide one-row widget: Zayt or the marker beside the count and headline. -->
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"
@@ -22,9 +22,14 @@
         android:gravity="center_vertical"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
         android:importantForAccessibility="noHideDescendants">
+        <FrameLayout
+            android:id="@+id/widget_art"
+            android:layout_width="30dp"
+            android:layout_height="36dp"
+            android:importantForAccessibility="noHideDescendants"/>
         <ImageView
             android:id="@+id/widget_marker"
             android:layout_width="18dp"
@@ -62,6 +67,6 @@
             android:hyphenationFrequency="none"
             android:ellipsize="end"
             android:lineSpacingExtra="2dp"
-            android:maxLines="1"/>
+            android:maxLines="2"/>
     </LinearLayout>
 </FrameLayout>

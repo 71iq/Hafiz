@@ -3,7 +3,8 @@ import { AppState } from "react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
-import { deviceZoneKey } from "@/lib/habit/dates";
+import { isStreakMilestone } from "@/lib/habit/milestones";
+import { deviceZoneKey, localDateOf } from "@/lib/habit/dates";
 import { useLocalToday } from "@/lib/habit/use-day-boundary";
 import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { useSettings } from "@/lib/settings/context";
@@ -36,6 +37,10 @@ export function useWidgetPublishing(): void {
 
   useEffect(() => {
     if (!active || !db) return;
+    // A committed grade can earn a milestone while the launcher is covered by Hafiz.
+    // Consume it on the first return to the home screen. Nothing is persisted or reconstructed.
+    let milestoneDay: string | null = null;
+    let owner = new AbortController();
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     const cancelSettle = () => {
       if (settleTimer) clearTimeout(settleTimer);
@@ -56,8 +61,10 @@ export function useWidgetPublishing(): void {
         zone = deviceZoneKey();
         publish();
       } else if (state === "background") {
-        // The home screen is current the moment the person leaves Hafiz.
-        publish();
+        const earnedHere = milestoneDay === localDateOf(new Date());
+        milestoneDay = null;
+        cancelSettle();
+        void publishWidget(db, earnedHere ? owner.signal : undefined);
       }
     });
     const zoneTimer = setInterval(() => {
@@ -66,16 +73,27 @@ export function useWidgetPublishing(): void {
       zone = next;
       publish();
     }, ZONE_CHECK_MS);
-    const unsubscribeReview = subscribeReviewActivity(settleThenPublish);
+    const unsubscribeReview = subscribeReviewActivity((wird) => {
+      if (wird && wird.kind !== "none" && isStreakMilestone(wird.length)) milestoneDay = localDateOf(new Date());
+      settleThenPublish();
+    });
     const unsubscribeHabit = subscribeHabitChanged(settleThenPublish);
     const unsubscribeSync = subscribeSyncCompleted((summary) => {
       const changed =
         summary.pulled > 0 || summary.localDataReplaced || summary.accountRestored || summary.restoreCompleted;
-      if (changed) publish();
+      if (changed) {
+        if (summary.localDataReplaced || summary.accountRestored || summary.restoreCompleted) {
+          milestoneDay = null;
+          owner.abort();
+          owner = new AbortController();
+        }
+        publish();
+      }
     });
     const unsubscribeRefresh = subscribeWidgetRefresh(publish);
     const unsubscribePlacement = widgetPlatform.subscribePlacement(publish);
     return () => {
+      owner.abort();
       cancelSettle();
       appState.remove();
       clearInterval(zoneTimer);
@@ -85,5 +103,5 @@ export function useWidgetPublishing(): void {
       unsubscribeRefresh();
       unsubscribePlacement();
     };
-  }, [active, db]);
+  }, [active, db, userId, today]);
 }

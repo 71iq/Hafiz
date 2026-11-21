@@ -146,6 +146,30 @@ describe("useWidgetPublishing triggers (spec 6.5)", () => {
     expect(publishWidget).toHaveBeenCalledTimes(1);
   });
 
+  it("carries a locally earned milestone through foreground refreshes and consumes it on one background", () => {
+    mount();
+    act(() => emitReviewActivity({ kind: "minimum_met", length: 7 }));
+    act(() => jest.advanceTimersByTime(1500));
+    expect(publishWidget).toHaveBeenLastCalledWith(mockDb);
+    act(() => appStateListener!("background"));
+    expect(publishWidget).toHaveBeenLastCalledWith(mockDb, expect.objectContaining({ aborted: false }));
+    act(() => appStateListener!("background"));
+    expect(publishWidget).toHaveBeenLastCalledWith(mockDb, undefined);
+  });
+
+  it("discards a pending milestone on account restore and on a change of owner", () => {
+    const hook = mount();
+    act(() => emitReviewActivity({ kind: "minimum_met", length: 7 }));
+    act(() => emitSyncCompleted({ pushed: 0, pulled: 1, accountRestored: true }));
+    act(() => appStateListener!("background"));
+    expect(publishWidget).toHaveBeenLastCalledWith(mockDb, undefined);
+    act(() => emitReviewActivity({ kind: "minimum_met", length: 7 }));
+    mockUserId = "second-synthetic-user";
+    hook.rerender({});
+    act(() => appStateListener!("background"));
+    expect(publishWidget).toHaveBeenLastCalledWith(mockDb, undefined);
+  });
+
   it("publishes after a sync with new data, and not after one without", () => {
     mount();
     act(() => emitSyncCompleted({ pushed: 3, pulled: 0 }));
@@ -252,6 +276,18 @@ describe("publishWidget (spec 6.4)", () => {
     expect(loads).toHaveLength(2);
     expect(mockPublish).toHaveBeenCalledTimes(2);
     expect(JSON.parse(mockPublish.mock.calls[1][0]).language).toBe("ar");
+  });
+
+  it("drops a milestone publication if its owner changes while the timeline is loading", async () => {
+    const owner = new AbortController();
+    jest.mocked(loadWidgetInput).mockImplementation(async (_db, options) => {
+      owner.abort();
+      return stubInput(options.language, options.now);
+    });
+    actualPublish.setWidgetPublishOptions({ language: "en", themeMode: "white", effectiveTheme: "white" });
+    await expect(actualPublish.publishWidget(mockDb as never, owner.signal)).resolves.toEqual({ status: "waiting" });
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(mockClear).not.toHaveBeenCalled();
   });
 
   it("clears the widget instead of leaving a stale one when loading fails, and logs no content", async () => {

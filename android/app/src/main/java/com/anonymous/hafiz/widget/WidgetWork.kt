@@ -4,10 +4,12 @@ import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
+import android.provider.Settings
 import android.util.Log
 import java.util.TimeZone
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 /** Reason codes only: never strings or numbers from the timeline. */
 object WidgetLog {
@@ -32,7 +34,7 @@ data class WidgetPlacementCounts(val small: Int, val medium: Int) {
  * never race, so a render always reads a whole stored timeline.
  */
 object WidgetWork {
-  val executor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+  val executor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { runnable ->
     Thread(runnable, "HafizWidget").apply { isDaemon = true }
   }
 
@@ -48,7 +50,7 @@ object WidgetWork {
   }
 
   /** Reads the store, renders every placed widget and arms the next boundary alarm, or cancels it. */
-  fun refresh(context: Context) {
+  fun refresh(context: Context, playMilestone: Boolean = false) {
     val manager = AppWidgetManager.getInstance(context)
     val ids = smallIds(context, manager) + mediumIds(context, manager)
     val timeline = WidgetStore.readTimeline(context)
@@ -59,7 +61,16 @@ object WidgetWork {
       WidgetSelector.select(timeline, System.currentTimeMillis(), TimeZone.getDefault())
     }
     if (selection is WidgetSelection.Neutral && selection.reason != "missing") WidgetLog.reason("select", selection.reason)
-    WidgetRenderer.renderAll(context, manager, ids, timeline, selection, appearance)
+    val animate = playMilestone && ids.isNotEmpty() && selection is WidgetSelection.Entry &&
+      selection.entry.state == "milestone" && selection.entry.image != null &&
+      Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+    WidgetRenderer.renderAll(context, manager, ids, timeline, selection, appearance, animate)
+    if (animate) {
+      // Replace the host's transient progress drawable with the identical last still. Read the
+      // current timeline again in case settings, account or today's state changed. Leave the
+      // one-shot on its final frame briefly so a busy launcher has time to display the landing.
+      executor.schedule({ refresh(context) }, 5, TimeUnit.SECONDS)
+    }
     if (ids.isNotEmpty() && selection is WidgetSelection.Entry) {
       WidgetScheduler.schedule(context, selection.nextBoundary)
     } else {

@@ -1,9 +1,11 @@
-type Listener = () => void;
+import type { WirdProgressEvent } from "@/lib/habit/queries";
+
+type Listener = (wird?: WirdProgressEvent) => void;
 
 const listeners = new Set<Listener>();
 
-export function emitReviewActivity() {
-  for (const listener of listeners) listener();
+export function emitReviewActivity(wird?: WirdProgressEvent) {
+  for (const listener of listeners) listener(wird);
 }
 
 export function subscribeReviewActivity(listener: Listener) {

@@ -12,6 +12,7 @@ import {
  */
 type HafizWidgetModule = NativeModule & {
   publishTimeline: (json: string) => Promise<WidgetPlacement>;
+  publishEarnedMilestone?: (json: string) => Promise<WidgetPlacement>;
   clearTimeline: () => Promise<void>;
   getPlacement: () => Promise<WidgetPlacement>;
   canRequestPin: () => Promise<boolean>;
@@ -28,7 +29,8 @@ const emitter = native ? new NativeEventEmitter(native) : null;
 export const widgetPlatform: WidgetPlatform = native
   ? {
       supported: true,
-      publish: (json) => native.publishTimeline(json),
+      publish: (json, playMilestone) =>
+        playMilestone && native.publishEarnedMilestone ? native.publishEarnedMilestone(json) : native.publishTimeline(json),
       clear: () => native.clearTimeline(),
       getPlacement: () => native.getPlacement(),
       canRequestPin: () => native.canRequestPin(),

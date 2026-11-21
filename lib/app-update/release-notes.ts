@@ -8,6 +8,16 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.9": {
+    en: [
+      "Zayt now appears on both the small streak widget and the larger wird widget, with a different pose for each stage of your day.",
+      "When you reach a streak milestone and return to your home screen, Zayt does a short turn. Reduced motion shows a still pose.",
+    ],
+    ar: [
+      "يظهر زيت الآن في أداة السلسلة الصغيرة وأداة الوِرد الكبيرة، ويتغيّر مظهره بحسب حالة وِردك.",
+      "عندما تبلغ محطة في سلسلتك وتعود إلى الشاشة الرئيسية، يدور زيت دورة قصيرة. وإذا فعّلت تقليل الحركة، يظهر بصورة ثابتة.",
+    ],
+  },
   "1.0.8": {
     en: [
       "With the back, home and recent apps buttons, the bar at the bottom now matches the page instead of showing a shaded band.",
