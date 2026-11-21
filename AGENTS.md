@@ -16,7 +16,7 @@ Choose simple ownership over more layers. Reuse the established feature componen
 - tests/ and scripts/ contain focused checks. Generated dist/, public/data/ and native build output are not source edits.
 - `user cases.md` lists user-facing behavior. docs/feature-tree.json maps each screen, widget, transition and shared flow to those cases; docs/feature-tree.md explains its fields.
 
-Check the active branch and worktree before edits. Preserve the existing AppNavigation.tsx change in the original checkout. Modernization work has a separate checkout and runbook. Work there only when the task selects it, and follow its local instructions without merging or publishing it as incidental setup work.
+Check the active branch and worktree before edits and preserve unrelated changes. For a modernization assignment, locate the assigned branch with `git worktree list` and follow `docs/refactoring/RUNBOOK.md` in that checkout. Keep ordinary Hafiz work in its assigned checkout.
 
 ## Product and content constraints
 

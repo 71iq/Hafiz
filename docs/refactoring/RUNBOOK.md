@@ -4,7 +4,9 @@ The 2026-11-06 user instructions below supersede older task descriptions and ret
 
 ## Scope and ownership
 
-Work only in `/home/ehab/.codex/worktrees/hafiz-modernization/Hafiz` on `codex/hafiz-modernization`. Preserve the original checkout, protected Quran/content/font/database inputs and offline behavior. No push, merge, deployment, production operation, credit purchase or billing-provider change.
+For an assigned modernization run, use `git worktree list` to locate the branch named in `scripts/ralph/config.json`. Keep it in a dedicated worktree and preserve the original checkout, protected Quran/content/font/database inputs and offline behavior.
+
+For the modernization handoff, Ehab authorized pushing the modernization branch after all assigned work is verified and the final batch gate passes. At that point push the branch and verify its remote HEAD. Merge, deployment and production operations require separate authorization. Credit purchases and billing-provider changes are outside this assignment.
 
 Primary owns architecture, privacy/security, ambiguous data behavior and final acceptance. Use a bounded worker for implementation and a separate stronger reviewer. Read the current task and inspect its callers/tests before editing. Implement in the working source, without copy-only handoffs, frozen artifacts or hash-pinned verification scripts.
 
@@ -31,7 +33,7 @@ npm run refactor:stop
 npm run test:refactor-runner
 ```
 
-Use normal implementation mode for future tasks. Required task metadata can be prepared without a separate commit. The controller retains its two-attempt diagnosis window, at most three iterations per invocation, 900-second child deadlines and 90-minute batch limit. These bound failures, not the mission. After a concrete correction, continue another bounded attempt rather than stopping on attempt count alone.
+Use normal implementation mode for future tasks. Required task metadata can be prepared without a separate commit. The controller retains its two-attempt diagnosis window, at most three iterations per invocation, 900-second child deadlines and 90-minute batch limit. When the runner stops at its cap, the primary inspects the saved diff and evidence. Once the cause is corrected, reopen the task and continue a bounded attempt under the existing authorization.
 
 Keep the 6 GiB process scope, zero swap and inherited nonblocking orchestrator/writer leases. Terminate only owned process groups. Inspect surviving children after interruption. Matching source checkpoints may resume after interruption, but checks and independent review remain mandatory. Checkpoint identity is recovery bookkeeping, not a worker-command audit.
 
@@ -63,7 +65,7 @@ The configured Ralph models are Codex models. Since the 2026-11-07 takeover, the
 
 Supabase changes are source-only migrations plus matching schema.sql. Prove them with the isolated, network-disabled probes in `scripts/supabase-probes/`, which need Docker and a cached `postgres:17` image. Never apply them to a deployed database without explicit approval.
 
-Decisions on 2026-11-07: discussion follows reflection visibility (RF170); local data belongs to the device (RF025); iOS verification is waived (RF042 deferred); an Android phone is available over USB for RF040/RF041. The branch may be pushed only after all work is verified.
+On 2026-11-07 Ehab decided that discussion follows reflection visibility (RF170), local data belongs to the device (RF025), and iOS verification is waived (RF042 deferred). For RF040/RF041, check whether the Android phone used for that run is currently connected.
 
 ### Cost rules (user, 2026-11-07)
 
