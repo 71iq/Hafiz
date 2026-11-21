@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Picker preview before Android 12: the widget's shape and done marker, without text. -->
+<!-- Picker preview before Android 12: the widget's shape and Zayt, without text. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
   <item>
     <shape android:shape="rectangle">
@@ -8,5 +8,5 @@
       <size android:width="130dp" android:height="64dp"/>
     </shape>
   </item>
-  <item android:drawable="@drawable/hafiz_widget_marker_done" android:gravity="start|center_vertical" android:start="14dp" android:width="22dp" android:height="22dp"/>
+  <item android:drawable="@drawable/hafiz_widget_zayt_shimmer" android:gravity="start|center_vertical" android:start="14dp" android:width="36dp" android:height="45dp"/>
 </layer-list>

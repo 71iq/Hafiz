@@ -27,12 +27,12 @@
         android:importantForAccessibility="noHideDescendants">
         <ImageView
             android:id="@+id/widget_zayt"
-            android:layout_width="56dp"
-            android:layout_height="70dp"
+            android:layout_width="64dp"
+            android:layout_height="80dp"
             android:layout_marginEnd="14dp"
             android:layout_gravity="top"
             android:scaleType="fitCenter"
-            android:src="@drawable/hafiz_widget_zayt_warm"
+            android:src="@drawable/hafiz_widget_zayt_shimmer"
             android:importantForAccessibility="no"/>
         <LinearLayout
             android:layout_width="0dp"

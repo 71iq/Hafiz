@@ -4,7 +4,7 @@
   <!-- Home-screen widget. The picker shows these in the system language. -->
   <string name="hafiz_widget_small_label">Hafiz streak</string>
   <string name="hafiz_widget_medium_label">Hafiz wird</string>
-  <string name="hafiz_widget_small_description">Your wird streak and whether today is done.</string>
+  <string name="hafiz_widget_small_description">Your streak and today\'s wird with Zayt.</string>
   <string name="hafiz_widget_medium_description">Your streak, today\'s wird and plan, with Zayt.</string>
   <string name="hafiz_widget_open_app">Open Hafiz to see today\'s wird</string>
   <string name="hafiz_widget_open_app_description">Hafiz. Open Hafiz to see today\'s wird.</string>

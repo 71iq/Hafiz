@@ -44,6 +44,7 @@ import {
   localStartOfTomorrow,
   todayBounds,
 } from "@/lib/date";
+import type { WirdProgressEvent } from "@/lib/habit/queries";
 import { emitReviewActivity } from "./review-events";
 import { reviewDueCutoff } from "./review-transition";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
@@ -1441,14 +1442,14 @@ export async function putStudyLogRow(db: DatabaseExecutor, log: StudyLogInput): 
 }
 
 /** Publish a committed review: achievements are a logged side effect, then listeners refresh. */
-export function publishReviewLogged(db: AppDatabase, log: StudyLogInput): void {
+export function publishReviewLogged(db: AppDatabase, log: StudyLogInput, wird?: WirdProgressEvent): void {
   recordAchievementEvent(db, {
     type: "review_logged",
     cardId: log.cardId,
     rating: log.rating,
     reviewedAt: log.reviewedAt,
   }).catch(console.warn);
-  emitReviewActivity();
+  emitReviewActivity(wird);
 }
 
 export async function getReviewStats(db: DatabaseExecutor, activityDays = 90): Promise<ReviewStats> {

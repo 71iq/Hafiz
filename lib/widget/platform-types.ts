@@ -10,7 +10,7 @@ export type WidgetPlacement = Readonly<{ small: number; medium: number }>;
 export type WidgetPlatform = Readonly<{
   supported: boolean;
   /** Validates and stores the timeline JSON, re-renders every placed widget, and returns the placement. */
-  publish: (json: string) => Promise<WidgetPlacement>;
+  publish: (json: string, playMilestone?: boolean) => Promise<WidgetPlacement>;
   /** Removes the stored timeline, so placed widgets show the neutral state. */
   clear: () => Promise<void>;
   getPlacement: () => Promise<WidgetPlacement>;

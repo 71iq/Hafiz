@@ -2,7 +2,7 @@
   <!-- Home-screen widget only. The rest of the app's Arabic lives in lib/i18n. -->
   <string name="hafiz_widget_small_label">سلسلة حافظ</string>
   <string name="hafiz_widget_medium_label">وِرد حافظ</string>
-  <string name="hafiz_widget_small_description">سلسلة وِردك وهل تمّ وِرد اليوم.</string>
+  <string name="hafiz_widget_small_description">سلسلتك وحالة وِرد اليوم مع زيت.</string>
   <string name="hafiz_widget_medium_description">سلسلتك ووِرد اليوم وخطته، مع زيت.</string>
   <string name="hafiz_widget_open_app">افتح حافظ لترى وِرد اليوم</string>
   <string name="hafiz_widget_open_app_description">حافظ. افتح حافظ لترى وِرد اليوم.</string>

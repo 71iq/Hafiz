@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { persistReviewTransition, DEFAULT_REVIEW_SAVE_CONTEXT, type ReviewSaveContext } from "@/lib/fsrs/persist-review";
 import { setStudyCardMarked } from "@/lib/fsrs/queries";
+import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { endReviewSession, readReviewSession, startReviewSession } from "@/lib/fsrs/review-sessions";
 import { Rating, type Grade } from "@/lib/fsrs/scheduler";
@@ -98,6 +99,20 @@ describe("wird progress on grade (STR-01, DB-01)", () => {
     event = await grade("2:11", atLocalTime(TODAY, 611));
     expect(event.wird).toEqual({ kind: "none" });
     expect(count("sync_queue", "table_name = 'habit_days'")).toBe(1);
+  });
+
+  it("publishes the earned streak milestone once after real grades commit", async () => {
+    await seedDone([addDays(TODAY, -2), addDays(TODAY, -1)]);
+    const heard = jest.fn();
+    const unsubscribe = subscribeReviewActivity(heard);
+    try {
+      await reciteMinimum(TODAY, 600);
+      await grade("2:11", atLocalTime(TODAY, 611));
+      const events = heard.mock.calls.map(([event]) => event).filter((event) => event.kind !== "none");
+      expect(events).toEqual([{ kind: "minimum_met", length: 3 }]);
+    } finally {
+      unsubscribe();
+    }
   });
 
   it("stores each review's local date, zone and detail", async () => {

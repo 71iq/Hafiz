@@ -151,7 +151,7 @@ export async function persistReviewTransition({
   // The grade is committed. A listener failing now must not report it unsaved: a retry of the same
   // grade would then append a second log.
   try {
-    publishReviewLogged(db, saved.log);
+    publishReviewLogged(db, saved.log, saved.result.wird);
   } catch (error) {
     console.warn("[persistReviewTransition] A review listener failed after the grade was saved:", error);
   }
