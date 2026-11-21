@@ -1,0 +1,1456 @@
+{
+  "schemaVersion": 1,
+  "baseStudioCommit": "278afa4b38f036980358c656a9090526f4fc6aaa",
+  "runtimeBudgetBytes": 4000000,
+  "runtimeBytes": 3212082,
+  "spriteCanvas": {
+    "width": 600,
+    "height": 720,
+    "feetBaselineY": 704
+  },
+  "idleBlinkClosedMs": 250,
+  "scenes": {
+    "dawn": {
+      "inkPrimary": "#182C30",
+      "inkSecondary": "#293E3E",
+      "minimumContrast": {
+        "primary": 8.43,
+        "secondary": 4.85
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_dawn_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.82,
+              "x": 56,
+              "y": 56
+            },
+            "secondary": {
+              "ratio": 7.12,
+              "x": 596,
+              "y": 548
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_dawn_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.43,
+              "x": 1472,
+              "y": 248
+            },
+            "secondary": {
+              "ratio": 4.85,
+              "x": 195,
+              "y": 427
+            }
+          }
+        }
+      }
+    },
+    "morning": {
+      "inkPrimary": "#173039",
+      "inkSecondary": "#263E40",
+      "minimumContrast": {
+        "primary": 8.7,
+        "secondary": 4.85
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_morning_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.7,
+              "x": 875,
+              "y": 61
+            },
+            "secondary": {
+              "ratio": 7.77,
+              "x": 652,
+              "y": 187
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_morning_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.92,
+              "x": 16,
+              "y": 44
+            },
+            "secondary": {
+              "ratio": 4.85,
+              "x": 1110,
+              "y": 540
+            }
+          }
+        }
+      }
+    },
+    "day": {
+      "inkPrimary": "#142D35",
+      "inkSecondary": "#203E45",
+      "minimumContrast": {
+        "primary": 8.16,
+        "secondary": 5.06
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_day_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.16,
+              "x": 883,
+              "y": 272
+            },
+            "secondary": {
+              "ratio": 6.7,
+              "x": 740,
+              "y": 317
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_day_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.64,
+              "x": 0,
+              "y": 44
+            },
+            "secondary": {
+              "ratio": 5.06,
+              "x": 1311,
+              "y": 442
+            }
+          }
+        }
+      }
+    },
+    "golden": {
+      "inkPrimary": "#34251C",
+      "inkSecondary": "#473327",
+      "minimumContrast": {
+        "primary": 8.6,
+        "secondary": 4.92
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_golden_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.6,
+              "x": 717,
+              "y": 47
+            },
+            "secondary": {
+              "ratio": 7.37,
+              "x": 512,
+              "y": 186
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_golden_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.65,
+              "x": 72,
+              "y": 48
+            },
+            "secondary": {
+              "ratio": 4.92,
+              "x": 87,
+              "y": 435
+            }
+          }
+        }
+      }
+    },
+    "dusk": {
+      "inkPrimary": "#FFF9EF",
+      "inkSecondary": "#F9E9EA",
+      "minimumContrast": {
+        "primary": 8.14,
+        "secondary": 5.32
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_dusk_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.61,
+              "x": 11,
+              "y": 377
+            },
+            "secondary": {
+              "ratio": 5.57,
+              "x": 380,
+              "y": 583
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_dusk_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.14,
+              "x": 1098,
+              "y": 310
+            },
+            "secondary": {
+              "ratio": 5.32,
+              "x": 1218,
+              "y": 464
+            }
+          }
+        }
+      }
+    },
+    "night": {
+      "inkPrimary": "#FFF9ED",
+      "inkSecondary": "#F2EAF7",
+      "minimumContrast": {
+        "primary": 7.69,
+        "secondary": 5.61
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_night_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 7.69,
+              "x": 816,
+              "y": 227
+            },
+            "secondary": {
+              "ratio": 5.87,
+              "x": 410,
+              "y": 542
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_night_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 7.84,
+              "x": 1299,
+              "y": 99
+            },
+            "secondary": {
+              "ratio": 5.61,
+              "x": 227,
+              "y": 465
+            }
+          }
+        }
+      }
+    },
+    "midnight": {
+      "inkPrimary": "#FFFAED",
+      "inkSecondary": "#D6DBEA",
+      "minimumContrast": {
+        "primary": 8.07,
+        "secondary": 5.92
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_midnight_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.07,
+              "x": 54,
+              "y": 148
+            },
+            "secondary": {
+              "ratio": 5.92,
+              "x": 226,
+              "y": 448
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_midnight_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.07,
+              "x": 616,
+              "y": 109
+            },
+            "secondary": {
+              "ratio": 6.33,
+              "x": 380,
+              "y": 299
+            }
+          }
+        }
+      }
+    },
+    "sunrise": {
+      "inkPrimary": "#32232F",
+      "inkSecondary": "#44333C",
+      "minimumContrast": {
+        "primary": 8.52,
+        "secondary": 4.79
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_sunrise_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.52,
+              "x": 172,
+              "y": 54
+            },
+            "secondary": {
+              "ratio": 7.21,
+              "x": 624,
+              "y": 186
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_sunrise_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.76,
+              "x": 296,
+              "y": 56
+            },
+            "secondary": {
+              "ratio": 4.79,
+              "x": 1145,
+              "y": 553
+            }
+          }
+        }
+      }
+    },
+    "radiant": {
+      "inkPrimary": "#342B19",
+      "inkSecondary": "#443723",
+      "minimumContrast": {
+        "primary": 10.6,
+        "secondary": 4.89
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_radiant_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 10.6,
+              "x": 11,
+              "y": 55
+            },
+            "secondary": {
+              "ratio": 7.42,
+              "x": 551,
+              "y": 602
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_radiant_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 10.8,
+              "x": 213,
+              "y": 46
+            },
+            "secondary": {
+              "ratio": 4.89,
+              "x": 1340,
+              "y": 417
+            }
+          }
+        }
+      }
+    },
+    "radiant_night": {
+      "inkPrimary": "#FFF8E5",
+      "inkSecondary": "#F4E6D1",
+      "minimumContrast": {
+        "primary": 7.91,
+        "secondary": 5.44
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_radiant_night_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 7.92,
+              "x": 465,
+              "y": 311
+            },
+            "secondary": {
+              "ratio": 5.44,
+              "x": 506,
+              "y": 582
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_radiant_night_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 7.91,
+              "x": 29,
+              "y": 75
+            },
+            "secondary": {
+              "ratio": 5.49,
+              "x": 850,
+              "y": 412
+            }
+          }
+        }
+      }
+    },
+    "milestone": {
+      "inkPrimary": "#302317",
+      "inkSecondary": "#44321F",
+      "minimumContrast": {
+        "primary": 8.36,
+        "secondary": 4.93
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_milestone_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.36,
+              "x": 116,
+              "y": 256
+            },
+            "secondary": {
+              "ratio": 6.05,
+              "x": 502,
+              "y": 602
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_milestone_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.54,
+              "x": 388,
+              "y": 48
+            },
+            "secondary": {
+              "ratio": 4.93,
+              "x": 122,
+              "y": 418
+            }
+          }
+        }
+      }
+    },
+    "calm": {
+      "inkPrimary": "#272D3A",
+      "inkSecondary": "#373D49",
+      "minimumContrast": {
+        "primary": 8.35,
+        "secondary": 5.83
+      },
+      "crops": {
+        "sq": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_calm_sq.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.35,
+              "x": 24,
+              "y": 47
+            },
+            "secondary": {
+              "ratio": 6.77,
+              "x": 634,
+              "y": 324
+            }
+          }
+        },
+        "wide": {
+          "file": "res/drawable-nodpi/hafiz_widget_scene_calm_wide.webp",
+          "contrast": {
+            "primary": {
+              "ratio": 8.45,
+              "x": 24,
+              "y": 44
+            },
+            "secondary": {
+              "ratio": 5.83,
+              "x": 12,
+              "y": 409
+            }
+          }
+        }
+      }
+    }
+  },
+  "files": [
+    {
+      "path": "clips.json",
+      "bytes": 4285,
+      "sha256": "c53ca956990aa3a7606245a79a314c4a111d6eb374595fb617263da8dc43ac0a"
+    },
+    {
+      "path": "flame/flame_lit_t0.svg",
+      "bytes": 1027,
+      "sha256": "644b68eb352a36510af6b0c4dc82c05790ade4ea9f81207c2c6ea12a695e9ac7",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "flame/flame_lit_t1.svg",
+      "bytes": 1027,
+      "sha256": "a66998f67cfc4d7f8dfa9f772b67dadd54ba0510a4de4421380bd4a33d2871d6",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "flame/flame_lit_t2.svg",
+      "bytes": 1027,
+      "sha256": "3bf76ed1ef312843ba9f0a63ab913e863448e61de4f0dddce00a3e47a70a4cbc",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "flame/flame_lit_t3.svg",
+      "bytes": 1192,
+      "sha256": "74c634c2f8c327de3f4319e09797caa50bc8f6737eb97e347097df6a886bb7d7",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "flame/flame_lit_t4.svg",
+      "bytes": 1352,
+      "sha256": "bfc8651a1d0cc4628c32e5b52e2a6adbe95434d1cc1cbb1350135b8532736db0",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "flame/flame_lit_t5.svg",
+      "bytes": 1523,
+      "sha256": "ced93d4bcd4366ba40acdbe1cfc44b7814318b98050b4cf20d9858e992aba530",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "flame/flame_lit_t6.svg",
+      "bytes": 1788,
+      "sha256": "be2b3ed78526ca1cee4c9a2729c73c7c0e0c5432e353650451b6d89ab0408211",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "flame/flame_out.svg",
+      "bytes": 551,
+      "sha256": "88f821ad1a32bbccc789e17c6689babaccfaf5e983516356c11a95c707f73b20",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "flame/flame_unlit.svg",
+      "bytes": 315,
+      "sha256": "1d0780285a3f92119cdad55231b73817c9c20153d8cab9b8f014989cba1ee2ab",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 40267
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_calm_sq.webp",
+      "bytes": 20410,
+      "sha256": "a450e166814fa035588d047b4e40a4dd4fae2f5b76d8b14c5263e91c98020560",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_calm_wide.webp",
+      "bytes": 21278,
+      "sha256": "630a0f4f0f60ca1f5f944f9b4b67020ed9eebdfb42c3028e1b6b44db981f56d2",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_dawn_sq.webp",
+      "bytes": 23732,
+      "sha256": "4bbb144fc20c0ed031f9d38e5cee498e03b688d433a7d805f3755caf38331da9",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_dawn_wide.webp",
+      "bytes": 16086,
+      "sha256": "909c2334955ff81950420686c2193328a18b608aadaa195d6e459eb2f97775d4",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_day_sq.webp",
+      "bytes": 27892,
+      "sha256": "54280157c77dfe4375684a97195b732ca170c239e7e713ce7c11882a4a9d609c",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_day_wide.webp",
+      "bytes": 20828,
+      "sha256": "5c018a0112a9b5e31d51903f3796073bdfc39676953f0fee46946be1a18a1275",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_dusk_sq.webp",
+      "bytes": 20170,
+      "sha256": "aedb0bc309471bbf9c65036d1cb8a4a2aea6371dedb22fa0ce22f07a21ad4ec8",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_dusk_wide.webp",
+      "bytes": 17190,
+      "sha256": "e380107f6e193eaa8d06f2c57b3c53fb005700fefdeb9463bb8d6799ab32b043",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_golden_sq.webp",
+      "bytes": 24766,
+      "sha256": "7e2378dce8efc3dfea202983dfc85a39d0ecde581a41475fe0b1d623811a0213",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_golden_wide.webp",
+      "bytes": 20456,
+      "sha256": "508bf7d15e17c8a399d2262118350cf1cecfdf4aa032c284ecb61915f41ae2da",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_midnight_sq.webp",
+      "bytes": 9766,
+      "sha256": "c9b21e205617c8f0b5c3160ee46c3382123a312328eaa33bb2b51aa0f50fb4b4",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_midnight_wide.webp",
+      "bytes": 10754,
+      "sha256": "192e322dae625a512421fc42c5d41664b3627a555f64d15d7e8e068c9d5abcec",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_milestone_sq.webp",
+      "bytes": 27604,
+      "sha256": "17432d41c4ada0c48b1bac7e0b10bd951600ec25a02cbf67a51d8b07f77694a1",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_milestone_wide.webp",
+      "bytes": 29884,
+      "sha256": "6095afb77c7d757d5be5ec25a37fa8d45c6bf886d33370a54eeb80b34e3157b2",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_morning_sq.webp",
+      "bytes": 25236,
+      "sha256": "90d9b95d0eadca7c45f62f67ba287489da2b8932aa0ee0d66aa2d7a7754c9d27",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_morning_wide.webp",
+      "bytes": 20068,
+      "sha256": "018448ba0730180b45726026279b62ffd6d9e2c7468f89880fe553492dfd968b",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_night_sq.webp",
+      "bytes": 15004,
+      "sha256": "c01cd19f6437200ab686747a597d1d216050f0836465fbb751babdcc50674d3e",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_night_wide.webp",
+      "bytes": 13738,
+      "sha256": "1c2b3208554718e21bbcc5b15b528030fad23137610ea07edd4f9d7150f66f31",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_radiant_night_sq.webp",
+      "bytes": 22698,
+      "sha256": "936c4f4ff2a727ff23dce1f73db7dba09bcbf65a4a632fed8264846b033de18e",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_radiant_night_wide.webp",
+      "bytes": 22538,
+      "sha256": "83d6ce58b2550b685d4481500274285bc4f0448aa795febea788d6c4fab7fb1a",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_radiant_sq.webp",
+      "bytes": 24754,
+      "sha256": "548f63b506b2850587156cef461f50595bccb27eaa699d8938a2186670426340",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_radiant_wide.webp",
+      "bytes": 25662,
+      "sha256": "a7718fc27424aa9c1c102349f0e39d4729d7d80b69cebdf688d96a5a3abb0be7",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_sunrise_sq.webp",
+      "bytes": 25702,
+      "sha256": "6d02aac71082f6e7595bd17d3d8d7299835c297c30a16a70f8693a8d96099317",
+      "width": 900,
+      "height": 900,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_scene_sunrise_wide.webp",
+      "bytes": 21378,
+      "sha256": "db7bd64da76bbb051111f8c7d4c32af3fdd4bad20f275c3375499e8e33e66f71",
+      "width": 1500,
+      "height": 600,
+      "codec": "VP8",
+      "alpha": false
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_00.webp",
+      "bytes": 22778,
+      "sha256": "8a09f68b821093abe89d780c648ef42c5c64f84b155c51eee8f054783bc8e332",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_01.webp",
+      "bytes": 21622,
+      "sha256": "39e5e219bcbc969a51855a4979bb0676159060ca354541c3c7fea78d995c3489",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_02.webp",
+      "bytes": 23504,
+      "sha256": "56e006214f5ced18a29cb76d8a83895a213991975a6b1a336ab1fca0b333a58d",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_03.webp",
+      "bytes": 23490,
+      "sha256": "3c24c11089d41ad63f2e583290b5de9ec21cc80cd468522672385a124ff34760",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_04.webp",
+      "bytes": 23524,
+      "sha256": "f8764dd2941cff69c100273b5007f40f62a41451f70aebd00348e20056faa54b",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_05.webp",
+      "bytes": 22670,
+      "sha256": "3c9e01bac17c4fcd8860b5e1312fc99297ffbfc5a63fa533a83cc360ba56d379",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_06.webp",
+      "bytes": 22306,
+      "sha256": "ec9a43c072502b052b3cd7d32af9d9d787ae1f27ae1824dafa6d00c2ac0218f2",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_07.webp",
+      "bytes": 23626,
+      "sha256": "5acb1de3aaf58158d6b7a911ca6bc3e80c830683566512e8fb13a868a1cd55b7",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_08.webp",
+      "bytes": 24280,
+      "sha256": "8bbcbcd0536401728d1c13ce2f0603e3e2bb16fe99f2bb6fadea341b32a83b32",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_09.webp",
+      "bytes": 23796,
+      "sha256": "4e09f78e54365f2486b3643537474893c68e070dc8cf9c9dfa456defd9507ec3",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_10.webp",
+      "bytes": 23236,
+      "sha256": "b7677bbc6ea941628db9c5e6eade114fd3c4e1bb10986ef31c0efaa82164e460",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_11.webp",
+      "bytes": 23398,
+      "sha256": "78f8e4e06ae30063b36d013f4b951b643764b881c5a120f7766e75a92c361b5b",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_12.webp",
+      "bytes": 23332,
+      "sha256": "8216890abfcaea7b938101833681c9f4f0735de114ff34f79fd4ef552a554ddf",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_13.webp",
+      "bytes": 22478,
+      "sha256": "4a6a070cfb7d0903b02a4ad82320887a3d85b3763c3a8d8effb5d407b5248ee9",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_14.webp",
+      "bytes": 22478,
+      "sha256": "4a6a070cfb7d0903b02a4ad82320887a3d85b3763c3a8d8effb5d407b5248ee9",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_15.webp",
+      "bytes": 23332,
+      "sha256": "8216890abfcaea7b938101833681c9f4f0735de114ff34f79fd4ef552a554ddf",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_00.webp",
+      "bytes": 47760,
+      "sha256": "e0c291dd9980a43a2c408126b6f3a05e9ba1bce095c4e764c8fe8682fb6f227a",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_01.webp",
+      "bytes": 45780,
+      "sha256": "b7dbc15ba7758d49e54baff2eccdb249aaac99e71eef69be619a42bb57a64b80",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_02.webp",
+      "bytes": 51038,
+      "sha256": "ecae213db6e13bf5c6e6933c2ebd3c5e70fcc51f04846d5583a4f4f4660505fa",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_03.webp",
+      "bytes": 51816,
+      "sha256": "8941cfbcafe4c62215f6520396e0a7b45caea9cd73c582349adc7b4bb55c3ba8",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_04.webp",
+      "bytes": 50040,
+      "sha256": "13598a32fc44b7853871a1ef6c62338e215288e927b74e2eb6dc85b4abc067f4",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_05.webp",
+      "bytes": 47188,
+      "sha256": "a7ef0a1a718ca3561f9341ead0f4219e1691ebbe09ae2b73d18597da418b467d",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_06.webp",
+      "bytes": 46316,
+      "sha256": "57ca91b6f7e260c09e015b505f2bcdfa795776f6efe8464d9722709c544c519d",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_07.webp",
+      "bytes": 49104,
+      "sha256": "2c9e1dcf7ad5ec56a4c7cdcc55ddcee3e9f1a00ea134e35fc342f08a435ed26e",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_08.webp",
+      "bytes": 49778,
+      "sha256": "692cb8a8e740b98b4e9ca10d3edd13dffc2a2f84c5f7901218b5d843d350586b",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_09.webp",
+      "bytes": 49026,
+      "sha256": "f900900e8c07e8606a661420b62da49c65d4de8c5552e33701ba18b5ecdce92f",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_10.webp",
+      "bytes": 48438,
+      "sha256": "494f4b49858dd0a84134105c8b23081aab960f9404f38582bba04a795fd9308a",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_11.webp",
+      "bytes": 48252,
+      "sha256": "41f4aca5f7495e53525a8f9495a566fd9473559b1ccc07d0991ac67688a3bfcf",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_12.webp",
+      "bytes": 48202,
+      "sha256": "704ec96584e0b1d3679e95402d5c252e3727f2572c5ec0e8679cdc6f8a131b50",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_13.webp",
+      "bytes": 47394,
+      "sha256": "ffcda2f5e33925ab96cef648abcd34868974d3d663e85a3abf6a45b362ed3ab7",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_14.webp",
+      "bytes": 47394,
+      "sha256": "ffcda2f5e33925ab96cef648abcd34868974d3d663e85a3abf6a45b362ed3ab7",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_done_halo_15.webp",
+      "bytes": 48202,
+      "sha256": "704ec96584e0b1d3679e95402d5c252e3727f2572c5ec0e8679cdc6f8a131b50",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_glow.webp",
+      "bytes": 23352,
+      "sha256": "ff6a4e27c8e7167bc10fea755a9c84e8014577251f54667fc8c9ed62eb9fffcb",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_glow_blink.webp",
+      "bytes": 72678,
+      "sha256": "db0ea91968b42eac7ef7d62ecbd1ff562aef2c244a7024c6d666d96541346b8f",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8L",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_glow_halo.webp",
+      "bytes": 48374,
+      "sha256": "7ad66b8684628b9521055b546e0ed4928ba166140df4ab9b6d647eff1cfc377b",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_glow_halo_blink.webp",
+      "bytes": 131186,
+      "sha256": "9f5739566a9478911151b189164218f94620c51faf0e563a96d7ec21d1bb2056",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8L",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_milestone.webp",
+      "bytes": 23132,
+      "sha256": "9e2ba48baab52def3ebbedbd81692865a4d56941be24d3143459f9df4bc2c6e5",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_open.webp",
+      "bytes": 23620,
+      "sha256": "3af872f62df9be27f948b3b68fe354e2104c67a0533cf08767acf992834d8186",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_open_blink.webp",
+      "bytes": 68332,
+      "sha256": "5be8e7be752459c3bd8b918d8b6d18c481f0cd3d8517d9a85d7b5dec054b57e5",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8L",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_open_halo.webp",
+      "bytes": 49478,
+      "sha256": "61154d920f724853ba4bf07a437d9190cda6e7ad2229508782e9ee41602c9cb0",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_open_halo_blink.webp",
+      "bytes": 128650,
+      "sha256": "49d3713b50f448c8652b238fe73c550f88242443c83f0848f4926eb6d7310618",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8L",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_rest.webp",
+      "bytes": 22778,
+      "sha256": "8a09f68b821093abe89d780c648ef42c5c64f84b155c51eee8f054783bc8e332",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_rest_blink.webp",
+      "bytes": 65292,
+      "sha256": "bbca1c4692f3cf83bd25929678219eb39333c0d24bba311a77e9aefa17068414",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8L",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_shimmer.webp",
+      "bytes": 23332,
+      "sha256": "8216890abfcaea7b938101833681c9f4f0735de114ff34f79fd4ef552a554ddf",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_shimmer_halo.webp",
+      "bytes": 48202,
+      "sha256": "704ec96584e0b1d3679e95402d5c252e3727f2572c5ec0e8679cdc6f8a131b50",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_sit.webp",
+      "bytes": 21112,
+      "sha256": "ed6867af82e5d3307fdd36d24d224cd12aef158313ca7b76e2045f718d830554",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_00.webp",
+      "bytes": 22778,
+      "sha256": "8a09f68b821093abe89d780c648ef42c5c64f84b155c51eee8f054783bc8e332",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_01.webp",
+      "bytes": 21510,
+      "sha256": "57560257208a19bd3ab5eb1dbe5eaddfc55ed1bd586573be91fa32ddd66f28da",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_02.webp",
+      "bytes": 20864,
+      "sha256": "d0c11998e022b00d6721ab21cd8e330d63f456d964e9c550d050a973710bf8bd",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_03.webp",
+      "bytes": 22282,
+      "sha256": "131751eeaa836108e4db32ce04a20b1f17e1f23800923fd9bca93e7cd5711c23",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_04.webp",
+      "bytes": 23074,
+      "sha256": "ca9a3adb5c0ce08645f70f6b6805072bdbbdc407e8d4b9c0c33ef9a49ed64178",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_05.webp",
+      "bytes": 16346,
+      "sha256": "da4637c13cb3ca16d531ff22720cfedc3c55106843207c478d583fae32b98ddb",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_06.webp",
+      "bytes": 19858,
+      "sha256": "3d7eacd5d27371e60e05aa54b0c7e45f4b0e1e51796660ade8856f9baf3ee213",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_07.webp",
+      "bytes": 21582,
+      "sha256": "3d7e3efcf79d88ef924b0f1896450580e79807e357f24b558e26e4105837877c",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_08.webp",
+      "bytes": 24900,
+      "sha256": "280493e46834df9990d1c96161084c05f1eb1be73aa2d7088df8d4ac0deb37cc",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_09.webp",
+      "bytes": 25046,
+      "sha256": "256fc4c9573b997aa295dc87f884e1fc4b2f83a38d69dd1def6bc155896c079d",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_10.webp",
+      "bytes": 24228,
+      "sha256": "768293b7fc22ff9d5d3ded49efdbf633bbd4bc7956e2c24b3082fd2c734b3c6a",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_11.webp",
+      "bytes": 29760,
+      "sha256": "708e675de682642ee1a42f86dbb125e255888f467dca02580de71e4a79bac780",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_12.webp",
+      "bytes": 31616,
+      "sha256": "03e3b5a593f0cfc7f6c0d6877565d28bf17010f1f8fd96b5ac9284a8adbd3087",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_13.webp",
+      "bytes": 30264,
+      "sha256": "66fbfd82023b1b7ed1155cfc894c55d92839702bbd99e022c0b08df433622f3f",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_14.webp",
+      "bytes": 23316,
+      "sha256": "5310aac125527f552d11eab839affeea600d9982756ae14043cd5b4fd31abfff",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_15.webp",
+      "bytes": 22294,
+      "sha256": "dee92eafe35de27f0a5038dfdddec43ad1672baaf223057a02a732d987f8fcb3",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_turn_16.webp",
+      "bytes": 23132,
+      "sha256": "9e2ba48baab52def3ebbedbd81692865a4d56941be24d3143459f9df4bc2c6e5",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_warm.webp",
+      "bytes": 22840,
+      "sha256": "c659771cf406a163dc7338fd97f433a38e45c11b929401abe2f4b244379424c7",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_warm_blink.webp",
+      "bytes": 65900,
+      "sha256": "4851e98ca504d68ffd854873f729891de6b03991178ffb2c410aa22ff0236da9",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8L",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_warm_halo.webp",
+      "bytes": 47826,
+      "sha256": "e319a0d29d71c90806d3ba42fb27f5921205abfacbd030c5de0bcaa052477c98",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_warm_halo_blink.webp",
+      "bytes": 124096,
+      "sha256": "7a0dd2cd69775553387582927c660f15211cfeea8564777ebc8bc3c9f5fb3a4d",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8L",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_wave.webp",
+      "bytes": 23590,
+      "sha256": "6676c70c6911b5ab19f3852b6cb12e8fdcb6576893ab06064a58a70960f60099",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8",
+      "alpha": true
+    },
+    {
+      "path": "res/drawable-nodpi/hafiz_widget_zayt_wave_blink.webp",
+      "bytes": 67936,
+      "sha256": "c03b21ed28d32fc54644f88e8fabf9d151e5e1a5863a1be4101e40e6a98226e9",
+      "width": 600,
+      "height": 720,
+      "codec": "VP8L",
+      "alpha": true
+    }
+  ],
+  "reviewFiles": [
+    {
+      "path": "../review/states.png",
+      "bytes": 6829972,
+      "sha256": "17fe745b36366265411d07150ac6e6bf50287f67529e03767386c26fd18400fc",
+      "width": 2856,
+      "height": 7251
+    },
+    {
+      "path": "../review/states-ar.png",
+      "bytes": 6838670,
+      "sha256": "a8dc8c70487d45fdc95dffdb732eaae77788ba104f84753c2cfb02c07a21d9d7",
+      "width": 2856,
+      "height": 7251
+    },
+    {
+      "path": "../review/day.png",
+      "bytes": 1071225,
+      "sha256": "4c45ad946d7c4104d01fd90671b912889695c797a38217dcad006724b5ebdf26",
+      "width": 2130,
+      "height": 1221
+    },
+    {
+      "path": "../review/thumbs.png",
+      "bytes": 383262,
+      "sha256": "13268487bd8c3f141cebec7403800b8cf7aae24ffb60ce30c6780a6b609d338c",
+      "width": 1392,
+      "height": 615
+    },
+    {
+      "path": "../review/flames.png",
+      "bytes": 300185,
+      "sha256": "3cb21b5b77623c943d44d69005fdae181f4058f280cf6f89326dfb63b9201d10",
+      "width": 2124,
+      "height": 807
+    },
+    {
+      "path": "../review/home.png",
+      "bytes": 1123337,
+      "sha256": "8a8aa6ba36da5aefdca73514e862f5e6b1ae9585a19d119e3a80b2fe54866551",
+      "width": 2160,
+      "height": 2340
+    },
+    {
+      "path": "../review/sizes.png",
+      "bytes": 802324,
+      "sha256": "a6e6ed1416c0651ac290a2912c1148fd52e12059a301b8523aa2cfbbed373eaf",
+      "width": 2112,
+      "height": 1347
+    }
+  ]
+}
