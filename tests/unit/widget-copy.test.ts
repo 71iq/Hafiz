@@ -479,6 +479,8 @@ describe("widget copy helpers", () => {
       "Hafiz. Streak: 12 days. Done. Note.",
     );
     expect(joinSentences([])).toBe("");
-    expect(joinSentences(["Hafiz", "Wird time?", "Last hour!", "وقت الوِرد؟"])).toBe("Hafiz. Wird time? Last hour! وقت الوِرد؟");
+    expect(joinSentences(["Hafiz", "Wird time?", "Last hour!", "وقت الوِرد؟"])).toBe(
+      "Hafiz. Wird time? Last hour! وقت الوِرد؟",
+    );
   });
 });
