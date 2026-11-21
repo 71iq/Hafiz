@@ -80,20 +80,6 @@
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:layout_marginTop="4dp"/>
-            <TextView
-                android:id="@+id/widget_note"
-                android:visibility="gone"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif"
-                android:textSize="12sp"
-                android:textColor="@color/hafiz_widget_text_secondary"
-                android:textAlignment="viewStart"
-                android:breakStrategy="high_quality"
-                android:hyphenationFrequency="none"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:layout_marginTop="6dp"/>
         </LinearLayout>
         <FrameLayout
             android:id="@+id/widget_art"
@@ -116,7 +102,7 @@
                     android:layout_height="wrap_content"
                     android:adjustViewBounds="true"
                     android:src="@drawable/hafiz_widget_zayt_shimmer"
-                    android:maxWidth="150dp"
+                    android:maxWidth="112dp"
                     android:scaleType="fitCenter"
                     android:importantForAccessibility="no"/>
                 <FrameLayout

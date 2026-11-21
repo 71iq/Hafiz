@@ -70,6 +70,7 @@ describe("widget timeline validation (spec 7.4)", () => {
     ["an unknown pose", (t) => Object.assign(t.entries[0], { pose: "cheer" })],
     ["an unknown flame", (t) => Object.assign(t.entries[0], { flame: "frozen" })],
     ["a tier above 6", (t) => Object.assign(t.entries[0], { tier: 7 })],
+    ["an unknown urgency", (t) => Object.assign(t.entries[0], { urgency: "panic" })],
     ["a fractional tier", (t) => Object.assign(t.entries[0], { tier: 1.5 })],
     ["a version 1 field", (t) => Object.assign(t.entries[0], { headline: "Today's wird awaits" })],
     ["a week of six days", (t) => (t.entries[0].week = t.entries[0].week.slice(1))],

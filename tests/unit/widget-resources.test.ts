@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { WIDGET_PALETTES } from "@/lib/widget/palette";
-import { WIDGET_FLAMES, WIDGET_MAX_TIER, WIDGET_POSES, WIDGET_SCENES, WIDGET_STATES } from "@/lib/widget/types";
+import {
+  WIDGET_FLAMES,
+  WIDGET_MAX_TIER,
+  WIDGET_POSES,
+  WIDGET_SCENES,
+  WIDGET_STATES,
+  WIDGET_URGENCIES,
+} from "@/lib/widget/types";
 
 const root = path.resolve(__dirname, "../..");
 const res = path.join(root, "android/app/src/main/res");
@@ -80,7 +87,7 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
       const name = `hafiz_widget_zayt_${pose}`;
       expect([name, art(name), kotlin.includes(`R.drawable.${name}`)]).toEqual([name, true, true]);
     }
-    for (const layout of kotlin.matchAll(/R\.layout\.(hafiz_widget_motion_\w+)/g)) {
+    for (const layout of kotlin.matchAll(/R\.layout\.(hafiz_widget_\w+)/g)) {
       expect([layout[1], fs.existsSync(path.join(res, `layout/${layout[1]}.xml`))]).toEqual([layout[1], true]);
     }
     const flames = [...Array.from({ length: WIDGET_MAX_TIER + 1 }, (_, tier) => `lit_t${tier}`), "unlit", "out"];
@@ -99,8 +106,8 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
     const regular = body("hafiz_widget_wide");
     const roomy = body("hafiz_widget_wide_roomy");
     expect(regular).toContain('android:maxWidth="112dp"');
-    expect(roomy).toContain('android:maxWidth="150dp"');
-    expect(roomy.replace('android:maxWidth="150dp"', 'android:maxWidth="112dp"')).toBe(regular);
+    expect(roomy).toContain('android:maxWidth="165dp"');
+    expect(roomy.replace('android:maxWidth="165dp"', 'android:maxWidth="112dp"')).toBe(regular);
   });
 
   it("lets the Kotlin parser accept exactly the states, scenes, poses and flames JavaScript sends", () => {
@@ -117,6 +124,7 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
     expect(set("SCENES")).toEqual([...WIDGET_SCENES].sort());
     expect(set("POSES")).toEqual([...WIDGET_POSES].sort());
     expect(set("FLAMES")).toEqual([...WIDGET_FLAMES].sort());
+    expect(set("URGENCIES")).toEqual([...WIDGET_URGENCIES].sort());
     expect(kotlin).toContain(`const val MAX_TIER = ${WIDGET_MAX_TIER}`);
   });
 

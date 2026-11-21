@@ -25,6 +25,8 @@ data class WidgetDay(val mark: String, val label: String)
 data class WidgetEntry(
   val startsAt: Long,
   val state: String,
+  /** Time left before the streak is at stake, "none" when nothing is; drives the waiting flame. */
+  val urgency: String,
   val scene: String,
   /** Null when Show Zayt is off. */
   val pose: String?,
@@ -72,7 +74,10 @@ object WidgetLimits {
   )
   val POSES = setOf(
     "rest", "warm", "wave", "glow", "open", "shimmer", "milestone", "sit", "glow_halo", "open_halo", "warm_halo", "shimmer_halo",
+    "eager", "impatient", "worried", "anxious", "panicked", "relieved", "lonely",
+    "worried_halo", "anxious_halo", "panicked_halo", "relieved_halo",
   )
+  val URGENCIES = setOf("none", "calm", "steady", "nudge", "urgent", "critical", "last")
   val FLAMES = setOf("lit", "unlit", "out")
   val DAY_MARKS = setOf("lit", "kept", "open", "empty")
   const val WEEK_DAYS = 7
@@ -83,7 +88,7 @@ object WidgetLimits {
 object WidgetTimelineParser {
   private val TOP_KEYS = setOf("version", "generatedAt", "expiresAt", "timeZone", "language", "direction", "colorMode", "colors", "entries")
   private val ENTRY_KEYS = setOf(
-    "startsAt", "state", "scene", "pose", "flame", "tier", "count", "line", "note", "week", "contentDescription", "tap",
+    "startsAt", "state", "urgency", "scene", "pose", "flame", "tier", "count", "line", "note", "week", "contentDescription", "tap",
   )
   private val DAY_KEYS = setOf("mark", "label")
   private val LEGACY_ENTRY_KEYS = setOf(
@@ -164,6 +169,7 @@ object WidgetTimelineParser {
     return WidgetEntry(
       startsAt = instant(map["startsAt"]),
       state = enumValue(map["state"], WidgetLimits.STATES, "state"),
+      urgency = enumValue(map["urgency"], WidgetLimits.URGENCIES, "urgency"),
       scene = enumValue(map["scene"], WidgetLimits.SCENES, "scene"),
       pose = if (map["pose"] == null) null else enumValue(map["pose"], WidgetLimits.POSES, "pose"),
       flame = enumValue(map["flame"], WidgetLimits.FLAMES, "flame"),
@@ -213,6 +219,7 @@ object WidgetTimelineParser {
     return WidgetEntry(
       startsAt = instant(map["startsAt"]),
       state = state,
+      urgency = "none",
       scene = scene,
       pose = if (image == null) null else pose,
       flame = when {

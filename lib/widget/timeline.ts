@@ -4,7 +4,7 @@ import type { DayClock } from "@/lib/notifications/clock";
 import { makeUpCutoff } from "@/lib/notifications/day-times";
 import { createHabitProjector } from "@/lib/notifications/habit-projection";
 import type { DayPrayerTimes } from "@/lib/prayer/times";
-import { describeWidgetEntry, WIDGET_BAND_MINUTES, type WidgetPlanFacts } from "@/lib/widget/copy";
+import { describeWidgetEntry, WIDGET_URGENCY_HOURS, type WidgetPlanFacts } from "@/lib/widget/copy";
 import type { WidgetAppearance } from "@/lib/widget/palette";
 import {
   WIDGET_HORIZON_DAYS,
@@ -33,6 +33,7 @@ export type WidgetBuildInput = Readonly<{
 function sameContent(a: WidgetEntryContent, b: WidgetEntryContent): boolean {
   return (
     a.state === b.state &&
+    a.urgency === b.urgency &&
     a.scene === b.scene &&
     a.pose === b.pose &&
     a.flame === b.flame &&
@@ -49,8 +50,8 @@ function sameContent(a: WidgetEntryContent, b: WidgetEntryContent): boolean {
 /**
  * Spec 7.2: the next 7 local days for a person who does nothing more, as entries that start at each
  * instant the widget can change: now, each local midnight, each make-up cutoff (where yesterday's
- * window closes and grace settles), each evening band start, the sky's other band changes (noon,
- * 16:00, 22:00 and 23:00) and when more review comes due today.
+ * window closes and grace settles), each evening start, 20:00, each urgency step before midnight
+ * and before each cutoff (12, 8, 4, 2 and 1 hours left), and when more review comes due today.
  * lib/habit's projection applies every streak rule; this only words the result. Pure.
  */
 export function buildWidgetTimeline(input: WidgetBuildInput): WidgetTimeline {
@@ -62,11 +63,14 @@ export function buildWidgetTimeline(input: WidgetBuildInput): WidgetTimeline {
   const candidates = [nowMs];
   for (let offset = 0; offset < WIDGET_HORIZON_DAYS; offset += 1) {
     const date = addDays(today, offset);
+    const midnight = clock.at(addDays(date, 1), 0).getTime();
+    const cutoff = makeUpCutoff({ clock, prayers }, addDays(date, -1)).getTime();
     candidates.push(
       clock.at(date, 0).getTime(),
-      makeUpCutoff({ clock, prayers }, addDays(date, -1)).getTime(),
+      cutoff,
       input.eveningStartsAt(date).getTime(),
-      ...WIDGET_BAND_MINUTES.map((minutes) => clock.at(date, minutes).getTime()),
+      clock.at(date, 20 * 60).getTime(),
+      ...WIDGET_URGENCY_HOURS.flatMap((hours) => [midnight - hours * 3_600_000, cutoff - hours * 3_600_000]),
     );
   }
   if (input.plan.moreDueAt) candidates.push(input.plan.moreDueAt.getTime());

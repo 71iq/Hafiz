@@ -1,4 +1,4 @@
-import type { LocalDate } from "@/lib/habit/dates";
+import { addDays, type LocalDate } from "@/lib/habit/dates";
 import type { EarnBack } from "@/lib/habit/earn-back";
 import type { HabitHeadline, HabitSnapshot } from "@/lib/habit/snapshot";
 import { strings } from "@/lib/i18n/strings";
@@ -9,9 +9,9 @@ import {
   describeWidgetEntry,
   formatWidgetDate,
   joinSentences,
-  widgetBandAt,
+  widgetUrgencyAt,
+  widgetVariant,
   widgetWeek,
-  type WidgetBand,
   type WidgetPlanFacts,
 } from "@/lib/widget/copy";
 import { WIDGET_STATES, type WidgetEntryContent, type WidgetState } from "@/lib/widget/types";
@@ -259,48 +259,81 @@ describe("widget copy rules (spec 4.3)", () => {
     }
   });
 
-  it("chooses the scene, Zayt, flame and tap of each state by day (spec 4.2, 4.6)", () => {
-    const expected: Record<WidgetState, [string, string, string, string]> = {
-      begin: ["dawn", "wave", "out", "home"],
-      fresh_start: ["dawn", "wave", "out", "wird"],
-      open_day: ["morning", "rest", "unlit", "wird"],
-      open_evening: ["dusk", "glow", "unlit", "wird"],
-      make_up: ["dawn", "wave", "unlit", "wird"],
-      earn_back_open: ["morning", "rest", "out", "wird"],
-      earn_back_done: ["sunrise", "open", "lit", "home"],
-      done: ["radiant", "shimmer", "lit", "home"],
-      safe: ["radiant", "warm", "lit", "wird"],
-      milestone: ["milestone", "milestone", "lit", "home"],
-      kept: ["calm", "sit", "lit", "home"],
-      paused: ["calm", "sit", "unlit", "home"],
+  it("chooses the scene, Zayt, flame and tap of each state (spec 4.2, 4.6)", () => {
+    const expected: Record<WidgetState, [string, readonly string[], string, string]> = {
+      begin: ["dawn", ["wave"], "out", "home"],
+      fresh_start: ["dawn", ["lonely"], "out", "wird"],
+      open_day: ["morning", ["rest", "wave"], "unlit", "wird"],
+      open_evening: ["dusk", ["worried"], "unlit", "wird"],
+      make_up: ["dawn", ["worried"], "unlit", "wird"],
+      earn_back_open: ["morning", ["rest", "wave"], "out", "wird"],
+      earn_back_done: ["sunrise", ["open"], "lit", "home"],
+      done: ["radiant", ["shimmer"], "lit", "home"],
+      safe: ["radiant", ["warm"], "lit", "wird"],
+      milestone: ["milestone", ["milestone"], "lit", "home"],
+      kept: ["calm", ["sit"], "lit", "home"],
+      paused: ["calm", ["sit"], "unlit", "home"],
     };
     for (const state of WIDGET_STATES) {
       const entry = describe1(state, DISTINCT, "en", true);
-      expect([state, entry.scene, entry.pose, entry.flame, entry.tap]).toEqual([state, ...expected[state]]);
+      const [scene, poses, flame, tap] = expected[state];
+      expect([state, entry.scene, poses.includes(entry.pose!), entry.flame, entry.tap]).toEqual([
+        state,
+        scene,
+        true,
+        flame,
+        tap,
+      ]);
     }
     expect(describe1("milestone", DISTINCT, "en", true, true).tap).toBe("wird");
   });
 
-  it("darkens the sky of an open day towards midnight while Zayt's light grows, and turns a done night gold", () => {
+  it("escalates an open day's sky, Zayt and line as midnight nears, and turns a done night gold", () => {
     const at = (minutes: number) =>
       describe1(minutes >= 21 * 60 ? "open_evening" : "open_day", DISTINCT, "en", true, undefined, minutes);
+    const days = "4,321 days";
     const rows = [
-      [9 * 60, "morning", "rest", strings.en.widgetOpenHeadline],
-      [12 * 60, "day", "wave", strings.en.widgetLineDay],
-      [16 * 60, "golden", "warm", strings.en.widgetLineGolden],
-      [22 * 60, "night", "open_halo", strings.en.widgetLineNight],
-      [23 * 60 + 30, "midnight", "glow_halo", strings.en.widgetLineMidnight],
+      [9 * 60, "calm", "morning", ["rest", "wave"], [strings.en.widgetLineCalm, strings.en.widgetOpenHeadline]],
+      [12 * 60 + 30, "steady", "day", ["eager", "wave"], [strings.en.widgetLineDay, strings.en.widgetLineSteady]],
+      [16 * 60 + 30, "nudge", "golden", ["impatient", "warm"], [`Keep your ${days}`, `Don't break ${days}`]],
+      [21 * 60, "urgent", "dusk", ["worried"], [`Save your ${days}`, strings.en.widgetLineUrgent2]],
+      [22 * 60 + 30, "critical", "night", ["anxious_halo"], [strings.en.widgetLineCritical, `Hurry, ${days} at stake`]],
+      [23 * 60 + 30, "last", "midnight", ["panicked_halo"], [strings.en.widgetLineLast, `Now, or lose ${days}`]],
     ] as const;
-    for (const [minutes, scene, pose, line] of rows) {
+    for (const [minutes, urgency, scene, poses, lines] of rows) {
       const entry = at(minutes);
-      expect([minutes, entry.scene, entry.pose, entry.line]).toEqual([minutes, scene, pose, line]);
+      expect([minutes, entry.urgency, entry.scene, (poses as readonly string[]).includes(entry.pose!)]).toEqual([
+        minutes,
+        urgency,
+        scene,
+        true,
+      ]);
+      expect([minutes, (lines as readonly string[]).includes(entry.line!)]).toEqual([minutes, true]);
     }
-    const dusk = describe1("open_evening", DISTINCT, "en", true);
-    expect([dusk.scene, dusk.pose, dusk.line]).toEqual(["dusk", "glow", strings.en.notifTitleLate]);
     const doneLate = describe1("done", DISTINCT, "en", true, undefined, 22 * 60 + 30);
-    expect([doneLate.scene, doneLate.pose, doneLate.flame]).toEqual(["radiant_night", "shimmer_halo", "lit"]);
+    expect([doneLate.urgency, doneLate.scene, ["shimmer_halo", "relieved_halo"].includes(doneLate.pose!)]).toEqual([
+      "none",
+      "radiant_night",
+      true,
+    ]);
     const beginLate = describe1("begin", DISTINCT, "en", true, undefined, 21 * 60 + 30);
     expect([beginLate.scene, beginLate.pose]).toEqual(["night", "glow_halo"]);
+  });
+
+  it("counts the make-up window down to its cutoff, with a last chance from two hours before", () => {
+    const at = (minutes: number) => describe1("make_up", DISTINCT, "en", true, undefined, minutes);
+    expect([at(8 * 60).urgency, at(8 * 60).line]).toEqual(["nudge", "Make up by 12:30 PM"]);
+    expect([at(10 * 60).urgency, at(10 * 60).pose, at(10 * 60).line]).toEqual([
+      "urgent",
+      "worried",
+      "Last chance: 12:30 PM",
+    ]);
+    expect([at(12 * 60).urgency, at(12 * 60).pose]).toEqual(["last", "panicked"]);
+  });
+
+  it("names no figure in an urgent line when Show numbers is off", () => {
+    const entry = describe1("open_evening", DISTINCT, "en", false, undefined, 23 * 60 + 30);
+    expect([strings.en.widgetLineLast, strings.en.widgetLineLast2Plain]).toContain(entry.line);
   });
 
   it("shows a zero streak as 0 with an unlit flame, in each language's digits", () => {
@@ -338,46 +371,30 @@ describe("widget copy rules (spec 4.3)", () => {
   });
 });
 
-describe("the widget's sky bands (spec 4.6)", () => {
-  const band = (minutes: number, eveningMinutes = 21 * 60): WidgetBand =>
-    widgetBandAt(CLOCK.at(D, minutes), CLOCK, (date) => CLOCK.at(date, eveningMinutes));
+describe("the widget's urgency levels (spec 4.6)", () => {
+  const deadline = CLOCK.at("2026-11-24", 0);
+  const level = (hoursLeft: number) => widgetUrgencyAt(new Date(deadline.getTime() - hoursLeft * 3_600_000), deadline);
 
-  it("moves through the local day at noon, 16:00, the evening start, 22:00 and 23:00", () => {
-    expect(
-      [
-        0,
-        11 * 60 + 59,
-        12 * 60,
-        15 * 60 + 59,
-        16 * 60,
-        20 * 60 + 59,
-        21 * 60,
-        21 * 60 + 59,
-        22 * 60,
-        22 * 60 + 59,
-        23 * 60,
-        23 * 60 + 59,
-      ].map((m) => band(m)),
-    ).toEqual([
-      "morning",
-      "morning",
-      "day",
-      "day",
-      "golden",
-      "golden",
-      "dusk",
-      "dusk",
-      "night",
-      "night",
-      "midnight",
-      "midnight",
+  it("steps up at 12, 8, 4, 2 and 1 hours left", () => {
+    expect([13, 12, 9, 8, 5, 4, 3, 2, 1.5, 1, 0.25].map(level)).toEqual([
+      "calm",
+      "steady",
+      "steady",
+      "nudge",
+      "nudge",
+      "urgent",
+      "urgent",
+      "critical",
+      "critical",
+      "last",
+      "last",
     ]);
   });
 
-  it("lets an early evening start open dusk before 16:00, and a late one skip dusk", () => {
-    expect(band(15 * 60, 14 * 60 + 30)).toBe("dusk");
-    expect(band(22 * 60 + 20, 22 * 60 + 45)).toBe("night");
-    expect(band(21 * 60 + 50, 22 * 60 + 45)).toBe("golden");
+  it("picks the same variant for a date and level every time, and spreads variants over days", () => {
+    expect(widgetVariant(D, "calm", 2)).toBe(widgetVariant(D, "calm", 2));
+    const picks = new Set(Array.from({ length: 14 }, (_, day) => widgetVariant(addDays(D, day), "calm", 2)));
+    expect(picks).toEqual(new Set([0, 1]));
   });
 });
 
@@ -405,8 +422,8 @@ describe("review findings: today's recitation, restored days and the spoken line
   it("speaks the line the screen shows in the last hour, in both languages", () => {
     for (const language of ["en", "ar"] as const) {
       const entry = describe1("open_evening", DISTINCT, language, true, undefined, 23 * 60 + 20);
-      expect(entry.line).toBe(strings[language].widgetLineMidnight);
-      expect(entry.contentDescription).toContain(strings[language].widgetLineMidnight);
+      expect(entry.urgency).toBe("last");
+      expect(entry.contentDescription).toContain(entry.line!);
       expect(entry.contentDescription).not.toContain(strings[language].notifTitleLate);
     }
   });
@@ -462,5 +479,6 @@ describe("widget copy helpers", () => {
       "Hafiz. Streak: 12 days. Done. Note.",
     );
     expect(joinSentences([])).toBe("");
+    expect(joinSentences(["Hafiz", "Wird time?", "Last hour!", "وقت الوِرد؟"])).toBe("Hafiz. Wird time? Last hour! وقت الوِرد؟");
   });
 });

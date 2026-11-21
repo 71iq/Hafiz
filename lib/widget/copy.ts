@@ -14,6 +14,7 @@ import type {
   WidgetScene,
   WidgetState,
   WidgetTap,
+  WidgetUrgencyLevel,
 } from "@/lib/widget/types";
 
 /** Spec 4.4: today's plan facts, read once per build. */
@@ -43,59 +44,118 @@ export type WidgetCopyInput = Readonly<{
 
 type Language = "en" | "ar";
 
-/** The part of the local day an entry falls in. It picks the sky, not the streak rules. */
-export type WidgetBand = "morning" | "day" | "golden" | "dusk" | "night" | "midnight";
+/**
+ * How close the streak is to being lost, from the time left before its deadline: local midnight
+ * while today is open, the make-up cutoff while yesterday can still be made up. "none" is a state
+ * with nothing at stake today.
+ */
+export type WidgetUrgency = WidgetUrgencyLevel;
 
-const NOON = 12 * 60;
-const GOLDEN_HOUR = 16 * 60;
-const NIGHT = 22 * 60;
-const LAST_HOUR = 23 * 60;
+const HOUR = 3_600_000;
 
-/** Wall-clock minutes at which the band can change, besides the evening start. */
-export const WIDGET_BAND_MINUTES: readonly number[] = [NOON, GOLDEN_HOUR, NIGHT, LAST_HOUR];
+/** Hours left at which urgency steps up; for a midnight deadline, 12:00, 16:00, 20:00, 22:00, 23:00. */
+export const WIDGET_URGENCY_HOURS: readonly number[] = [12, 8, 4, 2, 1];
 
-/** Spec 4.6: the sky follows the local day; the evening start (spec 4.5) opens dusk. */
-export function widgetBandAt(at: Date, clock: DayClock, eveningStartsAt: (date: LocalDate) => Date): WidgetBand {
-  const minutes = clock.minutesOf(at);
-  if (minutes >= LAST_HOUR) return "midnight";
-  if (minutes >= NIGHT) return "night";
-  if (at.getTime() >= eveningStartsAt(clock.dateOf(at)).getTime()) return "dusk";
-  if (minutes >= GOLDEN_HOUR) return "golden";
-  if (minutes >= NOON) return "day";
-  return "morning";
+/** Spec 4.6: the urgency level `deadline - at` falls in. */
+export function widgetUrgencyAt(at: Date, deadline: Date): Exclude<WidgetUrgency, "none"> {
+  const left = deadline.getTime() - at.getTime();
+  if (left > 12 * HOUR) return "calm";
+  if (left > 8 * HOUR) return "steady";
+  if (left > 4 * HOUR) return "nudge";
+  if (left > 2 * HOUR) return "urgent";
+  if (left > HOUR) return "critical";
+  return "last";
 }
 
-const OPEN_ART: Record<WidgetBand, readonly [WidgetScene, WidgetPose]> = {
-  morning: ["morning", "rest"],
-  day: ["day", "wave"],
-  golden: ["golden", "warm"],
-  dusk: ["dusk", "glow"],
-  night: ["night", "open_halo"],
-  midnight: ["midnight", "glow_halo"],
-};
-
-/**
- * Spec 4.6: the scene and Zayt's still. While today is open the sky darkens towards midnight and
- * Zayt's own light grows; urgency never shows on Zayt's face. Done days turn gold, by night too.
- */
-export function widgetArt(state: WidgetState, band: WidgetBand): readonly [WidgetScene, WidgetPose] {
-  const dark = band === "dusk" || band === "night" || band === "midnight";
+/** The deadline a state counts down to, or null when nothing is at stake today. */
+export function widgetDeadline(state: WidgetState, at: Date, clock: DayClock, makeUpCutoff: Date | null): Date | null {
   switch (state) {
-    case "begin":
-    case "fresh_start":
-      return dark ? ["night", "glow_halo"] : ["dawn", "wave"];
-    case "make_up":
-      return ["dawn", "wave"];
     case "open_day":
     case "open_evening":
     case "earn_back_open":
-      return OPEN_ART[band];
+      return clock.at(addDays(clock.dateOf(at), 1), 0);
+    case "make_up":
+      return makeUpCutoff;
+    default:
+      return null;
+  }
+}
+
+type Level = Exclude<WidgetUrgency, "none">;
+
+/** The sky for an open day at each level, darkening towards the deadline. */
+const OPEN_SCENES: Record<Level, WidgetScene> = {
+  calm: "morning",
+  steady: "day",
+  nudge: "golden",
+  urgent: "dusk",
+  critical: "night",
+  last: "midnight",
+};
+
+/**
+ * Zayt's still at each level: happy, then eager, impatient, worried, anxious and panicked as the
+ * deadline nears (owner decision, 2026-11-21). Night skies take the poses with their own light.
+ * Each level offers variants; one is picked per level and day.
+ */
+const OPEN_POSES: Record<Level, readonly WidgetPose[]> = {
+  calm: ["rest", "wave"],
+  steady: ["eager", "wave"],
+  nudge: ["impatient", "warm"],
+  urgent: ["worried"],
+  critical: ["anxious_halo"],
+  last: ["panicked_halo"],
+};
+
+/** The make-up window keeps its dawn sky; Zayt's face carries the countdown to the cutoff. */
+const MAKE_UP_POSES: Record<Level, readonly WidgetPose[]> = {
+  calm: ["wave", "rest"],
+  steady: ["eager", "wave"],
+  nudge: ["impatient"],
+  urgent: ["worried"],
+  critical: ["anxious"],
+  last: ["panicked"],
+};
+
+/** A stable pick for this date and level, so refreshes agree and the next level shows another face. */
+export function widgetVariant(date: LocalDate, key: string, count: number): number {
+  let hash = 0;
+  for (const character of `${date}:${key}`) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return hash % count;
+}
+
+/** Evening for the done and begin scenes: from the evening start or 20:00, whichever comes first. */
+function isEvening(at: Date, clock: DayClock, eveningStartsAt: (date: LocalDate) => Date): boolean {
+  return clock.minutesOf(at) >= 20 * 60 || at.getTime() >= eveningStartsAt(clock.dateOf(at)).getTime();
+}
+
+/** Spec 4.6: the scene and Zayt's still for a state at this level and time. */
+export function widgetArt(
+  state: WidgetState,
+  urgency: WidgetUrgency,
+  evening: boolean,
+  date: LocalDate,
+): readonly [WidgetScene, WidgetPose] {
+  const pick = (poses: readonly WidgetPose[]) => poses[widgetVariant(date, urgency, poses.length)];
+  switch (state) {
+    case "begin":
+      return evening ? ["night", "glow_halo"] : ["dawn", "wave"];
+    case "fresh_start":
+      return ["dawn", "lonely"];
+    case "make_up":
+      return ["dawn", pick(MAKE_UP_POSES[urgency === "none" ? "calm" : urgency])];
+    case "open_day":
+    case "open_evening":
+    case "earn_back_open": {
+      const level = urgency === "none" ? "calm" : urgency;
+      return [OPEN_SCENES[level], pick(OPEN_POSES[level])];
+    }
     case "earn_back_done":
-      return dark ? ["radiant_night", "open_halo"] : ["sunrise", "open"];
+      return evening ? ["radiant_night", "open_halo"] : ["sunrise", "open"];
     case "done":
-      return dark ? ["radiant_night", "shimmer_halo"] : ["radiant", "shimmer"];
+      return evening ? ["radiant_night", pick(["shimmer_halo", "relieved_halo"])] : ["radiant", "shimmer"];
     case "safe":
-      return dark ? ["radiant_night", "warm_halo"] : ["radiant", "warm"];
+      return evening ? ["radiant_night", "warm_halo"] : ["radiant", "warm"];
     case "milestone":
       return ["milestone", "milestone"];
     case "kept":
@@ -159,12 +219,16 @@ export function formatWidgetDate(date: LocalDate, language: Language): string {
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
-/** "A. B. C." from parts: each trimmed, a trailing period dropped, empty parts skipped. */
+/**
+ * "A. B? C!" from parts: each trimmed, a trailing period dropped and added back unless the part
+ * already ends in a question or exclamation mark, Arabic included. Empty parts are skipped.
+ */
 export function joinSentences(parts: readonly (string | null | undefined)[]): string {
-  const sentences = parts
+  return parts
     .map((part) => (part ?? "").trim().replace(/\.+$/, "").trim())
-    .filter((part) => part.length > 0);
-  return sentences.length === 0 ? "" : `${sentences.join(". ")}.`;
+    .filter((part) => part.length > 0)
+    .map((part) => (/[?!؟]$/.test(part) ? part : `${part}.`))
+    .join(" ");
 }
 
 /**
@@ -245,8 +309,12 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
   // Lit once today counts: by the state, or by today's own recitation while yesterday awaits a make-up.
   const todayLit = length > 0 && (LIT.has(state) || snapshot.streak.doneToday);
   const flame: WidgetFlame = length === 0 ? "out" : todayLit ? "lit" : "unlit";
-  const band = widgetBandAt(at, clock, input.eveningStartsAt);
-  const [scene, pose] = widgetArt(state, band);
+  const date = clock.dateOf(at);
+  const deadline = widgetDeadline(state, at, clock, h.kind === "make_up_open" ? h.cutoff : null);
+  const urgency: WidgetUrgency = deadline ? widgetUrgencyAt(at, deadline) : "none";
+  const [scene, pose] = widgetArt(state, urgency, isEvening(at, clock, input.eveningStartsAt), date);
+  // Loss framing names the streak from the nudge on, when Show numbers is on (owner decision).
+  const days = showNumbers && length > 0 ? formatDays(length, language) : null;
   const time = h.kind === "make_up_open" ? formatClockMinutesForDisplay(clock.minutesOf(h.cutoff), language) : "";
   const earnBack = h.kind === "earn_back" ? h.earnBack : null;
   const earnBackValues = earnBack
@@ -263,23 +331,30 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
   let detail: string;
   switch (state) {
     case "begin":
-      headline = s.habitBeginToday;
+      headline = s.widgetLineBegin;
       detail = s.widgetBeginDetail;
       break;
-    case "fresh_start":
-      headline = s.widgetFreshStartHeadline;
+    case "fresh_start": {
+      const lines = [s.widgetLineFresh, s.widgetLineFresh2];
+      headline = lines[widgetVariant(date, "fresh", lines.length)];
       detail = s.widgetFreshStartDetail;
       break;
+    }
     case "open_day":
-      headline = openLine(band, s);
+      headline = openLine(urgency === "none" ? "calm" : urgency, date, s, days);
       detail = s.habitAtRisk;
       break;
     case "open_evening":
-      headline = openLine(band, s);
+      headline = openLine(urgency === "none" ? "calm" : urgency, date, s, days);
       detail = s.widgetEveningDetail;
       break;
     case "make_up":
-      headline = interpolate(s.widgetMakeUpHeadline, { time });
+      headline = interpolate(
+        urgency === "urgent" || urgency === "critical" || urgency === "last"
+          ? s.widgetLineMakeUpLast
+          : s.widgetMakeUpHeadline,
+        { time },
+      );
       detail = interpolate(s.habitMakeUpOpen, { time });
       break;
     case "earn_back_open":
@@ -360,6 +435,7 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
 
   return {
     state,
+    urgency,
     scene,
     pose: input.showZayt ? pose : null,
     flame,
@@ -385,31 +461,37 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
  * day says nothing, because the lit flame and the gold scene already do. `headline` is the spoken
  * headline, reused where it is already short, so TalkBack reads what the screen shows.
  */
-/** The open day's line by the sky band: calm in the morning, the time left as midnight nears. */
-function openLine(band: WidgetBand, s: (typeof strings)[Language]): string {
-  switch (band) {
-    case "morning":
-      return s.widgetOpenHeadline;
-    case "day":
-      return s.widgetLineDay;
-    case "golden":
-      return s.widgetLineGolden;
-    case "dusk":
-      return s.notifTitleLate;
-    case "night":
-      return s.widgetLineNight;
-    case "midnight":
-      return s.widgetLineMidnight;
-  }
+/**
+ * The open day's line at each level: an invitation while there is time, then the streak at stake as
+ * the deadline nears. Each level has two lines; one is picked per level and day.
+ */
+function openLine(level: Level, date: LocalDate, s: (typeof strings)[Language], days: string | null): string {
+  const lines: readonly string[] = (() => {
+    switch (level) {
+      case "calm":
+        return [s.widgetLineCalm, s.widgetOpenHeadline];
+      case "steady":
+        return [s.widgetLineDay, s.widgetLineSteady];
+      case "nudge":
+        return days
+          ? [interpolate(s.widgetLineNudge, { days }), interpolate(s.widgetLineNudge2, { days })]
+          : [s.widgetLineNudgePlain, s.widgetLineNudge2Plain];
+      case "urgent":
+        return [days ? interpolate(s.widgetLineUrgent, { days }) : s.widgetLineUrgentPlain, s.widgetLineUrgent2];
+      case "critical":
+        return [s.widgetLineCritical, days ? interpolate(s.widgetLineCritical2, { days }) : s.widgetLineCritical2Plain];
+      case "last":
+        return [s.widgetLineLast, days ? interpolate(s.widgetLineLast2, { days }) : s.widgetLineLast2Plain];
+    }
+  })();
+  return lines[widgetVariant(date, `line:${level}`, lines.length)];
 }
 
 function lineFor(state: WidgetState, language: Language, headline: string, reviewLeft: boolean): string | null {
   const s = strings[language];
   switch (state) {
     case "begin":
-      return s.widgetLineBegin;
     case "fresh_start":
-      return s.widgetFreshStartHeadline;
     case "open_day":
     case "open_evening":
     case "make_up":

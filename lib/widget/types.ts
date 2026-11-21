@@ -60,7 +60,21 @@ export const WIDGET_POSES = [
   "open_halo",
   "warm_halo",
   "shimmer_halo",
+  // The urgency batch (owner decision, 2026-11-21): faces that follow the time left.
+  "eager",
+  "impatient",
+  "worried",
+  "anxious",
+  "panicked",
+  "relieved",
+  "lonely",
+  "worried_halo",
+  "anxious_halo",
+  "panicked_halo",
+  "relieved_halo",
 ] as const;
+/** How close the streak is to being lost (lib/widget/copy.ts widgetUrgencyAt). */
+export const WIDGET_URGENCIES = ["none", "calm", "steady", "nudge", "urgent", "critical", "last"] as const;
 /** The streak icon: lit once today counts, unlit while the streak waits for today, out at zero. */
 export const WIDGET_FLAMES = ["lit", "unlit", "out"] as const;
 export const WIDGET_TAPS = ["wird", "home"] as const;
@@ -72,6 +86,7 @@ export type WidgetState = (typeof WIDGET_STATES)[number];
 export type WidgetScene = (typeof WIDGET_SCENES)[number];
 export type WidgetPose = (typeof WIDGET_POSES)[number];
 export type WidgetFlame = (typeof WIDGET_FLAMES)[number];
+export type WidgetUrgencyLevel = (typeof WIDGET_URGENCIES)[number];
 export type WidgetTap = (typeof WIDGET_TAPS)[number];
 export type WidgetDayMark = (typeof WIDGET_DAY_MARKS)[number];
 
@@ -91,6 +106,8 @@ export type WidgetEntry = Readonly<{
   /** Epoch ms. The entry lasts until the next entry's startsAt, the last one until expiresAt. */
   startsAt: number;
   state: WidgetState;
+  /** Time left before the streak is at stake; drives the waiting flame's ember. */
+  urgency: WidgetUrgencyLevel;
   scene: WidgetScene;
   /** Null when Show Zayt is off: the widget then uses the app theme's plain card. */
   pose: WidgetPose | null;

@@ -12,6 +12,7 @@ import {
   WIDGET_SCENES,
   WIDGET_STATES,
   WIDGET_TAPS,
+  WIDGET_URGENCIES,
   WIDGET_TIMELINE_VERSION,
   WIDGET_WEEK_DAYS,
   type WidgetTimeline,
@@ -55,6 +56,7 @@ const entrySchema = z
   .strictObject({
     startsAt: instant,
     state: z.enum(WIDGET_STATES),
+    urgency: z.enum(WIDGET_URGENCIES),
     scene: z.enum(WIDGET_SCENES),
     pose: z.enum(WIDGET_POSES).nullable(),
     flame: z.enum(WIDGET_FLAMES),

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 110 x 100 dp and up: the tile. Flame and count over the scene, one line, Zayt filling the rest.
+<!-- 110 x 100 dp and up: the tile. Flame and count over the scene, one line, and Zayt filling the rest,
+     cut by the bottom edge so it stays the largest thing.
      Shared by both modes. With Show Zayt on, widget_scene shows the sky and widget_art holds Zayt; the
      renderer sets every color. With it off, widget_scene is the theme card and widget_art is gone. -->
 <FrameLayout
@@ -81,7 +82,7 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:layout_marginTop="2dp"
-            android:layout_marginBottom="-10dp"
+            android:layout_marginBottom="-22dp"
             android:importantForAccessibility="noHideDescendants">
             <!-- Wraps the still exactly, so a frame list in widget_motion gets the same box. FrameLayout
                  measures match_parent children again at its final size only when it has two or more, so the
