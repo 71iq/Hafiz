@@ -62,9 +62,7 @@ const entrySchema = z
     count: text(1, 12).nullable(),
     line: text(1, 48).nullable(),
     note: text(1, 80).nullable(),
-    week: z
-      .array(z.strictObject({ mark: z.enum(WIDGET_DAY_MARKS), label: text(1, 3) }))
-      .length(WIDGET_WEEK_DAYS),
+    week: z.array(z.strictObject({ mark: z.enum(WIDGET_DAY_MARKS), label: text(1, 3) })).length(WIDGET_WEEK_DAYS),
     contentDescription: text(1, 400),
     tap: z.enum(WIDGET_TAPS),
   })
