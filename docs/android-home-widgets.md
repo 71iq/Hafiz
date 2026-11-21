@@ -26,7 +26,7 @@ Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both u
 | 250×170           | Wide: the same with Zayt up to 112 dp wide.                                                                                                           |
 | 250×130           | Low wide: the wide layout with a smaller count and line, so a 4×2 on short launcher rows keeps its week row. Hafiz wird is never shorter than 130 dp. |
 | 130×130           | Tile: flame and count centred at the top, one line below, Zayt filling the rest with only its feet cut.                                               |
-| 110×100           | Small tile: flame, count and Zayt, no line, so Zayt's face is never cut.                                                                              |
+| 110×100           | Small tile: flame, count and Zayt, with no line so Zayt's face is never cut; with Zayt off, the plain tile keeps its line.                            |
 | 250×64 and 170×64 | Short: flame, count and line at the start; Zayt fills the height at the end, with only the twig tip and feet cut.                                     |
 | 210×40            | Strip: one row with the line beside the count, and Zayt filling the height.                                                                           |
 | 100×40            | Tiny: the flame with the count, or the line when there is no count. No Zayt, so neither is cut.                                                       |

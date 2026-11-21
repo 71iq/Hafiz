@@ -50,16 +50,17 @@ object WidgetRenderer {
     val art: Boolean,
     /** The line shows beside a count; where it does not, only a missing count brings it back. */
     val lineWithCount: Boolean,
-    /** The smallest tile has no room for a line at all without cutting Zayt's face. */
-    val line: Boolean = true,
+    /** The smallest tile has no room for a line beside Zayt without cutting its face; without Zayt it does. */
+    val lineBesideZayt: Boolean = true,
   ) {
     WIDE_ROOMY(R.layout.hafiz_widget_wide_roomy, R.layout.hafiz_widget_wide_roomy_plain, R.layout.hafiz_widget_wide_roomy_plain_system, 320f, 170f, wideScene = true, weekView = true, art = true, lineWithCount = true),
     WIDE(R.layout.hafiz_widget_wide, R.layout.hafiz_widget_wide_plain, R.layout.hafiz_widget_wide_plain_system, 250f, 170f, wideScene = true, weekView = true, art = true, lineWithCount = true),
     // A 4 x 2 on a launcher with short rows keeps its week row (the provider's minimum is 130 dp).
     WIDE_LOW(R.layout.hafiz_widget_wide_low, R.layout.hafiz_widget_wide_low_plain, R.layout.hafiz_widget_wide_low_plain_system, 250f, 130f, wideScene = true, weekView = true, art = true, lineWithCount = true),
     TILE(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 130f, 130f, wideScene = false, weekView = false, art = true, lineWithCount = true),
-    // Below 130 dp any line would cut Zayt's face, so the smallest tile keeps the flame, count and Zayt.
-    TILE_SMALL(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 110f, 100f, wideScene = false, weekView = false, art = true, lineWithCount = false, line = false),
+    // Below 130 dp a line would cut Zayt's face, so the smallest tile with Zayt keeps the flame, count
+    // and Zayt; the plain tile keeps its line.
+    TILE_SMALL(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 110f, 100f, wideScene = false, weekView = false, art = true, lineWithCount = true, lineBesideZayt = false),
     // A wide, short widget looks like a long 2 x 1: Zayt looks up from the bottom edge.
     WIDE_SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 250f, 64f, wideScene = true, weekView = false, art = true, lineWithCount = true),
     SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 170f, 64f, wideScene = true, weekView = false, art = true, lineWithCount = true),
@@ -260,11 +261,12 @@ object WidgetRenderer {
     views.setViewVisibility(R.id.widget_flame, if (flameLoop != null) View.INVISIBLE else View.VISIBLE)
 
     showText(views, R.id.widget_count, entry.count)
-    showText(views, R.id.widget_line, if (!bucket.line || (!bucket.lineWithCount && entry.count != null)) null else entry.line)
+    val zayt = if (bucket.art) pose else null
+    val lineShown = (bucket.lineWithCount || entry.count == null) && (bucket.lineBesideZayt || zayt == null)
+    showText(views, R.id.widget_line, if (lineShown) entry.line else null)
     // The plan or grace note is spoken in the label only; the widget stays minimal (owner, 2026-11-21).
     if (bucket.weekView) showWeek(views, entry.week, weekColors)
 
-    val zayt = if (bucket.art) pose else null
     views.setViewVisibility(R.id.widget_art, if (zayt == null) View.GONE else View.VISIBLE)
     if (zayt != null) showZayt(context, views, entry, zayt, motion)
 
