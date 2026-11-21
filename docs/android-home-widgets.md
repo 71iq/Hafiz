@@ -20,15 +20,18 @@ Hafiz takes the escalation: the darkening sky, a character whose state follows t
 
 Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both use the same data and resize down to a single row. Each layout has an ideal size. From Android 12 the launcher picks the closest ideal size that fits the widget. Earlier versions apply the same rule to the size in the widget options, so one size gets one layout everywhere. Every minimum leaves room for a three-digit count beside the flame.
 
-| Ideal size, dp    | Layout                                                                                                               |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 320×170           | Roomy wide: flame and count, one line and the week row at the start; Zayt up to 165 dp wide at the end.              |
-| 250×170           | Wide: the same with Zayt up to 112 dp wide.                                                                          |
-| 130×130           | Tile: flame and count centred at the top, one line below, Zayt filling the rest with its lower body cut by the edge. |
-| 110×100           | Small tile: the tile without the line beside a count, so Zayt keeps its size.                                        |
-| 250×64 and 170×64 | Short: flame, count and line at the start; a tall Zayt at the end looks up from the bottom edge.                     |
-| 210×40            | Strip: one row with the line beside the count, and Zayt looking up.                                                  |
-| 100×40            | Tiny: the flame with the count, or the line when there is no count. No Zayt, so neither is cut.                      |
+| Ideal size, dp    | Layout                                                                                                                                                |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 320×170           | Roomy wide: flame and count, one line and the week row at the start; Zayt up to 165 dp wide at the end.                                               |
+| 250×170           | Wide: the same with Zayt up to 112 dp wide.                                                                                                           |
+| 250×130           | Low wide: the wide layout with a smaller count and line, so a 4×2 on short launcher rows keeps its week row. Hafiz wird is never shorter than 130 dp. |
+| 130×130           | Tile: flame and count centred at the top, one line below, Zayt filling the rest with only its feet cut.                                               |
+| 110×100           | Small tile: flame, count and Zayt, no line, so Zayt's face is never cut.                                                                              |
+| 250×64 and 170×64 | Short: flame, count and line at the start; Zayt fills the height at the end, with only the twig tip and feet cut.                                     |
+| 210×40            | Strip: one row with the line beside the count, and Zayt filling the height.                                                                           |
+| 100×40            | Tiny: the flame with the count, or the line when there is no count. No Zayt, so neither is cut.                                                       |
+
+Zayt's face sits low on the drop, so no layout crops more than the feet and the tip of the twig. Android 12 and later round every widget's corners. Before that, launchers do not, so the renderer draws the sky at the widget's reported size with the card's 16 dp radius.
 
 With **Show Zayt** on, the background is the scene. With it off, each layout shows a plain card in the app's theme, the System theme following the launcher's day or night colours. An expired or unreadable timeline gets the neutral text layout.
 
@@ -79,7 +82,7 @@ The evening scenes for done and begin start at the evening start or 20:00, which
 
 Calm stills blink slowly about every 4 and 6 seconds, two blinks with unequal gaps. The urgency faces loop their own short movement: a bounce, a foot tap, a drip, a tremble. The seated and celebrating stills stay still. From 4 hours left the waiting flame's ember pulses, faster and red in the last hour. Each is a frame list on an indeterminate ProgressBar inside the widget's RemoteViews, so the launcher runs it and Hafiz never wakes to animate.
 
-A completed, locally committed review can carry a wird progress event: the minimum met, a day made up or a streak earned back. The widget lifecycle remembers it in memory for that local day and the first background transition consumes it. At backgrounding, Hafiz sends a fresh timeline with a one-time celebration request. Native plays the clip that the entry now showing calls for: the A07 turn on a milestone or the A06 hop on a done day. Other states keep the blink. Each clip ends on the entry's own still. Twelve seconds after publication, one follow-up refresh reads the latest state and returns to the blink. The launcher decodes every frame before a clip starts, which took about 7 seconds on a software-rendered emulator, so the hold leaves a slow launcher time to play it. Clip frames are packed at 400 by 480 pixels to keep that decoding and its memory small; the last drawing is the full-size still. Actual display timing depends on the launcher.
+A completed, locally committed review can carry a wird progress event: the minimum met, a day made up or a streak earned back. The widget lifecycle remembers it in memory for that local day and the first background transition consumes it. At backgrounding, Hafiz sends a fresh timeline with a one-time celebration request. Native plays the clip that the entry now showing calls for: the A07 turn on a milestone or the A06 hop on a done day, landing on the relieved brow wipe after a late finish. Other states keep the blink. Each clip ends on the entry's own still. Twelve seconds after publication, one follow-up refresh reads the latest state and returns to the blink. The launcher decodes every frame before a clip starts, which took about 7 seconds on a software-rendered emulator, so the hold leaves a slow launcher time to play it. Clip frames are packed at 400 by 480 pixels to keep that decoding and its memory small; the last drawing is the full-size still. Actual display timing depends on the launcher.
 
 A new install, pin, resize, startup, clock change, sync or account restore shows the current still and blink. None of those creates a locally earned event, and a second trip to the launcher that day does not repeat one. Changing accounts or restoring local data discards a pending event. With system animations off, every widget is still. There is no sound or haptic feedback.
 

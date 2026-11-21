@@ -5,6 +5,14 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.BitmapShader
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Shader
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -42,12 +50,16 @@ object WidgetRenderer {
     val art: Boolean,
     /** The line shows beside a count; where it does not, only a missing count brings it back. */
     val lineWithCount: Boolean,
+    /** The smallest tile has no room for a line at all without cutting Zayt's face. */
+    val line: Boolean = true,
   ) {
     WIDE_ROOMY(R.layout.hafiz_widget_wide_roomy, R.layout.hafiz_widget_wide_roomy_plain, R.layout.hafiz_widget_wide_roomy_plain_system, 320f, 170f, wideScene = true, weekView = true, art = true, lineWithCount = true),
     WIDE(R.layout.hafiz_widget_wide, R.layout.hafiz_widget_wide_plain, R.layout.hafiz_widget_wide_plain_system, 250f, 170f, wideScene = true, weekView = true, art = true, lineWithCount = true),
+    // A 4 x 2 on a launcher with short rows keeps its week row (the provider's minimum is 130 dp).
+    WIDE_LOW(R.layout.hafiz_widget_wide_low, R.layout.hafiz_widget_wide_low_plain, R.layout.hafiz_widget_wide_low_plain_system, 250f, 130f, wideScene = true, weekView = true, art = true, lineWithCount = true),
     TILE(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 130f, 130f, wideScene = false, weekView = false, art = true, lineWithCount = true),
-    // Below 130 dp a two-line line would leave Zayt a sliver, so the smallest tile keeps the count and Zayt.
-    TILE_SMALL(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 110f, 100f, wideScene = false, weekView = false, art = true, lineWithCount = false),
+    // Below 130 dp any line would cut Zayt's face, so the smallest tile keeps the flame, count and Zayt.
+    TILE_SMALL(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 110f, 100f, wideScene = false, weekView = false, art = true, lineWithCount = false, line = false),
     // A wide, short widget looks like a long 2 x 1: Zayt looks up from the bottom edge.
     WIDE_SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 250f, 64f, wideScene = true, weekView = false, art = true, lineWithCount = true),
     SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 170f, 64f, wideScene = true, weekView = false, art = true, lineWithCount = true),
@@ -90,12 +102,18 @@ object WidgetRenderer {
     }
   }
 
-  /** The add-widget dialog's preview: today's state in the layout the widget starts with, still. */
+  /**
+   * The add-widget dialog's preview: today's state, still. From Android 12 the launcher picks the
+   * layout for the preview's size, as it will for the placed widget; before that, the typical one.
+   */
   fun buildPreview(context: Context, kind: String): RemoteViews {
     val timeline = WidgetStore.readTimeline(context)
     val selection = timeline?.let { WidgetSelector.select(it, System.currentTimeMillis(), java.util.TimeZone.getDefault()) }
     if (timeline != null && selection is WidgetSelection.Entry) {
       try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+          return RemoteViews(Bucket.entries.associate { SizeF(it.width, it.height) to entryViews(context, it, timeline, selection.entry, Motion.NONE) })
+        }
         return entryViews(context, if (kind == "medium") Bucket.WIDE_ROOMY else Bucket.TILE, timeline, selection.entry, Motion.NONE)
       } catch (error: Exception) {
         WidgetLog.failure("preview", error)
@@ -117,7 +135,8 @@ object WidgetRenderer {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
           return RemoteViews(Bucket.entries.associate { SizeF(it.width, it.height) to entryViews(context, it, timeline, selection.entry, motion) })
         }
-        return entryViews(context, bucketFor(context, options), timeline, selection.entry, motion)
+        val size = reportedSize(context, options)
+        return entryViews(context, bucketFor(size), timeline, selection.entry, motion, size)
       } catch (error: Exception) {
         WidgetLog.failure("entry", error)
       }
@@ -129,17 +148,67 @@ object WidgetRenderer {
    * Before Android 12, from the size the launcher reports: the bucket whose ideal size fits and lies
    * closest, as RemoteViews chooses among sized layouts from Android 12; with none fitting, tiny.
    */
-  private fun bucketFor(context: Context, options: Bundle): Bucket {
-    val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val width = options.getInt(if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH).toFloat()
-    val height = options.getInt(if (landscape) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT).toFloat()
+  private fun bucketFor(size: SizeF): Bucket {
+    val width = size.width
+    val height = size.height
     return Bucket.entries
       .filter { it.width <= width && it.height <= height }
       .minByOrNull { (width - it.width) * (width - it.width) + (height - it.height) * (height - it.height) }
       ?: Bucket.TINY
   }
 
-  private fun entryViews(context: Context, bucket: Bucket, timeline: WidgetTimeline, entry: WidgetEntry, motion: Motion): RemoteViews {
+  /** The widget's size in dp as the launcher reports it before Android 12, for the current orientation. */
+  private fun reportedSize(context: Context, options: Bundle): SizeF {
+    val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val width = options.getInt(if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+    val height = options.getInt(if (landscape) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
+    return SizeF(width.toFloat(), height.toFloat())
+  }
+
+  /**
+   * Before Android 12 launchers do not round a widget's corners, and a full-bleed sky would show square
+   * ones. The sky is then drawn at the widget's reported size with the card's radius, at 2 px per dp:
+   * the soft gradients need no more, and the update stays small. Null keeps the plain resource.
+   */
+  private fun roundedScene(context: Context, resource: Int, size: SizeF?): Bitmap? {
+    if (size == null || size.width < 1f || size.height < 1f) return null
+    val scale = 2f
+    val width = (size.width * scale).toInt()
+    val height = (size.height * scale).toInt()
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeResource(context.resources, resource, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    val sample = maxOf(1, minOf(bounds.outWidth / width, bounds.outHeight / height))
+    val source = BitmapFactory.decodeResource(context.resources, resource, BitmapFactory.Options().apply { inSampleSize = sample })
+      ?: return null
+    // Centre-crop the sky to the widget's shape, as the layout's centerCrop would.
+    val target = width.toFloat() / height
+    val crop = if (source.width.toFloat() / source.height > target) {
+      val cropWidth = (source.height * target).toInt()
+      Rect((source.width - cropWidth) / 2, 0, (source.width + cropWidth) / 2, source.height)
+    } else {
+      val cropHeight = (source.width / target).toInt()
+      Rect(0, (source.height - cropHeight) / 2, source.width, (source.height + cropHeight) / 2)
+    }
+    val cropped = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    Canvas(cropped).drawBitmap(source, crop, Rect(0, 0, width, height), Paint(Paint.FILTER_BITMAP_FLAG))
+    source.recycle()
+    val radius = context.resources.getDimension(R.dimen.hafiz_widget_radius) / context.resources.displayMetrics.density * scale
+    val rounded = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = BitmapShader(cropped, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP) }
+    Canvas(rounded).drawRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), radius, radius, paint)
+    cropped.recycle()
+    return rounded
+  }
+
+  private fun entryViews(
+    context: Context,
+    bucket: Bucket,
+    timeline: WidgetTimeline,
+    entry: WidgetEntry,
+    motion: Motion,
+    size: SizeF? = null,
+  ): RemoteViews {
     val pose = entry.pose
     val colors = timeline.colors
     val layout = when {
@@ -159,7 +228,9 @@ object WidgetRenderer {
     var weekColors = intArrayOf(0, 0, 0)
     if (pose != null) {
       val ink = WidgetArt.ink(entry.scene)
-      views.setImageViewResource(R.id.widget_scene, WidgetArt.scene(entry.scene, bucket.wideScene))
+      val scene = WidgetArt.scene(entry.scene, bucket.wideScene)
+      val rounded = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) roundedScene(context, scene, size) else null
+      if (rounded != null) views.setImageViewBitmap(R.id.widget_scene, rounded) else views.setImageViewResource(R.id.widget_scene, scene)
       views.setTextColor(R.id.widget_count, if (entry.flame == "lit") ink.lit else ink.primary)
       views.setTextColor(R.id.widget_line, ink.primary)
       when (entry.flame) {
@@ -189,7 +260,7 @@ object WidgetRenderer {
     views.setViewVisibility(R.id.widget_flame, if (flameLoop != null) View.INVISIBLE else View.VISIBLE)
 
     showText(views, R.id.widget_count, entry.count)
-    showText(views, R.id.widget_line, if (!bucket.lineWithCount && entry.count != null) null else entry.line)
+    showText(views, R.id.widget_line, if (!bucket.line || (!bucket.lineWithCount && entry.count != null)) null else entry.line)
     // The plan or grace note is spoken in the label only; the widget stays minimal (owner, 2026-11-21).
     if (bucket.weekView) showWeek(views, entry.week, weekColors)
 

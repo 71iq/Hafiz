@@ -400,7 +400,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     );
     const plain = buildWidgetTimeline(input({ days: streak, showNumbers: false })).entries[0];
     expect(plain).toMatchObject({ state: "milestone", pose: "milestone", count: null, line: "Done today" });
-    expect(plain.contentDescription).toBe("Hafiz. Wird done for today. See you tomorrow, in sha' Allah.");
+    expect(plain.contentDescription).toBe("Hafiz. Done today. See you tomorrow, in sha' Allah.");
   });
 
   it("8. starts the evening band at the streak-at-risk time", () => {
