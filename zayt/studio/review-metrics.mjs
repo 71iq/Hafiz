@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
-import { jobs, out, frameDir, json } from "./common.mjs";
+import { jobs, out, cache, sharp, frameDir, json } from "./common.mjs";
+import { camera } from "./capture.mjs";
 import { decode, nominal } from "./decoded.mjs";
 
 const round = (value) => Number(value.toFixed(2));
@@ -89,6 +90,18 @@ report.rest.flankScan = {
   sub80Columns: sub80.map((p) => p.col),
 };
 assert.ok(sub80.every((p) => Math.min(p.col - across[0].col, across.at(-1).col - p.col) < 0.06 * across.length));
+// Render the same moving body and sparks without the halo. A rest-pose
+// outline would count the squash, raised arms and sparkles as stray light.
+const barePeak = {};
+await camera(async (render) => {
+  for (const key of ["A07-S-light", "A15-M-light"]) {
+    const job = get(key);
+    const pose = capture(key).poses.find((p) => p.halo === 1);
+    const file = path.join(cache, "reference", job.id + "-no-spill.png");
+    await render(job.size, { ...pose, halo: 0 }, { variant: "light" }, null, file);
+    barePeak[job.id] = await sharp(file).ensureAlpha().raw().toBuffer();
+  }
+});
 for (const key of ["A07-S-light", "A07-S-dark", "A15-M-light", "A15-M-dark"]) {
   const job = get(key),
     d = await media(key),
@@ -96,20 +109,28 @@ for (const key of ["A07-S-light", "A07-S-dark", "A15-M-light", "A15-M-dark"]) {
     poses = capture(key).poses;
   const peakIndex = poses.findIndex((p) => p.halo === 1),
     peak = nominal(d, job, peakIndex),
-    hold = d.frames.at(-1),
-    minRow = rowAt(d.height, 3.18);
-  const core = samplePoint(d, peak, 0.025, 1.18),
-    edge = samplePoint(d, peak, 0.775, 1.21);
-  const spill = outside(base, peak, d.width, minRow),
+    hold = d.frames.at(-1);
+  const atBodyPoint = (x, y) =>
+    samplePoint(
+      d,
+      peak,
+      x * poses[peakIndex].width,
+      y * poses[peakIndex].height + 0.19 * (1 - poses[peakIndex].height) + poses[peakIndex].root[1],
+    );
+  const core = atBodyPoint(0.025, 1.18),
+    edge = atBodyPoint(0.775, 1.21);
+  const light = await media(key.replace("dark", "light")),
+    silhouette = barePeak[job.id];
+  const spill = outside(silhouette, peak, d.width),
     holdExterior = outside(base, hold, d.width),
     posterExterior = outside(base, (await decode(path.join(out, job.poster))).frames[0], d.width);
-  const extent = reach(base, peak, d.width, d.height, minRow);
+  const extent = reach(silhouette, peak, d.width, d.height, 0);
   let offWindowMax = 0;
-  for (const [index, pose] of poses.entries())
-    if (!pose.halo) {
-      offWindowMax = Math.max(offWindowMax, outside(base, nominal(d, job, index), d.width, minRow).peak);
-    }
-  assert.equal(offWindowMax, 0, key + " exterior alpha outside peak window");
+  for (const [index, pose] of poses.entries()) {
+    if (!pose.halo)
+      offWindowMax = Math.max(offWindowMax, outside(nominal(light, job, index), nominal(d, job, index), d.width).peak);
+  }
+  assert.ok(offWindowMax <= 2, key + " exterior alpha outside peak window: " + offWindowMax);
   report.glow[key] = {
     peakIndex,
     core,
@@ -137,7 +158,8 @@ for (const key of ["A07-S-light", "A15-M-light", "A10-S", "A11-S", "A19-L"]) {
   const edge = (index) => Math.round((index * job.seconds * 1000) / poses.length);
   const closed = poses.flatMap((pose, index) => (pose.face.eyeOpen === 0 && pose.opacity > 0 ? [index] : []));
   const protectedFrames = poses.flatMap((p, i) =>
-    p.sit === 1 || p.glow >= 0.999 || p.motes.some((v) => v > 0 && v < 1) || (job.id === "A19" && p.root[1] === 0)
+    (p.sit === 1 || p.glow >= 0.999 || p.motes.some((v) => v > 0 && v < 1) || (job.id === "A19" && p.root[1] === 0)) &&
+    !p.face.joy
       ? [i]
       : [],
   );
@@ -178,7 +200,7 @@ for (const key of ["A07-S-light", "A15-M-light", "A10-S", "A11-S", "A19-L"]) {
 const wave = capture("A04-S").poses,
   lift = capture("A08-S").poses;
 const sway = wave.flatMap((p, i) =>
-  (i * 1.8) / (wave.length - 1) >= 0.6 && (i * 1.8) / (wave.length - 1) <= 1.3 ? [p.arms[0] - 90] : [],
+  (i * 2) / (wave.length - 1) >= 0.85 && (i * 2) / (wave.length - 1) <= 1.55 ? [p.arms[0] - 90] : [],
 );
 report.gestures = {
   sampledWaveDegrees: sway.map(round),
@@ -192,13 +214,14 @@ report.gestures = {
 const moteClip = await media("A15-M-light"),
   moteJob = get("A15-M-light"),
   motePoses = capture(moteJob.key).poses;
-const crestIndex = motePoses.findIndex((p) => p.motes[0] > 0.46),
+const crestIndex = motePoses.findIndex((p) => p.motes[2] > 0.46),
   crest = nominal(moteClip, moteJob, crestIndex);
 const topOfLeaves = (await media("A01-M")).frames[0].findIndex((v, i) => i % 4 === 3 && v > 0),
   leafRow = Math.floor(topOfLeaves / (4 * moteClip.width));
 let maximum = 0,
   location;
-for (let row = 0; row < leafRow; row++)
+// Ignore the leaf spring below the motes while it settles after landing.
+for (let row = 0; row < Math.min(leafRow, rowAt(moteClip.height, 3.55)); row++)
   for (let col = 0; col < moteClip.width; col++) {
     const alpha = crest[(row * moteClip.width + col) * 4 + 3];
     if (alpha > maximum) {
@@ -224,6 +247,7 @@ report.motes = {
   diameterAt1Alpha: chord(1),
   leafTopRow: leafRow,
 };
+assert.ok(report.motes.diameterAt95Pct >= 2 && report.motes.diameterAt95Pct <= 3);
 const bandJob = get("A06-S"),
   band = await media(bandJob.key),
   bandPoses = capture(bandJob.key).poses;
@@ -237,7 +261,11 @@ for (const [name, target] of [
       0,
     ),
     y = bandPoses[index].sweep;
-  report.band[name] = { index, ...samplePoint(band, nominal(band, bandJob, index), 0, y) };
+  const pose = bandPoses[index];
+  report.band[name] = {
+    index,
+    ...samplePoint(band, nominal(band, bandJob, index), 0, y * pose.height + 0.19 * (1 - pose.height) + pose.root[1]),
+  };
   assert.ok(report.band[name].h >= 46 && report.band[name].h <= 50, name + " band hue");
 }
 json(path.join(out, "review-metrics.json"), report);

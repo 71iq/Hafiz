@@ -24,7 +24,7 @@ function payload(webp) {
   }
   return Buffer.concat(bits);
 }
-export async function exactRects({ dir, frames, dest, quality, loops }) {
+export async function exactRects({ dir, frames, dest, quality, loops, alphaStep = 1 }) {
   const packets = [];
   let previous, width, height;
   for (const [ordinal, { index, ms }] of frames.entries()) {
@@ -33,6 +33,13 @@ export async function exactRects({ dir, frames, dest, quality, loops }) {
       .raw()
       .toBuffer({ resolveWithObject: true });
     ({ width, height } = info);
+    // Small coverage changes inside the moving oil are expensive to encode.
+    // Bound the error to two alpha levels and preserve effects, edges and endpoints.
+    if (alphaStep > 1 && ordinal > 0 && ordinal < frames.length - 1) {
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 208) data[i] = 255 - alphaStep * Math.round((255 - data[i]) / alphaStep);
+      }
+    }
     let left = width,
       top = height,
       right = -1,

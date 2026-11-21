@@ -39,7 +39,7 @@ export const jobs = manifest.animations.flatMap((anim) =>
     }),
   ),
 );
-export const pilot = ["A06-S", "A07-S-light", "A07-S-dark", "A04-S", "A15-M-light"];
+export const pilot = ["A07-S-light", "A07-S-dark"];
 export const select = (keys) =>
   keys.flatMap((key) =>
     key === "pilot"

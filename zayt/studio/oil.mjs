@@ -41,6 +41,8 @@ export function oilMaterial(body, reflection) {
       oil: new THREE.Vector3(),
       reflection,
       eyeOpen: 1,
+      joy: 0,
+      eyeArc: 0,
       eyeScale: 0.7,
       browHeight: 0,
       browTilt: 0,
@@ -66,7 +68,7 @@ export function oilMaterial(body, reflection) {
     fragmentShader: `precision highp float;
     varying vec3 p; varying vec3 n;
     uniform sampler2D reflection; uniform vec3 oil;
-    uniform float body,eyeOpen,eyeScale,browHeight,browTilt,mouthCurve,blush,highlight,glow,fillHeight,sweep,drift,chest;
+    uniform float body,joy,eyeArc,eyeOpen,eyeScale,browHeight,browTilt,mouthCurve,blush,highlight,glow,fillHeight,sweep,drift,chest;
     float sq(float x){return x*x;} float bell(vec2 v){return exp(-dot(v,v));}
     float ink(float distance){float aa=max(fwidth(distance)*.60,.0006);return 1.-smoothstep(-aa,aa,distance);}
     void main(){
@@ -121,6 +123,20 @@ export function oilMaterial(body, reflection) {
           vec3 iris=mix(vec3(.145,.084,.039),vec3(.50,.297,.083),smoothstep(.08,.95,-uv.y)*eyeOpen);
           iris=mix(iris,vec3(.086,.045,.023),.85*(1.-smoothstep(.46,.68,length(uv-vec2(0.,.14))))*eyeOpen);
           float glint=ink(length((p.xy-vec2(sign(p.x)*.39-rad*.28,1.096+ey*.31))/rad)-.205)*smoothstep(.35,.91,eyeOpen);
+          if(eyeArc>0.){
+            // An upward arc with rounded tips. The centre opens up as the
+            // circle narrows, so a happy eye never becomes a straight blink.
+            float x=clamp(eye.x/.129,-1.,1.);
+            float arcY=.089*(1.-x*x)-.014;
+            float spine=eyeArc*.129;
+            float along=clamp(eye.x,-spine,spine);
+            float endCap=mix(rad,.029,eyeArc);
+            float halfHeight=mix(ey*1.055,.029,eyeArc);
+            vec2 lens=vec2((eye.x-along)/endCap,(eye.y-eyeArc*arcY)/halfHeight);
+            eyeMask=ink((length(lens)-1.)*min(endCap,halfHeight));
+            iris=mix(iris,vec3(.16,.086,.032),eyeArc);
+            glint*=1.-eyeArc;
+          }
           c=mix(c,mix(iris,vec3(1.,.98,.89),glint*highlight),eyeMask);
           float bx=(abs(p.x)-.43)/.091;
           float by=1.39+browHeight+.025*(1.-bx*bx)-.013*bx+browTilt*bx;
@@ -129,7 +145,15 @@ export function oilMaterial(body, reflection) {
           float mx=clamp(p.x/ (.096+.012*mouthCurve),-1.,1.);
           float my=.925+(.040+.013*mouthCurve)*mx*mx;
           float mouth=ink(length(vec2(p.x-mx*(.096+.012*mouthCurve),p.y-my))-.0095);
-          c=mix(c,vec3(.235,.126,.035),mouth);
+          if(joy>0.){
+            float halfWidth=.108+.107*joy;
+            float x=clamp(p.x/halfWidth,-1.,1.);
+            float top=mix(.925+(.040+.013*mouthCurve)*x*x,.944+.030*x*x,joy);
+            float bottom=top-(.158*joy)*(1.-x*x);
+            float opening=max(abs(p.x)-halfWidth,max(p.y-top,bottom-p.y));
+            mouth=ink(opening-.008);
+          }
+          c=mix(c,mix(vec3(.235,.126,.035),vec3(.185,.077,.035),joy),mouth);
         }
       }
       float opacity=1.-.13*pow(1.-depth,3.); gl_FragColor=vec4(clamp(c,0.,1.)*opacity,opacity);

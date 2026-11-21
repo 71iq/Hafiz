@@ -73,7 +73,7 @@ export async function strips(jobs, pilot = false) {
         22,
         16,
         pilot
-          ? "Budget pilot / five samples, poster, gesture peak / beige and black"
+          ? "A07 energy pilot / five samples, poster, gesture peak / beige and black"
           : "Five samples at 56 pt / first to last, then poster",
       ],
     ];
@@ -86,7 +86,7 @@ export async function strips(jobs, pilot = false) {
     for (const bg of pilot ? [surfaces[0], surfaces[6]] : [job.variant === "dark" ? surfaces[6] : surfaces[0]]) {
       labels.push([6, y + height / 2 + 3, 11, job.key]);
       const poster = !job.poster ? d.frames.at(-1) : (await decode(path.join(out, job.poster))).frames[0];
-      const peakTime = { A06: 0.51, A07: 1.74, A04: 0.6, A15: 1.94 }[job.id];
+      const peakTime = 0.98;
       for (let index = 0; index < (pilot ? 7 : 6); index++)
         parts.push({
           input: await tile(
@@ -122,14 +122,14 @@ export async function surfacesSheet(jobs) {
   const motionPeaks = {
     A01: 0,
     A02: 2.4,
-    A04: 0.6,
-    A06: 0.58,
-    A07: 1.74,
-    A08: 0.57,
+    A04: 1.19,
+    A06: 0.28,
+    A07: 0.98,
+    A08: 0.73,
     A10: 0.5,
     A11: 1,
-    A15: 1.94,
-    A17: 0.36,
+    A15: 1.38,
+    A17: 0.28,
     A19: 1.55,
   };
   for (const [row, job] of jobs.entries()) {

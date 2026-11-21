@@ -33,7 +33,8 @@ export async function encode(
     if (frames.at(-1)?.hash === capture.hashes[index]) frames.at(-1).ms += ms;
     else frames.push({ hash: capture.hashes[index], index, ms });
   }
-  if (["A06", "A07", "A15"].includes(job.id)) return exactRects({ dir, frames, dest, quality, loops: 1 });
+  if (["A06", "A07", "A15"].includes(job.id))
+    return exactRects({ dir, frames, dest, quality, loops: 1, alphaStep: job.id === "A15" ? 5 : 1 });
   const args = [
     "-loop",
     job.id === "A02" ? "2" : "1",
@@ -58,7 +59,9 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     const dir = frameDir(job),
       capture = JSON.parse(fs.readFileSync(path.join(dir, "capture.json"))),
       trials = [];
-    for (const quality of job.key === "A06-S" ? [75, 70] : [83, 77, 70]) {
+    // These two exports reach their byte targets at the lower starting qualities.
+    const qualities = { "A06-S": [75, 70], "A15-M-dark": [77, 70] };
+    for (const quality of qualities[job.key] || [83, 77, 70]) {
       await encode(job, { quality });
       const bytes = fs.statSync(path.join(out, job.media)).size;
       trials.push({ quality, bytes, level: capture.level });

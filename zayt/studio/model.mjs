@@ -60,17 +60,19 @@ function armSurface() {
   geometry.setIndex(indices);
   return geometry;
 }
-function shapeArm(mesh, sign, angle, heart) {
+function shapeArm(mesh, sign, angle, heart, reach) {
   const anchor = point([sign * 0.755, 1.006, 0.09]),
     axis = point([sign * Math.sin(angle), -Math.cos(angle), 0.23]).normalize();
   const knots = [
     anchor,
     anchor.clone().addScaledVector(axis, 0.16),
-    anchor.clone().addScaledVector(axis, 0.34),
-    anchor.clone().addScaledVector(axis, 0.52),
+    anchor.clone().addScaledVector(axis, 0.34 + 0.1 * reach),
+    anchor.clone().addScaledVector(axis, 0.52 + 0.175 * reach),
   ];
   knots[1].x += sign * 0.048;
   knots[2].x += sign * 0.026;
+  knots[1].y -= 0.086 * reach;
+  knots[2].y -= 0.09 * reach;
   const chest = [
     [-0.715, 0.76, 0.18],
     [-0.77, 0.69, 0.46],
@@ -180,6 +182,43 @@ function aura(scene, profile) {
   scene.add(mesh);
   return mesh;
 }
+// An uneven fan keeps the sparks separated and the space above the twig clear.
+const sparkTracks = [
+  [-1.28, 0.29],
+  [0.85, 0.83],
+  [-0.9, 0.81],
+  [1.34, 0.18],
+  [-1.16, -0.28],
+  [0.46, 1.12],
+  [1.2, -0.39],
+  [-0.41, 1.05],
+];
+function makeSparkles(scene) {
+  const quad = new THREE.PlaneGeometry(0.21, 0.21);
+  return sparkTracks.map(() => {
+    const spark = new THREE.Mesh(
+      quad,
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: { opacity: { value: 0 }, edged: { value: 0 } },
+        vertexShader: `varying vec2 disc;void main(){disc=uv*2.-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+        fragmentShader: `varying vec2 disc;uniform float opacity,edged;
+        void main(){
+          vec2 d=abs(disc);
+          float r=pow(pow(d.x,.85)+pow(d.y,.85),1./.85);
+          float a=1.-smoothstep(.46,1.,r);
+          vec3 core=mix(vec3(1.,.82,.42),vec3(.97,.72,.27),edged);
+          vec3 edge=mix(vec3(1.,.78,.35),vec3(.65,.40,.10),edged);
+          gl_FragColor=vec4(mix(core,edge,smoothstep(.32,.58,r)),a*opacity);
+        }`,
+      }),
+    );
+    spark.renderOrder = 3;
+    scene.add(spark);
+    return spark;
+  });
+}
 export function buildRig(scene) {
   scene.add(new THREE.HemisphereLight(0xfffae0, 0xaf946d, 1.55));
   for (const [pos, power] of [
@@ -252,7 +291,8 @@ export function buildRig(scene) {
     torso.add(mesh);
     return mesh;
   });
-  const halo = aura(root, drop.geometry.parameters.points);
+  const halo = aura(torso, drop.geometry.parameters.points);
+  const sparks = makeSparkles(scene);
   let seed = 0x5a617974;
   const random = () => (seed = (Math.imul(1664525, seed) + 1013904223) >>> 0) / 4294967296;
   const moteQuad = new THREE.PlaneGeometry(0.157, 0.157);
@@ -267,7 +307,7 @@ export function buildRig(scene) {
         fragmentShader: `varying vec2 disc;uniform float strength;void main(){float a=1.-smoothstep(.17,1.,length(disc));gl_FragColor=vec4(1.,.82,.45,strength*a*a);}`,
       }),
     );
-    root.add(mesh);
+    scene.add(mesh);
     return {
       mesh,
       x: (index % 2 ? -1 : 1) * (0.08 + random() * 0.31),
@@ -276,6 +316,7 @@ export function buildRig(scene) {
   });
   return (pose, style) => {
     root.position.set(...pose.root);
+    root.rotation.set(0, pose.spin || 0, pose.lean || 0, "ZXY");
     torso.scale.set(pose.width, pose.height, 1 / (pose.width * pose.height));
     torso.position.y = 0.19 * (1 - pose.height) - 0.177 * pose.sit;
     body.uniforms.breathHeight.value = pose.breathHeight || 0;
@@ -284,7 +325,9 @@ export function buildRig(scene) {
     const oil = palettes[style.color ?? "gold"];
     for (const mat of [body, limb]) mat.uniforms.oil.value.set(...oil.map((channel) => channel / 255));
     for (const [key, value] of Object.entries({
+      joy: 0,
       ...pose.face,
+      eyeArc: pose.face.eyeArc ?? pose.face.joy ?? 0,
       eyeScale: style.eyes ?? 0.7,
       glow: pose.glow,
       fillHeight: pose.fillHeight,
@@ -307,10 +350,21 @@ export function buildRig(scene) {
       const sign = index ? 1 : -1,
         angle = (pose.arms[index] * Math.PI) / 180,
         heart = index ? 0 : pose.chest;
-      shapeArm(arm, sign, angle, heart);
+      shapeArm(arm, sign, angle, heart, pose.arms[index] === 29 ? 0 : pose.reach || 0);
     });
     halo.visible = style.variant === "dark" && pose.halo > 0;
     halo.material.uniforms.power.value = pose.halo * 0.28;
+    sparks.forEach((spark, index) => {
+      const t = pose.burst,
+        [x, y] = sparkTracks[index];
+      spark.visible = index < pose.sparkleCount && t > 0 && t < 1;
+      if (!spark.visible) return;
+      const outward = 0.52 + 0.6 * (1 - (1 - t) ** 2);
+      spark.position.set(x * outward, 1.8 + y * outward - 0.12 * t * t, 1.05);
+      spark.rotation.z = 0.16 * ((index % 3) - 1);
+      spark.material.uniforms.edged.value = Number(style.variant !== "dark");
+      spark.material.uniforms.opacity.value = Math.min(1, t / 0.19) * (1 - t * t);
+    });
     motes.forEach(({ mesh, x, raise }, index) => {
       const progress = pose.motes[index] ?? 0;
       mesh.visible = progress > 0 && progress < 1;

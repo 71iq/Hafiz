@@ -1,6 +1,6 @@
 {
-  "version": "3.1",
-  "spec": "zayt-spec.md v3.1, sections 5, 8 and 9",
+  "version": "4.0",
+  "spec": "zayt-spec.md v4.0, sections 5, 8 and 9",
   "fps": 24,
   "aspect_w_over_h": 0.8,
   "tiers": {
@@ -74,7 +74,8 @@
           }
         ]
       },
-      "nominal_samples": 1
+      "nominal_samples": 1,
+      "changed_in": "unchanged in v4; keep the v3.1 render from 37acac0a"
     },
     {
       "id": "A02",
@@ -96,16 +97,17 @@
           }
         ]
       },
-      "nominal_samples": 115
+      "nominal_samples": 115,
+      "changed_in": "unchanged in v4; keep the v3.1 render from 37acac0a"
     },
     {
       "id": "A04",
       "name": "welcome_wave",
       "priority": "P0",
       "mode": "once",
-      "seconds": 1.8,
+      "seconds": 2.0,
       "directional": false,
-      "beats": "Right arm (viewer's left) rises to ~60 deg above horizontal with a slight curve 0.2-0.6 s, passing through horizontal without holding; one slow sway between 40 and 70 deg 0.6-1.3 s; lowers 1.3-1.6 s; settle.",
+      "beats": "v4. Anticipation squash 8% 0-0.15 s; hop to 10% with 10% stretch 0.15-0.45 s, leaves trailing; happy-arc eyes and open smile from 0.25 s; landing squash 12% 0.45-0.60 s; right arm (viewer's left) swings to ~65 deg above horizontal 0.55-0.85 s, passing horizontal without holding; two quick sways 45-75 deg 0.85-1.55 s with up to 4 deg side lean, never forward; eyes reopen and mouth closes to warm smile at 1.30 s; arm lowers 1.55-1.80 s; settle wobble 1.80-2.00 s. Nothing refers to time away.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A04",
       "exports": {
@@ -117,7 +119,9 @@
         ],
         "review": []
       },
-      "nominal_samples": 43
+      "nominal_samples": 48,
+      "changed_in": "v4",
+      "register": "celebration"
     },
     {
       "id": "A06",
@@ -126,7 +130,7 @@
       "mode": "once",
       "seconds": 1.6,
       "directional": false,
-      "beats": "One move: a band of light sweeps feet to tip 0.2-1.0 s, following the curve of the drop, feathered over >=40% of its height on each side, hue 46-50, half strength across the face; one slow blink at 1.1 s.",
+      "beats": "v4. Anticipation squash 10% 0-0.15 s; hop to 12% with 10% stretch 0.15-0.40 s, leaves flick down then up; happy-arc eyes and open smile 0.30-0.75 s; landing squash 14% 0.40-0.55 s, two damped wobbles to 0.90 s; light band sweeps feet to tip 0.45-1.05 s, following the curve of the drop, feathered over >=40% of its height each side, hue 46-50, half strength across the face; eyes reopen at 0.75 s; one slow blink at 1.15 s. Shortest celebration and smallest file.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A06",
       "exports": {
@@ -142,7 +146,9 @@
         ],
         "review": []
       },
-      "nominal_samples": 38
+      "nominal_samples": 38,
+      "changed_in": "v4",
+      "register": "celebration"
     },
     {
       "id": "A07",
@@ -151,7 +157,7 @@
       "mode": "once",
       "seconds": 3.0,
       "directional": false,
-      "beats": "Inner light rises base to tip 0.3-1.6 s (peak over >=0.4 s), warming to #FFE9A8/#FFF3C8 at hue 44-48, never hue 60; dark render: visible amber halo 25-30% at the edge, zero within 10-12 px, peak to decay only; light render: none; no motes (S); one slow blink at ~2.3 s after the light starts to fall.",
+      "beats": "v4. Anticipation squash 18% 0-0.35 s while the inner light starts to rise; take-off 0.35 s; jump to 35% with 18% stretch and one full spin 0.35-0.85 s; at the top, frontal, the cheer with happy-arc eyes, open smile and lifted brows 0.85-1.10 s; fall and landing squash 18% 1.10-1.30 s; light peak 1.30-1.40 s (risen over >=0.4 s, hue 44-48) with a burst of 6-8 sparkles from the upper body fading within 0.7 s, cores 4-5 px at S; dark render halo blooms with the peak, light render no outer halo and sparkles with a thin deeper-gold edge; two damped wobbles as the arms lower 1.40-2.10 s; eyes reopen at 2.10 s; one slow blink at 2.50 s after the light starts to fall.",
       "hold": "warm_smile_glow_35",
       "beat_sheet": "zayt-spec.md 8.5 A07",
       "exports": {
@@ -169,7 +175,9 @@
         ],
         "review": []
       },
-      "nominal_samples": 72
+      "nominal_samples": 72,
+      "changed_in": "v4",
+      "register": "big_celebration"
     },
     {
       "id": "A08",
@@ -178,7 +186,7 @@
       "mode": "once",
       "seconds": 2.0,
       "directional": false,
-      "beats": "Read in the leaves: large leaf lifts ~30 deg with one overshoot and two visible settles 0.2-1.2 s; body swells 3%; both arms rise ~10 deg with the swell; one slow blink at 1.3 s.",
+      "beats": "v4. A rebound. Squash 10% 0-0.15 s; first bounce to 12% 0.15-0.45 s; landing 0.45-0.55 s; second bounce to 20% 0.55-0.90 s with both arms opening wide at shoulder height and the large leaf flicking up 35 deg with one overshoot; happy-arc eyes and open smile 0.65-1.30 s; landing squash 14% and two wobbles 0.90-1.50 s; arms return 1.40-1.70 s; one slow blink at 1.75 s. Nothing refers to the gap. Also marks a made-up day.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A08",
       "exports": {
@@ -190,7 +198,9 @@
         ],
         "review": []
       },
-      "nominal_samples": 48
+      "nominal_samples": 48,
+      "changed_in": "v4",
+      "register": "celebration"
     },
     {
       "id": "A10",
@@ -215,7 +225,8 @@
         ],
         "review": []
       },
-      "nominal_samples": 48
+      "nominal_samples": 48,
+      "changed_in": "unchanged in v4; keep the v3.1 render from 37acac0a"
     },
     {
       "id": "A11",
@@ -236,16 +247,17 @@
         ],
         "review": []
       },
-      "nominal_samples": 53
+      "nominal_samples": 53,
+      "changed_in": "unchanged in v4; keep the v3.1 render from 37acac0a"
     },
     {
       "id": "A15",
       "name": "juz_light",
       "priority": "P1",
       "mode": "once",
-      "seconds": 3.6,
+      "seconds": 4.0,
       "directional": false,
-      "beats": "Inner light fills base to tip 0.3-1.8 s (peak over >=0.6 s), hue 44-48; dark render visible amber halo; five soft single-colour motes (2-3 px core, ~6 px feather at M, no rim) rise straight up 1.0-3.0 s from above the leaves and fade by opacity only; one slow blink at ~3.0 s after the motes have gone.",
+      "beats": "v4. The biggest moment. Light fills base up while Zayt sinks into an 18% squash 0-0.60 s; take-off 0.60 s; jump to 45% with one full spin 0.60-1.20 s; at the top, frontal, the cheer with happy-arc eyes, open smile and lifted brows 1.20-1.55 s; fall and landing squash 18% 1.55-1.80 s; light peak about 1.75 s (risen over >=0.6 s) with a first burst of 8 sparkles; dark render halo blooms, light render none and sparkles with a thin deeper-gold edge; second victory hop to 15% with arms out 1.80-2.40 s; five motes rise straight up from behind the leaves 2.30-3.30 s, fading by opacity, cores 2-3 px at M with ~6 px feather and no rim; arms lower and two wobbles 2.40-3.10 s as the light starts to fall; eyes reopen at 3.10 s; one slow blink at 3.50 s after the motes are gone.",
       "hold": "warm_smile_glow_35",
       "beat_sheet": "zayt-spec.md 8.5 A15",
       "exports": {
@@ -263,16 +275,18 @@
         ],
         "review": []
       },
-      "nominal_samples": 86
+      "nominal_samples": 96,
+      "changed_in": "v4",
+      "register": "big_celebration"
     },
     {
       "id": "A17",
       "name": "tap_hello",
       "priority": "P2",
       "mode": "once",
-      "seconds": 0.9,
+      "seconds": 1.0,
       "directional": false,
-      "beats": "Review export only. Starts and ends on warm_smile. One blink and the smile warms a little 0-0.3 s, leaves sway 8 deg and settle 0.1-0.7 s. No squash, no haptic.",
+      "beats": "v4. Review export only. Starts and ends on warm_smile. Quick squash 8% 0-0.15 s; small hop to 6% with happy-arc eyes and open smile 0.15-0.40 s; landing and one wobble 0.40-0.55 s; leaves flick 12 deg and settle 0.10-0.70 s; eyes reopen at 0.70 s. No haptic.",
       "hold": "warm_smile",
       "beat_sheet": "zayt-spec.md 8.5 A17",
       "exports": {
@@ -284,7 +298,9 @@
           }
         ]
       },
-      "nominal_samples": 22
+      "nominal_samples": 24,
+      "changed_in": "v4",
+      "register": "celebration"
     },
     {
       "id": "A19",
@@ -305,26 +321,28 @@
           }
         ]
       },
-      "nominal_samples": 62
+      "nominal_samples": 62,
+      "changed_in": "unchanged in v4; keep the v3.1 render from 37acac0a"
     }
   ],
   "cut": {
     "A03": "arrive: no surface; bounce for its own sake",
     "A05": "intention_settle: resembles the standing posture of salah",
     "A09": "focus_ready: no surface; coach energy",
-    "A12": "sabaq_glad: same as A06 without the hop",
+    "A12": "sabaq_glad: without its own idea it is A06; a passed sabaq uses A06 at M, which has a hop since v4",
     "A13": "made_up_settle: indistinguishable at 64 pt; use A08",
     "A14": "portrait_still: initials for everyone",
     "A16": "goal_heart_nod: rewards streak commitment",
     "A18": "empty_waiting: a waiting pose is an ask"
   },
   "budget_bytes": {
-    "runtime_total": 3500000,
-    "animated_S": 150000,
-    "animated_M": 300000,
+    "runtime_total": 5000000,
+    "animated_S": 300000,
+    "animated_M": 600000,
     "still_or_poster_S": 25000,
     "poster_M": 50000,
-    "counts": "every runtime export incl. variants, posters and the A01 still; masters and review exports excluded; decimal bytes"
+    "counts": "every runtime export incl. variants, posters and the A01 still; masters and review exports excluded; decimal bytes",
+    "note_v4": "raised from 3,500,000 / 150,000 / 300,000 because jumps, spins and sparkle bursts compress worse; the v3.1 set was 1,218,780 bytes"
   },
   "sampling": "nominal samples = round(seconds x 24); first and last samples exactly on start and hold poses; integer ms frame durations summing to the declared length; identical samples may merge",
   "loop_count": {
@@ -338,6 +356,58 @@
     "no contact shadow in any file, including the light glow variants",
     "glow hue stays 44-48; never hue 60",
     "hold frames: every pixel outside the silhouette exactly transparent",
-    "closed eyes never coincide with the light peak, rising motes or a seated pose"
-  ]
+    "closed eyes in a calm line never coincide with the light peak, rising motes or a seated pose; happy-arc eyes with the open smile on a moving body are allowed at the peak",
+    "happy-arc eyes and the open smile only in celebrations, only while the body moves, never on a hold, poster or seated pose; the mouth closes to the warm smile before the hold",
+    "the open smile has a dark warm interior, no teeth and no tongue",
+    "the cheer: arms out and up at 30-50 deg above horizontal, tips well outside the body width and below the top of the body, never in front of the body or beside the face, at most 0.5 s",
+    "start, hold and poster frames are frontal; only spin frames pass through side views; the face overlay turns with the body and hides past the side",
+    "light leaves the body only as separate sparkles or motes that fade by opacity; no ring, disc, rays or crown",
+    "no fire, confetti, fireworks, explosions, trophies or points"
+  ],
+  "registers": {
+    "celebration": {
+      "ids": [
+        "A04",
+        "A06",
+        "A08",
+        "A17"
+      ],
+      "squash_stretch_max": 0.14,
+      "off_ground_max": {
+        "A04": 0.1,
+        "A06": 0.12,
+        "A08": 0.2,
+        "A17": 0.06
+      },
+      "spin": false,
+      "easing": "anticipation, then ease out with a small overshoot"
+    },
+    "big_celebration": {
+      "ids": [
+        "A07",
+        "A15"
+      ],
+      "squash_stretch_max": 0.18,
+      "off_ground_max": {
+        "A07": 0.35,
+        "A15": 0.45
+      },
+      "spin": "one full turn about the vertical axis",
+      "easing": "anticipation, then ease out with a small overshoot"
+    },
+    "comfort": {
+      "ids": [
+        "A01",
+        "A02",
+        "A10",
+        "A11"
+      ],
+      "squash_stretch_max": 0.08,
+      "off_ground_max": 0,
+      "spin": false,
+      "easing": "slow-in and slow-out, sine or cubic"
+    },
+    "note": "Heights are fractions of the body height without the twig. Every jump lands where it took off. A19's drop-in is outside these limits."
+  },
+  "production_gate_v4": "Render A07 S light and dark first at the v4 energy; the owner approves it at phone size before the batch (zayt-spec.md decision 11)."
 }

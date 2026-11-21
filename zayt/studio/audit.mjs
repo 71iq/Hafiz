@@ -144,6 +144,38 @@ async function slotDifferences(job, decoded, poster) {
   }
   return { width: 45, height: 56, background, channelThreshold: 24, changedPixels };
 }
+function checkCelebration(job, poses) {
+  if (!job.register?.includes("celebration")) return null;
+  const heights = poses.map((p) => p.root[1]);
+  const jumps = heights.filter((h, i) => h > 0 && heights[i - 1] === 0).length;
+  assert.equal(jumps, ["A08", "A15"].includes(job.id) ? 2 : 1, job.key + " jump count");
+  const height = Math.max(...heights) / 2.58;
+  assert.ok(Math.abs(height - manifest.registers[job.register].off_ground_max[job.id]) < 0.01);
+  const big = job.register === "big_celebration";
+  const turn = poses.slice(0, -1).map((p) => p.spin);
+  for (let i = 1; i < turn.length; i++) assert.ok(turn[i] >= turn[i - 1]);
+  assert.equal(turn.at(-1), big ? 2 * Math.PI : 0);
+  if (big) {
+    const arcs = poses.map((p) => p.face.eyeArc ?? p.face.joy);
+    arcs.forEach((arc, i) => {
+      if (arc < arcs[i - 1]) assert.equal(arc, 0, job.key + " half-lid while reopening");
+    });
+  }
+  const cheer = poses.filter((p) => Math.min(...p.arms) >= 120);
+  const cheerSeconds = (cheer.length * job.seconds) / poses.length;
+  assert.ok(big ? cheerSeconds > 0 && cheerSeconds <= 0.5 : cheer.length === 0);
+  assert.ok(cheer.every((p) => p.root[1] > 0 && p.face.joy > 0.65));
+  assert.ok(poses.some((p) => p.face.joy === 1));
+  const sparkles = Math.max(0, ...poses.filter((p) => p.burst > 0 && p.burst < 1).map((p) => p.sparkleCount));
+  assert.equal(sparkles, job.id === "A07" ? 7 : job.id === "A15" ? 8 : 0);
+  return {
+    jumps,
+    peakBodyHeights: round(height),
+    turns: turn.at(-1) / (2 * Math.PI),
+    cheerSeconds: round(cheerSeconds),
+    sparkles,
+  };
+}
 for (const job of jobs) {
   const moving = job.mode !== "still",
     d = await decode(path.join(out, job.media)),
@@ -199,18 +231,30 @@ for (const job of jobs) {
     if (pose.face.eyeOpen === 0) closed.push(n);
     assert.equal(pose.face.blush, 0.5);
     assert.equal(pose.face.browTilt, 0);
-    if (job.id === "A08") {
+    const big = job.register === "big_celebration",
+      celebrates = big || job.register === "celebration";
+    if (big || job.id === "A08") {
       assert.equal(pose.arms[0], pose.arms[1]);
-      assert.ok(pose.arms[1] >= 29 && pose.arms[1] <= 39);
+      assert.ok(pose.arms[1] <= (big ? 140 : 95));
     } else assert.equal(pose.arms[1], 29);
     if (pose.sit === 1 || pose.glow >= 0.999 || pose.motes.some((value) => value > 0 && value < 1))
       assert.equal(pose.face.eyeOpen, 1);
     if (job.id === "A19" && pose.root[1] === 0) assert.equal(pose.face.eyeOpen, 1);
-    if (n === job.nominal_samples - 1) assert.equal(pose.halo, 0);
-    assert.ok(pose.root[1] === 0 || job.id === "A19");
-    checks(Math.abs(pose.height - 1) <= 0.080001, job.key + " height");
-    if (job.id === "A07" || job.id === "A15")
-      if ((n * 0.99 * job.seconds) / (job.nominal_samples - 1) > 0.3) assert.equal(pose.face.mouthCurve, 1);
+    if (n === job.nominal_samples - 1) {
+      assert.equal(pose.halo, 0);
+      assert.equal(pose.face.joy || 0, 0);
+      assert.equal(pose.root[1], 0);
+    }
+    if (!big) assert.equal(pose.spin || 0, 0);
+    if (!celebrates) assert.equal(pose.face.joy || 0, 0);
+    const limits = manifest.registers[job.register] || manifest.registers.comfort;
+    assert.equal(pose.root[0], 0);
+    assert.equal(pose.root[2], 0);
+    if (job.id !== "A19") {
+      const height = limits.off_ground_max[job.id] || 0;
+      checks(pose.root[1] >= 0 && pose.root[1] <= 2.58 * height + 1e-6, job.key + " jump height");
+    }
+    checks(Math.abs(pose.height - 1) <= limits.squash_stretch_max + 1e-6, job.key + " stretch");
   }
   const closureMs = closed.reduce(
     (sum, n) =>
@@ -236,6 +280,7 @@ for (const job of jobs) {
     posterDelta,
     fiveSamplesVsPoster,
     posterSurfaces,
+    celebration: checkCelebration(job, capture.poses),
     encodedVsMaster: { worstRms, worstP99, worstSample },
     fullyClosedMs: closureMs,
     outsideHoldPixels,
@@ -254,7 +299,13 @@ const actual = ["S", "M", "L"].flatMap((tier) =>
 );
 assert.deepEqual(actual.sort(), rows.map((r) => r.path).sort());
 assert.equal(
-  rows.filter((r) => r.kind === "animation").sort((a, b) => a.bytes - b.bytes)[0].path,
+  rows
+    .filter(
+      (r) =>
+        r.kind === "animation" &&
+        jobs.some((job) => job.media === r.path && job.role === "runtime" && /celebration/.test(job.register)),
+    )
+    .sort((a, b) => a.bytes - b.bytes)[0].path,
   jobs.find((j) => j.key === "A06-S").media,
 );
 const overages = runtime.filter((r) => r.bytes > r.cap).map((r) => ({ path: r.path, over: r.bytes - r.cap }));
