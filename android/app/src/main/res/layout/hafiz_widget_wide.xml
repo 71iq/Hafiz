@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 250 x 110 dp and up: text at the start, Zayt full height at the end. The week row and the note show from 190 dp tall.
+<!-- 250 x 170 dp and up: text at the start, Zayt at the end, capped at 112 dp wide so the text column
+     keeps room for a three-digit count. hafiz_widget_wide_roomy is the same from 320 dp wide.
      Shared by both modes. With Show Zayt on, widget_scene shows the sky and widget_art holds Zayt; the
      renderer sets every color. With it off, widget_scene is the theme card and widget_art is gone. -->
 <FrameLayout
@@ -283,7 +284,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:adjustViewBounds="true"
-                    android:maxWidth="150dp"
+                    android:maxWidth="112dp"
                     android:scaleType="fitCenter"
                     android:importantForAccessibility="no"/>
                 <FrameLayout

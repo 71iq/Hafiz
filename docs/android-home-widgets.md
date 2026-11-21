@@ -16,16 +16,17 @@ Hafiz keeps the time bands, the darkening sky, the colour change of the count an
 
 ## Picker, placement and resizing
 
-Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both use the same data and resize down to a single row. Android 12 and later receive every size at once and pick the largest layout that fits. Earlier versions use the dimensions in the widget options, trying the rows below from the top.
+Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both use the same data and resize down to a single row. Each layout has an ideal size. From Android 12 the launcher picks the closest ideal size that fits the widget. Earlier versions apply the same rule to the size in the widget options, so one size gets one layout everywhere. Every minimum leaves room for a three-digit count beside the flame.
 
-| Available space, dp | Layout                                                                                                                 |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| 250×190             | Wide: flame and count, one line, the week row and the plan or grace note at the start, Zayt at full height at the end. |
-| 250×110             | The wide layout without the week row and note.                                                                         |
-| 110×100             | Tile: flame and count centred at the top, one line below, Zayt filling the rest with the feet just cut by the edge.    |
-| 150×64              | Short: flame, count and line at the start; a tall Zayt at the end looks up from the bottom edge.                       |
-| 150×40              | Strip: one row with the line beside the count, and Zayt looking up.                                                    |
-| 100×40              | Tiny: flame with the count, or the line when there is no count, and Zayt looking up.                                   |
+| Ideal size, dp    | Layout                                                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 320×170           | Roomy wide: flame and count, one line, the week row and the plan or grace note at the start; Zayt up to 150 dp wide at the end. |
+| 250×170           | Wide: the same without the note, with Zayt up to 112 dp wide.                                                                   |
+| 130×130           | Tile: flame and count centred at the top, one line below, Zayt filling the rest with the feet just cut by the edge.             |
+| 110×100           | Small tile: the tile without the line beside a count, so Zayt keeps its size.                                                   |
+| 250×64 and 170×64 | Short: flame, count and line at the start; a tall Zayt at the end looks up from the bottom edge.                                |
+| 210×40            | Strip: one row with the line beside the count, and Zayt looking up.                                                             |
+| 100×40            | Tiny: the flame with the count, or the line when there is no count. No Zayt, so neither is cut.                                 |
 
 With **Show Zayt** on, the background is the scene. With it off, each layout shows a plain card in the app's theme, the System theme following the launcher's day or night colours. An expired or unreadable timeline gets the neutral text layout.
 
@@ -37,7 +38,7 @@ The count is the streak length, 0 included. On a scene it turns the flame's colo
 
 The line is short. A done day has none, since the lit flame and the gold scene already say it. With Show numbers off the count is hidden, so a done day says "Done today".
 
-The 4×2 widget at full height adds a week row: the last seven days with today last, each under its weekday letter. A recited day is a small lit flame, a day kept by grace, an excuse or a pause is a soft dot, today's open day is the ember, and any other day is an empty ring. Nothing marks a day as missed.
+The 4×2 widget from 170 dp tall adds a week row: the last seven days with today last, each under its weekday letter. A recited day is a small lit flame, a day kept by grace, an excuse or a pause is a soft dot, today's open day is the ember, and any other day is an empty ring. Nothing marks a day as missed.
 
 ## State, sky and Zayt
 

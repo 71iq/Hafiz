@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Below 150 x 40 dp: the flame with the count, or the line when there is no count, and Zayt.
+<!-- 100 x 40 dp and up, smaller than the others: the flame with the count, or the line when there is no
+     count. The renderer hides Zayt here to keep the width for them; the views stay so every layout
+     has the same IDs.
      Shared by both modes. With Show Zayt on, widget_scene shows the sky and widget_art holds Zayt; the
      renderer sets every color. With it off, widget_scene is the theme card and widget_art is gone. -->
 <FrameLayout

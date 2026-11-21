@@ -23,6 +23,11 @@ import java.util.Locale
  * from the size the launcher reports.
  */
 object WidgetRenderer {
+  /**
+   * The layouts with their ideal sizes in dp. From Android 12 the launcher picks the closest ideal
+   * size that fits the widget; [bucketFor] applies the same rule before that, so a size gets the same
+   * layout on every version. Each minimum leaves room for a three-digit count beside the flame.
+   */
   private enum class Bucket(
     val scene: Int,
     val plain: Int,
@@ -31,16 +36,25 @@ object WidgetRenderer {
     val height: Float,
     /** The wide crop of the sky; the tile uses the square one. */
     val wideScene: Boolean,
-    /** The layout has the note and week row views, shown from 190 dp tall. */
-    val noteView: Boolean,
+    /** The layout has the week row and note views; the week row shows whenever it does. */
+    val weekView: Boolean,
+    /** The plan or grace note fits below the week row. */
     val note: Boolean,
+    /** Zayt has room here; the tiny layout keeps its width for the count or the line. */
+    val art: Boolean,
+    /** The line shows beside a count; where it does not, only a missing count brings it back. */
+    val lineWithCount: Boolean,
   ) {
-    WIDE(R.layout.hafiz_widget_wide, R.layout.hafiz_widget_wide_plain, R.layout.hafiz_widget_wide_plain_system, 250f, 190f, wideScene = true, noteView = true, note = true),
-    WIDE_SHORT(R.layout.hafiz_widget_wide_short, R.layout.hafiz_widget_wide_short_plain, R.layout.hafiz_widget_wide_short_plain_system, 250f, 110f, wideScene = true, noteView = true, note = false),
-    TILE(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 110f, 100f, wideScene = false, noteView = false, note = false),
-    SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 150f, 64f, wideScene = true, noteView = false, note = false),
-    STRIP(R.layout.hafiz_widget_strip, R.layout.hafiz_widget_strip_plain, R.layout.hafiz_widget_strip_plain_system, 150f, 40f, wideScene = true, noteView = false, note = false),
-    TINY(R.layout.hafiz_widget_tiny, R.layout.hafiz_widget_tiny_plain, R.layout.hafiz_widget_tiny_plain_system, 100f, 40f, wideScene = true, noteView = false, note = false),
+    WIDE_ROOMY(R.layout.hafiz_widget_wide_roomy, R.layout.hafiz_widget_wide_roomy_plain, R.layout.hafiz_widget_wide_roomy_plain_system, 320f, 170f, wideScene = true, weekView = true, note = true, art = true, lineWithCount = true),
+    WIDE(R.layout.hafiz_widget_wide, R.layout.hafiz_widget_wide_plain, R.layout.hafiz_widget_wide_plain_system, 250f, 170f, wideScene = true, weekView = true, note = false, art = true, lineWithCount = true),
+    TILE(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 130f, 130f, wideScene = false, weekView = false, note = false, art = true, lineWithCount = true),
+    // Below 130 dp a two-line line would leave Zayt a sliver, so the smallest tile keeps the count and Zayt.
+    TILE_SMALL(R.layout.hafiz_widget_tile, R.layout.hafiz_widget_tile_plain, R.layout.hafiz_widget_tile_plain_system, 110f, 100f, wideScene = false, weekView = false, note = false, art = true, lineWithCount = false),
+    // A wide, short widget looks like a long 2 x 1: Zayt looks up from the bottom edge.
+    WIDE_SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 250f, 64f, wideScene = true, weekView = false, note = false, art = true, lineWithCount = true),
+    SHORT(R.layout.hafiz_widget_short, R.layout.hafiz_widget_short_plain, R.layout.hafiz_widget_short_plain_system, 170f, 64f, wideScene = true, weekView = false, note = false, art = true, lineWithCount = true),
+    STRIP(R.layout.hafiz_widget_strip, R.layout.hafiz_widget_strip_plain, R.layout.hafiz_widget_strip_plain_system, 210f, 40f, wideScene = true, weekView = false, note = false, art = true, lineWithCount = true),
+    TINY(R.layout.hafiz_widget_tiny, R.layout.hafiz_widget_tiny_plain, R.layout.hafiz_widget_tiny_plain_system, 100f, 40f, wideScene = true, weekView = false, note = false, art = false, lineWithCount = false),
   }
 
   /** What may move: nothing, the idle blink, or the blink after a one-shot clip earned this session. */
@@ -84,7 +98,7 @@ object WidgetRenderer {
     val selection = timeline?.let { WidgetSelector.select(it, System.currentTimeMillis(), java.util.TimeZone.getDefault()) }
     if (timeline != null && selection is WidgetSelection.Entry) {
       try {
-        return entryViews(context, if (kind == "medium") Bucket.WIDE else Bucket.TILE, timeline, selection.entry, Motion.NONE)
+        return entryViews(context, if (kind == "medium") Bucket.WIDE_ROOMY else Bucket.TILE, timeline, selection.entry, Motion.NONE)
       } catch (error: Exception) {
         WidgetLog.failure("preview", error)
       }
@@ -113,12 +127,18 @@ object WidgetRenderer {
     return neutralViews(context, appearance)
   }
 
-  /** Before Android 12: the first bucket that fits the reported size, in the spec's order, else tiny. */
+  /**
+   * Before Android 12, from the size the launcher reports: the bucket whose ideal size fits and lies
+   * closest, as RemoteViews chooses among sized layouts from Android 12; with none fitting, tiny.
+   */
   private fun bucketFor(context: Context, options: Bundle): Bucket {
     val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val width = options.getInt(if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
-    val height = options.getInt(if (landscape) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
-    return Bucket.entries.firstOrNull { width >= it.width && height >= it.height } ?: Bucket.TINY
+    val width = options.getInt(if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH).toFloat()
+    val height = options.getInt(if (landscape) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT).toFloat()
+    return Bucket.entries
+      .filter { it.width <= width && it.height <= height }
+      .minByOrNull { (width - it.width) * (width - it.width) + (height - it.height) * (height - it.height) }
+      ?: Bucket.TINY
   }
 
   private fun entryViews(context: Context, bucket: Bucket, timeline: WidgetTimeline, entry: WidgetEntry, motion: Motion): RemoteViews {
@@ -142,14 +162,14 @@ object WidgetRenderer {
       views.setImageViewResource(R.id.widget_scene, WidgetArt.scene(entry.scene, bucket.wideScene))
       views.setTextColor(R.id.widget_count, if (entry.flame == "lit") ink.lit else ink.primary)
       views.setTextColor(R.id.widget_line, ink.primary)
-      if (bucket.noteView) views.setTextColor(R.id.widget_note, ink.secondary)
+      if (bucket.weekView) views.setTextColor(R.id.widget_note, ink.secondary)
       if (entry.flame != "lit") flameTint = if (entry.flame == "out") ink.secondary else ink.primary
       weekColors = intArrayOf(ink.secondary, ink.primary, ink.secondary)
     } else if (colors != null) {
       views.setInt(R.id.widget_scene, "setColorFilter", colors.surface)
       views.setTextColor(R.id.widget_count, colors.accentText)
       views.setTextColor(R.id.widget_line, colors.textPrimary)
-      if (bucket.noteView) views.setTextColor(R.id.widget_note, colors.textSecondary)
+      if (bucket.weekView) views.setTextColor(R.id.widget_note, colors.textSecondary)
       if (entry.flame != "lit") flameTint = if (entry.flame == "out") colors.textSecondary else colors.accent
       weekColors = intArrayOf(colors.textSecondary, colors.accent, colors.textSecondary)
     }
@@ -164,15 +184,15 @@ object WidgetRenderer {
     views.setViewVisibility(R.id.widget_flame, if (ember) View.INVISIBLE else View.VISIBLE)
 
     showText(views, R.id.widget_count, entry.count)
-    // The tiny layout has room for the count or the line, not both.
-    showText(views, R.id.widget_line, if (bucket == Bucket.TINY && entry.count != null) null else entry.line)
-    if (bucket.noteView) {
+    showText(views, R.id.widget_line, if (!bucket.lineWithCount && entry.count != null) null else entry.line)
+    if (bucket.weekView) {
       showText(views, R.id.widget_note, if (bucket.note) entry.note else null)
-      showWeek(views, if (bucket.note) entry.week else emptyList(), weekColors)
+      showWeek(views, entry.week, weekColors)
     }
 
-    views.setViewVisibility(R.id.widget_art, if (pose == null) View.GONE else View.VISIBLE)
-    if (pose != null) showZayt(context, views, entry, pose, motion)
+    val zayt = if (bucket.art) pose else null
+    views.setViewVisibility(R.id.widget_art, if (zayt == null) View.GONE else View.VISIBLE)
+    if (zayt != null) showZayt(context, views, entry, zayt, motion)
 
     views.setContentDescription(android.R.id.background, entry.contentDescription)
     views.setOnClickPendingIntent(android.R.id.background, tapIntent(context, entry.tap))

@@ -94,6 +94,15 @@ describe("Android widget resources match lib/widget (spec 5.1, 9.5)", () => {
     }
   });
 
+  it("keeps the roomy 4 by 2 identical to the regular one except for Zayt's width cap", () => {
+    const body = (file: string) => read(`layout/${file}.xml`).replace(/^<\?xml[^>]*>\n<!--[\s\S]*?-->/, "");
+    const regular = body("hafiz_widget_wide");
+    const roomy = body("hafiz_widget_wide_roomy");
+    expect(regular).toContain('android:maxWidth="112dp"');
+    expect(roomy).toContain('android:maxWidth="150dp"');
+    expect(roomy.replace('android:maxWidth="150dp"', 'android:maxWidth="112dp"')).toBe(regular);
+  });
+
   it("lets the Kotlin parser accept exactly the states, scenes, poses and flames JavaScript sends", () => {
     const kotlin = fs.readFileSync(
       path.join(root, "android/app/src/main/java/com/anonymous/hafiz/widget/WidgetTimeline.kt"),
