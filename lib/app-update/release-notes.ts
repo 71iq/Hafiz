@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.13": {
+    en: [
+      "The Clear and Cancel buttons in Quran search stay separate on narrow screens.",
+      "Screen readers can read the Quran text shown on review cards and in memorization sessions.",
+      "The app explains what optional sync does. The privacy policy explains that sync includes the text of private notes.",
+    ],
+    ar: [
+      "يظل زرّا المسح والإلغاء منفصلين في البحث في القرآن على الشاشات الضيقة.",
+      "تستطيع قارئات الشاشة قراءة النص القرآني الظاهر في بطاقات المراجعة وجلسات الحفظ.",
+      "يوضح التطبيق ما تفعله المزامنة الاختيارية، وتوضح سياسة الخصوصية أن المزامنة تشمل نص الملاحظات الخاصة.",
+    ],
+  },
   "1.0.12": {
     en: [
       "Your home-screen widget shows your streak beside a flame, including zero. Zayt is larger, and tall widgets show all seven days along the bottom.",
