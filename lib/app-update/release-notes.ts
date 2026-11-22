@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.15": {
+    en: [
+      "Next and Previous step through every word in Word Detail.",
+      "Card menus take keyboard focus and return it when you close them.",
+      "Screen readers announce word review save buttons and deck tabs. Ayah marker color choices appear on web.",
+    ],
+    ar: [
+      "ينتقل زرّا التالي والسابق بين جميع الكلمات في تفاصيل الكلمة.",
+      "ينتقل تركيز لوحة المفاتيح إلى قوائم البطاقات ويعود إلى زر فتحها عند إغلاقها.",
+      "تعلن قارئات الشاشة أزرار حفظ الكلمات وتبويبات المجموعات. وتظهر خيارات لون علامات الآيات على الويب.",
+    ],
+  },
   "1.0.14": {
     en: [
       "Screen readers can read fully visible ayahs in the Mushaf and Ayah Detail. Hidden ayahs stay hidden during recall.",
