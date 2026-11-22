@@ -8,6 +8,10 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.10": {
+    en: ["Quran search matches punctuation exactly as you type it."],
+    ar: ["يطابق البحث في القرآن علامات الترقيم كما تكتبها."],
+  },
   "1.0.9": {
     en: [
       "Zayt now appears on both the small streak widget and the larger wird widget, with a different pose for each stage of your day.",
