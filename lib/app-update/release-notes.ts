@@ -8,6 +8,16 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.14": {
+    en: [
+      "Screen readers can read fully visible ayahs in the Mushaf and Ayah Detail. Hidden ayahs stay hidden during recall.",
+      "Reciter preview buttons include the recording style when available.",
+    ],
+    ar: [
+      "تستطيع قارئات الشاشة قراءة الآيات الظاهرة بالكامل في المصحف وتفاصيل الآية. وتبقى الآيات المخفية محجوبة أثناء الاستظهار.",
+      "تذكر أزرار تجربة أصوات القراء نمط التلاوة عند توفره.",
+    ],
+  },
   "1.0.13": {
     en: [
       "The Clear and Cancel buttons in Quran search stay separate on narrow screens.",
