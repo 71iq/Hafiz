@@ -489,6 +489,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Switch rows and the prayer-times row mirror through MirroredRow; the time stepper keeps minus left and plus right in both directions.",
   ),
   entry(
+    "components/notifications/SittingChips.tsx",
+    "picker-menu",
+    "source",
+    "Prayer and set-time chip groups wrap in reading order through MirroredRow; headings and captions align to the start side.",
+  ),
+  entry(
     "components/notifications/WirdReminderBanner.tsx",
     "feedback",
     "source",
