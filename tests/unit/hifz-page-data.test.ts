@@ -39,14 +39,15 @@ describe("recitation pages from the bundled Quran data", () => {
     }
   });
 
-  it("gives aligned words their position and first letter, and markers none", async () => {
+  it("gives aligned words their position, Unicode text and first letter, and markers none", async () => {
     const { sql, db } = bundled();
     try {
       const page = await loadRecitationPage(db, 3, pageWords[2]);
       const first = page.lines[0].tokens[0];
-      expect(first).toMatchObject({ surah: 2, ayah: 6, wordPos: 1, isMarker: false, firstLetter: "إِ" });
+      expect(first).toMatchObject({ surah: 2, ayah: 6, wordPos: 1, isMarker: false, text: "إِنَّ", firstLetter: "إِ" });
       const marker = page.lines.flatMap((line) => line.tokens).find((token) => token.isMarker)!;
       expect(marker).toMatchObject({ wordPos: null, firstLetter: null });
+      expect(marker.text).toBeUndefined();
     } finally {
       sql.close();
     }
@@ -83,7 +84,7 @@ describe("page units", () => {
   it("puts unmatched page-words glyphs into word-id lines", () => {
     const page = buildRecitationPage(
       9,
-      [{ surah: 1, ayah: 1, text_qcf2: "a b c", text_uthmani: "x y" }],
+      [{ surah: 1, ayah: 1, text_qcf2: "a b c", text_uthmani: "بِسْمِ" }],
       [
         { line_number: 1, line_type: "ayah", is_centered: 0, surah_number: null, first_word_id: 1, last_word_id: 2 },
         { line_number: 2, line_type: "ayah", is_centered: 1, surah_number: null, first_word_id: 3, last_word_id: 3 },
@@ -91,6 +92,7 @@ describe("page units", () => {
       { "1": "a", "2": "z" },
     );
     expect(page.lines.map((line) => line.tokens.map((token) => token.glyph))).toEqual([["a", "b"], ["c"]]);
+    expect(page.lines[0].tokens.every((token) => token.text === undefined && token.firstLetter === null)).toBe(true);
     expect(page.lines[1].centered).toBe(true);
   });
 });

@@ -8,6 +8,8 @@ export type PageToken = Readonly<{
   /** 1-based word position, or null for the ayah marker and for words that could not be aligned. */
   wordPos: number | null;
   isMarker: boolean;
+  /** Canonical Unicode word when it maps to this glyph. */
+  text?: string;
   /** L1 cue: the word's first letter with its marks, or null when the word could not be aligned. */
   firstLetter: string | null;
 }>;
@@ -61,13 +63,15 @@ function pageTokens(ayahs: readonly AyahRow[]): PageToken[] {
     const aligned = words.length === glyphs.length - 1;
     glyphs.forEach((glyph, index) => {
       const isMarker = index === glyphs.length - 1;
+      const text = isMarker || !aligned ? undefined : words[index];
       tokens.push({
         glyph,
         surah: row.surah,
         ayah: row.ayah,
         wordPos: isMarker || !aligned ? null : index + 1,
         isMarker,
-        firstLetter: isMarker || !aligned ? null : firstLetterOf(words[index]),
+        text,
+        firstLetter: text === undefined ? null : firstLetterOf(text),
       });
     });
   }

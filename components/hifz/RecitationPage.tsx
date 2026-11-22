@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef } from "react";
-import { PanResponder, Platform, Text, View, type LayoutChangeEvent } from "react-native";
+import { PanResponder, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { quranPageFontName, quranPageFontPaletteStyle, quranPageMarkerFontPaletteStyle } from "@/lib/fonts/loader";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import type { PageLine, PageToken, RecitationPage as PageData } from "@/lib/hifz/page-data";
@@ -23,6 +23,14 @@ const HIDDEN_INK = "rgba(0, 0, 0, 0.004)";
  * every gap longer than any word, so a tap anywhere on a word reaches that word.
  */
 const TAP_GAP = Platform.OS === "android" ? "\u2060\u2060\u2060 " : " ";
+const SCREEN_READER_ONLY = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  opacity: 0,
+  userSelect: "none",
+} as const;
 
 export type RevealState = Readonly<{
   /** Every word shows: the self-check after Done, or full-text practice. */
@@ -127,11 +135,13 @@ export function RecitationPage({
   const palette = quranPageFontPaletteStyle(quranRenderFontStyle, page.page, effectiveTheme);
   const markerPalette = quranPageMarkerFontPaletteStyle(quranRenderFontStyle, page.page, effectiveTheme, quranMarkerStyle);
   const ink = isDark ? "#f5f5f5" : "#1f1b16";
-  const faint = isDark ? "rgba(245,245,245,0.08)" : "rgba(31,27,22,0.07)";
+  const faintOpacity = isDark ? 0.08 : 0.07;
+  const faint = isDark ? `rgba(245,245,245,${faintOpacity})` : `rgba(31,27,22,${faintOpacity})`;
   const markedBackground = isDark ? "rgba(251, 191, 36, 0.28)" : "rgba(217, 119, 6, 0.18)";
   const gapBackground = isDark ? "rgba(45, 212, 191, 0.16)" : "rgba(13, 148, 136, 0.12)";
 
-  const tappable = reveal.all && onWordPress !== undefined;
+  const web = Platform.OS === "web";
+  const markWord = reveal.all ? onWordPress : undefined;
   let tokenIndex = 0;
   return (
     <View
@@ -165,6 +175,20 @@ export function RecitationPage({
         const lineTouched = reveal.touchedLines.has(line.lineNumber);
         const start = tokenIndex;
         tokenIndex += line.tokens.length;
+        const words = line.tokens.map((token, offset) => {
+          const index = start + offset;
+          const key = tokenKey(token, index);
+          const isGap = cloze !== null && token.surah === cloze.surah && token.ayah === cloze.ayah && token.wordPos === cloze.wordPos;
+          const visible =
+            reveal.all || (!isGap && (level === 0 || token.isMarker || index < reveal.count || (level === 3 && lineTouched)));
+          const firstLetterOnly = !visible && !isGap && level === 1;
+          const spoken = visible ? token.text : firstLetterOnly ? token.firstLetter : undefined;
+          const isMarked = marked?.has(key) ?? false;
+          const onPress = markWord && !token.isMarker ? () => markWord(token, key) : undefined;
+          const label = onPress ? [spoken, wordLabel(token)].filter(Boolean).join(", ") : undefined;
+          return { token, key, isGap, visible, firstLetterOnly, spoken, isMarked, onPress, label };
+        });
+        const spokenLine = markWord ? "" : words.map((word) => word.spoken).filter(Boolean).join(" ");
         return (
           <View
             key={`line-${line.lineNumber}`}
@@ -173,49 +197,73 @@ export function RecitationPage({
             }}
           >
             <Text
+              // Native flattens inline text into one view. Web can keep the inline buttons exposed.
+              aria-hidden={!web || !markWord}
+              selectable={false}
               style={{ fontFamily, ...palette, fontSize, lineHeight, textAlign: "center", color: ink, writingDirection: "rtl" }}
             >
-              {line.tokens.map((token, offset) => {
-                const index = start + offset;
-                const key = tokenKey(token, index);
-                const shownByPointer = index < reveal.count;
-                const isGap =
-                  cloze !== null && token.surah === cloze.surah && token.ayah === cloze.ayah && token.wordPos === cloze.wordPos;
-                const visible = isGap
-                  ? reveal.all
-                  : reveal.all || level === 0 || token.isMarker || shownByPointer || (level === 3 && lineTouched);
-                const firstLetterOnly = !visible && level === 1;
-                const isMarked = marked?.has(key) ?? false;
-                const color = visible ? undefined : firstLetterOnly ? undefined : level === 3 ? faint : HIDDEN_INK;
-                const pressable = reveal.all && !token.isMarker && onWordPress;
-                return (
-                  <Fragment key={key}>
-                    {firstLetterOnly ? (
-                      <Text style={{ fontFamily: undefined, fontSize: fontSize * 0.9, color: ink }}>
-                        {token.firstLetter ?? "ـ"}
-                      </Text>
-                    ) : (
-                      <Text
-                        onPress={pressable ? () => onWordPress!(token, key) : undefined}
-                        accessibilityRole={pressable ? "button" : undefined}
-                        accessibilityLabel={pressable ? wordLabel(token) : undefined}
-                        accessibilityState={pressable ? { selected: isMarked } : undefined}
-                        style={{
-                          ...(token.isMarker ? markerPalette : null),
-                          color,
-                          // The gap keeps its place and shows as a soft box, so the reciter knows where it is.
-                          backgroundColor: isMarked ? markedBackground : isGap && !visible ? gapBackground : undefined,
-                          ...(isGap && !visible ? { borderRadius: 6 } : null),
-                        }}
-                      >
-                        {token.glyph}
-                      </Text>
-                    )}
-                    {offset < line.tokens.length - 1 ? (tappable ? TAP_GAP : " ") : null}
-                  </Fragment>
-                );
-              })}
+              {words.map(({ token, key, isGap, visible, firstLetterOnly, isMarked, onPress, label }, offset) => (
+                <Fragment key={key}>
+                  {firstLetterOnly ? (
+                    <Text style={{ fontFamily: undefined, fontSize: fontSize * 0.9, color: ink }}>
+                      {token.firstLetter ?? "ـ"}
+                    </Text>
+                  ) : (
+                    <Text
+                      onPress={onPress}
+                      role={web && onPress ? "button" : undefined}
+                      accessibilityLabel={web ? label : undefined}
+                      aria-pressed={web && onPress ? isMarked : undefined}
+                      aria-hidden={web && markWord && !onPress ? true : undefined}
+                      style={{
+                        ...(token.isMarker ? markerPalette : null),
+                        color: web || visible ? undefined : level === 3 && !isGap ? faint : HIDDEN_INK,
+                        // The gap keeps its place and shows as a soft box, so the reciter knows where it is.
+                        backgroundColor: isMarked ? markedBackground : isGap && !visible ? gapBackground : undefined,
+                        ...(isGap && !visible ? { borderRadius: 6 } : null),
+                      }}
+                    >
+                      {web && (onPress || !visible) ? (
+                        // Color fonts can paint independently of the text color.
+                        <Text aria-hidden style={visible ? undefined : { opacity: level === 3 && !isGap ? faintOpacity : 0 }}>
+                          {token.glyph}
+                        </Text>
+                      ) : token.glyph}
+                    </Text>
+                  )}
+                  {offset < words.length - 1 ? (markWord ? TAP_GAP : " ") : null}
+                </Fragment>
+              ))}
             </Text>
+            {spokenLine ? (
+              web ? (
+                <Text style={SCREEN_READER_ONLY} {...{ lang: "ar" }}>
+                  {spokenLine}
+                </Text>
+              ) : (
+                <View accessible accessibilityLabel={spokenLine} accessibilityLanguage="ar" pointerEvents="none" style={StyleSheet.absoluteFill} />
+              )
+            ) : null}
+            {!web && markWord ? (
+              // Inline text handles glyph taps. Native views supply screen-reader activation.
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { flexDirection: "row" }]}>
+                {words.map(({ key, onPress, label, isMarked }) =>
+                  onPress ? (
+                    <Pressable
+                      key={key}
+                      onPress={onPress}
+                      onAccessibilityTap={onPress}
+                      accessibilityRole="button"
+                      accessibilityLabel={label}
+                      accessibilityState={{ selected: isMarked }}
+                      style={{ flex: 1 }}
+                    />
+                  ) : (
+                    <View key={key} style={{ flex: 1 }} />
+                  ),
+                )}
+              </View>
+            ) : null}
           </View>
         );
       })}
