@@ -3,6 +3,8 @@
 export const VIEWPORT_BREAKPOINTS = {
   phoneCompact: 360,
   phoneLarge: 412,
+  /** From here a window stops behaving like a handset (the compact/medium window split). */
+  mediumWindow: 600,
   sidebar: 768,
   sidebarValidation: 1024,
   desktop: 1440,

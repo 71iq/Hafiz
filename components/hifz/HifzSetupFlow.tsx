@@ -33,7 +33,7 @@ import { interpolate } from "@/lib/i18n/useStrings";
 import { readPrayerLocation } from "@/lib/prayer/settings";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
-import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
 import type { PrayerLocation } from "@/lib/prayer/times";
 
 type Goal = "memorize" | "keep" | "both";
@@ -44,7 +44,9 @@ const PRESETS: readonly PlanPreset[] = ["part_time_beginner", "part_time_adult",
 
 /** The wizard's column width on every screen; onboarding and Settings both open it at this width. */
 export const SETUP_MAX_WIDTH = 640;
-/** From the sidebar breakpoint the wizard is a framed card no taller than this, so Continue stays near the options. */
+/** Below this window height the framed card would be too short for its footer, so the wizard stays full height. */
+const FRAMED_MIN_HEIGHT = 520;
+/** On medium and wider windows that are tall enough, the wizard is a framed card no taller than this, so Continue stays near the options. */
 const SETUP_CARD_MAX_HEIGHT = 760;
 const SETUP_CARD_MARGIN = 24;
 
@@ -321,7 +323,8 @@ type Props = {
 export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, onCancel }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const { width, height } = useWindowDimensions();
-  const framed = width >= SIDEBAR_BREAKPOINT;
+  // Short windows (web landscape phones) keep the full-height layout with the pinned footer.
+  const framed = width >= VIEWPORT_BREAKPOINTS.mediumWindow && height >= FRAMED_MIN_HEIGHT;
   const scrollRef = useRef<ScrollView>(null);
   const [stepIndex, setStepIndex] = useState(0);
   // Editing starts from the saved plan as it is: its goal, and its preset only while it still matches.
