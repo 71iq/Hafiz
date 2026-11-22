@@ -645,6 +645,7 @@ export default function SettingsScreen() {
                 {/* Glyphs mounted before their page font exists render and measure in the system font. */}
                 {quranPreview && quranPreviewFontReady ? (
                   <View
+                    aria-hidden
                     style={{
                       direction: "ltr",
                       flexDirection: "row-reverse",
