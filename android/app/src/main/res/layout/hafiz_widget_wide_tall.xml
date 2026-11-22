@@ -25,10 +25,12 @@
             android:layout_weight="1"
             android:orientation="horizontal"
             android:baselineAligned="false">
+            <!-- Only the reminder has a width limit. The flame and count claim their intrinsic
+                 width, including separators and the user's font scale. -->
             <LinearLayout
-                android:layout_width="110dp"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:minWidth="110dp"
                 android:orientation="vertical"
                 android:gravity="center_vertical"
                 android:paddingStart="14dp">
@@ -36,6 +38,7 @@
                 <TextView
                     android:id="@+id/widget_line"
                     android:layout_width="wrap_content"
+                    android:maxWidth="108dp"
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-medium"
                     android:textSize="15sp"
@@ -47,13 +50,13 @@
                     android:maxLines="3"
                     android:layout_marginTop="4dp"/>
             </LinearLayout>
-            <!-- The extra width goes to Zayt first. The inset on its inner frame uses the transparent
+            <!-- Zayt fills the remaining width. The inset on its inner frame uses the transparent
                  sides of the art without narrowing the count or stretching the animation. -->
             <FrameLayout
                 android:id="@+id/widget_art"
-                android:layout_width="134dp"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="3"
+                android:layout_weight="1"
                 android:importantForAccessibility="noHideDescendants">
                 <!-- Wraps the still exactly, so a frame list in widget_motion gets the same box. FrameLayout
                      measures match_parent children again at its final size only when it has two or more, so the
