@@ -218,11 +218,11 @@ export function MushafSlider({
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!interactive) return;
       if (programmaticScrollRef.current) return;
+      // Only a drag, wheel or pointer gesture makes the rail's scrolling the reader's. A scroll the
+      // rail made itself to follow the page can report after its short guard on a busy start, and
+      // committing it moved the reader and saved a position the reader never chose.
+      if (!userScrollingRef.current) return;
       onUserActivity?.();
-      if (!userScrollingRef.current) {
-        userScrollingRef.current = true;
-        setDragging(true);
-      }
       const offsetX = e.nativeEvent.contentOffset.x;
       activeOffsetRef.current = offsetX;
       updatePreviewFromOffset(offsetX);
