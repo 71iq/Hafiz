@@ -407,6 +407,7 @@ export function ResponsiveOverlay({
   // Android Back reaches only the topmost modal, even while its keyboard is open; the first press
   // only hides the keyboard, as elsewhere in Android, so a typed query or note is not closed with
   // it. The next press goes to onClose, which editors guard with the discard prompt.
+  // RNW also handles Escape on keyup, so only native gets the Modal close handler.
   const handleRequestClose = () => {
     if (Platform.OS === "android" && Keyboard.isVisible()) {
       Keyboard.dismiss();
@@ -416,7 +417,13 @@ export function ResponsiveOverlay({
   };
 
   return (
-    <Modal visible={open} transparent animationType="none" statusBarTranslucent onRequestClose={handleRequestClose}>
+    <Modal
+      visible={open}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={Platform.OS === "web" ? undefined : handleRequestClose}
+    >
       <Container
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className={cn("flex-1 px-0", overlayAlignment)}

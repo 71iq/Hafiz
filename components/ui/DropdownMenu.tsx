@@ -115,8 +115,11 @@ export function DropdownMenu({
   const { isDark, isRTL: settingsIsRTL, themeColors } = useSettings();
   const reduceMotion = useReducedMotionPreference();
   const isRTL = explicitIsRTL ?? settingsIsRTL;
+  const isWeb = Platform.OS === "web";
+  const modalAnimation = isWeb || reduceMotion ? "none" : "fade";
   const [anchor, setAnchor] = useState<AnchorRect | null>(null);
   const [menuHeight, setMenuHeight] = useState<number | null>(null);
+  const [webModalShown, setWebModalShown] = useState(false);
   const isOpen = anchor !== null;
 
   const menuWidth = Math.min(width, viewportWidth - MENU_MARGIN * 2);
@@ -143,7 +146,10 @@ export function DropdownMenu({
     });
   }, [align, anchor, height, menuHeight, menuWidth, viewportWidth]);
 
+  const handleWebModalShow = useCallback(() => setWebModalShown(true), []);
+
   const close = useCallback(() => {
+    setWebModalShown(false);
     setAnchor(null);
     setMenuHeight(null);
     activeIndex.current = -1;
@@ -168,16 +174,17 @@ export function DropdownMenu({
 
   const focusItem = useCallback((index: number) => {
     if (index < 0) return;
-    activeIndex.current = index;
     (itemRefs.current[index] as { focus?: () => void } | null)?.focus?.();
   }, []);
 
   // The open menu is the topmost surface: it owns Escape and the menu keys before any sheet or
   // the reader sees them. react-native-web's Modal returns focus to the trigger on close.
   useEffect(() => {
-    if (!isOpen) return;
-    const unregister = registerOverlayLayer(layerId);
-    if (Platform.OS !== "web" || typeof window === "undefined") return unregister;
+    if (isOpen) return registerOverlayLayer(layerId);
+  }, [isOpen, layerId]);
+
+  useEffect(() => {
+    if (!isOpen || !isWeb || typeof window === "undefined") return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopOverlayLayer(layerId) || event.isComposing || !MENU_KEYS.has(event.key)) return;
       event.preventDefault();
@@ -210,21 +217,20 @@ export function DropdownMenu({
       }
     };
     window.addEventListener("keydown", handleKeyDown, true);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      unregister();
-    };
-  }, [close, focusItem, isOpen, items, layerId, selectItem]);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [close, focusItem, isOpen, isWeb, items, layerId, selectItem]);
 
-  // Web: put focus on the first available item once the menu is placed.
+  // Wait until RNW hands off the focus trap and the menu has its measured position.
   const placed = menuPosition !== null;
   useEffect(() => {
-    if (!placed || Platform.OS !== "web") return;
-    const frame = requestAnimationFrame(() => focusItem(nextEnabledIndex(items, -1, 1)));
+    if (!placed || !webModalShown) return;
+    const frame = requestAnimationFrame(() => {
+      if (isTopOverlayLayer(layerId) && activeIndex.current < 0) focusItem(nextEnabledIndex(items, -1, 1));
+    });
     return () => cancelAnimationFrame(frame);
     // Only a newly placed menu takes focus; item changes keep the current focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placed]);
+  }, [placed, webModalShown]);
 
   return (
     <>
@@ -249,13 +255,16 @@ export function DropdownMenu({
         </Pressable>
       </View>
 
+      {/* RNW activates its focus trap on Modal onShow. Fade the menu surface on web so
+          the handoff from the parent trap does not depend on a CSS animation event. */}
       <Modal
-        key={reduceMotion ? "static" : "fade"}
+        key={modalAnimation}
         visible={isOpen}
         transparent
-        animationType={reduceMotion ? "none" : "fade"}
+        animationType={modalAnimation}
         statusBarTranslucent
-        onRequestClose={close}
+        onShow={isWeb ? handleWebModalShow : undefined}
+        onRequestClose={isWeb ? undefined : close}
       >
         <View className="flex-1">
           <Pressable className="absolute inset-0" onPress={close} />
@@ -266,7 +275,10 @@ export function DropdownMenu({
                 const measured = Math.ceil(event.nativeEvent.layout.height);
                 setMenuHeight((current) => (current === measured ? current : measured));
               }}
-              className="absolute overflow-hidden rounded-2xl border py-1.5 shadow-2xl"
+              className={cn(
+                "absolute overflow-hidden rounded-2xl border py-1.5 shadow-2xl",
+                isWeb && placed && !reduceMotion && "animate-in fade-in [animation-duration:250ms]",
+              )}
               style={{
                 backgroundColor: themeColors.surface,
                 borderColor,

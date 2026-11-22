@@ -10,7 +10,8 @@ jest.mock("lucide-react-native", () => new Proxy({}, { get: () => () => null }))
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
-jest.mock("@/lib/ui/reduced-motion", () => ({ useReducedMotionPreference: () => true }));
+const mockReduceMotion = jest.fn(() => true);
+jest.mock("@/lib/ui/reduced-motion", () => ({ useReducedMotionPreference: () => mockReduceMotion() }));
 // The overlay's crash boundary pulls in expo-router, which needs browser globals jsdom lacks.
 jest.mock("@/components/ui/ErrorBoundary", () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
@@ -38,7 +39,23 @@ const { Text } = jest.requireActual<typeof import("react-native")>("react-native
 let root: Root;
 let host: HTMLElement;
 let frames: FrameRequestCallback[];
+let deliverLayout: (target: Element) => void;
+const originalResizeObserver = window.ResizeObserver;
+beforeAll(() => {
+  window.ResizeObserver = class implements ResizeObserver {
+    constructor(callback: ResizeObserverCallback) {
+      deliverLayout = (target) => callback([{ target } as ResizeObserverEntry], this);
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
+afterAll(() => {
+  window.ResizeObserver = originalResizeObserver;
+});
 beforeEach(() => {
+  mockReduceMotion.mockReturnValue(true);
   frames = [];
   jest.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
     frames.push(cb);
@@ -66,8 +83,9 @@ function flushFrames() {
   }
 }
 
-function key(name: string, target: Element = document.activeElement ?? document.body) {
-  const event = new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true });
+function key(name: string, type = "keydown") {
+  const target = document.activeElement ?? document.body;
+  const event = new KeyboardEvent(type, { key: name, bubbles: true, cancelable: true });
   act(() => {
     target.dispatchEvent(event);
   });
@@ -132,15 +150,24 @@ it("lets only the topmost overlay handle Escape and keeps it from the reader", (
 });
 
 async function openMenu(trigger: HTMLElement) {
-  act(() => trigger.click());
+  act(() => {
+    trigger.focus();
+    trigger.click();
+  });
   // react-native-web measures the trigger on a timer.
   await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  const menu = document.querySelector('[role="menu"]')!;
+  await act(async () => {
+    deliverLayout(menu);
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
   flushFrames();
 }
 
-it("drives a menu by keyboard above a sheet without the reader seeing its keys", async () => {
+it.each([false, true])("drives a nested menu by keyboard with reduced motion=%s", async (reduceMotion) => {
+  mockReduceMotion.mockReturnValue(reduceMotion);
   const sheetClose = jest.fn();
   const reader = jest.fn();
   const mark = jest.fn();
@@ -165,9 +192,7 @@ it("drives a menu by keyboard above a sheet without the reader seeing its keys",
   // The first destructive item is set apart by a divider.
   expect(getComputedStyle(items()[3]).borderTopWidth).toBe("1px");
 
-  // jsdom has no layout, so the menu is never placed and does not take initial focus as it does in
-  // a browser; the first ArrowDown then focuses the first item.
-  key("ArrowDown");
+  // The menu takes focus after placement even when no CSS animationend event is delivered.
   expect(document.activeElement?.getAttribute("aria-label")).toBe("Mark");
   key("ArrowDown");
   expect(document.activeElement?.getAttribute("aria-label")).toBe("Suspend");
@@ -182,11 +207,12 @@ it("drives a menu by keyboard above a sheet without the reader seeing its keys",
   expect(reader).not.toHaveBeenCalled();
 
   key("Escape");
+  key("Escape", "keyup");
   expect(items()).toHaveLength(0);
+  expect(document.activeElement).toBe(trigger);
   expect(sheetClose).not.toHaveBeenCalled();
 
   await openMenu(trigger);
-  key("ArrowDown");
   key("ArrowDown");
   key("Enter");
   expect(items()).toHaveLength(0);
