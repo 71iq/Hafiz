@@ -1026,7 +1026,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
         <View className="px-5 pt-4 pb-3 items-center gap-2" style={rowDirection}>
           {/* Mirrored by hand, so pinned LTR: an inherited RTL direction would flip it back. */}
           <View
-            className={`${isRTL ? "flex-row-reverse" : "flex-row"} flex-1 items-center gap-2.5 bg-surface-low dark:bg-surface-dark-low rounded-full ${isRTL ? "pl-1 pr-4" : "pl-4 pr-1"} min-h-[44px]`}
+            className={`${isRTL ? "flex-row-reverse" : "flex-row"} min-w-0 flex-1 items-center gap-2.5 bg-surface-low dark:bg-surface-dark-low rounded-full ${isRTL ? "pl-1 pr-4" : "pl-4 pr-1"} min-h-[44px]`}
             style={{ direction: "ltr" }}
           >
             <Search size={18} color={mutedColor} />
@@ -1043,6 +1043,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
               onSubmitEditing={handleSubmit}
               style={{
                 flex: 1,
+                minWidth: 0,
                 fontFamily: "Manrope_500Medium",
                 fontSize: 15,
                 color: isDark ? "#e5e5e5" : "#2D2D2D",
@@ -1062,7 +1063,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
                 onPress={handleClear}
                 accessibilityRole="button"
                 accessibilityLabel={s.homeSearchClear}
-                className="h-11 w-11 items-center justify-center rounded-full"
+                className="h-11 w-11 shrink-0 items-center justify-center rounded-full"
                 style={(state) => focusRing(state, focusColor)}
               >
                 <X size={18} color={mutedColor} />
@@ -1073,7 +1074,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
             onPress={onClose}
             accessibilityRole="button"
             accessibilityLabel={s.homeSearchClose}
-            className="min-h-[44px] justify-center px-2"
+            className="min-h-[44px] min-w-11 shrink-0 justify-center px-2"
             style={(state) => focusRing(state, focusColor)}
           >
             <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, color: focusColor }}>{s.homeSearchCancel}</Text>

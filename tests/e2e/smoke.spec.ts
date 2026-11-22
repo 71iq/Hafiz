@@ -133,6 +133,27 @@ test("text search looks for literal punctuation in Quran text and translation", 
   }
 });
 
+test("clearing search on a narrow screen returns to history and keeps focus", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await waitForQaReady(page);
+  await page.goto("/home");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+
+  const input = page.getByRole("textbox", { name: "Search", exact: true });
+  await expect(input).toBeFocused();
+  await input.fill("mercy");
+  await input.press("Enter");
+  await expect(page.getByText(/^[1-9]\d* results$/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Clear search" }).click({ timeout: 5_000 });
+  await expect(input).toHaveValue("");
+  await expect(input).toBeFocused();
+  await expect(page.getByRole("button", { name: /^mercy\b/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Close search" }).click();
+  await expect(input).toBeHidden();
+});
+
 test("the offline banner follows browser connectivity and local Quran search still works", async ({ page, context }) => {
   await waitForQaReady(page);
   await page.goto("/home");
