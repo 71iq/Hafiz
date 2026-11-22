@@ -64,12 +64,9 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
-    // The shared route title owner sets "<title> | Hafiz" / "<title> | حافظ"; this page sets direction.
-    document.documentElement.setAttribute("lang", language);
-    document.documentElement.setAttribute("dir", isRTL ? "rtl" : "ltr");
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", content.description);
-  }, [content.description, isRTL, language]);
+  }, [content.description]);
 
   const goBack = () => {
     if (canGoBack) router.back();

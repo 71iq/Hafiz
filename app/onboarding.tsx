@@ -13,7 +13,7 @@ import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArrowLeft, ArrowRight, BookOpen, Languages } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
@@ -39,6 +39,8 @@ function OnboardingInner() {
   const isWide = width >= SIDEBAR_BREAKPOINT;
   const dir = isRTL ? "rtl" : "ltr";
   const rowDirection = isRTL ? "row-reverse" : "row";
+  // The welcome and retry rows mirror themselves relative to a physical left-to-right canvas.
+  const physicalDirection = Platform.OS === "web" ? "ltr" : undefined;
   const accentColor = isDark ? "#2dd4bf" : "#0d9488";
   const goldColor = "#FDDC91";
   const textPrimary = isDark ? "#F5F5F5" : "#2D2D2D";
@@ -277,6 +279,7 @@ function OnboardingInner() {
               minHeight: 44,
               borderRadius: 22,
               paddingHorizontal: 20,
+              direction: physicalDirection,
               flexDirection: rowDirection,
               alignItems: "center",
               justifyContent: "center",
@@ -314,7 +317,7 @@ function OnboardingInner() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
-      <View style={{ flex: 1, alignItems: "center", backgroundColor: themeColors.surface }}>
+      <View style={{ flex: 1, direction: physicalDirection, alignItems: "center", backgroundColor: themeColors.surface }}>
         <View style={{ flex: 1, width: "100%", maxWidth: 560, paddingHorizontal: isWide ? 32 : 22, paddingTop: 8, paddingBottom: 12, gap: 18 }}>
           {renderLanguagePill()}
           {renderWelcome()}

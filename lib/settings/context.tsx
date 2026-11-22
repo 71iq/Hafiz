@@ -830,6 +830,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const isDark = effectiveTheme === "dark" || effectiveTheme === "amoled";
   const themeColors = THEME_COLORS[effectiveTheme];
   const themeSurface = themeColors.surface;
+  const isRTL = uiLanguage === "ar";
+  const direction = isRTL ? "rtl" : "ltr";
   const themeVars = useMemo(
     () =>
       Platform.OS === "web" && typeof window === "undefined"
@@ -846,6 +848,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     applyWebThemePalette(effectiveTheme);
   }, [effectiveTheme]);
+
+  useLayoutEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    document.documentElement.lang = uiLanguage;
+    document.documentElement.dir = direction;
+  }, [direction, uiLanguage]);
 
   useEffect(() => {
     setHapticsEnabled(hapticsEnabled);
@@ -1327,7 +1335,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const accountPromoDismissed = isAccountPromoDismissed(accountPromoDismissedAt);
 
-  const isRTL = uiLanguage === "ar";
   const quranRenderFontStyle = resolvePageFontStyle(quranFontStyle, isDark);
 
   return (
@@ -1400,7 +1407,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       <View className="flex-1" style={themeVars}>
-        <DirectionProvider dir={isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+        <DirectionProvider dir={direction}>{children}</DirectionProvider>
       </View>
     </SettingsContext.Provider>
   );

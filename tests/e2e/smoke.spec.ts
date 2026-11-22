@@ -66,6 +66,8 @@ test.describe("strict route smoke", () => {
     await sharedPage.getByText("Verse by Verse", { exact: true }).click();
     await sharedPage.getByRole("radio", { name: "Dark", exact: true }).click();
     await sharedPage.getByText("العربية", { exact: true }).click();
+    await expect(sharedPage.locator("html")).toHaveAttribute("lang", "ar");
+    await expect(sharedPage.locator("html")).toHaveAttribute("dir", "rtl");
     await sharedPage.goto("/open?surah=2&ayah=255", { waitUntil: "domcontentloaded" });
     await expect(sharedPage.getByRole("button", { name: "2:255", exact: true })).toBeInViewport({ timeout: 30_000 });
     await expect(sharedPage.locator("html")).toHaveAttribute("dir", "rtl");
@@ -74,6 +76,35 @@ test.describe("strict route smoke", () => {
     await sharedPage.goto("/open?surah=2&ayah=255", { waitUntil: "domcontentloaded" });
     await expect(sharedPage.getByRole("button", { name: "2:255", exact: true })).toBeInViewport();
   });
+});
+
+test("onboarding language changes update the document and mirror the language button", async ({ page }) => {
+  await page.goto("/onboarding", { waitUntil: "domcontentloaded" });
+
+  const html = page.locator("html");
+  const arabic = page.getByRole("button", { name: "العربية", exact: true });
+  const english = page.getByRole("button", { name: "English", exact: true });
+  await expect(arabic).toBeVisible();
+  await expect(html).toHaveAttribute("lang", "en");
+  await expect(html).toHaveAttribute("dir", "ltr");
+  const viewportMiddle = await page.evaluate(() => innerWidth / 2);
+  expect(await arabic.evaluate((button) => button.getBoundingClientRect().left)).toBeGreaterThan(viewportMiddle);
+  await arabic.click();
+  await expect(html).toHaveAttribute("lang", "ar");
+  await expect(html).toHaveAttribute("dir", "rtl");
+  const arabicLayoutX = await english.evaluate((button) => button.getBoundingClientRect().x);
+  expect(arabicLayoutX).toBeLessThan(viewportMiddle);
+
+  await page.reload();
+  await expect(english).toBeVisible();
+  await expect(html).toHaveAttribute("lang", "ar");
+  await expect(html).toHaveAttribute("dir", "rtl");
+  expect(await english.evaluate((button) => button.getBoundingClientRect().x)).toBe(arabicLayoutX);
+
+  await english.click();
+  await expect(arabic).toBeVisible();
+  await expect(html).toHaveAttribute("lang", "en");
+  await expect(html).toHaveAttribute("dir", "ltr");
 });
 
 test("keyboard search stays in Mushaf and reader shortcuts stop on other tabs", async ({ page }) => {
