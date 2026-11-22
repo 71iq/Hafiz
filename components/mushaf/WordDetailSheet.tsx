@@ -26,6 +26,7 @@ import { DetailTabRow } from "./DetailTabRow";
 import { useDetailArrowKeys } from "./use-detail-arrow-keys";
 import {
   fetchWordMeaningAr,
+  fetchWordNeighbors,
   fetchWordQcf2Glyph,
   fetchWordRoot,
   fetchWordText,
@@ -181,30 +182,13 @@ export function WordDetailSheet() {
       return;
     }
     let cancelled = false;
-    Promise.all([
-      db.getFirstAsync<WordRef>(
-        `SELECT wr.surah, wr.ayah, wr.word_pos AS wordPos, q.v2_page AS v2Page
-         FROM word_roots wr
-         JOIN quran_text q ON q.surah = wr.surah AND q.ayah = wr.ayah
-         WHERE (wr.surah, wr.ayah, wr.word_pos) < (?, ?, ?)
-         ORDER BY wr.surah DESC, wr.ayah DESC, wr.word_pos DESC
-         LIMIT 1`,
-        [detailWord.surah, detailWord.ayah, detailWord.wordPos]
-      ),
-      db.getFirstAsync<WordRef>(
-        `SELECT wr.surah, wr.ayah, wr.word_pos AS wordPos, q.v2_page AS v2Page
-         FROM word_roots wr
-         JOIN quran_text q ON q.surah = wr.surah AND q.ayah = wr.ayah
-         WHERE (wr.surah, wr.ayah, wr.word_pos) > (?, ?, ?)
-         ORDER BY wr.surah, wr.ayah, wr.word_pos
-         LIMIT 1`,
-        [detailWord.surah, detailWord.ayah, detailWord.wordPos]
-      ),
-    ]).then(([previous, next]) => {
-      if (!cancelled) setNeighbors({ word: detailWord, previous, next });
-    }).catch(() => {
-      if (!cancelled) setNeighbors(null);
-    });
+    fetchWordNeighbors(db, detailWord)
+      .then(({ previous, next }) => {
+        if (!cancelled) setNeighbors({ word: detailWord, previous, next });
+      })
+      .catch(() => {
+        if (!cancelled) setNeighbors(null);
+      });
     return () => {
       cancelled = true;
     };

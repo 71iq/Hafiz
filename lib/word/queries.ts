@@ -1,4 +1,5 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
+import type { WordRef } from "./context";
 import { enqueueSync } from "@/lib/database/sync-queue";
 
 export type WordTranslationRow = {
@@ -130,6 +131,51 @@ export async function fetchWordQcf2Glyph(
   );
   const tokens = row?.text_qcf2?.split(/\s+/).filter(Boolean) ?? [];
   return tokens[wordPos - 1] ?? null;
+}
+
+// The reader gives one position to each space-separated QCF2 token before the ayah marker.
+function glyphWordCount(text: string): number {
+  return text.split(" ").filter(Boolean).length - 1;
+}
+
+export async function fetchWordNeighbors(
+  db: DatabaseExecutor,
+  word: WordRef,
+): Promise<{ previous: WordRef | null; next: WordRef | null }> {
+  const { surah, ayah, wordPos } = word;
+  const current = await db.getFirstAsync<{ text_qcf2: string; v2Page: number }>(
+    "SELECT text_qcf2, v2_page AS v2Page FROM quran_text WHERE surah = ? AND ayah = ?",
+    [surah, ayah],
+  );
+  const lastWordPos = current ? glyphWordCount(current.text_qcf2) : 0;
+  if (!current || wordPos < 1 || wordPos > lastWordPos) return { previous: null, next: null };
+
+  const currentRef = { ...word, v2Page: current.v2Page };
+  const [previousAyah, next] = await Promise.all([
+    wordPos === 1
+      ? db.getFirstAsync<Omit<WordRef, "wordPos"> & { text_qcf2: string }>(
+          `SELECT surah, ayah, v2_page AS v2Page, text_qcf2 FROM quran_text
+           WHERE (surah, ayah) < (?, ?) AND instr(trim(text_qcf2), ' ') > 0
+           ORDER BY surah DESC, ayah DESC LIMIT 1`,
+          [surah, ayah],
+        )
+      : null,
+    wordPos === lastWordPos
+      ? db.getFirstAsync<WordRef>(
+          `SELECT surah, ayah, v2_page AS v2Page, 1 AS wordPos FROM quran_text
+           WHERE (surah, ayah) > (?, ?) AND instr(trim(text_qcf2), ' ') > 0
+           ORDER BY surah, ayah LIMIT 1`,
+          [surah, ayah],
+        )
+      : { ...currentRef, wordPos: wordPos + 1 },
+  ]);
+
+  let previous = wordPos > 1 ? { ...currentRef, wordPos: wordPos - 1 } : null;
+  if (previousAyah) {
+    const { text_qcf2, ...ref } = previousAyah;
+    previous = { ...ref, wordPos: glyphWordCount(text_qcf2) };
+  }
+  return { previous, next };
 }
 
 /** One page of a root's occurrences in mushaf order. Common roots have thousands of rows. */
