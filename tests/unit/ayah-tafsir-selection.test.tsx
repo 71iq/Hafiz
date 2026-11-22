@@ -1,6 +1,11 @@
+/**
+ * @jest-environment jsdom
+ * @jest-environment-options {"customExportConditions":["node","node-addons"]}
+ */
+
 import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import React, { type ComponentProps } from "react";
-import { Dimensions, I18nManager } from "react-native";
+import { Dimensions, I18nManager, Platform } from "react-native";
 import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AyahDetailModal } from "@/components/mushaf/AyahDetailModal";
@@ -73,6 +78,7 @@ const originalScreen = Dimensions.get("screen");
 jest.mock("expo-router", () => ({ router: { navigate: (...args: unknown[]) => mockRouterNavigate(...args) } }));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDatabase }));
 jest.mock("@/lib/database/init", () => ({ ensureTafsirSourceImported: jest.fn() }));
+jest.mock("@/lib/app-update/build-info", () => ({ useWebRevision: () => null }));
 jest.mock("@/lib/settings/context", () => {
   const actual = jest.requireActual<typeof import("@/lib/settings/context")>("@/lib/settings/context");
   return { ...actual, useSettings: () => ({ ...actual.useSettings(), ...mockSettings }) };
@@ -224,6 +230,25 @@ describe.each(cases)("ayah detail $language/$width", ({ language, width }) => {
       Dimensions.set({ window: originalWindow, screen: originalScreen });
     }
   });
+
+  it.each(["android", "ios", "web"] as const)(
+    "exposes the Unicode verse once on %s while drawing the glyphs",
+    async (platform) => {
+      jest.replaceProperty(Platform, "OS", platform);
+      const view = await renderModal();
+
+      if (platform === "web") {
+        expect(view.UNSAFE_root.findByType("span").props).toMatchObject({ lang: "ar", children: "نص" });
+        expect(view.queryByLabelText("نص")).toBeNull();
+      } else {
+        expect(view.getByLabelText("نص").props).toMatchObject({ accessible: true, accessibilityLanguage: "ar" });
+      }
+      for (const glyph of ["a", "b"]) {
+        expect(view.queryByText(glyph)).toBeNull();
+        expect(view.getByText(glyph, { includeHiddenElements: true })).toBeTruthy();
+      }
+    },
+  );
 
   it("orders text tabs and keeps Translation in either interface language", async () => {
     const view = await renderModal();

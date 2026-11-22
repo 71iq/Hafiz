@@ -553,6 +553,9 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                   <View className="items-end" style={{ direction: "ltr" }}>
                     <View
                       className="self-end"
+                      {...(Platform.OS !== "web" && row.text_uthmani
+                        ? { accessible: true, accessibilityLabel: row.text_uthmani, accessibilityLanguage: "ar" }
+                        : undefined)}
                       style={{
                         direction: "ltr",
                         flexDirection: "row-reverse",
@@ -563,11 +566,27 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
                         maxWidth: "100%",
                       }}
                     >
+                      {Platform.OS === "web" && row.text_uthmani ? (
+                        <span
+                          lang="ar"
+                          style={{
+                            position: "absolute",
+                            width: 1,
+                            height: 1,
+                            clipPath: "inset(50%)",
+                            overflow: "hidden",
+                            userSelect: "none",
+                          }}
+                        >
+                          {row.text_uthmani}
+                        </span>
+                      ) : null}
                       {qcf2Tokens.map((glyph, index) => {
                         const isMarker = index === qcf2Tokens.length - 1;
                         return (
                           <Text
                             key={`${activeTarget.surah}-${activeTarget.ayah}-${index}`}
+                            aria-hidden
                             className="text-charcoal dark:text-neutral-100"
                             style={{
                               fontFamily: qcf2FontFamily,
