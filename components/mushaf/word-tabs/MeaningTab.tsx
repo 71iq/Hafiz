@@ -495,6 +495,9 @@ function CustomMeaningButton({
     <Pressable
       onPress={onPress}
       disabled={disabled || saving}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      aria-busy={saving}
       className={`mt-3 items-center gap-2 rounded-full px-4 py-2 ${isRTL ? "self-end flex-row-reverse" : "self-start flex-row"} bg-primary-accent dark:bg-primary-bright`}
       style={({ pressed }) => ({
         transform: [{ scale: pressed ? 0.98 : 1 }],
@@ -570,6 +573,9 @@ function SaveToVocabButton({
     <Pressable
       onPress={onPress}
       disabled={saved || saving}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      aria-busy={saving}
       className={`mt-4 items-center gap-2 rounded-full px-4 py-2 ${isRTL ? "self-end flex-row-reverse" : "self-start flex-row"} ${
         saved ? "bg-primary-accent/10 dark:bg-primary-bright/10" : "bg-surface-high dark:bg-surface-dark-high"
       }`}
