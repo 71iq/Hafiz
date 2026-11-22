@@ -18,7 +18,7 @@ Hafiz takes the escalation: the darkening sky, a character whose state follows t
 
 ## Picker, placement and resizing
 
-Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both use the same data and resize down to a single row. Each layout has an ideal size. From Android 12 the launcher picks the closest ideal size that fits the widget. Earlier versions apply the same rule to the size in the widget options, so one size gets one layout everywhere. Every minimum leaves room for a three-digit count beside the flame.
+Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both use the same data. The streak tile resizes down to a single row. The wird widget keeps enough height for the week. Each layout has an ideal size. From Android 12 the launcher picks the closest ideal size that fits the widget. Earlier versions apply the same rule to the size in the widget options, so one size gets one layout everywhere. Every minimum leaves room for a three-digit count beside the flame.
 
 | Ideal size, dp    | Layout                                                                                                                                                |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -52,23 +52,23 @@ Each entry uses the same habit projection and review-left rules as Home. **Wird*
 
 While today is open, urgency is the time left before local midnight. While yesterday can still be made up, it is the time left before the make-up cutoff: Dhuhr, or 12:30 without prayer times. Each level has two Zayt or line variants, and the widget picks one per level and day, so the faces change from day to day without flickering between refreshes. A level never shows the face the level before it showed that day.
 
-| Level    | Time left | Sky on an open day           | Zayt                                   | Line, numbers on                              | Motion              |
-| -------- | --------- | ---------------------------- | -------------------------------------- | --------------------------------------------- | ------------------- |
-| Calm     | over 12 h | Morning                      | Standing or waving                     | Wird time? · Today's wird awaits              | Blink               |
-| Steady   | 8 to 12 h | Midday                       | Eager or waving                        | Keep it going · Keep your streak going        | Bounce or blink     |
-| Nudge    | 4 to 8 h  | Golden hour                  | Impatient or warm                      | Keep your 12 days · Don't break 12 days       | Foot tap or blink   |
-| Urgent   | 2 to 4 h  | Dusk                         | Worried, a bead of oil sweat           | Save your 12 days · Your streak needs you     | The bead drips      |
-| Critical | 1 to 2 h  | Night                        | Anxious, trembling, with its own light | Under 2 hours left! · Hurry, 12 days at stake | Tremble             |
-| Last     | under 1 h | Midnight, red at the horizon | Panicked, light flickering             | Last hour! · Now, or lose 12 days             | Tremble and flicker |
+| Level    | Time left | Sky on an open day           | Zayt                                                            | Line, numbers on                          | Motion                                         |
+| -------- | --------- | ---------------------------- | --------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------- |
+| Calm     | over 12 h | Morning                      | Standing or waving                                              | Wird time? · Today's wird awaits          | Blink                                          |
+| Steady   | 8 to 12 h | Midday                       | Eager or waving                                                 | Keep it going · Keep your streak going    | Bounce or blink                                |
+| Nudge    | 4 to 8 h  | Golden hour                  | Impatient or warm                                               | Keep your 12 days · Don't break 12 days   | Foot tap or blink                              |
+| Urgent   | 2 to 4 h  | Dusk                         | Worried with a bead of oil sweat, or fretful and glancing aside | Save your 12 days · Your streak needs you | The bead drips, or a weight shift and a glance |
+| Critical | 1 to 2 h  | Night                        | Anxious and trembling, or nervous on tiptoe, with its own light | Under 2 hours left! · 12 days at stake!   | Tremble, or darting eyes and a shiver          |
+| Last     | under 1 h | Midnight, red at the horizon | Panicked with its light flickering, or frantic and hopping      | Last hour! · Now, or lose 12 days         | Tremble and flicker, or two quick hops         |
 
-The make-up window keeps the dawn sky with the same faces and says "Make up by 12:30", then "Last chance: 12:30" from two hours before the cutoff.
+The make-up window has its own dawn, which turns rose from 4 hours before the cutoff and red from 2 hours before, with the same faces without the night halo. It says "Make up by 12:30", then "Last chance: 12:30" from 4 hours before the cutoff.
 
 | State                    | Scene                         | Zayt                                     | Line                                     | Tap                                    |
 | ------------------------ | ----------------------------- | ---------------------------------------- | ---------------------------------------- | -------------------------------------- |
 | Begin                    | Dawn, or night in the evening | Wave, or glowing                         | Start your streak                        | Home                                   |
 | After a lost streak      | Dawn                          | Lonely but hopeful                       | Start again today · Your wird misses you | Wird                                   |
 | Open day                 | By level                      | By level                                 | By level                                 | Wird                                   |
-| Make-up available        | Dawn                          | By level                                 | Make up by the cutoff, then last chance  | Wird                                   |
+| Make-up available        | Dawn, then rose, then red     | By level                                 | Make up by the cutoff, then last chance  | Wird                                   |
 | Earning back, open       | By level                      | By level                                 | Earning back: n of 3                     | Wird                                   |
 | Earning back, today done | Sunrise, or gold night        | Arms open                                | Today counts: n of 3                     | Home                                   |
 | Done                     | Gold, or gold night           | Shimmer, or relieved after a late finish | None                                     | Home                                   |
@@ -81,7 +81,7 @@ The evening scenes for done and begin start at the evening start or 20:00, which
 
 ## Motion and event ownership
 
-Calm stills blink slowly about every 4 and 6 seconds, two blinks with unequal gaps. The urgency faces loop their own short movement: a bounce, a foot tap, a drip, a tremble. The seated and celebrating stills stay still. From 4 hours left the waiting flame's ember pulses, faster and red in the last hour. Each is a frame list on an indeterminate ProgressBar inside the widget's RemoteViews, so the launcher runs it and Hafiz never wakes to animate.
+Calm stills blink slowly about every 4 and 6 seconds, two blinks with unequal gaps. The urgency faces loop their own short movement: a bounce, a foot tap, a drip, a glance, darting eyes, a tremble or two quick hops. The seated and celebrating stills stay still. From 4 hours left the waiting flame's ember pulses, faster and red in the last hour. Each is a frame list on an indeterminate ProgressBar inside the widget's RemoteViews, so the launcher runs it and Hafiz never wakes to animate.
 
 A completed, locally committed review can carry a wird progress event: the minimum met, a day made up or a streak earned back. The widget lifecycle remembers it in memory for that local day and the first background transition consumes it. At backgrounding, Hafiz sends a fresh timeline with a one-time celebration request. Native plays the clip that the entry now showing calls for: the A07 turn on a milestone or the A06 hop on a done day, landing on the relieved brow wipe after a late finish. Other states keep the blink. Each clip ends on the entry's own still. Twelve seconds after publication, one follow-up refresh reads the latest state and returns to the blink. The launcher decodes every frame before a clip starts, which took about 7 seconds on a software-rendered emulator, so the hold leaves a slow launcher time to play it. Clip frames are packed at 400 by 480 pixels to keep that decoding and its memory small; the last drawing is the full-size still. Actual display timing depends on the launcher.
 
@@ -97,8 +97,8 @@ The entire card is one tap target and one TalkBack description, which keeps the 
 
 ## Art and acceptance
 
-The art comes from the Zayt studio's widget export on the `feat/zayt-widget-art` branch: twelve scenes in a square and a wide crop, the calm stills with their blink frames, the urgency faces with their loops, and the done and milestone clips. To reproduce the Android resources, run `node scripts/render-widget-art.mjs /path/to/studio/zayt/widget/out` from the app checkout. It copies the files and writes the frame lists and their ProgressBar layouts, and turns the export's flame SVGs into the vector drawables and ember loops in `android/app/src/main/res/drawable`. `tests/unit/widget-resources.test.ts` checks that every scene, pose and flame JavaScript can send has its resources and is accepted by the Kotlin parser.
+The art comes from the Zayt studio's widget export on the `feat/zayt-widget-art` branch: fourteen scenes in a square and a wide crop, the calm stills with their blink frames, the urgency faces with their loops, and the done and milestone clips. To reproduce the Android resources, run `node scripts/render-widget-art.mjs /path/to/studio/zayt/widget/out` from the app checkout. It copies the files and writes the frame lists and their ProgressBar layouts, and turns the export's flame SVGs into the vector drawables and ember loops in `android/app/src/main/res/drawable`. `tests/unit/widget-resources.test.ts` checks that every scene, pose and flame JavaScript can send has its resources and is accepted by the Kotlin parser.
 
-Acceptance covers both picker entries, all six layouts, every state and urgency level, both directions, fixed and System themes with Zayt off, numbers off, reduced motion, expired data and tap routing. On a native widget host, watch the blink, a done hop and a milestone turn end on their stills, then repeat with reduced motion. Read the Arabic line and check the start edge at narrow widths. Check that the text, destination and accessible label remain useful with no art.
+Acceptance covers both picker entries, every size in the table above, every state and urgency level, both directions, fixed and System themes with Zayt off, numbers off, reduced motion, expired data and tap routing. On a native widget host, watch the blink, a done hop and a milestone turn end on their stills, then repeat with reduced motion. Read the Arabic line and check the start edge at narrow widths. Check that the text, destination and accessible label remain useful with no art.
 
 This specification covers Android home-screen widgets. An iOS WidgetKit implementation and a lock-screen surface would each need a separate product decision.

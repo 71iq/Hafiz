@@ -267,8 +267,8 @@ describe("widget copy rules (spec 4.3)", () => {
       begin: ["dawn", ["wave"], "out", "home"],
       fresh_start: ["dawn", ["lonely"], "out", "wird"],
       open_day: ["morning", ["rest", "wave"], "unlit", "wird"],
-      open_evening: ["dusk", ["worried"], "unlit", "wird"],
-      make_up: ["dawn", ["worried"], "unlit", "wird"],
+      open_evening: ["dusk", ["worried", "fretful"], "unlit", "wird"],
+      make_up: ["dawn_rose", ["worried", "fretful"], "unlit", "wird"],
       earn_back_open: ["morning", ["rest", "wave"], "out", "wird"],
       earn_back_done: ["sunrise", ["open"], "lit", "home"],
       done: ["radiant", ["shimmer"], "lit", "home"],
@@ -299,9 +299,21 @@ describe("widget copy rules (spec 4.3)", () => {
       [9 * 60, "calm", "morning", ["rest", "wave"], [strings.en.widgetLineCalm, strings.en.widgetOpenHeadline]],
       [12 * 60 + 30, "steady", "day", ["eager", "wave"], [strings.en.widgetLineDay, strings.en.widgetLineSteady]],
       [16 * 60 + 30, "nudge", "golden", ["impatient", "warm"], [`Keep your ${days}`, `Don't break ${days}`]],
-      [21 * 60, "urgent", "dusk", ["worried"], [`Save your ${days}`, strings.en.widgetLineUrgent2]],
-      [22 * 60 + 30, "critical", "night", ["anxious_halo"], [strings.en.widgetLineCritical, `Hurry, ${days} at stake`]],
-      [23 * 60 + 30, "last", "midnight", ["panicked_halo"], [strings.en.widgetLineLast, `Now, or lose ${days}`]],
+      [21 * 60, "urgent", "dusk", ["worried", "fretful"], [`Save your ${days}`, strings.en.widgetLineUrgent2]],
+      [
+        22 * 60 + 30,
+        "critical",
+        "night",
+        ["anxious_halo", "nervous_halo"],
+        [strings.en.widgetLineCritical, `${days} at stake!`],
+      ],
+      [
+        23 * 60 + 30,
+        "last",
+        "midnight",
+        ["panicked_halo", "frantic_halo"],
+        [strings.en.widgetLineLast, `Now, or lose ${days}`],
+      ],
     ] as const;
     for (const [minutes, urgency, scene, poses, lines] of rows) {
       const entry = at(minutes);
@@ -319,15 +331,28 @@ describe("widget copy rules (spec 4.3)", () => {
     expect([beginLate.scene, beginLate.pose]).toEqual(["night", "glow_halo"]);
   });
 
-  it("counts the make-up window down to its cutoff, with a last chance from two hours before", () => {
+  it("counts the make-up window down to its cutoff on a reddening dawn, with a last chance from four hours before", () => {
     const at = (minutes: number) => describe1("make_up", DISTINCT, "en", true, undefined, minutes);
-    expect([at(8 * 60).urgency, at(8 * 60).line]).toEqual(["nudge", "Make up by 12:30\u00A0PM"]);
-    expect([at(10 * 60).urgency, at(10 * 60).pose, at(10 * 60).line]).toEqual([
+    expect([at(8 * 60).urgency, at(8 * 60).scene, at(8 * 60).line]).toEqual([
+      "nudge",
+      "dawn",
+      "Make up by 12:30\u00A0PM",
+    ]);
+    expect([at(10 * 60).urgency, at(10 * 60).scene, at(10 * 60).line]).toEqual([
       "urgent",
-      "worried",
+      "dawn_rose",
       "Last chance: 12:30\u00A0PM",
     ]);
-    expect([at(12 * 60).urgency, at(12 * 60).pose]).toEqual(["last", "panicked"]);
+    expect(["worried", "fretful"]).toContain(at(10 * 60).pose);
+    // The dawn turns red in the last two hours before the cutoff.
+    expect([at(11 * 60).urgency, at(11 * 60).scene, at(12 * 60).urgency, at(12 * 60).scene]).toEqual([
+      "critical",
+      "dawn_red",
+      "last",
+      "dawn_red",
+    ]);
+    expect(["anxious", "nervous"]).toContain(at(11 * 60).pose);
+    expect(["panicked", "frantic"]).toContain(at(12 * 60).pose);
   });
 
   it("shows the relieved face only after a late finish, by night", () => {

@@ -45,6 +45,9 @@ export const WIDGET_SCENES = [
   "radiant_night",
   "milestone",
   "calm",
+  // The make-up window's dawn, reddening as the cutoff nears.
+  "dawn_rose",
+  "dawn_red",
 ] as const;
 /** Zayt's still. The _halo poses carry their own light for the night scenes. */
 export const WIDGET_POSES = [
@@ -72,6 +75,12 @@ export const WIDGET_POSES = [
   "anxious_halo",
   "panicked_halo",
   "relieved_halo",
+  // Second faces for the late levels, so the last hours change from day to day.
+  "fretful",
+  "nervous",
+  "frantic",
+  "nervous_halo",
+  "frantic_halo",
 ] as const;
 /** How close the streak is to being lost (lib/widget/copy.ts widgetUrgencyAt). */
 export const WIDGET_URGENCIES = ["none", "calm", "steady", "nudge", "urgent", "critical", "last"] as const;

@@ -225,7 +225,7 @@ describe("widget timeline example (spec 7.3)", () => {
         state: "open_day",
         urgency: "urgent",
         scene: "dusk",
-        pose: "worried",
+        pose: "fretful",
         flame: "unlit",
         tier: 1,
         count: "12",
