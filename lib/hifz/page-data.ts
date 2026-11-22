@@ -10,6 +10,8 @@ export type PageToken = Readonly<{
   isMarker: boolean;
   /** Canonical Unicode word when it maps to this glyph. */
   text?: string;
+  /** Full canonical text on the first glyph when the words cannot be aligned individually. */
+  unalignedAyah?: Readonly<{ text: string; tokenCount: number }>;
   /** L1 cue: the word's first letter with its marks, or null when the word could not be aligned. */
   firstLetter: string | null;
 }>;
@@ -71,6 +73,7 @@ function pageTokens(ayahs: readonly AyahRow[]): PageToken[] {
         wordPos: isMarker || !aligned ? null : index + 1,
         isMarker,
         text,
+        unalignedAyah: !aligned && index === 0 ? { text: row.text_uthmani, tokenCount: glyphs.length } : undefined,
         firstLetter: text === undefined ? null : firstLetterOf(text),
       });
     });

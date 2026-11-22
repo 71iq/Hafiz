@@ -54,3 +54,20 @@ it("marks the same word through its visible glyph and its accessible self-check 
   expect(onWordPress).toHaveBeenNthCalledWith(1, page.lines[0].tokens[0], key);
   expect(onWordPress).toHaveBeenNthCalledWith(2, page.lines[0].tokens[0], key);
 });
+
+it("reads an unaligned ayah intact only when the whole ayah is visible", () => {
+  const unaligned = buildRecitationPage(
+    1,
+    [{ surah: 1, ayah: 1, text_qcf2: glyphs, text_uthmani: "بِسْمِ" }],
+    [],
+    { "1": "\ue001", "2": "\ue002 \ue003" },
+  );
+  const { rerender } = render(<RecitationPage {...props} page={unaligned} level={0} reveal={shown} />);
+  expect(screen.getByLabelText("بِسْمِ")).toBeOnTheScreen();
+
+  rerender(<RecitationPage {...props} page={unaligned} level={0} reveal={shown} lineNumbers={new Set([1])} />);
+  expect(screen.queryByLabelText("بِسْمِ")).toBeNull();
+
+  rerender(<RecitationPage {...props} page={unaligned} level={4} reveal={{ ...HIDDEN, count: 1 }} />);
+  expect(screen.queryByLabelText("بِسْمِ")).toBeNull();
+});

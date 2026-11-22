@@ -47,6 +47,10 @@ function tokenKey(token: Pick<PageToken, "surah" | "ayah" | "wordPos" | "glyph">
   return `${token.surah}:${token.ayah}:${token.wordPos ?? "m"}:${index}`;
 }
 
+function ayahKey(token: Pick<PageToken, "surah" | "ayah">): string {
+  return `${token.surah}:${token.ayah}`;
+}
+
 /** Ayah lines in reading order, limited to the given line numbers (a half page). */
 export function visibleLines(page: PageData, lineNumbers: ReadonlySet<number> | null): PageLine[] {
   return page.lines.filter((line) => lineNumbers === null || lineNumbers.has(line.lineNumber));
@@ -98,6 +102,17 @@ export function RecitationPage({
   const { quranRenderFontStyle, effectiveTheme, quranMarkerStyle } = useSettings();
   const ready = useQuranPageFontReady(quranRenderFontStyle, page.page);
   const lines = useMemo(() => visibleLines(page, lineNumbers), [page, lineNumbers]);
+  const selectedTokenCounts = useMemo(() => {
+    if (lineNumbers === null) return null;
+    const counts = new Map<string, number>();
+    for (const line of lines) {
+      for (const token of line.tokens) {
+        const key = ayahKey(token);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [lineNumbers, lines]);
   const lineLayouts = useRef(new Map<number, { y: number; height: number }>());
   const containerRef = useRef<View>(null);
   const containerTop = useRef(0);
@@ -182,7 +197,14 @@ export function RecitationPage({
           const visible =
             reveal.all || (!isGap && (level === 0 || token.isMarker || index < reveal.count || (level === 3 && lineTouched)));
           const firstLetterOnly = !visible && !isGap && level === 1;
-          const spoken = visible ? token.text : firstLetterOnly ? token.firstLetter : undefined;
+          const unaligned = token.unalignedAyah;
+          const wholeAyahVisible =
+            unaligned !== undefined &&
+            (reveal.all || (level === 0 && (cloze === null || ayahKey(cloze) !== ayahKey(token)))) &&
+            (selectedTokenCounts === null || selectedTokenCounts.get(ayahKey(token)) === unaligned.tokenCount);
+          const spoken = visible
+            ? token.text ?? (wholeAyahVisible ? unaligned.text : undefined)
+            : firstLetterOnly ? token.firstLetter : undefined;
           const isMarked = marked?.has(key) ?? false;
           const onPress = markWord && !token.isMarker ? () => markWord(token, key) : undefined;
           const label = onPress ? [spoken, wordLabel(token)].filter(Boolean).join(", ") : undefined;
