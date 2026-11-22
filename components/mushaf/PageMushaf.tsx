@@ -74,6 +74,7 @@ type AyahRow = {
   surah: number;
   ayah: number;
   text_qcf2: string;
+  text_uthmani: string;
   v2_page: number;
 };
 
@@ -96,6 +97,7 @@ type AyahData = {
   surah: number;
   ayah: number;
   textQcf2: string;
+  textUthmani: string;
 };
 
 type PageLineRow = {
@@ -164,6 +166,7 @@ function buildPageData(
       surah: a.surah,
       ayah: a.ayah,
       textQcf2: a.text_qcf2 ?? "",
+      textUthmani: a.text_uthmani,
     }));
 
     const pd: PageData = { page: page.page, ayahs: pageAyahs };
@@ -474,7 +477,7 @@ export function PageMushaf({
             "SELECT page, surah_start, ayah_start, surah_end, ayah_end FROM page_map ORDER BY page"
           ),
           db.getAllAsync<AyahRow>(
-            "SELECT surah, ayah, text_qcf2, v2_page FROM quran_text ORDER BY surah, ayah"
+            "SELECT surah, ayah, text_qcf2, text_uthmani, v2_page FROM quran_text ORDER BY surah, ayah"
           ),
           db.getAllAsync<SurahRow>(
             "SELECT number, name_arabic, name_english, ayah_count, revelation_type FROM surahs ORDER BY number"

@@ -9,6 +9,7 @@ import { strings } from "@/lib/i18n/strings";
 
 type PageProps = ComponentProps<typeof PageMushaf>;
 let mockPageProps: PageProps | undefined;
+const mockVisibilityRenders: NonNullable<PageProps["hifzVisibility"]>[] = [];
 const mockSettings: Partial<ReturnType<typeof useSettings>> = {};
 let mockWordCounts = [3, 2];
 const mockGoToPage = jest.fn<void, [number]>();
@@ -40,6 +41,10 @@ const originalScreen = Dimensions.get("screen");
 jest.mock("expo-router", () => ({
   useFocusEffect: () => undefined,
   router: { push: (...a: unknown[]) => mockForbidden(...a) },
+}));
+jest.mock("@react-navigation/native", () => ({
+  ...jest.requireActual("@react-navigation/native"),
+  useIsFocused: () => true,
 }));
 jest.mock("react-native-reanimated", () => {
   const React = jest.requireActual<typeof import("react")>("react");
@@ -100,6 +105,7 @@ jest.mock("@/components/mushaf/PageMushaf", () => {
   return {
     PageMushaf: (props: PageProps) => {
       mockPageProps = props;
+      if (props.hifzVisibility) mockVisibilityRenders.push(props.hifzVisibility);
       const { goToPageRef, onPageChange } = props;
       React.useEffect(() => {
         if (!goToPageRef || !onPageChange) throw new Error("Missing reader navigation contract");
@@ -173,6 +179,7 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     mockPageProps = undefined;
+    mockVisibilityRenders.length = 0;
     mockWordCounts = [3, 2];
     Object.assign(mockSettings, {
       uiLanguage: language,
@@ -340,11 +347,15 @@ describe.each(cases)("Hifz owner $language/$width", ({ language, width }) => {
   });
   it("manual page changes reset progress and stop automatic reveal", async () => {
     const view = await open();
+    press(view, s.hifzRevealNextAyah);
     press(view, s.hifzContinueAutoReveal);
-    await tick();
+    expect(progress()).toEqual({ revealedAyahCount: 1, activeAyahKey: "1:2", activeVisibleWordCount: 1 });
     await act(async () => {
       page().onPageChange(3);
     });
+    const nextPageRenders = mockVisibilityRenders.filter((visibility) => visibility.page === 3);
+    expect(nextPageRenders.length).toBeGreaterThan(0);
+    for (const visibility of nextPageRenders) expect(visibility).toMatchObject(hidden);
     expect(progress()).toEqual(hidden);
     expect(view.getByRole("button", { name: s.hifzContinueAutoReveal })).toBeOnTheScreen();
     await tick(2000);

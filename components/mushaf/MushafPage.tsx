@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { Fragment, memo, useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
 import { useSimilarMarks } from "@/lib/hifz/use-similar-markers";
 import { useDatabaseStatus } from "@/lib/database/provider";
@@ -6,6 +6,7 @@ import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native
 import { Bismillah } from "./Bismillah";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
+import { AyahReadout } from "./AyahReadout";
 import { SimilarVersePageMarker } from "./SimilarVerseMarker";
 import {
   isQuranPageFontLoaded,
@@ -52,6 +53,7 @@ type AyahData = {
   surah: number;
   ayah: number;
   textQcf2: string;
+  textUthmani: string;
 };
 
 type SurahInfo = {
@@ -125,6 +127,7 @@ type WordIdentity = {
 type PageGlyph = {
   glyph: string;
   identity: WordIdentity;
+  ayahStart?: { text: string; lastWordPos: number };
 };
 
 
@@ -149,6 +152,7 @@ function buildPageGlyphs(ayahs: AyahData[]): PageGlyph[] {
     for (let i = 0; i < tokens.length - 1; i++) {
       glyphs.push({
         glyph: tokens[i],
+        ayahStart: i === 0 ? { text: a.textUthmani, lastWordPos: tokens.length - 1 } : undefined,
         identity: {
           surah: a.surah,
           ayah: a.ayah,
@@ -319,16 +323,16 @@ function MushafPageInner({
   }, [pageGlyphs]);
 
   const isHifzWordHidden = useCallback(
-    (identity: WordIdentity) => {
+    ({ surah, ayah, wordPos }: Pick<WordIdentity, "surah" | "ayah" | "wordPos">) => {
       if (!hifzVisibility?.enabled) return false;
       if (hifzVisibility.page !== pageNumber) return true;
-      const key = `${identity.surah}:${identity.ayah}`;
+      const key = `${surah}:${ayah}`;
       const ayahIndex = ayahIndexByKey.get(key);
-      if (ayahIndex === undefined) return false;
+      if (ayahIndex === undefined) return true;
       if (ayahIndex < hifzVisibility.revealedAyahCount) return false;
       if (
         key === hifzVisibility.activeAyahKey &&
-        identity.wordPos <= hifzVisibility.activeVisibleWordCount
+        wordPos <= hifzVisibility.activeVisibleWordCount
       ) {
         return false;
       }
@@ -493,7 +497,8 @@ function MushafPageInner({
           }}
         >
           {words.map((w, i) => {
-            const identity = pageGlyphs[lineStartIndex + i]?.identity;
+            const token = pageGlyphs[lineStartIndex + i];
+            const identity = token?.identity;
             if (identity && !identity.isMarker) {
               const isTargetWord =
                 highlightedWord &&
@@ -507,24 +512,31 @@ function MushafPageInner({
                 ? "#0d9488"
                 : getWordHighlightColor(identity.surah, identity.ayah, identity.wordPos) ??
                   getHighlightColor(identity.surah, identity.ayah);
+              const ayahStart = token.ayahStart;
+              // A QCF2 token may contain extra pause marks or several words. Expose the entire
+              // ayah once, only when all of its visual word positions are revealed.
               return (
-                <WordToken
-                  key={`w-${lineNumber}-${i}`}
-                  glyph={w}
-                  fontFamily={fontFamily}
-                  fontPalette={fontPaletteStyle?.fontPalette ?? null}
-                  fontSize={fontSize}
-                  lineHeight={lineHeight}
-                  surah={identity.surah}
-                  ayah={identity.ayah}
-                  wordPos={identity.wordPos}
-                  v2Page={pageNumber}
-                  highlightColor={hlColor}
-                  arrivalWash={isTargetWord || isTargetAyah ? arrivalWash : undefined}
-                  hidden={isHifzWordHidden(identity)}
-                  weakSpot={isWeakSpot(identity.surah, identity.ayah, identity.wordPos)}
-                  compactLayout
-                />
+                <Fragment key={`w-${lineNumber}-${i}`}>
+                  {ayahStart && !isHifzWordHidden({ ...identity, wordPos: ayahStart.lastWordPos }) && (
+                    <AyahReadout text={ayahStart.text} />
+                  )}
+                  <WordToken
+                    glyph={w}
+                    fontFamily={fontFamily}
+                    fontPalette={fontPaletteStyle?.fontPalette ?? null}
+                    fontSize={fontSize}
+                    lineHeight={lineHeight}
+                    surah={identity.surah}
+                    ayah={identity.ayah}
+                    wordPos={identity.wordPos}
+                    v2Page={pageNumber}
+                    highlightColor={hlColor}
+                    arrivalWash={isTargetWord || isTargetAyah ? arrivalWash : undefined}
+                    hidden={isHifzWordHidden(identity)}
+                    weakSpot={isWeakSpot(identity.surah, identity.ayah, identity.wordPos)}
+                    compactLayout
+                  />
+                </Fragment>
               );
             }
             // Ayah end marker — opens ayah details modal
@@ -586,6 +598,7 @@ function MushafPageInner({
                   })}
                 >
                   <Text
+                    aria-hidden
                     selectable={Platform.OS === "web"}
                     className="text-charcoal dark:text-neutral-100"
                     style={{
@@ -618,9 +631,11 @@ function MushafPageInner({
               );
             }
             // No identity fallback
+            if (hifzVisibility?.enabled) return null;
             return (
               <Text
                 key={`w-${lineNumber}-${i}`}
+                aria-hidden
                 className="text-charcoal dark:text-neutral-100"
                 style={{ fontFamily, ...fontPaletteStyle, fontSize, lineHeight, paddingHorizontal: 0 }}
               >
@@ -696,26 +711,34 @@ function MushafPageInner({
       });
     }
   } else {
-    // Fallback: render ayahs as continuous text (shouldn't happen with layout data)
+    // Continuous fallback has no word-level reveal targets.
+    const visibleAyahs = ayahs.filter(
+      ({ surah, ayah, textQcf2 }) =>
+        !isHifzWordHidden({ surah, ayah, wordPos: Math.max(1, splitGlyphs(textQcf2).length - 1) }),
+    );
     content = (
-      <Text
-        className="text-charcoal dark:text-neutral-100"
-        style={{
-          fontFamily,
-          ...fontPaletteStyle,
-          fontSize,
-          lineHeight,
-          textAlign: "justify",
-          writingDirection: "rtl",
-        }}
-      >
-        {ayahs.map((a, i) => (
-          <Text key={`${a.surah}-${a.ayah}`}>
-            {a.textQcf2}
-            {i < ayahs.length - 1 ? " " : ""}
-          </Text>
-        ))}
-      </Text>
+      <>
+        <AyahReadout text={visibleAyahs.map((a) => a.textUthmani).join(" ")} />
+        <Text
+          aria-hidden
+          className="text-charcoal dark:text-neutral-100"
+          style={{
+            fontFamily,
+            ...fontPaletteStyle,
+            fontSize,
+            lineHeight,
+            textAlign: "justify",
+            writingDirection: "rtl",
+          }}
+        >
+          {visibleAyahs.map((a, i) => (
+            <Text key={`${a.surah}-${a.ayah}`}>
+              {a.textQcf2}
+              {i < visibleAyahs.length - 1 ? " " : ""}
+            </Text>
+          ))}
+        </Text>
+      </>
     );
   }
 

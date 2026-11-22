@@ -38,8 +38,9 @@ describe("RF-184 Android single-Text ayah words", () => {
   it("opens the detail sheet for the word under the finger when the ayah text is long-pressed", () => {
     const view = renderAyah();
 
-    fireEvent(view.getByText("ﱂ"), "pressIn");
-    fireEvent(view.getByTestId("ayah-text"), "longPress");
+    expect(view.queryByText("ﱂ")).toBeNull();
+    fireEvent(view.getByText("ﱂ", { includeHiddenElements: true }), "pressIn");
+    fireEvent(view.getByTestId("ayah-text", { includeHiddenElements: true }), "longPress");
 
     expect(mockMarkActivity).toHaveBeenCalledTimes(1);
     expect(mockOpenDetail).toHaveBeenCalledWith({ surah: 1, ayah: 1, wordPos: 2, v2Page: 1 });
@@ -48,19 +49,19 @@ describe("RF-184 Android single-Text ayah words", () => {
   it("does nothing on a long press that did not start on a word", () => {
     const view = renderAyah();
 
-    fireEvent(view.getByTestId("ayah-text"), "longPress");
+    fireEvent(view.getByTestId("ayah-text", { includeHiddenElements: true }), "longPress");
 
     expect(mockOpenDetail).not.toHaveBeenCalled();
   });
 
   it("does not reopen the previous word after the touch ends", () => {
     const view = renderAyah();
-    const ayahText = view.getByTestId("ayah-text");
+    const ayahText = view.getByTestId("ayah-text", { includeHiddenElements: true });
 
-    fireEvent(view.getByText("\uFC42"), "pressIn");
+    fireEvent(view.getByText("\uFC42", { includeHiddenElements: true }), "pressIn");
     fireEvent(ayahText, "longPress");
     fireEvent(ayahText, "pressOut");
-    fireEvent(view.getByText("\uFC43"), "pressIn");
+    fireEvent(view.getByText("\uFC43", { includeHiddenElements: true }), "pressIn");
     fireEvent(ayahText, "pressOut");
     fireEvent(ayahText, "longPress");
 
@@ -88,8 +89,8 @@ describe("ayah end marker gestures in verse view", () => {
       />,
     );
 
-    fireEvent(view.getByText("ﱃ"), "pressIn");
-    fireEvent(view.getByTestId("ayah-text"), "longPress");
+    fireEvent(view.getByText("ﱃ", { includeHiddenElements: true }), "pressIn");
+    fireEvent(view.getByTestId("ayah-text", { includeHiddenElements: true }), "longPress");
 
     expect(onMarkerLongPress).toHaveBeenCalledTimes(1);
     expect(mockOpenDetail).not.toHaveBeenCalled();

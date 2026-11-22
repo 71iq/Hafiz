@@ -24,6 +24,7 @@ import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
 import { AyahWordText } from "./WordSpan";
+import { AyahReadout } from "./AyahReadout";
 import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
 import { useSimilarMarks } from "@/lib/hifz/use-similar-markers";
 import { SimilarVerseButton } from "./SimilarVerseMarker";
@@ -67,6 +68,7 @@ type Props = {
   surah: number;
   ayah: number;
   text: string;
+  textUthmani: string;
   v2Page: number;
   fontSize: number;
   lineHeight: number;
@@ -82,6 +84,7 @@ function AyahBlockInner({
   surah,
   ayah,
   text,
+  textUthmani,
   v2Page,
   fontSize,
   lineHeight,
@@ -438,6 +441,15 @@ function AyahBlockInner({
             width: "100%",
           }}
         >
+          <AyahReadout
+            text={textUthmani}
+            {...(Platform.OS === "android" && showAyahMarkers && wordTokens.marker
+              ? {
+                  accessibilityActions: markerAccessibility.accessibilityActions,
+                  onAccessibilityAction: markerAccessibility.onAccessibilityAction,
+                }
+              : undefined)}
+          />
           {Platform.OS === "android" ? (
             // Android clips each separate Text to its own box, which cut page-font word glyphs that draw
             // outside their advance. One Text per ayah with nested word spans draws every word fully.
@@ -559,7 +571,7 @@ function AyahBlockInner({
                     ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                   }}
                 >
-                  {wordTokens.marker}
+                  <Text aria-hidden>{wordTokens.marker}</Text>
                 </Text>
               )}
             </View>

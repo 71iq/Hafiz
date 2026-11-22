@@ -1,10 +1,11 @@
 import React from "react";
-import { Dimensions, I18nManager } from "react-native";
+import { Dimensions, I18nManager, Platform } from "react-native";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import { AyahBlock } from "@/components/mushaf/AyahBlock";
 import { PageMushaf } from "@/components/mushaf/PageMushaf";
+import type { HifzVisibility } from "@/components/mushaf/MushafPage";
 import { ReadingSettingsSheet } from "@/components/mushaf/ReadingSettingsSheet";
 import { pageCardId } from "@/lib/hifz/units";
 import { strings } from "@/lib/i18n/strings";
@@ -29,6 +30,8 @@ const SIBLING_PAGE = 412;
 // Two words and a marker for the marked ayah, one word and a marker for the plain one.
 const MARKED_GLYPHS = ["G-a", "G-b", "G-m5"];
 const PLAIN_GLYPHS = ["G-c", "G-m6"];
+const MARKED_TEXT = "نَصٌّ عَرَبِيٌّ تَجْرِيبِيٌّ";
+const PLAIN_TEXT = "مِثَالٌ";
 const refRows = [
   {
     group_id: "fixture-group",
@@ -85,10 +88,10 @@ function createDb() {
       if (sql.includes("FROM page_map")) {
         return [1, PAGE].map((page) => ({ page, surah_start: 2, ayah_start: 1, surah_end: 2, ayah_end: 6 }));
       }
-      if (sql.startsWith("SELECT surah, ayah, text_qcf2, v2_page FROM quran_text")) {
+      if (sql.startsWith("SELECT surah, ayah, text_qcf2, text_uthmani, v2_page FROM quran_text")) {
         return [
-          { ...MARKED, text_qcf2: MARKED_GLYPHS.join(" "), v2_page: PAGE },
-          { ...PLAIN, text_qcf2: PLAIN_GLYPHS.join(" "), v2_page: PAGE },
+          { ...MARKED, text_qcf2: MARKED_GLYPHS.join(" "), text_uthmani: MARKED_TEXT, v2_page: PAGE },
+          { ...PLAIN, text_qcf2: PLAIN_GLYPHS.join(" "), text_uthmani: PLAIN_TEXT, v2_page: PAGE },
         ];
       }
       if (sql.includes("FROM surahs ORDER BY number")) {
@@ -208,15 +211,6 @@ jest.mock("@/components/reflections/ReflectionsSection", () => ({ ReflectionsSec
 jest.mock("@/components/notes/PrivateNotesSection", () => ({ PrivateNotesSection: () => null }));
 jest.mock("@/components/mushaf/word-tabs/QiraatTab", () => ({ QiraatTab: () => null }));
 jest.mock("@/components/settings/TafsirSourcePicker", () => ({ TafsirSourcePicker: () => null }));
-jest.mock("@/components/mushaf/WordToken", () => {
-  const { Text } = jest.requireActual<typeof import("react-native")>("react-native");
-  const ReactActual = jest.requireActual<typeof import("react")>("react");
-  return {
-    WEAK_SPOT_LIGHT: "#d97706",
-    WEAK_SPOT_DARK: "#f59e0b",
-    WordToken: ({ glyph }: { glyph: string }) => ReactActual.createElement(Text, null, glyph),
-  };
-});
 jest.mock("@/lib/fonts/loader", () => ({
   isSurahNameFontLoaded: () => true,
   loadSurahNameFont: async () => undefined,
@@ -278,8 +272,8 @@ function renderPageView(language: Language, { withSettings = false } = {}) {
 function renderVerseView(language: Language, { withSettings = false } = {}) {
   return render(
     <Providers language={language}>
-      <AyahBlock {...MARKED} text={MARKED_GLYPHS.join(" ")} v2Page={PAGE} fontSize={20} lineHeight={44} />
-      <AyahBlock {...PLAIN} text={PLAIN_GLYPHS.join(" ")} v2Page={PAGE} fontSize={20} lineHeight={44} />
+      <AyahBlock {...MARKED} text={MARKED_GLYPHS.join(" ")} textUthmani={MARKED_TEXT} v2Page={PAGE} fontSize={20} lineHeight={44} />
+      <AyahBlock {...PLAIN} text={PLAIN_GLYPHS.join(" ")} textUthmani={PLAIN_TEXT} v2Page={PAGE} fontSize={20} lineHeight={44} />
       {withSettings ? <ReadingSettingsSheet visible onClose={() => undefined} /> : null}
     </Providers>,
   );
@@ -353,6 +347,73 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
     expect(screen.queryByText(verseText(refRows[1]))).toBeNull();
   });
 
+  it("reads the exact page ayah once after full reveal, even when Unicode and glyph counts differ", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    const subject = (visibility: HifzVisibility) => (
+      <Providers language={language}>
+        <PageMushaf currentPage={PAGE} hifzVisibility={visibility} />
+      </Providers>
+    );
+    const visibility = {
+      enabled: true,
+      page: PAGE,
+      revealedAyahCount: 0,
+      activeAyahKey: `${MARKED.surah}:${MARKED.ayah}`,
+      activeVisibleWordCount: 1,
+    };
+    const view = render(subject(visibility));
+    await settle();
+
+    expect(screen.getByText(MARKED_GLYPHS[0], { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByLabelText(MARKED_TEXT, { includeHiddenElements: true })).toBeNull();
+    view.rerender(subject({ ...visibility, revealedAyahCount: 1 }));
+
+    expect(screen.getAllByLabelText(MARKED_TEXT)).toHaveLength(1);
+    expect(screen.queryByLabelText(PLAIN_TEXT, { includeHiddenElements: true })).toBeNull();
+    for (const glyph of [...MARKED_GLYPHS, ...PLAIN_GLYPHS]) {
+      expect(screen.queryByText(glyph)).toBeNull();
+    }
+
+    view.rerender(subject({ ...visibility, page: PAGE + 1, revealedAyahCount: 2 }));
+    expect(screen.queryByLabelText(MARKED_TEXT, { includeHiddenElements: true })).toBeNull();
+  });
+
+  it("mounts the Android verse readout after reveal and preserves the marker selection action", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    const onRevealChange = jest.fn();
+    const subject = (revealed: boolean) => (
+      <Providers language={language}>
+        <AyahBlock
+          {...MARKED}
+          text={MARKED_GLYPHS.join(" ")}
+          textUthmani={MARKED_TEXT}
+          v2Page={PAGE}
+          fontSize={20}
+          lineHeight={44}
+          hideMode
+          revealed={revealed}
+          onRevealChange={onRevealChange}
+        />
+      </Providers>
+    );
+    const view = render(subject(false));
+    await settle();
+
+    expect(screen.queryByLabelText(MARKED_TEXT, { includeHiddenElements: true })).toBeNull();
+    fireEvent.press(screen.getByLabelText(new RegExp(strings[language].tapToReveal)));
+    expect(onRevealChange).toHaveBeenCalledWith(MARKED.surah, MARKED.ayah, true, PAGE);
+
+    view.rerender(subject(true));
+    const readout = screen.getByLabelText(MARKED_TEXT);
+    expect(readout.props.accessibilityLanguage).toBe("ar");
+    expect(screen.queryByText(MARKED_GLYPHS[0])).toBeNull();
+    fireEvent(readout, "accessibilityAction", { nativeEvent: { actionName: "longpress" } });
+    expect(mockSelectAyah).toHaveBeenCalledWith(MARKED.surah, MARKED.ayah);
+
+    view.rerender(subject(false));
+    expect(screen.queryByLabelText(MARKED_TEXT, { includeHiddenElements: true })).toBeNull();
+  });
+
   it("reads the memorized pages again when the marks come back on screen, so a change made meanwhile shows", async () => {
     const first = renderPageView(language);
     await settle();
@@ -362,7 +423,7 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
     fixture.memorizedPages = [PAGE];
     renderPageView(language);
     await settle();
-    expect(screen.getByText(MARKED_GLYPHS[0])).toBeTruthy();
+    expect(screen.getByText(MARKED_GLYPHS[0], { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId("similar-verse-marker")).toBeNull();
   });
 
@@ -371,7 +432,7 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
     renderPageView(language);
     await settle();
 
-    expect(screen.getByText(MARKED_GLYPHS[0])).toBeTruthy();
+    expect(screen.getByText(MARKED_GLYPHS[0], { includeHiddenElements: true })).toBeTruthy();
     expect(reads).toContain(`similar:${PAGE}`);
     expect(screen.queryByTestId("similar-verse-marker")).toBeNull();
   });
@@ -395,7 +456,7 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
     renderPageView(language, { withSettings: true });
     await settle();
 
-    expect(screen.getByText(MARKED_GLYPHS[0])).toBeTruthy();
+    expect(screen.getByText(MARKED_GLYPHS[0], { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId("similar-verse-marker")).toBeNull();
     expect(reads).toEqual([]);
 
@@ -410,8 +471,8 @@ describe.each(["en", "ar"] satisfies Language[])("similar-verse marks in %s", (l
     await settle();
 
     expect(reads).toContain(`similar:${PAGE}`);
-    expect(screen.getByText(MARKED_GLYPHS[0])).toBeTruthy();
-    expect(screen.getByText(PLAIN_GLYPHS[0])).toBeTruthy();
+    expect(screen.getByText(MARKED_GLYPHS[0], { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByText(PLAIN_GLYPHS[0], { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId("similar-verse-marker")).toBeNull();
   });
 

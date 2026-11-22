@@ -163,7 +163,14 @@ export function AyahWordText({
   }, []);
 
   return (
-    <Text testID={testID} className={className} style={style} onLongPress={handleLongPress} onPressOut={forgetWord}>
+    <Text
+      aria-hidden
+      testID={testID}
+      className={className}
+      style={style}
+      onLongPress={handleLongPress}
+      onPressOut={forgetWord}
+    >
       {words.map((glyph, i) => {
         const wordPos = i + 1;
         return (

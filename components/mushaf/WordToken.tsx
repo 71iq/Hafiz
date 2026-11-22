@@ -1,5 +1,6 @@
 import { memo, useCallback, useRef } from "react";
 import { Text, Pressable, Platform, PixelRatio, View } from "react-native";
+import { formatAyahRef } from "@/lib/arabic";
 import { useSettings, type ThemePalette } from "@/lib/settings/context";
 import { useWordTap } from "./useWordTap";
 
@@ -57,7 +58,7 @@ function WordTokenInner({
   compactLayout = false,
   weakSpot = false,
 }: Props) {
-  const { isDark, viewMode, pageScroll, effectiveTheme } = useSettings();
+  const { isDark, isRTL, viewMode, pageScroll, effectiveTheme } = useSettings();
   const tokenRef = useRef<View>(null);
   const tap = useWordTap({ surah, ayah, wordPos, v2Page, disabled, hidden });
   const { wordRef, isTooltipSelected, isTouchInput, openDetail } = tap;
@@ -120,6 +121,15 @@ function WordTokenInner({
   return (
     <Pressable
       ref={tokenRef as any}
+      accessible={!hidden}
+      aria-hidden={hidden || undefined}
+      accessibilityRole="button"
+      accessibilityLabel={hidden ? undefined : formatAyahRef(isRTL, surah, ayah, wordPos)}
+      onAccessibilityTap={handleLongPress}
+      accessibilityActions={[{ name: "activate" }]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "activate") handleLongPress();
+      }}
       onPress={handlePress}
       onLongPress={allowNativeTouchSelection ? undefined : handleLongPress}
       delayLongPress={400}
@@ -154,6 +164,7 @@ function WordTokenInner({
         />
       )}
       <Text
+        aria-hidden
         selectable={Platform.OS === "web" && !hidden}
         className={inkClassName}
         style={{

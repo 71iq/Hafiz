@@ -1,11 +1,12 @@
 import React from "react";
 import { Platform, View, StyleSheet, type StyleProp, type TextStyle } from "react-native";
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import { WordToken } from "@/components/mushaf/WordToken";
 
 jest.mock("@/lib/settings/context", () => ({
   useSettings: () => ({ isDark: false, viewMode: "page", pageScroll: "vertical" }),
 }));
+const mockLongPress = jest.fn();
 jest.mock("@/components/mushaf/useWordTap", () => ({
   useWordTap: () => ({
     wordRef: { current: null },
@@ -13,7 +14,7 @@ jest.mock("@/components/mushaf/useWordTap", () => ({
     isTouchInput: true,
     openDetail: jest.fn(),
     press: jest.fn(),
-    longPress: jest.fn(),
+    longPress: mockLongPress,
   }),
 }));
 
@@ -49,11 +50,15 @@ describe("RF-189 page-view word ink on Android", () => {
     Platform.OS = "android";
     const view = renderWord({ highlightColor: "#0d9488" });
 
-    const sizing = view.getByText(RAHMAN);
+    const sizing = view.getByText(RAHMAN, { includeHiddenElements: true });
     const ink = view.getByText("\u200f" + RAHMAN, { includeHiddenElements: true });
     const spacer = ink.findByType(View);
-    // Screen readers hear the word once.
-    expect(view.getAllByText(RAHMAN)).toHaveLength(1);
+    // The ayah readout owns Quran text. Neither layer exposes a glyph to screen readers.
+    expect(view.queryByText(RAHMAN)).toBeNull();
+    expect(view.queryByText("\u200f" + RAHMAN)).toBeNull();
+    const word = view.getByRole("button", { name: "1:1:3" });
+    fireEvent(word, "accessibilityAction", { nativeEvent: { actionName: "activate" } });
+    expect(mockLongPress).toHaveBeenCalledTimes(1);
     // Color-font layers ignore the text color, so hide the sizing copy with view opacity.
     expect(flat(sizing).opacity).toBe(0);
     expect(flat(sizing).position).toBeUndefined();
@@ -84,7 +89,7 @@ describe("RF-189 page-view word ink on Android", () => {
     Platform.OS = "android";
     const view = renderWord({ compactLayout: false });
 
-    const sizing = view.getByText(RAHMAN);
+    const sizing = view.getByText(RAHMAN, { includeHiddenElements: true });
     const ink = view.getByText("\u200f" + RAHMAN, { includeHiddenElements: true });
     const spacer = ink.findByType(View);
     // The ink layer is offset from the Pressable's edge, which sits 1 px outside the word Text's
@@ -100,6 +105,8 @@ describe("RF-189 page-view word ink on Android", () => {
     Platform.OS = "android";
     const view = renderWord({ hidden: true });
 
+    expect(view.queryByRole("button")).toBeNull();
+    expect(view.queryByText(RAHMAN)).toBeNull();
     expect(view.getAllByText(RAHMAN, { includeHiddenElements: true })).toHaveLength(1);
     // Colour-font palette layers ignore a transparent colour; only opacity hides them.
     expect(flat(view.getByText(RAHMAN, { includeHiddenElements: true })).opacity).toBe(0);
@@ -110,6 +117,7 @@ describe("RF-189 page-view word ink on Android", () => {
     const view = renderWord();
 
     expect(view.getAllByText(RAHMAN, { includeHiddenElements: true })).toHaveLength(1);
-    expect(flat(view.getByText(RAHMAN)).color).toBeUndefined();
+    expect(view.queryByText(RAHMAN)).toBeNull();
+    expect(flat(view.getByText(RAHMAN, { includeHiddenElements: true })).color).toBeUndefined();
   });
 });

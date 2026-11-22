@@ -87,6 +87,7 @@ import {
 
 type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 type HifzPageAyah = { key: string; wordCount: number };
+const EMPTY_HIFZ_PAGE_AYAHS: HifzPageAyah[] = [];
 /** Device-only (off the sync allowlist): the reader has dismissed the weak-spot explanation. */
 const WEAK_SPOT_NOTE_KEY = "device_weak_spot_note_seen";
 
@@ -171,6 +172,7 @@ type AyahRow = {
   surah: number;
   ayah: number;
   text_qcf2: string;
+  text_uthmani: string;
   v2_page: number;
 };
 
@@ -188,6 +190,7 @@ type MushafItem =
       surah: number;
       ayah: number;
       text: string;
+      textUthmani: string;
       v2Page: number;
     };
 
@@ -480,12 +483,12 @@ function MushafInner() {
   const [hifzAutoRunning, setHifzAutoRunning] = useState(false);
   const [mushafIndex, setMushafIndex] = useState<MushafIndex | null>(null);
   const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
-  const [pageModeHifzAyahs, setPageModeHifzAyahs] = useState<HifzPageAyah[]>([]);
+  const [pageModeHifzData, setPageModeHifzData] = useState<{ page: number; ayahs: HifzPageAyah[] } | null>(null);
   const isPageMode = viewMode === "page";
   const currentPageRef = useRef(1);
   const topAyahRef = useRef<{ surah: number; ayah: number } | null>(null);
   topAyahRef.current = topAyah;
-  const hifzCurrentPageAyahsRef = useRef<HifzPageAyah[]>([]);
+  const hifzCurrentPageAyahsRef = useRef({ page: currentPage, ayahs: EMPTY_HIFZ_PAGE_AYAHS });
   const hifzEnabledRef = useRef(false);
   const hifzAutoAdvancePageRef = useRef(false);
   const hifzAutoPageChangeRef = useRef(false);
@@ -546,12 +549,6 @@ function MushafInner() {
   const recitingKey =
     recitation.active && recitation.currentAyah ? `${recitation.currentAyah.surah}:${recitation.currentAyah.ayah}` : null;
   const displayedHighlightKey = recitingKey ?? highlightedKey;
-
-  const commitCurrentPage = useCallback((page: number) => {
-    const next = Math.max(1, Math.min(604, Number.isFinite(page) ? Math.round(page) : 1));
-    currentPageRef.current = next;
-    setCurrentPage(next);
-  }, []);
 
   const clearVerseScrollRetry = useCallback(() => {
     verseScrollRequestRef.current += 1;
@@ -636,7 +633,7 @@ function MushafInner() {
         }
 
         const ayahs = await db.getAllAsync<AyahRow>(
-          "SELECT surah, ayah, text_qcf2, v2_page FROM quran_text ORDER BY surah, ayah"
+          "SELECT surah, ayah, text_qcf2, text_uthmani, v2_page FROM quran_text ORDER BY surah, ayah"
         );
 
         const flatItems: MushafItem[] = [];
@@ -663,6 +660,7 @@ function MushafInner() {
             surah: row.surah,
             ayah: row.ayah,
             text: row.text_qcf2,
+            textUthmani: row.text_uthmani,
             v2Page: row.v2_page,
           });
         }
@@ -696,6 +694,7 @@ function MushafInner() {
         })),
     [currentPage, items]
   );
+  const pageModeHifzAyahs = pageModeHifzData?.page === currentPage ? pageModeHifzData.ayahs : EMPTY_HIFZ_PAGE_AYAHS;
   const currentPageHifzAyahs = isPageMode ? pageModeHifzAyahs : verseModeHifzAyahs;
 
   // ERR-06: the first time weak-spot markers appear on the open page, one dismissible note says what
@@ -734,7 +733,7 @@ function MushafInner() {
 
   useEffect(() => {
     if (!isPageMode) {
-      setPageModeHifzAyahs([]);
+      setPageModeHifzData(null);
       return;
     }
     let cancelled = false;
@@ -744,17 +743,18 @@ function MushafInner() {
     )
       .then((rows) => {
         if (cancelled) return;
-        setPageModeHifzAyahs(
-          rows.map((row) => ({
+        setPageModeHifzData({
+          page: currentPage,
+          ayahs: rows.map((row) => ({
             key: `${row.surah}:${row.ayah}`,
             wordCount: Math.max(0, row.text_qcf2.split(" ").filter(Boolean).length - 1),
-          }))
-        );
+          })),
+        });
       })
       .catch((e) => {
         if (!cancelled) {
           console.warn("[Mushaf] failed to load page hifz ayahs:", e);
-          setPageModeHifzAyahs([]);
+          setPageModeHifzData(null);
         }
       });
     return () => {
@@ -784,6 +784,14 @@ function MushafInner() {
     });
   }, [applyHifzProgress]);
 
+  const commitCurrentPage = useCallback((page: number) => {
+    const next = Math.max(1, Math.min(604, Number.isFinite(page) ? Math.round(page) : 1));
+    // A new page and its empty reveal state render together.
+    if (next !== currentPageRef.current) resetHifzProgress();
+    currentPageRef.current = next;
+    setCurrentPage(next);
+  }, [resetHifzProgress]);
+
   const clearHifzTimer = useCallback(() => {
     if (hifzAutoTimerRef.current) {
       clearInterval(hifzAutoTimerRef.current);
@@ -796,8 +804,7 @@ function MushafInner() {
     setHifzAutoRunning(false);
   }, [clearHifzTimer]);
 
-  // Navigation stops auto reveal; the progress resets only if the page actually changes (see the
-  // currentPage effect), so same-page jumps and view switches keep what was revealed.
+  // A jump stops auto reveal. commitCurrentPage clears reveals when the page changes.
   const resetHifzForNavigation = useCallback(() => {
     if (!hifzEnabledRef.current) return;
     stopHifzAuto();
@@ -821,8 +828,8 @@ function MushafInner() {
       stopHifzAuto();
       return;
     }
-    const pageAyahs = hifzCurrentPageAyahsRef.current;
-    if (pageAyahs.length === 0) return;
+    const { page, ayahs: pageAyahs } = hifzCurrentPageAyahsRef.current;
+    if (page !== currentPageRef.current || pageAyahs.length === 0) return;
 
     const progress = hifzProgressRef.current;
     let activeAyahKey = progress.activeAyahKey;
@@ -870,8 +877,8 @@ function MushafInner() {
   }, [applyHifzProgress, handleHifzPageComplete, stopHifzAuto]);
 
   useEffect(() => {
-    hifzCurrentPageAyahsRef.current = currentPageHifzAyahs;
-  }, [currentPageHifzAyahs]);
+    hifzCurrentPageAyahsRef.current = { page: currentPage, ayahs: currentPageHifzAyahs };
+  }, [currentPage, currentPageHifzAyahs]);
 
   useEffect(() => {
     hifzEnabledRef.current = hifzEnabled;
@@ -880,14 +887,6 @@ function MushafInner() {
   useEffect(() => {
     hifzAutoAdvancePageRef.current = hifzAutoAdvancePage;
   }, [hifzAutoAdvancePage]);
-
-  useEffect(() => {
-    hifzProgressRef.current = {
-      revealedAyahCount: hifzRevealedAyahCount,
-      activeAyahKey: hifzActiveAyahKey,
-      activeVisibleWordCount: hifzActiveVisibleWordCount,
-    };
-  }, [hifzActiveAyahKey, hifzActiveVisibleWordCount, hifzRevealedAyahCount]);
 
   useEffect(() => {
     clearHifzTimer();
@@ -1149,6 +1148,7 @@ function MushafInner() {
           surah={item.surah}
           ayah={item.ayah}
           text={item.text}
+          textUthmani={item.textUthmani}
           v2Page={item.v2Page}
           fontSize={fontSize}
           lineHeight={lineHeight}
@@ -1529,13 +1529,12 @@ function MushafInner() {
 
   useEffect(() => {
     if (!hifzEnabled) return;
-    resetHifzProgress();
     if (hifzAutoPageChangeRef.current) {
       hifzAutoPageChangeRef.current = false;
       return;
     }
     stopHifzAuto();
-  }, [currentPage, hifzEnabled, resetHifzProgress, stopHifzAuto]);
+  }, [currentPage, hifzEnabled, stopHifzAuto]);
 
   // Verse view has no reveal rail: auto reveal stops, the page's reveals wait for the return.
   useEffect(() => {

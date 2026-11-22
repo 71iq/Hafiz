@@ -68,8 +68,8 @@ describe("Mushaf page line spacing", () => {
 describe("Mushaf page line with a similar-verse mark (MUT-02)", () => {
   // Synthetic glyphs: two words and a marker for 2:5, one word and a marker for 2:6, on one line.
   const ayahs = [
-    { surah: 2, ayah: 5, textQcf2: "G-a G-b G-m5" },
-    { surah: 2, ayah: 6, textQcf2: "G-c G-m6" },
+    { surah: 2, ayah: 5, textQcf2: "G-a G-b G-m5", textUthmani: "نص تجريبي" },
+    { surah: 2, ayah: 6, textQcf2: "G-c G-m6", textUthmani: "مثال" },
   ];
   const lineLayout: PageLineLayout[] = [
     { line_number: 3, line_type: "ayah", is_centered: 0, first_word_id: 1, last_word_id: 5, surah_number: null },

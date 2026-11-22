@@ -59,7 +59,7 @@ describe("Quran RTL source invariants", () => {
   it("keeps PageMushaf assigning page-font content by v2_page and text_qcf2", () => {
     expectSourceContainsAll("components/mushaf/PageMushaf.tsx", [
       "Build page data using v2_page assignments.",
-      "SELECT surah, ayah, text_qcf2, v2_page FROM quran_text ORDER BY surah, ayah",
+      "SELECT surah, ayah, text_qcf2, text_uthmani, v2_page FROM quran_text ORDER BY surah, ayah",
       "if (!a.v2_page) continue;",
       "ayahsByPage.get(a.v2_page)",
       "textQcf2: a.text_qcf2 ?? \"\"",
