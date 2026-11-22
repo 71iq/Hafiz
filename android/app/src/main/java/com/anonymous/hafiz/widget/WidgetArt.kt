@@ -35,6 +35,8 @@ object WidgetArt {
       "radiant_night" -> Ink(color("#FFF8E5"), color("#F4E6D1"), color("#FFC94D"))
       "milestone" -> Ink(color("#302317"), color("#44321F"), color("#9A3412"))
       "calm" -> Ink(color("#272D3A"), color("#373D49"), color("#9A3412"))
+      "dawn_rose" -> Ink(color("#34232B"), color("#50313C"), color("#9A3412"))
+      "dawn_red" -> Ink(color("#FFF8E8"), color("#FAE6D9"), color("#FFC94D"))
       else -> Ink(color("#142D35"), color("#203E45"), color("#9A3412"))
     }
 
@@ -51,6 +53,8 @@ object WidgetArt {
       "radiant_night" -> if (wide) R.drawable.hafiz_widget_scene_radiant_night_wide else R.drawable.hafiz_widget_scene_radiant_night_sq
       "milestone" -> if (wide) R.drawable.hafiz_widget_scene_milestone_wide else R.drawable.hafiz_widget_scene_milestone_sq
       "calm" -> if (wide) R.drawable.hafiz_widget_scene_calm_wide else R.drawable.hafiz_widget_scene_calm_sq
+      "dawn_rose" -> if (wide) R.drawable.hafiz_widget_scene_dawn_rose_wide else R.drawable.hafiz_widget_scene_dawn_rose_sq
+      "dawn_red" -> if (wide) R.drawable.hafiz_widget_scene_dawn_red_wide else R.drawable.hafiz_widget_scene_dawn_red_sq
       else -> if (wide) R.drawable.hafiz_widget_scene_day_wide else R.drawable.hafiz_widget_scene_day_sq
     }
 
@@ -78,6 +82,11 @@ object WidgetArt {
       "anxious_halo" -> R.drawable.hafiz_widget_zayt_anxious_halo
       "panicked_halo" -> R.drawable.hafiz_widget_zayt_panicked_halo
       "relieved_halo" -> R.drawable.hafiz_widget_zayt_relieved_halo
+      "fretful" -> R.drawable.hafiz_widget_zayt_fretful
+      "nervous" -> R.drawable.hafiz_widget_zayt_nervous
+      "frantic" -> R.drawable.hafiz_widget_zayt_frantic
+      "nervous_halo" -> R.drawable.hafiz_widget_zayt_nervous_halo
+      "frantic_halo" -> R.drawable.hafiz_widget_zayt_frantic_halo
       else -> R.drawable.hafiz_widget_zayt_wave
     }
 
@@ -105,6 +114,11 @@ object WidgetArt {
       "worried_halo" -> R.layout.hafiz_widget_motion_loop_worried_halo
       "anxious_halo" -> R.layout.hafiz_widget_motion_loop_anxious_halo
       "panicked_halo" -> R.layout.hafiz_widget_motion_loop_panicked_halo
+      "fretful" -> R.layout.hafiz_widget_motion_loop_fretful
+      "nervous" -> R.layout.hafiz_widget_motion_loop_nervous
+      "frantic" -> R.layout.hafiz_widget_motion_loop_frantic
+      "nervous_halo" -> R.layout.hafiz_widget_motion_loop_nervous_halo
+      "frantic_halo" -> R.layout.hafiz_widget_motion_loop_frantic_halo
       else -> null
     }
 

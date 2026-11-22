@@ -109,19 +109,29 @@ const OPEN_POSES: Record<Level, readonly WidgetPose[]> = {
   calm: ["rest", "wave"],
   steady: ["eager", "wave"],
   nudge: ["impatient", "warm"],
-  urgent: ["worried"],
-  critical: ["anxious_halo"],
-  last: ["panicked_halo"],
+  urgent: ["worried", "fretful"],
+  critical: ["anxious_halo", "nervous_halo"],
+  last: ["panicked_halo", "frantic_halo"],
 };
 
-/** The make-up window keeps its dawn sky; Zayt's face carries the countdown to the cutoff. */
+/** The make-up window's dawn turns rose, then red, as the cutoff nears. */
+const MAKE_UP_SCENES: Record<Level, WidgetScene> = {
+  calm: "dawn",
+  steady: "dawn",
+  nudge: "dawn",
+  urgent: "dawn_rose",
+  critical: "dawn_red",
+  last: "dawn_red",
+};
+
+/** Zayt's faces in the make-up window: the same ladder, without the night halo. */
 const MAKE_UP_POSES: Record<Level, readonly WidgetPose[]> = {
   calm: ["wave", "rest"],
   steady: ["eager", "wave"],
-  nudge: ["impatient"],
-  urgent: ["worried"],
-  critical: ["anxious"],
-  last: ["panicked"],
+  nudge: ["impatient", "warm"],
+  urgent: ["worried", "fretful"],
+  critical: ["anxious", "nervous"],
+  last: ["panicked", "frantic"],
 };
 
 /**
@@ -178,7 +188,7 @@ export function widgetArt(
     case "fresh_start":
       return ["dawn", "lonely"];
     case "make_up":
-      return ["dawn", ladderPose(MAKE_UP_POSES, level, date, "make_up")];
+      return [MAKE_UP_SCENES[level], ladderPose(MAKE_UP_POSES, level, date, "make_up")];
     case "open_day":
     case "open_evening":
     case "earn_back_open":

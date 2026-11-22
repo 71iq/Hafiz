@@ -71,11 +71,13 @@ object WidgetLimits {
   )
   val SCENES = setOf(
     "dawn", "morning", "day", "golden", "dusk", "night", "midnight", "sunrise", "radiant", "radiant_night", "milestone", "calm",
+    "dawn_rose", "dawn_red",
   )
   val POSES = setOf(
     "rest", "warm", "wave", "glow", "open", "shimmer", "milestone", "sit", "glow_halo", "open_halo", "warm_halo", "shimmer_halo",
     "eager", "impatient", "worried", "anxious", "panicked", "relieved", "lonely",
     "worried_halo", "anxious_halo", "panicked_halo", "relieved_halo",
+    "fretful", "nervous", "frantic", "nervous_halo", "frantic_halo",
   )
   val URGENCIES = setOf("none", "calm", "steady", "nudge", "urgent", "critical", "last")
   val FLAMES = setOf("lit", "unlit", "out")
