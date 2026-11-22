@@ -38,7 +38,12 @@ export function FieldMessage({
     <Text
       dir={dir}
       variant="caption"
-      className={cn(tone === "error" ? "text-red-500" : "text-warm-500 dark:text-neutral-400", className)}
+      // Caption's dark:text-neutral-400 would gray out errors in dark themes, so the error tone sets its
+      // own dark color. red-600 reads at 4.5:1 or more on the white and beige surfaces.
+      className={cn(
+        tone === "error" ? "text-red-600 dark:text-red-400" : "text-warm-500 dark:text-neutral-400",
+        className
+      )}
       style={[{ ...textAlignStyle(dir), writingDirection: dir }, style]}
       {...props}
     />
