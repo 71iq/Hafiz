@@ -95,10 +95,10 @@ type SmartDeckDisplay = {
   subtitle: string;
   icon: typeof Sparkles;
   filter: BuiltInDeckFilter;
-  total: number;
-  dueCount: number;
-  newCount: number;
-};
+} & DeckTodayCounts;
+
+/** A deck's queue for the rest of today; `total` is the deck's size, kept for the empty-deck checks. */
+type DeckTodayCounts = Awaited<ReturnType<typeof getDeckTodayStats>>;
 
 type DeckReviewSettingsTarget = {
   id: string;
@@ -147,10 +147,13 @@ export default function HomeScreen() {
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
   /** The header row's width, measured, so Start Review can take its own full-width line when needed. */
   const [headerWidth, setHeaderWidth] = useState(0);
-  const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({
+  const [vocabStats, setVocabStats] = useState<DeckTodayCounts>({
     total: 0,
     dueCount: 0,
     newCount: 0,
+    learningCount: 0,
+    reviewCount: 0,
+    heldBack: 0,
   });
   const accountPromo = useAccountPromo("home");
   const openMushaf = useOpenMushaf();
@@ -280,13 +283,7 @@ export default function HomeScreen() {
             readSmartDeckFilter(db, definition.id),
           ]);
           const stats = await getDeckTodayStats(db, definition.id, settings);
-          return {
-            ...definition,
-            filter,
-            total: stats.total,
-            dueCount: stats.dueCount,
-            newCount: stats.newCount,
-          };
+          return { ...definition, filter, ...stats };
         }),
       );
 
@@ -1231,7 +1228,7 @@ function SmartDeckCard({
     </View>
   );
   const statsNode = (
-    <DeckStats total={deck.total} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />
+    <DeckStats stats={deck} isDark={isDark} isRTL={isRTL} />
   );
 
   return (
@@ -1260,7 +1257,7 @@ function VocabularyDeckCard({
   showLabels,
   s,
 }: {
-  stats: { total: number; dueCount: number; newCount: number };
+  stats: DeckTodayCounts;
   onStartReview: () => void;
   onConfigure: () => void;
   onShowCards: () => void;
@@ -1330,7 +1327,7 @@ function VocabularyDeckCard({
     </View>
   );
   const statsNode = (
-    <DeckStats total={stats.total} newCount={stats.newCount} dueCount={stats.dueCount} isDark={isDark} isRTL={isRTL} />
+    <DeckStats stats={stats} isDark={isDark} isRTL={isRTL} />
   );
 
   return (
@@ -1349,43 +1346,38 @@ function VocabularyDeckCard({
 }
 
 function DeckStats({
-  total,
-  newCount,
-  dueCount,
-  showReviewStats = true,
+  stats: counts,
   isDark,
   isRTL,
 }: {
-  total: number;
-  newCount: number;
-  dueCount: number;
-  showReviewStats?: boolean;
+  stats: DeckTodayCounts;
   isDark: boolean;
   isRTL: boolean;
 }) {
-  const { themeColors } = useSettings();
   const s = useStrings();
-  // Each count carries a caption: three bare colored numbers left people guessing what they meant.
-  // New and Due take their color only above zero, so a zero never looks like work waiting.
+  // Today's work, not the deck's size: the new, learning and review cards the queue offers now, the
+  // same counts Review all loads. Each count carries a caption, and takes its color only above zero,
+  // so a zero never looks like work waiting.
   const stats = [
-    { value: total, label: s.deckStatCards, color: undefined },
-    ...(showReviewStats
-      ? [
-          { value: newCount, label: s.deckCardsFilterNew, color: newCount > 0 ? (isDark ? "#4ade80" : "#16a34a") : undefined },
-          { value: dueCount, label: s.deckCardsFilterDue, color: dueCount > 0 ? (isDark ? "#f87171" : "#dc2626") : undefined },
-        ]
-      : []),
+    { value: counts.newCount, label: s.deckCardsFilterNew, color: counts.newCount > 0 ? (isDark ? "#4ade80" : "#16a34a") : undefined },
+    {
+      value: counts.learningCount,
+      label: s.deckCardsFilterLearning,
+      color: counts.learningCount > 0 ? (isDark ? "#fbbf24" : "#d97706") : undefined,
+    },
+    { value: counts.reviewCount, label: s.deckCardsFilterReview, color: counts.reviewCount > 0 ? (isDark ? "#f87171" : "#dc2626") : undefined },
   ];
-  const left = newCount + dueCount;
-  // Today's remaining cards come from the same queue counts, so the daily limit is visible before
-  // starting. Without any, the caption says why the deck has nothing to start.
-  const availability = !showReviewStats
-    ? null
-    : total === 0
-      ? s.homeDeckNoCards
-      : left > 0
-        ? interpolate(s.deckLeftToday, { n: isRTL ? toArabicNumber(left) : String(left) })
-        : s.homeDeckNothingDue;
+  const queued = counts.newCount + counts.dueCount;
+  // A caption only when it adds something: due cards the daily limit keeps for a later day, or why
+  // the deck has nothing to start.
+  const availability =
+    counts.heldBack > 0
+      ? interpolate(s.deckHeldBackToday, { n: isRTL ? toArabicNumber(counts.heldBack) : String(counts.heldBack) })
+      : counts.total === 0
+        ? s.homeDeckNoCards
+        : queued === 0
+          ? s.homeDeckNothingDue
+          : null;
   return (
     <View className={isRTL ? "items-end" : "items-start"} style={{ gap: 2 }}>
       <View
@@ -1394,34 +1386,25 @@ function DeckStats({
         className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
         style={{ direction: "ltr" }}
       >
-        {stats.map((stat, index) => (
-          <View key={stat.label} className={`items-center ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={{ gap: 12 }}>
-            {index === 1 ? <View style={{ width: 1, height: 28, backgroundColor: themeColors.surfaceDim }} /> : null}
-            <View className="items-center min-w-[32px]">
-              <Text
-                className={
-                  stat.color
-                    ? "text-center"
-                    : index === 0
-                      ? "text-charcoal dark:text-neutral-100 text-center"
-                      : "text-warm-500 dark:text-neutral-400 text-center"
-                }
-                style={{
-                  fontFamily: "Manrope_700Bold",
-                  fontSize: 14,
-                  fontVariant: ["tabular-nums"],
-                  ...(stat.color ? { color: stat.color } : null),
-                }}
-              >
-                {isRTL ? toArabicNumber(stat.value) : stat.value}
-              </Text>
-              <Text
-                className="text-warm-500 dark:text-neutral-400 text-center"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 10, marginTop: 1 }}
-              >
-                {stat.label}
-              </Text>
-            </View>
+        {stats.map((stat) => (
+          <View key={stat.label} className="items-center min-w-[32px]">
+            <Text
+              className={stat.color ? "text-center" : "text-warm-500 dark:text-neutral-400 text-center"}
+              style={{
+                fontFamily: "Manrope_700Bold",
+                fontSize: 14,
+                fontVariant: ["tabular-nums"],
+                ...(stat.color ? { color: stat.color } : null),
+              }}
+            >
+              {isRTL ? toArabicNumber(stat.value) : stat.value}
+            </Text>
+            <Text
+              className="text-warm-500 dark:text-neutral-400 text-center"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 10, marginTop: 1 }}
+            >
+              {stat.label}
+            </Text>
           </View>
         ))}
       </View>

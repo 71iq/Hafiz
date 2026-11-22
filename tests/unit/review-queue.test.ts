@@ -31,7 +31,7 @@ describe("review queue shared by Home and sessions", () => {
     sql.exec(`
       CREATE TABLE user_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT, deleted_at TEXT);
       CREATE TABLE qiraat_encyclopedia (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, text TEXT, ayah_group TEXT, PRIMARY KEY(surah, ayah));
-      CREATE TABLE quran_text (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, text_clean TEXT, text_qcf2 TEXT, PRIMARY KEY(surah, ayah));
+      CREATE TABLE quran_text (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, text_clean TEXT, text_uthmani TEXT, text_qcf2 TEXT, PRIMARY KEY(surah, ayah));
       CREATE TABLE asbab_al_nuzul (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, occasions_json TEXT);
       CREATE TABLE mutashabihat_groups (id TEXT PRIMARY KEY, sort_order INTEGER, cue TEXT, kind TEXT);
       CREATE TABLE mutashabihat_refs (group_id TEXT, sort_order INTEGER, surah INTEGER, ayah INTEGER, tail_5 TEXT);
@@ -165,6 +165,48 @@ describe("review queue shared by Home and sessions", () => {
 
     expect(queue.map((item) => item.card.id).sort()).toEqual(["qiraat:1:1", "qiraat:1:2", "qiraat:1:3", "word:2:255:3"]);
     expect(queue).toHaveLength(offered);
+  });
+
+  it("splits today's queue into new, learning and review, and counts the due cards the daily limit holds back", async () => {
+    for (let ayah = 1; ayah <= 20; ayah++) qiraatCandidate(1, ayah);
+    // Due longest, so the queue takes them first: two learning and one relearning card.
+    insert("qiraat:1:1", QIRAAT, { state: State.Learning, due: minutesFromNow(-48 * 60) });
+    insert("qiraat:1:2", QIRAAT, { state: State.Learning, due: minutesFromNow(-48 * 60) });
+    insert("qiraat:1:3", QIRAAT, { state: State.Relearning, due: minutesFromNow(-48 * 60) });
+    for (let ayah = 4; ayah <= 15; ayah++) insert(`qiraat:1:${ayah}`, QIRAAT);
+    for (let word = 1; word <= 12; word++) insert(`word:2:255:${word}`, "meanings");
+    // Reviews first, by due date, so the limit's cut is predictable.
+    await writeDeckReviewSettings(db, QIRAAT, {
+      dailyReviewLimit: 10,
+      newCardsLimit: 5,
+      newReviewOrder: "reviewsFirst",
+      reviewSortOrder: "due",
+    });
+    await writeDeckReviewSettings(db, "meanings", { dailyReviewLimit: 10 });
+    const stats = async (deckId: string) => getDeckTodayStats(db, deckId, await readDeckReviewSettings(db, deckId));
+
+    const qiraat = await stats(QIRAAT);
+    const qiraatQueue = (await loadReviewQueue(db, QIRAAT)).map((item) => item.card.state);
+    expect(qiraat).toMatchObject({ newCount: 0, learningCount: 3, reviewCount: 7, dueCount: 10, heldBack: 5, total: 20 });
+    expect(qiraatQueue.filter((state) => state === State.Learning || state === State.Relearning)).toHaveLength(3);
+    expect(qiraatQueue.filter((state) => state === State.Review)).toHaveLength(7);
+    expect(qiraatQueue).toHaveLength(qiraat.newCount + qiraat.dueCount);
+
+    const meanings = await stats("meanings");
+    expect(meanings).toMatchObject({ newCount: 0, learningCount: 0, reviewCount: 10, heldBack: 2 });
+    let offered = 0;
+    for (const deckId of REVIEW_DECK_IDS) {
+      const row = await stats(deckId);
+      offered += row.newCount + row.learningCount + row.reviewCount;
+    }
+    expect(await loadReviewQueue(db)).toHaveLength(offered);
+
+    // Ten meaning cards studied today use up that deck's limit: nothing is offered, every due card waits.
+    for (let word = 1; word <= 10; word++) {
+      sql.prepare("INSERT INTO study_log (card_id, state, reviewed_at) VALUES (?, 2, ?)").run(`word:2:255:${word}`, minutesFromNow(-5));
+    }
+    expect(await stats("meanings")).toMatchObject({ newCount: 0, reviewCount: 0, dueCount: 0, heldBack: 12 });
+    expect(await loadReviewQueue(db, "meanings")).toHaveLength(0);
   });
 
   it("counts new cards introduced earlier today against the deck's daily new-card limit", async () => {

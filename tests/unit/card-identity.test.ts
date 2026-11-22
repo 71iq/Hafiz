@@ -112,7 +112,7 @@ describe("RF-182 smart-deck stats count only reachable cards", () => {
   it("does not offer a candidate live in another deck in today's counts", async () => {
     await expect(
       getSmartDeckTodayStats(store.db, SMART_DECK_IDS.qiraat, { limit: 10, newCardsLimit: 10 }),
-    ).resolves.toEqual({ total: 3, due: 0, newCount: 2 });
+    ).resolves.toEqual({ total: 3, due: 0, newCount: 2, learningCount: 0, reviewCount: 0, heldBack: 0 });
     await expect(materializeSmartDeckCards(store.db, SMART_DECK_IDS.qiraat, 10, 10)).resolves.toBe(2);
   });
 });

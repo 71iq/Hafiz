@@ -6,6 +6,7 @@ import { Languages, Layers } from "lucide-react-native";
 import HomeScreen, { mergeUnlockQueue } from "@/app/(tabs)/home";
 import { Card } from "@/components/ui/Card";
 import { strings, type UIStrings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
 import type { useSettings } from "@/lib/settings/context";
 import { VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
 import { getDeckTodayStats, readDeckReviewSettings, MEANINGS_DECK_ID } from "@/lib/fsrs/queries";
@@ -53,8 +54,9 @@ const mockRouterPush = jest.fn();
 let mockCards: CardsProps | undefined;
 let mockReview: ReviewProps | undefined;
 let mockFilter: FilterProps | undefined;
-const smartStats: Stats = { total: 17, newCount: 0, dueCount: 0 };
-const vocabStats: Stats = { total: 29, newCount: 7, dueCount: 11 };
+const ZERO: Stats = { total: 0, newCount: 0, dueCount: 0, learningCount: 0, reviewCount: 0, heldBack: 0 };
+const smartStats: Stats = { ...ZERO, total: 17 };
+const vocabStats: Stats = { total: 29, newCount: 7, dueCount: 11, learningCount: 3, reviewCount: 8, heldBack: 0 };
 
 jest.mock("@react-navigation/native", () => {
   const { useEffect } = jest.requireActual<typeof import("react")>("react");
@@ -270,18 +272,33 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
         direction: "ltr",
         flexDirection: language === "ar" ? "row-reverse" : "row",
       });
-      expect(scope.getByText(num(stats.total))).toBeTruthy();
-      // New and Due are colored only above zero; a zero stays muted.
-      const newNodes = scope.getAllByText(num(stats.newCount));
-      const dueNodes = scope.getAllByText(num(stats.dueCount));
-      expect(newNodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? "#4ade80" : "#16a34a"))).toBe(
-        stats.newCount > 0,
-      );
-      expect(dueNodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? "#f87171" : "#dc2626"))).toBe(
-        stats.dueCount > 0,
-      );
-      // Without cards for today the caption says so instead of "0 left today".
-      if (stats.newCount + stats.dueCount === 0) expect(scope.getByText(s.homeDeckNothingDue, { includeHiddenElements: true })).toBeTruthy();
+      // Today's new, learning and review cards, never the deck's size.
+      expect(scope.queryByText(num(stats.total))).toBeNull();
+      for (const label of [s.deckCardsFilterNew, s.deckCardsFilterLearning, s.deckCardsFilterReview]) {
+        expect(scope.getByText(label)).toBeTruthy();
+      }
+      // Each count is colored only above zero; a zero stays muted.
+      for (const [value, light, darkColor] of [
+        [stats.newCount, "#16a34a", "#4ade80"],
+        [stats.learningCount, "#d97706", "#fbbf24"],
+        [stats.reviewCount, "#dc2626", "#f87171"],
+      ] as const) {
+        const nodes = scope.getAllByText(num(value));
+        expect(nodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? darkColor : light))).toBe(value > 0);
+      }
+      // Without cards for today the caption says so; with cards and nothing held back there is none.
+      const nothingDue = scope.queryByText(s.homeDeckNothingDue, { includeHiddenElements: true });
+      expect(nothingDue !== null).toBe(stats.newCount + stats.dueCount === 0);
+      expect(
+        scope.getByLabelText(
+          [
+            `${stats.newCount} ${s.deckCardsFilterNew}`,
+            `${stats.learningCount} ${s.deckCardsFilterLearning}`,
+            `${stats.reviewCount} ${s.deckCardsFilterReview}`,
+            ...(nothingDue ? [s.homeDeckNothingDue] : []),
+          ].join(", "),
+        ),
+      ).toBeTruthy();
       const start = startTarget(view, title);
       expect(start.props.accessibilityRole).toBe("button");
       expect(StyleSheet.flatten(start.props.style)).toMatchObject({ position: "absolute", backgroundColor: "transparent" });
@@ -350,7 +367,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(mockRouterPush.mock.calls).toEqual([[{ pathname: "/flashcards/session", params: { deckId: MEANINGS_DECK_ID } }]]);
   });
   it("keeps an empty smart deck disabled even with nonzero due/new counts and omits empty vocabulary", async () => {
-    jest.mocked(getDeckTodayStats).mockResolvedValue({ total: 0, newCount: 37, dueCount: 31 });
+    jest.mocked(getDeckTodayStats).mockResolvedValue({ ...ZERO, newCount: 37, dueCount: 31, reviewCount: 31 });
     const view = await home();
     const s = strings[language];
     const node = card(view, s.smartDeckRetentionTitle);
@@ -369,14 +386,43 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     jest
       .mocked(getDeckTodayStats)
       .mockImplementation(async (_db, id) =>
-        id === MEANINGS_DECK_ID ? { ...vocabStats } : { total: 40, newCount: 4, dueCount: 2 },
+        id === MEANINGS_DECK_ID
+          ? { ...vocabStats }
+          : { total: 40, newCount: 4, dueCount: 2, learningCount: 1, reviewCount: 1, heldBack: 6 },
       );
     const view = await home();
     const s = strings[language];
-    // Five smart decks offer 4 new and 2 due each; the vocabulary deck offers 7 new and 11 due.
+    // Five smart decks offer 4 new and 2 due each; the vocabulary deck offers 7 new and 11 due. Cards
+    // the daily limit holds back are not offered today, so they stay out of the headline.
     expect(view.getByText(num(48))).toBeTruthy();
     fireEvent.press(view.getByText(s.flashcardsStartReview));
     expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/flashcards/session", params: {} });
+  });
+  it("says how many due cards wait past today's limit only when the limit holds some back", async () => {
+    jest.mocked(getDeckTodayStats).mockImplementation(async (_db, id) =>
+      id === SMART_DECK_IDS.retention
+        ? { total: 995, newCount: 5, dueCount: 12, learningCount: 2, reviewCount: 10, heldBack: 30 }
+        : id === MEANINGS_DECK_ID
+          ? { ...vocabStats }
+          : { ...ZERO },
+    );
+    const view = await home();
+    const s = strings[language];
+    const retention = within(card(view, s.smartDeckRetentionTitle));
+    const heldBack = interpolate(s.deckHeldBackToday, { n: num(30) });
+    expect(retention.getByText(heldBack, { includeHiddenElements: true })).toBeTruthy();
+    expect(retention.queryByText(num(995))).toBeNull();
+    expect(
+      retention.getByLabelText(
+        `5 ${s.deckCardsFilterNew}, 2 ${s.deckCardsFilterLearning}, 10 ${s.deckCardsFilterReview}, ${heldBack}`,
+      ),
+    ).toBeTruthy();
+    // A deck with work today and nothing held back has no caption.
+    const vocab = within(card(view, s.vocabDeckTitle));
+    expect(vocab.queryByText(s.homeDeckNothingDue, { includeHiddenElements: true })).toBeNull();
+    expect(vocab.queryByText(interpolate(s.deckHeldBackToday, { n: num(0) }), { includeHiddenElements: true })).toBeNull();
+    // The headline is what the rows offer: 5 + 12 from the ayah deck and 7 + 11 from meanings.
+    expect(view.getByText(num(35))).toBeTruthy();
   });
   it("uses the shared phoneLarge breakpoint inclusively and changes layout after resize", async () => {
     width(VIEWPORT_BREAKPOINTS.phoneLarge);
@@ -451,7 +497,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
     const s = strings[language];
     expect(view.queryByText(s.homeLoadFailed)).toBeNull();
     jest.spyOn(console, "warn").mockImplementation(() => {});
-    const changedSmart = { ...smartStats, total: 23 };
+    const changedSmart = { ...smartStats, dueCount: 23, reviewCount: 23 };
     jest.mocked(getDeckTodayStats).mockImplementation(async (_db, id) => {
       if (id === MEANINGS_DECK_ID) throw new Error("synthetic dashboard failure");
       return { ...changedSmart };
@@ -462,8 +508,8 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
     });
 
     await waitFor(() => expect(view.getByText(s.homeLoadFailed)).toBeTruthy());
-    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(smartStats.total))).toBeTruthy();
-    expect(within(card(view, s.vocabDeckTitle)).getByText(num(vocabStats.total))).toBeTruthy();
+    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(s.homeDeckNothingDue, { includeHiddenElements: true })).toBeTruthy();
+    expect(within(card(view, s.vocabDeckTitle)).getByText(num(vocabStats.reviewCount))).toBeTruthy();
 
     jest
       .mocked(getDeckTodayStats)
@@ -473,7 +519,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
     });
 
     await waitFor(() => expect(view.queryByText(s.homeLoadFailed)).toBeNull());
-    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(changedSmart.total))).toBeTruthy();
+    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(changedSmart.reviewCount))).toBeTruthy();
   });
 
   it.each(["fails", "succeeds"] as const)(
@@ -486,8 +532,8 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
       const older = new Promise<Stats>((resolve, reject) => {
         settleOlder = (value) => (value instanceof Error ? reject(value) : resolve(value));
       });
-      const olderSmart = { ...smartStats, total: 99 };
-      const newerSmart = { ...smartStats, total: 23 };
+      const olderSmart = { ...smartStats, dueCount: 99, reviewCount: 99 };
+      const newerSmart = { ...smartStats, dueCount: 23, reviewCount: 23 };
       jest.mocked(getDeckTodayStats).mockImplementation(async (_db, id) => {
         if (id === MEANINGS_DECK_ID) return older;
         return { ...olderSmart };
@@ -502,7 +548,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
         review().onSaved("saved");
       });
       await waitFor(() =>
-        expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(newerSmart.total))).toBeTruthy(),
+        expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(newerSmart.reviewCount))).toBeTruthy(),
       );
 
       await act(async () => {
@@ -510,7 +556,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
       });
 
       expect(view.queryByText(s.homeLoadFailed)).toBeNull();
-      expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(newerSmart.total))).toBeTruthy();
+      expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(newerSmart.reviewCount))).toBeTruthy();
     },
   );
 });
@@ -525,7 +571,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home order and entry poin
     jest
       .mocked(getDeckTodayStats)
       .mockImplementation(async (_db, id) =>
-        id === SMART_DECK_IDS.mutashabihat ? { total: 5, newCount: 1, dueCount: 0 } : { total: 0, newCount: 0, dueCount: 0 },
+        id === SMART_DECK_IDS.mutashabihat ? { ...ZERO, total: 5, newCount: 1 } : { ...ZERO },
       );
     const view = await home();
     const s = strings[language];
