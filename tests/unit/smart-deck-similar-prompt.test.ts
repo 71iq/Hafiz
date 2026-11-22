@@ -45,6 +45,7 @@ beforeEach(async () => {
     const glyphs = uthmani
       .split(" ")
       .map((_, index) => `G${ayahNumber}-${index}`)
+      .concat(`E${ayahNumber}`)
       .join(" ");
     ayah.run(number, ayahNumber, uthmani, clean, glyphs);
   }
@@ -68,6 +69,42 @@ test("a similar-verse card prompt ends with the similar words when only the Uthm
     prefixWordCount: 9,
     promptUthmani: SIMILAR,
     promptQcf2: Array.from({ length: 9 }, (_, index) => `G88-${index}`).join(" "),
+  });
+});
+
+test("the preceding ayah cue carries its own Unicode text", async () => {
+  store.sql.exec("UPDATE mutashabihat_refs SET similar_text = NULL");
+  store.sql.exec(
+    "UPDATE quran_text SET text_clean = (SELECT text_clean FROM quran_text WHERE surah = 15 AND ayah = 88) WHERE surah = 20 AND ayah = 131",
+  );
+
+  await expect(getSmartCardContent(store.db, "mutashabihat:g:0")).resolves.toMatchObject({
+    promptContextUthmani: AYAT[0][2],
+    promptContextQcf2: "G87-0 G87-1 G87-2 G87-3 G87-4 G87-5 G87-6 E87",
+    promptUthmani: AYAT[1][2],
+    needsExplicitRefLabel: true,
+  });
+});
+
+test("a tail card uses Unicode slices when a mark shifts the page-font word boundary", async () => {
+  store.sql.exec("UPDATE mutashabihat_groups SET kind = 'tail', cue = 'للمؤمنين' WHERE id = 'g'");
+  const cardId = "similar-tail:g:0";
+  const words = AYAT[1][2].split(" ");
+  const prefix = words.slice(0, -1).join(" ");
+  const tail = words.at(-1);
+  await expect(getSmartCardContent(store.db, cardId)).resolves.toMatchObject({
+    promptUthmani: prefix,
+    promptQcf2: Array.from({ length: words.length - 1 }, (_, index) => `G88-${index}`).join(" "),
+    hiddenAnswerQcf2: `G88-${words.length - 1} E88`,
+    hiddenAnswerUthmani: tail,
+  });
+
+  store.sql.exec("UPDATE quran_text SET text_qcf2 = 'mark ' || text_qcf2 WHERE surah = 15 AND ayah = 88");
+  await expect(getSmartCardContent(store.db, cardId)).resolves.toMatchObject({
+    promptUthmani: prefix,
+    promptQcf2: undefined,
+    hiddenAnswerQcf2: undefined,
+    hiddenAnswerUthmani: tail,
   });
 });
 

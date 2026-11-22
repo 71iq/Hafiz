@@ -96,7 +96,7 @@ import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { useSettings } from "@/lib/settings/context";
 import { hapticMedium } from "@/lib/haptics";
 
-type AyahText = { qcf2: string; page: number; surah: number; ayah: number };
+type AyahText = { qcf2: string; uthmani: string; page: number; surah: number; ayah: number };
 
 /** The logged drifts into a pair (their error ids, the latest last) and the pair they drifted between. */
 type DriftSource = Readonly<{ errorIds: readonly string[]; pair: SimilarPair }>;
@@ -117,7 +117,7 @@ type QueueItem =
   | { kind: "half"; card: StudyCardRow; page: number; half: Half }
   | { kind: "seam"; card: StudyCardRow; page: number; prompt: AyahText | null; answer: AyahText | null }
   | { kind: "cloze"; card: StudyCardRow; surah: number; ayah: number; word: number; page: number }
-  | { kind: "drill"; item: InboxItem; text: { qcf2: string; page: number } | null }
+  | { kind: "drill"; item: InboxItem; text: Pick<AyahText, "qcf2" | "uthmani" | "page"> | null }
   /**
    * "Which one", asked about one verse of a pair: after a drift (MUT-04), with the live drifts into the
    * pair that queued it, or interleaved after a reviewed page (MUT-03), with null `errorIds`.
@@ -193,11 +193,11 @@ async function ayahOnPage(
   which: "first" | "last",
 ): Promise<AyahText | null> {
   const order = which === "first" ? "surah ASC, ayah ASC" : "surah DESC, ayah DESC";
-  const row = await db.getFirstAsync<{ surah: number; ayah: number; text_qcf2: string; v2_page: number }>(
-    `SELECT surah, ayah, text_qcf2, v2_page FROM quran_text WHERE v2_page = ? ORDER BY ${order} LIMIT 1`,
+  const row = await db.getFirstAsync<{ surah: number; ayah: number; text_qcf2: string; text_uthmani: string; v2_page: number }>(
+    `SELECT surah, ayah, text_qcf2, text_uthmani, v2_page FROM quran_text WHERE v2_page = ? ORDER BY ${order} LIMIT 1`,
     [page],
   );
-  return row ? { qcf2: row.text_qcf2, page: row.v2_page, surah: row.surah, ayah: row.ayah } : null;
+  return row ? { qcf2: row.text_qcf2, uthmani: row.text_uthmani, page: row.v2_page, surah: row.surah, ayah: row.ayah } : null;
 }
 
 function tierLabel(tier: Tier, s: UIStrings): string {
@@ -394,11 +394,11 @@ function HifzReviewScreen() {
       }
       for (const item of monthlyCheck ? [] : inbox) {
         if (item.ayah === null) continue;
-        const row = await db.getFirstAsync<{ text_qcf2: string; v2_page: number }>(
-          "SELECT text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+        const row = await db.getFirstAsync<{ text_qcf2: string; text_uthmani: string; v2_page: number }>(
+          "SELECT text_qcf2, text_uthmani, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
           [item.surah, item.ayah],
         );
-        items.push({ kind: "drill", item, text: row ? { qcf2: row.text_qcf2, page: row.v2_page } : null });
+        items.push({ kind: "drill", item, text: row ? { qcf2: row.text_qcf2, uthmani: row.text_uthmani, page: row.v2_page } : null });
       }
       // SCH-07, MUT-04: after a drift into a known sibling, the next session recites the sibling's page,
       // and the next three ask which verse of the pair is which. The ayah's own drill stays above.
@@ -1154,6 +1154,7 @@ function HifzReviewScreen() {
             <Card elevation="low" className="w-full p-5">
               <Qcf2AyahText
                 textQcf2={current.prompt.qcf2}
+                textUthmani={current.prompt.uthmani}
                 v2Page={current.prompt.page}
                 fontSize={fontSize}
                 lineHeight={lineHeight}
@@ -1164,6 +1165,7 @@ function HifzReviewScreen() {
             <Card elevation="low" className="w-full p-5 border border-primary-accent/30 dark:border-primary-bright/30">
               <Qcf2AyahText
                 textQcf2={current.answer.qcf2}
+                textUthmani={current.answer.uthmani}
                 v2Page={current.answer.page}
                 fontSize={fontSize}
                 lineHeight={lineHeight}
@@ -1214,6 +1216,7 @@ function HifzReviewScreen() {
             <Card elevation="low" className="w-full p-5">
               <Qcf2AyahText
                 textQcf2={current.text.qcf2}
+                textUthmani={current.text.uthmani}
                 v2Page={current.text.page}
                 fontSize={fontSize}
                 lineHeight={lineHeight}
@@ -1438,6 +1441,7 @@ function HifzReviewScreen() {
                 {seamShown && seamText ? (
                   <Qcf2AyahText
                     textQcf2={seamText.qcf2}
+                    textUthmani={seamText.uthmani}
                     v2Page={seamText.page}
                     fontSize={fontSize}
                     lineHeight={lineHeight}

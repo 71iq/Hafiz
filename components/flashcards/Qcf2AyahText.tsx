@@ -10,23 +10,25 @@ import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 
 type Props = {
   textQcf2: string;
+  textUthmani: string;
   v2Page: number;
   fontSize: number;
   lineHeight: number;
   colorClassName?: string;
   highlightWordPos?: number;
-  showAyahMarker?: boolean;
+  hasAyahMarker?: boolean;
   ayah?: number;
 };
 
 export function Qcf2AyahText({
   textQcf2,
+  textUthmani,
   v2Page,
   fontSize,
   lineHeight,
   colorClassName = "text-charcoal dark:text-neutral-100",
   highlightWordPos,
-  showAyahMarker = true,
+  hasAyahMarker = true,
 }: Props) {
   const { quranRenderFontStyle: quranFontStyle, showAyahMarkers, quranMarkerStyle, effectiveTheme } = useSettings();
   const visible = useQuranPageFontReady(quranFontStyle, v2Page);
@@ -34,8 +36,9 @@ export function Qcf2AyahText({
   // Glyphs mounted before their page font exists render and measure in the system font.
   if (!visible) return <View style={{ minHeight: lineHeight }} />;
 
-  const allTokens = textQcf2.split(" ").filter(Boolean);
-  const tokens = showAyahMarker && showAyahMarkers ? allTokens : allTokens.slice(0, -1);
+  const allTokens = textQcf2.split(/\s+/).filter(Boolean);
+  const showMarker = hasAyahMarker && showAyahMarkers;
+  const tokens = hasAyahMarker && !showMarker ? allTokens.slice(0, -1) : allTokens;
   if (tokens.length === 0) return null;
   const highlightIndex = typeof highlightWordPos === "number" ? highlightWordPos - 1 : -1;
   const fontFamily = quranPageFontName(quranFontStyle, v2Page);
@@ -46,6 +49,9 @@ export function Qcf2AyahText({
     effectiveTheme,
     quranMarkerStyle,
   );
+  const nativeAccessibility = textUthmani
+    ? { accessible: true, accessibilityLabel: textUthmani, accessibilityLanguage: "ar" }
+    : { accessible: false, "aria-hidden": true as const };
 
   if (Platform.OS === "android") {
     // Android clips each separate Text to its own advance box, and page-font word glyphs draw outside
@@ -53,12 +59,13 @@ export function Qcf2AyahText({
     // every word fully, like the reader's verse view.
     return (
       <Text
+        {...nativeAccessibility}
         className={colorClassName}
         style={{ fontFamily, ...fontPaletteStyle, fontSize, lineHeight, textAlign: "center", alignSelf: "stretch" }}
       >
         {tokens.map((token, index) => {
           const highlighted = index === highlightIndex;
-          const isMarker = showAyahMarker && showAyahMarkers && index === tokens.length - 1;
+          const isMarker = showMarker && index === tokens.length - 1;
           return (
             <Fragment key={`${token}-${index}`}>
               <Text
@@ -80,6 +87,7 @@ export function Qcf2AyahText({
 
   return (
     <View
+      {...(Platform.OS === "web" ? undefined : nativeAccessibility)}
       style={{
         direction: "ltr",
         flexDirection: "row-reverse",
@@ -89,12 +97,28 @@ export function Qcf2AyahText({
         rowGap: Math.max(4, fontSize * 0.2),
       }}
     >
+      {Platform.OS === "web" && textUthmani ? (
+        <span
+          lang="ar"
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            clipPath: "inset(50%)",
+            overflow: "hidden",
+            userSelect: "none",
+          }}
+        >
+          {textUthmani}
+        </span>
+      ) : null}
       {tokens.map((token, index) => {
         const highlighted = index === highlightIndex;
-        const isMarker = showAyahMarker && showAyahMarkers && index === tokens.length - 1;
+        const isMarker = showMarker && index === tokens.length - 1;
         return (
           <Text
             key={`${token}-${index}`}
+            aria-hidden
             className={highlighted ? "text-primary-accent dark:text-primary-bright" : colorClassName}
             style={{
               fontFamily,

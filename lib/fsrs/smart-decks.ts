@@ -59,6 +59,7 @@ export type SmartCardContent = {
   targetRef: SmartDeckRef;
   refs: SmartDeckRef[];
   promptContextQcf2?: string;
+  promptContextUthmani?: string;
   promptContextV2Page?: number;
   promptQcf2?: string;
   promptUthmani?: string;
@@ -493,10 +494,10 @@ export async function getSmartDeckCandidateCardIds(
     cue: string;
     tail_5: string | null;
     text_clean: string;
-    text_qcf2: string;
+    text_uthmani: string;
   }>(
     `SELECT g.id, g.sort_order AS group_sort_order, r.sort_order AS ref_sort_order,
-            g.cue, r.tail_5, qt.text_clean, qt.text_qcf2
+            g.cue, r.tail_5, qt.text_clean, qt.text_uthmani
        FROM mutashabihat_groups g
        JOIN mutashabihat_refs r ON r.group_id = g.id
        JOIN quran_text qt ON qt.surah = r.surah AND qt.ayah = r.ayah
@@ -506,7 +507,10 @@ export async function getSmartDeckCandidateCardIds(
     params
   );
   return rows
-    .filter((row) => kind !== "tail" || hasVisibleTailPrompt(row.cue, row.tail_5, row.text_clean, row.text_qcf2))
+    .filter((row) =>
+      kind !== "tail" ||
+      splitQuranWords(row.text_uthmani).length > inferTailWordCount(row.cue, row.tail_5, row.text_clean)
+    )
     .map((row) => `${prefix}${row.id}:${row.ref_sort_order}`);
 }
 
@@ -1040,6 +1044,7 @@ async function getMutashabihatCardContent(
     ...(previousAyahContext
       ? {
           promptContextQcf2: previousAyahContext.textQcf2,
+          promptContextUthmani: previousAyahContext.textUthmani,
           promptContextV2Page: previousAyahContext.v2Page,
         }
       : {}),
@@ -1050,7 +1055,7 @@ async function getMutashabihatCardContent(
 async function getPreviousAyahPromptContext(
   db: DatabaseExecutor,
   targetRef: SmartDeckRef
-): Promise<{ textQcf2: string; v2Page: number } | null> {
+): Promise<Pick<SmartDeckRef, "textQcf2" | "textUthmani" | "v2Page"> | null> {
   let previousSurah = targetRef.surah;
   let previousAyah = targetRef.ayah - 1;
   if (previousAyah < 1) {
@@ -1064,13 +1069,14 @@ async function getPreviousAyahPromptContext(
   }
   if (previousAyah < 1) return null;
 
-  const row = await db.getFirstAsync<{ text_qcf2: string; v2_page: number }>(
-    "SELECT text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+  const row = await db.getFirstAsync<{ text_qcf2: string; text_uthmani: string; v2_page: number }>(
+    "SELECT text_qcf2, text_uthmani, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
     [previousSurah, previousAyah]
   );
-  if (!row?.text_qcf2 || !row.v2_page) return null;
+  if (!row?.text_uthmani || !row.text_qcf2 || !row.v2_page) return null;
   return {
     textQcf2: row.text_qcf2,
+    textUthmani: row.text_uthmani,
     v2Page: row.v2_page,
   };
 }
@@ -1088,35 +1094,22 @@ function parseMutashabihatCardId(
   return { groupId, sortOrder };
 }
 
-function hasVisibleTailPrompt(
-  cue: string,
-  tail5: string | null,
-  textClean: string,
-  textQcf2: string
-): boolean {
-  const wordCount = splitQuranWords(textClean).length || Math.max(0, splitQcf2Words(textQcf2).length - 1);
-  if (wordCount === 0) return false;
-  const hiddenCount = inferTailWordCount(cue, tail5, textClean);
-  return wordCount - hiddenCount > 0;
-}
-
 function buildTailPrompt(
   cue: string,
   targetRef: SmartDeckRef
 ): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "hiddenAnswerQcf2" | "hiddenAnswerUthmani" | "prefixWordCount"> | null {
   const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
   const uthmaniWords = splitQuranWords(targetRef.textUthmani);
-  const wordCount = splitQuranWords(targetRef.textClean).length || Math.max(0, qcf2Tokens.length - 1);
-  if (wordCount === 0) return null;
-
-  const hiddenCount = Math.min(inferTailWordCount(cue, targetRef.tail5, targetRef.textClean), wordCount);
-  const prefixWordCount = wordCount - hiddenCount;
+  const hiddenCount = inferTailWordCount(cue, targetRef.tail5, targetRef.textClean);
+  const prefixWordCount = uthmaniWords.length - hiddenCount;
   if (prefixWordCount <= 0) return null;
 
+  // Some verses have separate mark glyphs. Use Unicode for slices when the word boundary is ambiguous.
+  const aligned = qcf2Tokens.length === uthmaniWords.length + 1;
   return {
-    promptQcf2: qcf2Tokens.slice(0, prefixWordCount).join(" "),
+    promptQcf2: aligned ? qcf2Tokens.slice(0, prefixWordCount).join(" ") : undefined,
     promptUthmani: uthmaniWords.slice(0, prefixWordCount).join(" "),
-    hiddenAnswerQcf2: qcf2Tokens.slice(prefixWordCount).join(" "),
+    hiddenAnswerQcf2: aligned ? qcf2Tokens.slice(prefixWordCount).join(" ") : undefined,
     hiddenAnswerUthmani: uthmaniWords.slice(prefixWordCount).join(" "),
     prefixWordCount,
   };
@@ -1129,11 +1122,9 @@ function buildMutashabihatPrompt(
   const segmentedPrompt = buildSegmentedMutashabihatPrompt(targetRef, refs);
   if (segmentedPrompt) return segmentedPrompt;
 
-  const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
   const uthmaniWords = splitQuranWords(targetRef.textUthmani);
   const targetWords = normalizeArabicWords(targetRef.textClean);
-  const fallbackCount = qcf2Tokens.length || uthmaniWords.length || targetWords.length;
-  let prefixWordCount = fallbackCount;
+  let prefixWordCount = uthmaniWords.length;
   let needsExplicitRefLabel = true;
 
   if (targetWords.length > 0) {
@@ -1153,11 +1144,8 @@ function buildMutashabihatPrompt(
     }
   }
 
-  const safePrefixCount = Math.max(0, Math.min(prefixWordCount, qcf2Tokens.length || prefixWordCount));
   return {
-    promptQcf2: qcf2Tokens.slice(0, safePrefixCount).join(" "),
-    promptUthmani: uthmaniWords.slice(0, safePrefixCount).join(" "),
-    prefixWordCount: safePrefixCount,
+    ...buildPrefixPrompt(targetRef.textQcf2, uthmaniWords, Math.min(prefixWordCount, uthmaniWords.length)),
     needsExplicitRefLabel,
   };
 }
@@ -1177,9 +1165,8 @@ function buildSegmentedMutashabihatPrompt(
     uthmaniSegmentEnd(targetRef);
   if (promptWordCount <= 0) return null;
 
-  const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
   const uthmaniWords = splitQuranWords(targetRef.textUthmani);
-  const safePrefixCount = Math.max(0, Math.min(promptWordCount, targetWords.length, qcf2Tokens.length || promptWordCount));
+  const safePrefixCount = Math.min(promptWordCount, targetWords.length, uthmaniWords.length);
   if (safePrefixCount <= 0) return null;
 
   const normalizedRefs = refs.map((ref) => ({
@@ -1191,10 +1178,22 @@ function buildSegmentedMutashabihatPrompt(
   const needsExplicitRefLabel = !(matches.length === 1 && matches[0].ref.sortOrder === targetRef.sortOrder);
 
   return {
-    promptQcf2: qcf2Tokens.slice(0, safePrefixCount).join(" "),
-    promptUthmani: uthmaniWords.slice(0, safePrefixCount).join(" "),
-    prefixWordCount: safePrefixCount,
+    ...buildPrefixPrompt(targetRef.textQcf2, uthmaniWords, safePrefixCount),
     needsExplicitRefLabel,
+  };
+}
+
+function buildPrefixPrompt(textQcf2: string, uthmaniWords: string[], prefixWordCount: number) {
+  const wordGlyphs = splitQcf2Words(textQcf2).slice(0, -1);
+  const wholeAyah = prefixWordCount === uthmaniWords.length;
+  return {
+    promptQcf2: wholeAyah
+      ? wordGlyphs.join(" ")
+      : wordGlyphs.length === uthmaniWords.length
+        ? wordGlyphs.slice(0, prefixWordCount).join(" ")
+        : undefined,
+    promptUthmani: uthmaniWords.slice(0, prefixWordCount).join(" "),
+    prefixWordCount,
   };
 }
 

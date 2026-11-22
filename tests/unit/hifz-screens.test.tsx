@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import HifzReviewRoute from "@/app/hifz/review";
 import SabaqRoute from "@/app/hifz/sabaq";
 import type { GradingButtons } from "@/components/flashcards/GradingButtons";
+import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
 import type { SessionHabitInput } from "@/components/habit/SessionHabitCards";
 import type { RecitationPage as RecitationPageView } from "@/components/hifz/RecitationPage";
 import { endReviewSession, startReviewSession } from "@/lib/fsrs/review-sessions";
@@ -140,7 +141,7 @@ jest.mock("@/components/flashcards/GradingButtons", () => ({
   },
   getGradeSchedulePreviews: () => ({}),
 }));
-jest.mock("@/components/flashcards/Qcf2AyahText", () => ({ Qcf2AyahText: () => null }));
+jest.mock("@/components/flashcards/Qcf2AyahText", () => ({ Qcf2AyahText: jest.fn(() => null) }));
 jest.mock("@/components/hifz/MistakeTypeSheet", () => ({ MistakeTypeSheet: () => null, errorTypeLabel: () => "Wrong word" }));
 jest.mock("@/components/habit/SessionHabitCards", () => ({
   SessionHabitCards: ({ input }: { input: SessionHabitInput }) => {
@@ -688,12 +689,15 @@ describe("hifz review screen", () => {
   it("dismisses a drill once and refreshes the reader's weak-spot markers (ERR-06)", async () => {
     mockParams = { mode: "mistakes" };
     jest.mocked(readMistakeInbox).mockResolvedValue([inboxItem]);
-    mockDatabase.getFirstAsync.mockResolvedValue({ text_qcf2: "a b", v2_page: 5 });
+    const verse = "عَمَّ يَتَسَآءَلُونَ";
+    mockDatabase.getFirstAsync.mockResolvedValue({ text_qcf2: "a b e", text_uthmani: verse, v2_page: 5 });
     const dismissal = deferred<void>();
     jest.mocked(dismissInboxItem).mockReturnValue(dismissal.promise);
     render(<HifzReviewRoute />, { wrapper: Wrapper });
     await flush();
+    expect(Qcf2AyahText).not.toHaveBeenCalled();
     fireEvent.press(screen.getByRole("button", { name: s.hifzDrillShow }));
+    expect(jest.mocked(Qcf2AyahText).mock.lastCall?.[0]).toMatchObject({ textUthmani: verse, textQcf2: "a b e" });
     const dismiss = screen.getByRole("button", { name: s.hifzDrillDismiss });
     await act(async () => {
       fireEvent.press(dismiss);

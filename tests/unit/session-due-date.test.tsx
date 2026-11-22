@@ -70,6 +70,7 @@ const NativeModal = ReactNative.Modal;
 const mockDatabase = Object.freeze({
   identity: "session-due-date-database",
   getFirstAsync: jest.fn(async (): Promise<unknown> => null),
+  getAllAsync: async () => [],
   withTransactionAsync: async (task: (transaction: unknown) => Promise<void>) => task(mockDatabase),
 });
 const mockRouterReplace = jest.fn();
@@ -2095,6 +2096,51 @@ describe("Flashcard session due-date editor characterization", () => {
         act(() => onKeyDown?.({ key, repeat: false, isComposing: false, keyCode: 0, target: null, preventDefault, ...extra }));
         return preventDefault;
       }
+
+      function arabicText(view: ReturnType<typeof render>) {
+        return view.root.findAllByType("span").filter((node) => node.props.lang === "ar").map((node) => node.props.children);
+      }
+
+      it("exposes the current ayah and reveals only the selected adjacent ayah in Unicode", async () => {
+        const card = makeStudyCard("78:2", localDateWithOffset(0));
+        jest.mocked(loadReviewQueue).mockResolvedValue(
+          reviewQueue([card], { ...reviewSettings, testModes: ["nextAyah", "previousAyah"] }),
+        );
+        const ayahs = ["عَمَّ يَتَسَآءَلُونَ", "عَنِ ٱلنَّبَإِ ٱلْعَظِيمِ", "ٱلَّذِى هُمْ فِيهِ مُخْتَلِفُونَ"];
+        mockDatabase.getFirstAsync.mockImplementation(async (sql?: string, params?: number[]) => {
+          if (!sql?.includes("FROM quran_text WHERE surah = ? AND ayah = ?") || !params) return null;
+          const ayah = params[1];
+          return { text_uthmani: ayahs[ayah - 1], text_clean: ayahs[ayah - 1], text_qcf2: `G${ayah} E${ayah}`, v2_page: 582 };
+        });
+        const view = renderSession();
+        await waitFor(() => expect(arabicText(view)).toEqual([ayahs[1]]));
+        expect(view.queryByText("G2")).toBeNull();
+        expect(view.getByText("G2", { includeHiddenElements: true })).toBeTruthy();
+
+        press(" ");
+        await waitFor(() => expect(arabicText(view)).toEqual([ayahs[1], ayahs[2]]));
+        press(" ");
+        await waitFor(() => expect(arabicText(view)).toEqual([ayahs[1], ayahs[0]]));
+      });
+
+      it("keeps the final visible prefix glyph and exposes only the tail after reveal", async () => {
+        const card = makeStudyCard("similar-tail:fixture:0", localDateWithOffset(0));
+        const ref = { ...firstRef, textUthmani: "عَنِ ٱلنَّبَإِ ٱلْعَظِيمِ", textQcf2: "G1 G2 G3 E" };
+        jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([card]));
+        jest.mocked(getSmartCardContent).mockResolvedValue({
+          kind: "similarTail", cue: "", targetRef: ref, refs: [ref],
+          promptQcf2: "G1 G2", promptUthmani: "عَنِ ٱلنَّبَإِ",
+          hiddenAnswerQcf2: "G3 E", hiddenAnswerUthmani: "ٱلْعَظِيمِ",
+        });
+        const view = renderSession();
+        await waitFor(() => expect(arabicText(view)).toEqual(["عَنِ ٱلنَّبَإِ"]));
+        expect(view.getByText("G2", { includeHiddenElements: true })).toBeTruthy();
+        expect(view.queryByText("G3", { includeHiddenElements: true })).toBeNull();
+        press(" ");
+        await waitFor(() => expect(arabicText(view)).toEqual(["عَنِ ٱلنَّبَإِ", "ٱلْعَظِيمِ"]));
+        expect(view.queryByText("G3")).toBeNull();
+        expect(view.getByText("G3", { includeHiddenElements: true })).toBeTruthy();
+      });
 
       it("reveals with Space and grades 1 to 4 by meaning in RTL, ignoring repeats, typing and composition", async () => {
         configureSettings("ar", false);
