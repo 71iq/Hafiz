@@ -1,9 +1,14 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { materializeAllSmartDeckCards, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
+import { putUserSetting } from "@/lib/database/user-settings";
+import { readDeckReviewSettings } from "@/lib/fsrs/queries";
+import { materializeSmartDeckCards, SMART_DECK_IDS, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
 import { declareMemorizedPages } from "@/lib/hifz/pages";
 import { putHifzPlan, readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
+import { writeStartingDeckLimits } from "@/lib/hifz/starting-limits";
 import { pagesOfJuz } from "@/lib/hifz/units";
 import { applyUnitSwitch } from "@/lib/hifz/unit-applied";
+import { REVIEW_ANCHOR_KEY, reviewAnchorValue } from "@/lib/notifications/settings";
+import type { ReminderAnchor } from "@/lib/notifications/types";
 
 /** Pages whose every ayah belongs to one of the surahs (a page shared with an unchosen surah is left out). */
 async function pagesCoveredBySurahs(db: DatabaseExecutor, surahs: readonly number[]): Promise<number[]> {
@@ -36,6 +41,11 @@ export type HifzSetup = Readonly<{
   plan: HifzPlan;
   memorizedSurahs: readonly number[];
   memorizedJuz: readonly number[];
+  /**
+   * REMIND-07: the second sitting for review, an anchor or null for off, saved with the plan. Left out,
+   * the saved value stays as it is.
+   */
+  reviewAnchor?: ReminderAnchor | null;
   now?: Date;
 }>;
 
@@ -45,7 +55,8 @@ export type HifzSetup = Readonly<{
  * page cards from fully reviewed ayah cards and stops the ayah deck adding new cards, then declares
  * the other memorized pages, unverified with first checks spread over the first cycle (ONB-04). Ayah
  * review restores the ayah cards page review set aside and keeps the existing ayah decks. The
- * similar-verse, qira'at and asbab decks follow the memorized surahs either way.
+ * similar-verse, qira'at and asbab decks follow the memorized surahs either way. A first setup also
+ * gives the smart decks lighter daily limits from the pace (lib/hifz/starting-limits).
  */
 export async function applyHifzSetup(
   db: AppDatabase,
@@ -55,8 +66,12 @@ export async function applyHifzSetup(
   const now = setup.now ?? new Date();
   let migratedPages = 0;
   await db.withTransactionAsync(async (tx) => {
-    const previousPlanUnit = (await readHifzPlan(tx))?.unit ?? null;
+    const previousPlan = await readHifzPlan(tx);
+    const previousPlanUnit = previousPlan?.unit ?? null;
+    // Before the unit switch, so page review records the pace's ayah limit and then sets 0.
+    await writeStartingDeckLimits(tx, { plan, hadPlan: previousPlan !== null });
     await putHifzPlan(tx, plan);
+    if (setup.reviewAnchor !== undefined) await putUserSetting(tx, REVIEW_ANCHOR_KEY, reviewAnchorValue(setup.reviewAnchor));
     // Only a change between page and ayah review switches the cards (lib/hifz/unit-applied).
     migratedPages = await applyUnitSwitch(tx, { unit: plan.unit, previousPlanUnit, now });
   });
@@ -66,7 +81,11 @@ export async function applyHifzSetup(
   if (surahs.size > 0) await writeAllDecksFilter(db, { type: "surah", surahs: [...surahs].sort((a, b) => a - b) });
 
   if (plan.unit === "ayah") {
-    await materializeAllSmartDeckCards(db);
+    // Each deck's own limits, so a deck that starts with no new cards gets no new rows.
+    for (const deckId of Object.values(SMART_DECK_IDS)) {
+      const settings = await readDeckReviewSettings(db, deckId);
+      await materializeSmartDeckCards(db, deckId, settings.dailyReviewLimit, settings.newCardsLimit);
+    }
     return { declaredPages: 0, migratedPages: 0 };
   }
   // Pages that now have a card, including those just made from ayah cards, are left alone.

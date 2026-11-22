@@ -4,7 +4,14 @@ import type { HabitDay, HabitPause } from "@/lib/habit/types";
 import { userState } from "@/lib/habit/user-state";
 import type { DayPrayerTimes } from "@/lib/prayer/times";
 import type { DayClock } from "@/lib/notifications/clock";
-import { buildDayTimes, isQuietAt, makeUpCutoff, type DayTimesInput, type ReminderDayTimes } from "@/lib/notifications/day-times";
+import {
+  buildDayTimes,
+  isQuietAt,
+  makeUpCutoff,
+  reviewFitsDay,
+  type DayTimesInput,
+  type ReminderDayTimes,
+} from "@/lib/notifications/day-times";
 import { createHabitProjector, type HabitProjector } from "@/lib/notifications/habit-projection";
 import type { RemindLaterPending } from "@/lib/notifications/settings";
 import { chooseTemplate, type TemplateUse, type TemplateVars } from "@/lib/notifications/templates";
@@ -20,6 +27,8 @@ const DORMANT_WEEKLY_DAYS: readonly number[] = [30, 37, 44, 51];
 const DORMANT_MONTHLY_UNTIL_DAYS = 183;
 const MAKE_UP_LEAD_MINUTES = 90;
 const MINUTE = 60_000;
+/** REMIND-07: a review reminder this close to another reminder of its day is not sent on its own. */
+const REVIEW_MERGE_MINUTES = 30;
 /** A Monday. Every-other-day back-off counts from here, so the days stay put across replans. */
 const BACKOFF_EPOCH: LocalDate = "2026-01-05";
 
@@ -73,6 +82,12 @@ export type PlannerInput = Readonly<{
   late?: readonly DeliveredReminder[];
   remindLater: RemindLaterPending | null;
   facts: (date: LocalDate) => ReminderFactValues;
+  /**
+   * REMIND-07: review is left on a date. Today's answer is the latest known state (loadReviewLeft);
+   * a later date is unknown, so it is true whenever a hifz plan exists and its copy stays conditional.
+   * Left out, no review reminder is planned.
+   */
+  reviewLeft?: (date: LocalDate) => boolean;
   /** Templates already chosen for a `type|localDate`, kept when still eligible so replans are stable. */
   preferredTemplates?: ReadonlyMap<string, string>;
   random?: () => number;
@@ -87,7 +102,8 @@ export type SkipReason =
   | "cap"
   | "no_template"
   | "state_changed"
-  | "sent";
+  | "sent"
+  | "merged";
 export type SkippedSlot = Readonly<{ type: NotificationType; localDate: LocalDate; at: Date; reason: SkipReason }>;
 export type PlanResult = Readonly<{ slots: PlannedSlot[]; skipped: SkippedSlot[] }>;
 
@@ -126,9 +142,30 @@ export function isCoveredToday(snapshot: HabitSnapshot): boolean {
  * Today is excused or paused: the user set the day aside, so nothing presses them to recite. A day
  * already done is not set aside; yesterday's open make-up can still be reminded then (STR-07).
  */
-function isSetAsideToday(snapshot: HabitSnapshot, pause: HabitPause | null, date: LocalDate): boolean {
+export function isSetAsideToday(snapshot: HabitSnapshot, pause: HabitPause | null, date: LocalDate): boolean {
   const status = snapshot.streak.todayStatus;
   return status === "excused" || status === "paused" || (pause !== null && pause.start <= date && date <= pause.end);
+}
+
+const RECITED: ReadonlySet<string> = new Set(["done", "made_up", "earned_back"]);
+
+/**
+ * REMIND-07's habit gate for the second sitting, after the set-aside and pause exclusions: today's
+ * minimum is met, or the habit at the review time is at risk, has a make-up open, or is empty for
+ * someone who has recited at least one day. Without today's minimum, an earn-back window or a fresh
+ * start does not pass, so lapsed users keep only the comeback cadence (6.3).
+ */
+export function reviewSittingGate(
+  snapshot: HabitSnapshot,
+  days: readonly HabitDay[],
+  pause: HabitPause | null,
+  date: LocalDate,
+): boolean {
+  if (isSetAsideToday(snapshot, pause, date) || snapshot.headline.kind === "paused") return false;
+  if (snapshot.streak.todayStatus === "done") return true;
+  const kind = snapshot.headline.kind;
+  if (kind === "at_risk" || kind === "make_up_open") return true;
+  return kind === "empty" && days.some((day) => RECITED.has(day.status));
 }
 
 function mod(value: number, by: number): number {
@@ -152,7 +189,8 @@ function minutesBefore(at: Date, minutes: number): Date {
  * Rules: nothing on a day already done, excused or paused (NOT-05); quiet hours except the opt-in
  * late reminder and a Ramadan anchor the user chose (NOT-08, NOT-10); every slot inside its own
  * date (NOT-06); back-off (NOT-09); the daily cap with follow-ups counted (NOT-07); follow-up skip
- * rules (NOT-05b); random template choice without repeats (NOT-12).
+ * rules (NOT-05b); random template choice without repeats (NOT-12). The optional review reminder
+ * (REMIND-07) follows its own rules: see its slot below.
  */
 export function planNotifications(input: PlannerInput): PlanResult {
   const { now, clock, prefs } = input;
@@ -163,6 +201,7 @@ export function planNotifications(input: PlannerInput): PlanResult {
     clock,
     prayers: input.prayers,
     anchor: prefs.anchor,
+    reviewAnchor: prefs.reviewAnchor,
     ramadanAnchor: prefs.ramadanAnchor,
     isRamadan: input.isRamadan,
   };
@@ -321,6 +360,27 @@ export function planNotifications(input: PlannerInput): PlanResult {
       }
     }
 
+    // REMIND-07: the second sitting for review, only while review is left. It is not a wird reminder, so
+    // it stays due after today's minimum. It must come after the main sitting on the same date, and it
+    // comes at the time the user chose, so quiet hours do not apply. Ignoring it never raises back-off.
+    const reviewAt = times.reviewAt;
+    if (prefs.reviewAnchor && reviewAt && reviewFitsDay(clock, date, times.anchorAt, reviewAt) && input.reviewLeft?.(date)) {
+      const review = project(date, reviewAt);
+      if (reviewSittingGate(review.snapshot, review.days, input.habit.pause, date)) {
+        add({
+          type: "review_reminder",
+          at: reviewAt,
+          // Only today's review is known; a later date's copy says "if you have review left".
+          vars: { ...base, reviewLeft: date === today ? 1 : undefined },
+          route: "wird",
+          priority: 4,
+          exemptQuiet: true,
+          backoff: true,
+          late: false,
+        });
+      }
+    }
+
     // Late reminder: opt-in and exempt from quiet hours. Planning at 23:00 or later schedules no new
     // one for today, but keeps one already set, so a replan late in the evening does not cancel it.
     if (prefs.types.late_reminder) {
@@ -368,6 +428,17 @@ export function planNotifications(input: PlannerInput): PlanResult {
   const sent = (candidate: Candidate) =>
     candidate.type !== "remind_later" &&
     input.delivered.some((item) => item.type === candidate.type && item.localDate === candidate.localDate);
+  // REMIND-07: one message when the review reminder falls within 30 minutes of another reminder of its
+  // day, planned or already shown (or held late by the OS), even when an earlier run sent it. The
+  // other one keeps its wording: the main sitting, the streak at risk or al-Kahf.
+  const shown = [...input.delivered, ...(input.late ?? [])];
+  const nearOther = (candidate: Candidate, others: readonly { type: string; localDate: LocalDate; at: Date }[]) =>
+    others.some(
+      (item) =>
+        item.type !== "review_reminder" &&
+        item.localDate === candidate.localDate &&
+        Math.abs(item.at.getTime() - candidate.at.getTime()) <= REVIEW_MERGE_MINUTES * MINUTE,
+    );
   // NOT-07 caps per date, counting everything that already fired that day, follow-ups included. A
   // follow-up ranks first, so it takes the place of the lowest-ranked later reminder of its day only
   // when the cap would otherwise be exceeded.
@@ -419,7 +490,12 @@ export function planNotifications(input: PlannerInput): PlanResult {
           if (projected !== null && COUNTED_FOR_BACKOFF.has(candidate.type) && counts(candidate)) projected += 1;
         }
       }
-      return { timed, skippedHere: late, ...capDate(date, timed) };
+      const merged = timed.filter(
+        (candidate) => candidate.type === "review_reminder" && (nearOther(candidate, timed) || nearOther(candidate, shown)),
+      );
+      for (const candidate of merged) late.push({ type: candidate.type, localDate: candidate.localDate, at: candidate.at, reason: "merged" });
+      const kept = timed.filter((candidate) => !merged.includes(candidate));
+      return { timed: kept, skippedHere: late, ...capDate(date, kept) };
     };
     const first = timeDate(() => true);
     const firstKept = new Set(first.kept);

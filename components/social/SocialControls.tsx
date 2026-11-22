@@ -56,7 +56,8 @@ export function SocialNotice({
         </Text>
         {stacked ? null : action}
       </View>
-      {stacked ? <View className="mt-2" style={{ alignSelf: isRTL ? "flex-end" : "flex-start" }}>{action}</View> : null}
+      {/* A pinned row: hand-mirrored alignSelf flipped twice under the RTL tab root. */}
+      {stacked ? <View className="mt-2" style={socialRowStyle(isRTL)}>{action}</View> : null}
     </Card>
   );
 }

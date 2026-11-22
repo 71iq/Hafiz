@@ -18,6 +18,7 @@ import {
   AuthFormNotice,
   AuthRouteLink,
   AuthScreenShell,
+  AuthTextLink,
   AuthUnavailableState,
   useAuthIconColors,
   useRevealOnFocus,
@@ -106,6 +107,8 @@ function SignupFormScreen() {
       if (result.value.status === "alreadyRegistered" || result.value.status === "needsEmailConfirmation") {
         // The same neutral result either way, so the form does not reveal who has an account.
         setPendingConfirmationEmail(data.email);
+        // The provider just handled a confirmation and refuses another within the same window.
+        resendCooldown.start(EMAIL_RESEND_COOLDOWN_SECONDS);
         return;
       }
       // A session exists: replace auth with the captured context or Home. No profile setup step.
@@ -132,24 +135,65 @@ function SignupFormScreen() {
     }
   };
 
+  // Leaving for another auth screen carries only the email, in memory.
+  const openLogin = (email: string) => {
+    carryAuthEmail(email);
+    router.replace("/auth/login");
+  };
+
+  // A neutral result: a confirmed or Google address gets no email, so the panel always offers the
+  // ways back in, and never says whether the address has an account.
+  const confirmationPanel = pendingConfirmationEmail ? (
+    <View className="w-full">
+      <AuthFormNotice
+        message={interpolate(resendState === "sent" ? s.authSignupConfirmationResent : s.authSignupConfirmEmail, {
+          email: pendingConfirmationEmail,
+        })}
+        tone="success"
+        dir={dir}
+      />
+      <AuthFormNotice message={formError.message} dir={dir} />
+      <Button onPress={() => openLogin(pendingConfirmationEmail)} size="lg" dir={dir}>
+        <PendingLabel pending={false} label={s.authLogin} pendingLabel={s.authLogin} dir={dir} />
+      </Button>
+      <View className="h-2" />
+      <AuthTextLink
+        label={s.authForgotPassword}
+        dir={dir}
+        align="center"
+        onPress={() => {
+          carryAuthEmail(pendingConfirmationEmail);
+          router.push("/auth/forgot-password");
+        }}
+      />
+      <AuthTextLink
+        label={
+          resendState === "sending"
+            ? s.authSending
+            : resendCooldown.active
+              ? interpolate(s.authResendIn, { seconds: formatSeconds(resendCooldown.remaining, locale) })
+              : s.authResendConfirmation
+        }
+        dir={dir}
+        align="center"
+        disabled={resendCooldown.active || resendState === "sending"}
+        onPress={() => void handleResendConfirmation()}
+      />
+      <AuthTextLink
+        label={s.authUseDifferentEmail}
+        dir={dir}
+        align="center"
+        onPress={() => {
+          setPendingConfirmationEmail(null);
+          setResendState("idle");
+        }}
+      />
+    </View>
+  ) : null;
+
   const form = configured ? (
     <View className="w-full">
       <AuthFormNotice message={formError.message} dir={dir} />
-      {pendingConfirmationEmail ? (
-        <AuthFormNotice
-          message={resendState === "sent" ? s.authConfirmationResent : s.authSignupConfirmEmail}
-          tone="success"
-          dir={dir}
-          action={{
-            label: resendCooldown.active
-              ? interpolate(s.authResendIn, { seconds: formatSeconds(resendCooldown.remaining, locale) })
-              : s.authResendConfirmation,
-            onPress: handleResendConfirmation,
-            disabled: resendCooldown.active,
-            busy: resendState === "sending",
-          }}
-        />
-      ) : null}
 
       <FormTextField
         control={control}
@@ -283,10 +327,7 @@ function SignupFormScreen() {
         prompt={s.authHasAccount}
         action={s.authLogin}
         dir={dir}
-        onPress={() => {
-          carryAuthEmail(getValues("email") ?? "");
-          router.replace("/auth/login");
-        }}
+        onPress={() => openLogin(pendingConfirmationEmail ?? getValues("email") ?? "")}
       />
     </>
   ) : null;
@@ -304,7 +345,7 @@ function SignupFormScreen() {
       footer={footer}
       unavailableContent={unavailableContent}
     >
-      {form}
+      {confirmationPanel ?? form}
     </AuthScreenShell>
   );
 }

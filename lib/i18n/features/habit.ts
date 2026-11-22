@@ -69,6 +69,9 @@ export const habitStrings = {
     habitCommitTomorrow: "I'll be back tomorrow",
     habitCommitTomorrowAfter: "I'll be back tomorrow after {{prayer}}",
     habitCommitTomorrowAt: "I'll be back tomorrow at {{time}}",
+    // STR-20 with the second sitting on and review left (REMIND-07).
+    habitCommitReviewAfter: "I'll finish my review after {{prayer}}",
+    habitCommitReviewAt: "I'll finish my review at {{time}}",
     habitCommitted: "See you tomorrow, in sha' Allah",
     habitGoalOfferTitle: "Set a streak goal",
     habitGoalOfferBody: "A near goal helps the habit settle. You can change it any time.",
@@ -190,6 +193,8 @@ export const habitStrings = {
     habitCommitTomorrow: "سأعود غدًا",
     habitCommitTomorrowAfter: "سأعود غدًا بعد {{prayer}}",
     habitCommitTomorrowAt: "سأعود غدًا الساعة {{time}}",
+    habitCommitReviewAfter: "سأكمل مراجعتي بعد {{prayer}}",
+    habitCommitReviewAt: "سأكمل مراجعتي الساعة {{time}}",
     habitCommitted: "نلقاك غدًا إن شاء الله",
     habitGoalOfferTitle: "حدّد هدفًا للسلسلة",
     habitGoalOfferBody: "الهدف القريب يساعد على ترسيخ العادة، ويمكنك تغييره متى شئت.",

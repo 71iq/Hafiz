@@ -1,20 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AccessibilityInfo, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Minus, Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { MirroredRow } from "@/components/ui/MirroredRow";
-import { Switch } from "@/components/ui/Switch";
+import { Switch, SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
-import { MemorizedPortionPicker, type SurahChoice } from "@/components/hifz/MemorizedPortionPicker";
+import { MemorizedPortionPicker, type PortionMode, type SurahChoice } from "@/components/hifz/MemorizedPortionPicker";
 import type { AppDatabase } from "@/lib/database/types";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { Card } from "@/components/ui/Card";
 import { CALCULATION_METHOD_LABEL_KEYS, PrayerTimesSetup } from "@/components/notifications/PrayerTimesSetup";
+import { SittingChips } from "@/components/notifications/SittingChips";
 import {
   applyPreset,
   DEFAULT_HIFZ_PLAN,
+  DEFAULT_PLAN_PRESET,
   presetOf,
-  PRAYERS,
   MEMORIZE_REPETITION_BOUNDS,
   MEMORIZE_REPETITION_PRESETS,
   memorizeRepetitionPresetOf,
@@ -29,16 +30,37 @@ import {
 import { formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import { deviceClock, formatClockMinutesForDisplay } from "@/lib/notifications/clock";
+import {
+  chipAnchor,
+  chipOf,
+  defaultReviewChip,
+  reviewChipAllowed,
+  type SittingChip,
+  type SittingDay,
+} from "@/lib/notifications/review-sitting";
+import { anchorFromPlan, readReviewAnchor } from "@/lib/notifications/settings";
+import type { ReminderAnchor } from "@/lib/notifications/types";
 import { readPrayerLocation } from "@/lib/prayer/settings";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
-import type { PrayerLocation } from "@/lib/prayer/times";
+import { VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
+import { createPrayerTimesLookup, type PrayerLocation } from "@/lib/prayer/times";
 
 type Goal = "memorize" | "keep" | "both";
 type Step = "goal" | "memorized" | "tracks" | "pace" | "when";
 
 const STEPS: readonly Step[] = ["goal", "memorized", "tracks", "pace", "when"];
 const PRESETS: readonly PlanPreset[] = ["part_time_beginner", "part_time_adult", "full_time", "maintenance", "short_surahs"];
+
+/** The wizard's column width on every screen; onboarding and Settings both open it at this width. */
+export const SETUP_MAX_WIDTH = 640;
+/** Below this window height the framed card would be too short for its footer, so the wizard stays full height. */
+const FRAMED_MIN_HEIGHT = 520;
+/** On medium and wider windows that are tall enough, the wizard is a framed card no taller than this, so Continue stays near the options. */
+// Tall enough for the whole juz grid with the title and footer, so tall windows never scroll it.
+const SETUP_CARD_MAX_HEIGHT = 840;
+const SETUP_CARD_MARGIN = 24;
 
 function presetLabel(preset: PlanPreset, s: UIStrings): string {
   switch (preset) {
@@ -70,14 +92,17 @@ function prayerLabel(prayer: Prayer, s: UIStrings): string {
   }
 }
 
-/** The chosen time in words for the implementation intention (ANC-01): "After Fajr", "In the morning". */
+/** The chosen time in words inside the implementation intention (ANC-01): "after Fajr", "in the morning". */
 function anchorPhrase(anchor: Anchor, language: "en" | "ar", s: UIStrings): string {
-  if (anchor.kind === "prayer") return interpolate(s.hifzAfterPrayer, { prayer: prayerLabel(anchor.prayer, s) });
+  if (anchor.kind === "prayer") return interpolate(s.hifzAfterPrayerInline, { prayer: prayerLabel(anchor.prayer, s) });
   if (anchor.minutes === 8 * 60) return s.hifzWhenInMorning;
   if (anchor.minutes === 20 * 60) return s.hifzWhenInEvening;
-  const at = new Date(2026, 0, 1, Math.floor(anchor.minutes / 60), anchor.minutes % 60);
-  const time = at.toLocaleTimeString(language === "ar" ? "ar-u-nu-arab" : "en", { hour: "numeric", minute: "2-digit" });
-  return interpolate(s.hifzWhenAtTime, { time });
+  return interpolate(s.hifzWhenAtTime, { time: formatClockMinutesForDisplay(anchor.minutes, language) });
+}
+
+function planAnchorOf(chip: SittingChip): Anchor {
+  const anchor = chipAnchor(chip);
+  return anchor.kind === "prayer" ? { kind: "prayer", prayer: anchor.prayer, offsetMin: anchor.offsetMinutes } : anchor;
 }
 
 type StepEntry = Readonly<{
@@ -271,6 +296,30 @@ export function setupSavedNotice(saved: SetupSaved, s: UIStrings, language: "en"
   return saved.repetitionsChanged && saved.plan.method !== "review_only" ? s.hifzPlanSaved : s.hifzPlanSavedReview;
 }
 
+/**
+ * Wide screens frame the wizard in a card with one top edge on every step, so the title stays put while the card's
+ * height follows the step. Phones keep the footer pinned at the bottom, in thumb reach on every step.
+ */
+function SetupFrame({ framed, top, maxHeight, children }: { framed: boolean; top: number; maxHeight: number; children: ReactNode }) {
+  return (
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      {framed ? (
+        <View style={{ flex: 1, alignItems: "center", paddingTop: top, paddingBottom: SETUP_CARD_MARGIN, paddingHorizontal: SETUP_CARD_MARGIN }}>
+          {/* The card's dark fill matches the page so the surface-low controls inside keep the contrast they have on phones. */}
+          <View
+            className="overflow-hidden border border-surface-high bg-surface-bright dark:border-surface-dark-high dark:bg-surface-dark"
+            style={{ width: "100%", maxWidth: SETUP_MAX_WIDTH, maxHeight, flexShrink: 1, borderRadius: 30 }}
+          >
+            {children}
+          </View>
+        </View>
+      ) : (
+        <View style={{ flex: 1, width: "100%", maxWidth: SETUP_MAX_WIDTH, alignSelf: "center" }}>{children}</View>
+      )}
+    </KeyboardAvoidingView>
+  );
+}
+
 type Props = {
   db: AppDatabase;
   language: "en" | "ar";
@@ -288,11 +337,15 @@ type Props = {
  */
 export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, onCancel }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
+  const { width, height } = useWindowDimensions();
+  // Short windows (web landscape phones) keep the full-height layout with the pinned footer.
+  const framed = width >= VIEWPORT_BREAKPOINTS.mediumWindow && height >= FRAMED_MIN_HEIGHT;
+  const scrollRef = useRef<ScrollView>(null);
   const [stepIndex, setStepIndex] = useState(0);
   // Editing starts from the saved plan as it is: its goal, and its preset only while it still matches.
   const [goal, setGoal] = useState<Goal>(initialPlan?.method === "review_only" ? "keep" : "both");
-  const [plan, setPlan] = useState<HifzPlan>(initialPlan ?? applyPreset(DEFAULT_HIFZ_PLAN, "part_time_adult"));
-  const [preset, setPreset] = useState<PlanPreset | null>(initialPlan ? presetOf(initialPlan) : "part_time_adult");
+  const [plan, setPlan] = useState<HifzPlan>(initialPlan ?? applyPreset(DEFAULT_HIFZ_PLAN, DEFAULT_PLAN_PRESET));
+  const [preset, setPreset] = useState<PlanPreset | null>(initialPlan ? presetOf(initialPlan) : DEFAULT_PLAN_PRESET);
   // The unit chosen on the tracks step. "Short surahs" reviews ayah by ayah; another pace brings this back.
   const [chosenUnit, setChosenUnit] = useState<HifzPlan["unit"]>(
     initialPlan && presetOf(initialPlan) !== "short_surahs" ? initialPlan.unit : DEFAULT_HIFZ_PLAN.unit,
@@ -302,10 +355,17 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   const [surahsAttempt, setSurahsAttempt] = useState(0);
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
+  // Juz or surah view of the memorized step, kept here so Back and Continue return to the same view.
+  const [portionMode, setPortionMode] = useState<PortionMode>("juz");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [prayerTimesOpen, setPrayerTimesOpen] = useState(false);
   const [prayerLocation, setPrayerLocation] = useState<PrayerLocation | null>(null);
+  // REMIND-07: the second sitting for review. A new setup starts with it off; a saved choice, "off" or
+  // a time, is loaded and kept as it is, never recomputed from the pace or the main time.
+  const [reviewAnchor, setReviewAnchor] = useState<ReminderAnchor | null>(null);
+  const savedReview = useRef<ReminderAnchor | null | undefined>(undefined);
+  const reviewTouched = useRef(false);
   const step = STEPS[stepIndex];
   // What the current step showed when it opened, so "Not now" can leave it untouched.
   const stepEntry = useRef<StepEntry | null>(null);
@@ -318,7 +378,12 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   useEffect(() => {
     let active = true;
     setSurahsState("loading");
-    db.getAllAsync<SurahChoice>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number")
+    // Each surah's first and last page let the surah list say which surahs a chosen juz already covers.
+    db.getAllAsync<SurahChoice>(
+      `SELECT s.number, s.name_arabic, s.name_english, s.ayah_count, MIN(q.v2_page) AS first_page, MAX(q.v2_page) AS last_page
+       FROM surahs s LEFT JOIN quran_text q ON q.surah = s.number AND q.v2_page > 0
+       GROUP BY s.number ORDER BY s.number`,
+    )
       .then((rows) => {
         if (!active) return;
         setSurahs(rows);
@@ -333,10 +398,29 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     };
   }, [db, surahsAttempt]);
 
+  // Each step opens at its top: the scroll view is shared, so a long surah list would leave the next step scrolled.
+  useEffect(() => {
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false });
+  }, [stepIndex]);
+
   // Saving is announced once when it starts, beside the busy state on both buttons.
   useEffect(() => {
     if (saving) AccessibilityInfo.announceForAccessibility?.(s.setupSavingAnnouncement);
   }, [saving, s.setupSavingAnnouncement]);
+
+  useEffect(() => {
+    let active = true;
+    readReviewAnchor(db)
+      .then((saved) => {
+        if (!active) return;
+        savedReview.current = saved;
+        if (!reviewTouched.current) setReviewAnchor(saved);
+      })
+      .catch((loadError) => console.warn("[HifzSetup] The second sitting failed to load:", loadError));
+    return () => {
+      active = false;
+    };
+  }, [db]);
 
   // The optional prayer-times row says whether a location is already saved on this device.
   useEffect(() => {
@@ -376,7 +460,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     // Tapping the goal already chosen changes nothing, so it does not reset the saved pace.
     if (next === goal) return;
     setGoal(next);
-    const nextPreset: PlanPreset = next === "keep" ? "maintenance" : "part_time_adult";
+    const nextPreset: PlanPreset = next === "keep" ? "maintenance" : DEFAULT_PLAN_PRESET;
     setPreset(nextPreset);
     setPlan((value) => applyPreset(value, nextPreset));
   };
@@ -387,11 +471,19 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     setError(null);
     try {
       const finalPlan: HifzPlan = goal === "keep" ? { ...plan, method: "review_only", newPerDay: 0 } : plan;
+      // The second sitting is written with the plan, and only when this setup changed it. If the saved
+      // value never loaded, a choice the user made is still written rather than dropped.
+      const reviewChanged =
+        savedReview.current === undefined
+          ? reviewTouched.current
+          : JSON.stringify(reviewAnchor) !== JSON.stringify(savedReview.current);
       const result = await applyHifzSetup(db, {
         plan: finalPlan,
         memorizedSurahs: [...selectedSurahs],
         memorizedJuz: [...selectedJuz],
+        ...(reviewChanged ? { reviewAnchor } : {}),
       });
+      if (reviewChanged) savedReview.current = reviewAnchor;
       onDone({
         plan: finalPlan,
         declaredPages: result.declaredPages,
@@ -451,10 +543,33 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     }
   }, [s, step]);
 
+  // REMIND-07: second-sitting chips are later than the main sitting today, by the location chosen on
+  // this step, the saved one or the fallback times. The picker uses the ordinary main time; a Ramadan
+  // time is handled when reminders are planned.
+  const sittingDay = useMemo<SittingDay>(
+    () => ({ clock: deviceClock, prayers: createPrayerTimesLookup(prayerLocation), date: deviceClock.dateOf(new Date()) }),
+    [prayerLocation],
+  );
+  const mainAnchor = anchorFromPlan(plan.anchor);
+  const reviewDefault = defaultReviewChip(sittingDay, mainAnchor);
+  const reviewSwitchDisabled = reviewAnchor === null && reviewDefault === null;
+  const setReview = (value: ReminderAnchor | null) => {
+    reviewTouched.current = true;
+    setReviewAnchor(value);
+  };
+  const usesPrayer = plan.anchor.kind === "prayer" || reviewAnchor?.kind === "prayer";
+
+  // The card sits at one top offset on every step and never runs past the bottom margin.
+  const cardTop = Math.max(SETUP_CARD_MARGIN, Math.round((height - SETUP_CARD_MAX_HEIGHT) / 2));
+  const cardMaxHeight = Math.min(SETUP_CARD_MAX_HEIGHT, height - cardTop - SETUP_CARD_MARGIN);
+
   return (
     // The footer stays above the keyboard while the surah search is focused; dragging the list closes it.
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <SetupFrame framed={framed} top={cardTop} maxHeight={cardMaxHeight}>
       <ScrollView
+        ref={scrollRef}
+        // Framed, the scroll view is only as tall as its step and gives up height to the footer when the step is long.
+        style={framed ? { flexGrow: 0, flexShrink: 1 } : undefined}
         contentContainerStyle={{ padding: 20, gap: 16 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -483,6 +598,8 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
               surahs={surahs}
               selectedSurahs={selectedSurahs}
               selectedJuz={selectedJuz}
+              mode={portionMode}
+              onModeChange={setPortionMode}
               onToggleSurah={(surah) => setSelectedSurahs((value) => toggle(value, surah))}
               onSetSurahs={(numbers, selected) =>
                 setSelectedSurahs((value) => {
@@ -592,46 +709,65 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
             <Text dir={dir} variant="muted">
               {interpolate(s.hifzWhenHint, { when: anchorPhrase(plan.anchor, language, s) })}
             </Text>
-            <MirroredRow dir={dir} className="flex-wrap gap-2" accessibilityRole="radiogroup" accessibilityLabel={title}>
-              {PRAYERS.map((prayer) => {
-                const selected = plan.anchor.kind === "prayer" && plan.anchor.prayer === prayer;
-                return (
-                  <Pressable
-                    key={prayer}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    onPress={() => setPlan((value) => ({ ...value, anchor: { kind: "prayer", prayer, offsetMin: 20 } }))}
-                    className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
-                  >
-                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
-                      {interpolate(s.hifzAfterPrayer, { prayer: prayerLabel(prayer, s) })}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              {[
-                { label: s.hifzWhenMorning, minutes: 8 * 60 },
-                { label: s.hifzWhenEvening, minutes: 20 * 60 },
-              ].map((option) => {
-                const selected = plan.anchor.kind === "clock" && plan.anchor.minutes === option.minutes;
-                return (
-                  <Pressable
-                    key={option.minutes}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    onPress={() => setPlan((value) => ({ ...value, anchor: { kind: "clock", minutes: option.minutes } }))}
-                    className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
-                  >
-                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </MirroredRow>
+            <SittingChips
+              label={title}
+              selected={chipOf(mainAnchor)}
+              onSelect={(chip) => setPlan((value) => ({ ...value, anchor: planAnchorOf(chip) }))}
+              dir={dir}
+              language={language}
+              s={s}
+            />
+            {/* REMIND-07: an optional second sitting for whatever review is left. Off unless chosen. The whole
+                row is the switch, as in Settings, so its caption, including why it is off, is the hint. */}
+            <SwitchRow
+              label={s.notifReviewTitle}
+              hint={reviewSwitchDisabled ? s.notifReviewNeedsEarlier : s.notifReviewHint}
+              value={reviewAnchor !== null}
+              disabled={reviewSwitchDisabled}
+              onValueChange={(on) => {
+                if (!on) setReview(null);
+                else if (reviewDefault) setReview(chipAnchor(reviewDefault));
+              }}
+              className="mt-2 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
+            >
+              <MirroredRow dir={dir} className="items-center justify-between gap-3">
+                <View className="flex-1">
+                  <Text dir={dir} style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className="text-charcoal dark:text-neutral-100">
+                    {s.notifReviewTitle}
+                  </Text>
+                  <Text dir={dir} variant="caption">
+                    {reviewSwitchDisabled ? s.notifReviewNeedsEarlier : s.notifReviewHint}
+                  </Text>
+                </View>
+                <SwitchTrack value={reviewAnchor !== null} disabled={reviewSwitchDisabled} />
+              </MirroredRow>
+            </SwitchRow>
+            {reviewAnchor ? (
+              <View style={{ gap: 8 }}>
+                <SittingChips
+                  label={s.notifReviewTitle}
+                  selected={chipOf(reviewAnchor)}
+                  onSelect={(chip) => setReview(chipAnchor(chip))}
+                  allowed={(chip) => reviewChipAllowed(sittingDay, mainAnchor, chip)}
+                  dir={dir}
+                  language={language}
+                  s={s}
+                />
+                {/* A saved clock time that no chip names stays visible, so it can be kept or replaced. */}
+                {reviewAnchor.kind === "clock" && chipOf(reviewAnchor) === null ? (
+                  <Text dir={dir} variant="body-sm">
+                    {interpolate(s.notifClockValue, { time: formatClockMinutesForDisplay(reviewAnchor.minutes, language) })}
+                  </Text>
+                ) : null}
+                <Text dir={dir} variant="caption">
+                  {s.notifReviewSkipNote}
+                </Text>
+              </View>
+            ) : null}
             {/* 5.1 step 7: a prayer anchor needs prayer times; without them it falls back to set clock times.
-                The setup stays one optional row until asked for, so the anchor choice and Save lead the step. */}
-            {plan.anchor.kind === "prayer" ? (
+                The setup stays one optional row until asked for, so the anchor choice and Save lead the step.
+                It shows when either sitting follows a prayer. */}
+            {usesPrayer ? (
               <Card elevation="low" className="mt-2 px-4 py-3">
                 <MirroredRow dir={dir} className="min-h-[44px] items-center gap-3">
                   <View className="min-w-0 flex-1">
@@ -670,7 +806,10 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         ) : null}
       </ScrollView>
 
-      <View className="px-5 pb-5 pt-2" style={{ gap: 8 }}>
+      <View
+        className={framed ? "border-surface-high px-5 pb-5 pt-3 dark:border-surface-dark-high" : "px-5 pb-5 pt-2"}
+        style={framed ? { gap: 8, borderTopWidth: StyleSheet.hairlineWidth } : { gap: 8 }}
+      >
         <Button
           label={saving ? s.hifzSaving : stepIndex === STEPS.length - 1 ? s.hifzSaveMemorized : s.hifzContinue}
           onPress={next}
@@ -706,6 +845,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
           ) : null}
         </MirroredRow>
       </View>
-    </KeyboardAvoidingView>
+    </SetupFrame>
   );
 }

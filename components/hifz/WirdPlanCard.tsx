@@ -61,7 +61,7 @@ export function WirdPlanCard({
 
   if (wird === null) {
     return (
-      <Card elevation="low" className="mb-6 p-5 rounded-4xl">
+      <Card elevation="low" className="mb-6 p-5 rounded-4xl" style={{ direction: "ltr" }}>
         <MirroredRow dir={dir} className="items-start gap-3">
           <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center">
             <Sparkles size={18} color={accent} />
@@ -95,8 +95,9 @@ export function WirdPlanCard({
   const muted = mutedIconColor(effectiveTheme);
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
 
+  // Hand-mirrored alignSelf below pins LTR coordinates; under the RTL tab root it flipped twice.
   return (
-    <Card elevation="low" className="mb-6 p-5 rounded-4xl">
+    <Card elevation="low" className="mb-6 p-5 rounded-4xl" style={{ direction: "ltr" }}>
       <MirroredRow dir={dir} className="items-center justify-between gap-3">
         <MirroredRow dir={dir} className="items-center gap-2">
           <BookOpenCheck size={18} color={accent} />

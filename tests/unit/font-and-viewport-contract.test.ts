@@ -15,6 +15,7 @@ describe("font and viewport contracts", () => {
     expect(VIEWPORT_BREAKPOINTS).toEqual({
       phoneCompact: 360,
       phoneLarge: 412,
+      mediumWindow: 600,
       sidebar: 768,
       sidebarValidation: 1024,
       desktop: 1440,

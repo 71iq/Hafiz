@@ -6,7 +6,7 @@ export const decksStrings = {
     decksTryAgain: "Try again",
     // Deck settings
     deckReviewSettingsSubtitle: "Review settings",
-    deckLeftToday: "{{n}} left today",
+    deckHeldBackToday: "{{n}} more due after today's limit",
     deckSettingsSavedNamed: "{{deck}} settings saved",
     deckSettingsSave: "Save",
     deckSettingsAdvanced: "Advanced",
@@ -68,7 +68,7 @@ export const decksStrings = {
   ar: {
     decksTryAgain: "حاول مجددًا",
     deckReviewSettingsSubtitle: "إعدادات المراجعة",
-    deckLeftToday: "متبقٍ {{n}} اليوم",
+    deckHeldBackToday: "{{n}} مستحقة أخرى بعد حدّ اليوم",
     deckSettingsSavedNamed: "تم حفظ إعدادات {{deck}}",
     deckSettingsSave: "حفظ",
     deckSettingsAdvanced: "متقدم",

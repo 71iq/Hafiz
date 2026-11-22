@@ -240,7 +240,6 @@ function HifzReviewScreen() {
   const { isDark, isRTL, uiLanguage, fontSize, lineHeight } = useSettings();
   // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
   const headerJoin = uiLanguage === "ar" ? "، " : " · ";
-  const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ mode?: string; level?: string }>();
   const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
@@ -305,6 +304,8 @@ function HifzReviewScreen() {
   const [seamShown, setSeamShown] = useState(false);
   const [planProgress, setPlanProgress] = useState<{ done: number; total: number } | null>(null);
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
+  // Read again once the session ends, so a finished review is reflected (STR-20, REMIND-07).
+  const commitLabel = useCommitmentLabel(db, s, uiLanguage, habitResult);
   const sessionRef = useRef<ReviewSessionRef | null>(null);
   // Session and item times count only while the review is on screen with the app active.
   const sessionClock = useActiveClock();

@@ -7,6 +7,8 @@ import { Rating } from "@/lib/fsrs/scheduler";
 import { applyPreset, DEFAULT_HIFZ_PLAN, type HifzPlan } from "@/lib/hifz/plan";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { strings } from "@/lib/i18n/strings";
+import { interpolate } from "@/lib/i18n/useStrings";
+import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { DirectionProvider } from "@/lib/ui/direction";
 
 const mockSettings = {
@@ -80,9 +82,213 @@ describe("HifzSetupFlow Not now", () => {
   it("states the chosen time in the intention line", async () => {
     const view = await renderFlow();
     for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
-    expect(view.getByText(/^After Fajr, I will do my wird\./)).toBeTruthy();
-    fireEvent.press(view.getByText(s.hifzWhenEvening));
-    expect(view.getByText(/^In the evening, I will do my wird\./)).toBeTruthy();
+    expect(view.getByText(/^I'll start my wird after Fajr\. A fixed time makes the habit easier/)).toBeTruthy();
+    fireEvent.press(view.getByText(interpolate(s.hifzWhenEvening, { time: formatClockMinutesForDisplay(20 * 60, "en") })));
+    expect(view.getByText(/^I'll start my wird in the evening\./)).toBeTruthy();
+  });
+});
+
+describe("HifzSetupFlow when step and the second sitting (START-02, REMIND-07)", () => {
+  const MAGHRIB = { kind: "prayer", prayer: "maghrib", offsetMinutes: 20 };
+  const morning = interpolate(s.hifzWhenMorning, { time: formatClockMinutesForDisplay(8 * 60, "en") });
+  const evening = interpolate(s.hifzWhenEvening, { time: formatClockMinutesForDisplay(20 * 60, "en") });
+  /** No saved prayer location, so prayer chips use the fallback clock times. */
+  const dbWith = (saved: string | null = null) =>
+    ({
+      getAllAsync: jest.fn(async (sql: string) =>
+        sql.includes("user_settings") && saved !== null ? [{ key: "notif_pref_review_anchor", value: saved }] : [],
+      ),
+    }) as unknown as AppDatabase;
+
+  beforeEach(() => jest.mocked(applyHifzSetup).mockClear());
+
+  async function openWhen(db: AppDatabase = dbWith()) {
+    const view = render(
+      <DirectionProvider dir="ltr">
+        <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={null} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    return view;
+  }
+  async function saved(view: ReturnType<typeof render>) {
+    await act(async () => {
+      fireEvent.press(view.getByText(s.hifzSaveMemorized));
+    });
+    return jest.mocked(applyHifzSetup).mock.calls.at(-1)![1];
+  }
+  const reviewSwitch = (view: ReturnType<typeof render>) => view.getByRole("switch", { name: s.notifReviewTitle });
+  // The main sitting's seven chips come first, then the second sitting's seven while it is on.
+  const mainChip = (view: ReturnType<typeof render>, name: string) => view.getAllByRole("radio", { name })[0];
+  const reviewChip = (view: ReturnType<typeof render>, name: string) => {
+    const chips = view.getAllByRole("radio", { name });
+    expect(chips).toHaveLength(2);
+    return chips[1];
+  };
+
+  it("groups the main chips, names the clock times, and starts with the second sitting off", async () => {
+    const view = await openWhen();
+    expect(view.getByText(s.hifzWhenTitle)).toBeTruthy();
+    expect(view.getByText(s.hifzWhenAfterPrayerGroup)).toBeTruthy();
+    expect(view.getByText(s.hifzWhenSetTimeGroup)).toBeTruthy();
+    expect(view.getByText(morning)).toBeTruthy();
+    expect(mainChip(view, "After Fajr").props.accessibilityState).toMatchObject({ checked: true });
+    expect(reviewSwitch(view).props.accessibilityState).toMatchObject({ checked: false });
+    expect(view.getByText(s.notifReviewHint)).toBeTruthy();
+    expect("reviewAnchor" in (await saved(view))).toBe(false);
+  });
+
+  it("turns on after Maghrib for a Fajr main, offers only later chips, and saves with the plan", async () => {
+    const view = await openWhen();
+    fireEvent.press(reviewSwitch(view));
+    expect(reviewSwitch(view).props.accessibilityState).toMatchObject({ checked: true });
+    expect(reviewChip(view, "After Maghrib").props.accessibilityState).toMatchObject({ checked: true });
+    expect(reviewChip(view, "After Fajr").props.accessibilityState).toMatchObject({ disabled: true });
+    expect(reviewChip(view, morning).props.accessibilityState).toMatchObject({ disabled: false });
+    expect(view.getByText(s.notifReviewSkipNote)).toBeTruthy();
+    fireEvent.press(reviewChip(view, "After Isha"));
+    expect((await saved(view)).reviewAnchor).toEqual({ kind: "prayer", prayer: "isha", offsetMinutes: 20 });
+  });
+
+  it("offers only Isha after a Maghrib main, so 20:00 is disabled", async () => {
+    const view = await openWhen();
+    fireEvent.press(mainChip(view, "After Maghrib"));
+    fireEvent.press(reviewSwitch(view));
+    expect(reviewChip(view, "After Isha").props.accessibilityState).toMatchObject({ checked: true, disabled: false });
+    const reviewChips = view.getAllByRole("radio").slice(7);
+    expect(reviewChips).toHaveLength(7);
+    expect(reviewChips.filter((chip) => !chip.props.accessibilityState.disabled)).toHaveLength(1);
+    expect(reviewChip(view, evening).props.accessibilityState).toMatchObject({ disabled: true });
+  });
+
+  it("keeps the switch off with a reason after Isha or 20:00", async () => {
+    for (const choose of [(view: ReturnType<typeof render>) => fireEvent.press(mainChip(view, "After Isha")), (view: ReturnType<typeof render>) => fireEvent.press(mainChip(view, evening))]) {
+      const view = await openWhen();
+      choose(view);
+      expect(reviewSwitch(view).props.accessibilityState).toMatchObject({ checked: false, disabled: true });
+      expect(view.getByText(s.notifReviewNeedsEarlier)).toBeTruthy();
+      view.unmount();
+    }
+  });
+
+  it("loads a saved second sitting and writes it only when this setup changes it", async () => {
+    const view = await openWhen(dbWith(JSON.stringify(MAGHRIB)));
+    expect(reviewSwitch(view).props.accessibilityState).toMatchObject({ checked: true });
+    expect(reviewChip(view, "After Maghrib").props.accessibilityState).toMatchObject({ checked: true });
+    expect("reviewAnchor" in (await saved(view))).toBe(false);
+    fireEvent.press(reviewSwitch(view));
+    expect((await saved(view)).reviewAnchor).toBeNull();
+
+    const off = await openWhen(dbWith("off"));
+    expect(reviewSwitch(off).props.accessibilityState).toMatchObject({ checked: false });
+    expect("reviewAnchor" in (await saved(off))).toBe(false);
+  });
+
+  it("still saves a second sitting the user chose when the saved one failed to load", async () => {
+    const failing = () =>
+      ({
+        getAllAsync: jest.fn(async (sql: string) => {
+          if (sql.includes("user_settings")) throw new Error("locked");
+          return [];
+        }),
+      }) as unknown as AppDatabase;
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const untouched = await openWhen(failing());
+      expect("reviewAnchor" in (await saved(untouched))).toBe(false);
+      untouched.unmount();
+
+      const view = await openWhen(failing());
+      fireEvent.press(reviewSwitch(view));
+      expect((await saved(view)).reviewAnchor).toEqual(MAGHRIB);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("shows a saved clock time that no chip names", async () => {
+    const view = await openWhen(dbWith(JSON.stringify({ kind: "clock", minutes: 21 * 60 + 15 })));
+    expect(reviewSwitch(view).props.accessibilityState).toMatchObject({ checked: true });
+    expect(view.getByText(interpolate(s.notifClockValue, { time: formatClockMinutesForDisplay(21 * 60 + 15, "en") }))).toBeTruthy();
+  });
+
+  it("keeps a saved second sitting when the main time moves past it, with the skip note, and can turn it off", async () => {
+    const view = await openWhen(dbWith(JSON.stringify(MAGHRIB)));
+    fireEvent.press(mainChip(view, "After Isha"));
+    expect(reviewSwitch(view).props.accessibilityState).toMatchObject({ checked: true, disabled: false });
+    expect(reviewChip(view, "After Maghrib").props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+    expect(view.getByText(s.notifReviewSkipNote)).toBeTruthy();
+    expect("reviewAnchor" in (await saved(view))).toBe(false);
+    fireEvent.press(reviewSwitch(view));
+    expect((await saved(view)).reviewAnchor).toBeNull();
+  });
+
+  it("shows the prayer-times row when only the second sitting follows a prayer", async () => {
+    const view = await openWhen();
+    fireEvent.press(mainChip(view, morning));
+    expect(view.queryByText(s.notifPrayerTimesOptional)).toBeNull();
+    fireEvent.press(reviewSwitch(view));
+    expect(reviewChip(view, "After Maghrib").props.accessibilityState).toMatchObject({ checked: true });
+    expect(view.getByText(s.notifPrayerTimesOptional)).toBeTruthy();
+  });
+
+  it("writes the Arabic step in natural Arabic", async () => {
+    const ar = strings.ar;
+    const view = render(
+      <DirectionProvider dir="rtl">
+        <HifzSetupFlow db={dbWith()} language="ar" isDark={false} s={ar} initialPlan={null} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(ar.hifzContinue));
+    expect(view.getByText("متى تجلس لوِردك؟")).toBeTruthy();
+    expect(view.getByText(/^سأبدأ وِردي بعد الفجر\. الوقت الثابت يجعل العادة أيسر/)).toBeTruthy();
+    expect(view.getByText("جلسة ثانية للمراجعة")).toBeTruthy();
+    expect(view.getByText("بعد الصلاة")).toBeTruthy();
+    expect(view.getByText("في وقت محدد")).toBeTruthy();
+  });
+});
+
+describe("HifzSetupFlow default pace", () => {
+  const db = { getAllAsync: jest.fn(async () => []) } as unknown as AppDatabase;
+  const pace = (plan: HifzPlan) => ({ newPerDay: plan.newPerDay, recentEvery: plan.recentEvery, dailyBudgetMin: plan.dailyBudgetMin });
+  const beginner = { newPerDay: 0.25, recentEvery: 2, dailyBudgetMin: 20 };
+
+  beforeEach(() => jest.mocked(applyHifzSetup).mockClear());
+
+  async function saveFrom(initialPlan: HifzPlan | null, beforeSaving: (view: ReturnType<typeof render>) => void = () => {}) {
+    const view = render(
+      <DirectionProvider dir="ltr">
+        <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={initialPlan} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    beforeSaving(view);
+    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    await act(async () => {
+      fireEvent.press(view.getByText(s.hifzSaveMemorized));
+    });
+    expect(applyHifzSetup).toHaveBeenCalledTimes(1);
+    return jest.mocked(applyHifzSetup).mock.calls[0][1].plan;
+  }
+
+  it("starts a new setup on the part-time beginner pace", async () => {
+    expect(pace(await saveFrom(null))).toEqual(beginner);
+  });
+
+  it("returns to the beginner pace when the goal moves away from keep", async () => {
+    const plan = await saveFrom(null, (view) => {
+      fireEvent.press(view.getByText(s.hifzGoalKeep));
+      fireEvent.press(view.getByText(s.hifzGoalBoth));
+    });
+    expect(plan.method).toBe("standard");
+    expect(pace(plan)).toEqual(beginner);
+  });
+
+  it("keeps the stored pace when a saved plan is edited", async () => {
+    const stored = applyPreset(DEFAULT_HIFZ_PLAN, "part_time_adult");
+    expect(pace(await saveFrom(stored))).toEqual({ newPerDay: 0.5, recentEvery: 1, dailyBudgetMin: 30 });
   });
 });
 
@@ -321,6 +527,61 @@ describe("HifzSetupFlow save and surah list recovery", () => {
     expect(view.getByText(s.setupNoSurahMatches.replace("{{query}}", "zzz"))).toBeTruthy();
     fireEvent.press(view.getByText(s.homeSearchClear));
     expect(view.getByText("2 surahs")).toBeTruthy();
-    expect(view.getByText("Al-Fatiha, Al-Mulk")).toBeTruthy();
+    expect(view.getByLabelText("Remove Al-Fatiha")).toBeTruthy();
+    expect(view.getByLabelText("Remove Al-Mulk")).toBeTruthy();
+  });
+
+  it("shows the selection above the surah list as removable chips in Quran order", async () => {
+    const view = renderFlow({ getAllAsync: jest.fn(async () => surahRows) } as unknown as AppDatabase);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByLabelText("Juz 30"));
+    fireEvent.press(view.getByText(s.hifzBySurah));
+    fireEvent.press(view.getByText("68. Al-Qalam"));
+    fireEvent.press(view.getByText("1. Al-Fatiha"));
+
+    // The count comes before the first surah row, so it is seen without scrolling the list.
+    const tree = JSON.stringify(view.toJSON());
+    expect(tree.indexOf("1 juz · 2 surahs")).toBeGreaterThan(-1);
+    expect(tree.indexOf("1 juz · 2 surahs")).toBeLessThan(tree.indexOf("1. Al-Fatiha"));
+    // Juz first, then surahs by number, whatever order they were chosen in.
+    const chips = view.getAllByLabelText(/^Remove /).map((chip) => chip.props.accessibilityLabel);
+    expect(chips).toEqual(["Remove Juz 30", "Remove Al-Fatiha", "Remove Al-Qalam"]);
+
+    fireEvent.press(view.getByLabelText("Remove Al-Qalam"));
+    expect(view.queryByLabelText("Remove Al-Qalam")).toBeNull();
+    expect(view.getByRole("checkbox", { name: /68\. Al-Qalam/ }).props.accessibilityState).toMatchObject({ checked: false });
+    fireEvent.press(view.getByLabelText("Remove Juz 30"));
+    expect(view.getByText("1 surah")).toBeTruthy();
+  });
+
+  it("collapses a long selection behind a +N chip", async () => {
+    const view = renderFlow({ getAllAsync: jest.fn(async () => surahRows) } as unknown as AppDatabase);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    for (const juz of [1, 2, 3, 4, 5, 6, 7, 8]) fireEvent.press(view.getByLabelText(`Juz ${juz}`));
+    expect(view.getAllByLabelText(/^Remove /)).toHaveLength(6);
+    fireEvent.press(view.getByText("+2"));
+    expect(view.getAllByLabelText(/^Remove /)).toHaveLength(8);
+    expect(view.getByLabelText(s.sharedShowLess)).toBeTruthy();
+  });
+
+  it("marks surahs a chosen juz includes, and keeps the surah view across Back and Continue", async () => {
+    const rows = [
+      { ...surahRows[0], first_page: 1, last_page: 1 },
+      { ...surahRows[1], first_page: 562, last_page: 564 },
+      { number: 78, name_arabic: "النبأ", name_english: "The Tidings", ayah_count: 40, first_page: 582, last_page: 583 },
+    ];
+    const view = renderFlow({ getAllAsync: jest.fn(async () => rows) } as unknown as AppDatabase);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByLabelText("Juz 30"));
+    fireEvent.press(view.getByText(s.hifzBySurah));
+    expect(view.getByRole("checkbox", { name: /78\. An-Naba/ })).toBeTruthy();
+    expect(view.getAllByText("Included in Juz 30")).toHaveLength(1);
+
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByText(s.hifzBack));
+    expect(view.getByPlaceholderText(s.setupSurahSearchPlaceholder)).toBeTruthy();
   });
 });

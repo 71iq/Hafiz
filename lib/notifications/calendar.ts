@@ -6,10 +6,10 @@ import { readPrayerLocation } from "@/lib/prayer/settings";
 import { createPrayerTimesLookup } from "@/lib/prayer/times";
 import { saveCalendarFile } from "@/lib/notifications/calendar-file";
 import { deviceClock, type DayClock } from "@/lib/notifications/clock";
-import { buildDayTimes } from "@/lib/notifications/day-times";
-import { isRamadan } from "@/lib/notifications/ramadan";
+import { resolveAnchorAt } from "@/lib/notifications/day-times";
 import { readReminderPrefs, readUiLanguage } from "@/lib/notifications/settings";
 import { prayerLabel, type Language } from "@/lib/notifications/templates";
+import type { ReminderAnchor } from "@/lib/notifications/types";
 
 const CALENDAR_FILE_NAME = "hafiz-daily-wird.ics";
 
@@ -46,50 +46,57 @@ function utcStamp(at: Date): string {
   return at.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
-/**
- * AMB-05: one daily repeating event with a reminder at its start. The time is floating (no zone),
- * so it stays at the same wall-clock time wherever the calendar is.
- */
-export function buildWirdCalendar(input: {
-  date: LocalDate;
+export type WirdCalendarEvent = Readonly<{
   minutes: number;
   title: string;
   description: string;
-  now: Date;
+  /** Stable, so a calendar updates the event when the file is added again. */
   uid: string;
-}): string {
-  const hours = String(Math.floor(input.minutes / 60)).padStart(2, "0");
-  const minutes = String(input.minutes % 60).padStart(2, "0");
-  const start = `${compactDate(input.date)}T${hours}${minutes}00`;
+}>;
+
+/**
+ * AMB-05: daily repeating events, each with a reminder at its start: the wird, and the second sitting
+ * for review when it is on (REMIND-07). The time is floating (no zone), so it stays at the same
+ * wall-clock time wherever the calendar is.
+ */
+export function buildWirdCalendar(input: { date: LocalDate; now: Date; events: readonly WirdCalendarEvent[] }): string {
+  const event = (item: WirdCalendarEvent) => {
+    const hours = String(Math.floor(item.minutes / 60)).padStart(2, "0");
+    const minutes = String(item.minutes % 60).padStart(2, "0");
+    return [
+      "BEGIN:VEVENT",
+      `UID:${item.uid}`,
+      `DTSTAMP:${utcStamp(input.now)}`,
+      `DTSTART:${compactDate(input.date)}T${hours}${minutes}00`,
+      "DURATION:PT15M",
+      "RRULE:FREQ=DAILY",
+      `SUMMARY:${escapeText(item.title)}`,
+      `DESCRIPTION:${escapeText(item.description)}`,
+      "TRANSP:TRANSPARENT",
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${escapeText(item.title)}`,
+      "TRIGGER:PT0M",
+      "END:VALARM",
+      "END:VEVENT",
+    ];
+  };
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Hafiz//Daily wird//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    "BEGIN:VEVENT",
-    `UID:${input.uid}`,
-    `DTSTAMP:${utcStamp(input.now)}`,
-    `DTSTART:${start}`,
-    "DURATION:PT15M",
-    "RRULE:FREQ=DAILY",
-    `SUMMARY:${escapeText(input.title)}`,
-    `DESCRIPTION:${escapeText(input.description)}`,
-    "TRANSP:TRANSPARENT",
-    "BEGIN:VALARM",
-    "ACTION:DISPLAY",
-    `DESCRIPTION:${escapeText(input.title)}`,
-    "TRIGGER:PT0M",
-    "END:VALARM",
-    "END:VEVENT",
+    ...input.events.flatMap(event),
     "END:VCALENDAR",
   ];
   return `${lines.map(foldLine).join("\r\n")}\r\n`;
 }
 
 /**
- * The calendar file for the user's reminder time. A prayer anchor uses today's time, rounded to 5
- * minutes, and the description says that prayer times move through the year.
+ * The calendar file for the user's reminder time, and for the second sitting when it is on. A prayer
+ * anchor uses today's time, rounded to 5 minutes, and the description says that prayer times move
+ * through the year. Neither event follows the Ramadan time.
  */
 async function buildWirdCalendarForUser(
   db: DatabaseExecutor,
@@ -102,27 +109,30 @@ async function buildWirdCalendarForUser(
   ]);
   const strings = notificationsStrings[lang];
   const date = clock.dateOf(now);
-  const times = buildDayTimes(
-    { clock, prayers: createPrayerTimesLookup(location), anchor: prefs.anchor, ramadanAnchor: null, isRamadan },
-    date,
-  );
-  const exact = clock.minutesOf(times.anchorAt);
-  const minutes = prefs.anchor.kind === "clock" ? prefs.anchor.minutes : (Math.round(exact / 5) * 5) % 1440;
-  const description =
-    prefs.anchor.kind === "prayer"
-      ? `${strings.notifCalendarEventNote} ${interpolate(strings.notifCalendarEventPrayerNote, {
-          prayer: prayerLabel(prefs.anchor.prayer, lang),
-        })}`
-      : strings.notifCalendarEventNote;
-  return buildWirdCalendar({
-    date,
-    minutes,
-    title: strings.notifCalendarEventTitle,
-    description,
-    now,
-    // A stable UID lets a calendar update the event when the file is added again.
-    uid: "daily-wird@hafizquran.app",
-  });
+  const day = { clock, prayers: createPrayerTimesLookup(location) };
+  const minutesOf = (anchor: ReminderAnchor) =>
+    anchor.kind === "clock" ? anchor.minutes : (Math.round(clock.minutesOf(resolveAnchorAt(day, date, anchor)) / 5) * 5) % 1440;
+  const describe = (note: string, anchor: ReminderAnchor) =>
+    anchor.kind === "prayer"
+      ? `${note} ${interpolate(strings.notifCalendarEventPrayerNote, { prayer: prayerLabel(anchor.prayer, lang) })}`
+      : note;
+  const events: WirdCalendarEvent[] = [
+    {
+      minutes: minutesOf(prefs.anchor),
+      title: strings.notifCalendarEventTitle,
+      description: describe(strings.notifCalendarEventNote, prefs.anchor),
+      uid: "daily-wird@hafizquran.app",
+    },
+  ];
+  if (prefs.reviewAnchor) {
+    events.push({
+      minutes: minutesOf(prefs.reviewAnchor),
+      title: strings.notifCalendarReviewEventTitle,
+      description: describe(strings.notifCalendarReviewEventNote, prefs.reviewAnchor),
+      uid: "daily-review@hafizquran.app",
+    });
+  }
+  return buildWirdCalendar({ date, now, events });
 }
 
 /** Build the file and hand it to the platform: a download on web, the share sheet on native. */

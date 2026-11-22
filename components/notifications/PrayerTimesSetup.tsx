@@ -79,7 +79,8 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
   const [latitudeText, setLatitudeText] = useState("");
   const [longitudeText, setLongitudeText] = useState("");
   const [methodsOpen, setMethodsOpen] = useState(false);
-  const [coordinatesOpen, setCoordinatesOpen] = useState(false);
+  // Typed coordinates, the calculation method and Asr time stay behind one row until asked for.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const iconColor = isDark ? "#E5E5E5" : "#3F3F46";
   const placeholderColor = isDark ? "#737373" : "#8B8178";
@@ -130,7 +131,7 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
       if (result.kind === "ok") await saveCoordinates(result.coordinates, "device");
       else {
         // The message asks for coordinates, so the fields open with it.
-        setCoordinatesOpen(true);
+        setAdvancedOpen(true);
         setStatus({
           kind: "message",
           text: result.kind === "denied" ? s.notifLocationDenied : s.notifLocationUnavailable,
@@ -139,7 +140,7 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
         });
       }
     } catch {
-      setCoordinatesOpen(true);
+      setAdvancedOpen(true);
       setStatus({ kind: "message", text: s.notifLocationUnavailable, tone: "info", place: "location" });
     }
   };
@@ -194,118 +195,127 @@ export function PrayerTimesSetup({ onChange, onSkip, onDone }: PrayerTimesSetupP
 
       <View className="gap-2">
         <DisclosureRow
-          onPress={() => setCoordinatesOpen((open) => !open)}
+          onPress={() => setAdvancedOpen((open) => !open)}
           accessibilityRole="button"
-          accessibilityState={{ expanded: coordinatesOpen }}
+          accessibilityState={{ expanded: advancedOpen }}
           style={{ minHeight: 44 }}
-          trailing={coordinatesOpen ? <ChevronUp size={18} color={iconColor} /> : <ChevronDown size={18} color={iconColor} />}
+          trailing={advancedOpen ? <ChevronUp size={18} color={iconColor} /> : <ChevronDown size={18} color={iconColor} />}
         >
-          <Text variant="title-sm">{s.notifManualEntry}</Text>
-        </DisclosureRow>
-        {coordinatesOpen ? (
-          <>
-            <MirroredRow className="gap-2">
-              <View className="gap-1" style={{ flex: 1 }}>
-                <Text variant="label-lg" nativeID="prayer-latitude-label">
-                  {s.notifLatitude}
-                </Text>
-                <Input
-                  value={latitudeText}
-                  onChangeText={setLatitudeText}
-                  placeholder={s.notifLatitudeExample}
-                  placeholderTextColor={placeholderColor}
-                  className={OUTLINE_BORDER}
-                  accessibilityLabel={s.notifLatitude}
-                  accessibilityLabelledBy="prayer-latitude-label"
-                  keyboardType="numbers-and-punctuation"
-                  autoCorrect={false}
-                />
-              </View>
-              <View className="gap-1" style={{ flex: 1 }}>
-                <Text variant="label-lg" nativeID="prayer-longitude-label">
-                  {s.notifLongitude}
-                </Text>
-                <Input
-                  value={longitudeText}
-                  onChangeText={setLongitudeText}
-                  placeholder={s.notifLongitudeExample}
-                  placeholderTextColor={placeholderColor}
-                  className={OUTLINE_BORDER}
-                  accessibilityLabel={s.notifLongitude}
-                  accessibilityLabelledBy="prayer-longitude-label"
-                  keyboardType="numbers-and-punctuation"
-                  autoCorrect={false}
-                />
-              </View>
-            </MirroredRow>
-            <Button variant="outline" className={OUTLINE_BORDER} onPress={saveManual} label={s.notifSaveCoordinates} />
-            {coordinatesStatus ? (
-              <Text
-                variant="body-sm"
-                accessibilityLiveRegion="polite"
-                className={coordinatesStatus.tone === "error" ? "text-red-600 dark:text-red-400" : STATUS_TEXT}
-              >
-                {coordinatesStatus.text}
-              </Text>
-            ) : null}
-          </>
-        ) : null}
-      </View>
-
-      <View className="gap-2">
-        <Text variant="title-sm">{s.notifCalculationMethod}</Text>
-        <Pressable
-          onPress={() => setMethodsOpen((open) => !open)}
-          accessibilityRole="button"
-          accessibilityLabel={`${s.notifCalculationMethod}: ${s[CALCULATION_METHOD_LABEL_KEYS[method]]}`}
-          accessibilityState={{ expanded: methodsOpen }}
-          className="rounded-2xl bg-surface-high dark:bg-surface-dark-high px-4"
-          style={{ minHeight: 44, justifyContent: "center" }}
-        >
-          <MirroredRow className="items-center justify-between gap-2">
-            <Text variant="body" style={{ flex: 1 }}>
-              {s[CALCULATION_METHOD_LABEL_KEYS[method]]}
+          <Text variant="title-sm">{s.notifPrayerAdvanced}</Text>
+          {/* Closed, the row still says which method and Asr time apply. */}
+          {advancedOpen ? null : (
+            <Text variant="caption">
+              {`${s[CALCULATION_METHOD_LABEL_KEYS[method]]}${uiLanguage === "ar" ? "، " : " · "}${madhab === "hanafi" ? s.notifAsrHanafi : s.notifAsrStandard}`}
             </Text>
-            {methodsOpen ? <ChevronUp size={18} color={iconColor} /> : <ChevronDown size={18} color={iconColor} />}
-          </MirroredRow>
-        </Pressable>
-        {methodsOpen && (
-          <View accessibilityRole="radiogroup" className="gap-1">
-            {CALCULATION_METHODS.map((key) => {
-              const selected = key === method;
-              return (
-                <Pressable
-                  key={key}
-                  onPress={() => chooseMethod(key)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
-                  accessibilityLabel={s[CALCULATION_METHOD_LABEL_KEYS[key]]}
-                  className="rounded-xl px-4"
-                  style={{ minHeight: 44, justifyContent: "center" }}
+          )}
+        </DisclosureRow>
+        {advancedOpen ? (
+          <View className="gap-4">
+            <View className="gap-2">
+              <Text variant="title-sm">{s.notifManualEntry}</Text>
+              <MirroredRow className="gap-2">
+                <View className="gap-1" style={{ flex: 1 }}>
+                  <Text variant="label-lg" nativeID="prayer-latitude-label">
+                    {s.notifLatitude}
+                  </Text>
+                  <Input
+                    value={latitudeText}
+                    onChangeText={setLatitudeText}
+                    placeholder={s.notifLatitudeExample}
+                    placeholderTextColor={placeholderColor}
+                    className={OUTLINE_BORDER}
+                    accessibilityLabel={s.notifLatitude}
+                    accessibilityLabelledBy="prayer-latitude-label"
+                    keyboardType="numbers-and-punctuation"
+                    autoCorrect={false}
+                  />
+                </View>
+                <View className="gap-1" style={{ flex: 1 }}>
+                  <Text variant="label-lg" nativeID="prayer-longitude-label">
+                    {s.notifLongitude}
+                  </Text>
+                  <Input
+                    value={longitudeText}
+                    onChangeText={setLongitudeText}
+                    placeholder={s.notifLongitudeExample}
+                    placeholderTextColor={placeholderColor}
+                    className={OUTLINE_BORDER}
+                    accessibilityLabel={s.notifLongitude}
+                    accessibilityLabelledBy="prayer-longitude-label"
+                    keyboardType="numbers-and-punctuation"
+                    autoCorrect={false}
+                  />
+                </View>
+              </MirroredRow>
+              <Button variant="outline" className={OUTLINE_BORDER} onPress={saveManual} label={s.notifSaveCoordinates} />
+              {coordinatesStatus ? (
+                <Text
+                  variant="body-sm"
+                  accessibilityLiveRegion="polite"
+                  className={coordinatesStatus.tone === "error" ? "text-red-600 dark:text-red-400" : STATUS_TEXT}
                 >
-                  <MirroredRow className="items-center gap-2">
-                    <View style={{ width: 18 }}>{selected ? <Check size={18} color={iconColor} /> : null}</View>
-                    <Text variant="body" style={{ flex: 1 }}>
-                      {s[CALCULATION_METHOD_LABEL_KEYS[key]]}
-                    </Text>
-                  </MirroredRow>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </View>
+                  {coordinatesStatus.text}
+                </Text>
+              ) : null}
+            </View>
 
-      <View className="gap-2">
-        <Text variant="title-sm">{s.notifAsrMethod}</Text>
-        <ToggleGroup<AsrMadhab>
-          value={madhab}
-          onValueChange={chooseMadhab}
-          items={[
-            { value: "shafi", label: s.notifAsrStandard },
-            { value: "hanafi", label: s.notifAsrHanafi },
-          ]}
-        />
+            <View className="gap-2">
+              <Text variant="title-sm">{s.notifCalculationMethod}</Text>
+              <Pressable
+                onPress={() => setMethodsOpen((open) => !open)}
+                accessibilityRole="button"
+                accessibilityLabel={`${s.notifCalculationMethod}: ${s[CALCULATION_METHOD_LABEL_KEYS[method]]}`}
+                accessibilityState={{ expanded: methodsOpen }}
+                className="rounded-2xl bg-surface-high dark:bg-surface-dark-high px-4"
+                style={{ minHeight: 44, justifyContent: "center" }}
+              >
+                <MirroredRow className="items-center justify-between gap-2">
+                  <Text variant="body" style={{ flex: 1 }}>
+                    {s[CALCULATION_METHOD_LABEL_KEYS[method]]}
+                  </Text>
+                  {methodsOpen ? <ChevronUp size={18} color={iconColor} /> : <ChevronDown size={18} color={iconColor} />}
+                </MirroredRow>
+              </Pressable>
+              {methodsOpen && (
+                <View accessibilityRole="radiogroup" className="gap-1">
+                  {CALCULATION_METHODS.map((key) => {
+                    const selected = key === method;
+                    return (
+                      <Pressable
+                        key={key}
+                        onPress={() => chooseMethod(key)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: selected }}
+                        accessibilityLabel={s[CALCULATION_METHOD_LABEL_KEYS[key]]}
+                        className="rounded-xl px-4"
+                        style={{ minHeight: 44, justifyContent: "center" }}
+                      >
+                        <MirroredRow className="items-center gap-2">
+                          <View style={{ width: 18 }}>{selected ? <Check size={18} color={iconColor} /> : null}</View>
+                          <Text variant="body" style={{ flex: 1 }}>
+                            {s[CALCULATION_METHOD_LABEL_KEYS[key]]}
+                          </Text>
+                        </MirroredRow>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            <View className="gap-2">
+              <Text variant="title-sm">{s.notifAsrMethod}</Text>
+              <ToggleGroup<AsrMadhab>
+                value={madhab}
+                onValueChange={chooseMadhab}
+                items={[
+                  { value: "shafi", label: s.notifAsrStandard },
+                  { value: "hanafi", label: s.notifAsrHanafi },
+                ]}
+              />
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {location && todayTimes && (

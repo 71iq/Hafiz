@@ -147,7 +147,11 @@ and return-path records in Cloudflare, and GoTrue uses `smtp.resend.com` on port
 587 with a sending-only key. The SMTP values live in `/etc/hafiz/supabase.env`
 (`SMTP_*`, mapped by the pinned compose file), not in `auth.env`. Email links
 expire after one hour (`GOTRUE_MAILER_OTP_EXP=3600`), as on the former project. Port 465 is unreachable from this network. Keep
-email confirmation enabled. Caddy still rejects the email endpoints the app does
+email confirmation enabled. A signup or confirmation resend for an address that
+is already confirmed, including through Google, returns success without sending
+email. In `auth.audit_log_entries` a repeated signup shows as
+`user_repeated_signup`, a resend for a confirmed address leaves no entry, and a
+sent confirmation shows as `user_confirmation_requested`. Caddy still rejects the email endpoints the app does
 not use (OTP, magic link, invite and reauthentication). The Google login uses a
 second client secret on the original OAuth client, because the first secret
 survived only as a hash. GoTrue has `GOTRUE_DISABLE_SIGNUP=false` and

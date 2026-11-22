@@ -347,7 +347,8 @@ function ReflectionJourneyInner() {
   );
 
   const outlineClass = "border border-warm-200 dark:border-neutral-700";
-  const startSelf = isRTL ? "self-end" : "self-start";
+  // A lone action sits in a pinned row so it starts on the reading side. Hand-mirrored self-end under
+  // the RTL tab root flipped twice and put it on the left in the narrow Arabic layout.
 
   const levelContent = selectedLevel ? (
     <>
@@ -541,14 +542,16 @@ function ReflectionJourneyInner() {
               </Text>
             </View>
             {nextLevel ? (
-              <Button variant="outline" onPress={() => selectLevel(nextLevel.id)} className={`${outlineClass} ${startSelf}`}>
-                <View className="items-center gap-2" style={rowStyle}>
-                  <Sparkles size={14} color={accent} />
-                  <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                    {s.reflectionJourneyOpenNext}
-                  </Text>
-                </View>
-              </Button>
+              <View style={rowStyle}>
+                <Button variant="outline" onPress={() => selectLevel(nextLevel.id)} className={outlineClass}>
+                  <View className="items-center gap-2" style={rowStyle}>
+                    <Sparkles size={14} color={accent} />
+                    <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                      {s.reflectionJourneyOpenNext}
+                    </Text>
+                  </View>
+                </Button>
+              </View>
             ) : null}
           </View>
         ) : (
@@ -616,11 +619,13 @@ function ReflectionJourneyInner() {
                 {interpolate(s.journeyLevelsLeft, { n: formatNumber(levels.length - completedCount, uiLanguage) })}
               </Text>
               {firstUnfinished && firstUnfinished.id !== selectedLevel.id ? (
-                <Button variant="outline" onPress={() => selectLevel(firstUnfinished.id)} className={`${outlineClass} ${startSelf}`}>
-                  <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                    {s.journeyOpenUnfinished}
-                  </Text>
-                </Button>
+                <View style={rowStyle}>
+                  <Button variant="outline" onPress={() => selectLevel(firstUnfinished.id)} className={outlineClass}>
+                    <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                      {s.journeyOpenUnfinished}
+                    </Text>
+                  </Button>
+                </View>
               ) : null}
             </>
           )}

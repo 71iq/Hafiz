@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.17": {
+    en: [
+      "Setup starts on a lighter pace with fewer cards, shows the juz and surahs you chose at the top, and can add an optional second sitting for review.",
+      "Deck rows show today's new, learning and review cards, and Continue reading opens the page you were on.",
+      "Arabic screens align to the right, and the sign-in and sign-up fields are simpler.",
+    ],
+    ar: [
+      "يبدأ الإعداد بوتيرة أخف وبطاقات أقل، ويعرض الأجزاء والسور التي اخترتها في الأعلى، ويمكنك إضافة جلسة ثانية للمراجعة.",
+      "تعرض المجموعات بطاقات اليوم الجديدة وقيد التعلم والمراجعة، ويفتح «متابعة القراءة» الصفحة التي توقفت عندها.",
+      "تحاذي الشاشات العربية جهة اليمين، وصارت حقول تسجيل الدخول وإنشاء الحساب أبسط.",
+    ],
+  },
   "1.0.16": {
     en: ["Memorization stages use plain names in English: New, Recent and Long-term."],
     ar: ["تستخدم الواجهة الإنجليزية أسماء واضحة لمراحل الحفظ: جديد وقريب وبعيد. ولم تتغير الواجهة العربية."],

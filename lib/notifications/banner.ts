@@ -2,7 +2,7 @@ import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import type { LocalDate } from "@/lib/habit/dates";
 import { deviceClock, type DayClock } from "@/lib/notifications/clock";
 import { projectHabit } from "@/lib/notifications/habit-projection";
-import { planNotifications } from "@/lib/notifications/planner";
+import { isSetAsideToday, planNotifications } from "@/lib/notifications/planner";
 import { reminderPlatform } from "@/lib/notifications/platform";
 import { hijriDateOf, RAMADAN_MONTH } from "@/lib/notifications/ramadan";
 import { loadReminderContext, rescheduleReminders } from "@/lib/notifications/schedule";
@@ -15,7 +15,7 @@ import {
   writeReminderPref,
 } from "@/lib/notifications/settings";
 import { renderNotification, type Language } from "@/lib/notifications/templates";
-import type { NotificationType, RamadanAnchor, ReminderRoute } from "@/lib/notifications/types";
+import { WIRD_TYPES, type NotificationType, type RamadanAnchor, type ReminderRoute } from "@/lib/notifications/types";
 
 export type ReminderBanner =
   | Readonly<{ kind: "ramadan_offer"; hijriYear: number; localDate: LocalDate }>
@@ -47,7 +47,13 @@ const STATE_FOR_TYPE: Partial<Record<NotificationType, readonly string[]>> = {
   late_reminder: ["at_risk"],
   grace_used: ["at_risk"],
   earnback_open: ["earn_back"],
+  // REMIND-07's habit gate without today's minimum. With the minimum met it shows under any headline,
+  // an open earn-back included, while review is left.
+  review_reminder: ["at_risk", "empty", "make_up_open"],
 };
+
+/** Reminders that stay true once today's minimum is met: al-Kahf, and the second sitting while review is left. */
+const SHOWN_WHEN_DONE: ReadonlySet<NotificationType> = new Set<NotificationType>(["friday_kahf", "review_reminder"]);
 
 /**
  * The in-app reminder for right now (NOT-03). Web always uses it because it cannot schedule; native
@@ -56,7 +62,7 @@ const STATE_FOR_TYPE: Partial<Record<NotificationType, readonly string[]>> = {
  * days of Ramadan it offers the Ramadan reminder times once (NOT-10).
  */
 export async function loadReminderBanner(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   { now = new Date(), language, clock = deviceClock }: { now?: Date; language?: Language; clock?: DayClock } = {},
 ): Promise<ReminderBanner | null> {
   const context = await loadReminderContext(db, { now, language, clock });
@@ -84,13 +90,28 @@ export async function loadReminderBanner(
     random: seededRandom(today),
   });
   const due = plan.slots.filter((slot) => slot.at.getTime() <= now.getTime() && slot.localDate === today);
-  const latest = due[due.length - 1];
+  const snapshot = projectHabit(input, today, now).snapshot;
+  const minimumMet = snapshot.streak.todayStatus === "done";
+  // Before today's minimum, the main sitting's reminder keeps the banner when it is due: REMIND-07's
+  // review banner takes over only once the minimum is met or nothing else is due.
+  const latestDue = due[due.length - 1];
+  const latest =
+    latestDue?.type === "review_reminder" && !minimumMet
+      ? (due.filter((slot) => WIRD_TYPES.has(slot.type)).at(-1) ?? latestDue)
+      : latestDue;
   if (!latest) return null;
 
-  const current = projectHabit(input, today, now).snapshot.headline.kind;
-  if (["done_today", "excused_today", "paused"].includes(current) && latest.type !== "friday_kahf") return null;
-  const needed = STATE_FOR_TYPE[latest.type];
-  if (needed && !needed.includes(current)) return null;
+  const current = snapshot.headline.kind;
+  if (["excused_today", "paused"].includes(current) && latest.type !== "friday_kahf") return null;
+  if (current === "done_today" && !SHOWN_WHEN_DONE.has(latest.type)) return null;
+  if (latest.type === "review_reminder") {
+    // Today's review state at `now`, not when the plan was made, and never on a day set aside.
+    if (!context.reviewLeft.left || isSetAsideToday(snapshot, input.habit.pause, today)) return null;
+    if (!minimumMet && !STATE_FOR_TYPE.review_reminder!.includes(current)) return null;
+  } else {
+    const needed = STATE_FOR_TYPE[latest.type];
+    if (needed && !needed.includes(current)) return null;
+  }
 
   const dismissed = await readLocalSetting(db, LOCAL_KEYS.bannerDismissed, bannerDismissedSchema);
   if (dismissed?.local_date === today && dismissed.kind === latest.type) return null;

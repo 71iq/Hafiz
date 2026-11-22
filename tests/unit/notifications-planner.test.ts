@@ -12,46 +12,9 @@ import {
   type PlannerInput,
 } from "@/lib/notifications/planner";
 import { templateById } from "@/lib/notifications/templates";
-import { DEFAULT_REMINDER_PREFS, WIRD_TYPES, type NotificationType, type ReminderPrefs } from "@/lib/notifications/types";
+import { DEFAULT_REMINDER_PREFS, WIRD_TYPES, type NotificationType, type ReminderAnchor, type ReminderPrefs } from "@/lib/notifications/types";
 import type { DayPrayerTimes } from "@/lib/prayer/times";
-
-/** A clock for a named IANA zone, independent of the machine running the tests. */
-function zonedClock(timeZone: string): DayClock {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  });
-  const wall = (at: Date) => {
-    const values = Object.fromEntries(parts.formatToParts(at).map((part) => [part.type, part.value]));
-    return {
-      date: `${values.year}-${values.month}-${values.day}`,
-      minutes: Number(values.hour) * 60 + Number(values.minute),
-      utcOfWall: Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day), Number(values.hour), Number(values.minute), Number(values.second)),
-    };
-  };
-  const offsetAt = (ms: number) => wall(new Date(ms)).utcOfWall - Math.floor(ms / 1000) * 1000;
-  return {
-    at: (date, minutes) => {
-      const [year, month, day] = date.split("-").map(Number);
-      const guess = Date.UTC(year, month - 1, day, 0, minutes);
-      let instant = guess - offsetAt(guess);
-      instant = guess - offsetAt(instant);
-      return new Date(instant);
-    },
-    dateOf: (at) => wall(at).date,
-    minutesOf: (at) => wall(at).minutes,
-    weekdayOf: (date) => {
-      const [year, month, day] = date.split("-").map(Number);
-      return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-    },
-  };
-}
+import { zonedClock } from "@/tests/jest/zoned-clock";
 
 const RIYADH = zonedClock("Asia/Riyadh");
 const LONDON = zonedClock("Europe/London");
@@ -484,6 +447,149 @@ describe("planNotifications", () => {
       expect(template.needs).not.toContain("fiveMinutes");
       expect(template.needs).not.toContain("surah");
     }
+  });
+});
+
+describe("the second sitting for review (REMIND-07)", () => {
+  const MAGHRIB: ReminderAnchor = { kind: "prayer", prayer: "maghrib", offsetMinutes: 20 };
+  const clockAt = (minutes: number): ReminderAnchor => ({ kind: "clock", minutes });
+  const withReview = (reviewAnchor: ReminderAnchor = MAGHRIB, extra: Omit<Partial<ReminderPrefs>, "types"> & { types?: Partial<ReminderPrefs["types"]> } = {}) =>
+    prefsWith({ reviewAnchor, ...extra });
+  const left = () => true;
+  const habitOf = (statuses: Record<LocalDate, DayStatus>, pause: { start: LocalDate; end: LocalDate } | null = null) => ({ days: days(statuses), pause });
+  /** Five done days to yesterday and today's minimum met. */
+  const doneToday = habitOf({ ...streak(5), [TODAY]: "done" });
+  /** A one-day streak, which has no evening at-risk reminder, so later dates have room for the review reminder. */
+  const oneDay = habitOf(streak(1));
+  const on = (result: ReturnType<typeof planNotifications>, date: LocalDate = TODAY) => summary(result).filter((line) => line.startsWith(date));
+  const reviews = (result: ReturnType<typeof planNotifications>) => result.slots.filter((slot) => slot.type === "review_reminder");
+
+  it("stays due after today's minimum while review is left, at the time the user chose", () => {
+    const result = planNotifications(input({ prefs: withReview(), habit: doneToday, reviewLeft: left, now: RIYADH.at(TODAY, 9 * 60) }));
+    expect(on(result)).toEqual([`${TODAY} 18:20 review_reminder`]);
+    const slot = reviews(result).find((item) => item.localDate === TODAY)!;
+    expect(slot.route).toBe("wird");
+    expect(slot.vars.reviewLeft).toBe(1);
+  });
+
+  it("stays due after today's minimum during an open earn-back", () => {
+    const habit = habitOf({ ...streak(10, -3, "excused"), [TODAY]: "done" });
+    const now = RIYADH.at(TODAY, 9 * 60);
+    expect(projectHabit(input({ habit }), TODAY, now).snapshot.headline.kind).toBe("earn_back");
+    expect(on(planNotifications(input({ prefs: withReview(), habit, reviewLeft: left, now })))).toEqual([`${TODAY} 18:20 review_reminder`]);
+  });
+
+  it("sends nothing once today's review is finished, and keeps later dates' copy conditional", () => {
+    const reviewLeft = (date: LocalDate) => date !== TODAY;
+    // Tomorrow's streak is at risk; with the evening at-risk reminder off, the review reminder fits the cap.
+    const prefs = withReview(MAGHRIB, { types: { streak_at_risk: false } });
+    const result = planNotifications(input({ prefs, habit: doneToday, reviewLeft, now: RIYADH.at(TODAY, 9 * 60) }));
+    expect(reviews(result).some((slot) => slot.localDate === TODAY)).toBe(false);
+    const later = reviews(result).filter((slot) => slot.localDate > TODAY);
+    expect(later.length).toBeGreaterThan(0);
+    for (const slot of later) {
+      expect(slot.vars.reviewLeft).toBeUndefined();
+      expect(templateById(slot.templateId)?.needs).not.toContain("reviewLeft");
+    }
+  });
+
+  it("is off without a plan, and off when the second sitting is off", () => {
+    expect(reviews(planNotifications(input({ prefs: withReview(), habit: oneDay })))).toEqual([]);
+    expect(reviews(planNotifications(input({ prefs: prefsWith({}), habit: oneDay, reviewLeft: left })))).toEqual([]);
+  });
+
+  it("sends nothing on an excused or paused day", () => {
+    for (const status of ["excused", "paused"] as const) {
+      const result = planNotifications(input({ prefs: withReview(), habit: habitOf({ ...streak(5), [TODAY]: status }), reviewLeft: left }));
+      expect(on(result).filter((line) => line.endsWith("review_reminder"))).toEqual([]);
+    }
+    const paused = planNotifications(input({ prefs: withReview(), habit: habitOf(streak(5), { start: TODAY, end: addDays(TODAY, 2) }), reviewLeft: left }));
+    expect(reviews(paused).filter((slot) => slot.localDate <= addDays(TODAY, 2))).toEqual([]);
+  });
+
+  it("sends a dormant user, a fresh start or someone who never recited no review reminder in the 7-day plan", () => {
+    for (const statuses of [streak(3, -60), streak(3, -10), {}]) {
+      expect(reviews(planNotifications(input({ prefs: withReview(), habit: habitOf(statuses), reviewLeft: left })))).toEqual([]);
+    }
+  });
+
+  it("does not remind an open earn-back before today's minimum", () => {
+    const habit = habitOf(streak(10, -3, "excused"));
+    expect(reviews(planNotifications(input({ prefs: withReview(), habit, reviewLeft: left })))).toEqual([]);
+  });
+
+  it("gives way to the main reminder and the streak at risk when the daily cap binds", () => {
+    const result = planNotifications(input({ prefs: withReview(), reviewLeft: left }));
+    expect(on(result)).toEqual([`${TODAY} 05:20 wird_reminder`, `${TODAY} 21:00 streak_at_risk`]);
+    expect(result.skipped).toContainEqual(expect.objectContaining({ type: "review_reminder", localDate: TODAY, reason: "cap" }));
+  });
+
+  it("sends one message when it falls within 30 minutes of the streak at risk, with the streak wording", () => {
+    const result = planNotifications(input({ prefs: withReview(clockAt(20 * 60 + 45)), reviewLeft: left }));
+    expect(on(result)).toEqual([`${TODAY} 05:20 wird_reminder`, `${TODAY} 21:00 streak_at_risk`]);
+    expect(result.skipped).toContainEqual(expect.objectContaining({ type: "review_reminder", localDate: TODAY, reason: "merged" }));
+    // Without a streak at risk, the review reminder keeps its own time.
+    const calm = planNotifications(input({ prefs: withReview(clockAt(20 * 60 + 45)), habit: oneDay, reviewLeft: left }));
+    expect(on(calm)).toEqual([`${TODAY} 05:20 wird_reminder`, `${TODAY} 20:45 review_reminder`]);
+  });
+
+  it("plans nothing on a day its time is at or before the main sitting", () => {
+    // The main time edited to equal the saved review time.
+    const equal = planNotifications(input({ prefs: withReview(MAGHRIB, { anchor: MAGHRIB }), habit: doneToday, reviewLeft: left }));
+    expect(reviews(equal)).toEqual([]);
+    // An evening main with a review time that resolves earlier.
+    const earlier = planNotifications(input({ prefs: withReview(MAGHRIB, { anchor: clockAt(20 * 60) }), habit: doneToday, reviewLeft: left }));
+    expect(reviews(earlier)).toEqual([]);
+  });
+
+  it("merges with a main clock time within 30 minutes of its prayer time, and comes on its own once the minimum is met", () => {
+    const prefs = withReview({ kind: "prayer", prayer: "dhuhr", offsetMinutes: 20 }, { anchor: clockAt(12 * 60 + 30) });
+    const open = planNotifications(input({ prefs, habit: oneDay, reviewLeft: left }));
+    expect(on(open)).toEqual([`${TODAY} 12:30 wird_reminder`]);
+    expect(open.skipped).toContainEqual(expect.objectContaining({ type: "review_reminder", localDate: TODAY, reason: "merged" }));
+    const done = planNotifications(input({ prefs, habit: habitOf({ ...streak(1), [TODAY]: "done" }), reviewLeft: left, now: RIYADH.at(TODAY, 9 * 60) }));
+    expect(on(done)).toEqual([`${TODAY} 12:50 review_reminder`]);
+  });
+
+  it("keeps its own time in Ramadan and merges with a Ramadan main time near it", () => {
+    const prefs = withReview(clockAt(22 * 60), { ramadanAnchor: "after_taraweeh" });
+    const ramadan = { isRamadan: () => true, reviewLeft: left };
+    // After Taraweeh is Isha + 90 minutes, 21:30 with the fallback times, half an hour before the review time.
+    const open = planNotifications(input({ prefs, habit: oneDay, ...ramadan }));
+    expect(on(open)).toEqual([`${TODAY} 21:30 wird_reminder`]);
+    const done = planNotifications(input({ prefs, habit: habitOf({ ...streak(1), [TODAY]: "done" }), now: RIYADH.at(TODAY, 9 * 60), ...ramadan }));
+    expect(on(done)).toEqual([`${TODAY} 22:00 review_reminder`]);
+  });
+
+  it("is sent at its chosen time inside quiet hours", () => {
+    const result = planNotifications(input({ prefs: withReview(clockAt(23 * 60 + 10)), habit: doneToday, reviewLeft: left, now: RIYADH.at(TODAY, 9 * 60) }));
+    expect(on(result)).toEqual([`${TODAY} 23:10 review_reminder`]);
+  });
+
+  it("ranks below Friday al-Kahf, and merges with it when the two are close", () => {
+    const friday = addDays(TODAY, 1);
+    const kahf = { friday_kahf: true };
+    // The main reminder already fired on Friday; al-Kahf takes the second place.
+    const delivered = [{ type: "wird_reminder", templateId: "wird_reminder.9", localDate: friday, at: RIYADH.at(friday, 5 * 60 + 20) }];
+    const capped = planNotifications(
+      input({ prefs: withReview(MAGHRIB, { types: kahf }), habit: habitOf(streak(1, 0)), reviewLeft: left, delivered, now: RIYADH.at(friday, 6 * 60) }),
+    );
+    expect(on(capped, friday)).toEqual([`${friday} 09:00 friday_kahf`]);
+    expect(capped.skipped).toContainEqual(expect.objectContaining({ type: "review_reminder", localDate: friday, reason: "cap" }));
+    // With the minimum met and a review time at 09:15, one message is sent, with the Kahf wording.
+    const near = planNotifications(
+      input({ prefs: withReview(clockAt(9 * 60 + 15), { types: kahf }), habit: habitOf({ ...streak(5, 0), [friday]: "done" }), reviewLeft: left, now: RIYADH.at(friday, 6 * 60) }),
+    );
+    expect(on(near, friday)).toEqual([`${friday} 09:00 friday_kahf`]);
+  });
+
+  it("does not follow a main reminder already shown within 30 minutes, across replans", () => {
+    // The main reminder fired at 07:40, the minimum was met at 07:50, and the review time is 08:00.
+    const delivered = [{ type: "wird_reminder", templateId: "wird_reminder.9", localDate: TODAY, at: RIYADH.at(TODAY, 7 * 60 + 40) }];
+    const prefs = withReview(clockAt(8 * 60), { anchor: clockAt(7 * 60 + 40) });
+    const result = planNotifications(input({ prefs, habit: doneToday, reviewLeft: left, delivered, now: RIYADH.at(TODAY, 7 * 60 + 55) }));
+    expect(reviews(result).filter((slot) => slot.localDate === TODAY)).toEqual([]);
+    expect(result.skipped).toContainEqual(expect.objectContaining({ type: "review_reminder", localDate: TODAY, reason: "merged" }));
   });
 });
 

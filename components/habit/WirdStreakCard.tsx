@@ -152,10 +152,10 @@ export function WirdStreakCard({
             {interpolate(s.habitStreakCount, { days: formatDays(streak.length, language) })}
           </Text>
         </MirroredRow>
-        <View className={`flex-shrink ${dir === "rtl" ? "items-start" : "items-end"}`}>
+        {/* Start-aligned beside the count. The MirroredRow pins LTR, so the hand-mirrored items-end is the right side in Arabic. */}
+        <View className={`min-w-0 flex-1 ${dir === "rtl" ? "items-end" : "items-start"}`}>
           <Text
             dir={dir}
-            align="end"
             className="text-warm-600 dark:text-neutral-400"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 18 }}
           >

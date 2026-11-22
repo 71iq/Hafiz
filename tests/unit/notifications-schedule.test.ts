@@ -28,10 +28,17 @@ import {
   requestRemindLater,
   rescheduleReminders,
 } from "@/lib/notifications/schedule";
-import { LOCAL_KEYS, writeReminderPref } from "@/lib/notifications/settings";
+import { exportWirdCalendar } from "@/lib/notifications/calendar";
+import { saveCalendarFile } from "@/lib/notifications/calendar-file";
+import { loadReviewSittingAhead } from "@/lib/notifications/review-today";
+import { LOCAL_KEYS, readReminderPrefs, REVIEW_ANCHOR_KEY, writeReminderPref } from "@/lib/notifications/settings";
+import { loadReviewLeft } from "@/lib/hifz/review-left";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn(), navigate: jest.fn() } }));
+// Today's review list comes from the hifz plan (lib/hifz/review-left); these tests set it directly.
+jest.mock("@/lib/hifz/review-left", () => ({ loadReviewLeft: jest.fn() }));
+jest.mock("@/lib/notifications/calendar-file", () => ({ saveCalendarFile: jest.fn(async () => {}) }));
 
 type FakePlatform = {
   supportsScheduling: boolean;
@@ -177,6 +184,7 @@ beforeEach(async () => {
     badge: null,
     nextId: 1,
   });
+  jest.mocked(loadReviewLeft).mockResolvedValue({ hasPlan: false, left: false });
   jest.spyOn(console, "warn").mockImplementation(() => {});
 });
 
@@ -808,5 +816,155 @@ describe("yesterday's notification with reminders off (NOT-06)", () => {
     await rescheduleReminders(store.db, { now: at(TODAY, 7), language: "en" });
 
     expect(fake.presented).toEqual([]);
+  });
+});
+
+describe("the second sitting for review (REMIND-07)", () => {
+  const REVIEW = { kind: "clock", minutes: 19 * 60 } as const;
+  const reviewLeft = (left: boolean) => jest.mocked(loadReviewLeft).mockResolvedValue({ hasPlan: true, left });
+  const rawSetting = (key: string) => store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(key)?.value ?? null;
+  const shownReview = (): PresentedReminder => ({
+    osId: "shown-review",
+    data: {
+      source: "hafiz-reminder",
+      logId: "shown-review-log",
+      type: "review_reminder",
+      localDate: TODAY,
+      route: "wird",
+      at: at(TODAY, 19).getTime(),
+      contentKey: "synthetic-review",
+    },
+  });
+
+  beforeEach(async () => {
+    reviewLeft(true);
+    await writeReminderPref(store.db, { kind: "reviewAnchor", value: REVIEW });
+  });
+
+  it("keeps the second sitting in its own synced key, and stores off as off", async () => {
+    expect((await readReminderPrefs(store.db)).reviewAnchor).toEqual(REVIEW);
+    expect(JSON.parse(String(rawSetting(REVIEW_ANCHOR_KEY)))).toEqual(REVIEW);
+    await writeReminderPref(store.db, { kind: "reviewAnchor", value: null });
+    expect(rawSetting(REVIEW_ANCHOR_KEY)).toBe("off");
+    expect((await readReminderPrefs(store.db)).reviewAnchor).toBeNull();
+    expect(rawSetting("notif_pref_review_reminder")).toBeNull();
+    const queued = store.sql.prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE row_id = ?").get(REVIEW_ANCHOR_KEY);
+    expect(Number(queued?.count)).toBeGreaterThan(0);
+  });
+
+  it("schedules today's review reminder after the minimum, keeps it shown, and clears it once review is done", async () => {
+    await seed([...lastDays(5), TODAY]);
+    await rescheduleReminders(store.db, { now: at(TODAY, 9), language: "en" });
+    const review = fake.scheduled.find((item) => item.data.type === "review_reminder" && item.data.localDate === TODAY)!;
+    expect(review.data.at).toBe(at(TODAY, 19).getTime());
+    expect(review.data.route).toBe("wird");
+    expect(review.request.remindLaterAction).toBe(false);
+    expect(review.request.title).toBe("Second sitting");
+
+    osFires(at(TODAY, 19, 5));
+    fake.presented = [{ osId: review.osId, data: review.data }];
+    await rescheduleReminders(store.db, { now: at(TODAY, 19, 5), language: "en" });
+    // Only the minimum is met: review is still left, so the notification stays.
+    expect(fake.presented.map((item) => item.data.type)).toEqual(["review_reminder"]);
+
+    reviewLeft(false);
+    await rescheduleReminders(store.db, { now: at(TODAY, 19, 30), language: "en" });
+    expect(fake.dismissed).toEqual([review.osId]);
+  });
+
+  it.each(["excused", "paused", "second sitting off", "reminders off"] as const)("clears a shown review reminder when %s", async (change) => {
+    await seed(lastDays(5));
+    if (change === "excused") {
+      await putHabitDay(store.db, { ...day(TODAY), status: "excused", earned_status: null, reason: "travel", minimum_met: 0 });
+    } else if (change === "paused") {
+      await putUserSetting(store.db, "habit_pause", JSON.stringify({ start: TODAY, end: addDays(TODAY, 3) }));
+    } else if (change === "second sitting off") {
+      await writeReminderPref(store.db, { kind: "reviewAnchor", value: null });
+    } else {
+      await writeReminderPref(store.db, { kind: "enabled", value: false });
+    }
+    fake.presented = [shownReview()];
+    await rescheduleReminders(store.db, { now: at(TODAY, 19, 10), language: "en" });
+    expect(fake.dismissed).toEqual(["shown-review"]);
+  });
+
+  it("shows the Home banner after the review time once the minimum is met, until review is done", async () => {
+    fake.supportsScheduling = false;
+    await seed([...lastDays(5), TODAY]);
+    expect(await loadReminderBanner(store.db, { now: at(TODAY, 18), language: "en" })).toBeNull();
+    expect(await loadReminderBanner(store.db, { now: at(TODAY, 19, 30), language: "en" })).toEqual(
+      expect.objectContaining({ kind: "reminder", type: "review_reminder", route: "wird", title: "Second sitting" }),
+    );
+    reviewLeft(false);
+    expect(await loadReminderBanner(store.db, { now: at(TODAY, 19, 40), language: "en" })).toBeNull();
+  });
+
+  it.each(["excused", "paused", "no plan"] as const)("shows no review banner when today is %s", async (state) => {
+    fake.supportsScheduling = false;
+    // A recited day stays recited, so the excused case sets today aside before any session.
+    await seed(state === "excused" ? lastDays(5) : [...lastDays(5), TODAY]);
+    if (state === "excused") {
+      await putHabitDay(store.db, { ...day(TODAY), status: "excused", earned_status: null, reason: "travel", minimum_met: 0 });
+    } else if (state === "paused") {
+      await putUserSetting(store.db, "habit_pause", JSON.stringify({ start: TODAY, end: addDays(TODAY, 3) }));
+    } else {
+      jest.mocked(loadReviewLeft).mockResolvedValue({ hasPlan: false, left: false });
+    }
+    expect(await loadReminderBanner(store.db, { now: at(TODAY, 19, 30), language: "en" })).not.toEqual(
+      expect.objectContaining({ type: "review_reminder" }),
+    );
+  });
+
+  it("keeps the main-sitting banner before today's minimum, and shows the review one once it is met", async () => {
+    fake.supportsScheduling = false;
+    // A one-day streak, so no evening streak-risk slot caps the review out of the banner plan.
+    await seed(lastDays(1));
+    expect(await loadReminderBanner(store.db, { now: at(TODAY, 19, 30), language: "en" })).toEqual(
+      expect.objectContaining({ type: "wird_reminder" }),
+    );
+    await seed([TODAY]);
+    expect(await loadReminderBanner(store.db, { now: at(TODAY, 19, 30), language: "en" })).toEqual(
+      expect.objectContaining({ type: "review_reminder" }),
+    );
+  });
+
+  it("shows the review banner under an open earn-back once the minimum is met, but not before it", async () => {
+    fake.supportsScheduling = false;
+    for (let offset = -3; offset > -13; offset--) {
+      await putHabitDay(store.db, { ...day(addDays(TODAY, offset)), status: "excused", earned_status: null, reason: "illness", minimum_met: 0 });
+    }
+    expect(await loadReminderBanner(store.db, { now: at(TODAY, 19, 30), language: "en" })).not.toEqual(
+      expect.objectContaining({ type: "review_reminder" }),
+    );
+    await seed([TODAY]);
+    const context = await loadReminderContext(store.db, { now: at(TODAY, 19, 30), language: "en" });
+    expect(projectHabit(context.input, TODAY, at(TODAY, 19, 30)).snapshot.headline.kind).toBe("earn_back");
+    expect(await loadReminderBanner(store.db, { now: at(TODAY, 19, 30), language: "en" })).toEqual(
+      expect.objectContaining({ type: "review_reminder" }),
+    );
+  });
+
+  it("adds a second calendar event with its own UID while the second sitting is on", async () => {
+    await exportWirdCalendar(store.db, { now: at(TODAY, 9), language: "en" });
+    const both = jest.mocked(saveCalendarFile).mock.calls.at(-1)![1];
+    expect(both).toContain("UID:daily-wird@hafizquran.app");
+    expect(both).toContain("UID:daily-review@hafizquran.app");
+    expect(both).toContain(`DTSTART:${TODAY.replace(/-/g, "")}T190000`);
+    expect(both).toContain("SUMMARY:Review sitting (Hafiz)");
+    await writeReminderPref(store.db, { kind: "reviewAnchor", value: null });
+    await exportWirdCalendar(store.db, { now: at(TODAY, 9), language: "en" });
+    const one = jest.mocked(saveCalendarFile).mock.calls.at(-1)![1];
+    expect(one.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(one).not.toContain("daily-review@hafizquran.app");
+  });
+
+  it("names the second sitting at session end only while it is ahead today with review left", async () => {
+    expect(await loadReviewSittingAhead(store.db, { now: at(TODAY, 9) })).toEqual(REVIEW);
+    expect(await loadReviewSittingAhead(store.db, { now: at(TODAY, 19, 30) })).toBeNull();
+    reviewLeft(false);
+    expect(await loadReviewSittingAhead(store.db, { now: at(TODAY, 9) })).toBeNull();
+    reviewLeft(true);
+    await writeReminderPref(store.db, { kind: "reviewAnchor", value: null });
+    expect(await loadReviewSittingAhead(store.db, { now: at(TODAY, 9) })).toBeNull();
   });
 });

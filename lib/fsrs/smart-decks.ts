@@ -80,6 +80,36 @@ export type SmartDeckStats = {
   newCount: number;
 };
 
+/**
+ * A deck's queue for the rest of today, split the way the Home deck row shows it. `due` is learning
+ * plus review. `heldBack` counts due learning and review cards the daily limit keeps for a later day.
+ */
+export type DeckTodayStats = SmartDeckStats & {
+  learningCount: number;
+  reviewCount: number;
+  heldBack: number;
+};
+
+/** Today's split of a deck's queue, and the due cards (new ones aside) the daily limit holds back. */
+export function splitTodayQueue(
+  total: number,
+  queuedRows: readonly StudyCardRow[],
+  dueRows: readonly StudyCardRow[],
+): DeckTodayStats {
+  // ts-fsrs State: 0 new, 1 learning, 2 review, 3 relearning.
+  const learningCount = queuedRows.filter((row) => row.state === 1 || row.state === 3).length;
+  const reviewCount = queuedRows.filter((row) => row.state === 2).length;
+  const due = learningCount + reviewCount;
+  return {
+    total,
+    due,
+    newCount: queuedRows.filter((row) => row.state === 0).length,
+    learningCount,
+    reviewCount,
+    heldBack: Math.max(0, dueRows.filter((row) => row.state !== 0).length - due),
+  };
+}
+
 export type DueCardsForReviewOptions = number | {
   limit?: number;
   newCardsLimit?: number;
@@ -624,20 +654,21 @@ export async function getSmartDeckStats(
   };
 }
 
+/** `options` null means the daily limit is used up: nothing is queued and every due card is held back. */
 export async function getSmartDeckTodayStats(
   db: AppDatabase,
   deckId: SmartDeckId,
-  options?: DueCardsForReviewOptions
-): Promise<SmartDeckStats> {
+  options?: DueCardsForReviewOptions | null
+): Promise<DeckTodayStats> {
   if (deckId === SMART_DECK_IDS.retention) {
     await migrateLegacyRetentionDecks(db);
   }
   const ids = await getSmartDeckCandidateCardIds(db, deckId);
-  if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
+  if (ids.length === 0) return splitTodayQueue(0, [], []);
 
   const now = new Date().toISOString();
   const dueCutoff = reviewDueCutoff();
-  const normalized = normalizeDueOptions(options);
+  const normalized = normalizeDueOptions(options ?? undefined);
   const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
   const dueRows = rows
     .filter((row) => row.due <= dueCutoff && isReviewableCard(row, now))
@@ -667,13 +698,8 @@ export async function getSmartDeckTodayStats(
         updated_at: now,
       };
     });
-  const queuedRows = applyReviewQueueOptions([...dueRows, ...missingRows], options);
-
-  return {
-    total: ids.length,
-    due: queuedRows.filter((row) => row.state !== 0).length,
-    newCount: queuedRows.filter((row) => row.state === 0).length,
-  };
+  const queuedRows = options === null ? [] : applyReviewQueueOptions([...dueRows, ...missingRows], options);
+  return splitTodayQueue(ids.length, queuedRows, dueRows);
 }
 
 export async function materializeSmartDeckCards(
@@ -801,18 +827,6 @@ export async function materializeSmartDeckCards(
   });
 
   return insertedCount;
-}
-
-export async function materializeAllSmartDeckCards(
-  db: AppDatabase,
-  limitPerDeck?: number,
-  newCardsLimit = DEFAULT_DECK_NEW_CARD_LIMIT
-): Promise<number> {
-  let created = 0;
-  for (const deckId of SMART_DECK_ID_LIST) {
-    created += await materializeSmartDeckCards(db, deckId, limitPerDeck, newCardsLimit);
-  }
-  return created;
 }
 
 export async function getDueCardsForReview(

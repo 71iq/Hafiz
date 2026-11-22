@@ -88,7 +88,6 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, effectiveTheme } = useSettings();
-  const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const pageWidth = Math.min(width, 640);
@@ -115,6 +114,8 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
   const [chunkSaved, setChunkSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [habitResult, setHabitResult] = useState<SessionHabitInput | null>(null);
+  // Read again once the lesson ends, so the review left is current (STR-20, REMIND-07).
+  const commitLabel = useCommitmentLabel(db, s, uiLanguage, habitResult);
   const [showZayt, setShowZayt] = useState(false);
   const [surahNames, setSurahNames] = useState<Map<number, string>>(new Map());
   const [similar, setSimilar] = useState<SimilarGroup[]>([]);

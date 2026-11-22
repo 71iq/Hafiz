@@ -7,12 +7,12 @@ import { PRAYERS } from "@/lib/prayer/times";
 import {
   DEFAULT_REMINDER_PREFS,
   MAX_PRAYER_OFFSET_MINUTES,
-  NOTIFICATION_TYPES,
   RAMADAN_ANCHORS,
-  type NotificationType,
+  TOGGLEABLE_NOTIFICATION_TYPES,
   type RamadanAnchor,
   type ReminderAnchor,
   type ReminderPrefs,
+  type ToggleableNotificationType,
 } from "@/lib/notifications/types";
 
 /**
@@ -27,7 +27,14 @@ const PREF_KEYS = {
   badge: "notif_pref_badge",
 } as const;
 
-export function typePrefKey(type: NotificationType): string {
+/**
+ * REMIND-07: the second sitting for review, an anchor as JSON or "off". It is its own key rather than
+ * part of `hifz_plan`, because released apps drop plan fields they do not know when they save a plan.
+ */
+export const REVIEW_ANCHOR_KEY = "notif_pref_review_anchor";
+
+/** Only types with their own switch have a key, so `notif_pref_review_reminder` is never read or written. */
+export function typePrefKey(type: ToggleableNotificationType): string {
   return `${PREF_PREFIX}${type}`;
 }
 
@@ -67,15 +74,26 @@ function onOff(value: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
+/** The stored second sitting: an anchor, or null for "off", a missing value or one that does not parse. */
+export function parseReviewAnchor(value: string | undefined | null): ReminderAnchor | null {
+  return value === "off" ? null : parseJson(value, anchorSchema);
+}
+
+/** The stored form of the second sitting, for a caller that writes it inside its own transaction. */
+export function reviewAnchorValue(anchor: ReminderAnchor | null): string {
+  return anchor ? JSON.stringify(anchorSchema.parse(anchor)) : "off";
+}
+
 export function parseReminderPrefs(values: ReadonlyMap<string, string>): ReminderPrefs {
   const types = Object.fromEntries(
-    NOTIFICATION_TYPES.map((type) => [type, onOff(values.get(typePrefKey(type)), DEFAULT_REMINDER_PREFS.types[type])]),
-  ) as Record<NotificationType, boolean>;
+    TOGGLEABLE_NOTIFICATION_TYPES.map((type) => [type, onOff(values.get(typePrefKey(type)), DEFAULT_REMINDER_PREFS.types[type])]),
+  ) as Record<ToggleableNotificationType, boolean>;
   const ramadan = values.get(PREF_KEYS.ramadanAnchor);
   return {
     enabled: onOff(values.get(PREF_KEYS.enabled), DEFAULT_REMINDER_PREFS.enabled),
     types,
     anchor: parseJson(values.get(PREF_KEYS.anchor), anchorSchema) ?? DEFAULT_REMINDER_PREFS.anchor,
+    reviewAnchor: parseReviewAnchor(values.get(REVIEW_ANCHOR_KEY)),
     ramadanAnchor: (RAMADAN_ANCHORS as readonly string[]).includes(ramadan ?? "") ? (ramadan as RamadanAnchor) : null,
     badge: onOff(values.get(PREF_KEYS.badge), DEFAULT_REMINDER_PREFS.badge),
   };
@@ -90,7 +108,7 @@ async function readSettings(db: DatabaseExecutor, where: string, params: string[
 }
 
 /** The hifz plan's "when" (3.3) is the reminder time, so the two can never disagree. */
-function anchorFromPlan(anchor: HifzPlan["anchor"]): ReminderAnchor {
+export function anchorFromPlan(anchor: HifzPlan["anchor"]): ReminderAnchor {
   return anchor.kind === "prayer"
     ? { kind: "prayer", prayer: anchor.prayer, offsetMinutes: Math.min(anchor.offsetMin, MAX_PRAYER_OFFSET_MINUTES) }
     : { kind: "clock", minutes: anchor.minutes };
@@ -109,11 +127,18 @@ export async function readReminderPrefs(db: DatabaseExecutor): Promise<ReminderP
   return plan ? { ...prefs, anchor: anchorFromPlan(plan.anchor) } : prefs;
 }
 
+/** The saved second sitting alone, for screens that edit it without the other preferences. */
+export async function readReviewAnchor(db: DatabaseExecutor): Promise<ReminderAnchor | null> {
+  const values = await readSettings(db, "key = ?", [REVIEW_ANCHOR_KEY]);
+  return parseReviewAnchor(values.get(REVIEW_ANCHOR_KEY));
+}
+
 /** Each change writes one key, so turning one type off never touches the others (NOT-11). */
 export type ReminderPrefChange =
   | { kind: "enabled"; value: boolean }
-  | { kind: "type"; type: NotificationType; value: boolean }
+  | { kind: "type"; type: ToggleableNotificationType; value: boolean }
   | { kind: "anchor"; value: ReminderAnchor }
+  | { kind: "reviewAnchor"; value: ReminderAnchor | null }
   | { kind: "ramadanAnchor"; value: RamadanAnchor | null }
   | { kind: "badge"; value: boolean };
 
@@ -129,6 +154,8 @@ export async function writeReminderPref(db: AppDatabase, change: ReminderPrefCha
       if (plan) return writeHifzPlan(db, { ...plan, anchor: anchorToPlan(anchor) });
       return writeUserSetting(db, PREF_KEYS.anchor, JSON.stringify(anchor));
     }
+    case "reviewAnchor":
+      return writeUserSetting(db, REVIEW_ANCHOR_KEY, reviewAnchorValue(change.value));
     case "ramadanAnchor":
       return writeUserSetting(db, PREF_KEYS.ramadanAnchor, change.value ?? "off");
     case "badge":

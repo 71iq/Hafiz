@@ -77,7 +77,8 @@ export const homeSearchStrings = {
     homeSearchRemoveNamed: "إزالة {{query}}",
     homeSearchRetry: "إعادة المحاولة",
     // Home
-    homeDueNew: "{{due}} مستحقة · {{new}} جديدة",
+    // An Arabic comma, not a middle dot: next to Arabic-Indic digits a dot reads as zero (٨١ · looked like ٨١٠).
+    homeDueNew: "{{due}} مستحقة، {{new}} جديدة",
     homeAllCaughtUp: "أنهيت مراجعة اليوم",
     homeStartReading: "ابدأ القراءة من الفاتحة",
     homeMoreDecks: "مجموعات أخرى",

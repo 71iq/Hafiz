@@ -15,6 +15,7 @@ import { formatDays, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
+import { loadReviewSittingAhead } from "@/lib/notifications/review-today";
 import { readReminderPrefs } from "@/lib/notifications/settings";
 import { prayerLabel } from "@/lib/notifications/templates";
 import type { ReminderAnchor } from "@/lib/notifications/types";
@@ -59,9 +60,27 @@ export function showsCommitment(input: SessionHabitInput): boolean {
  * or the reminder setting's without a plan): "I'll be back tomorrow after Fajr", or the time for a
  * clock anchor. Read once when the session screen mounts, so it is ready at the end; until then, or
  * when it cannot be read, the commitment has no anchor.
+ *
+ * With the second sitting on (REMIND-07), review still left and its time later today, it names that
+ * sitting instead: "I'll finish my review after Maghrib". That is read again each time `sessionResult`
+ * changes, so it reflects the review the session just did; while `sessionResult` is null it is not read.
  */
-export function useCommitmentLabel(db: AppDatabase, s: UIStrings, language: "en" | "ar"): string {
+export function useCommitmentLabel(db: AppDatabase, s: UIStrings, language: "en" | "ar", sessionResult?: unknown): string {
   const [anchor, setAnchor] = useState<ReminderAnchor | null>(null);
+  const [review, setReview] = useState<ReminderAnchor | null>(null);
+  useEffect(() => {
+    let current = true;
+    setReview(null);
+    if (sessionResult === null) return;
+    loadReviewSittingAhead(db)
+      .then((ahead) => {
+        if (current) setReview(ahead);
+      })
+      .catch((error: unknown) => console.warn("[Habit] Could not read the second sitting:", error));
+    return () => {
+      current = false;
+    };
+  }, [db, sessionResult]);
   useEffect(() => {
     let current = true;
     readReminderPrefs(db)
@@ -73,6 +92,11 @@ export function useCommitmentLabel(db: AppDatabase, s: UIStrings, language: "en"
       current = false;
     };
   }, [db]);
+  if (review) {
+    return review.kind === "prayer"
+      ? interpolate(s.habitCommitReviewAfter, { prayer: prayerLabel(review.prayer, language) })
+      : interpolate(s.habitCommitReviewAt, { time: formatClockMinutesForDisplay(review.minutes, language) });
+  }
   if (!anchor) return s.habitCommitTomorrow;
   return anchor.kind === "prayer"
     ? interpolate(s.habitCommitTomorrowAfter, { prayer: prayerLabel(anchor.prayer, language) })

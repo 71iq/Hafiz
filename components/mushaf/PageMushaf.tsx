@@ -463,11 +463,16 @@ export function PageMushaf({
     }
   }, []);
 
-  // Layout offsets for getItemLayout — enables instant scrollToIndex
-  const [layoutInfo, setLayoutInfo] = useState<{
-    heights: number[];
-    offsets: number[];
-  } | null>(null);
+  // Layout offsets for getItemLayout — enables instant scrollToIndex. Derived in the render that has
+  // the pages, so loading them does not produce a second, identical layout that the anchor below
+  // would treat as a font change.
+  const layoutInfo = useMemo(
+    () =>
+      pageData.length > 0
+        ? buildLayoutOffsets(pageData, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom, verticalLineHeightMultiplier)
+        : null,
+    [pageData, pagePaddingBottom, pagePaddingTop, verticalLineHeightMultiplier, verticalLineSlotHeight]
+  );
 
   useEffect(() => {
     async function loadData() {
@@ -532,7 +537,6 @@ export function PageMushaf({
 
         const data = buildPageData(pages, ayahs, lineLookup, offsetLookup, pageWords);
         setPageData(data);
-        setLayoutInfo(buildLayoutOffsets(data, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom, verticalLineHeightMultiplier));
       } catch (err) {
         console.error("[PageMushaf] Failed to load data:", err);
         setLoadFailed(true);
@@ -558,13 +562,6 @@ export function PageMushaf({
     }
     setPageMetaMap(meta);
   }, [juzRangeRows, pageRows, surahMap, uiLanguage]);
-
-  // Rebuild layout offsets when lineHeight changes (font size adjustment)
-  useEffect(() => {
-    if (pageData.length > 0) {
-      setLayoutInfo(buildLayoutOffsets(pageData, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom, verticalLineHeightMultiplier));
-    }
-  }, [verticalLineHeightMultiplier, verticalLineSlotHeight, pageData, pagePaddingTop, pagePaddingBottom]);
 
   // A font or size change rebuilds every page height while the list keeps its pixel offset, which
   // landed on a different page. Keep the reader on the same page at the same relative position.
@@ -616,11 +613,16 @@ export function PageMushaf({
     [layoutInfo, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom]
   );
 
+  // Pages this list reported through onPageChange that the parent has not passed back yet. The parent
+  // passes each one back as the page prop, sometimes a render after a newer report, so a late copy of
+  // an earlier page must not move the list back to it.
+  const reportedPagesRef = useRef<number[]>([]);
   const updateCurrentPage = useCallback(
     (page: number) => {
       if (page < 1 || page > pageData.length) return;
       if (currentPageRef.current === page) return;
       currentPageRef.current = page;
+      reportedPagesRef.current = [...reportedPagesRef.current.slice(-7), page];
       setCurrentPage(page);
       onPageChange?.(page);
     },
@@ -683,7 +685,12 @@ export function PageMushaf({
       } else {
         const index = page - 1;
         const offset = layoutInfo?.offsets[index];
+        // A jump replaces any position still waiting to be confirmed. A layout anchor planted before
+        // a cold start's target arrived otherwise kept retrying its own offset (page 1) and pulled
+        // the list back from the target.
+        pendingAnchorOffsetRef.current = null;
         if (typeof offset === "number") {
+          verticalOffsetRef.current = offset;
           flatListRef.current?.scrollToOffset({
             offset,
             animated,
@@ -707,9 +714,21 @@ export function PageMushaf({
     }
   }, [goToPageRef, jumpToPage]);
 
+  // A changed page prop moves the list, including one set before the pages loaded. A prop that only
+  // passes back a page this list reported is not a request.
+  const appliedRequestRef = useRef<number | null>(null);
   useEffect(() => {
     if (requestedPage === undefined || pageData.length === 0) return;
     const page = clampPage(requestedPage, pageData.length);
+    if (appliedRequestRef.current === page) return;
+    appliedRequestRef.current = page;
+    const reported = reportedPagesRef.current;
+    const echo = reported.lastIndexOf(page);
+    if (echo >= 0) {
+      reportedPagesRef.current = reported.slice(echo + 1);
+      return;
+    }
+    reportedPagesRef.current = [];
     if (page !== currentPageRef.current) {
       jumpToPage(page, false);
     }
@@ -1520,6 +1539,10 @@ export function PageMushaf({
           updateCellsBatchingPeriod={50}
           windowSize={5}
           contentContainerStyle={{ paddingBottom: verticalScrollBottomInset }}
+          // Every page sits at the offset getItemLayout reports, and this list keeps its own place
+          // when page heights change. Browser scroll anchoring moved it again when the list rendered
+          // the pages around an arrival: 2:255 on page 42 jumped 768 px down onto page 43.
+          style={Platform.OS === "web" ? ({ overflowAnchor: "none" } as object) : undefined}
           {...(Platform.OS === "web" ? ({ onWheel: pauseAutoScrollForUser } as Record<string, unknown>) : {})}
         />
       )}

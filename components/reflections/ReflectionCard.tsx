@@ -236,21 +236,24 @@ export function ReflectionCard({
           ) : null}
         </View>
 
+        {/* Lone actions sit in pinned rows: hand-mirrored alignSelf flipped twice under an RTL ancestor. */}
         {showReference && referenceLabel ? (
-          <Pressable
-            onPress={() => onReferencePress?.(reflection)}
-            accessibilityRole="link"
-            hitSlop={8}
-            className={`mb-2 self-start rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5 ${isRTL ? "self-end" : "self-start"}`}
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-          >
-            <Text
-              className="text-primary-accent dark:text-primary-bright"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, textAlign: contentAlign }}
+          <View className={`${rowClassName} mb-2`} style={rowFlexStyle}>
+            <Pressable
+              onPress={() => onReferencePress?.(reflection)}
+              accessibilityRole="link"
+              hitSlop={8}
+              className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5"
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
             >
-              {referenceLabel}
-            </Text>
-          </Pressable>
+              <Text
+                className="text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, textAlign: contentAlign }}
+              >
+                {referenceLabel}
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
 
         {onPress && !sending ? (
@@ -265,19 +268,20 @@ export function ReflectionCard({
           contentText
         )}
         {canClamp && clamped ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => onPress?.(reflection.id)}
-            className="mb-2 min-h-11 justify-center"
-            style={{ alignSelf: isRTL ? "flex-end" : "flex-start" }}
-          >
-            <Text
-              className="text-primary-accent dark:text-primary-bright"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+          <View className={`${rowClassName} mb-2`} style={rowFlexStyle}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onPress?.(reflection.id)}
+              className="min-h-11 justify-center"
             >
-              {s.reflectionReadMore}
-            </Text>
-          </Pressable>
+              <Text
+                className="text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+              >
+                {s.reflectionReadMore}
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
 
         <View

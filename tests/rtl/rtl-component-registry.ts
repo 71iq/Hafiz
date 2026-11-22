@@ -489,6 +489,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Switch rows and the prayer-times row mirror through MirroredRow; the time stepper keeps minus left and plus right in both directions.",
   ),
   entry(
+    "components/notifications/SittingChips.tsx",
+    "picker-menu",
+    "source",
+    "Prayer and set-time chip groups wrap in reading order through MirroredRow; headings and captions align to the start side.",
+  ),
+  entry(
     "components/notifications/WirdReminderBanner.tsx",
     "feedback",
     "source",
@@ -728,7 +734,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "source",
     "Fallback actions should align logically if expanded.",
   ),
-  entry("components/ui/Field.tsx", "form-field", "rntl", "Labels and messages align to start."),
+  entry("components/ui/Field.tsx", "form-field", "rntl", "Messages align to start; inputs carry the accessible name."),
   entry(
     "components/ui/FormTextField.tsx",
     "form-field",
