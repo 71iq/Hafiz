@@ -8,6 +8,16 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.12": {
+    en: [
+      "Your home-screen widget shows your streak beside a flame, including zero. Zayt is larger, and tall widgets show all seven days along the bottom.",
+      "As time runs short, the sky changes and Zayt looks more worried. Finish your wird to light the flame and see Zayt celebrate.",
+    ],
+    ar: [
+      "تعرض أداة الشاشة الرئيسية عدد أيام سلسلتك بجوار شعلة، حتى عندما يكون العدد صفرًا. يظهر زيت بحجم أكبر، وتظهر أيام الأسبوع السبعة أسفل الأداة الطويلة.",
+      "كلما قلّ الوقت المتبقي لوِردك، تتغيّر السماء وملامح زيت. وعندما تُتمّ وِردك تضيء الشعلة ويحتفل زيت.",
+    ],
+  },
   "1.0.11": {
     en: ["Mushaf pages show the full dots and hamza at the edges of words. Surah headings show all four words of the Basmala."],
     ar: ["تظهر نقاط الحروف والهمزة كاملة عند أطراف الكلمات في صفحات المصحف، وتظهر البسملة بكلماتها الأربع في مطلع السورة."],
