@@ -941,8 +941,12 @@ function MushafInner() {
         );
         page = row?.v2_page ?? null;
       }
-      if (page && goToPageRef.current) {
-        goToPageRef.current(page);
+      // Committed through the page prop, which PageMushaf applies once its pages have loaded; a direct
+      // jump on a cold reader was dropped (as for the saved-position restore). The direct jump still
+      // runs so a loaded reader returns to the top of the page it is already on.
+      if (page) {
+        commitCurrentPage(page);
+        goToPageRef.current?.(page);
       }
       return null;
     },
