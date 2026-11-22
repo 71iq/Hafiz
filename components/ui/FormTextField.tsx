@@ -2,12 +2,13 @@ import { type Ref } from "react";
 import { TextInput } from "react-native";
 import { Controller, type Control, type FieldPath, type FieldValues } from "react-hook-form";
 import { Input, type InputProps } from "@/components/ui/Input";
-import { Field, FieldMessage, Label } from "@/components/ui/Field";
+import { Field, FieldMessage } from "@/components/ui/Field";
 import { type Direction } from "@/lib/ui/direction";
 
 type FormTextFieldProps<TFieldValues extends FieldValues> = {
   control: Control<TFieldValues>;
   name: FieldPath<TFieldValues>;
+  /** The input's accessible name and, unless inputProps sets one, its placeholder. No visible label renders. */
   label: string;
   error?: string;
   /** Muted guidance under the field, shown until an error replaces it. */
@@ -29,16 +30,6 @@ export function FormTextField<TFieldValues extends FieldValues>({
 }: FormTextFieldProps<TFieldValues>) {
   return (
     <Field dir={dir} className="w-full">
-      {/* The visible label repeats the input's accessible name, so assistive technology skips it. */}
-      <Label
-        dir={dir}
-        className="text-sm"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        aria-hidden
-      >
-        {label}
-      </Label>
       <Controller
         control={control}
         name={name}

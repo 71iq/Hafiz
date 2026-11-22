@@ -8,10 +8,6 @@ type FieldProps = ViewProps & {
   dir?: Direction;
 };
 
-type LabelProps = ComponentProps<typeof Text> & {
-  dir?: Direction;
-};
-
 type FieldMessageProps = ComponentProps<typeof Text> & {
   dir?: Direction;
   tone?: "error" | "muted";
@@ -22,20 +18,9 @@ export function Field({ dir: explicitDir, className, style, ...props }: FieldPro
   return (
     <View
       className={cn("gap-2", dir === "rtl" ? "items-end" : "items-start", className)}
-      style={[{ direction: dir }, style]}
-      {...props}
-    />
-  );
-}
-
-export function Label({ dir: explicitDir, className, style, ...props }: LabelProps) {
-  const dir = useUIDirection(explicitDir);
-  return (
-    <Text
-      dir={dir}
-      variant="title-sm"
-      className={cn("text-charcoal dark:text-neutral-300", className)}
-      style={[{ ...textAlignStyle(dir), writingDirection: dir }, style]}
+      // items-end mirrors the column by hand; under its own or an inherited rtl direction flex-end
+      // resolved to the left, so the column is pinned to ltr.
+      style={[{ direction: "ltr" }, style]}
       {...props}
     />
   );

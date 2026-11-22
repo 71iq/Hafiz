@@ -765,7 +765,7 @@ export const strings = {
       "Cloud accounts are temporarily unavailable on this build. You can keep using Hafiz offline; your local progress stays on this device.",
     authInvalidCredentials: "Invalid login. Check your email, password, and email confirmation status, then try again.",
     authSignupConfirmEmail:
-      "Check your email to continue. If you already have an account, log in or reset your password instead.",
+      "If {{email}} is waiting for confirmation, we sent it a link. Check your inbox and spam folder. If you already have an account, including through Google, log in, use Continue with Google, or reset your password instead.",
     authResendConfirmation: "Resend confirmation email",
     authConfirmationResent:
       "If this email is waiting for confirmation, we sent a new link. Check your inbox and spam folder.",
@@ -1629,7 +1629,7 @@ export const strings = {
       "الحسابات السحابية غير متاحة مؤقتًا في هذا الإصدار. يمكنك متابعة استخدام حافظ دون اتصال، وسيبقى تقدمك المحلي على هذا الجهاز.",
     authInvalidCredentials: "بيانات الدخول غير صحيحة. تحقق من البريد وكلمة المرور وحالة تأكيد البريد ثم حاول مرة أخرى.",
     authSignupConfirmEmail:
-      "تحقق من بريدك الإلكتروني للمتابعة. إذا كان لديك حساب بالفعل، فسجّل الدخول أو أعد تعيين كلمة المرور.",
+      "إذا كان {{email}} بانتظار التأكيد، فقد أرسلنا إليه رابطًا. تحقق من صندوق الوارد والرسائل غير المرغوب فيها. إذا كان لديك حساب بالفعل، ولو عبر Google، فسجّل الدخول أو اختر «تابع باستخدام Google» أو أعد تعيين كلمة المرور.",
     authResendConfirmation: "إعادة إرسال رسالة التأكيد",
     authConfirmationResent:
       "إذا كان هذا البريد بانتظار التأكيد، فقد أرسلنا رابطًا جديدًا. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.",

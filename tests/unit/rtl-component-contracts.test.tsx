@@ -3,7 +3,7 @@ import { Text as RNText, View } from "react-native";
 import { useForm } from "react-hook-form";
 import { fireEvent } from "@testing-library/react-native";
 import { Button } from "@/components/ui/Button";
-import { Field, FieldMessage, Label } from "@/components/ui/Field";
+import { Field, FieldMessage } from "@/components/ui/Field";
 import { FormTextField } from "@/components/ui/FormTextField";
 import { Input } from "@/components/ui/Input";
 import { DisclosureRow, MirroredRow } from "@/components/ui/MirroredRow";
@@ -148,23 +148,20 @@ describe("RTL primitive component contracts", () => {
     expect(resolvedStyle.transform).not.toEqual(expect.arrayContaining([{ scaleX: -1 }]));
   });
 
-  it("Field, Label, and FieldMessage align text and chrome to logical start", () => {
+  it("Field and FieldMessage align text and chrome to logical start", () => {
     const { getByTestId, getByText } = renderWithDirection(
       <Field testID="field">
-        <Label>Name</Label>
         <FieldMessage>Required</FieldMessage>
       </Field>,
       "rtl"
     );
 
+    // items-end mirrors by hand, so the column is pinned ltr to keep flex-end on the physical right.
     const field = getByTestId("field");
     expect(field.props.className).toContain("items-end");
-    expect(getStyleValue(field, "direction")).toBe("rtl");
+    expect(getStyleValue(field, "direction")).toBe("ltr");
 
-    const label = getByText("Name");
     const message = getByText("Required");
-    expectTextAlignStart(label, "rtl");
-    expectWritingDirection(label, "rtl");
     expectTextAlignStart(message, "rtl");
     expectWritingDirection(message, "rtl");
   });
@@ -189,12 +186,17 @@ describe("RTL primitive component contracts", () => {
   });
 
   it("FormTextField passes direction through to Input and error text", () => {
-    const { getByTestId, getByText } = renderWithDirection(<TestFormTextField />, "ltr");
+    const { getByTestId, getByText, queryByText } = renderWithDirection(<TestFormTextField />, "ltr");
 
     const input = getByTestId("form-email-input");
     expectInputTextAlignStart(input, "rtl");
     expectWritingDirection(input, "rtl");
     expect(input.props.value).toBe("hafiz@example.com");
+    // No visible label: the label is the input's accessible name and its placeholder. The old label
+    // was aria-hidden, so hidden elements must be included for this check to catch it.
+    expect(queryByText("Email", { includeHiddenElements: true })).toBeNull();
+    expect(input.props.accessibilityLabel).toBe("Email");
+    expect(input.props.placeholder).toBe("Email");
 
     const error = getByText("Required");
     expectTextAlignStart(error, "rtl");

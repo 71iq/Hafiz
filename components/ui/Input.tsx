@@ -1,9 +1,9 @@
 import { forwardRef } from "react";
 import { type ReactNode } from "react";
 import { TextInput, View, type TextInputProps } from "react-native";
-import { useColorScheme } from "nativewind";
 import { useSettings } from "@/lib/settings/context";
 import { useUIDirection, inputTextStartStyle, type Direction } from "@/lib/ui/direction";
+import { mutedIconColor } from "@/lib/ui/theme-icons";
 import { cn } from "@/lib/utils";
 
 export type InputProps = TextInputProps & {
@@ -33,9 +33,9 @@ export const Input = forwardRef<TextInput, InputProps>(
     ref
   ) => {
     const dir = useUIDirection(explicitDir);
-    const { colorScheme } = useColorScheme();
-    const { themeColors } = useSettings();
-    const fallbackPlaceholderColor = colorScheme === "dark" ? "#737373" : themeColors.surfaceDim;
+    const { effectiveTheme } = useSettings();
+    // Placeholders often name the field, so they use the theme's readable secondary text color.
+    const fallbackPlaceholderColor = mutedIconColor(effectiveTheme);
     const input = (
       <TextInput
         ref={ref}

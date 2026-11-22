@@ -728,7 +728,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "source",
     "Fallback actions should align logically if expanded.",
   ),
-  entry("components/ui/Field.tsx", "form-field", "rntl", "Labels and messages align to start."),
+  entry("components/ui/Field.tsx", "form-field", "rntl", "Messages align to start; inputs carry the accessible name."),
   entry(
     "components/ui/FormTextField.tsx",
     "form-field",

@@ -20,11 +20,17 @@ export const authStrings = {
     authErrorGeneric: "Something went wrong. Try again.",
     authErrorWeakPassword: "Choose a stronger password.",
     authResendIn: "Resend in {{seconds}} s",
+    // Signup keeps the account guidance after a resend: a confirmed or Google address gets no email.
+    authSignupConfirmationResent:
+      "If {{email}} is still waiting for confirmation, we sent it a new link. Check your inbox and spam folder. If you already have an account, including through Google, log in, use Continue with Google, or reset your password instead.",
     authSendAgain: "Send again",
+    authUseDifferentEmail: "Use a different email",
     authSendAgainIn: "Send again in {{seconds}} s",
     authDisplayNameOptional: "Display name (optional)",
-    authDisplayNameHelp: "Shown to your Board members when set.",
-    authUsernameHint: "3-20 English letters (A-Z), numbers or _. Shown to your Board members.",
+    authDisplayNameHelp:
+      "Optional display name, shown instead of your username on your profile, reflections and the Board.",
+    authUsernameHint:
+      "Username: 3-20 English letters (A-Z), numbers or _. Shown on your profile, reflections and the Board.",
     authPasswordMinHint: "At least 6 characters",
     authForgotSent: "If {{email}} has a Hafiz account, we sent it a reset link. Check your inbox and spam folder.",
     authForgotSentBrowser:
@@ -59,11 +65,14 @@ export const authStrings = {
     authErrorGeneric: "حدث خطأ ما. حاول مرة أخرى.",
     authErrorWeakPassword: "اختر كلمة مرور أقوى.",
     authResendIn: "إعادة الإرسال بعد {{seconds}} ث",
+    authSignupConfirmationResent:
+      "إذا كان {{email}} لا يزال بانتظار التأكيد، فقد أرسلنا إليه رابطًا جديدًا. تحقق من صندوق الوارد والرسائل غير المرغوب فيها. إذا كان لديك حساب بالفعل، ولو عبر Google، فسجّل الدخول أو اختر «تابع باستخدام Google» أو أعد تعيين كلمة المرور.",
     authSendAgain: "إرسال مجددًا",
+    authUseDifferentEmail: "استخدم بريدًا آخر",
     authSendAgainIn: "الإرسال مجددًا بعد {{seconds}} ث",
     authDisplayNameOptional: "الاسم المعروض (اختياري)",
-    authDisplayNameHelp: "يظهر لأعضاء لوحتك عند تعيينه.",
-    authUsernameHint: "من ٣ إلى ٢٠ حرفًا إنجليزيًا (A-Z) أو رقمًا أو _. يظهر لأعضاء لوحتك.",
+    authDisplayNameHelp: "اسم معروض اختياري يظهر بدلًا من اسم المستخدم في ملفك وتأملاتك واللوحة.",
+    authUsernameHint: "اسم المستخدم: من ٣ إلى ٢٠ حرفًا إنجليزيًا (A-Z) أو رقمًا أو _. يظهر في ملفك وتأملاتك واللوحة.",
     authPasswordMinHint: "٦ أحرف على الأقل",
     authForgotSent:
       "إذا كان {{email}} مرتبطًا بحساب في حافظ، فقد أرسلنا إليه رابط إعادة التعيين. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.",

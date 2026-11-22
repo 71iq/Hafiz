@@ -8,6 +8,8 @@ import type { AuthActionHandle, SignUpResult } from "@/lib/auth/types";
 import type { AuthCommandResult, AuthOwner } from "@/lib/auth/coordinator";
 import { strings } from "@/lib/i18n/strings";
 import { clearAuthHandoff } from "@/lib/auth/form-handoff";
+import { interpolate } from "@/lib/i18n/useStrings";
+import { formatSeconds } from "@/components/auth/auth-messages";
 let mockLocale: "en" | "ar" = "en",
   mockConfigured = true,
   mockEmailEnabled = true,
@@ -188,6 +190,13 @@ function form(mode: Mode, strict = false) {
   }
   return view;
 }
+/** The neutral signup notice for the email form() types, after trimming and lowercasing. */
+function signupNotice(locale: "en" | "ar", resent = false) {
+  const s = strings[locale];
+  return interpolate(resent ? s.authSignupConfirmationResent : s.authSignupConfirmEmail, {
+    email: "qa@example.invalid",
+  });
+}
 function submitCallback(view: ReturnType<typeof render>): () => void {
   let node = view.getByTestId("email-submit");
   while (typeof node.props.onPress !== "function" && node.parent) node = node.parent;
@@ -267,7 +276,7 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
     expect(mockRouter.replace).not.toHaveBeenCalled();
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(view.queryByText("retired login failure")).toBeNull();
-    expect(view.queryByText(strings[locale].authSignupConfirmEmail)).toBeNull();
+    expect(view.queryByText(signupNotice(locale))).toBeNull();
   });
   it.each<Mode>(["login", "signup"])("%s cannot submit from a retained callback after unmount", async (mode) => {
     const login = pending<void>(),
@@ -325,8 +334,8 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
 
     it.each([
       // Registered and new emails get the same neutral result, so the form reveals no account.
-      ["alreadyRegistered", strings[locale].authSignupConfirmEmail, false],
-      ["needsEmailConfirmation", strings[locale].authSignupConfirmEmail, false],
+      ["alreadyRegistered", signupNotice(locale), false],
+      ["needsEmailConfirmation", signupNotice(locale), false],
       ["signedIn", null, true],
     ] as const)("handles signup %s only for its current result", async (status, message, leavesAuth) => {
       const signup = pending<SignUpResult>();
@@ -339,6 +348,83 @@ describe.each(["en", "ar"] as const)("email forms in %s", (locale) => {
       if (message) expect(view.getByText(message)).toBeTruthy();
       expect(mockRouter.replace).toHaveBeenCalledTimes(leavesAuth ? 1 : 0);
     });
+
+    it.each(["alreadyRegistered", "needsEmailConfirmation"] as const)(
+      "after signup %s offers Log in and Forgot password with the email and a cooling resend",
+      async (status) => {
+        jest.useFakeTimers();
+        try {
+          const s = strings[locale];
+          const signup = pending<SignUpResult>();
+          mockSignUp.mockReturnValue(signup.handle);
+          const view = form("signup");
+          fireEvent.press(view.getByTestId("email-submit"));
+          await flush();
+          signup.complete({ status });
+          await flush();
+
+          // Same neutral notice either way, and it keeps the existing-account and Google guidance.
+          expect(view.getByText(signupNotice(locale))).toBeTruthy();
+          expect(s.authSignupConfirmEmail).toContain("Google");
+          // The panel replaces the form fields, as Forgot password's sent panel does.
+          expect(view.queryByLabelText(s.authEmail)).toBeNull();
+
+          // The provider just handled a confirmation, so resend is cooling down from the start.
+          const coolingLabel = interpolate(s.authResendIn, { seconds: formatSeconds(60, locale) });
+          fireEvent.press(view.getByText(coolingLabel));
+          await flush();
+          expect(mockResend).not.toHaveBeenCalled();
+
+          act(() => {
+            jest.advanceTimersByTime(60_000);
+          });
+          fireEvent.press(view.getByText(s.authResendConfirmation));
+          await flush();
+          expect(mockResend).toHaveBeenCalledWith("qa@example.invalid");
+          // A resend for a confirmed or Google address sends nothing, so the guidance stays.
+          expect(view.getByText(signupNotice(locale, true))).toBeTruthy();
+          expect(s.authSignupConfirmationResent).toContain("Google");
+          expect(view.getByText(coolingLabel)).toBeTruthy();
+
+          fireEvent.press(view.getByText(s.authForgotPassword));
+          expect(mockRouter.push).toHaveBeenCalledWith("/auth/forgot-password");
+          view.unmount();
+          const forgot = render(<ForgotPasswordScreen />);
+          expect(forgot.getByLabelText(s.authEmail).props.value).toBe("qa@example.invalid");
+          forgot.unmount();
+          // Start clean so the Login check proves the Log in button carried the email itself.
+          clearAuthHandoff();
+
+          const again = form("signup");
+          const next = pending<SignUpResult>();
+          mockSignUp.mockReturnValue(next.handle);
+          fireEvent.press(again.getByTestId("email-submit"));
+          await flush();
+          next.complete({ status });
+          await flush();
+          // "Use a different email" brings the form back, so a mistyped address can be corrected.
+          fireEvent.press(again.getByText(s.authUseDifferentEmail));
+          expect(again.getByLabelText(s.authEmail)).toBeTruthy();
+          expect(again.queryByText(signupNotice(locale))).toBeNull();
+          fireEvent.press(again.getByTestId("email-submit"));
+          await flush();
+          next.complete({ status });
+          await flush();
+          // The panel's Log in button comes first; the footer link carries the same email.
+          fireEvent.press(again.getAllByText(s.authLogin)[0]);
+          expect(mockRouter.replace).toHaveBeenCalledWith("/auth/login");
+          again.unmount();
+          const login = render(<LoginScreen />);
+          expect(login.getByLabelText(s.authEmail).props.value).toBe("qa@example.invalid");
+          // No navigation argument carries the email.
+          for (const call of [...mockRouter.push.mock.calls, ...mockRouter.replace.mock.calls]) {
+            expect(JSON.stringify(call)).not.toContain("@");
+          }
+        } finally {
+          jest.useRealTimers();
+        }
+      },
+    );
 
     it.each<Mode>(["login", "signup"])("does not continue after %s settles following unmount", async (mode) => {
       const login = pending<void>(),
