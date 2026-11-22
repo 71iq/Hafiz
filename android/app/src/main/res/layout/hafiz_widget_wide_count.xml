@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
+    <FrameLayout
+        android:layout_width="28dp"
+        android:layout_height="28dp">
+        <ImageView
+            android:id="@+id/widget_flame"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/hafiz_widget_flame_unlit"
+            android:importantForAccessibility="no"/>
+        <FrameLayout
+            android:id="@+id/widget_flame_motion"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"/>
+    </FrameLayout>
+    <TextView
+        android:id="@+id/widget_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif"
+        android:textSize="34sp"
+        android:textColor="@color/hafiz_widget_accent_text"
+        android:textAlignment="viewStart"
+        android:breakStrategy="high_quality"
+        android:hyphenationFrequency="none"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textStyle="bold"
+        android:includeFontPadding="false"
+        android:layout_marginStart="4dp"/>
+</LinearLayout>

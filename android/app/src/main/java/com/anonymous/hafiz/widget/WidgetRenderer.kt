@@ -54,6 +54,9 @@ object WidgetRenderer {
     /** The smallest tile has no room for a line beside Zayt without cutting its face; without Zayt it does. */
     val lineBesideZayt: Boolean = true,
   ) {
+    // Both width bands switch to the tall composition at the same height on a resizing launcher.
+    TALL_ROOMY(R.layout.hafiz_widget_wide_tall, R.layout.hafiz_widget_wide_roomy_plain, R.layout.hafiz_widget_wide_roomy_plain_system, 320f, 210f, wideScene = true, weekView = true, art = true, lineWithCount = true),
+    TALL(R.layout.hafiz_widget_wide_tall, R.layout.hafiz_widget_wide_plain, R.layout.hafiz_widget_wide_plain_system, 250f, 210f, wideScene = true, weekView = true, art = true, lineWithCount = true),
     WIDE_ROOMY(R.layout.hafiz_widget_wide_roomy, R.layout.hafiz_widget_wide_roomy_plain, R.layout.hafiz_widget_wide_roomy_plain_system, 320f, 170f, wideScene = true, weekView = true, art = true, lineWithCount = true),
     WIDE(R.layout.hafiz_widget_wide, R.layout.hafiz_widget_wide_plain, R.layout.hafiz_widget_wide_plain_system, 250f, 170f, wideScene = true, weekView = true, art = true, lineWithCount = true),
     // A 4 x 2 on a launcher with short rows keeps its week row (the provider's minimum is 130 dp).

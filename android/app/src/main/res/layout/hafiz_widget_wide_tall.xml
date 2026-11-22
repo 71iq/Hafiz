@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- On tall 4 x 2 cards the week has its own row, leaving Zayt room beside the count and line. -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layoutDirection="locale">
+    <ImageView
+        android:id="@+id/widget_scene"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/hafiz_widget_card"
+        android:scaleType="centerCrop"
+        android:importantForAccessibility="no"/>
+    <LinearLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:importantForAccessibility="noHideDescendants">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+            <LinearLayout
+                android:layout_width="110dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp">
+                <include layout="@layout/hafiz_widget_wide_count"/>
+                <TextView
+                    android:id="@+id/widget_line"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="15sp"
+                    android:textColor="@color/hafiz_widget_text_primary"
+                    android:textAlignment="viewStart"
+                    android:breakStrategy="high_quality"
+                    android:hyphenationFrequency="none"
+                    android:ellipsize="end"
+                    android:maxLines="3"
+                    android:layout_marginTop="4dp"/>
+            </LinearLayout>
+            <!-- The extra width goes to Zayt first. The inset on its inner frame uses the transparent
+                 sides of the art without narrowing the count or stretching the animation. -->
+            <FrameLayout
+                android:id="@+id/widget_art"
+                android:layout_width="134dp"
+                android:layout_height="match_parent"
+                android:layout_weight="3"
+                android:importantForAccessibility="noHideDescendants">
+                <!-- Wraps the still exactly, so a frame list in widget_motion gets the same box. FrameLayout
+                     measures match_parent children again at its final size only when it has two or more, so the
+                     empty widget_motion_pair is what stretches the frame list to the still. -->
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginStart="-8dp"
+                    android:layout_marginEnd="-8dp">
+                    <ImageView
+                        android:id="@+id/widget_zayt"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:adjustViewBounds="true"
+                        android:scaleType="fitCenter"
+                        android:importantForAccessibility="no"/>
+                    <FrameLayout
+                        android:id="@+id/widget_motion"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:visibility="gone"/>
+                    <FrameLayout
+                        android:id="@+id/widget_motion_pair"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:importantForAccessibility="no"/>
+                </FrameLayout>
+            </FrameLayout>
+        </LinearLayout>
+        <include
+            layout="@layout/hafiz_widget_week"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="14dp"
+            android:layout_marginBottom="10dp"/>
+    </LinearLayout>
+</FrameLayout>
