@@ -129,7 +129,7 @@ type Phase = "loading" | "recite" | "check" | "summary" | "empty" | "error";
 /** The shared outline Button has no border; on this screen an outline action needs one to read as a button. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
 
-/** Save and load errors, one style across the review's steps and the sabaq screens. */
+/** Save and load errors, one style across the review's steps and the memorize screen. */
 const ERROR_TEXT_STYLE = { fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 } as const;
 /** Helper actions sit on a tinted fill so they read as buttons, at the full touch height. */
 const HELPER_BUTTON = "flex-1 h-11 px-2 bg-surface-low dark:bg-surface-dark-low";
@@ -202,15 +202,15 @@ async function ayahOnPage(
 
 function tierLabel(tier: Tier, s: UIStrings): string {
   switch (tier) {
-    case "sabaq":
-      return s.hifzTierSabaq;
-    case "sabqi":
-      return s.hifzTierSabqi;
-    case "manzil":
-      return s.hifzTierManzil;
-    case "manzil.needs_work":
+    case "new":
+      return s.hifzTierNew;
+    case "recent":
+      return s.hifzTierRecent;
+    case "long_term":
+      return s.hifzTierLongTerm;
+    case "long_term.needs_work":
       return s.hifzTierNeedsWork;
-    case "manzil.unverified":
+    case "long_term.unverified":
       return s.hifzTierUnverified;
   }
 }
@@ -227,7 +227,7 @@ function gradeLabel(rating: number, s: UIStrings): string {
 }
 
 /**
- * The wird review (4.4.2): today's planned pages in order, sabqi then manzil, each recited at a
+ * The wird review (4.4.2): today's planned pages in order, recent then long-term, each recited at a
  * support level, checked word by word, and graded with the rubric's proposal (4.2), followed by up
  * to 6 drills from the mistake inbox (ERR-04). Progress saves after every page (REV-01). With the
  * half-page unit (UNIT-02) each page is recited and checked as its first half, then its second, and
@@ -353,7 +353,7 @@ function HifzReviewScreen() {
         const cards = await loadPageCards(db, { today, plan: wird.plan });
         pageCards = cards;
         const byId = new Map(cards.map((card) => [card.row.id, card]));
-        setHeldPages(new Set(cards.filter((card) => card.tier !== "sabaq").map((card) => card.page)));
+        setHeldPages(new Set(cards.filter((card) => card.tier !== "new").map((card) => card.page)));
         let todo = monthlyCheck
           ? pickMonthlyCheck(monthlyCheckCandidates(cards, today)).map((card) => toPlanPage(card, today, now))
           : [...wird.todo];
@@ -483,7 +483,7 @@ function HifzReviewScreen() {
       current.kind === "half" || current.kind === "cloze"
         ? 4
         : (welcomeLevel ??
-          defaultSupportLevel(current.card.tier === "sabqi" ? "sabqi" : "manzil", current.retrievability));
+          defaultSupportLevel(current.card.tier === "recent" ? "recent" : "long_term", current.retrievability));
     const pageNumber = current.kind === "page" ? current.card.page : current.page;
     setAttempt(emptyAttempt(level));
     setReveal(HIDDEN);
@@ -1571,7 +1571,7 @@ function HifzReviewScreen() {
                     <Button label={s.hifzDone} onPress={done} disabled={!pageData} />
                   ) : (
                     // Read at full text, the first half still goes on to the second.
-                    <Button label={inHalves && part === "a" ? s.hifzNextHalf : s.hifzSabaqNext} onPress={skip} disabled={busy} />
+                    <Button label={inHalves && part === "a" ? s.hifzNextHalf : s.hifzMemorizeNext} onPress={skip} disabled={busy} />
                   )}
                   {/* Recited in salah logs the whole page, so in halves it is offered before the first half only. */}
                   {current.kind === "page" && (!inHalves || part === "a") ? (
@@ -1606,7 +1606,7 @@ function HifzReviewScreen() {
                       <Text dir={dir} variant="caption">
                         {s.hifzHalfNotGraded}
                       </Text>
-                      <Button label={s.hifzSabaqNext} onPress={skip} disabled={busy} />
+                      <Button label={s.hifzMemorizeNext} onPress={skip} disabled={busy} />
                     </>
                   ) : (
                     <GradingButtons

@@ -148,8 +148,8 @@ describe("local bands from the device (8.13)", () => {
 
   it("puts a page learner with all 604 pages memorized in the hafiz band at the plan's pace", async () => {
     jest.mocked(loadPageCards).mockResolvedValue([
-      ...Array.from({ length: 604 }, (_, i) => pageCard(i + 1, "manzil", 3)),
-      pageCard(1, "sabaq", 4),
+      ...Array.from({ length: 604 }, (_, i) => pageCard(i + 1, "long_term", 3)),
+      pageCard(1, "new", 4),
     ]);
     const bands = await readLocalSocialBands(fakeDb({ plan: DEFAULT_HIFZ_PLAN, ayahCards: 0 }), new Date("2026-11-13T12:00:00Z"));
     expect(bands).toMatchObject({ levelBand: "hafiz", paceBand: "half_page" });
@@ -157,9 +157,9 @@ describe("local bands from the device (8.13)", () => {
 
   it("uses the shared memorized definition: unverified pages and weak last grades do not count", async () => {
     jest.mocked(loadPageCards).mockResolvedValue([
-      ...Array.from({ length: 20 }, (_, i) => pageCard(i + 1, "sabqi", 3)),
-      ...Array.from({ length: 300 }, (_, i) => pageCard(i + 21, "manzil.unverified", 4)),
-      ...Array.from({ length: 100 }, (_, i) => pageCard(i + 321, "manzil", 2)),
+      ...Array.from({ length: 20 }, (_, i) => pageCard(i + 1, "recent", 3)),
+      ...Array.from({ length: 300 }, (_, i) => pageCard(i + 21, "long_term.unverified", 4)),
+      ...Array.from({ length: 100 }, (_, i) => pageCard(i + 321, "long_term", 2)),
     ]);
     const bands = await readLocalSocialBands(fakeDb({ plan: null, ayahCards: 0 }));
     expect(bands).toMatchObject({ levelBand: "juz_amma", paceBand: "maintenance" });

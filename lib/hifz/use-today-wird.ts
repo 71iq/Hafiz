@@ -9,7 +9,7 @@ import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird, type TodayWird } from "@/lib/hifz/pages";
 import { monthlyCheckDueFor } from "@/lib/hifz/progress";
 import { countDueRemediation, nextRemediationAt } from "@/lib/hifz/remediation";
-import { countSecondLooks } from "@/lib/hifz/sabaq";
+import { countSecondLooks } from "@/lib/hifz/memorize";
 import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 

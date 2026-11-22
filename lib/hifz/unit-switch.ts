@@ -12,13 +12,14 @@ import { State } from "@/lib/fsrs/scheduler";
 import { putAllDecksFilter, readSmartDeckFilter, SMART_DECK_IDS, type BuiltInDeckFilter } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_DECK_NEW_CARD_LIMIT, type StudyCardRow, type SurahAyahRange } from "@/lib/fsrs/types";
 import { localDateOf } from "@/lib/habit/dates";
-import { ensureManzilCycleStart } from "@/lib/hifz/pages";
+import { ensureLongTermCycleStart } from "@/lib/hifz/pages";
 import type { HifzPlan } from "@/lib/hifz/plan";
+import { storedTier } from "@/lib/hifz/tiers";
 import { HIFZ_PAGES_DECK_ID, isValidPage, pageCardId } from "@/lib/hifz/units";
 
 /**
  * UNIT-02, 7.6: switching the recitation unit. Moving to page review turns each page whose ayat all
- * have reviewed ayah cards into a manzil page card made from them and suspends those ayah cards.
+ * have reviewed ayah cards into a long-term page card made from them and suspends those ayah cards.
  * Moving back to ayah review restores them and sets every page card aside, so ayah review has no
  * page tasks.
  *
@@ -134,8 +135,8 @@ function neverReviewed(card: StudyCardRow): boolean {
 /**
  * Switch to page or half-page review, with the caller's transaction (7.6). Page, half-page and seam
  * cards set aside by an earlier switch to ayah review come back with their history, as do pages
- * memorized in ayah review (lib/hifz/sabaq). Each page whose ayat all have reviewed
- * ayah cards gets a manzil page card made from them, unless it already has a reviewed page card, and
+ * memorized in ayah review (lib/hifz/memorize). Each page whose ayat all have reviewed
+ * ayah cards gets a long-term page card made from them, unless it already has a reviewed page card, and
  * its ayah cards are suspended so the same ayat are not reviewed twice. A page card declared before
  * and never reviewed takes the ayah schedule instead of staying an unverified new card. Other pages
  * follow the declared path. The ayah deck stops adding new cards, and its limit from ayah review is
@@ -163,7 +164,7 @@ export async function switchToPageReview(
     const existing = pageCards.get(id);
     if (!existing || neverReviewed(existing)) {
       const { start, due } = scheduleFromAyahCards(cards, now);
-      const card = { id, deckId: HIFZ_PAGES_DECK_ID, due, tier: "manzil", now: at, start };
+      const card = { id, deckId: HIFZ_PAGES_DECK_ID, due, tier: storedTier("long_term"), now: at, start };
       if (!existing) {
         if (await insertNewStudyCard(db, card)) migrated += 1;
       } else {
@@ -191,8 +192,8 @@ export async function switchToPageReview(
     [SMART_DECK_IDS.retention],
   );
   for (const card of kept.filter(isUnitSwitchResume)) await putCardRow(db, { ...card, buried_until: null, updated_at: at });
-  // MST-04: like declared pages, pages made from ayah cards start the first manzil cycle.
-  if (migrated > 0) await ensureManzilCycleStart(db, localDateOf(now));
+  // MST-04: like declared pages, pages made from ayah cards start the first long-term cycle.
+  if (migrated > 0) await ensureLongTermCycleStart(db, localDateOf(now));
 
   const retention = await readDeckReviewSettings(db, SMART_DECK_IDS.retention);
   // Only a switch from ayah review records the limit: in page review it is already 0.
@@ -247,13 +248,13 @@ export async function switchToAyahReview(
 }
 
 /**
- * A page memorized through sabaq in ayah review (SBQ-02, UNIT-02), with the chunk grade's transaction.
+ * A page memorized as new lines in ayah review (SBQ-02, UNIT-02), with the chunk grade's transaction.
  * Its page card, created as in page review, is set aside with the switch mark, so it joins page review
  * on a switch to pages. Each of its ayat gets an ayah card that starts from the page's schedule, so the
  * new lines enter ayah review. An ayah card already reviewed, or suspended by the user, keeps its own
  * schedule; one never reviewed takes the page's.
  */
-export async function addSabaqPageToAyahReview(
+export async function addMemorizedPageToAyahReview(
   db: DatabaseExecutor,
   { page, start, due, now }: { page: number; start: StartingSchedule | null; due: Date; now: Date },
 ): Promise<void> {
@@ -313,7 +314,7 @@ export function filterCoveringSpans(filter: BuiltInDeckFilter, spans: readonly A
 }
 
 /**
- * SBQ-02 in ayah review: the ayah decks take in a page memorized through sabaq, as setup scopes them
+ * SBQ-02 in ayah review: the ayah decks take in a page memorized as new lines, as setup scopes them
  * to the memorized surahs (applyHifzSetup), so its new ayah cards are reviewed. Runs inside the
  * caller's transaction, so a failed grade leaves the filters as they were.
  */

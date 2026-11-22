@@ -14,18 +14,18 @@ const anchorSchema = z.discriminatedUnion("kind", [
 ]);
 export type Anchor = z.infer<typeof anchorSchema>;
 
-/** SBQ-01: the range each sabaq repetition count can be set to. */
-export const SABAQ_REPETITION_BOUNDS = {
+/** SBQ-01: the range each new memorization repetition count can be set to. */
+export const MEMORIZE_REPETITION_BOUNDS = {
   listen: { min: 1, max: 5 },
   looking: { min: 1, max: 30 },
   cleanInARow: { min: 1, max: 10 },
 } as const;
-export type SabaqRepetitionCount = keyof typeof SABAQ_REPETITION_BOUNDS;
+export type MemorizeRepetitionCount = keyof typeof MEMORIZE_REPETITION_BOUNDS;
 
-const repetitionCount = (count: SabaqRepetitionCount) =>
-  z.number().int().min(SABAQ_REPETITION_BOUNDS[count].min).max(SABAQ_REPETITION_BOUNDS[count].max);
+const repetitionCount = (count: MemorizeRepetitionCount) =>
+  z.number().int().min(MEMORIZE_REPETITION_BOUNDS[count].min).max(MEMORIZE_REPETITION_BOUNDS[count].max);
 
-const sabaqRepetitionsSchema = z.object({
+const memorizeRepetitionsSchema = z.object({
   /** Step 2: how many times the reciter plays the new lines. */
   listen: repetitionCount("listen"),
   /** Step 4: readings while looking before reciting from memory. */
@@ -33,9 +33,9 @@ const sabaqRepetitionsSchema = z.object({
   /** Step 6: clean recitations of all the new lines in a row. */
   cleanInARow: repetitionCount("cleanInARow"),
 });
-export type SabaqRepetitions = z.infer<typeof sabaqRepetitionsSchema>;
+export type MemorizeRepetitions = z.infer<typeof memorizeRepetitionsSchema>;
 
-export type SabaqRepetitionPreset = "looking_then_memory" | "twenty_times";
+export type MemorizeRepetitionPreset = "looking_then_memory" | "twenty_times";
 
 /**
  * SBQ-01 presets. The default is the "10 looking, then from memory" practice. The 20-times method is
@@ -43,17 +43,17 @@ export type SabaqRepetitionPreset = "looking_then_memory" | "twenty_times";
  * readings while looking; the ayah-by-ayah chaining step covers its per-ayah linking, so listening
  * and the clean run keep their default counts.
  */
-export const SABAQ_REPETITION_PRESETS: Readonly<Record<SabaqRepetitionPreset, Readonly<SabaqRepetitions>>> = {
+export const MEMORIZE_REPETITION_PRESETS: Readonly<Record<MemorizeRepetitionPreset, Readonly<MemorizeRepetitions>>> = {
   looking_then_memory: { listen: 3, looking: 10, cleanInARow: 3 },
   twenty_times: { listen: 3, looking: 20, cleanInARow: 3 },
 };
 
 /** The preset these counts match, or null when they are custom. */
-export function sabaqRepetitionPresetOf(counts: SabaqRepetitions): SabaqRepetitionPreset | null {
-  const presets = Object.keys(SABAQ_REPETITION_PRESETS) as SabaqRepetitionPreset[];
+export function memorizeRepetitionPresetOf(counts: MemorizeRepetitions): MemorizeRepetitionPreset | null {
+  const presets = Object.keys(MEMORIZE_REPETITION_PRESETS) as MemorizeRepetitionPreset[];
   return (
     presets.find((preset) => {
-      const values = SABAQ_REPETITION_PRESETS[preset];
+      const values = MEMORIZE_REPETITION_PRESETS[preset];
       return values.listen === counts.listen && values.looking === counts.looking && values.cleanInARow === counts.cleanInARow;
     }) ?? null
   );
@@ -63,23 +63,23 @@ const hifzPlanSchema = z.object({
   method: z.enum(["standard", "ottoman", "review_only"]),
   direction: z.enum(["juz_amma_first", "from_fatiha"]),
   newPerDay: z.number().min(0).max(2),
-  sabqiDays: z.number().int().min(1).max(60),
+  recentDays: z.number().int().min(1).max(60),
   cycleDays: z.number().int().min(1).max(60),
   dailyBudgetMin: z.number().int().min(5).max(240),
   /** Days of the week (0 is Sunday) that schedule new memorization. Review happens every day. */
   studyDays: z.array(z.number().int().min(0).max(6)).max(7),
-  /** Sabqi pages come back every k days: 1 full-time, 2 or 3 part-time (4.3.1). */
-  sabqiEvery: z.number().int().min(1).max(3),
+  /** Recent pages come back every k days: 1 full-time, 2 or 3 part-time (4.3.1). */
+  recentEvery: z.number().int().min(1).max(3),
   anchor: anchorSchema,
   /** UNIT-02: the recitation unit and whether meanings are reviewed too. */
   unit: z.enum(["page", "half", "ayah"]),
   meanings: z.boolean(),
-  /** Manzil target retention, 0.90 to 0.97 (4.1.2). */
+  /** Long-term target retention, 0.90 to 0.97 (4.1.2). */
   retention: z.number().min(0.9).max(0.97),
   /** PLN-04: new memorization first instead of last. */
   newFirst: z.boolean(),
-  /** SBQ-01: repetition counts for the sabaq steps. */
-  sabaqRepetitions: sabaqRepetitionsSchema,
+  /** SBQ-01: repetition counts for the new memorization steps. */
+  memorizeRepetitions: memorizeRepetitionsSchema,
 });
 export type HifzPlan = z.infer<typeof hifzPlanSchema>;
 
@@ -87,28 +87,28 @@ export const DEFAULT_HIFZ_PLAN: HifzPlan = {
   method: "standard",
   direction: "juz_amma_first",
   newPerDay: 0.5,
-  sabqiDays: 14,
+  recentDays: 14,
   cycleDays: 30,
   dailyBudgetMin: 30,
   studyDays: [0, 1, 2, 3, 4, 5, 6],
-  sabqiEvery: 1,
+  recentEvery: 1,
   anchor: { kind: "prayer", prayer: "fajr", offsetMin: 20 },
   unit: "page",
   meanings: false,
   retention: 0.95,
   newFirst: false,
-  sabaqRepetitions: { ...SABAQ_REPETITION_PRESETS.looking_then_memory },
+  memorizeRepetitions: { ...MEMORIZE_REPETITION_PRESETS.looking_then_memory },
 };
 
 export type PlanPreset = "part_time_beginner" | "part_time_adult" | "full_time" | "maintenance" | "short_surahs";
 
 /** 4.3.2 presets. */
 const PLAN_PRESETS: Readonly<Record<PlanPreset, Partial<HifzPlan>>> = {
-  part_time_beginner: { method: "standard", newPerDay: 0.25, sabqiEvery: 2, cycleDays: 30, dailyBudgetMin: 20 },
-  part_time_adult: { method: "standard", newPerDay: 0.5, sabqiEvery: 1, cycleDays: 30, dailyBudgetMin: 30 },
-  full_time: { method: "standard", newPerDay: 1, sabqiEvery: 1, sabqiDays: 14, cycleDays: 14, dailyBudgetMin: 90 },
+  part_time_beginner: { method: "standard", newPerDay: 0.25, recentEvery: 2, cycleDays: 30, dailyBudgetMin: 20 },
+  part_time_adult: { method: "standard", newPerDay: 0.5, recentEvery: 1, cycleDays: 30, dailyBudgetMin: 30 },
+  full_time: { method: "standard", newPerDay: 1, recentEvery: 1, recentDays: 14, cycleDays: 14, dailyBudgetMin: 90 },
   maintenance: { method: "review_only", newPerDay: 0, cycleDays: 30, dailyBudgetMin: 60 },
-  short_surahs: { method: "standard", unit: "ayah", newPerDay: 0.25, sabqiDays: 7, cycleDays: 14, dailyBudgetMin: 10 },
+  short_surahs: { method: "standard", unit: "ayah", newPerDay: 0.25, recentDays: 7, cycleDays: 14, dailyBudgetMin: 10 },
 };
 
 export function applyPreset(plan: HifzPlan, preset: PlanPreset): HifzPlan {
@@ -125,6 +125,36 @@ export function presetOf(plan: HifzPlan): PlanPreset | null {
   );
 }
 
+/**
+ * Plan fields saved under their original names in the synced hifz_plan JSON. Released Android
+ * versions read these keys and fall back to defaults for any key they miss, so the saved names stay
+ * while the code uses plain ones.
+ */
+const STORED_PLAN_KEYS = {
+  recentDays: "sabqiDays",
+  recentEvery: "sabqiEvery",
+  memorizeRepetitions: "sabaqRepetitions",
+} as const satisfies Partial<Record<keyof HifzPlan, string>>;
+
+function fromStoredPlanKeys(stored: Record<string, unknown>): Record<string, unknown> {
+  const plan = { ...stored };
+  for (const [field, key] of Object.entries(STORED_PLAN_KEYS)) {
+    delete plan[field];
+    delete plan[key];
+    if (key in stored) plan[field] = stored[key];
+  }
+  return plan;
+}
+
+function toStoredPlanKeys(plan: HifzPlan): Record<string, unknown> {
+  const stored: Record<string, unknown> = { ...plan };
+  for (const [field, key] of Object.entries(STORED_PLAN_KEYS)) {
+    stored[key] = stored[field];
+    delete stored[field];
+  }
+  return stored;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -133,16 +163,16 @@ export function parseHifzPlan(value: string | null | undefined): HifzPlan | null
   if (!value) return null;
   try {
     const raw = JSON.parse(value);
-    const stored: Record<string, unknown> = raw && typeof raw === "object" ? raw : {};
+    const stored = fromStoredPlanKeys(isRecord(raw) ? raw : {});
     // A plan saved before a count existed takes its default; a count out of range rejects the plan like any field.
-    const counts = stored.sabaqRepetitions;
-    const sabaqRepetitions =
+    const counts = stored.memorizeRepetitions;
+    const memorizeRepetitions =
       counts === undefined
-        ? DEFAULT_HIFZ_PLAN.sabaqRepetitions
+        ? DEFAULT_HIFZ_PLAN.memorizeRepetitions
         : isRecord(counts)
-          ? { ...DEFAULT_HIFZ_PLAN.sabaqRepetitions, ...counts }
+          ? { ...DEFAULT_HIFZ_PLAN.memorizeRepetitions, ...counts }
           : counts;
-    const parsed = hifzPlanSchema.safeParse({ ...DEFAULT_HIFZ_PLAN, ...stored, sabaqRepetitions });
+    const parsed = hifzPlanSchema.safeParse({ ...DEFAULT_HIFZ_PLAN, ...stored, memorizeRepetitions });
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
@@ -163,7 +193,7 @@ export async function writeHifzPlan(database: AppDatabase, plan: HifzPlan): Prom
 /** writeHifzPlan with the caller's executor, so the plan and its upload commit with the caller's other writes. */
 export async function putHifzPlan(db: DatabaseExecutor, plan: HifzPlan): Promise<void> {
   const parsed = hifzPlanSchema.parse(plan);
-  await putUserSetting(db, HIFZ_PLAN_KEY, JSON.stringify(parsed));
+  await putUserSetting(db, HIFZ_PLAN_KEY, JSON.stringify(toStoredPlanKeys(parsed)));
 }
 
 /** New memorization is scheduled on this weekday (0 is Sunday). */

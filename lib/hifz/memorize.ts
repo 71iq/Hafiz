@@ -7,16 +7,16 @@ import type { ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import { Rating, type Grade } from "@/lib/fsrs/scheduler";
 import type { StudyCardRow } from "@/lib/fsrs/types";
 import { addDays, atLocalTime, localDateOf, type LocalDate } from "@/lib/habit/dates";
-import { sabaqStepFlags } from "@/lib/habit/minimum";
+import { memorizeStepFlags } from "@/lib/habit/minimum";
 import { loadRecitationPage, type PageLine, type PageWordsLines, type RecitationPage } from "@/lib/hifz/page-data";
 import { readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
-import { pagePolicy } from "@/lib/hifz/tiers";
-import { addSabaqPageToAyahReview, coverPageInAyahReview } from "@/lib/hifz/unit-switch";
+import { pagePolicy, storedTier } from "@/lib/hifz/tiers";
+import { addMemorizedPageToAyahReview, coverPageInAyahReview } from "@/lib/hifz/unit-switch";
 import {
   chunkCardId,
   chunkCardPrefix,
   HIFZ_PAGES_DECK_ID,
-  HIFZ_SABAQ_DECK_ID,
+  HIFZ_NEW_LINES_DECK_ID,
   LINES_PER_PAGE,
   PAGE_COUNT,
   pageCardId,
@@ -49,7 +49,7 @@ export function newPageOrder(plan: Pick<HifzPlan, "method" | "direction">): numb
   return [...juz30, ...juz29, ...rest];
 }
 
-export type SabaqTarget = Readonly<{
+export type MemorizeTarget = Readonly<{
   page: number;
   pageData: RecitationPage;
   fromLine: number;
@@ -94,7 +94,7 @@ async function readDoneChunks(db: DatabaseExecutor, prefix: string): Promise<Ext
         )`,
     // Every id that starts with the prefix sorts at or after it and before the prefix with its last
     // character raised by one.
-    [HIFZ_SABAQ_DECK_ID, prefix, `${prefix.slice(0, -1)}${String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)}`],
+    [HIFZ_NEW_LINES_DECK_ID, prefix, `${prefix.slice(0, -1)}${String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)}`],
   );
   return rows.flatMap((row) => {
     const unit = parsePageUnit(row.id);
@@ -124,7 +124,7 @@ async function readMemorizedPages(db: DatabaseExecutor): Promise<Set<number>> {
  * that is not yet memorized, about `wantLines` long and extended up to 2 lines so it ends at an
  * ayah end. A chunk never runs into lines already memorized.
  */
-export async function nextSabaqTarget(
+export async function nextMemorizeTarget(
   db: DatabaseExecutor,
   {
     plan,
@@ -135,7 +135,7 @@ export async function nextSabaqTarget(
     wantLines: number;
     pageWords: (page: number) => PageWordsLines | null;
   },
-): Promise<SabaqTarget | null> {
+): Promise<MemorizeTarget | null> {
   const memorized = await readMemorizedPages(db);
   const page = newPageOrder(plan).find((candidate) => !memorized.has(candidate));
   if (page === undefined) return null;
@@ -153,7 +153,7 @@ async function chunkTarget(
     wantLines,
     pageWords,
   }: { page: number; wantLines: number; pageWords: (page: number) => PageWordsLines | null },
-): Promise<SabaqTarget | null> {
+): Promise<MemorizeTarget | null> {
   const done = await readDoneChunks(db, chunkCardPrefix(page));
   const covered = (line: PageLine) => coveredBy(done, line.lineNumber);
   const pageData = await loadRecitationPage(db, page, pageWords(page));
@@ -202,7 +202,7 @@ async function chunkTarget(
 
 /**
  * SBQ-03: the second look. A chunk card's reviews belong to the local day it was learned, the day
- * its clean run (step 6) passed. The sabaq screen offers it as a short second look before new lines,
+ * its clean run (step 6) passed. The memorize screen offers it as a short second look before new lines,
  * about an hour after its lesson, or sooner when the lesson's last grade set an earlier step: a failed
  * fluent check comes back with its relearning step. After that day the
  * chunk card is never offered again, whatever FSRS scheduled: once the page is complete its page
@@ -240,7 +240,7 @@ type TodaysChunk = Readonly<{ id: string; due: string; lessonEndAt: number; last
 
 /**
  * The live chunk cards learned on `today` (see SecondLook): those with a completed step 6 today, a
- * pass with no review before it or right after a failed one (sabaqStepFlags, the rule the wird day
+ * pass with no review before it or right after a failed one (memorizeStepFlags, the rule the wird day
  * uses). A chunk whose latest review before today passed belongs to that day; one that failed then
  * and was learned again today belongs to today.
  *
@@ -255,7 +255,7 @@ async function readTodaysChunks(db: DatabaseExecutor, today: LocalDate, now: Dat
       WHERE c.deck_id = ? AND c.id LIKE 'chunk:%' AND c.deleted_at IS NULL AND c.suspended_at IS NULL
         AND (c.buried_until IS NULL OR c.buried_until <= ?)
         AND EXISTS (SELECT 1 FROM study_log AS l WHERE l.card_id = c.id AND l.rating >= 3 AND l.local_date = ?)`,
-    [HIFZ_SABAQ_DECK_ID, now.toISOString(), today],
+    [HIFZ_NEW_LINES_DECK_ID, now.toISOString(), today],
   );
   if (cards.length === 0) return [];
   const logs = await db.getAllAsync<{ card_id: string; rating: number; reviewed_at: string; local_date: LocalDate | null; session_id: string | null }>(
@@ -274,7 +274,7 @@ async function readTodaysChunks(db: DatabaseExecutor, today: LocalDate, now: Dat
   const chunks: TodaysChunk[] = [];
   for (const card of cards) {
     const reviews = (reviewsByCard.get(card.id) ?? []).sort((a, b) => a.at - b.at);
-    const steps = sabaqStepFlags(reviews);
+    const steps = memorizeStepFlags(reviews);
     const todays = reviews.filter((review) => review.day === today);
     const learned = reviews.filter((review, index) => steps[index] && review.day === today).at(-1);
     if (!learned) continue;
@@ -403,21 +403,21 @@ async function saveChunkGrade(
   },
 ): Promise<ReviewSaveResult> {
   const at = now.toISOString();
-  const base = await readDeckReviewSettings(db, HIFZ_SABAQ_DECK_ID);
-  const created = (): StudyCardRow => newStudyCardRow({ id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
+  const base = await readDeckReviewSettings(db, HIFZ_NEW_LINES_DECK_ID);
+  const created = (): StudyCardRow => newStudyCardRow({ id, deckId: HIFZ_NEW_LINES_DECK_ID, due: now, tier: storedTier("new"), now: at });
   return persistReviewTransition({
     db,
     cardId: id,
     // Creating it does nothing when the card already exists.
     beforeWork: create
       ? async (tx) => {
-          await insertNewStudyCard(tx, { id, deckId: HIFZ_SABAQ_DECK_ID, due: now, tier: "sabaq", now: at });
+          await insertNewStudyCard(tx, { id, deckId: HIFZ_NEW_LINES_DECK_ID, due: now, tier: storedTier("new"), now: at });
         }
       : undefined,
     transition: async (tx) => {
       const current = await readCurrentCard(tx, id);
       if (!current && !create) throw new StudyCardDeletedError();
-      return calculateReviewTransition({ card: current ?? created(), rating, reviewedAt: now, reviewPolicy: pagePolicy("sabaq", plan, base) });
+      return calculateReviewTransition({ card: current ?? created(), rating, reviewedAt: now, reviewPolicy: pagePolicy("new", plan, base) });
     },
     context: {
       session,
@@ -433,10 +433,10 @@ async function saveChunkGrade(
 }
 
 /**
- * SBQ-02: a page memorized through sabaq starts from its chunks' ratings rather than as an empty
+ * SBQ-02: a page memorized as new lines starts from its chunks' ratings rather than as an empty
  * card. Read inside the grade's transaction, after the final chunk's own review is written, so every
  * chunk of the page counts. The page is as strong as its weakest chunk: the lowest stability, with
- * the chunks' mean difficulty, last reviewed now and due tomorrow as a sabqi page. Null when no
+ * the chunks' mean difficulty, last reviewed now and due tomorrow as a recent page. Null when no
  * graded chunk is left, and the page starts empty as before.
  */
 async function pageStartFromChunks(tx: DatabaseExecutor, page: number, now: Date): Promise<StartingSchedule | null> {
@@ -444,7 +444,7 @@ async function pageStartFromChunks(tx: DatabaseExecutor, page: number, now: Date
   const row = await tx.getFirstAsync<{ stability: number | null; difficulty: number | null }>(
     `SELECT MIN(stability) AS stability, AVG(difficulty) AS difficulty FROM study_cards
       WHERE deck_id = ? AND id >= ? AND id < ? AND deleted_at IS NULL AND state <> 0 AND stability > 0`,
-    [HIFZ_SABAQ_DECK_ID, prefix, `${prefix.slice(0, -1)};`],
+    [HIFZ_NEW_LINES_DECK_ID, prefix, `${prefix.slice(0, -1)};`],
   );
   if (!row?.stability || !row.difficulty) return null;
   return { stability: row.stability, difficulty: row.difficulty, lastReview: now.toISOString(), scheduledDays: 1 };
@@ -452,12 +452,12 @@ async function pageStartFromChunks(tx: DatabaseExecutor, page: number, now: Date
 
 /**
  * SBQ-02: once every ayah line of the page lies in a memorized chunk (readDoneChunks), the page joins
- * review, sabqi and due tomorrow, unless it has a live card already. Runs inside a chunk grade's
+ * review, recent and due tomorrow, unless it has a live card already. Runs inside a chunk grade's
  * transaction after its review is written, so the coverage it reads is the committed one: a failed
  * second look since the screen chose its lines keeps the page out, and a passed one that covers the
  * last lines adds it. In ayah review (UNIT-02) the page is reviewed as ayat instead: the ayah decks
  * take in its surahs, its card is set aside for a switch to pages, and its ayat get ayah cards
- * (addSabaqPageToAyahReview). `pageLines` are the page's ayah line numbers as the lesson laid them
+ * (addMemorizedPageToAyahReview). `pageLines` are the page's ayah line numbers as the lesson laid them
  * out, the numbering its chunk ids use. Returns whether it added the page.
  */
 async function addPageIfComplete(
@@ -487,8 +487,8 @@ async function addPageIfComplete(
   if (ayahReview) await coverPageInAyahReview(tx, page);
   const due = atLocalTime(addDays(completedOn, 1), 0);
   const start = await pageStartFromChunks(tx, page, now);
-  const added = await insertNewStudyCard(tx, { id: pageCardId(page), deckId: HIFZ_PAGES_DECK_ID, due, tier: "sabqi", now: now.toISOString(), start });
-  if (ayahReview) await addSabaqPageToAyahReview(tx, { page, start, due, now });
+  const added = await insertNewStudyCard(tx, { id: pageCardId(page), deckId: HIFZ_PAGES_DECK_ID, due, tier: storedTier("recent"), now: now.toISOString(), start });
+  if (ayahReview) await addMemorizedPageToAyahReview(tx, { page, start, due, now });
   return added;
 }
 
@@ -499,13 +499,13 @@ function pageLineNumbers(pageData: RecitationPage): number[] {
 /**
  * SBQ-02 after sync or a restore: the pages, in the plan's order, whose ayah lines are all memorized
  * but that have no page card. A grade adds its page from the chunks this device has, so two devices
- * whose chunks complete the page only once merged each add nothing, and sabaq would stay on a page
+ * whose chunks complete the page only once merged each add nothing, and new memorization would stay on a page
  * with nothing left to offer. Each page is dated to the grade that completed it, the latest of its
- * chunks' completed steps 6 (sabaqStepFlags), so it keeps its sabaq provenance (readSabaqPasses) and
+ * chunks' completed steps 6 (memorizeStepFlags), so it keeps its new memorization provenance (readMemorizePasses) and
  * its first review date. One transaction each, which checks the coverage again. Returns the number
  * of pages added.
  */
-export async function addCoveredSabaqPages(
+export async function addCoveredMemorizedPages(
   db: AppDatabase,
   { plan, pageWords }: { plan: HifzPlan; pageWords: (page: number) => PageWordsLines | null },
 ): Promise<number> {
@@ -544,7 +544,7 @@ export async function addCoveredSabaqPages(
         })
         .filter((review) => Number.isFinite(review.at))
         .sort((a, b) => a.at - b.at);
-      const steps = sabaqStepFlags(reviews);
+      const steps = memorizeStepFlags(reviews);
       const learned = reviews.filter((_, index) => steps[index]).at(-1);
       if (learned?.day && (completed === null || learned.at > completed.at)) completed = { at: learned.at, day: learned.day };
     }
@@ -560,9 +560,9 @@ export async function addCoveredSabaqPages(
   return added;
 }
 
-type ChunkSaveInput = { target: SabaqTarget; plan: HifzPlan; session: ReviewSessionRef | null; durationMs: number; now?: Date };
+type ChunkSaveInput = { target: MemorizeTarget; plan: HifzPlan; session: ReviewSessionRef | null; durationMs: number; now?: Date };
 
-function targetCardId(target: SabaqTarget): string {
+function targetCardId(target: MemorizeTarget): string {
   return chunkCardId(target.page, Math.max(1, target.fromLine), Math.min(LINES_PER_PAGE, target.toLine));
 }
 
@@ -602,11 +602,11 @@ async function saveTargetChunk(
 
 /**
  * SBQ-02, 4.4.1 step 6: once the whole chunk is recited cleanly the set number of times in a row, the
- * chunk becomes a sabaq card with Good as its first review, and when it completes its page the page
+ * chunk gets its card with Good as its first review, and when it completes its page the page
  * joins review in the same transaction. The review counts for the wird day (STR-01), so a lesson
  * left after step 6 keeps its lines and its credit. `durationMs` is the lesson's time so far.
  */
-export async function saveSabaqCleanRun(
+export async function saveMemorizeCleanRun(
   db: AppDatabase,
   { target, plan, session, durationMs, now = new Date() }: ChunkSaveInput,
 ): Promise<ReviewSaveResult & { pageAdded: boolean }> {
@@ -630,7 +630,7 @@ export async function saveSabaqCleanRun(
  * `secondLookNow` says the look is offered already, as after a check graded Again, whose relearning
  * step falls inside the learn-ahead window.
  */
-export async function completeSabaqChunk(
+export async function completeMemorizeChunk(
   db: AppDatabase,
   { target, plan, rating, session, durationMs, now = new Date() }: ChunkSaveInput & { rating: Grade },
 ): Promise<ReviewSaveResult & { pageAdded: boolean; secondLookAt: Date | null; secondLookNow: boolean }> {
@@ -658,7 +658,7 @@ export async function completeSabaqChunk(
     const learned = (await readTodaysChunks(db, localDateOf(now), now)).find((chunk) => chunk.id === id);
     look = learned ? lookAt(learned) : null;
   } catch (lookError) {
-    console.warn("[Sabaq] Could not read the second look after the check:", lookError);
+    console.warn("[Memorize] Could not read the second look after the check:", lookError);
   }
   const secondLookAt = look ? laterToday(look, now) : null;
   // As readSecondLookSchedule counts a look due now.
@@ -687,7 +687,7 @@ export async function saveSecondLook(
   }: { cardId: string; pageData: RecitationPage; plan: HifzPlan; rating: Grade; session: ReviewSessionRef | null; durationMs: number; now?: Date },
 ): Promise<ReviewSaveResult & { pageAdded: boolean }> {
   const unit = parsePageUnit(cardId);
-  if (unit?.kind !== "chunk") throw new Error(`Not a sabaq chunk: ${cardId}`);
+  if (unit?.kind !== "chunk") throw new Error(`Not a chunk: ${cardId}`);
   if (pageData.page !== unit.page) throw new Error(`Page ${pageData.page} is not the page of ${cardId}`);
   let pageAdded = false;
   const result = await saveChunkGrade(db, {

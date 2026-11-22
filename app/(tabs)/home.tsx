@@ -490,7 +490,7 @@ export default function HomeScreen() {
         : wird.todo.length +
           // A half page or seam due after a missed page is part of today's review (SCH-06, SCH-08).
           remediationDue +
-          (wird.newLines > 0 && !wird.daily.backlog && !wird.sabaqDoneToday ? 1 : 0);
+          (wird.newLines > 0 && !wird.daily.backlog && !wird.memorizeDoneToday ? 1 : 0);
   const remainingToday = totalDue + planRemaining;
   // MST-01: with page or half-page review, Home counts memorized pages instead of ayah cards.
   const pageMode = !!wird && wird.plan.unit !== "ayah";
@@ -762,7 +762,7 @@ export default function HomeScreen() {
             s={s}
             // Like the wird reminder: the page review, or the ayah review when the plan reviews ayat (UNIT-02).
             onStartReview={() => router.push(reminderHref("wird", wird?.plan ?? null))}
-            onStartSabaq={() => router.push("/hifz/sabaq" as Href)}
+            onStartMemorize={() => router.push("/hifz/memorize" as Href)}
             onSetup={() => router.push("/hifz/setup" as Href)}
             onDrill={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}
           />
@@ -786,7 +786,7 @@ export default function HomeScreen() {
             db={db}
             inboxCount={inboxCount}
             hasMemorizedPages={wird.memorizedPages > 0}
-            sabaqToday={wird.sabaqDoneToday}
+            memorizeToday={wird.memorizeDoneToday}
             language={uiLanguage}
             isDark={isDark}
             s={s}

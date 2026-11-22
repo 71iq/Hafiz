@@ -27,13 +27,13 @@ export function parseWirdMinimum(value: string | null | undefined): WirdMinimum 
 
 /**
  * Recitation is measured in sixtieths of a page so every weight is whole and the sums stay exact:
- * halves, seam quarters, ayah tenths and sabaq chunk lines (fifteenths) all divide 60, so chunks
+ * halves, seam quarters, ayah tenths and chunk lines (fifteenths) all divide 60, so chunks
  * that cover a page add up to exactly one page. An ayah card is about a tenth of a page: the 604
  * Madani pages hold 6,236 ayat.
  */
 export const PAGE_UNITS = 60;
 
-/** Lines on a Madani page (lib/hifz/units LINES_PER_PAGE): a sabaq chunk counts by its share of one. */
+/** Lines on a Madani page (lib/hifz/units LINES_PER_PAGE): a chunk counts by its share of one. */
 const LINES_PER_PAGE = 15;
 /** One line's weight, 4 sixtieths. */
 const LINE_UNITS = PAGE_UNITS / LINES_PER_PAGE;
@@ -44,7 +44,7 @@ const MAX_COUNTED_REVIEW_MS = 10 * 60_000;
 export type CardRole = "recitation" | "study";
 
 /**
- * Recitation cards test memorization: pages, half pages, seams, sabaq chunks, ayat and similar
+ * Recitation cards test memorization: pages, half pages, seams, chunks, ayat and similar
  * verses. Study cards (word meanings, qira'at, reasons of revelation) count only when the user turns
  * on "meanings count toward my wird" (UNIT-02), and then only by time.
  */
@@ -54,7 +54,7 @@ function cardRole(cardId: string): CardRole {
 }
 
 /**
- * A sabaq chunk's weight, by its lines: its id ends in "from-to" (lib/hifz/units chunkCardId). Four
+ * A chunk's weight, by its lines: its id ends in "from-to" (lib/hifz/units chunkCardId). Four
  * lines are 16 sixtieths, so a short second look (SBQ-03) is not a page of recitation (STR-01).
  * Null for an id that does not end in its lines; it counts as a page, as before.
  */
@@ -75,20 +75,20 @@ export function recitationUnits(cardId: string): number {
 }
 
 /**
- * `sabaqStep`: the review is a sabaq chunk's completed step 6 (SBQ-02): a passing review of the chunk
+ * `memorizeStep`: the review is a chunk's completed step 6 (SBQ-02): a passing review of the chunk
  * card with no review before it, or right after a failed one. That is the pass that memorized the
  * chunk, the first time or again after a failed fluent check or look, the same rule by which
- * nextSabaqTarget counts a chunk as memorized. STR-01 counts it as a wird day on its own, however
+ * nextMemorizeTarget counts a chunk as memorized. STR-01 counts it as a wird day on its own, however
  * short the chunk. A pass after a pass (the fluent check, a second look) adds no step of its own.
  */
-export type ReviewContribution = Readonly<{ cardId: string; durationMs: number | null; sabaqStep?: boolean }>;
+export type ReviewContribution = Readonly<{ cardId: string; durationMs: number | null; memorizeStep?: boolean }>;
 
 /**
  * Which of one chunk card's reviews, sorted by instant, are completed steps 6 (see ReviewContribution),
  * as DAY_TALLY_SQL reads them: a pass with no earlier review, or whose latest earlier review failed.
  * Reviews at the same earlier instant count as passed if any of them passed.
  */
-export function sabaqStepFlags(reviews: readonly { at: number; rating: number }[]): boolean[] {
+export function memorizeStepFlags(reviews: readonly { at: number; rating: number }[]): boolean[] {
   // The best rating at the latest instant before the current one, or null before the first review.
   let priorBest: number | null = null;
   let groupAt = Number.NaN;
@@ -104,7 +104,7 @@ export function sabaqStepFlags(reviews: readonly { at: number; rating: number }[
     return review.rating >= 3 && (priorBest === null || priorBest < 3);
   });
 }
-export type WirdTally = Readonly<{ pageUnits: number; countedMs: number; sabaqStep: boolean }>;
+export type WirdTally = Readonly<{ pageUnits: number; countedMs: number; memorizeStep: boolean }>;
 
 export function tallyReviews(
   reviews: readonly ReviewContribution[],
@@ -112,22 +112,22 @@ export function tallyReviews(
 ): WirdTally {
   let pageUnits = 0;
   let countedMs = 0;
-  let sabaqStep = false;
+  let memorizeStep = false;
   for (const review of reviews) {
-    if (review.sabaqStep) sabaqStep = true;
+    if (review.memorizeStep) memorizeStep = true;
     const role = cardRole(review.cardId);
     if (role === "study" && !options.studyCounts) continue;
     pageUnits += recitationUnits(review.cardId);
     const duration = review.durationMs ?? 0;
     if (Number.isFinite(duration) && duration > 0) countedMs += Math.min(duration, MAX_COUNTED_REVIEW_MS);
   }
-  return { pageUnits, countedMs, sabaqStep };
+  return { pageUnits, countedMs, memorizeStep };
 }
 
-/** STR-01: a page of graded recitation, the minutes of graded review, or a completed sabaq step 6. */
+/** STR-01: a page of graded recitation, the minutes of graded review, or a completed new memorization step 6. */
 export function meetsMinimum(tally: WirdTally, minimum: WirdMinimum): boolean {
   return (
-    tally.sabaqStep ||
+    tally.memorizeStep ||
     tally.pageUnits >= Math.round(minimum.pages * PAGE_UNITS) ||
     tally.countedMs >= minimum.minutes * 60_000
   );
@@ -135,7 +135,7 @@ export function meetsMinimum(tally: WirdTally, minimum: WirdMinimum): boolean {
 
 /** Progress toward the minimum as a fraction from 0 to 1, by whichever path is further along. */
 export function minimumProgress(tally: WirdTally, minimum: WirdMinimum): number {
-  if (tally.sabaqStep) return 1;
+  if (tally.memorizeStep) return 1;
   const byPages = tally.pageUnits / Math.max(1, Math.round(minimum.pages * PAGE_UNITS));
   const byMinutes = tally.countedMs / Math.max(1, minimum.minutes * 60_000);
   return Math.min(1, Math.max(byPages, byMinutes));
@@ -166,7 +166,7 @@ const TALLY_SELECT = `SELECT
       SELECT prior.rating FROM study_log AS prior
       WHERE prior.card_id = tallied.card_id AND julianday(prior.reviewed_at) < julianday(tallied.reviewed_at)
       ORDER BY julianday(prior.reviewed_at) DESC, prior.rating DESC LIMIT 1
-    ), 0) < 3 THEN 1 ELSE 0 END), 0) AS sabaq_step
+    ), 0) < 3 THEN 1 ELSE 0 END), 0) AS memorize_step
   FROM (SELECT card_id, rating, reviewed_at, duration_ms, local_date, makeup_for, ${LINES_SEG_SQL} AS lines_seg FROM study_log) AS tallied`;
 
 /**

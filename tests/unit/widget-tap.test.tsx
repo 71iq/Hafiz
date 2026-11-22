@@ -148,7 +148,7 @@ describe("useWidgetTaps", () => {
     expect(peekPendingWidgetTap()).toBe("wird");
   });
 
-  it.each(["/onboarding", "/flashcards/session", "/hifz/review", "/hifz/sabaq", "/hifz/setup"])(
+  it.each(["/onboarding", "/flashcards/session", "/hifz/review", "/hifz/memorize", "/hifz/setup"])(
     "drops the tap on %s",
     (pathname) => {
       mockPathname = pathname;

@@ -10,7 +10,7 @@ import {
   attemptEvents,
   emptyAttempt,
   endOfLineAt,
-  MANZIL_CYCLE_START_KEY,
+  LONG_TERM_CYCLE_START_KEY,
   nextHiddenWord,
   proposedRating,
   recordReviewPace,
@@ -118,7 +118,7 @@ describe("saving a page grade", () => {
       durationMs: 120_000,
       now,
     });
-    expect(result.tier).toBe("manzil");
+    expect(result.tier).toBe("long_term");
     expect(result.wird.kind).toBe("minimum_met");
     const log = store.sql.prepare("SELECT rating, support_level, proposed_rating, error_count FROM study_log").get();
     expect(log).toEqual({ rating: Rating.Hard, support_level: 1, proposed_rating: Rating.Hard, error_count: 1 });
@@ -158,7 +158,7 @@ describe("saving a page grade", () => {
       lapses: synced.lapses,
     });
     // After an Again, one Good grade is not yet two in a row, so the page still needs work.
-    expect(result.tier).toBe("manzil.needs_work");
+    expect(result.tier).toBe("long_term.needs_work");
     expect(store.sql.prepare("SELECT tier FROM study_cards WHERE id = ?").get(synced.id)).toEqual({ tier: "manzil.needs_work" });
     expect(result.transition.updatedCard.reps).toBe(synced.reps + 1);
   });
@@ -187,7 +187,7 @@ describe("saving a page grade", () => {
     });
   });
 
-  it("marks the day a manzil cycle completes and starts the next one tomorrow (MST-04)", async () => {
+  it("marks the day a long-term cycle completes and starts the next one tomorrow (MST-04)", async () => {
     const now = atLocalTime(TODAY, 600);
     await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now });
     for (const [offset, pageNumber] of [[0, 7], [1, 8]] as const) {
@@ -205,7 +205,7 @@ describe("saving a page grade", () => {
       });
     }
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ manzil_cycle_completed: 1, status: "done" });
-    expect(store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(MANZIL_CYCLE_START_KEY)).toEqual({
+    expect(store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(LONG_TERM_CYCLE_START_KEY)).toEqual({
       value: addDays(TODAY, 1),
     });
   });
@@ -224,14 +224,14 @@ describe("saving a page grade", () => {
       now,
     });
   }
-  const cycleStart = () => store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(MANZIL_CYCLE_START_KEY);
+  const cycleStart = () => store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(LONG_TERM_CYCLE_START_KEY);
   /** A zone further east puts the cards' creation instant on the next local day; a fallback start would move with it. */
   const travelEast = () =>
     store.sql.prepare("UPDATE study_cards SET created_at = ? WHERE id LIKE 'page:%'").run(atLocalTime(addDays(TODAY, 1), 30).toISOString());
 
-  it("counts a manzil page toward the cycle when its synced cached tier is stale (MST-04)", async () => {
+  it("counts a long-term page toward the cycle when its synced cached tier is stale (MST-04)", async () => {
     await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now: atLocalTime(TODAY, 600) });
-    // Another device's older row left page 8 cached as sabaq, while its merged history makes it manzil.
+    // Another device's older row left page 8 cached as new ("sabaq"), while its merged history makes it long-term.
     store.sql.prepare("UPDATE study_cards SET tier = 'sabaq' WHERE id = ?").run(pageCardId(8));
     await gradeGood(7, atLocalTime(TODAY, 601));
     expect((await readHabitDayRow(store.db, TODAY))?.manzil_cycle_completed).toBe(0);
@@ -243,7 +243,7 @@ describe("saving a page grade", () => {
     await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now: atLocalTime(TODAY, 600) });
     expect(cycleStart()).toEqual({ value: TODAY });
     expect(
-      store.sql.prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE table_name = 'user_settings' AND row_id = ?").get(MANZIL_CYCLE_START_KEY),
+      store.sql.prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE table_name = 'user_settings' AND row_id = ?").get(LONG_TERM_CYCLE_START_KEY),
     ).toEqual({ count: 1 });
     travelEast();
     await gradeGood(8, atLocalTime(TODAY, 601));
@@ -253,8 +253,8 @@ describe("saving a page grade", () => {
 
   it("stores the first cycle's start the first time it is needed when none was stored (MST-04)", async () => {
     await declareMemorizedPages(store.db, { pages: [7, 8], cycleDays: 2, now: atLocalTime(TODAY, 600) });
-    // As for pages that reached manzil through sabqi, with no declaration to store a start.
-    store.sql.prepare("DELETE FROM user_settings WHERE key = ?").run(MANZIL_CYCLE_START_KEY);
+    // As for pages that reached long-term through recent, with no declaration to store a start.
+    store.sql.prepare("DELETE FROM user_settings WHERE key = ?").run(LONG_TERM_CYCLE_START_KEY);
     await gradeGood(8, atLocalTime(TODAY, 601));
     expect(cycleStart()).toEqual({ value: TODAY });
     travelEast();
@@ -325,12 +325,12 @@ describe("page history from the review log", () => {
     const derived = await derivePageTiers(store.db, [id], { today: TODAY, plan });
     expect(all.history.grades.map((grade) => grade.rating)).toEqual([Rating.Again, Rating.Good, Rating.Good]);
     expect(one?.history.grades.map((grade) => grade.rating)).toEqual([Rating.Again, Rating.Good, Rating.Good]);
-    expect(all.tier).toBe("manzil");
-    expect(one?.tier).toBe("manzil");
-    expect(derived.get(id)).toBe("manzil");
+    expect(all.tier).toBe("long_term");
+    expect(one?.tier).toBe("long_term");
+    expect(derived.get(id)).toBe("long_term");
   });
 
-  it("reads only the graded page's sabaq chunks inside a grade", async () => {
+  it("reads only the graded page's chunks inside a grade", async () => {
     await declareMemorizedPages(store.db, { pages: [5], cycleDays: 30, now: atLocalTime(TODAY, 600) });
     const queries: string[] = [];
     const recording = new Proxy(store.db, {

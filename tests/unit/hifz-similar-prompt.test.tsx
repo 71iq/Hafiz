@@ -9,7 +9,7 @@ import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sql
 
 /**
  * Tail-only similar-verse groups carry no text segments (4.7), and some pairs read the same word for
- * word. The pair prompt (MUT-04) and the sabaq comparison (MUT-01) still need two readable, distinct
+ * word. The pair prompt (MUT-04) and the new memorization comparison (MUT-01) still need two readable, distinct
  * verses, and show each verse's meaning (MUT-05). Quran text, translations and the Muyassar tafsir are
  * copied from the bundled database.
  */
@@ -139,7 +139,7 @@ describe("tail-only similar verses", () => {
     expect(pair.self.similar).toBe("إِنَّ ٱللَّهَ بِكُلِّ شَىْءٍ عَلِيمٌۢ");
     expect(pair.sibling.similar).toBe("إِنَّ ٱللَّهَ بِكُلِّ شَىْءٍ عَلِيمٌ");
     expect(pair.self.context).toBeUndefined();
-    // The sabaq comparison reads the same groups.
+    // The new memorization comparison reads the same groups.
     const [group] = await similarGroupsForAyahs(store.db, [verse("8:75")]);
     expect(group.self.pre).not.toBe("");
     expect(group.siblings[0].similar).toBe("إِنَّ ٱللَّهَ بِكُلِّ شَىْءٍ عَلِيمٌ");

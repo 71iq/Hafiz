@@ -4,16 +4,16 @@ import { declareMemorizedPages, derivePageTiers, loadPageCard, loadPageCards, lo
 import { DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { countDueRemediation } from "@/lib/hifz/remediation";
 import {
-  addCoveredSabaqPages,
-  completeSabaqChunk,
+  addCoveredMemorizedPages,
+  completeMemorizeChunk,
   countSecondLooks,
   loadSecondLooks,
   newPageOrder,
-  nextSabaqTarget,
-  saveSabaqCleanRun,
+  nextMemorizeTarget,
+  saveMemorizeCleanRun,
   saveSecondLook,
-  type SabaqTarget,
-} from "@/lib/hifz/sabaq";
+  type MemorizeTarget,
+} from "@/lib/hifz/memorize";
 import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { startReviewSession } from "@/lib/fsrs/review-sessions";
 import { chunkCardId, PAGE_COUNT, pageCardId, parsePageUnit } from "@/lib/hifz/units";
@@ -93,7 +93,7 @@ describe("the ayah decks' scope for a page memorized in ayah review (UNIT-02)", 
   });
 });
 
-describe("sabaq chunks (SBQ-02)", () => {
+describe("chunks (SBQ-02)", () => {
   let store: OutboxDatabase;
   const plan = { ...DEFAULT_HIFZ_PLAN, method: "standard" as const, direction: "from_fatiha" as const };
 
@@ -124,19 +124,19 @@ describe("sabaq chunks (SBQ-02)", () => {
   });
 
   /**
-   * One lesson as the sabaq screen saves it: step 6's clean run five minutes before `checkAt`, then
+   * One lesson as the new memorization screen saves it: step 6's clean run five minutes before `checkAt`, then
    * the fluent check at `checkAt`, in the same review session.
    */
-  async function learn(target: SabaqTarget, rating: Grade, checkAt: Date, lessonPlan = plan) {
+  async function learn(target: MemorizeTarget, rating: Grade, checkAt: Date, lessonPlan = plan) {
     const session = startReviewSession("sabaq", { now: new Date(checkAt.getTime() - 10 * 60_000) });
-    const cleanRun = await saveSabaqCleanRun(store.db, {
+    const cleanRun = await saveMemorizeCleanRun(store.db, {
       target,
       plan: lessonPlan,
       session,
       durationMs: 60_000,
       now: new Date(checkAt.getTime() - 5 * 60_000),
     });
-    const check = await completeSabaqChunk(store.db, { target, plan: lessonPlan, rating, session, durationMs: 60_000, now: checkAt });
+    const check = await completeMemorizeChunk(store.db, { target, plan: lessonPlan, rating, session, durationMs: 60_000, now: checkAt });
     return { cleanRun, check, session };
   }
   /** A second look's page, laid out as loadSecondLooks lays it out without page words. */
@@ -149,7 +149,7 @@ describe("sabaq chunks (SBQ-02)", () => {
 
   it("chooses the next lines of the first unmemorized page, then adds the page at its last chunk's clean run", async () => {
     const pageWords = () => null;
-    const first = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+    const first = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
     expect(first).toMatchObject({ page: 1, fromLine: 2, toLine: 5, completesPage: false });
     expect(first.ayahs.map((ayah) => ayah.ayah)).toEqual([1, 2, 3, 4]);
 
@@ -159,12 +159,12 @@ describe("sabaq chunks (SBQ-02)", () => {
     // One chunk covers 4 lines, so a larger daily allocation is not done yet.
     await writeHifzPlan(store.db, { ...plan, newPerDay: 1, dailyBudgetMin: 240 });
     const wird = (await loadTodayWird(store.db, atLocalTime(TODAY, 9 * 60 + 30)))!;
-    expect(wird.sabaqLinesToday).toBe(4);
-    expect(wird.sabaqDoneToday).toBe(wird.newLines <= 4 && wird.newLines > 0);
+    expect(wird.memorizeLinesToday).toBe(4);
+    expect(wird.memorizeDoneToday).toBe(wird.newLines <= 4 && wird.newLines > 0);
     // STR-01: the completed step 6 is the day's minimum on its own, though it took a minute.
     expect(firstSave.cleanRun.wird.kind).toBe("minimum_met");
 
-    const second = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+    const second = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
     expect(second).toMatchObject({ page: 1, fromLine: 6, toLine: 8, completesPage: true });
     expect(second.linkAyahs.map((ayah) => ayah.ayah)).toEqual([3, 4]);
     const secondSave = await learn(second, Rating.Good, atLocalTime(TODAY, 600));
@@ -175,26 +175,26 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(count("SELECT COUNT(*) AS count FROM sync_queue WHERE table_name = 'study_cards' AND operation = 'INSERT' AND row_id = ?", pageCardId(1))).toBe(1);
 
     const cards = await loadPageCards(store.db, { today: TODAY, plan });
-    expect(cards.map((card) => [card.row.id, card.tier])).toEqual([[pageCardId(1), "sabqi"]]);
-    // A grade's own read of the page, limited to its chunks, sees the same sabaq history.
+    expect(cards.map((card) => [card.row.id, card.tier])).toEqual([[pageCardId(1), "recent"]]);
+    // A grade's own read of the page, limited to its chunks, sees the same new memorization history.
     const one = await loadPageCard(store.db, pageCardId(1), { today: TODAY, plan });
-    expect(one).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: TODAY } });
-    expect(await nextSabaqTarget(store.db, { plan: { ...plan, direction: "from_fatiha" }, wantLines: 4, pageWords })).toBeNull();
+    expect(one).toMatchObject({ tier: "recent", history: { declared: false, firstFluentDate: TODAY } });
+    expect(await nextMemorizeTarget(store.db, { plan: { ...plan, direction: "from_fatiha" }, wantLines: 4, pageWords })).toBeNull();
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
   });
 
   it("does not plan a page completed today for review before its first due date, tomorrow", async () => {
     await writeHifzPlan(store.db, plan);
-    const whole = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
+    const whole = (await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
     expect(whole.completesPage).toBe(true);
     const { cleanRun } = await learn(whole, Rating.Good, atLocalTime(TODAY, 600));
     expect(cleanRun.pageAdded).toBe(true);
     // This device saved no plan for today before the page was added, so today's list is built now.
     const today = (await loadTodayWird(store.db, atLocalTime(TODAY, 630)))!;
-    expect(today.cards.map((card) => [card.row.id, card.tier])).toEqual([[pageCardId(1), "sabqi"]]);
+    expect(today.cards.map((card) => [card.row.id, card.tier])).toEqual([[pageCardId(1), "recent"]]);
     // MST-01: the passing graded recitation that completed it counts until the page's own first grade.
     expect(today.memorizedPages).toBe(1);
-    expect(today.daily.sabqi).toEqual([]);
+    expect(today.daily.recent).toEqual([]);
     expect(today.todo).toEqual([]);
     const tomorrow = (await loadTodayWird(store.db, atLocalTime(addDays(TODAY, 1), 9 * 60)))!;
     expect(tomorrow.todo.map((page) => page.cardId)).toEqual([pageCardId(1)]);
@@ -213,10 +213,10 @@ describe("sabaq chunks (SBQ-02)", () => {
          VALUES ('1:7', ?, '2026-11-20T00:00:00.000Z', 30, 4, 0, 7, 0, 3, 0, 2, '2026-11-10T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')`,
       )
       .run(SMART_DECK_IDS.retention);
-    const whole = (await nextSabaqTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null }))!;
+    const whole = (await nextMemorizeTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null }))!;
     const now = atLocalTime(TODAY, 600);
     // Step 6's clean run adds the page, and in ayah review its ayat.
-    const saved = await saveSabaqCleanRun(store.db, { target: whole, plan: ayahPlan, session: null, durationMs: 600_000, now });
+    const saved = await saveMemorizeCleanRun(store.db, { target: whole, plan: ayahPlan, session: null, durationMs: 600_000, now });
     expect(saved.pageAdded).toBe(true);
 
     // The page card is kept for page review but set aside like a switch, so no page task appears.
@@ -227,7 +227,7 @@ describe("sabaq chunks (SBQ-02)", () => {
     });
     const tomorrow = atLocalTime(addDays(TODAY, 1), 9 * 60);
     expect((await loadTodayWird(store.db, tomorrow))!).toMatchObject({ todo: [], total: 0 });
-    expect(await nextSabaqTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null })).toBeNull();
+    expect(await nextMemorizeTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null })).toBeNull();
 
     // Each new ayah enters ayah review from the chunk's schedule, due tomorrow.
     const chunk = store.sql.prepare("SELECT stability, difficulty FROM study_cards WHERE id LIKE 'chunk:%'").get() as { stability: number; difficulty: number };
@@ -239,19 +239,19 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(await readSmartDeckFilter(store.db, SMART_DECK_IDS.retention)).toEqual({ type: "surah", surahs: [1, 2] });
     expect(await getSmartDeckCandidateCardIds(store.db, SMART_DECK_IDS.retention)).toEqual([1, 2, 3, 4, 5, 6, 7].map((ayah) => `1:${ayah}`));
 
-    // A switch to page review brings the page back as a sabqi page.
+    // A switch to page review brings the page back as a recent page.
     await writeHifzPlan(store.db, plan);
     await store.db.withTransactionAsync(async (tx) => {
       await switchToPageReview(tx, { previousUnit: "ayah", now: atLocalTime(addDays(TODAY, 1), 8 * 60) });
     });
     const pages = (await loadTodayWird(store.db, tomorrow))!;
-    expect(pages.todo.map((page) => [page.cardId, page.tier])).toEqual([[pageCardId(1), "sabqi"]]);
+    expect(pages.todo.map((page) => [page.cardId, page.tier])).toEqual([[pageCardId(1), "recent"]]);
   });
 
   it("keeps a lesson left after step 6: its chunk, the next lines and the day's credit", async () => {
     const pageWords = () => null;
-    const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
-    const saved = await saveSabaqCleanRun(store.db, { target, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60) });
+    const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+    const saved = await saveMemorizeCleanRun(store.db, { target, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60) });
     const id = chunkCardId(1, 2, 5);
     expect(store.sql.prepare("SELECT rating, duration_ms, support_level FROM study_log WHERE card_id = ?").all(id)).toEqual([
       { rating: Rating.Good, duration_ms: 60_000, support_level: 4 },
@@ -261,84 +261,84 @@ describe("sabaq chunks (SBQ-02)", () => {
     expect(saved.wird.kind).toBe("minimum_met");
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done" });
     // The lines count as memorized, so the next lesson goes on, and their look comes an hour later.
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords })).toMatchObject({ fromLine: 6, toLine: 8 });
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords })).toMatchObject({ fromLine: 6, toLine: 8 });
     expect(await countSecondLooks(store.db, atLocalTime(TODAY, 9 * 60 + 5))).toMatchObject({ due: 0, nextAt: atLocalTime(TODAY, 10 * 60) });
   });
 
   it("adds the page at the clean run of its last chunk, with the chunk, in one transaction", async () => {
-    const whole = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
+    const whole = (await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
     expect(whole.completesPage).toBe(true);
     // Queue order inside the save: the new chunk card, its update, the review log, then the page card.
     store.failQueueInsert(4);
-    await expect(saveSabaqCleanRun(store.db, { target: whole, plan, session: null, durationMs: 60_000 })).rejects.toThrow("Synthetic sync_queue write failure");
+    await expect(saveMemorizeCleanRun(store.db, { target: whole, plan, session: null, durationMs: 60_000 })).rejects.toThrow("Synthetic sync_queue write failure");
     expect(count("SELECT COUNT(*) AS count FROM study_cards")).toBe(0);
     expect(count("SELECT COUNT(*) AS count FROM study_log")).toBe(0);
 
     const now = atLocalTime(TODAY, 9 * 60);
-    const saved = await saveSabaqCleanRun(store.db, { target: whole, plan, session: null, durationMs: 60_000, now });
+    const saved = await saveMemorizeCleanRun(store.db, { target: whole, plan, session: null, durationMs: 60_000, now });
     expect(saved.pageAdded).toBe(true);
     expect(store.sql.prepare("SELECT tier, created_at FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual({ tier: "sabqi", created_at: now.toISOString() });
     expect(store.sql.prepare("SELECT reviewed_at FROM study_log WHERE card_id = ?").get(chunkCardId(1, 2, 8))).toEqual({ reviewed_at: now.toISOString() });
   });
 
   it("keeps the page its last chunk's clean run added when the fluent check fails", async () => {
-    const whole = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
+    const whole = (await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
     const { cleanRun, check } = await learn(whole, Rating.Again, atLocalTime(TODAY, 9 * 60));
     expect(cleanRun.pageAdded).toBe(true);
     expect(check.pageAdded).toBe(false);
-    expect(await loadPageCard(store.db, pageCardId(1), { today: TODAY, plan })).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: TODAY } });
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null })).toBeNull();
+    expect(await loadPageCard(store.db, pageCardId(1), { today: TODAY, plan })).toMatchObject({ tier: "recent", history: { declared: false, firstFluentDate: TODAY } });
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords: () => null })).toBeNull();
   });
 
   it("offers lines again on the same card after a failed fluent check, and goes on once they pass", async () => {
     const pageWords = () => null;
-    const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+    const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
     await learn(target, Rating.Again, atLocalTime(TODAY, 9 * 60));
-    const again = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+    const again = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
     expect(again).toMatchObject({ page: 1, fromLine: target.fromLine, toLine: target.toLine, completesPage: false });
 
     await learn(again, Rating.Good, atLocalTime(addDays(TODAY, 1), 9 * 60));
     expect(count("SELECT COUNT(*) AS count FROM study_cards WHERE id LIKE 'chunk:%'")).toBe(1);
     expect(count("SELECT COUNT(*) AS count FROM study_log WHERE card_id = ?", chunkCardId(1, 2, 5))).toBe(4);
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords })).toMatchObject({ fromLine: 6, toLine: 8 });
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords })).toMatchObject({ fromLine: 6, toLine: 8 });
   });
 
   it("offers a chunk again whose second look failed, though a later chunk on its page passed", async () => {
     const pageWords = () => null;
-    const first = (await nextSabaqTarget(store.db, { plan, wantLines: 3, pageWords }))!;
+    const first = (await nextMemorizeTarget(store.db, { plan, wantLines: 3, pageWords }))!;
     expect(first).toMatchObject({ fromLine: 2, toLine: 4 });
     const { check } = await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60));
-    const second = (await nextSabaqTarget(store.db, { plan, wantLines: 3, pageWords }))!;
+    const second = (await nextMemorizeTarget(store.db, { plan, wantLines: 3, pageWords }))!;
     expect(second).toMatchObject({ fromLine: 5, toLine: 7, completesPage: false });
     await learn(second, Rating.Good, atLocalTime(TODAY, 9 * 60 + 30));
 
     await saveSecondLook(store.db, { cardId: chunkCardId(1, 2, 4), pageData: await lookPage(chunkCardId(1, 2, 4)), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: check.secondLookAt! });
     // The failed lines come back in their place, up to the lines still memorized; the page is not complete with them.
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 2, toLine: 4, completesPage: false });
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 2, toLine: 4, completesPage: false });
     // Passing the look again makes them memorized, and the last line completes the page.
     const relearn = new Date((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(chunkCardId(1, 2, 4)) as { due: string }).due);
     await saveSecondLook(store.db, { cardId: chunkCardId(1, 2, 4), pageData: await lookPage(chunkCardId(1, 2, 4)), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 8, toLine: 8, completesPage: true });
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 8, toLine: 8, completesPage: true });
   });
 
   it("adds no page at step 6 of lines chosen before an earlier chunk's look failed, then adds it when the look passes", async () => {
     const pageWords = () => null;
-    const first = (await nextSabaqTarget(store.db, { plan, wantLines: 3, pageWords }))!;
+    const first = (await nextMemorizeTarget(store.db, { plan, wantLines: 3, pageWords }))!;
     const { check } = await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60));
     // The screen chooses the page's last lines when it opens, with the first chunk's look due.
-    const last = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords }))!;
+    const last = (await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords }))!;
     expect(last).toMatchObject({ fromLine: 5, toLine: 8, completesPage: true });
     const firstId = chunkCardId(1, first.fromLine, first.toLine);
     await saveSecondLook(store.db, { cardId: firstId, pageData: await lookPage(firstId), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: check.secondLookAt! });
 
     // Step 6 of those lines finds the first chunk no longer memorized, so the page waits.
-    const stale = await saveSabaqCleanRun(store.db, { target: last, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 10 * 60 + 5) });
+    const stale = await saveMemorizeCleanRun(store.db, { target: last, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 10 * 60 + 5) });
     expect(stale.pageAdded).toBe(false);
     expect(count("SELECT COUNT(*) AS count FROM study_cards WHERE id = ?", pageCardId(1))).toBe(0);
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 2, toLine: 4, completesPage: true });
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords })).toMatchObject({ fromLine: 2, toLine: 4, completesPage: true });
 
     // Passing the first chunk at its relearning look memorizes every line, so that grade adds the page.
-    // Without it every line would count as memorized with no page card, and sabaq would stay on this
+    // Without it every line would count as memorized with no page card, and new memorization would stay on this
     // page with nothing to offer.
     const relearn = new Date((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(firstId) as { due: string }).due);
     const passed = await saveSecondLook(store.db, { cardId: firstId, pageData: await lookPage(firstId), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
@@ -348,13 +348,13 @@ describe("sabaq chunks (SBQ-02)", () => {
 
   it("adds a page that chunks merged from another device completed, dated to its last learning (SBQ-02)", async () => {
     const pageWords = () => null;
-    const first = (await nextSabaqTarget(store.db, { plan, wantLines: 3, pageWords }))!;
+    const first = (await nextMemorizeTarget(store.db, { plan, wantLines: 3, pageWords }))!;
     const { check } = await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60));
-    const last = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords }))!;
+    const last = (await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords }))!;
     const firstId = chunkCardId(1, first.fromLine, first.toLine);
     // Another device failed the first chunk's look; this device pulls it, then learns the last lines.
     await saveSecondLook(store.db, { cardId: firstId, pageData: await lookPage(firstId), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: check.secondLookAt! });
-    expect((await saveSabaqCleanRun(store.db, { target: last, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 10 * 60 + 5) })).pageAdded).toBe(false);
+    expect((await saveMemorizeCleanRun(store.db, { target: last, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 10 * 60 + 5) })).pageAdded).toBe(false);
     // The other device learned the first chunk again; sync brings that pass.
     const repass = atLocalTime(TODAY, 10 * 60 + 30).toISOString();
     store.sql
@@ -365,25 +365,25 @@ describe("sabaq chunks (SBQ-02)", () => {
       .run(firstId, repass, repass, TODAY);
     // Every line is memorized, yet no device added the page, so no lesson is offered.
     expect(count("SELECT COUNT(*) AS count FROM study_cards WHERE id = ?", pageCardId(1))).toBe(0);
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toBeNull();
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords })).toBeNull();
 
-    expect(await addCoveredSabaqPages(store.db, { plan, pageWords })).toBe(1);
+    expect(await addCoveredMemorizedPages(store.db, { plan, pageWords })).toBe(1);
     expect(store.sql.prepare("SELECT tier, created_at FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual({ tier: "sabqi", created_at: repass });
-    // It keeps its sabaq provenance, so it counts as memorized, and a second pass adds nothing.
+    // It keeps its new memorization provenance, so it counts as memorized, and a second pass adds nothing.
     await writeHifzPlan(store.db, plan);
     expect((await loadTodayWird(store.db, atLocalTime(TODAY, 11 * 60)))!.memorizedPages).toBe(1);
-    expect(await addCoveredSabaqPages(store.db, { plan, pageWords })).toBe(0);
+    expect(await addCoveredMemorizedPages(store.db, { plan, pageWords })).toBe(0);
   });
 
   it("dates a recovered page's first review from the completing pass's stored day, after a time-zone change", async () => {
     const pageWords = () => null;
-    const first = (await nextSabaqTarget(store.db, { plan, wantLines: 3, pageWords }))!;
+    const first = (await nextMemorizeTarget(store.db, { plan, wantLines: 3, pageWords }))!;
     const { check } = await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60));
-    const last = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords }))!;
+    const last = (await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords }))!;
     const firstId = chunkCardId(1, first.fromLine, first.toLine);
     // Another device failed the first chunk's look; this device pulls it, then learns the last lines.
     await saveSecondLook(store.db, { cardId: firstId, pageData: await lookPage(firstId), plan, rating: Rating.Again, session: null, durationMs: 60_000, now: check.secondLookAt! });
-    expect((await saveSabaqCleanRun(store.db, { target: last, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 10 * 60 + 5) })).pageAdded).toBe(false);
+    expect((await saveMemorizeCleanRun(store.db, { target: last, plan, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 10 * 60 + 5) })).pageAdded).toBe(false);
     // The other device learned the first chunk again; sync brings that pass.
     const repass = atLocalTime(TODAY, 10 * 60 + 30).toISOString();
     store.sql
@@ -395,9 +395,9 @@ describe("sabaq chunks (SBQ-02)", () => {
       .run(firstId, repass, repass, addDays(TODAY, -1));
     // Every line is memorized, yet no device added the page, so no lesson is offered.
     expect(count("SELECT COUNT(*) AS count FROM study_cards WHERE id = ?", pageCardId(1))).toBe(0);
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords })).toBeNull();
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords })).toBeNull();
 
-    expect(await addCoveredSabaqPages(store.db, { plan, pageWords })).toBe(1);
+    expect(await addCoveredMemorizedPages(store.db, { plan, pageWords })).toBe(1);
     expect(store.sql.prepare("SELECT tier, created_at FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual({ tier: "sabqi", created_at: repass });
     // Due the day after the day it was completed on, not the day after this device's date for it.
     expect(store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual({ due: atLocalTime(TODAY, 0).toISOString() });
@@ -407,9 +407,9 @@ describe("sabaq chunks (SBQ-02)", () => {
     const ayahPlan = { ...plan, unit: "ayah" as const };
     await writeHifzPlan(store.db, ayahPlan);
     await writeAllDecksFilter(store.db, { type: "surah", surahs: [2] });
-    const whole = (await nextSabaqTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null }))!;
-    jest.spyOn(unitSwitch, "addSabaqPageToAyahReview").mockRejectedValueOnce(new Error("Synthetic ayah card failure"));
-    await expect(saveSabaqCleanRun(store.db, { target: whole, plan: ayahPlan, session: null, durationMs: 60_000 })).rejects.toThrow(
+    const whole = (await nextMemorizeTarget(store.db, { plan: ayahPlan, wantLines: 10, pageWords: () => null }))!;
+    jest.spyOn(unitSwitch, "addMemorizedPageToAyahReview").mockRejectedValueOnce(new Error("Synthetic ayah card failure"));
+    await expect(saveMemorizeCleanRun(store.db, { target: whole, plan: ayahPlan, session: null, durationMs: 60_000 })).rejects.toThrow(
       "Synthetic ayah card failure",
     );
     expect(await readSmartDeckFilter(store.db, SMART_DECK_IDS.retention)).toEqual({ type: "surah", surahs: [2] });
@@ -417,24 +417,24 @@ describe("sabaq chunks (SBQ-02)", () => {
   });
 
   it("counts a chunk once in its lesson's session, though step 6 and the check both grade it", async () => {
-    const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords: () => null }))!;
+    const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords: () => null }))!;
     const { session } = await learn(target, Rating.Good, atLocalTime(TODAY, 9 * 60));
     expect(store.sql.prepare("SELECT cards_reviewed FROM review_sessions WHERE id = ?").get(session.id)).toEqual({ cards_reviewed: 1 });
   });
 
   it("creates the chunk and its page at the fluent check when step 6 left no card", async () => {
-    const whole = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
+    const whole = (await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords: () => null }))!;
     const now = atLocalTime(TODAY, 9 * 60);
-    const saved = await completeSabaqChunk(store.db, { target: whole, plan, rating: Rating.Good, session: null, durationMs: 60_000, now });
+    const saved = await completeMemorizeChunk(store.db, { target: whole, plan, rating: Rating.Good, session: null, durationMs: 60_000, now });
     expect(saved.pageAdded).toBe(true);
-    expect(await loadPageCard(store.db, pageCardId(1), { today: TODAY, plan })).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: TODAY } });
+    expect(await loadPageCard(store.db, pageCardId(1), { today: TODAY, plan })).toMatchObject({ tier: "recent", history: { declared: false, firstFluentDate: TODAY } });
   });
 
   it("applies two saves of the same chunk queued at once, each from the card the other left", async () => {
-    const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords: () => null }))!;
+    const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords: () => null }))!;
     const id = chunkCardId(target.page, target.fromLine, target.toLine);
     const save = (rating: Grade, minute: number) =>
-      completeSabaqChunk(store.db, { target, plan, rating, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60 + minute) });
+      completeMemorizeChunk(store.db, { target, plan, rating, session: null, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60 + minute) });
     // Both read the chunk before either transaction runs; neither may calculate from that read.
     const [first, second] = await Promise.all([save(Rating.Again, 0), save(Rating.Good, 1)]);
     expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_log WHERE card_id = ?").get(id)).toEqual({ count: 2 });
@@ -453,20 +453,20 @@ describe("sabaq chunks (SBQ-02)", () => {
     pass.run(chunkCardId(5, 1, 4), at, at, TODAY);
     pass.run(chunkCardId(5, 1, 6), at, at, TODAY);
     const wird = (await loadTodayWird(store.db, atLocalTime(TODAY, 10 * 60)))!;
-    expect(wird.sabaqLinesToday).toBe(6);
+    expect(wird.memorizeLinesToday).toBe(6);
     expect(wird.newLines).toBeGreaterThan(6);
-    expect(wird.sabaqDoneToday).toBe(false);
+    expect(wird.memorizeDoneToday).toBe(false);
   });
 
   it("leaves no chunk behind when step 6's grade cannot be saved", async () => {
-    const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords: () => null }))!;
+    const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords: () => null }))!;
     // Queue order inside the grade: the new chunk card, its update, the review log, then the wird day.
     store.failQueueInsert(3);
-    await expect(saveSabaqCleanRun(store.db, { target, plan, session: null, durationMs: 600_000 })).rejects.toThrow(
+    await expect(saveMemorizeCleanRun(store.db, { target, plan, session: null, durationMs: 600_000 })).rejects.toThrow(
       "Synthetic sync_queue write failure",
     );
     expect(store.sql.prepare("SELECT COUNT(*) AS count FROM study_cards WHERE id LIKE 'chunk:%'").get()).toEqual({ count: 0 });
-    expect(await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords: () => null })).toMatchObject({ fromLine: target.fromLine });
+    expect(await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords: () => null })).toMatchObject({ fromLine: target.fromLine });
   });
 
   describe("page provenance (SBQ-02)", () => {
@@ -483,47 +483,47 @@ describe("sabaq chunks (SBQ-02)", () => {
     };
 
     it("keeps a page declared after a failed partial chunk on it", async () => {
-      const partial = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const partial = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       expect(partial.completesPage).toBe(false);
       await learn(partial, Rating.Again, atLocalTime(TODAY, 9 * 60));
       await declareMemorizedPages(store.db, { pages: [1], cycleDays: 30, now: atLocalTime(TODAY, 10 * 60) });
 
-      expect(await tierOf()).toMatchObject({ tier: "manzil.unverified", history: { declared: true, firstFluentDate: null } });
+      expect(await tierOf()).toMatchObject({ tier: "long_term.unverified", history: { declared: true, firstFluentDate: null } });
     });
 
     it("keeps a page declared after a passing chunk that did not complete it", async () => {
-      const partial = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const partial = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       await learn(partial, Rating.Good, atLocalTime(TODAY, 9 * 60));
       await declareMemorizedPages(store.db, { pages: [1], cycleDays: 30, now: atLocalTime(addDays(TODAY, 1), 8 * 60) });
 
-      expect(await tierOf(addDays(TODAY, 1))).toMatchObject({ tier: "manzil.unverified", history: { declared: true, firstFluentDate: null } });
+      expect(await tierOf(addDays(TODAY, 1))).toMatchObject({ tier: "long_term.unverified", history: { declared: true, firstFluentDate: null } });
     });
 
-    it("derives sabqi from the chunk that completed the page, dated by that chunk's clean run", async () => {
+    it("derives recent from the chunk that completed the page, dated by that chunk's clean run", async () => {
       const day2 = addDays(TODAY, 1);
-      const first = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const first = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       await learn(first, Rating.Again, atLocalTime(TODAY, 9 * 60));
       await learn(first, Rating.Good, atLocalTime(TODAY, 9 * 60 + 30));
-      const last = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const last = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       expect(last.completesPage).toBe(true);
       // Step 6 just before midnight adds the page; the check after midnight does not move its date.
       const { cleanRun, check } = await learn(last, Rating.Good, atLocalTime(day2, 2));
       expect(cleanRun.pageAdded).toBe(true);
       expect(check.pageAdded).toBe(false);
 
-      expect(await tierOf(day2)).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: TODAY } });
-      // The review history decides, so the page stays sabqi when its chunk cards are gone.
+      expect(await tierOf(day2)).toMatchObject({ tier: "recent", history: { declared: false, firstFluentDate: TODAY } });
+      // The review history decides, so the page stays recent when its chunk cards are gone.
       store.sql.prepare("UPDATE study_cards SET deleted_at = ? WHERE id LIKE 'chunk:%'").run(atLocalTime(day2, 10 * 60).toISOString());
-      expect(await tierOf(day2)).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: TODAY } });
+      expect(await tierOf(day2)).toMatchObject({ tier: "recent", history: { declared: false, firstFluentDate: TODAY } });
     });
 
-    it("starts a page memorized through sabaq from its chunks' ratings, as a review card", async () => {
-      const first = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+    it("starts a page memorized through new memorization from its chunks' ratings, as a review card", async () => {
+      const first = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       await learn(first, Rating.Easy, atLocalTime(TODAY, 9 * 60));
-      const last = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const last = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       const finishedAt = atLocalTime(TODAY, 9 * 60 + 30);
       const session = startReviewSession("sabaq", { now: atLocalTime(TODAY, 9 * 60 + 20) });
-      const saved = await saveSabaqCleanRun(store.db, { target: last, plan, session, durationMs: 60_000, now: finishedAt });
+      const saved = await saveMemorizeCleanRun(store.db, { target: last, plan, session, durationMs: 60_000, now: finishedAt });
       expect(saved.pageAdded).toBe(true);
 
       const chunks = store.sql
@@ -546,20 +546,20 @@ describe("sabaq chunks (SBQ-02)", () => {
         .prepare("SELECT data FROM sync_queue WHERE table_name = 'study_cards' AND row_id = ? ORDER BY id DESC LIMIT 1")
         .get(pageCardId(1)) as { data: string };
       expect(JSON.parse(upload.data)).toMatchObject({ state: State.Review, stability: page.stability, last_review: page.last_review });
-      // It is still a page from sabaq, not a declared one.
-      expect(await tierOf()).toMatchObject({ tier: "sabqi", history: { declared: false, firstFluentDate: TODAY } });
+      // It is still a page from new memorization, not a declared one.
+      expect(await tierOf()).toMatchObject({ tier: "recent", history: { declared: false, firstFluentDate: TODAY } });
       // The fluent check after it grades only the chunk; the page keeps its start.
-      await completeSabaqChunk(store.db, { target: last, plan, rating: Rating.Easy, session, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60 + 35) });
+      await completeMemorizeChunk(store.db, { target: last, plan, rating: Rating.Easy, session, durationMs: 60_000, now: atLocalTime(TODAY, 9 * 60 + 35) });
       expect(store.sql.prepare("SELECT * FROM study_cards WHERE id = ?").get(pageCardId(1))).toEqual(page);
     });
 
-    it("treats a sabaq page removed and declared again as declared", async () => {
-      const whole = (await nextSabaqTarget(store.db, { plan, wantLines: 10, pageWords }))!;
+    it("treats a new memorization page removed and declared again as declared", async () => {
+      const whole = (await nextMemorizeTarget(store.db, { plan, wantLines: 10, pageWords }))!;
       await learn(whole, Rating.Good, atLocalTime(TODAY, 9 * 60));
       store.sql.prepare("UPDATE study_cards SET deleted_at = ? WHERE id = ?").run(atLocalTime(TODAY, 10 * 60).toISOString(), pageCardId(1));
       await declareMemorizedPages(store.db, { pages: [1], cycleDays: 30, now: atLocalTime(TODAY, 11 * 60) });
 
-      expect(await tierOf()).toMatchObject({ tier: "manzil.unverified", history: { declared: true } });
+      expect(await tierOf()).toMatchObject({ tier: "long_term.unverified", history: { declared: true } });
     });
   });
 
@@ -572,7 +572,7 @@ describe("sabaq chunks (SBQ-02)", () => {
      * the fluent check at 9:00 in the same session. Returns the chunk's id and when its look comes due.
      */
     async function passPartialChunk(rating: Grade = Rating.Good) {
-      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       const { check } = await learn(target, rating, at(9 * 60));
       return { id: chunkCardId(1, target.fromLine, target.toLine), lookAt: check.secondLookAt!, saved: check };
     }
@@ -580,7 +580,7 @@ describe("sabaq chunks (SBQ-02)", () => {
     const cardDue = (id: string) => new Date((store.sql.prepare("SELECT due FROM study_cards WHERE id = ?").get(id) as { due: string }).due);
 
     it("offers a look an hour after a later lesson that learned the chunk again after a failed check", async () => {
-      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       const id = chunkCardId(1, target.fromLine, target.toLine);
       // Step 6 at 08:55 and a failed check at 09:00; the look that follows is skipped.
       await learn(target, Rating.Again, at(9 * 60));
@@ -592,17 +592,17 @@ describe("sabaq chunks (SBQ-02)", () => {
     });
 
     it("resolves a committed check whose look cannot be read afterwards, so the grade is not offered again", async () => {
-      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       const id = chunkCardId(1, target.fromLine, target.toLine);
       const session = startReviewSession("sabaq", { now: at(8 * 60 + 50) });
-      await saveSabaqCleanRun(store.db, { target, plan, session, durationMs: 60_000, now: at(8 * 60 + 55) });
+      await saveMemorizeCleanRun(store.db, { target, plan, session, durationMs: 60_000, now: at(8 * 60 + 55) });
       const read = store.db.getAllAsync.bind(store.db);
       jest.spyOn(store.db, "getAllAsync").mockImplementation(((sql: string, params?: unknown) => {
         if (sql.includes("c.buried_until <= ?")) return Promise.reject(new Error("Synthetic read failure"));
         return read(sql, params as never);
       }) as typeof store.db.getAllAsync);
       jest.spyOn(console, "warn").mockImplementation(() => undefined);
-      const check = await completeSabaqChunk(store.db, { target, plan, rating: Rating.Good, session, durationMs: 60_000, now: at(9 * 60) });
+      const check = await completeMemorizeChunk(store.db, { target, plan, rating: Rating.Good, session, durationMs: 60_000, now: at(9 * 60) });
       expect(check).toMatchObject({ secondLookAt: null, secondLookNow: false });
       expect(logCount(id)).toBe(2);
     });
@@ -625,7 +625,7 @@ describe("sabaq chunks (SBQ-02)", () => {
       const { lookAt } = await passPartialChunk();
       const offeredAt = new Date(lookAt.getTime() - REVIEW_LEARN_AHEAD_MS);
       expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toEqual({ due: 0, nextAt: lookAt, offeredAt });
-      // The moment it is offered, sabaq shows it and Home counts it.
+      // The moment it is offered, the memorize screen shows it and Home counts it.
       expect(await countSecondLooks(store.db, offeredAt)).toEqual({ due: 1, nextAt: null, offeredAt: null });
       expect((await loadSecondLooks(store.db, { now: offeredAt, pageWords })).due).toHaveLength(1);
     });
@@ -678,8 +678,8 @@ describe("sabaq chunks (SBQ-02)", () => {
     });
 
     it("offers a look an hour after a lesson left at step 6", async () => {
-      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
-      await saveSabaqCleanRun(store.db, { target, plan, session: startReviewSession("sabaq"), durationMs: 60_000, now: at(9 * 60) });
+      const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      await saveMemorizeCleanRun(store.db, { target, plan, session: startReviewSession("sabaq"), durationMs: 60_000, now: at(9 * 60) });
       expect(await countSecondLooks(store.db, at(9 * 60 + 5))).toMatchObject({ due: 0, nextAt: at(10 * 60) });
       expect((await loadSecondLooks(store.db, { now: at(10 * 60), pageWords })).due.map((look) => look.cardId)).toEqual([chunkCardId(1, 2, 5)]);
     });
@@ -693,7 +693,7 @@ describe("sabaq chunks (SBQ-02)", () => {
     });
 
     it("brings a failed check back with its relearning step the same day, and offers its lines again", async () => {
-      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       const id = chunkCardId(1, target.fromLine, target.toLine);
       const { check } = await learn(target, Rating.Again, at(9 * 60));
       // The relearning step is inside the learn-ahead window, so the look is open now and not promised for later.
@@ -702,11 +702,11 @@ describe("sabaq chunks (SBQ-02)", () => {
       expect(check.secondLookAt).toBeNull();
       expect(check.secondLookNow).toBe(true);
       expect((await loadSecondLooks(store.db, { now: at(9 * 60 + 1), pageWords })).due.map((look) => look.cardId)).toEqual([id]);
-      expect(await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords })).toMatchObject({ fromLine: target.fromLine, toLine: target.toLine });
+      expect(await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords })).toMatchObject({ fromLine: target.fromLine, toLine: target.toLine });
 
       // Passed at its look, the lines count as memorized again and the next lesson goes on.
       await saveSecondLook(store.db, { cardId: id, pageData: await lookPage(id), plan, rating: Rating.Good, session: null, durationMs: 60_000, now: relearn });
-      const next = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const next = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       expect(next).toMatchObject({ fromLine: 6, toLine: 8 });
       // A Hard check is not fluent either; its later step is promised with the time Home shows.
       const hard = await learn(next, Rating.Hard, at(11 * 60));
@@ -716,7 +716,7 @@ describe("sabaq chunks (SBQ-02)", () => {
     });
 
     it("offers a look on the day a chunk is learned again after a failed check", async () => {
-      const target = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const target = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       const id = chunkCardId(1, target.fromLine, target.toLine);
       await learn(target, Rating.Again, at(9 * 60));
       const day2 = addDays(TODAY, 1);
@@ -727,7 +727,7 @@ describe("sabaq chunks (SBQ-02)", () => {
 
     it("promises no second look past today", async () => {
       // Learned late in the evening, the look falls after midnight, so none is promised.
-      const late = (await nextSabaqTarget(store.db, { plan, wantLines: 4, pageWords }))!;
+      const late = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
       const { check } = await learn(late, Rating.Good, at(23 * 60 + 30));
       expect(check.secondLookAt).toBeNull();
       expect(check.secondLookNow).toBe(false);

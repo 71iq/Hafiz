@@ -91,7 +91,7 @@ export function takeLaunchWidgetTap(url: string | null): void {
 }
 
 /** Onboarding and open sessions keep their screen: a tap only brings Hafiz forward. */
-const GUARDED_PREFIXES = ["/flashcards/session", "/hifz/review", "/hifz/sabaq", "/hifz/setup"];
+const GUARDED_PREFIXES = ["/flashcards/session", "/hifz/review", "/hifz/memorize", "/hifz/setup"];
 
 function keepsScreen(pathname: string): boolean {
   return pathname === "/onboarding" || GUARDED_PREFIXES.some((prefix) => pathname.startsWith(prefix));

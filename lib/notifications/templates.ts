@@ -22,7 +22,7 @@ export type TemplateVar =
   | "pages"
   | "minutes"
   | "range"
-  | "manzil"
+  | "longTerm"
   | "onePage"
   | "fiveMinutes"
   | "ramadan";
@@ -53,7 +53,7 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
   t("wird_reminder", 4, "notifTWird4", ["n", "onePage"]),
   t("wird_reminder", 5, "notifTWird5", ["range"]),
   t("wird_reminder", 6, "notifTWird6", [], true),
-  t("wird_reminder", 7, "notifTWird7", ["manzil"]),
+  t("wird_reminder", 7, "notifTWird7", ["longTerm"]),
   t("wird_reminder", 8, "notifTWird8", [], true),
   t("wird_reminder", 9, "notifTWird9"),
   t("wird_reminder", 10, "notifTWird10", ["surah", "fiveMinutes"]),

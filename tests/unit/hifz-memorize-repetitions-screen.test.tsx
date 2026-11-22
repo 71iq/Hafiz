@@ -1,18 +1,18 @@
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import SabaqRoute from "@/app/hifz/sabaq";
+import MemorizeRoute from "@/app/hifz/memorize";
 import { endReviewSession, startReviewSession } from "@/lib/fsrs/review-sessions";
 import { loadHabitOverview } from "@/lib/habit/queries";
 import { readHabitSettings } from "@/lib/habit/settings";
 import type { PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import { loadTodayWird, readMemorizedPageNumbers } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN, type HifzPlan } from "@/lib/hifz/plan";
-import { loadSecondLooks, nextSabaqTarget, saveSabaqCleanRun, type SabaqTarget } from "@/lib/hifz/sabaq";
+import { loadSecondLooks, nextMemorizeTarget, saveMemorizeCleanRun, type MemorizeTarget } from "@/lib/hifz/memorize";
 import { similarGroupsForAyahs, withMemorizedSiblings } from "@/lib/hifz/similar";
 import { strings } from "@/lib/i18n/strings";
 
-/** SBQ-01: the sabaq steps follow the repetition counts saved in the plan, not fixed numbers. */
+/** SBQ-01: the new memorization steps follow the repetition counts saved in the plan, not fixed numbers. */
 
 const s = strings.en;
 const mockDatabase = {
@@ -66,11 +66,11 @@ jest.mock("@/lib/hifz/pages", () => ({
   loadTodayWird: jest.fn(),
   readMemorizedPageNumbers: jest.fn(),
 }));
-jest.mock("@/lib/hifz/sabaq", () => ({
-  addCoveredSabaqPages: async () => 0,
-  completeSabaqChunk: jest.fn(),
-  nextSabaqTarget: jest.fn(),
-  saveSabaqCleanRun: jest.fn(),
+jest.mock("@/lib/hifz/memorize", () => ({
+  addCoveredMemorizedPages: async () => 0,
+  completeMemorizeChunk: jest.fn(),
+  nextMemorizeTarget: jest.fn(),
+  saveMemorizeCleanRun: jest.fn(),
   loadSecondLooks: jest.fn(),
   saveSecondLook: jest.fn(),
 }));
@@ -93,7 +93,7 @@ const target = {
   ayahs: [{ surah: 2, ayah: 1 }],
   linkAyahs: [],
   completesPage: false,
-} satisfies SabaqTarget;
+} satisfies MemorizeTarget;
 
 function Wrapper({ children }: React.PropsWithChildren) {
   return (
@@ -113,16 +113,16 @@ async function flush() {
   });
 }
 const press = (name: string) => fireEvent.press(screen.getByRole("button", { name }));
-const nextShown = () => screen.queryByRole("button", { name: s.hifzSabaqNext }) !== null;
+const nextShown = () => screen.queryByRole("button", { name: s.hifzMemorizeNext }) !== null;
 
-async function openWith(sabaqRepetitions: HifzPlan["sabaqRepetitions"]) {
+async function openWith(memorizeRepetitions: HifzPlan["memorizeRepetitions"]) {
   jest.mocked(loadTodayWird).mockResolvedValue({
-    plan: { ...DEFAULT_HIFZ_PLAN, sabaqRepetitions },
+    plan: { ...DEFAULT_HIFZ_PLAN, memorizeRepetitions },
     newLines: 3,
-    sabaqLinesToday: 0,
+    memorizeLinesToday: 0,
     daily: { backlog: false },
   } as never);
-  render(<SabaqRoute />, { wrapper: Wrapper });
+  render(<MemorizeRoute />, { wrapper: Wrapper });
   await flush();
 }
 
@@ -132,67 +132,67 @@ beforeEach(() => {
   jest.mocked(endReviewSession).mockResolvedValue(null as never);
   jest.mocked(loadHabitOverview).mockResolvedValue(null as never);
   jest.mocked(readHabitSettings).mockResolvedValue({ showZayt: false } as never);
-  jest.mocked(nextSabaqTarget).mockResolvedValue(target);
+  jest.mocked(nextMemorizeTarget).mockResolvedValue(target);
   jest.mocked(loadSecondLooks).mockResolvedValue({ due: [], nextAt: null });
-  jest.mocked(saveSabaqCleanRun).mockResolvedValue({ wird: { kind: "none" }, pageAdded: false } as Awaited<ReturnType<typeof saveSabaqCleanRun>>);
+  jest.mocked(saveMemorizeCleanRun).mockResolvedValue({ wird: { kind: "none" }, pageAdded: false } as Awaited<ReturnType<typeof saveMemorizeCleanRun>>);
   jest.mocked(similarGroupsForAyahs).mockResolvedValue([]);
   jest.mocked(withMemorizedSiblings).mockReturnValue([]);
   jest.mocked(readMemorizedPageNumbers).mockResolvedValue(new Set());
 });
 
-describe("sabaq repetition counts (SBQ-01)", () => {
+describe("new memorization repetition counts (SBQ-01)", () => {
   it("plays, counts readings and asks for clean recitations as the plan's counts say", async () => {
     await openWith({ listen: 2, looking: 20, cleanInARow: 5 });
-    press(s.hifzSabaqNext);
+    press(s.hifzMemorizeNext);
 
     // Listening: the hint and the player use the plan's count.
     expect(screen.getByText("Listen while you follow the text. Repeats: 2.")).toBeTruthy();
-    press(s.hifzSabaqPlay);
+    press(s.hifzMemorizePlay);
     expect(mockAudio.playRange).toHaveBeenCalledWith({ ayahs: target.ayahs, repeatRange: 2 });
-    press(s.hifzSabaqNext);
-    press(s.hifzSabaqNext);
+    press(s.hifzMemorizeNext);
+    press(s.hifzMemorizeNext);
 
     // Reading while looking: Next appears only after the 20th reading.
     expect(screen.getByText("0 of 20")).toBeTruthy();
-    for (let reading = 0; reading < 19; reading += 1) press(s.hifzSabaqReadOnce);
+    for (let reading = 0; reading < 19; reading += 1) press(s.hifzMemorizeReadOnce);
     expect(screen.getByText("19 of 20")).toBeTruthy();
     expect(nextShown()).toBe(false);
-    press(s.hifzSabaqReadOnce);
+    press(s.hifzMemorizeReadOnce);
     expect(screen.getByText("20 of 20")).toBeTruthy();
     expect(nextShown()).toBe(true);
-    press(s.hifzSabaqNext);
+    press(s.hifzMemorizeNext);
 
     // The one ayah, then the whole lines five clean times in a row.
     press(s.hifzDrillShow);
-    press(s.hifzSabaqClean);
-    expect(screen.getByText(s.hifzSabaqStepChunk)).toBeTruthy();
+    press(s.hifzMemorizeClean);
+    expect(screen.getByText(s.hifzMemorizeStepChunk)).toBeTruthy();
     expect(screen.getByText("Clean in a row: 0 of 5")).toBeTruthy();
     for (let clean = 0; clean < 4; clean += 1) {
       press(s.hifzDrillShow);
-      press(s.hifzSabaqClean);
+      press(s.hifzMemorizeClean);
     }
     expect(screen.getByText("Clean in a row: 4 of 5")).toBeTruthy();
-    expect(saveSabaqCleanRun).not.toHaveBeenCalled();
+    expect(saveMemorizeCleanRun).not.toHaveBeenCalled();
     press(s.hifzDrillShow);
-    press(s.hifzSabaqClean);
+    press(s.hifzMemorizeClean);
     // The fifth saves the chunk (SBQ-02), then the lesson moves on.
     await flush();
-    expect(saveSabaqCleanRun).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
+    expect(saveMemorizeCleanRun).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(s.hifzMemorizeStepLink)).toBeTruthy();
   });
 
   it("moves on after a single reading and a single clean recitation when set to 1", async () => {
     await openWith({ listen: 1, looking: 1, cleanInARow: 1 });
-    for (let step = 0; step < 3; step += 1) press(s.hifzSabaqNext);
+    for (let step = 0; step < 3; step += 1) press(s.hifzMemorizeNext);
     expect(screen.getByText("0 of 1")).toBeTruthy();
-    press(s.hifzSabaqReadOnce);
-    press(s.hifzSabaqNext);
+    press(s.hifzMemorizeReadOnce);
+    press(s.hifzMemorizeNext);
     press(s.hifzDrillShow);
-    press(s.hifzSabaqClean);
+    press(s.hifzMemorizeClean);
     press(s.hifzDrillShow);
-    press(s.hifzSabaqClean);
+    press(s.hifzMemorizeClean);
     await flush();
-    expect(saveSabaqCleanRun).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(s.hifzSabaqStepLink)).toBeTruthy();
+    expect(saveMemorizeCleanRun).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(s.hifzMemorizeStepLink)).toBeTruthy();
   });
 });

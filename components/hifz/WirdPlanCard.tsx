@@ -28,13 +28,13 @@ type Props = {
   isDark: boolean;
   s: UIStrings;
   onStartReview: () => void;
-  onStartSabaq: () => void;
+  onStartMemorize: () => void;
   onSetup: () => void;
   onDrill: () => void;
 };
 
 /**
- * Home's wird card (4.3, GOAL-01, GOAL-04): today's pages as recent and manzil counts, new lines,
+ * Home's wird card (4.3, GOAL-01, GOAL-04): today's pages as recent and long-term counts, new lines,
  * the time left, and a clear "Wird complete" state with nothing more asked. Without a plan it offers
  * setup instead.
  */
@@ -49,7 +49,7 @@ export function WirdPlanCard({
   isDark,
   s,
   onStartReview,
-  onStartSabaq,
+  onStartMemorize,
   onSetup,
   onDrill,
 }: Props) {
@@ -85,9 +85,9 @@ export function WirdPlanCard({
   // A page on a due learning step is in both lists; total counts each page once.
   const total = wird.total;
   const complete = wird.todo.length === 0 && total > 0;
-  const sabqi = wird.todo.filter((page) => page.tier === "sabqi").length;
-  const manzil = wird.todo.length - sabqi;
-  const showSabaq = newMemorizationOpen(wird);
+  const recent = wird.todo.filter((page) => page.tier === "recent").length;
+  const longTerm = wird.todo.length - recent;
+  const showMemorize = newMemorizationOpen(wird);
   // Ayah review lists no pages; its work is the ayah cards (Start opens the flashcard session).
   const ayahMode = wird.plan.unit === "ayah";
   const secondLookLabel =
@@ -121,22 +121,22 @@ export function WirdPlanCard({
 
       {!complete ? (
         <MirroredRow dir={dir} className="mt-3 flex-wrap gap-x-4 gap-y-1">
-          {sabqi > 0 ? (
+          {recent > 0 ? (
             <Text dir={dir} variant="caption">
-              {interpolate(s.hifzWirdSabqi, { n: formatNumber(sabqi, language) })}
+              {interpolate(s.hifzWirdRecent, { n: formatNumber(recent, language) })}
             </Text>
           ) : null}
-          {manzil > 0 ? (
+          {longTerm > 0 ? (
             <Text dir={dir} variant="caption">
-              {interpolate(s.hifzWirdManzil, { n: formatNumber(manzil, language) })}
+              {interpolate(s.hifzWirdLongTerm, { n: formatNumber(longTerm, language) })}
             </Text>
           ) : null}
-          {showSabaq ? (
+          {showMemorize ? (
             // The lines still left of today's allocation, so a finished lesson does not read as work left.
             <Text dir={dir} variant="caption">
-              {wird.sabaqDoneToday
+              {wird.memorizeDoneToday
                 ? s.hifzWirdNewDone
-                : interpolate(s.hifzWirdNew, { lines: formatLines(Math.max(1, wird.newLines - wird.sabaqLinesToday), language) })}
+                : interpolate(s.hifzWirdNew, { lines: formatLines(Math.max(1, wird.newLines - wird.memorizeLinesToday), language) })}
             </Text>
           ) : null}
         </MirroredRow>
@@ -172,15 +172,15 @@ export function WirdPlanCard({
 
       {complete ? (
         // Once the wird is complete, new lines stay on offer but nothing more is pressed on the user.
-        showSabaq ? (
+        showMemorize ? (
           <MirroredRow dir={dir} className="mt-4">
             <Button
               variant="outline"
               size="sm"
               // Small text and width, but still a 44 px touch target.
               className="h-11 border border-warm-300 dark:border-neutral-700"
-              label={wird.sabaqDoneToday ? s.hifzSabaqMore : s.hifzSabaqStart}
-              onPress={onStartSabaq}
+              label={wird.memorizeDoneToday ? s.hifzMemorizeMore : s.hifzMemorizeStart}
+              onPress={onStartMemorize}
             />
           </MirroredRow>
         ) : null
@@ -190,23 +190,23 @@ export function WirdPlanCard({
           {wird.todo.length > 0 || (ayahMode && ayahDue + ayahNew > 0) ? (
             <Button label={wird.done.length > 0 ? s.hifzWirdContinue : s.hifzWirdStart} onPress={onStartReview} />
           ) : null}
-          {showSabaq ? (
+          {showMemorize ? (
             <Button
               variant={wird.todo.length > 0 ? "outline" : "default"}
               className={wird.todo.length > 0 ? "border border-warm-300 dark:border-neutral-700" : undefined}
-              label={wird.sabaqDoneToday ? s.hifzSabaqMore : s.hifzSabaqStart}
-              onPress={onStartSabaq}
+              label={wird.memorizeDoneToday ? s.hifzMemorizeMore : s.hifzMemorizeStart}
+              onPress={onStartMemorize}
             />
           ) : null}
         </View>
       )}
 
-      {/* SBQ-03: the second look is offered even with a backlog or a complete wird; sabaq shows it first. */}
+      {/* SBQ-03: the second look is offered even with a backlog or a complete wird; the memorize screen shows it first. */}
       {secondLooksDue > 0 ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${secondLookLabel}, ${s.hifzSecondLookAction}`}
-          onPress={onStartSabaq}
+          onPress={onStartMemorize}
           // Capped on wide layouts so "Start" stays near its label.
           className="mt-3 w-full max-w-md min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4 py-2.5"
           style={{ alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}

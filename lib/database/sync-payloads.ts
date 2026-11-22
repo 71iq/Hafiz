@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isSyncableUserSetting } from "@/lib/database/user-settings";
 import { syncTimestampSchema } from "@/lib/database/sync-timestamps";
+import { STORED_TIERS } from "@/lib/hifz/tiers";
 
 const timestamp = syncTimestampSchema;
 const optionalTimestamp = timestamp.nullish();
@@ -29,7 +30,8 @@ const jsonContainer = z.union([jsonText, z.array(z.json()), z.record(z.string(),
 const flag = z.union([z.boolean(), z.literal(0), z.literal(1)]);
 const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const nonNegative = integer.min(0);
-const tier = z.enum(["sabaq", "sabqi", "manzil", "manzil.needs_work", "manzil.unverified"]);
+// Saved tier values, which keep the names released apps sync (lib/hifz/tiers).
+const tier = z.enum(STORED_TIERS);
 
 const setting = z.object({
   ...wireMetadata,

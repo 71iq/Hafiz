@@ -21,7 +21,7 @@ function card(id: string, deckId: string, due: string) {
 }
 
 describe("the flashcard summary's next review", () => {
-  it("is the earliest flashcard, not a hifz page or a sabaq chunk past its day (SBQ-03)", async () => {
+  it("is the earliest flashcard, not a hifz page or a chunk past its day (SBQ-03)", async () => {
     card("chunk:madani15:5:1-4", "hifz-sabaq", "2026-01-01T00:00:00.000Z");
     card("page:madani15:5", "hifz-pages", "2026-01-02T00:00:00.000Z");
     card("word:2:255:3", "meanings", "2026-02-01T00:00:00.000Z");

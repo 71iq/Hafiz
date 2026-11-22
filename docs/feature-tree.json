@@ -421,7 +421,7 @@
           "title": "Save setup and open the first session, or skip",
           "kind": "transition",
           "cases": ["START-04", "START-05"],
-          "uses": ["hifz.review", "hifz.sabaq", "review.session", "home"],
+          "uses": ["hifz.review", "hifz.memorize", "review.session", "home"],
           "native": false,
           "children": []
         }
@@ -476,7 +476,7 @@
           "title": "Today's hifz plan card",
           "kind": "widget",
           "cases": ["PLAN-01"],
-          "uses": ["hifz.review", "hifz.sabaq", "hifz.review.drills"],
+          "uses": ["hifz.review", "hifz.memorize", "hifz.review.drills"],
           "native": false,
           "children": []
         },
@@ -1194,7 +1194,7 @@
             },
             {
               "id": "hifz.setup.repetitions",
-              "title": "Sabaq repetition counts: presets or custom",
+              "title": "New memorization repetition counts: presets or custom",
               "kind": "widget",
               "cases": [],
               "uses": [],
@@ -1295,15 +1295,15 @@
           ]
         },
         {
-          "id": "hifz.sabaq",
-          "title": "Sabaq: new lines",
+          "id": "hifz.memorize",
+          "title": "New memorization: new lines",
           "kind": "screen",
           "cases": ["PLAN-08"],
           "uses": ["wird.minimum", "wird.sessioncards", "wird.zayt", "hifz.setup.repetitions"],
           "native": false,
           "children": [
             {
-              "id": "hifz.sabaq.secondlook",
+              "id": "hifz.memorize.secondlook",
               "title": "Same-day second look before new lines",
               "kind": "widget",
               "cases": [],

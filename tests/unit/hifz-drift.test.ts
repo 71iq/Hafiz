@@ -109,7 +109,7 @@ describe("drift into a similar verse (SCH-07, MUT-04)", () => {
     expect(first[0].pair.self).toMatchObject({ surah: 2, ayah: 5, page: 2 });
     expect(first[0].pair.sibling).toMatchObject({ surah: 31, ayah: 5, page: 411, similar: "عَلَىٰ هُدًى" });
 
-    // A sabaq session builds no drill list, so it uses up no follow-up.
+    // A new memorization session builds no drill list, so it uses up no follow-up.
     await sessionAt(new Date(now.getTime() + 30 * 60_000), "sabaq");
     expect(await loadDriftDrills(store.db, TODAY)).toMatchObject([{ siblingPage: 411, sessionsSince: 0 }]);
 

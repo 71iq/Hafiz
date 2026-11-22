@@ -156,11 +156,11 @@ export async function readWirdTally(
   db: DatabaseExecutor,
   { day, makeUp, settings }: { day: LocalDate; makeUp: boolean; settings: HabitSettings },
 ): Promise<WirdTally> {
-  const row = await db.getFirstAsync<{ page_units: number; counted_ms: number; sabaq_step: number }>(
+  const row = await db.getFirstAsync<{ page_units: number; counted_ms: number; memorize_step: number }>(
     makeUp ? MAKEUP_TALLY_SQL : DAY_TALLY_SQL,
     [settings.studyCountsTowardMinimum ? 1 : 0, day],
   );
-  return { pageUnits: Number(row?.page_units ?? 0), countedMs: Number(row?.counted_ms ?? 0), sabaqStep: Number(row?.sabaq_step ?? 0) > 0 };
+  return { pageUnits: Number(row?.page_units ?? 0), countedMs: Number(row?.counted_ms ?? 0), memorizeStep: Number(row?.memorize_step ?? 0) > 0 };
 }
 
 /**

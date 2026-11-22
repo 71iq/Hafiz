@@ -45,7 +45,7 @@ export const socialStrings = {
     boardIntentionBody:
       "\"Actions are judged by intentions\" (Bukhari 1). The Board is here to encourage steady review. Make your wird for Allah, and let the Board be a reminder.",
     boardRules:
-      "Points come only from wird days: 1 for the minimum, 1 more for the full wird and 1 for a finished manzil cycle, at most 3 a day. Excused and grace days add nothing and are never shown.",
+      "Points come only from wird days: 1 for the minimum, 1 more for the full wird and 1 for a finished long-term review cycle, at most 3 a day. Excused and grace days add nothing and are never shown.",
     boardIntentionPrivacy:
       "People in your group see your name or nickname, weekly points and streak. Never your pages, mistakes, grades or excused days.",
     boardHowPoints: "How points work",

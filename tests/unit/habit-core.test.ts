@@ -408,13 +408,13 @@ describe("minimum wird (STR-01)", () => {
 
   it("counts meanings only when the user turned that on, and only by time", () => {
     const words = Array.from({ length: 40 }, (_, i) => ({ cardId: `word:2:255:${i + 1}`, durationMs: 10_000 }));
-    expect(tallyReviews(words, { studyCounts: false })).toEqual({ pageUnits: 0, countedMs: 0, sabaqStep: false });
-    expect(tallyReviews(words, { studyCounts: true })).toEqual({ pageUnits: 0, countedMs: 400_000, sabaqStep: false });
+    expect(tallyReviews(words, { studyCounts: false })).toEqual({ pageUnits: 0, countedMs: 0, memorizeStep: false });
+    expect(tallyReviews(words, { studyCounts: true })).toEqual({ pageUnits: 0, countedMs: 400_000, memorizeStep: false });
   });
 
-  it("counts a page card or a finished sabaq chunk on its own", () => {
+  it("counts a page card or a finished chunk on its own", () => {
     expect(meetsMinimum(tallyReviews([{ cardId: "page:madani15:582", durationMs: 0 }], { studyCounts: false }), minimum)).toBe(true);
-    // A sabaq chunk counts by its share of the page's 15 lines (STR-01): a short second look on 4 lines
+    // A chunk counts by its share of the page's 15 lines (STR-01): a short second look on 4 lines
     // is not a page, while a chunk that covers the whole page is.
     expect(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(PAGE_UNITS * 4 / 15);
     expect(tallyReviews([{ cardId: "chunk:madani15:582:1-15", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(PAGE_UNITS);
@@ -512,7 +512,7 @@ describe("wird extras (5.4)", () => {
     today: TODAY,
     inboxCount: 2,
     hasMemorizedPages: true,
-    sabaqToday: true,
+    memorizeToday: true,
     doneToday: new Set<ExtraKind>(),
     ...overrides,
   });
@@ -520,7 +520,7 @@ describe("wird extras (5.4)", () => {
   it("offers at most 2 eligible extras and skips ones that do not apply", () => {
     const state = emptyExtrasState(TODAY);
     expect(chooseExtras(state, context())).toHaveLength(EXTRAS_PER_DAY);
-    expect(chooseExtras(state, context({ inboxCount: 0, hasMemorizedPages: false, sabaqToday: false }))).toEqual([]);
+    expect(chooseExtras(state, context({ inboxCount: 0, hasMemorizedPages: false, memorizeToday: false }))).toEqual([]);
     expect(chooseExtras(state, context({ inboxCount: 0, hasMemorizedPages: false }))).toEqual(["deepen"]);
   });
 

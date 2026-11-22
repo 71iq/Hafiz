@@ -32,13 +32,13 @@ export function backoffLevel(consecutiveIgnored: number): BackoffLevel {
 
 export type HabitInput = Readonly<{ days: readonly HabitDay[]; pause: HabitPause | null }>;
 
-/** Values the copy can mention for a date. The hifz plan can fill pages, minutes, range and manzil later. */
+/** Values the copy can mention for a date. The hifz plan can fill pages, minutes, range and long-term later. */
 export type ReminderFactValues = Readonly<{
   surah?: number;
   pages?: number;
   minutes?: number;
   range?: string;
-  manzil?: number;
+  longTerm?: number;
 }>;
 
 /** A notification that already fired on this device. Cancelled ones are never included. */

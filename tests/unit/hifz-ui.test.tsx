@@ -86,7 +86,7 @@ describe("HifzSetupFlow Not now", () => {
   });
 });
 
-describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
+describe("HifzSetupFlow new memorization repetitions (SBQ-01)", () => {
   const db = { getAllAsync: jest.fn(async () => []) } as unknown as AppDatabase;
   const savedPlan: HifzPlan = { ...DEFAULT_HIFZ_PLAN, newPerDay: 1 };
 
@@ -165,7 +165,7 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
     expect(checked(view, s.hifzRepsTwentyTimes)).toBe(true);
     expect(checked(view, s.hifzRepsLookingThenMemory)).toBe(false);
     const plan = await saveAndReadPlan(view);
-    expect(plan.sabaqRepetitions).toEqual({ listen: 3, looking: 20, cleanInARow: 3 });
+    expect(plan.memorizeRepetitions).toEqual({ listen: 3, looking: 20, cleanInARow: 3 });
     expect(plan.newPerDay).toBe(1);
   });
 
@@ -182,17 +182,17 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
     for (let tap = 0; tap < 3; tap += 1) fireEvent.press(view.getByLabelText("More: Listens"));
     expect(view.getByLabelText("More: Listens").props.accessibilityState).toMatchObject({ disabled: true });
     const plan = await saveAndReadPlan(view);
-    expect(plan.sabaqRepetitions).toEqual({ listen: 5, looking: 15, cleanInARow: 1 });
+    expect(plan.memorizeRepetitions).toEqual({ listen: 5, looking: 15, cleanInARow: 1 });
   });
 
   it("opens a plan's custom counts as custom, and a preset replaces them", async () => {
-    const view = await openPace({ ...savedPlan, sabaqRepetitions: { listen: 2, looking: 12, cleanInARow: 4 } });
+    const view = await openPace({ ...savedPlan, memorizeRepetitions: { listen: 2, looking: 12, cleanInARow: 4 } });
     expect(checked(view, s.hifzRepsCustom)).toBe(true);
     expect(view.getByText("12")).toBeTruthy();
     fireEvent.press(radio(view, s.hifzRepsLookingThenMemory));
     expect(view.queryByLabelText("More: Reads while looking")).toBeNull();
     const plan = await saveAndReadPlan(view);
-    expect(plan.sabaqRepetitions).toEqual({ listen: 3, looking: 10, cleanInARow: 3 });
+    expect(plan.memorizeRepetitions).toEqual({ listen: 3, looking: 10, cleanInARow: 3 });
   });
 
   it("drops the counts when the goal is only to keep what is memorized", async () => {
@@ -210,7 +210,7 @@ describe("HifzSetupFlow sabaq repetitions (SBQ-01)", () => {
 
   it("labels the counts in Arabic with Arabic digits", async () => {
     const ar = strings.ar;
-    const view = await openPace({ ...savedPlan, sabaqRepetitions: { listen: 2, looking: 12, cleanInARow: 4 } }, "ar");
+    const view = await openPace({ ...savedPlan, memorizeRepetitions: { listen: 2, looking: 12, cleanInARow: 4 } }, "ar");
     expect(view.getByText(ar.hifzRepsTitle)).toBeTruthy();
     expect(view.getByText("١٢")).toBeTruthy();
     expect(view.getByLabelText(`أكثر: ${ar.hifzRepsLooking}`)).toBeTruthy();

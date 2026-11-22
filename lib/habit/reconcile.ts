@@ -1,7 +1,7 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
-import { meetsMinimum, sabaqStepFlags, tallyReviews } from "@/lib/habit/minimum";
+import { meetsMinimum, memorizeStepFlags, tallyReviews } from "@/lib/habit/minimum";
 import { putHabitDay } from "@/lib/habit/queries";
 import { readHabitSettings } from "@/lib/habit/settings";
 import type { HabitDayRow } from "@/lib/habit/types";
@@ -36,8 +36,8 @@ function rowFor(date: LocalDate, status: "done" | "made_up", at: string, credite
   };
 }
 
-/** The instants of each chunk card's completed steps 6 (STR-01), by sabaqStepFlags. */
-function sabaqStepInstants(rows: readonly { card_id: string; rating: number; reviewed_at: string }[]): Map<string, Set<number>> {
+/** The instants of each chunk card's completed steps 6 (STR-01), by memorizeStepFlags. */
+function memorizeStepInstants(rows: readonly { card_id: string; rating: number; reviewed_at: string }[]): Map<string, Set<number>> {
   const byCard = new Map<string, { at: number; rating: number }[]>();
   for (const row of rows) {
     const at = Date.parse(row.reviewed_at);
@@ -49,7 +49,7 @@ function sabaqStepInstants(rows: readonly { card_id: string; rating: number; rev
   const steps = new Map<string, Set<number>>();
   for (const [cardId, reviews] of byCard) {
     reviews.sort((a, b) => a.at - b.at);
-    const flags = sabaqStepFlags(reviews);
+    const flags = memorizeStepFlags(reviews);
     steps.set(cardId, new Set(reviews.filter((_, index) => flags[index]).map((review) => review.at)));
   }
   return steps;
@@ -71,7 +71,7 @@ export async function reconcileHabitDaysFromLogs(
   { now, dates }: { now: Date; dates?: ReadonlySet<LocalDate> },
 ): Promise<number> {
   const today = localDateOf(now);
-  // Each sabaq chunk's reviews: a pass with no review before it, or right after a failed one, is
+  // Each chunk's reviews: a pass with no review before it, or right after a failed one, is
   // a completed step 6 (STR-01), as DAY_TALLY_SQL reads it. Compared as instants, since sync can
   // change a timestamp's spelling.
   const chunkReviews = await db.getAllAsync<{
@@ -113,7 +113,7 @@ export async function reconcileHabitDaysFromLogs(
     ),
     db.getAllAsync<HabitDayRow>("SELECT * FROM habit_days WHERE status IS NOT NULL"),
   ]);
-  const stepsAt = sabaqStepInstants(chunkReviews);
+  const stepsAt = memorizeStepInstants(chunkReviews);
   const days = new Map(habitRows.map((row) => [row.local_date, row]));
   const own = new Map<LocalDate, LoggedReview[]>();
   const makeUps = new Map<LocalDate, LoggedReview[]>();
@@ -130,7 +130,7 @@ export async function reconcileHabitDaysFromLogs(
         reviews.map((review) => ({
           cardId: review.card_id,
           durationMs: review.duration_ms,
-          sabaqStep: review.rating >= 3 && (stepsAt.get(review.card_id)?.has(Date.parse(review.reviewed_at)) ?? false),
+          memorizeStep: review.rating >= 3 && (stepsAt.get(review.card_id)?.has(Date.parse(review.reviewed_at)) ?? false),
         })),
         { studyCounts: settings.studyCountsTowardMinimum },
       ),

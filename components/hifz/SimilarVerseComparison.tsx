@@ -30,7 +30,7 @@ function verseKey(ref: SimilarRef): string {
 }
 
 /**
- * MUT-01, MUT-05: the sabaq step that compares each chunk ayah with the similar verses already
+ * MUT-01, MUT-05: the new memorization step that compares each chunk ayah with the similar verses already
  * memorized, one card per group. The verse being memorized shows its meaning in the interface
  * language; each sibling's waits behind "Show translation", and a group shows its first three
  * siblings, then "Show n more", so a page with many similar verses stays short. The meanings are read

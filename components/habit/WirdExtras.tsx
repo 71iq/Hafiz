@@ -25,7 +25,7 @@ type Props = {
   db: AppDatabase;
   inboxCount: number;
   hasMemorizedPages: boolean;
-  sabaqToday: boolean;
+  memorizeToday: boolean;
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
@@ -55,7 +55,7 @@ function label(kind: ExtraKind, s: UIStrings): string {
  * the app can start (strengthen, connect) opens it; one done away from the app (salah) or already done
  * reads as a plain note, so nothing looks tappable that is not.
  */
-export function WirdExtras({ db, inboxCount, hasMemorizedPages, sabaqToday, language, isDark, s, onStrengthen, onConnect }: Props) {
+export function WirdExtras({ db, inboxCount, hasMemorizedPages, memorizeToday, language, isDark, s, onStrengthen, onConnect }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
@@ -93,7 +93,7 @@ export function WirdExtras({ db, inboxCount, hasMemorizedPages, sabaqToday, lang
 
   if (!state) return null;
   const today = state.date;
-  const kinds = chooseExtras(state, { today, inboxCount, hasMemorizedPages, sabaqToday, doneToday });
+  const kinds = chooseExtras(state, { today, inboxCount, hasMemorizedPages, memorizeToday, doneToday });
   if (kinds.length === 0) return null;
 
   return (

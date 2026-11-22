@@ -24,7 +24,7 @@ import {
 import { ZaytAnimation, ZaytStill } from "@/components/habit/ZaytAnimation";
 import { zaytResultEventId } from "@/lib/zayt/presentation";
 import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
-import { SabaqSecondLook } from "@/components/hifz/SabaqSecondLook";
+import { MemorizeSecondLook } from "@/components/hifz/MemorizeSecondLook";
 import { SimilarVerseComparison } from "@/components/hifz/SimilarVerseComparison";
 import { loadPageWordsData } from "@/components/mushaf/MushafPage";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
@@ -43,16 +43,16 @@ import { loadTodayWird, newMemorizationOpen, readMemorizedPageNumbers } from "@/
 import { similarGroupsForAyahs, withMemorizedSiblings, type SimilarGroup } from "@/lib/hifz/similar";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import {
-  addCoveredSabaqPages,
-  completeSabaqChunk,
+  addCoveredMemorizedPages,
+  completeMemorizeChunk,
   loadSecondLooks,
-  nextSabaqTarget,
-  saveSabaqCleanRun,
+  nextMemorizeTarget,
+  saveMemorizeCleanRun,
   saveSecondLook,
-  type SabaqTarget,
+  type MemorizeTarget,
   type SecondLook,
   type SecondLooks,
-} from "@/lib/hifz/sabaq";
+} from "@/lib/hifz/memorize";
 import { formatAyahRef } from "@/lib/arabic";
 import { formatNumber } from "@/lib/i18n/count";
 import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
@@ -76,15 +76,15 @@ function formatClockTime(at: Date, language: "en" | "ar"): string {
 }
 
 /**
- * Sabaq, new memorization (4.4.1): intention, listening, meaning, reading while looking, ayah by
+ * New memorization (4.4.1): intention, listening, meaning, reading while looking, ayah by
  * ayah from memory with chaining, the whole chunk three times cleanly, which turns the chunk into a
- * sabaq card (SBQ-02), linking to what came before, then a graded fluent check of that card.
+ * chunk card (SBQ-02), linking to what came before, then a graded fluent check of that card.
  */
 /**
  * `onRestart` opens the screen again from the start, for the second look the done step offers once
  * it is due (SBQ-03): a fresh load offers due looks before new lines.
  */
-function SabaqScreen({ onRestart }: { onRestart: () => void }) {
+function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage, effectiveTheme } = useSettings();
@@ -99,7 +99,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   const { playRange, rangeState, stop, togglePause } = useAyahAudio();
 
   const [loading, setLoading] = useState(true);
-  const [target, setTarget] = useState<SabaqTarget | null>(null);
+  const [target, setTarget] = useState<MemorizeTarget | null>(null);
   const [plan, setPlan] = useState<HifzPlan | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [looking, setLooking] = useState(0);
@@ -162,7 +162,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
    * How load chose the lesson's lines, so a graded second look can choose them again. Null when the
    * screen offers no new lines.
    */
-  const targetQuery = useRef<Parameters<typeof nextSabaqTarget>[1] | null>(null);
+  const targetQuery = useRef<Parameters<typeof nextMemorizeTarget>[1] | null>(null);
   /**
    * The rendered copy of `saveLock === "saving"`, for the remove guard below. Unlike `busy` it ends as
    * soon as the grade is saved, so leaving while the summary loads is not held.
@@ -193,7 +193,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
    */
   /** Show the lesson's lines, with the similar verses the user already knows (MUT-01). */
   const showTarget = useCallback(
-    async (next: SabaqTarget | null) => {
+    async (next: MemorizeTarget | null) => {
       setTarget(next);
       if (!next) return;
       // MUT-01: before memorizing, show siblings the user already knows, with the difference marked.
@@ -222,12 +222,12 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       }
       setPlan(wird.plan);
       setCatchUpFirst(wird.daily.backlog);
-      setLinesDoneToday(wird.sabaqDoneToday);
+      setLinesDoneToday(wird.memorizeDoneToday);
       const pageWords = (page: number) => words?.[page - 1] ?? null;
       // SBQ-02: a page completed only by chunks merged from another device joins review now, so the
       // lesson goes on to the next page. A failure here leaves the lines as they are.
-      await addCoveredSabaqPages(db, { plan: wird.plan, pageWords }).catch((healError: unknown) => {
-        console.warn("[Sabaq] Could not add a page its merged chunks completed:", healError);
+      await addCoveredMemorizedPages(db, { plan: wird.plan, pageWords }).catch((healError: unknown) => {
+        console.warn("[Memorize] Could not add a page its merged chunks completed:", healError);
         return 0;
       });
       // Opened for a second look on a day new memorization is paused, the screen offers no new lines.
@@ -235,15 +235,15 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         ? {
             plan: wird.plan,
             // Only the lines still left of today's allocation; at least 3 so a chunk is worth memorizing.
-            wantLines: Math.max(3, wird.newLines - wird.sabaqLinesToday),
+            wantLines: Math.max(3, wird.newLines - wird.memorizeLinesToday),
             pageWords,
           }
         : null;
       const [next, secondLooks] = await Promise.all([
-        targetQuery.current ? nextSabaqTarget(db, targetQuery.current) : Promise.resolve(null),
+        targetQuery.current ? nextMemorizeTarget(db, targetQuery.current) : Promise.resolve(null),
         // A second look that cannot be read is left for the next visit; new lines still load.
         loadSecondLooks(db, { pageWords }).catch((lookError) => {
-          console.warn("[Sabaq] Failed to load second looks:", lookError);
+          console.warn("[Memorize] Failed to load second looks:", lookError);
           return NO_SECOND_LOOKS;
         }),
       ]);
@@ -254,7 +254,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       sessionRef.current = startReviewSession("sabaq");
       lessonClock.reset();
     } catch (loadError) {
-      console.warn("[Sabaq] Failed to load:", loadError);
+      console.warn("[Memorize] Failed to load:", loadError);
       setError(strings.current.hifzLoadFailed);
     } finally {
       setLoading(false);
@@ -284,7 +284,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         if (current) setMeanings(rows);
       })
       .catch((meaningError: unknown) => {
-        console.warn("[Sabaq] Failed to load meanings:", meaningError);
+        console.warn("[Memorize] Failed to load meanings:", meaningError);
         if (current) setError(strings.current.hifzLoadFailed);
       });
     return () => {
@@ -376,11 +376,11 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
    * again before it starts. The same lines keep the loaded lesson; a failed read keeps it too, since
    * the save checks the page in its own transaction.
    */
-  const chooseTargetAgain = async (): Promise<SabaqTarget | null> => {
+  const chooseTargetAgain = async (): Promise<MemorizeTarget | null> => {
     const query = targetQuery.current;
     if (!query) return target;
     try {
-      const next = await nextSabaqTarget(db, query);
+      const next = await nextMemorizeTarget(db, query);
       const same =
         next !== null &&
         target !== null &&
@@ -392,7 +392,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       await showTarget(next);
       return next;
     } catch (targetError) {
-      console.warn("[Sabaq] Could not choose the lesson's lines again:", targetError);
+      console.warn("[Memorize] Could not choose the lesson's lines again:", targetError);
       return target;
     }
   };
@@ -436,7 +436,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       // A chunk deleted since the screen loaded, such as by sync, has nothing left to review.
       if (saveError instanceof StudyCardDeletedError) nextLook();
       else {
-        console.warn("[Sabaq] Second look save failed:", saveError);
+        console.warn("[Memorize] Second look save failed:", saveError);
         setError(s.hifzSaveFailed);
       }
     } finally {
@@ -461,7 +461,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     setError(null);
     try {
       const durationMs = lessonClock.elapsedMs();
-      const result = await saveSabaqCleanRun(db, { target, plan, session: sessionRef.current, durationMs });
+      const result = await saveMemorizeCleanRun(db, { target, plan, session: sessionRef.current, durationMs });
       saveLock.current = "open";
       setSaving(false);
       setChunkSaved(true);
@@ -476,12 +476,12 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       lessonClock.reset();
       goNext();
     } catch (saveError) {
-      console.warn("[Sabaq] Clean run save failed:", saveError);
+      console.warn("[Memorize] Clean run save failed:", saveError);
       leaveWhenSaved.current = false;
       pendingBack.current = null;
       setLeavePending(false);
       // No grade was given here: the lines were not saved, and Clean saves them again.
-      setError(s.hifzSabaqCleanRunSaveFailed);
+      setError(s.hifzMemorizeCleanRunSaveFailed);
     } finally {
       if (saveLock.current === "saving") {
         saveLock.current = "open";
@@ -498,7 +498,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const result = await completeSabaqChunk(db, {
+      const result = await completeMemorizeChunk(db, {
         target,
         plan,
         rating,
@@ -537,7 +537,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
         durationMs: cleanRunMs.current + lessonClock.elapsedMs(),
       });
     } catch (saveError) {
-      console.warn("[Sabaq] Save failed:", saveError);
+      console.warn("[Memorize] Save failed:", saveError);
       leaveWhenSaved.current = false;
       pendingBack.current = null;
       setLeavePending(false);
@@ -569,7 +569,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   const look = looks[lookIndex];
   if (look && plan) {
     return (
-      <SabaqSecondLook
+      <MemorizeSecondLook
         key={look.cardId}
         look={look}
         index={lookIndex}
@@ -605,7 +605,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
             isDark={isDark}
           />
           <View className="w-full max-w-sm" style={{ gap: 10 }}>
-            <Button label={linesDoneToday ? s.hifzSabaqMore : s.hifzSabaqStart} onPress={() => setLooksDoneStep(false)} />
+            <Button label={linesDoneToday ? s.hifzMemorizeMore : s.hifzMemorizeStart} onPress={() => setLooksDoneStep(false)} />
             <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
           </View>
         </View>
@@ -622,8 +622,8 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
           <EmptyState
             icon={error ? RotateCcw : BookOpenCheck}
             tone={!error && looksSaved > 0 ? "success" : "neutral"}
-            title={error ?? (looksSaved > 1 ? s.hifzSecondLooksSaved : looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzSabaqNoNew)}
-            // The serif title of the sabaq's other ends, as on its done step.
+            title={error ?? (looksSaved > 1 ? s.hifzSecondLooksSaved : looksSaved > 0 ? s.hifzSecondLookSaved : s.hifzMemorizeNoNew)}
+            // The serif title of the lesson's other ends, as on its done step.
             titleStyle="display"
             subtitle={
               laterLook
@@ -649,23 +649,23 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   }
 
   const stepTitle: Record<Step, string> = {
-    intention: s.hifzSabaqIntention,
-    listen: s.hifzSabaqStepListen,
-    meaning: s.hifzSabaqStepMeaning,
-    looking: s.hifzSabaqStepLooking,
-    ayah: s.hifzSabaqStepAyah,
-    chunk: s.hifzSabaqStepChunk,
-    link: s.hifzSabaqStepLink,
-    check: s.hifzSabaqStepCheck,
+    intention: s.hifzMemorizeIntention,
+    listen: s.hifzMemorizeStepListen,
+    meaning: s.hifzMemorizeStepMeaning,
+    looking: s.hifzMemorizeStepLooking,
+    ayah: s.hifzMemorizeStepAyah,
+    chunk: s.hifzMemorizeStepChunk,
+    link: s.hifzMemorizeStepLink,
+    check: s.hifzMemorizeStepCheck,
     similar: s.hifzSimilarTitle,
-    done: s.hifzSabaqDoneTitle,
+    done: s.hifzMemorizeDoneTitle,
   };
   const hidden = step === "ayah" || step === "chunk" || step === "link" || step === "check";
   // Teal text under 14 px uses the darker token in light mode.
   const accent = isDark ? "#2dd4bf" : "#0f766e";
   const muted = mutedIconColor(effectiveTheme);
   // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
-  const portion = `${interpolate(s.hifzPageN, { n: formatNumber(target.page, uiLanguage) })}${uiLanguage === "ar" ? "، " : " · "}${interpolate(s.hifzSabaqLines, {
+  const portion = `${interpolate(s.hifzPageN, { n: formatNumber(target.page, uiLanguage) })}${uiLanguage === "ar" ? "، " : " · "}${interpolate(s.hifzMemorizeLines, {
     from: formatNumber(target.fromLine, uiLanguage),
     to: formatNumber(target.toLine, uiLanguage),
   })}`;
@@ -675,9 +675,9 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
   // a check graded Again, whose relearning step is a few minutes away.
   const lookLine =
     step === "done" && outcome?.secondLookAt
-      ? interpolate(s.hifzSabaqSecondLookAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
+      ? interpolate(s.hifzMemorizeSecondLookAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
       : step === "done" && outcome?.secondLookNow
-        ? s.hifzSabaqSecondLookNow
+        ? s.hifzMemorizeSecondLookNow
         : null;
   // After a failed check, the look says when the lines come back. Without one they come back as new
   // lines, or in tomorrow's review once step 6 has completed their page.
@@ -686,11 +686,11 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       ? lookLine
         ? null
         : outcome.pageAdded
-          ? s.hifzSabaqNotFluentReview
-          : s.hifzSabaqNotFluent
+          ? s.hifzMemorizeNotFluentReview
+          : s.hifzMemorizeNotFluent
       : outcome?.partial
-        ? s.hifzSabaqDonePartial
-        : s.hifzSabaqDone;
+        ? s.hifzMemorizeDonePartial
+        : s.hifzMemorizeDone;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -760,7 +760,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
             style={{ fontFamily: "NotoSerif_700Bold", fontSize: 21, lineHeight: 30 }}
             className="text-charcoal dark:text-neutral-100"
           >
-            {step === "done" && outcome?.passed === false ? s.hifzSabaqNotFluentTitle : stepTitle[step]}
+            {step === "done" && outcome?.passed === false ? s.hifzMemorizeNotFluentTitle : stepTitle[step]}
           </Text>
           {/* The header already names the page and lines, so the intention has no caption. */}
           {step !== "intention" && !(step === "done" && doneCaption === null) ? (
@@ -772,17 +772,17 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
               style={{ lineHeight: 20 }}
             >
               {step === "listen"
-                ? interpolate(s.hifzSabaqListenHint, { n: formatNumber(plan.sabaqRepetitions.listen, uiLanguage) })
+                ? interpolate(s.hifzMemorizeListenHint, { n: formatNumber(plan.memorizeRepetitions.listen, uiLanguage) })
                 : step === "looking"
-                  ? s.hifzSabaqLookingHint
+                  ? s.hifzMemorizeLookingHint
                   : step === "ayah"
-                    ? s.hifzSabaqAyahHint
+                    ? s.hifzMemorizeAyahHint
                     : step === "chunk"
-                      ? s.hifzSabaqChunkHint
+                      ? s.hifzMemorizeChunkHint
                       : step === "link"
-                        ? s.hifzSabaqLinkHint
+                        ? s.hifzMemorizeLinkHint
                         : step === "check"
-                          ? s.hifzSabaqCheckHint
+                          ? s.hifzMemorizeCheckHint
                           : step === "similar"
                             ? s.hifzSimilarHint
                             : step === "done"
@@ -865,7 +865,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
               {error}
             </Text>
           ) : null}
-          {step === "intention" ? <Button label={s.hifzSabaqNext} onPress={goNext} /> : null}
+          {step === "intention" ? <Button label={s.hifzMemorizeNext} onPress={goNext} /> : null}
 
           {step === "listen" ? (
             <>
@@ -875,16 +875,16 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
                 onPress={() =>
                   rangeState.active
                     ? togglePause()
-                    : playRange({ ayahs: [...target.ayahs], repeatRange: plan.sabaqRepetitions.listen }).catch(console.warn)
+                    : playRange({ ayahs: [...target.ayahs], repeatRange: plan.memorizeRepetitions.listen }).catch(console.warn)
                 }
               >
                 {rangeState.active && !rangeState.paused ? <Pause size={16} color={muted} /> : <Play size={16} color={muted} />}
                 <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
-                  {rangeState.active && !rangeState.paused ? s.hifzSabaqPause : s.hifzSabaqPlay}
+                  {rangeState.active && !rangeState.paused ? s.hifzMemorizePause : s.hifzMemorizePlay}
                 </Text>
               </Button>
               <Button
-                label={s.hifzSabaqNext}
+                label={s.hifzMemorizeNext}
                 onPress={() => {
                   stop();
                   goNext();
@@ -893,17 +893,17 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
             </>
           ) : null}
 
-          {step === "meaning" || step === "similar" ? <Button label={s.hifzSabaqNext} onPress={goNext} /> : null}
+          {step === "meaning" || step === "similar" ? <Button label={s.hifzMemorizeNext} onPress={goNext} /> : null}
 
           {step === "looking" ? (
             <>
               <Text dir={dir} align="center" variant="caption">
-                {interpolate(s.hifzSabaqLookingCount, { done: formatNumber(looking, uiLanguage), target: formatNumber(plan.sabaqRepetitions.looking, uiLanguage) })}
+                {interpolate(s.hifzMemorizeLookingCount, { done: formatNumber(looking, uiLanguage), target: formatNumber(plan.memorizeRepetitions.looking, uiLanguage) })}
               </Text>
-              {looking < plan.sabaqRepetitions.looking ? (
-                <Button label={s.hifzSabaqReadOnce} onPress={() => setLooking((value) => value + 1)} />
+              {looking < plan.memorizeRepetitions.looking ? (
+                <Button label={s.hifzMemorizeReadOnce} onPress={() => setLooking((value) => value + 1)} />
               ) : (
-                <Button label={s.hifzSabaqNext} onPress={goNext} />
+                <Button label={s.hifzMemorizeNext} onPress={goNext} />
               )}
             </>
           ) : null}
@@ -917,9 +917,9 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
               <Button
                 className={`flex-1 ${OUTLINE_BORDER}`}
                 variant="outline"
-                label={s.hifzSabaqNotYet}
+                label={s.hifzMemorizeNotYet}
                 // Once the clean run is met, it is saved or retried, not started over.
-                disabled={busy || (step === "chunk" && cleanRun >= plan.sabaqRepetitions.cleanInARow)}
+                disabled={busy || (step === "chunk" && cleanRun >= plan.memorizeRepetitions.cleanInARow)}
                 onPress={() => {
                   setShown(false);
                   setCleanRun(0);
@@ -927,13 +927,13 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
               />
               <Button
                 className="flex-1"
-                label={s.hifzSabaqClean}
+                label={s.hifzMemorizeClean}
                 disabled={busy}
                 onPress={() => {
-                  if (step === "chunk" && cleanRun + 1 >= plan.sabaqRepetitions.cleanInARow) {
+                  if (step === "chunk" && cleanRun + 1 >= plan.memorizeRepetitions.cleanInARow) {
                     // The clean run is met. The lines stay shown until it is saved, so a failed save
                     // is retried with the same button.
-                    setCleanRun(plan.sabaqRepetitions.cleanInARow);
+                    setCleanRun(plan.memorizeRepetitions.cleanInARow);
                     void saveCleanRun();
                     return;
                   }
@@ -955,9 +955,9 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 
           {step === "chunk" ? (
             <Text dir={dir} align="center" variant="caption">
-              {interpolate(s.hifzSabaqCleanCount, {
+              {interpolate(s.hifzMemorizeCleanCount, {
                 n: formatNumber(cleanRun, uiLanguage),
-                target: formatNumber(plan.sabaqRepetitions.cleanInARow, uiLanguage),
+                target: formatNumber(plan.memorizeRepetitions.cleanInARow, uiLanguage),
               })}
             </Text>
           ) : null}
@@ -984,7 +984,7 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
                     ? s.flashcardsSummaryDone
                     : outcome?.secondLookAt
                       ? // The look later today is the next return, not tomorrow (STR-20).
-                        interpolate(s.hifzSabaqBackAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
+                        interpolate(s.hifzMemorizeBackAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
                       : commitLabel
                 }
                 onPress={leave}
@@ -995,10 +995,10 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
       </View>
       <ConfirmDialog
         visible={exitOpen}
-        title={s.hifzSabaqExitTitle}
-        message={s.hifzSabaqExitBody}
-        cancelLabel={s.hifzSabaqExitStay}
-        confirmLabel={s.hifzSabaqExitLeave}
+        title={s.hifzMemorizeExitTitle}
+        message={s.hifzMemorizeExitBody}
+        cancelLabel={s.hifzMemorizeExitStay}
+        confirmLabel={s.hifzMemorizeExitLeave}
         tone="neutral"
         emphasis="cancel"
         isDark={isDark}
@@ -1017,16 +1017,16 @@ function SabaqScreen({ onRestart }: { onRestart: () => void }) {
 }
 
 /** Opened from a deep link or a reminder, the route waits for the database like the other routes. */
-export default function SabaqScreenRoute() {
+export default function MemorizeScreenRoute() {
   const { isReady, progress, error } = useDatabaseStatus();
   const s = useStrings();
   if (error) return <DatabaseErrorState title={s.databaseError} message={error} />;
   if (!isReady) return <LoadingScreen progress={progress} />;
-  return <SabaqVisit />;
+  return <MemorizeVisit />;
 }
 
-/** One visit of the sabaq screen; "Start second look" on the done step begins another. */
-function SabaqVisit() {
+/** One visit of the memorize screen; "Start second look" on the done step begins another. */
+function MemorizeVisit() {
   const [visit, setVisit] = useState(0);
-  return <SabaqScreen key={visit} onRestart={() => setVisit((value) => value + 1)} />;
+  return <MemorizeScreen key={visit} onRestart={() => setVisit((value) => value + 1)} />;
 }

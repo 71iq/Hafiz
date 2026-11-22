@@ -1,4 +1,5 @@
 import type { StepUnit } from "ts-fsrs";
+import type { StoredTier } from "@/lib/hifz/tiers";
 
 export type SurahAyahRange = { surah: number; ayahStart: number; ayahEnd: number };
 
@@ -21,8 +22,8 @@ export interface StudyCardRow {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
-  /** Cached hifz tier of a page card (TIER-01). Derived from history, never the source of truth. */
-  tier?: string | null;
+  /** Cached hifz tier of a page card (TIER-01), as saved (see storedTier). Derived from history, never the source of truth. */
+  tier?: StoredTier | null;
   tier_changed_at?: string | null;
 }
 

@@ -159,7 +159,7 @@ export function DriftPairPrompt({ pair, target, dir, s, accent, accentText, busy
               {error}
             </Text>
           ) : null}
-          <Button label={s.hifzSabaqNext} onPress={onNext} disabled={busy || chosen === null} />
+          <Button label={s.hifzMemorizeNext} onPress={onNext} disabled={busy || chosen === null} />
         </View>
       </View>
     </View>

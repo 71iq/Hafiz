@@ -9,7 +9,7 @@ export function meaningKey({ surah, ayah }: VerseKey): string {
 
 /**
  * MUT-05: each verse's meaning in the interface language, keyed 's:a': the Muyassar tafsir in Arabic,
- * the English translation in English, from the same bundled tables the sabaq meaning step reads. A
+ * the English translation in English, from the same bundled tables the new memorization meaning step reads. A
  * verse without one is left out. The repo has no tawjih data, so the classical explanation of why each
  * wording fits its place is not shown.
  */

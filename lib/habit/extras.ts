@@ -51,7 +51,7 @@ export type ExtrasContext = Readonly<{
   /** Memorized pages exist (connect and salah need something to recite). */
   hasMemorizedPages: boolean;
   /** New lines were memorized today (deepen points at their tafsir). */
-  sabaqToday: boolean;
+  memorizeToday: boolean;
   /** What the log shows was done today, so an extra completes without a tap. */
   doneToday: ReadonlySet<ExtraKind>;
 }>;
@@ -64,7 +64,7 @@ function eligible(kind: ExtraKind, context: ExtrasContext): boolean {
     case "salah":
       return context.hasMemorizedPages;
     case "deepen":
-      return context.sabaqToday;
+      return context.memorizeToday;
   }
 }
 

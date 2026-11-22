@@ -8,7 +8,7 @@ import type { StudyCardRow } from "@/lib/fsrs/types";
 import { addDays, atLocalTime, localDateOf, weekdayOf, type LocalDate } from "@/lib/habit/dates";
 import { buildDailyPlan, type DailyPlan, type PlanPage } from "@/lib/hifz/daily-plan";
 import { isStudyDay, readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
-import { tierFor, type GradeEvent, type PageHistory, type Tier } from "@/lib/hifz/tiers";
+import { storedTier, tierFor, type GradeEvent, type PageHistory, type Tier } from "@/lib/hifz/tiers";
 import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import { chunkCardPrefix, HIFZ_PAGES_DECK_ID, isValidPage, pageCardId, parsePageUnit } from "@/lib/hifz/units";
 
@@ -37,10 +37,10 @@ async function readPageRows(db: DatabaseExecutor): Promise<StudyCardRow[]> {
 }
 
 /** Passing chunk grades by page, each page's keyed by the grade's instant, with its stored local date. */
-type SabaqPasses = ReadonlyMap<number, ReadonlyMap<number, LocalDate>>;
+type MemorizePasses = ReadonlyMap<number, ReadonlyMap<number, LocalDate>>;
 
 /**
- * The passing chunk grades of the given pages, or of every page. A page was memorized through sabaq
+ * The passing chunk grades of the given pages, or of every page. A page was memorized as new lines
  * in the app only when one of these grades created its page card: the chunk that completed the page
  * passed, and the page card was created in that grade's transaction with the same instant (SBQ-02).
  * Every other page card was declared, in setup or My memorization, even when some of its lines have
@@ -48,7 +48,7 @@ type SabaqPasses = ReadonlyMap<number, ReadonlyMap<number, LocalDate>>;
  * of the page. The grade's stored local date is the page's fluent date, so later travel does not
  * move it.
  */
-async function readSabaqPasses(db: DatabaseExecutor, onlyPages?: readonly number[]): Promise<SabaqPasses> {
+async function readMemorizePasses(db: DatabaseExecutor, onlyPages?: readonly number[]): Promise<MemorizePasses> {
   // A grade reads only its own pages' chunk logs, through the card id index; the full scan is for
   // loading every page. Each page's chunk ids sort between its prefix and the prefix with ':' raised to ';'.
   const ranges = onlyPages?.map((page) => {
@@ -109,14 +109,14 @@ function gradesByCard(
 export async function derivePageTiers(
   db: DatabaseExecutor,
   cardIds: readonly string[],
-  { today, plan }: { today: LocalDate; plan: Pick<HifzPlan, "sabqiDays"> },
+  { today, plan }: { today: LocalDate; plan: Pick<HifzPlan, "recentDays"> },
 ): Promise<Map<string, Tier>> {
   const tiers = new Map<string, Tier>();
   if (cardIds.length === 0) return tiers;
   const placeholders = cardIds.map(() => "?").join(", ");
-  const [rows, sabaq, logs] = await Promise.all([
+  const [rows, passes, logs] = await Promise.all([
     db.getAllAsync<StudyCardRow>(`SELECT * FROM study_cards WHERE id IN (${placeholders}) AND deleted_at IS NULL`, [...cardIds]),
-    readSabaqPasses(db, pagesOf(cardIds)),
+    readMemorizePasses(db, pagesOf(cardIds)),
     db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
       `SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id IN (${placeholders})`,
       [...cardIds],
@@ -126,7 +126,7 @@ export async function derivePageTiers(
   for (const row of rows) {
     const unit = parsePageUnit(row.id);
     if (unit?.kind !== "page") continue;
-    tiers.set(row.id, tierFor(pageHistory(row, unit.page, sabaq, grades), today, plan));
+    tiers.set(row.id, tierFor(pageHistory(row, unit.page, passes, grades), today, plan));
   }
   return tiers;
 }
@@ -142,12 +142,12 @@ function pagesOf(cardIds: readonly string[]): number[] {
 }
 
 /**
- * A page card's history. It came from sabaq only when a passing chunk grade of its page has the
- * card's creation instant (see readSabaqPasses); otherwise it was declared and stays declared.
+ * A page card's history. It came from new memorization only when a passing chunk grade of its page has the
+ * card's creation instant (see readMemorizePasses); otherwise it was declared and stays declared.
  */
-function pageHistory(row: StudyCardRow, page: number, sabaq: SabaqPasses, grades: Map<string, GradeEvent[]>): PageHistory {
+function pageHistory(row: StudyCardRow, page: number, passes: MemorizePasses, grades: Map<string, GradeEvent[]>): PageHistory {
   const created = Date.parse(row.created_at);
-  const firstFluentDate = Number.isFinite(created) ? (sabaq.get(page)?.get(created) ?? null) : null;
+  const firstFluentDate = Number.isFinite(created) ? (passes.get(page)?.get(created) ?? null) : null;
   const own = grades.get(row.id) ?? [];
   // UNIT-02: a card with a last review but no grades of its own started from its reviewed ayah cards.
   const fromAyahReviews = firstFluentDate === null && own.length === 0 && row.last_review !== null;
@@ -162,31 +162,31 @@ function pageHistory(row: StudyCardRow, page: number, sabaq: SabaqPasses, grades
 export async function loadPageCard(
   db: DatabaseExecutor,
   cardId: string,
-  { today, plan }: { today: LocalDate; plan: Pick<HifzPlan, "sabqiDays"> },
+  { today, plan }: { today: LocalDate; plan: Pick<HifzPlan, "recentDays"> },
 ): Promise<PageCard | null> {
   const unit = parsePageUnit(cardId);
   if (unit?.kind !== "page") return null;
-  const [row, sabaq, logs] = await Promise.all([
+  const [row, passes, logs] = await Promise.all([
     db.getFirstAsync<StudyCardRow>("SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL", [cardId]),
-    readSabaqPasses(db, [unit.page]),
+    readMemorizePasses(db, [unit.page]),
     db.getAllAsync<{ card_id: string; rating: number; local_date: LocalDate | null; reviewed_at: string }>(
       "SELECT card_id, rating, local_date, reviewed_at FROM study_log WHERE card_id = ?",
       [cardId],
     ),
   ]);
   if (!row) return null;
-  const history = pageHistory(row, unit.page, sabaq, gradesByCard(logs));
+  const history = pageHistory(row, unit.page, passes, gradesByCard(logs));
   return { row, page: unit.page, history, tier: tierFor(history, today, plan) };
 }
 
 /** Every page card with its derived tier (TIER-01). The tier is recomputed from history, never read from the cache. */
 export async function loadPageCards(db: DatabaseExecutor, { today, plan }: { today: LocalDate; plan: HifzPlan }): Promise<PageCard[]> {
-  const [rows, sabaq, grades] = await Promise.all([readPageRows(db), readSabaqPasses(db), readPageGrades(db)]);
+  const [rows, passes, grades] = await Promise.all([readPageRows(db), readMemorizePasses(db), readPageGrades(db)]);
   const cards: PageCard[] = [];
   for (const row of rows) {
     const unit = parsePageUnit(row.id);
     if (!unit || unit.kind !== "page") continue;
-    const history = pageHistory(row, unit.page, sabaq, grades);
+    const history = pageHistory(row, unit.page, passes, grades);
     cards.push({ row, page: unit.page, history, tier: tierFor(history, today, plan) });
   }
   return cards;
@@ -217,22 +217,22 @@ function retrievability(row: StudyCardRow, now: Date): number | null {
 }
 
 /**
- * MST-01: a page counts as memorized when it is sabqi or manzil and its last graded review was Good
+ * MST-01: a page counts as memorized when it is recent or long-term and its last graded review was Good
  * or better. Declared pages count once their first check passes. Home, Progress and the board use
  * this one definition.
  */
 export function isMemorized(card: PageCard): boolean {
-  if (card.tier === "sabaq" || card.tier === "manzil.unverified") return false;
+  if (card.tier === "new" || card.tier === "long_term.unverified") return false;
   const last = card.history.grades[card.history.grades.length - 1];
   // Until the page's own first grade decides, the graded recitation that made the page counts: the
-  // passing chunk grade that completed it in sabaq, or the reviewed ayah cards it was made from.
+  // passing chunk grade that completed it in new memorization, or the reviewed ayah cards it was made from.
   if (last === undefined) return card.history.fromAyahReviews === true || card.history.firstFluentDate !== null;
   return last.rating >= 3;
 }
 
 export function toPlanPage(card: PageCard, today: LocalDate, now: Date): PlanPage {
   const before = card.history.grades.filter((grade) => grade.date < today);
-  // UNIT-02: a page made from its reviewed ayah cards was last reviewed with them, so its manzil floor
+  // UNIT-02: a page made from its reviewed ayah cards was last reviewed with them, so its long-term floor
   // counts from that date instead of treating it as never reviewed.
   const ayahReviewed =
     before.length === 0 && card.history.fromAyahReviews && card.row.last_review ? localDateOf(new Date(card.row.last_review)) : null;
@@ -263,7 +263,7 @@ async function readMinutesPerPage(db: DatabaseExecutor): Promise<{ newPage: numb
 /**
  * A page card on a learning or relearning step that is due now, within the learn-ahead window the
  * session requeue and the flashcard queues use (REVIEW_LEARN_AHEAD_MS). A page graded Again today is
- * on such a step (10 minutes for sabqi and manzil), so it comes back the same day.
+ * on such a step (10 minutes for recent and long-term), so it comes back the same day.
  */
 function learningStepDue(row: StudyCardRow, now: Date): boolean {
   return (
@@ -327,16 +327,16 @@ export type TodayWird = Readonly<{
   minutesPerNewPage: number;
   memorizedPages: number;
   /** Lines whose fluent check passed today. */
-  sabaqLinesToday: number;
+  memorizeLinesToday: number;
   /** Every page card with its tier, so callers do not read the review history again. */
   cards: readonly PageCard[];
   /** Today's new memorization is done: the lines passed today reach the day's allocation. */
-  sabaqDoneToday: boolean;
+  memorizeDoneToday: boolean;
 }>;
 
 /**
  * PLN-02: new memorization is open today only on a day with new lines and without a review backlog.
- * Home offers "Memorize new lines" and the sabaq screen offers a new chunk by this one rule; a
+ * Home offers "Memorize new lines" and the memorize screen offers a new chunk by this one rule; a
  * second look from earlier today is offered either way.
  */
 export function newMemorizationOpen(wird: Pick<TodayWird, "newLines" | "daily">): boolean {
@@ -364,7 +364,7 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
   const plan = await readHifzPlan(database);
   if (!plan) return null;
   const today = localDateOf(now);
-  const [cards, minutes, snapshotRow, sabaqToday] = await Promise.all([
+  const [cards, minutes, snapshotRow, memorizeToday] = await Promise.all([
     loadPageCards(database, { today, plan }),
     readMinutesPerPage(database),
     database.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [TODAY_PLAN_KEY]),
@@ -395,7 +395,7 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
       [TODAY_PLAN_KEY, JSON.stringify(snapshot), now.toISOString()],
     );
   }
-  const linesToday = passedLineCount(sabaqToday.map((row) => row.card_id));
+  const linesToday = passedLineCount(memorizeToday.map((row) => row.card_id));
   const byId = new Map(pages.map((page) => [page.cardId, page]));
   const planned = snapshot.ids.flatMap((id) => {
     const page = byId.get(id);
@@ -441,14 +441,14 @@ export async function loadTodayWird(database: AppDatabase, now = new Date()): Pr
     minutesPerNewPage: minutes.newPage,
     memorizedPages: cards.filter(isMemorized).length,
     cards,
-    sabaqLinesToday: linesToday,
+    memorizeLinesToday: linesToday,
     // Today's new memorization is done once the lines passed today reach the day's allocation.
-    sabaqDoneToday: snapshot.newLines > 0 ? linesToday >= snapshot.newLines : linesToday > 0,
+    memorizeDoneToday: snapshot.newLines > 0 ? linesToday >= snapshot.newLines : linesToday > 0,
   };
 }
 
 /**
- * ONB-04, SCH-04: declare pages already memorized. Each becomes a manzil page, unverified until its
+ * ONB-04, SCH-04: declare pages already memorized. Each becomes a long-term page, unverified until its
  * first graded review, with first checks spread evenly over the first cycle (oldest declared first),
  * so nothing has to be tested all at once on day 1. Pages that already have a card are left alone.
  */
@@ -465,31 +465,31 @@ export async function declareMemorizedPages(
     for (const [index, page] of unique.entries()) {
       const offset = Math.floor((index * cycleDays) / unique.length);
       const due = atLocalTime(addDays(today, offset), 0);
-      if (await insertNewStudyCard(db, { id: pageCardId(page), deckId: HIFZ_PAGES_DECK_ID, due, tier: "manzil.unverified", now: at })) {
+      if (await insertNewStudyCard(db, { id: pageCardId(page), deckId: HIFZ_PAGES_DECK_ID, due, tier: storedTier("long_term.unverified"), now: at })) {
         created += 1;
       }
     }
-    // MST-04: the first manzil cycle starts on the day pages are first declared, stored as a calendar
+    // MST-04: the first long-term cycle starts on the day pages are first declared, stored as a calendar
     // date so later travel does not move it.
-    if (created > 0) await ensureManzilCycleStart(db, today);
+    if (created > 0) await ensureLongTermCycleStart(db, today);
   });
   return created;
 }
 
-/** MST-04: the synced calendar date the current manzil cycle started on. */
-export const MANZIL_CYCLE_START_KEY = "hifz_manzil_cycle_start";
+/** MST-04: the synced calendar date the current long-term cycle started on. The key keeps its original name, which released apps sync. */
+export const LONG_TERM_CYCLE_START_KEY = "hifz_manzil_cycle_start";
 
 /**
- * The stored manzil cycle start, or `fallback` stored as the start when none is stored yet. Pass a
+ * The stored long-term cycle start, or `fallback` stored as the start when none is stored yet. Pass a
  * transaction so the setting and its queued upload commit with the caller's other writes.
  */
-export async function ensureManzilCycleStart(db: DatabaseExecutor, fallback: LocalDate): Promise<LocalDate> {
+export async function ensureLongTermCycleStart(db: DatabaseExecutor, fallback: LocalDate): Promise<LocalDate> {
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = ? AND deleted_at IS NULL",
-    [MANZIL_CYCLE_START_KEY],
+    [LONG_TERM_CYCLE_START_KEY],
   );
   if (row?.value) return row.value;
-  await putUserSetting(db, MANZIL_CYCLE_START_KEY, fallback);
+  await putUserSetting(db, LONG_TERM_CYCLE_START_KEY, fallback);
   return fallback;
 }
 

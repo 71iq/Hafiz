@@ -11,7 +11,7 @@ const s = strings.en;
 function wird(
   overrides: { backlog?: boolean; newLines?: number; linesToday?: number; todo?: number; unit?: "page" | "ayah" } = {},
 ): TodayWird {
-  const page = { cardId: "page:madani15:1", tier: "sabqi" } as TodayWird["todo"][number];
+  const page = { cardId: "page:madani15:1", tier: "recent" } as TodayWird["todo"][number];
   return {
     plan: { unit: overrides.unit ?? "page" },
     daily: { backlog: overrides.backlog ?? false },
@@ -19,8 +19,8 @@ function wird(
     done: [page],
     total: 1 + (overrides.todo ?? 0),
     newLines: overrides.newLines ?? 0,
-    sabaqLinesToday: overrides.linesToday ?? 0,
-    sabaqDoneToday: (overrides.linesToday ?? 0) >= (overrides.newLines ?? 0) && (overrides.linesToday ?? 0) > 0,
+    memorizeLinesToday: overrides.linesToday ?? 0,
+    memorizeDoneToday: (overrides.linesToday ?? 0) >= (overrides.newLines ?? 0) && (overrides.linesToday ?? 0) > 0,
     remainingMinutes: 3,
     memorizedPages: 1,
   } as unknown as TodayWird;
@@ -34,7 +34,7 @@ function renderCard(props: {
   ayahNew?: number;
   language?: "en" | "ar";
 }) {
-  const handlers = { onStartReview: jest.fn(), onStartSabaq: jest.fn(), onSetup: jest.fn(), onDrill: jest.fn() };
+  const handlers = { onStartReview: jest.fn(), onStartMemorize: jest.fn(), onSetup: jest.fn(), onDrill: jest.fn() };
   const view = render(
     <WirdPlanCard
       wird={props.wird}
@@ -71,11 +71,11 @@ describe("Home's second-look cue (SBQ-03)", () => {
   it.each([
     ["a complete wird with no new lines", wird()],
     ["a backlog, which hides new lines", wird({ backlog: true, newLines: 5, todo: 2 })],
-  ])("opens sabaq from %s", (_label, today) => {
+  ])("opens new memorization from %s", (_label, today) => {
     const { view, handlers } = renderCard({ wird: today, secondLooksDue: 1 });
-    expect(view.queryByText(s.hifzSabaqStart)).toBeNull();
+    expect(view.queryByText(s.hifzMemorizeStart)).toBeNull();
     fireEvent.press(view.getByRole("button", { name: `${s.hifzSecondLookReady}, ${s.hifzSecondLookAction}` }));
-    expect(handlers.onStartSabaq).toHaveBeenCalledTimes(1);
+    expect(handlers.onStartMemorize).toHaveBeenCalledTimes(1);
   });
 
   it("counts several due looks, in Arabic too", () => {
@@ -94,7 +94,7 @@ describe("Home's second-look cue (SBQ-03)", () => {
   });
 
   it("counts a page back on a learning step once in the day's total", () => {
-    const page = { cardId: "page:madani15:1", tier: "manzil" } as TodayWird["todo"][number];
+    const page = { cardId: "page:madani15:1", tier: "long_term" } as TodayWird["todo"][number];
     const today = { ...wird(), todo: [page], done: [page], total: 1 } as unknown as TodayWird;
     expect(renderCard({ wird: today }).view.getByText("1 / 1")).toBeTruthy();
   });
@@ -120,8 +120,8 @@ describe("Home's second-look cue (SBQ-03)", () => {
 
   it("offers more lines, not new ones, once today's are done", () => {
     const done = renderCard({ wird: wird({ newLines: 7, linesToday: 12, todo: 2 }) }).view;
-    expect(done.getByText(s.hifzSabaqMore)).toBeTruthy();
-    expect(done.queryByText(s.hifzSabaqStart)).toBeNull();
-    expect(renderCard({ wird: wird({ newLines: 7, todo: 2 }) }).view.getByText(s.hifzSabaqStart)).toBeTruthy();
+    expect(done.getByText(s.hifzMemorizeMore)).toBeTruthy();
+    expect(done.queryByText(s.hifzMemorizeStart)).toBeNull();
+    expect(renderCard({ wird: wird({ newLines: 7, todo: 2 }) }).view.getByText(s.hifzMemorizeStart)).toBeTruthy();
   });
 });

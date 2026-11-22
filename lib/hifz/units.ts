@@ -8,8 +8,11 @@ export const LINES_PER_PAGE = 15;
 
 /** The page deck holds page, half-page and seam cards for memorized pages (3.4). */
 export const HIFZ_PAGES_DECK_ID = "hifz-pages";
-/** The sabaq deck holds today's new memorization chunks. */
-export const HIFZ_SABAQ_DECK_ID = "hifz-sabaq";
+/**
+ * The new-lines deck holds today's new memorization chunks. Every chunk card stores this id and
+ * released apps sync it, so it keeps its original name.
+ */
+export const HIFZ_NEW_LINES_DECK_ID = "hifz-sabaq";
 
 export type PageUnit =
   | { kind: "page"; page: number }

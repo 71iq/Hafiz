@@ -25,13 +25,13 @@ import {
   DEFAULT_HIFZ_PLAN,
   parseHifzPlan,
   readHifzPlan,
-  SABAQ_REPETITION_PRESETS,
-  sabaqRepetitionPresetOf,
+  MEMORIZE_REPETITION_PRESETS,
+  memorizeRepetitionPresetOf,
   writeHifzPlan,
   type HifzPlan,
 } from "@/lib/hifz/plan";
 import { emptyAttempt, savePageGrade } from "@/lib/hifz/review";
-import { pagePolicy, tierFor, type GradeEvent } from "@/lib/hifz/tiers";
+import { pagePolicy, storedTier, tierFor, tierFromStored, type GradeEvent, type Tier } from "@/lib/hifz/tiers";
 import { pageCardId } from "@/lib/hifz/units";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
@@ -60,63 +60,79 @@ function grade(daysAgo: number, rating: GradeEvent["rating"]): GradeEvent {
 }
 
 describe("tiers (3.2, 8.6)", () => {
-  it("keeps declared pages unverified until their first grade, then manzil", () => {
-    expect(tierFor({ declared: true, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe("manzil.unverified");
-    expect(tierFor({ declared: true, firstFluentDate: null, grades: [grade(1, 3)] }, TODAY, plan)).toBe("manzil");
+  it("saves each tier under the value released apps and the server accept", () => {
+    const saved: Record<Tier, string> = {
+      new: "sabaq",
+      recent: "sabqi",
+      long_term: "manzil",
+      "long_term.needs_work": "manzil.needs_work",
+      "long_term.unverified": "manzil.unverified",
+    };
+    for (const [tier, value] of Object.entries(saved) as [Tier, string][]) {
+      expect(storedTier(tier)).toBe(value);
+      expect(tierFromStored(value)).toBe(tier);
+    }
+    expect(tierFromStored(null)).toBeNull();
+    expect(tierFromStored("long_term")).toBeNull();
   });
 
-  it("marks a manzil lapse as needing work until two Good grades in a row", () => {
+  it("keeps declared pages unverified until their first grade, then long-term", () => {
+    expect(tierFor({ declared: true, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe("long_term.unverified");
+    expect(tierFor({ declared: true, firstFluentDate: null, grades: [grade(1, 3)] }, TODAY, plan)).toBe("long_term");
+  });
+
+  it("marks a long-term lapse as needing work until two Good grades in a row", () => {
     const declared = (grades: GradeEvent[]) => tierFor({ declared: true, firstFluentDate: null, grades }, TODAY, plan);
-    expect(declared([grade(5, 3), grade(3, 1)])).toBe("manzil.needs_work");
-    expect(declared([grade(5, 3), grade(3, 1), grade(2, 3)])).toBe("manzil.needs_work");
-    expect(declared([grade(5, 3), grade(3, 1), grade(2, 3), grade(1, 2), grade(0, 3)])).toBe("manzil.needs_work");
-    expect(declared([grade(5, 3), grade(3, 1), grade(2, 3), grade(1, 4)])).toBe("manzil");
+    expect(declared([grade(5, 3), grade(3, 1)])).toBe("long_term.needs_work");
+    expect(declared([grade(5, 3), grade(3, 1), grade(2, 3)])).toBe("long_term.needs_work");
+    expect(declared([grade(5, 3), grade(3, 1), grade(2, 3), grade(1, 2), grade(0, 3)])).toBe("long_term.needs_work");
+    expect(declared([grade(5, 3), grade(3, 1), grade(2, 3), grade(1, 4)])).toBe("long_term");
   });
 
-  it("keeps a page memorized in the app in sabqi for sabqi_days and until it settles", () => {
+  it("keeps a page memorized in the app in recent for recent_days and until it settles", () => {
     const memorized = (firstFluentDaysAgo: number, grades: GradeEvent[]) =>
       tierFor({ declared: false, firstFluentDate: addDays(TODAY, -firstFluentDaysAgo), grades }, TODAY, plan);
-    expect(memorized(3, [grade(2, 3), grade(1, 3)])).toBe("sabqi");
-    expect(memorized(20, [grade(3, 3), grade(2, 3), grade(1, 3)])).toBe("manzil");
-    expect(memorized(20, [grade(3, 3), grade(2, 2), grade(1, 3)])).toBe("sabqi");
-    expect(memorized(5, [grade(2, 1), grade(1, 1)])).toBe("sabaq");
-    expect(tierFor({ declared: false, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe("sabaq");
+    expect(memorized(3, [grade(2, 3), grade(1, 3)])).toBe("recent");
+    expect(memorized(20, [grade(3, 3), grade(2, 3), grade(1, 3)])).toBe("long_term");
+    expect(memorized(20, [grade(3, 3), grade(2, 2), grade(1, 3)])).toBe("recent");
+    expect(memorized(5, [grade(2, 1), grade(1, 1)])).toBe("new");
+    expect(tierFor({ declared: false, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe("new");
   });
 
-  it("keeps a graduated page in manzil after a later Hard or Again", () => {
+  it("keeps a graduated page in long-term after a later Hard or Again", () => {
     const memorized = (grades: GradeEvent[]) => tierFor({ declared: false, firstFluentDate: addDays(TODAY, -30), grades }, TODAY, plan);
     const graduated = [grade(12, 3), grade(11, 3), grade(10, 3)];
-    expect(memorized(graduated)).toBe("manzil");
-    expect(memorized([...graduated, grade(5, 2)])).toBe("manzil");
-    expect(memorized([...graduated, grade(5, 1)])).toBe("manzil.needs_work");
-    expect(memorized([...graduated, grade(5, 1), grade(4, 3), grade(3, 3)])).toBe("manzil");
+    expect(memorized(graduated)).toBe("long_term");
+    expect(memorized([...graduated, grade(5, 2)])).toBe("long_term");
+    expect(memorized([...graduated, grade(5, 1)])).toBe("long_term.needs_work");
+    expect(memorized([...graduated, grade(5, 1), grade(4, 3), grade(3, 3)])).toBe("long_term");
   });
 
   it("graduates a page by time before its next grade, so later Again grades do not send it back (TIER-01)", () => {
     const memorized = (grades: GradeEvent[]) => tierFor({ declared: false, firstFluentDate: addDays(TODAY, -30), grades }, TODAY, plan);
-    // Three Good grades early in sabqi, then no grade until well past sabqi_days: manzil by time alone.
+    // Three Good grades early in recent, then no grade until well past recent_days: long-term by time alone.
     const early = [grade(29, 3), grade(28, 3), grade(27, 3)];
-    expect(memorized(early)).toBe("manzil");
-    expect(memorized([...early, grade(5, 1)])).toBe("manzil.needs_work");
-    expect(memorized([...early, grade(5, 1), grade(4, 1)])).toBe("manzil.needs_work");
-    // Before sabqi_days have passed, two Again grades in a row still send the page back.
-    expect(memorized([...early, grade(26, 1), grade(25, 1)])).toBe("sabaq");
+    expect(memorized(early)).toBe("long_term");
+    expect(memorized([...early, grade(5, 1)])).toBe("long_term.needs_work");
+    expect(memorized([...early, grade(5, 1), grade(4, 1)])).toBe("long_term.needs_work");
+    // Before recent_days have passed, two Again grades in a row still send the page back.
+    expect(memorized([...early, grade(26, 1), grade(25, 1)])).toBe("new");
   });
 
-  it("relearns a page sent back to sabaq and starts a new sabqi period on its next Good grade", () => {
+  it("relearns a page sent back to the new tier and starts a new recent period on its next Good grade", () => {
     const memorized = (grades: GradeEvent[]) => tierFor({ declared: false, firstFluentDate: addDays(TODAY, -30), grades }, TODAY, plan);
     const failed = [grade(29, 3), grade(28, 1), grade(27, 1)];
-    expect(memorized(failed)).toBe("sabaq");
-    expect(memorized([...failed, grade(26, 2)])).toBe("sabaq");
-    expect(memorized([...failed, grade(26, 3)])).toBe("sabqi");
-    expect(memorized([...failed, grade(26, 3), grade(20, 3), grade(10, 3)])).toBe("manzil");
-    expect(memorized([...failed, grade(5, 3)])).toBe("sabqi");
+    expect(memorized(failed)).toBe("new");
+    expect(memorized([...failed, grade(26, 2)])).toBe("new");
+    expect(memorized([...failed, grade(26, 3)])).toBe("recent");
+    expect(memorized([...failed, grade(26, 3), grade(20, 3), grade(10, 3)])).toBe("long_term");
+    expect(memorized([...failed, grade(5, 3)])).toBe("recent");
   });
 
-  it("caps manzil intervals at the cycle and sabqi at one day (SCH-02, SCH-03)", () => {
-    const manzil = pagePolicy("manzil", { cycleDays: 20, retention: 0.95 }, DEFAULT_DECK_REVIEW_SETTINGS);
-    expect(manzil).toMatchObject({ maximumInterval: 20, requestRetention: 0.95, learningSteps: [], relearningSteps: ["10m", "1d"] });
-    expect(pagePolicy("sabqi", plan, DEFAULT_DECK_REVIEW_SETTINGS)).toMatchObject({ maximumInterval: 1 });
+  it("caps long-term intervals at the cycle and recent at one day (SCH-02, SCH-03)", () => {
+    const longTerm = pagePolicy("long_term", { cycleDays: 20, retention: 0.95 }, DEFAULT_DECK_REVIEW_SETTINGS);
+    expect(longTerm).toMatchObject({ maximumInterval: 20, requestRetention: 0.95, learningSteps: [], relearningSteps: ["10m", "1d"] });
+    expect(pagePolicy("recent", plan, DEFAULT_DECK_REVIEW_SETTINGS)).toMatchObject({ maximumInterval: 1 });
   });
 });
 
@@ -124,7 +140,7 @@ function page(n: number, overrides: Partial<PlanPage> = {}): PlanPage {
   return {
     cardId: pageCardId(n),
     page: n,
-    tier: "manzil",
+    tier: "long_term",
     lastReviewDate: addDays(TODAY, -5),
     reviewedToday: false,
     dueDate: addDays(TODAY, 10),
@@ -144,13 +160,13 @@ const input = (pages: PlanPage[], overrides: Partial<Parameters<typeof buildDail
 });
 
 describe("daily plan (4.3.1)", () => {
-  it("takes ceil(O / C) of the oldest manzil pages plus every overdue page, sabqi first", () => {
-    const manzil = Array.from({ length: 40 }, (_, i) => page(i + 1, { lastReviewDate: addDays(TODAY, -(i % 25) - 1) }));
+  it("takes ceil(O / C) of the oldest long-term pages plus every overdue page, recent first", () => {
+    const longTerm = Array.from({ length: 40 }, (_, i) => page(i + 1, { lastReviewDate: addDays(TODAY, -(i % 25) - 1) }));
     // Past its floor date, so its recall is the lowest of the slice.
     const overdue = page(100, { lastReviewDate: addDays(TODAY, -33), retrievability: 0.6 });
-    const sabqi = page(200, { tier: "sabqi", lastReviewDate: addDays(TODAY, -1) });
-    const result = buildDailyPlan(input([...manzil, overdue, sabqi]));
-    expect(result.review[0]).toBe(sabqi);
+    const recent = page(200, { tier: "recent", lastReviewDate: addDays(TODAY, -1) });
+    const result = buildDailyPlan(input([...longTerm, overdue, recent]));
+    expect(result.review[0]).toBe(recent);
     expect(result.floor[0]).toBe(overdue);
     expect(result.floor).toHaveLength(2);
     expect(result.overdueCount).toBe(1);
@@ -166,34 +182,34 @@ describe("daily plan (4.3.1)", () => {
     expect(reviewLeftToday(ayahDay, { remediationDue: 0, ayahReviewsDue: 0 })).toBe(false);
   });
 
-  it("orders the day's manzil slice by lowest recall, after pages never reviewed (SCH-05)", () => {
+  it("orders the day's long-term slice by lowest recall, after pages never reviewed (SCH-05)", () => {
     const strong = page(1, { lastReviewDate: addDays(TODAY, -25), retrievability: 0.99 });
     const weak = page(2, { lastReviewDate: addDays(TODAY, -25), retrievability: 0.1 });
-    const unchecked = page(3, { tier: "manzil.unverified", lastReviewDate: null, retrievability: null });
+    const unchecked = page(3, { tier: "long_term.unverified", lastReviewDate: null, retrievability: null });
     const others = Array.from({ length: 60 }, (_, i) => page(10 + i, { lastReviewDate: addDays(TODAY, -(i % 20) - 1) }));
     const result = buildDailyPlan(input([strong, weak, unchecked, ...others]));
     // The floor still takes the oldest reviews; within it the weaker page comes first.
     expect(result.floor.slice(0, 3).map((item) => item.page)).toEqual([3, 2, 1]);
   });
 
-  it("puts a page sent back to sabaq first in the review every day", () => {
-    const relearn = page(300, { tier: "sabaq", lastReviewDate: addDays(TODAY, -1) });
-    const sabqi = page(200, { tier: "sabqi", lastReviewDate: addDays(TODAY, -1) });
-    const result = buildDailyPlan(input([page(1), sabqi, relearn]));
-    expect(result.review.slice(0, 2)).toEqual([relearn, sabqi]);
+  it("puts a page sent back to the new tier first in the review every day", () => {
+    const relearn = page(300, { tier: "new", lastReviewDate: addDays(TODAY, -1) });
+    const recent = page(200, { tier: "recent", lastReviewDate: addDays(TODAY, -1) });
+    const result = buildDailyPlan(input([page(1), recent, relearn]));
+    expect(result.review.slice(0, 2)).toEqual([relearn, recent]);
   });
 
-  it("waits for a new sabqi page's first due date before its first review", () => {
-    // Completed through sabaq today: no page review yet, due tomorrow at local midnight.
-    const fresh = page(200, { tier: "sabqi", lastReviewDate: null, dueDate: addDays(TODAY, 1), retrievability: null });
-    expect(buildDailyPlan(input([fresh])).sabqi).toEqual([]);
+  it("waits for a new recent page's first due date before its first review", () => {
+    // Completed through new memorization today: no page review yet, due tomorrow at local midnight.
+    const fresh = page(200, { tier: "recent", lastReviewDate: null, dueDate: addDays(TODAY, 1), retrievability: null });
+    expect(buildDailyPlan(input([fresh])).recent).toEqual([]);
     const dueToday = { ...fresh, dueDate: TODAY };
-    expect(buildDailyPlan(input([dueToday])).sabqi).toEqual([dueToday]);
+    expect(buildDailyPlan(input([dueToday])).recent).toEqual([dueToday]);
   });
 
-  it("adds manzil pages FSRS wants sooner and pages that need work, needs-work first", () => {
+  it("adds long-term pages FSRS wants sooner and pages that need work, needs-work first", () => {
     const weak = page(5, { retrievability: 0.8 });
-    const work = page(6, { tier: "manzil.needs_work" });
+    const work = page(6, { tier: "long_term.needs_work" });
     // The strong page is the oldest, so it fills the one floor place.
     const strong = page(7, { retrievability: 0.99, lastReviewDate: addDays(TODAY, -20) });
     const result = buildDailyPlan(input([weak, work, strong], { plan: { ...plan, cycleDays: 1000, dailyBudgetMin: 60 } }));
@@ -210,7 +226,7 @@ describe("daily plan (4.3.1)", () => {
     expect(result.newLines).toBe(0);
   });
 
-  it("pauses new memorization while manzil is far behind (PLN-02) and fits new lines in the budget (PLN-03)", () => {
+  it("pauses new memorization while long-term is far behind (PLN-02) and fits new lines in the budget (PLN-03)", () => {
     const behind = Array.from({ length: 6 }, (_, i) => page(i + 1, { lastReviewDate: addDays(TODAY, -40) }));
     expect(buildDailyPlan(input(behind)).backlog).toBe(true);
     expect(buildDailyPlan(input(behind)).newLines).toBe(0);
@@ -253,17 +269,17 @@ describe("plan setting", () => {
     expect(parseHifzPlan(null)).toBeNull();
   });
 
-  describe("sabaq repetition counts (SBQ-01)", () => {
-    const counts = (value: Partial<HifzPlan["sabaqRepetitions"]>) => ({ ...plan.sabaqRepetitions, ...value });
+  describe("new memorization repetition counts (SBQ-01)", () => {
+    const counts = (value: Partial<HifzPlan["memorizeRepetitions"]>) => ({ ...plan.memorizeRepetitions, ...value });
 
     it("gives a plan saved before the counts existed the '10 looking, then from memory' defaults", () => {
-      const { sabaqRepetitions: _omitted, ...olderPlan } = DEFAULT_HIFZ_PLAN;
+      const { memorizeRepetitions: _omitted, ...olderPlan } = DEFAULT_HIFZ_PLAN;
       expect(parseHifzPlan(JSON.stringify({ ...olderPlan, newPerDay: 1 }))).toMatchObject({
         newPerDay: 1,
-        sabaqRepetitions: { listen: 3, looking: 10, cleanInARow: 3 },
+        memorizeRepetitions: { listen: 3, looking: 10, cleanInARow: 3 },
       });
       // A partly saved set keeps the counts it has and takes the default for the rest.
-      expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: { looking: 20 } }))?.sabaqRepetitions).toEqual({
+      expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: { looking: 20 } }))?.memorizeRepetitions).toEqual({
         listen: 3,
         looking: 20,
         cleanInARow: 3,
@@ -272,7 +288,7 @@ describe("plan setting", () => {
 
     it("accepts each count at both ends of its range", () => {
       for (const value of [counts({ listen: 1, looking: 1, cleanInARow: 1 }), counts({ listen: 5, looking: 30, cleanInARow: 10 })]) {
-        expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: value }))?.sabaqRepetitions).toEqual(value);
+        expect(parseHifzPlan(JSON.stringify({ sabaqRepetitions: value }))?.memorizeRepetitions).toEqual(value);
       }
     });
 
@@ -295,25 +311,47 @@ describe("plan setting", () => {
     });
 
     it("offers the default practice and the 20-times method as presets", () => {
-      expect(SABAQ_REPETITION_PRESETS).toEqual({
+      expect(MEMORIZE_REPETITION_PRESETS).toEqual({
         looking_then_memory: { listen: 3, looking: 10, cleanInARow: 3 },
         twenty_times: { listen: 3, looking: 20, cleanInARow: 3 },
       });
-      expect(DEFAULT_HIFZ_PLAN.sabaqRepetitions).toEqual(SABAQ_REPETITION_PRESETS.looking_then_memory);
-      expect(sabaqRepetitionPresetOf(counts({ looking: 20 }))).toBe("twenty_times");
-      expect(sabaqRepetitionPresetOf(counts({}))).toBe("looking_then_memory");
-      expect(sabaqRepetitionPresetOf(counts({ looking: 20, cleanInARow: 5 }))).toBeNull();
+      expect(DEFAULT_HIFZ_PLAN.memorizeRepetitions).toEqual(MEMORIZE_REPETITION_PRESETS.looking_then_memory);
+      expect(memorizeRepetitionPresetOf(counts({ looking: 20 }))).toBe("twenty_times");
+      expect(memorizeRepetitionPresetOf(counts({}))).toBe("looking_then_memory");
+      expect(memorizeRepetitionPresetOf(counts({ looking: 20, cleanInARow: 5 }))).toBeNull();
+    });
+
+    it("reads and saves plan fields under the keys released apps sync", async () => {
+      // Released Android versions read sabqiDays, sabqiEvery and sabaqRepetitions from hifz_plan.
+      const stored = { ...DEFAULT_HIFZ_PLAN, sabqiDays: 7, sabqiEvery: 2, sabaqRepetitions: counts({ looking: 20 }) } as Record<string, unknown>;
+      for (const field of ["recentDays", "recentEvery", "memorizeRepetitions"]) delete stored[field];
+      const parsed = parseHifzPlan(JSON.stringify(stored));
+      expect(parsed).toMatchObject({ recentDays: 7, recentEvery: 2, memorizeRepetitions: counts({ looking: 20 }) });
+      // The plain field names are not a saved format.
+      expect(parseHifzPlan(JSON.stringify({ recentDays: 3 }))?.recentDays).toBe(DEFAULT_HIFZ_PLAN.recentDays);
+      const store = await openOutboxDatabase();
+      try {
+        await writeHifzPlan(store.db, parsed!);
+        const queued = store.sql.prepare("SELECT data FROM sync_queue WHERE table_name = 'user_settings' AND row_id = 'hifz_plan'").get() as { data: string };
+        const saved = JSON.parse(JSON.parse(queued.data).value);
+        expect(saved).toMatchObject({ sabqiDays: 7, sabqiEvery: 2, sabaqRepetitions: counts({ looking: 20 }) });
+        expect(saved).not.toHaveProperty("recentDays");
+        expect(saved).not.toHaveProperty("recentEvery");
+        expect(saved).not.toHaveProperty("memorizeRepetitions");
+      } finally {
+        await store.close();
+      }
     });
 
     it("saves the counts in the synced plan and refuses counts out of range", async () => {
       const store = await openOutboxDatabase();
       try {
-        await writeHifzPlan(store.db, { ...plan, sabaqRepetitions: counts({ looking: 20 }) });
-        expect((await readHifzPlan(store.db))?.sabaqRepetitions).toEqual(counts({ looking: 20 }));
+        await writeHifzPlan(store.db, { ...plan, memorizeRepetitions: counts({ looking: 20 }) });
+        expect((await readHifzPlan(store.db))?.memorizeRepetitions).toEqual(counts({ looking: 20 }));
         const queued = store.sql.prepare("SELECT data FROM sync_queue WHERE table_name = 'user_settings' AND row_id = 'hifz_plan'").get() as { data: string };
         expect(JSON.parse(JSON.parse(queued.data).value).sabaqRepetitions).toEqual(counts({ looking: 20 }));
-        await expect(writeHifzPlan(store.db, { ...plan, sabaqRepetitions: counts({ looking: 31 }) })).rejects.toThrow();
-        expect((await readHifzPlan(store.db))?.sabaqRepetitions.looking).toBe(20);
+        await expect(writeHifzPlan(store.db, { ...plan, memorizeRepetitions: counts({ looking: 31 }) })).rejects.toThrow();
+        expect((await readHifzPlan(store.db))?.memorizeRepetitions.looking).toBe(20);
       } finally {
         await store.close();
       }
@@ -355,7 +393,7 @@ describe("memorized pages and today's wird (ONB-04, PLAN-01)", () => {
     const target = first.todo[0];
     const card = store.sql.prepare("SELECT * FROM study_cards WHERE id = ?").get(target.cardId) as never;
     // The page's own policy: a declared page has no learning steps, so Good schedules it days out.
-    const reviewPolicy = pagePolicy("manzil.unverified", { ...plan, cycleDays: 10 }, DEFAULT_DECK_REVIEW_SETTINGS);
+    const reviewPolicy = pagePolicy("long_term.unverified", { ...plan, cycleDays: 10 }, DEFAULT_DECK_REVIEW_SETTINGS);
     const transition = calculateReviewTransition({ card, rating: Rating.Good, reviewedAt: atLocalTime(TODAY, 610), reviewPolicy });
     await persistReviewTransition({ db: store.db, cardId: target.cardId, transition });
     const second = (await loadTodayWird(store.db, atLocalTime(TODAY, 620)))!;
@@ -430,7 +468,7 @@ describe("memorized pages and today's wird (ONB-04, PLAN-01)", () => {
     await gradePage(Rating.Good, atLocalTime(start, 610));
     const again = await gradePage(Rating.Again, atLocalTime(TODAY, 600));
     expect(again.transition.updatedCard.state).toBe(State.Relearning);
-    // A step longer than the learn-ahead window, as the sabaq tier's 1-hour step.
+    // A step longer than the learn-ahead window, as the new memorization tier's 1-hour step.
     store.sql.prepare("UPDATE study_cards SET due = ? WHERE id = ?").run(atLocalTime(TODAY, 780).toISOString(), pageCardId(1));
     const waiting = (await loadTodayWird(store.db, atLocalTime(TODAY, 610)))!;
     expect(waiting.todo).toEqual([]);
@@ -449,11 +487,11 @@ describe("progress views (MST-01 to MST-03)", () => {
     history: { declared: true, firstFluentDate: null, grades: ratings.map((rating, i) => ({ date: addDays(TODAY, -i - 1), rating: rating as 1 | 2 | 3 | 4 })) },
   });
 
-  it("counts a page as memorized only after a Good grade in sabqi or manzil", () => {
-    expect(isMemorized(card(1, "manzil", [3]))).toBe(true);
-    expect(isMemorized(card(1, "manzil.unverified", []))).toBe(false);
-    expect(isMemorized(card(1, "manzil.needs_work", [1]))).toBe(false);
-    expect(isMemorized(card(1, "sabaq", [4]))).toBe(false);
+  it("counts a page as memorized only after a Good grade in recent or long-term", () => {
+    expect(isMemorized(card(1, "long_term", [3]))).toBe(true);
+    expect(isMemorized(card(1, "long_term.unverified", []))).toBe(false);
+    expect(isMemorized(card(1, "long_term.needs_work", [1]))).toBe(false);
+    expect(isMemorized(card(1, "new", [4]))).toBe(false);
   });
 
   it("bands recall at 0.90 and 0.75 and completes a juz only when every page is memorized", () => {
@@ -469,7 +507,7 @@ describe("monthly check (MST-05)", () => {
   const card = (page: number, daysAgo: number, rating = 3): PageCard => ({
     row: {} as PageCard["row"],
     page,
-    tier: "manzil",
+    tier: "long_term",
     history: { declared: true, firstFluentDate: null, grades: [{ date: addDays(TODAY, -daysAgo), rating: rating as 3 }] },
   });
 

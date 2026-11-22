@@ -69,7 +69,7 @@ function OnboardingInner() {
   const firstSession = (plan: HifzPlan, declaredPages: number): Href => {
     if (plan.unit === "ayah") return "/flashcards/session";
     if (declaredPages > 0) return "/hifz/review";
-    if (plan.newPerDay > 0) return "/hifz/sabaq" as Href;
+    if (plan.newPerDay > 0) return "/hifz/memorize" as Href;
     return "/(tabs)/home";
   };
 

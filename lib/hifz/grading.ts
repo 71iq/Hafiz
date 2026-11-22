@@ -61,8 +61,8 @@ export function capRating(rating: Rating, level: SupportLevel): Rating {
 }
 
 /** MOD-01: the default support level for a page from its recall probability. */
-export function defaultSupportLevel(tier: "sabqi" | "manzil", retrievability: number | null): SupportLevel {
-  if (tier === "sabqi" || retrievability === null) return 4;
+export function defaultSupportLevel(tier: "recent" | "long_term", retrievability: number | null): SupportLevel {
+  if (tier === "recent" || retrievability === null) return 4;
   if (retrievability >= 0.85) return 4;
   if (retrievability >= 0.7) return 3;
   return 2;

@@ -73,7 +73,7 @@ export function zaytClip(request: ZaytClipRequest, dark: boolean): ZaytClip {
   return dark ? clips.dark : clips.light;
 }
 
-/** The rest pose still (A01), for the sabaq intention and the Show Zayt setting row. */
+/** The rest pose still (A01), for the new memorization intention and the Show Zayt setting row. */
 export function zaytRestPose(tier: ZaytTier): Asset {
   return REST[tier];
 }

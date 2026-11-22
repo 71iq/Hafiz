@@ -65,7 +65,8 @@ import {
 import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import { deviceTimeZone, localDateOf } from "@/lib/habit/dates";
 import type { Grader } from "@/lib/hifz/grading";
-import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID } from "@/lib/hifz/units";
+import type { StoredTier } from "@/lib/hifz/tiers";
+import { HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID } from "@/lib/hifz/units";
 
 type ReviewActivityDay = { date: string; count: number };
 
@@ -925,7 +926,7 @@ export async function setStudyCardDueDate(
 
 /**
  * The flashcard summary's next review: the earliest card the flashcard queues will show. Hifz page,
- * half-page, seam, gap and sabaq chunk cards are reviewed in the hifz flows, and a chunk past its day
+ * half-page, seam, gap and chunk cards are reviewed in the hifz flows, and a chunk past its day
  * keeps a due date no flow shows (SBQ-03), so their decks are left out.
  */
 export async function getNextEligibleReviewDate(db: DatabaseExecutor): Promise<string | null> {
@@ -936,7 +937,7 @@ export async function getNextEligibleReviewDate(db: DatabaseExecutor): Promise<s
         AND suspended_at IS NULL
         AND deck_id NOT IN (?, ?)
       ORDER BY due ASC`,
-    [HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID]
+    [HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID]
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
   const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(
@@ -1285,7 +1286,7 @@ export async function restoreDeletedStudyCard(db: DatabaseExecutor, id: string, 
 /**
  * A memory state a new card starts from instead of an empty card: a review card last reviewed at
  * `lastReview` with this stability and difficulty, next due on the card's `due`. SBQ-02 starts a page
- * memorized through sabaq from its chunks' ratings this way.
+ * memorized as new lines from its chunks' ratings this way.
  */
 export type StartingSchedule = Readonly<{ stability: number; difficulty: number; lastReview: string; scheduledDays: number }>;
 
@@ -1300,7 +1301,7 @@ export function newStudyCardRow({
   id: string;
   deckId: string;
   due: Date;
-  tier?: string | null;
+  tier?: StoredTier | null;
   now: string;
   start?: StartingSchedule | null;
 }): StudyCardRow {
@@ -1342,7 +1343,7 @@ export async function insertNewStudyCard(
     tier = null,
     now,
     start = null,
-  }: { id: string; deckId: string; due: Date; tier?: string | null; now: string; start?: StartingSchedule | null },
+  }: { id: string; deckId: string; due: Date; tier?: StoredTier | null; now: string; start?: StartingSchedule | null },
 ): Promise<boolean> {
   const row = newStudyCardRow({ id, deckId, due, tier, now, start });
   // Created again over a deletion, the card is stamped later than that deletion.

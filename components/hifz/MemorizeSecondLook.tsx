@@ -11,7 +11,7 @@ import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
 import { formatAyahRef } from "@/lib/arabic";
 import type { Grade } from "@/lib/fsrs/scheduler";
 import type { PageToken } from "@/lib/hifz/page-data";
-import type { SecondLook } from "@/lib/hifz/sabaq";
+import type { SecondLook } from "@/lib/hifz/memorize";
 import { formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
@@ -46,10 +46,10 @@ type Props = {
 
 /**
  * SBQ-03, the second look: recite lines memorized earlier today from memory, check them against the
- * page and grade the recall, before any new lines. Laid out like the sabaq lesson it precedes. Give
+ * page and grade the recall, before any new lines. Laid out like the new memorization lesson it precedes. Give
  * it a key per look, so the check starts hidden for each one.
  */
-export function SabaqSecondLook({
+export function MemorizeSecondLook({
   look,
   index,
   total,
@@ -77,7 +77,7 @@ export function SabaqSecondLook({
   const ayahLabel = useCallback((token: PageToken) => formatAyahRef(isRTL, token.surah, token.ayah), [isRTL]);
   // An Arabic comma in Arabic: beside Arabic-Indic digits a middle dot reads as a zero.
   const portion = `${interpolate(s.hifzPageN, { n: formatNumber(look.page, language) })}${language === "ar" ? "، " : " · "}${interpolate(
-    s.hifzSabaqLines,
+    s.hifzMemorizeLines,
     {
       from: formatNumber(look.fromLine, language),
       to: formatNumber(look.toLine, language),

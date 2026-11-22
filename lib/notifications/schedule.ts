@@ -54,7 +54,7 @@ import {
   writeLocalSetting,
 } from "@/lib/notifications/settings";
 import { NO_REPEAT_DAYS, renderNotification, type Language, type SurahNames } from "@/lib/notifications/templates";
-import { HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID } from "@/lib/hifz/units";
+import { HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID } from "@/lib/hifz/units";
 import { WIRD_TYPES, type NotificationLogRow, type PlannedSlot, type ReminderPrefs } from "@/lib/notifications/types";
 
 const DAY_MS = 86_400_000;
@@ -89,7 +89,7 @@ async function readDueSurahs(db: DatabaseExecutor, through: Date): Promise<{ sur
     `SELECT id, due FROM study_cards
      WHERE deleted_at IS NULL AND suspended_at IS NULL AND due <= ? AND deck_id NOT IN (?, ?)
      ORDER BY due LIMIT 300`,
-    [through.toISOString(), HIFZ_PAGES_DECK_ID, HIFZ_SABAQ_DECK_ID],
+    [through.toISOString(), HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID],
   );
   return rows.flatMap((row) => {
     const match = SURAH_CARD.exec(row.id);

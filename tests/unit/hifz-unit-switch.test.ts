@@ -201,7 +201,7 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
     expect(after.todo.length).toBe(after.daily.review.length);
   });
 
-  it("makes a manzil page card from a page's reviewed ayah cards and suspends them, declaring a page with a new ayah", async () => {
+  it("makes a long-term page card from a page's reviewed ayah cards and suspends them, declaring a page with a new ayah", async () => {
     await expect(setup(pagePlan)).resolves.toEqual({ declaredPages: 1, migratedPages: 1 });
 
     expect(cardRow(pageCardId(1))).toMatchObject({
@@ -317,18 +317,18 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
     expect((await loadTodayWird(store.db, now))!).toMatchObject({ todo: [], total: 0 });
   });
 
-  it("derives a page made from ayah cards as manzil and memorized before its first page grade", async () => {
+  it("derives a page made from ayah cards as long-term and memorized before its first page grade", async () => {
     await setup(pagePlan);
     const cards = await loadPageCards(store.db, { today: TODAY, plan: pagePlan });
     const migrated = cards.find((card) => card.page === 1)!;
-    expect(migrated).toMatchObject({ tier: "manzil", history: { declared: false, fromAyahReviews: true, grades: [] } });
+    expect(migrated).toMatchObject({ tier: "long_term", history: { declared: false, fromAyahReviews: true, grades: [] } });
     expect(isMemorized(migrated)).toBe(true);
-    // Its manzil floor counts from the last ayah review, not as a page never reviewed.
+    // Its long-term floor counts from the last ayah review, not as a page never reviewed.
     expect(toPlanPage(migrated, TODAY, now).lastReviewDate).toBe(localDateOf(new Date(migrated.row.last_review!)));
     // The ayah deck's limit before the switch syncs, so another device can restore it.
     expect(isSyncableUserSetting(AYAH_NEW_CARDS_LIMIT_KEY)).toBe(true);
     const declared = cards.find((card) => card.page === 2)!;
-    expect(declared).toMatchObject({ tier: "manzil.unverified", history: { declared: true, fromAyahReviews: false } });
+    expect(declared).toMatchObject({ tier: "long_term.unverified", history: { declared: true, fromAyahReviews: false } });
     expect(isMemorized(declared)).toBe(false);
   });
 
@@ -566,16 +566,16 @@ describe("switching the recitation unit (UNIT-02, 7.6)", () => {
 describe("the tier of a page made from ayah cards", () => {
   const plan = DEFAULT_HIFZ_PLAN;
 
-  it("is manzil before its first page grade, and follows its own grades after", () => {
+  it("is long-term before its first page grade, and follows its own grades after", () => {
     expect(tierFor({ declared: false, fromAyahReviews: true, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe(
-      "manzil",
+      "long_term",
     );
     expect(tierFor({ declared: true, fromAyahReviews: true, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe(
-      "manzil",
+      "long_term",
     );
     expect(tierFor({ declared: true, firstFluentDate: null, grades: [{ date: TODAY, rating: 1 }] }, TODAY, plan)).toBe(
-      "manzil.needs_work",
+      "long_term.needs_work",
     );
-    expect(tierFor({ declared: true, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe("manzil.unverified");
+    expect(tierFor({ declared: true, firstFluentDate: null, grades: [] }, TODAY, plan)).toBe("long_term.unverified");
   });
 });

@@ -203,6 +203,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Setup steps mirror option rows through MirroredRow; the step text follows the interface direction.",
   ),
   entry(
+    "components/hifz/MemorizeSecondLook.tsx",
+    "card",
+    "rntl",
+    "Second look header mirrors through MirroredRow and its text follows the interface direction; the chunk's Quran lines stay right to left.",
+  ),
+  entry(
     "components/hifz/MemorizedPortionPicker.tsx",
     "picker-menu",
     "source",
@@ -227,16 +233,10 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Quran lines are always right to left in the page font; hidden words keep their place and the layout never mirrors with the interface.",
   ),
   entry(
-    "components/hifz/SabaqSecondLook.tsx",
-    "card",
-    "rntl",
-    "Second look header mirrors through MirroredRow and its text follows the interface direction; the chunk's Quran lines stay right to left.",
-  ),
-  entry(
     "components/hifz/SimilarVerseComparison.tsx",
     "card",
     "rntl",
-    "Sabaq's similar-verse cards stack vertically; each verse stays right to left and its meaning follows the interface direction.",
+    "The new memorization similar-verse cards stack vertically; each verse stays right to left and its meaning follows the interface direction.",
   ),
   entry(
     "components/hifz/SimilarVerseLine.tsx",

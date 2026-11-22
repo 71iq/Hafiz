@@ -437,7 +437,7 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
     );
   });
 
-  it("weighs sabaq chunks by their lines, the same in SQL as in tallyReviews", async () => {
+  it("weighs chunks by their lines, the same in SQL as in tallyReviews", async () => {
     const chunkId = fc.oneof(
       fc
         .record({ page: fc.integer({ min: 1, max: 604 }), from: fc.integer({ min: 0, max: 20 }), to: fc.integer({ min: 0, max: 20 }) })
@@ -474,7 +474,7 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
   });
 });
 
-describe("a completed sabaq step 6 (STR-01)", () => {
+describe("a completed new memorization step 6 (STR-01)", () => {
   function insertLog(cardId: string, date: string, rating: number, makeupFor: string | null = null) {
     const at = atLocalTime(date, 9 * 60).toISOString();
     store.sql
@@ -485,8 +485,8 @@ describe("a completed sabaq step 6 (STR-01)", () => {
       .run(cardId, rating, at, at, date, makeupFor);
   }
   const tally = async (day: string) => {
-    const row = await store.db.getFirstAsync<{ sabaq_step: number }>(DAY_TALLY_SQL, [0, day]);
-    return Number(row?.sabaq_step) > 0;
+    const row = await store.db.getFirstAsync<{ memorize_step: number }>(DAY_TALLY_SQL, [0, day]);
+    return Number(row?.memorize_step) > 0;
   };
 
   it("counts a short chunk's first pass as a wird day, in SQL and in sync reconciliation", async () => {

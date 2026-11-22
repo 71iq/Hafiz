@@ -162,7 +162,7 @@ const row = { id: "page:madani15:411", deck_id: "hifz-pages", tier: "manzil" } a
 const siblingCard: PageCard = {
   row,
   page: 411,
-  tier: "manzil",
+  tier: "long_term",
   history: { declared: true, firstFluentDate: null, grades: [] },
 };
 const pageData: RecitationPage = {
@@ -220,14 +220,14 @@ function driftInbox(id: string): InboxItem {
 
 const saved = {
   wird: { kind: "none" },
-  tier: "manzil",
+  tier: "long_term",
   remediation: { half: null, seam: null },
   transition: { updatedCard: row, shouldRequeueInSession: false, reviewRecord: { rating: 3 } },
 } as never;
 
 function planCard(page: number): PageCard {
   const card = { id: `page:madani15:${page}`, deck_id: "hifz-pages", tier: "manzil" } as StudyCardRow;
-  return { row: card, page, tier: "manzil", history: { declared: true, firstFluentDate: null, grades: [] } };
+  return { row: card, page, tier: "long_term", history: { declared: true, firstFluentDate: null, grades: [] } };
 }
 
 /** Today's wird of the given pages, in order. */
@@ -290,7 +290,7 @@ describe("drift follow-ups on the review screen", () => {
     jest.mocked(loadDriftDrills).mockResolvedValue([drift(0)]);
     jest.mocked(savePageGrade).mockResolvedValue({
       wird: { kind: "none" },
-      tier: "manzil",
+      tier: "long_term",
       remediation: { half: null, seam: null },
       transition: { updatedCard: row, shouldRequeueInSession: false, reviewRecord: { rating: 3 } },
     } as never);
@@ -318,7 +318,7 @@ describe("drift follow-ups on the review screen", () => {
     const options = screen.getAllByRole("radio");
     expect(options).toHaveLength(2);
     // Next waits in the footer for a choice.
-    expect(screen.getByRole("button", { name: s.hifzSabaqNext })).toBeDisabled();
+    expect(screen.getByRole("button", { name: s.hifzMemorizeNext })).toBeDisabled();
 
     fireEvent.press(options[1]);
     expect(screen.getByText(s.hifzPairOther)).toBeTruthy();
@@ -327,8 +327,8 @@ describe("drift follow-ups on the review screen", () => {
     // The wrong choice is named, and the verse asked for is marked.
     expect(within(options[1]).getByText(s.hifzPairYourChoice)).toBeTruthy();
     expect(within(options[0]).getByLabelText(s.hifzPairAnswer)).toBeTruthy();
-    expect(screen.getByRole("button", { name: s.hifzSabaqNext })).toBeEnabled();
-    fireEvent.press(screen.getByRole("button", { name: s.hifzSabaqNext }));
+    expect(screen.getByRole("button", { name: s.hifzMemorizeNext })).toBeEnabled();
+    fireEvent.press(screen.getByRole("button", { name: s.hifzMemorizeNext }));
     await flush();
     expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
   });
@@ -349,7 +349,7 @@ describe("drift follow-ups on the review screen", () => {
     expect(screen.getByText(s.hifzPairRight)).toBeTruthy();
     // With its page, joined by an Arabic comma.
     expect(screen.getByText("البقرة ٢:٥، صفحة ٢")).toBeTruthy();
-    expect(screen.getByRole("button", { name: s.hifzSabaqNext })).toBeTruthy();
+    expect(screen.getByRole("button", { name: s.hifzMemorizeNext })).toBeTruthy();
   });
 });
 
@@ -416,7 +416,7 @@ describe("a drift dismissed as not a mistake", () => {
     expect(screen.getByText("2 / 2")).toBeTruthy();
     expect(screen.getByText(refLabel("الأعراف", "7:52"))).toBeTruthy();
     fireEvent.press(screen.getAllByRole("radio")[0]);
-    fireEvent.press(screen.getByRole("button", { name: s.hifzSabaqNext }));
+    fireEvent.press(screen.getByRole("button", { name: s.hifzMemorizeNext }));
     await flush();
     expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
   });
@@ -464,7 +464,7 @@ describe("interleaved similar-verse prompts (MUT-03)", () => {
       // MUT-05: once answered, each verse shows its meaning in the interface language.
       expect(screen.getByText(MEANINGS[0][language])).toBeTruthy();
       expect(screen.getByText(MEANINGS[1][language])).toBeTruthy();
-      fireEvent.press(screen.getByRole("button", { name: s.hifzSabaqNext }));
+      fireEvent.press(screen.getByRole("button", { name: s.hifzMemorizeNext }));
       await flush();
 
       expect(screen.getByText(`${n(4)} / ${n(4)}`)).toBeTruthy();
@@ -528,7 +528,7 @@ describe("interleaved similar-verse prompts (MUT-03)", () => {
       // Answer any prompt on the way to the next page.
       while (screen.queryByText(strings.en.hifzPairTitle)) {
         fireEvent.press(screen.getAllByRole("radio")[0]);
-        fireEvent.press(screen.getByRole("button", { name: strings.en.hifzSabaqNext }));
+        fireEvent.press(screen.getByRole("button", { name: strings.en.hifzMemorizeNext }));
         await flush();
       }
       await gradePage();

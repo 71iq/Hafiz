@@ -78,7 +78,7 @@ export async function persistReviewTransition({
   cardId: string;
   transition: ReviewTransition | ((tx: DatabaseExecutor) => Promise<ReviewTransition>);
   context?: ReviewSaveContext;
-  /** Writes that belong to this grade, such as a manzil cycle completing, run inside its transaction. */
+  /** Writes that belong to this grade, such as a long-term cycle completing, run inside its transaction. */
   extraWork?: (tx: DatabaseExecutor) => Promise<void>;
   /** Writes that must exist before the card is saved, such as creating it, run first in the transaction. */
   beforeWork?: (tx: DatabaseExecutor) => Promise<void>;

@@ -1552,7 +1552,7 @@ async function insertRemoteStudyCard(
     return;
   }
 
-  // The cached page tier travels with the card, so a restored device knows its manzil pages.
+  // The cached page tier travels with the card, so a restored device knows its long-term pages.
   await db.runAsync(
     `INSERT INTO study_cards
      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,

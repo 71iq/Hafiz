@@ -10,7 +10,7 @@ import { countMistakeInbox } from "@/lib/hifz/errors";
 import { loadTodayWird } from "@/lib/hifz/pages";
 import { monthlyCheckDueFor } from "@/lib/hifz/progress";
 import { countDueRemediation, nextRemediationAt } from "@/lib/hifz/remediation";
-import { countSecondLooks } from "@/lib/hifz/sabaq";
+import { countSecondLooks } from "@/lib/hifz/memorize";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { readDhuhrResolver } from "@/lib/prayer/settings";
 
@@ -51,7 +51,7 @@ jest.mock("@/lib/hifz/pages", () => ({ loadTodayWird: jest.fn() }));
 jest.mock("@/lib/hifz/errors", () => ({ countMistakeInbox: jest.fn() }));
 jest.mock("@/lib/hifz/remediation", () => ({ countDueRemediation: jest.fn(), nextRemediationAt: jest.fn() }));
 jest.mock("@/lib/hifz/progress", () => ({ monthlyCheckDueFor: jest.fn() }));
-jest.mock("@/lib/hifz/sabaq", () => ({ countSecondLooks: jest.fn() }));
+jest.mock("@/lib/hifz/memorize", () => ({ countSecondLooks: jest.fn() }));
 
 const db = {} as AppDatabase;
 const NO_PRAYER_TIMES: DhuhrResolver = () => null;

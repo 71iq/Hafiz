@@ -7,6 +7,8 @@ import { createId } from "@/lib/id";
 const SESSION_KINDS = [
   "cards",
   "wird",
+  // New memorization lessons. The saved kind keeps its original name, which released apps and the
+  // server's CHECK constraint use.
   "sabaq",
   "mistakes",
   "juz_check",

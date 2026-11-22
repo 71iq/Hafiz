@@ -15,16 +15,16 @@ import {
   DEFAULT_HIFZ_PLAN,
   presetOf,
   PRAYERS,
-  SABAQ_REPETITION_BOUNDS,
-  SABAQ_REPETITION_PRESETS,
-  sabaqRepetitionPresetOf,
+  MEMORIZE_REPETITION_BOUNDS,
+  MEMORIZE_REPETITION_PRESETS,
+  memorizeRepetitionPresetOf,
   type Anchor,
   type HifzPlan,
   type PlanPreset,
   type Prayer,
-  type SabaqRepetitionCount,
-  type SabaqRepetitionPreset,
-  type SabaqRepetitions,
+  type MemorizeRepetitionCount,
+  type MemorizeRepetitionPreset,
+  type MemorizeRepetitions,
 } from "@/lib/hifz/plan";
 import { formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -122,14 +122,14 @@ function CountStepper({
 }: {
   label: string;
   value: number;
-  count: SabaqRepetitionCount;
+  count: MemorizeRepetitionCount;
   onChange: (value: number) => void;
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
 }) {
   const dir = language === "ar" ? "rtl" : "ltr";
-  const { min, max } = SABAQ_REPETITION_BOUNDS[count];
+  const { min, max } = MEMORIZE_REPETITION_BOUNDS[count];
   const { effectiveTheme } = useSettings();
   const iconColor = mutedIconColor(effectiveTheme);
   const step = (delta: -1 | 1, disabled: boolean, name: string) => (
@@ -171,30 +171,30 @@ function CountStepper({
 }
 
 /**
- * SBQ-01: how many times sabaq has the user listen, read while looking and recite cleanly. Two
+ * SBQ-01: how many times new memorization has the user listen, read while looking and recite cleanly. Two
  * presets or custom counts; custom stays chosen once opened, even when its counts match a preset.
  */
-function SabaqRepetitionsSection({
+function MemorizeRepetitionsSection({
   value,
   onChange,
   language,
   isDark,
   s,
 }: {
-  value: SabaqRepetitions;
-  onChange: (value: SabaqRepetitions) => void;
+  value: MemorizeRepetitions;
+  onChange: (value: MemorizeRepetitions) => void;
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
 }) {
   const dir = language === "ar" ? "rtl" : "ltr";
   const [customOpen, setCustomOpen] = useState(false);
-  const choice: SabaqRepetitionPreset | "custom" = customOpen ? "custom" : (sabaqRepetitionPresetOf(value) ?? "custom");
-  const choosePreset = (preset: SabaqRepetitionPreset) => {
+  const choice: MemorizeRepetitionPreset | "custom" = customOpen ? "custom" : (memorizeRepetitionPresetOf(value) ?? "custom");
+  const choosePreset = (preset: MemorizeRepetitionPreset) => {
     setCustomOpen(false);
-    onChange({ ...SABAQ_REPETITION_PRESETS[preset] });
+    onChange({ ...MEMORIZE_REPETITION_PRESETS[preset] });
   };
-  const counts: readonly { count: SabaqRepetitionCount; label: string }[] = [
+  const counts: readonly { count: MemorizeRepetitionCount; label: string }[] = [
     { count: "listen", label: s.hifzRepsListen },
     { count: "looking", label: s.hifzRepsLooking },
     { count: "cleanInARow", label: s.hifzRepsClean },
@@ -400,7 +400,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         unitSwitched: initialPlan !== null && (initialPlan.unit === "ayah") !== (finalPlan.unit === "ayah"),
         unitChanged: initialPlan !== null && initialPlan.unit !== finalPlan.unit,
         repetitionsChanged:
-          initialPlan !== null && JSON.stringify(initialPlan.sabaqRepetitions) !== JSON.stringify(finalPlan.sabaqRepetitions),
+          initialPlan !== null && JSON.stringify(initialPlan.memorizeRepetitions) !== JSON.stringify(finalPlan.memorizeRepetitions),
       });
     } catch (saveError) {
       console.warn("[HifzSetup] Save failed:", saveError);
@@ -576,9 +576,9 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
             </View>
             {/* Only when editing a saved plan: onboarding keeps the default counts (5.1, ONB-01). */}
             {initialPlan && goal !== "keep" && plan.method !== "review_only" ? (
-              <SabaqRepetitionsSection
-                value={plan.sabaqRepetitions}
-                onChange={(sabaqRepetitions) => setPlan((value) => ({ ...value, sabaqRepetitions }))}
+              <MemorizeRepetitionsSection
+                value={plan.memorizeRepetitions}
+                onChange={(memorizeRepetitions) => setPlan((value) => ({ ...value, memorizeRepetitions }))}
                 language={language}
                 isDark={isDark}
                 s={s}

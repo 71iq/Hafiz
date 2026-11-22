@@ -15,13 +15,13 @@ import type { PageLine, PageToken, RecitationPage } from "@/lib/hifz/page-data";
 import type { HifzPlan } from "@/lib/hifz/plan";
 import {
   derivePageTiers,
-  ensureManzilCycleStart,
+  ensureLongTermCycleStart,
   loadPageCard,
-  MANZIL_CYCLE_START_KEY,
+  LONG_TERM_CYCLE_START_KEY,
   readMemorizedPageNumbers,
   T_REV_KEY,
 } from "@/lib/hifz/pages";
-import { isManzil, pagePolicy, tierFor, type PageHistory, type Tier } from "@/lib/hifz/tiers";
+import { isLongTerm, pagePolicy, storedTier, tierFor, tierFromStored, type PageHistory, type Tier } from "@/lib/hifz/tiers";
 import { errorHalf, hasSeamAfter, remediateHalf, remediationPolicy, reviewSeam, type Half } from "@/lib/hifz/remediation";
 import { HIFZ_PAGES_DECK_ID, pageCardId, parsePageUnit } from "@/lib/hifz/units";
 import { bringSimilarCardsForward, pickDriftSibling, similarGroupsForAyahs } from "@/lib/hifz/similar";
@@ -199,21 +199,25 @@ async function bringDriftCardsForward(tx: DatabaseExecutor, attempt: Attempt, no
   for (const ayah of driftedAyahs(attempt).values()) await bringSimilarCardsForward(tx, { ...ayah, now });
 }
 
-export { MANZIL_CYCLE_START_KEY };
+export { LONG_TERM_CYCLE_START_KEY };
 
 /**
- * MST-04: a manzil cycle completes on the day every manzil page has a graded review dated on or
+ * MST-04: a long-term cycle completes on the day every long-term page has a graded review dated on or
  * after the cycle start. That day's wird is marked (it feeds board points) and the next cycle starts
- * tomorrow. Runs inside the grade transaction. A cached manzil tier is trusted, since a page stays
- * manzil once it gets there. Every other page card is derived from its history, because a sabqi page
+ * tomorrow. Runs inside the grade transaction. A cached long-term tier is trusted, since a page stays
+ * long-term once it gets there. Every other page card is derived from its history, because a recent page
  * can graduate by time alone and a synced cached tier can be older than the merged history. Review
  * days are the stored local dates, and the cycle start is a stored calendar date, so travel moves
  * neither.
  */
-async function completeManzilCycleIfDone(
+function isCachedLongTerm(tier: Tier | null): boolean {
+  return tier !== null && isLongTerm(tier);
+}
+
+async function completeLongTermCycleIfDone(
   db: DatabaseExecutor,
   now: Date,
-  plan: Pick<HifzPlan, "sabqiDays">,
+  plan: Pick<HifzPlan, "recentDays">,
 ): Promise<boolean> {
   const today = localDateOf(now);
   const [pages, lastReviews] = await Promise.all([
@@ -225,19 +229,17 @@ async function completeManzilCycleIfDone(
       "SELECT card_id, MAX(local_date) AS last FROM study_log WHERE card_id LIKE 'page:%' GROUP BY card_id",
     ),
   ]);
-  const uncertain = pages.filter((page) => !page.tier?.startsWith("manzil")).map((page) => page.id);
+  const cached = (page: { tier: string | null }) => tierFromStored(page.tier);
+  const uncertain = pages.filter((page) => !isCachedLongTerm(cached(page))).map((page) => page.id);
   const derived = await derivePageTiers(db, uncertain, { today, plan });
-  const manzil = pages.filter((page) => {
-    const tier = derived.get(page.id) ?? page.tier;
-    return tier !== null && tier !== undefined && tier.startsWith("manzil");
-  });
-  if (manzil.length === 0) return false;
-  // Without a stored start (pages that reached manzil through sabqi), the first cycle starts on the
-  // day the earliest manzil page was created, fixed as a calendar date the first time it is needed.
-  const start = await ensureManzilCycleStart(db, manzil.map((page) => localDateOf(new Date(page.created_at))).sort()[0]);
+  const longTerm = pages.filter((page) => isCachedLongTerm(derived.get(page.id) ?? cached(page)));
+  if (longTerm.length === 0) return false;
+  // Without a stored start (pages that went from recent to long-term), the first cycle starts on the
+  // day the earliest long-term page was created, fixed as a calendar date the first time it is needed.
+  const start = await ensureLongTermCycleStart(db, longTerm.map((page) => localDateOf(new Date(page.created_at))).sort()[0]);
   if (start > today) return false;
   const last = new Map(lastReviews.map((row) => [row.card_id, row.last]));
-  const complete = manzil.every((page) => {
+  const complete = longTerm.every((page) => {
     const reviewed = last.get(page.id);
     return reviewed !== null && reviewed !== undefined && reviewed >= start;
   });
@@ -258,7 +260,7 @@ async function completeManzilCycleIfDone(
     created_at: at,
     updated_at: at,
   });
-  await putUserSetting(db, MANZIL_CYCLE_START_KEY, addDays(today, 1));
+  await putUserSetting(db, LONG_TERM_CYCLE_START_KEY, addDays(today, 1));
   return true;
 }
 
@@ -293,7 +295,7 @@ export type PageRemediation = Readonly<{ half: Half | null; seam: "clean" | "lap
 
 /**
  * Save one page grade (DB-01): the FSRS step under the page's tier policy, the review log with its
- * support level and the rubric's proposal, the attempt's errors, the new cached tier, a manzil cycle
+ * support level and the rubric's proposal, the attempt's errors, the new cached tier, a long-term cycle
  * completing, and the day's wird, in one transaction.
  */
 export async function savePageGrade(
@@ -347,8 +349,8 @@ export async function savePageGrade(
       after = tier;
       const updatedCard: StudyCardRow = {
         ...transition.updatedCard,
-        tier,
-        tier_changed_at: tier === card.tier ? (card.tier_changed_at ?? null) : now.toISOString(),
+        tier: storedTier(tier),
+        tier_changed_at: storedTier(tier) === card.tier ? (card.tier_changed_at ?? null) : now.toISOString(),
       };
       return { ...transition, updatedCard };
     },
@@ -364,7 +366,7 @@ export async function savePageGrade(
       dhuhr: input.dhuhr,
     },
     extraWork: async (tx) => {
-      if (after !== null && isManzil(after)) await completeManzilCycleIfDone(tx, now, input.plan);
+      if (after !== null && isLongTerm(after)) await completeLongTermCycleIfDone(tx, now, input.plan);
       if (half && pageNumber !== null) await remediateHalf(tx, { page: pageNumber, half, now });
       if (seam && pageNumber !== null) await reviewSeam(tx, { page: pageNumber, clean: seam === "clean", now });
       // SCH-07, MUT-04: a drift into a similar verse brings that pair's cards due within a day.
