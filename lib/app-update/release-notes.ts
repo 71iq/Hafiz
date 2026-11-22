@@ -8,6 +8,10 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.16": {
+    en: ["Memorization stages use plain names in English: New, Recent and Long-term."],
+    ar: ["تستخدم الواجهة الإنجليزية أسماء واضحة لمراحل الحفظ: جديد وقريب وبعيد. ولم تتغير الواجهة العربية."],
+  },
   "1.0.15": {
     en: [
       "Next and Previous step through every word in Word Detail.",
