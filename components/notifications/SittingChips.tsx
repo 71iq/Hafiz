@@ -31,7 +31,8 @@ function Chip({ label, accessibilityLabel, selected, disabled, onPress }: { labe
       aria-checked={selected}
       disabled={disabled}
       onPress={onPress}
-      className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
+      // The outline keeps each chip visible on surface-low cards (Settings), where the fill alone matched the card.
+      className={`min-h-[44px] justify-center rounded-full border px-4 ${selected ? "border-primary-accent/40 bg-primary-accent/15 dark:border-primary-bright/40 dark:bg-primary-bright/15" : "border-warm-300 bg-surface-low dark:border-neutral-700 dark:bg-surface-dark-low"}`}
       style={disabled ? { opacity: 0.4 } : undefined}
     >
       <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>

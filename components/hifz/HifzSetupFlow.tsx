@@ -58,7 +58,8 @@ export const SETUP_MAX_WIDTH = 640;
 /** Below this window height the framed card would be too short for its footer, so the wizard stays full height. */
 const FRAMED_MIN_HEIGHT = 520;
 /** On medium and wider windows that are tall enough, the wizard is a framed card no taller than this, so Continue stays near the options. */
-const SETUP_CARD_MAX_HEIGHT = 760;
+// Tall enough for the whole juz grid with the title and footer, so tall windows never scroll it.
+const SETUP_CARD_MAX_HEIGHT = 840;
 const SETUP_CARD_MARGIN = 24;
 
 function presetLabel(preset: PlanPreset, s: UIStrings): string {
