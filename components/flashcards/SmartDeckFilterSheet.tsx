@@ -326,6 +326,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
                   }}
                   accessibilityRole="tab"
                   accessibilityState={{ selected }}
+                  aria-selected={selected}
                   className={`h-11 rounded-full px-5 items-center justify-center ${
                     selected ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
                   }`}
