@@ -257,17 +257,21 @@ export function ReadingSettingsSheet({
 
           <SettingsSectionLabel label={s.readingSettingsAyahDisplay} isRTL={isRTL} />
           <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
-            <SettingsActionRow
-              title={s.quranMarkerStyleLabel}
-              subtitle={quranRenderFontStyle === "qcf2" ? s.quranMarkerModernOnly : undefined}
-              value={markerStyleLabel}
-              isRTL={isRTL}
-              onPress={() => setMarkerStylePickerVisible(true)}
-              disabled={quranRenderFontStyle === "qcf2"}
-              trailing={<Chevron size={17} color={controlColor} />}
-              compact={compactRows}
-            />
-            <Divider />
+            {Platform.OS === "web" && (
+              <>
+                <SettingsActionRow
+                  title={s.quranMarkerStyleLabel}
+                  subtitle={quranRenderFontStyle === "qcf2" ? s.quranMarkerModernOnly : undefined}
+                  value={markerStyleLabel}
+                  isRTL={isRTL}
+                  onPress={() => setMarkerStylePickerVisible(true)}
+                  disabled={quranRenderFontStyle === "qcf2"}
+                  trailing={<Chevron size={17} color={controlColor} />}
+                  compact={compactRows}
+                />
+                <Divider />
+              </>
+            )}
             {/* The whole row is the switch, so its target is the row, not the 24 px track. */}
             <SwitchRow
               label={s.hifzSimilarMarkSetting}
@@ -348,18 +352,20 @@ export function ReadingSettingsSheet({
         </OverlayBody>
       </ResponsiveOverlay>
 
-      <ChoiceDialog
-        visible={markerStylePickerVisible}
-        title={s.readingSettingsChooseMarkerStyle}
-        value={quranMarkerStyle}
-        options={markerStyleOptions}
-        onChange={setQuranMarkerStyle}
-        onClose={() => setMarkerStylePickerVisible(false)}
-        isRTL={isRTL}
-        isDark={isDark}
-        surfaceColor={themeSurface}
-        closeLabel={s.genericClose}
-      />
+      {Platform.OS === "web" && (
+        <ChoiceDialog
+          visible={markerStylePickerVisible}
+          title={s.readingSettingsChooseMarkerStyle}
+          value={quranMarkerStyle}
+          options={markerStyleOptions}
+          onChange={setQuranMarkerStyle}
+          onClose={() => setMarkerStylePickerVisible(false)}
+          isRTL={isRTL}
+          isDark={isDark}
+          surfaceColor={themeSurface}
+          closeLabel={s.genericClose}
+        />
+      )}
       <TajweedLegendSheet
         visible={tajweedLegendVisible}
         onClose={() => setTajweedLegendVisible(false)}

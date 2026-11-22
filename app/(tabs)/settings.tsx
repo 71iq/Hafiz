@@ -582,7 +582,7 @@ export default function SettingsScreen() {
                 <SwitchTrack value={isTajweedStyle(quranFontStyle)} />
               </SwitchRow>
 
-              {quranRenderFontStyle !== "qcf2" && (
+              {Platform.OS === "web" && quranRenderFontStyle !== "qcf2" && (
                 <SettingsControlRow label={s.quranMarkerStyleLabel} isRTL={isRTL}>
                   <ToggleGroup<QuranMarkerStyle>
                     value={quranMarkerStyle}
