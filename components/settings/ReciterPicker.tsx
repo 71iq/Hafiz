@@ -12,7 +12,7 @@ import {
   readReciterCatalog,
   refreshReciterCatalog,
 } from "@/lib/audio/reciter-catalog";
-import type { QfReciter } from "@/lib/quran-foundation/recitations";
+import { formatReciterLabel, type QfReciter } from "@/lib/quran-foundation/recitations";
 import { useSettings } from "@/lib/settings/context";
 import { inputTextStartStyle, textStartStyle } from "@/lib/ui/direction";
 
@@ -190,6 +190,7 @@ export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props)
             const selected = reciter.id === selectedId;
             const name = uiLanguage === "ar" ? reciter.nameAr : reciter.nameEn;
             const style = uiLanguage === "ar" ? reciter.styleAr : reciter.styleEn;
+            const previewName = style.trim() && style !== "QF" ? formatReciterLabel(reciter, uiLanguage) : name;
             const previewing = previewId === reciter.id;
             const previewLoading = previewing && session?.status === "loading";
             const error = previewError?.id === reciter.id ? audioFailureMessage(previewError.failure, s) : null;
@@ -255,7 +256,9 @@ export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props)
                       onPress={() => void handlePreview(reciter.id)}
                       disabled={previewBusy || previewLoading}
                       accessibilityRole="button"
-                      accessibilityLabel={previewing ? s.reciterStopPreview : interpolate(s.reciterPreview, { name })}
+                      accessibilityLabel={interpolate(previewing ? s.reciterStopPreview : s.reciterPreview, {
+                        name: previewName,
+                      })}
                       accessibilityHint={previewBusy ? s.reciterPreviewBusy : undefined}
                       accessibilityState={{ disabled: previewBusy || previewLoading, busy: previewLoading }}
                       className="mx-1 h-11 w-11 shrink-0 items-center justify-center rounded-full"
