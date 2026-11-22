@@ -3,19 +3,19 @@ import { AccessibilityInfo, BackHandler, KeyboardAvoidingView, Platform, Pressab
 import { Minus, Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { MirroredRow } from "@/components/ui/MirroredRow";
-import { Switch } from "@/components/ui/Switch";
+import { Switch, SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
 import { MemorizedPortionPicker, type PortionMode, type SurahChoice } from "@/components/hifz/MemorizedPortionPicker";
 import type { AppDatabase } from "@/lib/database/types";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { Card } from "@/components/ui/Card";
 import { CALCULATION_METHOD_LABEL_KEYS, PrayerTimesSetup } from "@/components/notifications/PrayerTimesSetup";
+import { SittingChips } from "@/components/notifications/SittingChips";
 import {
   applyPreset,
   DEFAULT_HIFZ_PLAN,
   DEFAULT_PLAN_PRESET,
   presetOf,
-  PRAYERS,
   MEMORIZE_REPETITION_BOUNDS,
   MEMORIZE_REPETITION_PRESETS,
   memorizeRepetitionPresetOf,
@@ -30,11 +30,22 @@ import {
 import { formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import { deviceClock, formatClockMinutesForDisplay } from "@/lib/notifications/clock";
+import {
+  chipAnchor,
+  chipOf,
+  defaultReviewChip,
+  reviewChipAllowed,
+  type SittingChip,
+  type SittingDay,
+} from "@/lib/notifications/review-sitting";
+import { anchorFromPlan, readReviewAnchor } from "@/lib/notifications/settings";
+import type { ReminderAnchor } from "@/lib/notifications/types";
 import { readPrayerLocation } from "@/lib/prayer/settings";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 import { VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
-import type { PrayerLocation } from "@/lib/prayer/times";
+import { createPrayerTimesLookup, type PrayerLocation } from "@/lib/prayer/times";
 
 type Goal = "memorize" | "keep" | "both";
 type Step = "goal" | "memorized" | "tracks" | "pace" | "when";
@@ -80,14 +91,17 @@ function prayerLabel(prayer: Prayer, s: UIStrings): string {
   }
 }
 
-/** The chosen time in words for the implementation intention (ANC-01): "After Fajr", "In the morning". */
+/** The chosen time in words inside the implementation intention (ANC-01): "after Fajr", "in the morning". */
 function anchorPhrase(anchor: Anchor, language: "en" | "ar", s: UIStrings): string {
-  if (anchor.kind === "prayer") return interpolate(s.hifzAfterPrayer, { prayer: prayerLabel(anchor.prayer, s) });
+  if (anchor.kind === "prayer") return interpolate(s.hifzAfterPrayerInline, { prayer: prayerLabel(anchor.prayer, s) });
   if (anchor.minutes === 8 * 60) return s.hifzWhenInMorning;
   if (anchor.minutes === 20 * 60) return s.hifzWhenInEvening;
-  const at = new Date(2026, 0, 1, Math.floor(anchor.minutes / 60), anchor.minutes % 60);
-  const time = at.toLocaleTimeString(language === "ar" ? "ar-u-nu-arab" : "en", { hour: "numeric", minute: "2-digit" });
-  return interpolate(s.hifzWhenAtTime, { time });
+  return interpolate(s.hifzWhenAtTime, { time: formatClockMinutesForDisplay(anchor.minutes, language) });
+}
+
+function planAnchorOf(chip: SittingChip): Anchor {
+  const anchor = chipAnchor(chip);
+  return anchor.kind === "prayer" ? { kind: "prayer", prayer: anchor.prayer, offsetMin: anchor.offsetMinutes } : anchor;
 }
 
 type StepEntry = Readonly<{
@@ -346,6 +360,11 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   const [error, setError] = useState<string | null>(null);
   const [prayerTimesOpen, setPrayerTimesOpen] = useState(false);
   const [prayerLocation, setPrayerLocation] = useState<PrayerLocation | null>(null);
+  // REMIND-07: the second sitting for review. A new setup starts with it off; a saved choice, "off" or
+  // a time, is loaded and kept as it is, never recomputed from the pace or the main time.
+  const [reviewAnchor, setReviewAnchor] = useState<ReminderAnchor | null>(null);
+  const savedReview = useRef<ReminderAnchor | null | undefined>(undefined);
+  const reviewTouched = useRef(false);
   const step = STEPS[stepIndex];
   // What the current step showed when it opened, so "Not now" can leave it untouched.
   const stepEntry = useRef<StepEntry | null>(null);
@@ -387,6 +406,20 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   useEffect(() => {
     if (saving) AccessibilityInfo.announceForAccessibility?.(s.setupSavingAnnouncement);
   }, [saving, s.setupSavingAnnouncement]);
+
+  useEffect(() => {
+    let active = true;
+    readReviewAnchor(db)
+      .then((saved) => {
+        if (!active) return;
+        savedReview.current = saved;
+        if (!reviewTouched.current) setReviewAnchor(saved);
+      })
+      .catch((loadError) => console.warn("[HifzSetup] The second sitting failed to load:", loadError));
+    return () => {
+      active = false;
+    };
+  }, [db]);
 
   // The optional prayer-times row says whether a location is already saved on this device.
   useEffect(() => {
@@ -437,11 +470,19 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     setError(null);
     try {
       const finalPlan: HifzPlan = goal === "keep" ? { ...plan, method: "review_only", newPerDay: 0 } : plan;
+      // The second sitting is written with the plan, and only when this setup changed it. If the saved
+      // value never loaded, a choice the user made is still written rather than dropped.
+      const reviewChanged =
+        savedReview.current === undefined
+          ? reviewTouched.current
+          : JSON.stringify(reviewAnchor) !== JSON.stringify(savedReview.current);
       const result = await applyHifzSetup(db, {
         plan: finalPlan,
         memorizedSurahs: [...selectedSurahs],
         memorizedJuz: [...selectedJuz],
+        ...(reviewChanged ? { reviewAnchor } : {}),
       });
+      if (reviewChanged) savedReview.current = reviewAnchor;
       onDone({
         plan: finalPlan,
         declaredPages: result.declaredPages,
@@ -500,6 +541,22 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         return s.hifzWhenTitle;
     }
   }, [s, step]);
+
+  // REMIND-07: second-sitting chips are later than the main sitting today, by the location chosen on
+  // this step, the saved one or the fallback times. The picker uses the ordinary main time; a Ramadan
+  // time is handled when reminders are planned.
+  const sittingDay = useMemo<SittingDay>(
+    () => ({ clock: deviceClock, prayers: createPrayerTimesLookup(prayerLocation), date: deviceClock.dateOf(new Date()) }),
+    [prayerLocation],
+  );
+  const mainAnchor = anchorFromPlan(plan.anchor);
+  const reviewDefault = defaultReviewChip(sittingDay, mainAnchor);
+  const reviewSwitchDisabled = reviewAnchor === null && reviewDefault === null;
+  const setReview = (value: ReminderAnchor | null) => {
+    reviewTouched.current = true;
+    setReviewAnchor(value);
+  };
+  const usesPrayer = plan.anchor.kind === "prayer" || reviewAnchor?.kind === "prayer";
 
   // The card sits at one top offset on every step and never runs past the bottom margin.
   const cardTop = Math.max(SETUP_CARD_MARGIN, Math.round((height - SETUP_CARD_MAX_HEIGHT) / 2));
@@ -651,46 +708,65 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
             <Text dir={dir} variant="muted">
               {interpolate(s.hifzWhenHint, { when: anchorPhrase(plan.anchor, language, s) })}
             </Text>
-            <MirroredRow dir={dir} className="flex-wrap gap-2" accessibilityRole="radiogroup" accessibilityLabel={title}>
-              {PRAYERS.map((prayer) => {
-                const selected = plan.anchor.kind === "prayer" && plan.anchor.prayer === prayer;
-                return (
-                  <Pressable
-                    key={prayer}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    onPress={() => setPlan((value) => ({ ...value, anchor: { kind: "prayer", prayer, offsetMin: 20 } }))}
-                    className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
-                  >
-                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
-                      {interpolate(s.hifzAfterPrayer, { prayer: prayerLabel(prayer, s) })}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              {[
-                { label: s.hifzWhenMorning, minutes: 8 * 60 },
-                { label: s.hifzWhenEvening, minutes: 20 * 60 },
-              ].map((option) => {
-                const selected = plan.anchor.kind === "clock" && plan.anchor.minutes === option.minutes;
-                return (
-                  <Pressable
-                    key={option.minutes}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    onPress={() => setPlan((value) => ({ ...value, anchor: { kind: "clock", minutes: option.minutes } }))}
-                    className={`min-h-[44px] justify-center rounded-full px-4 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
-                  >
-                    <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </MirroredRow>
+            <SittingChips
+              label={title}
+              selected={chipOf(mainAnchor)}
+              onSelect={(chip) => setPlan((value) => ({ ...value, anchor: planAnchorOf(chip) }))}
+              dir={dir}
+              language={language}
+              s={s}
+            />
+            {/* REMIND-07: an optional second sitting for whatever review is left. Off unless chosen. The whole
+                row is the switch, as in Settings, so its caption, including why it is off, is the hint. */}
+            <SwitchRow
+              label={s.notifReviewTitle}
+              hint={reviewSwitchDisabled ? s.notifReviewNeedsEarlier : s.notifReviewHint}
+              value={reviewAnchor !== null}
+              disabled={reviewSwitchDisabled}
+              onValueChange={(on) => {
+                if (!on) setReview(null);
+                else if (reviewDefault) setReview(chipAnchor(reviewDefault));
+              }}
+              className="mt-2 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
+            >
+              <MirroredRow dir={dir} className="items-center justify-between gap-3">
+                <View className="flex-1">
+                  <Text dir={dir} style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className="text-charcoal dark:text-neutral-100">
+                    {s.notifReviewTitle}
+                  </Text>
+                  <Text dir={dir} variant="caption">
+                    {reviewSwitchDisabled ? s.notifReviewNeedsEarlier : s.notifReviewHint}
+                  </Text>
+                </View>
+                <SwitchTrack value={reviewAnchor !== null} disabled={reviewSwitchDisabled} />
+              </MirroredRow>
+            </SwitchRow>
+            {reviewAnchor ? (
+              <View style={{ gap: 8 }}>
+                <SittingChips
+                  label={s.notifReviewTitle}
+                  selected={chipOf(reviewAnchor)}
+                  onSelect={(chip) => setReview(chipAnchor(chip))}
+                  allowed={(chip) => reviewChipAllowed(sittingDay, mainAnchor, chip)}
+                  dir={dir}
+                  language={language}
+                  s={s}
+                />
+                {/* A saved clock time that no chip names stays visible, so it can be kept or replaced. */}
+                {reviewAnchor.kind === "clock" && chipOf(reviewAnchor) === null ? (
+                  <Text dir={dir} variant="body-sm">
+                    {interpolate(s.notifClockValue, { time: formatClockMinutesForDisplay(reviewAnchor.minutes, language) })}
+                  </Text>
+                ) : null}
+                <Text dir={dir} variant="caption">
+                  {s.notifReviewSkipNote}
+                </Text>
+              </View>
+            ) : null}
             {/* 5.1 step 7: a prayer anchor needs prayer times; without them it falls back to set clock times.
-                The setup stays one optional row until asked for, so the anchor choice and Save lead the step. */}
-            {plan.anchor.kind === "prayer" ? (
+                The setup stays one optional row until asked for, so the anchor choice and Save lead the step.
+                It shows when either sitting follows a prayer. */}
+            {usesPrayer ? (
               <Card elevation="low" className="mt-2 px-4 py-3">
                 <MirroredRow dir={dir} className="min-h-[44px] items-center gap-3">
                   <View className="min-w-0 flex-1">

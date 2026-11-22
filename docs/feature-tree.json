@@ -1100,6 +1100,15 @@
           "uses": [],
           "native": false,
           "children": []
+        },
+        {
+          "id": "reminders.review",
+          "title": "Second sitting for review and its reminder",
+          "kind": "transition",
+          "cases": ["REMIND-07"],
+          "uses": ["onboarding.setup", "reminders.settings", "reminders.delivery", "reminders.banner", "wird.sessioncards"],
+          "native": false,
+          "children": []
         }
       ]
     },

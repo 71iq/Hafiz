@@ -9,8 +9,9 @@ import {
   templateById,
   type TemplateUse,
 } from "@/lib/notifications/templates";
+import { isReminderData } from "@/lib/notifications/platform-types";
 import { NOTIFICATION_TYPES } from "@/lib/notifications/types";
-import { parseReminderPrefs, typePrefKey } from "@/lib/notifications/settings";
+import { parseReminderPrefs, REVIEW_ANCHOR_KEY, reviewAnchorValue, typePrefKey } from "@/lib/notifications/settings";
 import { isSyncableUserSetting } from "@/lib/database/user-settings";
 
 jest.mock("@/lib/notifications/platform", () => ({
@@ -78,6 +79,12 @@ describe("back-off counting (8.11, NOT-09)", () => {
     expect(tally(rows, NOW.toISOString())).toBe(0);
   });
 
+  it("never counts an ignored review reminder, so the second sitting cannot thin the main reminder (REMIND-07)", () => {
+    const rows = [row("review_reminder", daysAgo(3)), row("review_reminder", daysAgo(2)), row("review_reminder", daysAgo(1))];
+    expect(tally(rows)).toBe(0);
+    expect(tally([...rows, row("wird_reminder", daysAgo(1.5))])).toBe(1);
+  });
+
   it("never counts a cancelled reminder as delivered, unless the OS had already shown it", () => {
     const due = daysAgo(1).toISOString();
     expect(isFired({ scheduled_for: due, cancelled_at: null }, NOW)).toBe(true);
@@ -142,7 +149,7 @@ describe("back-off counting (8.11, NOT-09)", () => {
 
 describe("templates (9.2, NOT-12, NOT-14)", () => {
   const placeholders = (text: string) => [...text.matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1]).sort();
-  const FLAGS = new Set(["onePage", "fiveMinutes", "ramadan"]);
+  const FLAGS = new Set(["onePage", "fiveMinutes", "ramadan", "reviewLeft"]);
 
   it("has at least 8 templates per type, in both languages, with matching placeholders", () => {
     for (const type of NOTIFICATION_TYPES) {
@@ -273,5 +280,25 @@ describe("reminder settings keys (7.6)", () => {
     expect(prefs.anchor).toEqual({ kind: "prayer", prayer: "fajr", offsetMinutes: 20 });
     expect(prefs.ramadanAnchor).toBe("before_suhoor");
     expect(prefs.enabled).toBe(true);
+  });
+
+  it("keeps the second sitting in its own synced key, off unless a valid time is saved (REMIND-07)", () => {
+    const maghrib = { kind: "prayer", prayer: "maghrib", offsetMinutes: 20 } as const;
+    expect(isSyncableUserSetting(REVIEW_ANCHOR_KEY)).toBe(true);
+    expect(parseReminderPrefs(new Map()).reviewAnchor).toBeNull();
+    expect(parseReminderPrefs(new Map([[REVIEW_ANCHOR_KEY, "off"]])).reviewAnchor).toBeNull();
+    expect(parseReminderPrefs(new Map([[REVIEW_ANCHOR_KEY, "{broken"]])).reviewAnchor).toBeNull();
+    expect(parseReminderPrefs(new Map([[REVIEW_ANCHOR_KEY, reviewAnchorValue(maghrib)]])).reviewAnchor).toEqual(maghrib);
+    expect(reviewAnchorValue(null)).toBe("off");
+    // The pref is the only switch: a stray per-type value is never read, and no type key exists for it.
+    const prefs = parseReminderPrefs(new Map([["notif_pref_review_reminder", "off"], [REVIEW_ANCHOR_KEY, reviewAnchorValue(maghrib)]]));
+    expect(prefs.reviewAnchor).toEqual(maghrib);
+    expect(Object.keys(prefs.types)).not.toContain("review_reminder");
+  });
+
+  it("accepts a tap on a review reminder as Hafiz reminder data", () => {
+    const data = { source: "hafiz-reminder", logId: "l", type: "review_reminder", localDate: "2026-11-12", route: "wird", at: 0, contentKey: "k" };
+    expect(isReminderData(data)).toBe(true);
+    expect(isReminderData({ ...data, type: "unknown_type" })).toBe(false);
   });
 });

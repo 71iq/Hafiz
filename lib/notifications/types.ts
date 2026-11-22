@@ -12,11 +12,22 @@ export const NOTIFICATION_TYPES = [
   "earnback_open",
   "friday_kahf",
   "comeback",
+  "review_reminder",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
+/**
+ * Types with their own switch in Settings and their own synced `notif_pref_<type>` value. The review
+ * reminder (REMIND-07) has none: `notif_pref_review_anchor` alone turns it on or off, so no second
+ * value can contradict it. It stays in NOTIFICATION_TYPES so a tap on it is still recognized.
+ */
+export type ToggleableNotificationType = Exclude<NotificationType, "review_reminder">;
+export const TOGGLEABLE_NOTIFICATION_TYPES: readonly ToggleableNotificationType[] = NOTIFICATION_TYPES.filter(
+  (type): type is ToggleableNotificationType => type !== "review_reminder",
+);
+
 /** 5.8.2 defaults. late_reminder and friday_kahf are opt-in. remind_later is the "Remind me in 1 hour" action. */
-const DEFAULT_TYPE_PREFS: Readonly<Record<NotificationType, boolean>> = {
+const DEFAULT_TYPE_PREFS: Readonly<Record<ToggleableNotificationType, boolean>> = {
   wird_reminder: true,
   streak_at_risk: true,
   remind_later: true,
@@ -30,7 +41,8 @@ const DEFAULT_TYPE_PREFS: Readonly<Record<NotificationType, boolean>> = {
 
 /**
  * Reminders that ask for a session, which count as ignored when no session follows within 2 hours
- * (NOT-09). Kahf messages are not counted. The planner projects the same set.
+ * (NOT-09). Kahf messages and the review reminder are not counted, so ignoring the second sitting never
+ * thins the main reminder. The planner projects the same set.
  */
 export const COUNTED_FOR_BACKOFF: ReadonlySet<NotificationType> = new Set<NotificationType>([
   "wird_reminder",
@@ -43,7 +55,10 @@ export const COUNTED_FOR_BACKOFF: ReadonlySet<NotificationType> = new Set<Notifi
   "comeback",
 ]);
 
-/** Types that are about today's wird. They stop once the minimum is done (NOT-05) or the day is covered. */
+/**
+ * Types that are about today's wird. They stop once the minimum is done (NOT-05) or the day is covered.
+ * The review reminder is not one: it stays due after the minimum while review is left (REMIND-07).
+ */
 export const WIRD_TYPES: ReadonlySet<NotificationType> = new Set<NotificationType>([
   "wird_reminder",
   "streak_at_risk",
@@ -71,8 +86,13 @@ export type RamadanAnchor = (typeof RAMADAN_ANCHORS)[number];
 export type ReminderPrefs = Readonly<{
   /** The master switch (NOT-11). Turning it off keeps each type's own setting. */
   enabled: boolean;
-  types: Readonly<Record<NotificationType, boolean>>;
+  types: Readonly<Record<ToggleableNotificationType, boolean>>;
   anchor: ReminderAnchor;
+  /**
+   * REMIND-07: the optional second sitting for review, or null when it is off. It keeps its own time
+   * in Ramadan; only the main anchor follows the Ramadan time.
+   */
+  reviewAnchor: ReminderAnchor | null;
   ramadanAnchor: RamadanAnchor | null;
   /** AMB-04: show 1 on the app icon while today's wird is open. */
   badge: boolean;
@@ -82,6 +102,7 @@ export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
   enabled: true,
   types: DEFAULT_TYPE_PREFS,
   anchor: DEFAULT_ANCHOR,
+  reviewAnchor: null,
   ramadanAnchor: null,
   badge: false,
 };

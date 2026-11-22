@@ -1,4 +1,5 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
+import { putUserSetting } from "@/lib/database/user-settings";
 import { readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { materializeSmartDeckCards, SMART_DECK_IDS, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
 import { declareMemorizedPages } from "@/lib/hifz/pages";
@@ -6,6 +7,8 @@ import { putHifzPlan, readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { writeStartingDeckLimits } from "@/lib/hifz/starting-limits";
 import { pagesOfJuz } from "@/lib/hifz/units";
 import { applyUnitSwitch } from "@/lib/hifz/unit-applied";
+import { REVIEW_ANCHOR_KEY, reviewAnchorValue } from "@/lib/notifications/settings";
+import type { ReminderAnchor } from "@/lib/notifications/types";
 
 /** Pages whose every ayah belongs to one of the surahs (a page shared with an unchosen surah is left out). */
 async function pagesCoveredBySurahs(db: DatabaseExecutor, surahs: readonly number[]): Promise<number[]> {
@@ -38,6 +41,11 @@ export type HifzSetup = Readonly<{
   plan: HifzPlan;
   memorizedSurahs: readonly number[];
   memorizedJuz: readonly number[];
+  /**
+   * REMIND-07: the second sitting for review, an anchor or null for off, saved with the plan. Left out,
+   * the saved value stays as it is.
+   */
+  reviewAnchor?: ReminderAnchor | null;
   now?: Date;
 }>;
 
@@ -63,6 +71,7 @@ export async function applyHifzSetup(
     // Before the unit switch, so page review records the pace's ayah limit and then sets 0.
     await writeStartingDeckLimits(tx, { plan, hadPlan: previousPlan !== null });
     await putHifzPlan(tx, plan);
+    if (setup.reviewAnchor !== undefined) await putUserSetting(tx, REVIEW_ANCHOR_KEY, reviewAnchorValue(setup.reviewAnchor));
     // Only a change between page and ayah review switches the cards (lib/hifz/unit-applied).
     migratedPages = await applyUnitSwitch(tx, { unit: plan.unit, previousPlanUnit, now });
   });

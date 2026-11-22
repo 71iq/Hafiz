@@ -14,6 +14,11 @@ export type ReminderDayTimes = Readonly<{
   /** The anchor is a Ramadan time the user chose (NOT-10), which may fall in quiet hours. */
   ramadanAnchor: boolean;
   /**
+   * The second sitting's time (REMIND-07), or null when it is off. It never follows the Ramadan time.
+   * It may resolve at or before the anchor, or past midnight; the planner skips it then (reviewFitsDay).
+   */
+  reviewAt: Date | null;
+  /**
    * 5.8.2: 3 hours before midnight, or after Isha when prayer times are set. After Isha it lands 20
    * minutes in, before quiet hours start, and it stays 30 minutes ahead of the late reminder.
    */
@@ -34,6 +39,8 @@ export type DayTimesInput = Readonly<{
   clock: DayClock;
   prayers: (date: LocalDate) => DayPrayerTimes | null;
   anchor: ReminderAnchor;
+  /** REMIND-07: the second sitting, null or left out when it is off. */
+  reviewAnchor?: ReminderAnchor | null;
   ramadanAnchor: RamadanAnchor | null;
   isRamadan: (date: LocalDate) => boolean;
 }>;
@@ -65,6 +72,16 @@ function prayerAt(input: Pick<DayTimesInput, "clock" | "prayers">, date: LocalDa
   return input.prayers(date)?.[prayer] ?? input.clock.at(date, FALLBACK_PRAYER_MINUTES[prayer]);
 }
 
+/**
+ * An anchor's instant on `date` without the Ramadan time: a clock minute, or minutes after the day's
+ * prayer, from saved prayer times or the fallback clock times. A late prayer plus its offset can pass
+ * midnight, so the result may fall on the next date.
+ */
+export function resolveAnchorAt(input: Pick<DayTimesInput, "clock" | "prayers">, date: LocalDate, anchor: ReminderAnchor): Date {
+  if (anchor.kind === "clock") return input.clock.at(date, anchor.minutes);
+  return plus(prayerAt(input, date, anchor.prayer), anchor.offsetMinutes);
+}
+
 function anchorTime(input: DayTimesInput, date: LocalDate): { at: Date; ramadan: boolean } {
   if (input.ramadanAnchor && input.isRamadan(date)) {
     if (input.ramadanAnchor === "after_taraweeh") {
@@ -72,9 +89,16 @@ function anchorTime(input: DayTimesInput, date: LocalDate): { at: Date; ramadan:
     }
     return { at: plus(prayerAt(input, date, "fajr"), -SUHOOR_BEFORE_FAJR_MINUTES), ramadan: true };
   }
-  const { anchor } = input;
-  if (anchor.kind === "clock") return { at: input.clock.at(date, anchor.minutes), ramadan: false };
-  return { at: plus(prayerAt(input, date, anchor.prayer), anchor.offsetMinutes), ramadan: false };
+  return { at: resolveAnchorAt(input, date, input.anchor), ramadan: false };
+}
+
+/**
+ * REMIND-07: the second sitting belongs to a day only when it comes strictly after the main sitting and
+ * both fall on that local date. Seasonal prayer times, a Ramadan time or a later edit of the main time
+ * can break this on some days; the saved choice stays, and only those days go without the reminder.
+ */
+export function reviewFitsDay(clock: DayClock, date: LocalDate, mainAt: Date, reviewAt: Date): boolean {
+  return reviewAt.getTime() > mainAt.getTime() && clock.dateOf(mainAt) === date && clock.dateOf(reviewAt) === date;
 }
 
 /**
@@ -106,6 +130,7 @@ export function buildDayTimes(input: DayTimesInput, date: LocalDate): ReminderDa
     date,
     anchorAt: anchor.at,
     ramadanAnchor: anchor.ramadan,
+    reviewAt: input.reviewAnchor ? resolveAnchorAt(input, date, input.reviewAnchor) : null,
     atRiskAt,
     lateAt,
     kahfAt,

@@ -11,6 +11,8 @@ import type { NotificationType, PlannedSlot } from "@/lib/notifications/types";
  * - onePage, fiveMinutes: the user's minimum wird is at most one page, or at most five minutes, so
  *   "one page is enough" stays true when the user raised their minimum.
  * - ramadan: only for the Ramadan invitation.
+ * - reviewLeft: today's review is known to be left, so the review reminder may say so. Later dates
+ *   are unknown, so their copy stays conditional (REMIND-07).
  */
 export type TemplateVar =
   | "n"
@@ -25,7 +27,8 @@ export type TemplateVar =
   | "longTerm"
   | "onePage"
   | "fiveMinutes"
-  | "ramadan";
+  | "ramadan"
+  | "reviewLeft";
 
 export type NotificationTemplate = Readonly<{
   id: string;
@@ -140,6 +143,15 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
   t("comeback", 9, "notifTBack9", [], true),
   t("comeback", 10, "notifTBack10"),
   t("comeback", 11, "notifTBack11", ["ramadan"]),
+
+  t("review_reminder", 1, "notifTReview1"),
+  t("review_reminder", 2, "notifTReview2"),
+  t("review_reminder", 3, "notifTReview3"),
+  t("review_reminder", 4, "notifTReview4"),
+  t("review_reminder", 5, "notifTReview5"),
+  t("review_reminder", 6, "notifTReview6", ["reviewLeft"]),
+  t("review_reminder", 7, "notifTReview7", ["reviewLeft"]),
+  t("review_reminder", 8, "notifTReview8", ["reviewLeft"]),
 ];
 
 const BY_ID = new Map(NOTIFICATION_TEMPLATES.map((template) => [template.id, template]));
@@ -158,6 +170,7 @@ const TITLE_KEYS: Readonly<Record<NotificationType, NotificationStringKey>> = {
   earnback_open: "notifTitleEarnBack",
   friday_kahf: "notifTitleKahf",
   comeback: "notifTitleComeback",
+  review_reminder: "notifTitleReview",
 };
 
 /** NOT-12: a template is not repeated within 15 days for the same type. */

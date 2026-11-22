@@ -2,6 +2,7 @@ import { Minus, Plus } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { AppState, Platform, View } from "react-native";
 import { PrayerTimesSetup, CALCULATION_METHOD_LABEL_KEYS } from "@/components/notifications/PrayerTimesSetup";
+import { SittingChips } from "@/components/notifications/SittingChips";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MirroredRow } from "@/components/ui/MirroredRow";
@@ -24,22 +25,24 @@ import {
 import type { PermissionState } from "@/lib/notifications/platform-types";
 import { isRamadan } from "@/lib/notifications/ramadan";
 import { previewReminders, rescheduleReminders, type ReminderPreview } from "@/lib/notifications/schedule";
+import { chipAnchor, chipOf, defaultReviewChip, reviewChipAllowed, type SittingDay } from "@/lib/notifications/review-sitting";
 import { readReminderPrefs, writeReminderPref, type ReminderPrefChange } from "@/lib/notifications/settings";
 import { localizeDigits, prayerLabel } from "@/lib/notifications/templates";
 import {
   DEFAULT_ANCHOR,
   MAX_PRAYER_OFFSET_MINUTES,
-  NOTIFICATION_TYPES,
-  type NotificationType,
+  TOGGLEABLE_NOTIFICATION_TYPES,
   type RamadanAnchor,
   type ReminderAnchor,
   type ReminderPrefs,
+  type ToggleableNotificationType,
 } from "@/lib/notifications/types";
 import { readPrayerLocation } from "@/lib/prayer/settings";
-import { PRAYERS, type PrayerLocation, type PrayerName } from "@/lib/prayer/times";
+import { createPrayerTimesLookup, PRAYERS, type PrayerLocation, type PrayerName } from "@/lib/prayer/times";
 import { useSettings } from "@/lib/settings/context";
 
-const TYPE_LABELS: Readonly<Record<NotificationType, readonly [UIStringKey, UIStringKey]>> = {
+/** The review reminder has no row here: the second sitting's own switch turns it on and off (REMIND-07). */
+const TYPE_LABELS: Readonly<Record<ToggleableNotificationType, readonly [UIStringKey, UIStringKey]>> = {
   wird_reminder: ["notifTypeWird", "notifTypeWirdHint"],
   streak_at_risk: ["notifTypeStreak", "notifTypeStreakHint"],
   remind_later: ["notifTypeRemindLater", "notifTypeRemindLaterHint"],
@@ -55,6 +58,10 @@ const OFFSET_STEP = 5;
 const CLOCK_STEP = 15;
 /** "Morning" in the plan anchor list (3.3). */
 const DEFAULT_CLOCK_MINUTES = 6 * 60;
+const KIND_DEFAULTS: Readonly<Record<ReminderAnchor["kind"], ReminderAnchor>> = {
+  prayer: DEFAULT_ANCHOR,
+  clock: { kind: "clock", minutes: DEFAULT_CLOCK_MINUTES },
+};
 type RamadanChoice = RamadanAnchor | "usual";
 /** Outline buttons need a visible edge; the shared outline variant is transparent only. */
 const OUTLINE_BORDER = "border border-warm-300 dark:border-neutral-700";
@@ -131,10 +138,73 @@ function Stepper({ value, decreaseLabel, increaseLabel, onDecrease, onIncrease, 
   );
 }
 
+/** The main sitting: a time after a prayer with its offset, or a clock time, each with the shared stepper. */
+function AnchorEditor({
+  anchor,
+  onChange,
+  iconColor,
+}: {
+  anchor: ReminderAnchor;
+  onChange: (value: ReminderAnchor) => void;
+  iconColor: string;
+}) {
+  const s = useStrings();
+  const { uiLanguage } = useSettings();
+  return (
+    <>
+      <ToggleGroup<ReminderAnchor["kind"]>
+        value={anchor.kind}
+        onValueChange={(kind) => {
+          if (kind !== anchor.kind) onChange(KIND_DEFAULTS[kind]);
+        }}
+        items={[
+          { value: "prayer", label: s.notifAnchorAfterPrayer },
+          { value: "clock", label: s.notifAnchorClock },
+        ]}
+      />
+      {anchor.kind === "prayer" ? (
+        <>
+          <ToggleGroup<PrayerName>
+            value={anchor.prayer}
+            onValueChange={(prayer) => onChange({ ...anchor, prayer })}
+            itemClassName="flex-auto px-2"
+            accessibilityLabel={s.notifAnchorPrayerLabel}
+            items={PRAYERS.map((prayer) => ({ value: prayer, label: prayerLabel(prayer, uiLanguage) }))}
+          />
+          <Stepper
+            value={interpolate(s.notifAnchorOffset, {
+              prayer: prayerLabel(anchor.prayer, uiLanguage),
+              minutes: localizeDigits(anchor.offsetMinutes, uiLanguage),
+            })}
+            decreaseLabel={s.notifOffsetEarlier}
+            increaseLabel={s.notifOffsetLater}
+            canDecrease={anchor.offsetMinutes > 0}
+            canIncrease={anchor.offsetMinutes < MAX_PRAYER_OFFSET_MINUTES}
+            onDecrease={() => onChange({ ...anchor, offsetMinutes: Math.max(0, anchor.offsetMinutes - OFFSET_STEP) })}
+            onIncrease={() => onChange({ ...anchor, offsetMinutes: Math.min(MAX_PRAYER_OFFSET_MINUTES, anchor.offsetMinutes + OFFSET_STEP) })}
+            iconColor={iconColor}
+          />
+        </>
+      ) : (
+        <Stepper
+          value={interpolate(s.notifClockValue, { time: formatClockMinutesForDisplay(anchor.minutes, uiLanguage) })}
+          decreaseLabel={s.notifClockEarlier}
+          increaseLabel={s.notifClockLater}
+          canDecrease
+          canIncrease
+          onDecrease={() => onChange({ kind: "clock", minutes: (anchor.minutes - CLOCK_STEP + 1440) % 1440 })}
+          onIncrease={() => onChange({ kind: "clock", minutes: (anchor.minutes + CLOCK_STEP) % 1440 })}
+          iconColor={iconColor}
+        />
+      )}
+    </>
+  );
+}
+
 /**
  * Reminder settings (5.8, NOT-11): a master switch, a switch per type that never touches the
  * others, the reminder time after a prayer or at a clock time, the Ramadan time, prayer-time
- * location, the app-icon badge and the calendar file. Every change replans reminders (NOT-04).
+ * location, the second sitting for review (REMIND-07), the app-icon badge and the calendar file. Every change replans reminders (NOT-04).
  * The screen supplies the section heading (notifSettingsTitle).
  */
 export function ReminderSettingsSection() {
@@ -203,9 +273,16 @@ export function ReminderSettingsSection() {
 
   if (!prefs) return null;
 
-  const anchor = prefs.anchor;
   const setAnchor = (value: ReminderAnchor) => void update({ kind: "anchor", value });
+  const review = prefs.reviewAnchor;
+  const setReview = (value: ReminderAnchor | null) => void update({ kind: "reviewAnchor", value });
   const today = deviceClock.dateOf(new Date());
+  // REMIND-07: the second sitting is picked from the setup chips, and only chips later than the main
+  // sitting today can be chosen. With none, the switch stays off and says why; a saved second sitting
+  // stays shown and can always be turned off.
+  const sittingDay: SittingDay = { clock: deviceClock, prayers: createPrayerTimesLookup(location), date: today };
+  const reviewDefault = defaultReviewChip(sittingDay, prefs.anchor);
+  const reviewSwitchDisabled = review === null && reviewDefault === null;
   const showRamadan = prefs.ramadanAnchor !== null || isRamadan(today);
   const nativeBlocked = !isWeb && permission !== null && permission.status !== "granted";
 
@@ -245,54 +322,7 @@ export function ReminderSettingsSection() {
       {prefs.enabled && (
         <Card elevation="low" className="p-5 gap-3">
           <Text variant="title-md">{s.notifAnchorTitle}</Text>
-          <ToggleGroup<ReminderAnchor["kind"]>
-            value={anchor.kind}
-            onValueChange={(kind) => {
-              if (kind === anchor.kind) return;
-              setAnchor(kind === "clock" ? { kind: "clock", minutes: DEFAULT_CLOCK_MINUTES } : DEFAULT_ANCHOR);
-            }}
-            items={[
-              { value: "prayer", label: s.notifAnchorAfterPrayer },
-              { value: "clock", label: s.notifAnchorClock },
-            ]}
-          />
-          {anchor.kind === "prayer" ? (
-            <>
-              <ToggleGroup<PrayerName>
-                value={anchor.prayer}
-                onValueChange={(prayer) => setAnchor({ ...anchor, prayer })}
-                itemClassName="flex-auto px-2"
-                accessibilityLabel={s.notifAnchorPrayerLabel}
-                items={PRAYERS.map((prayer) => ({ value: prayer, label: prayerLabel(prayer, uiLanguage) }))}
-              />
-              <Stepper
-                value={interpolate(s.notifAnchorOffset, {
-                  prayer: prayerLabel(anchor.prayer, uiLanguage),
-                  minutes: localizeDigits(anchor.offsetMinutes, uiLanguage),
-                })}
-                decreaseLabel={s.notifOffsetEarlier}
-                increaseLabel={s.notifOffsetLater}
-                canDecrease={anchor.offsetMinutes > 0}
-                canIncrease={anchor.offsetMinutes < MAX_PRAYER_OFFSET_MINUTES}
-                onDecrease={() => setAnchor({ ...anchor, offsetMinutes: Math.max(0, anchor.offsetMinutes - OFFSET_STEP) })}
-                onIncrease={() =>
-                  setAnchor({ ...anchor, offsetMinutes: Math.min(MAX_PRAYER_OFFSET_MINUTES, anchor.offsetMinutes + OFFSET_STEP) })
-                }
-                iconColor={iconColor}
-              />
-            </>
-          ) : (
-            <Stepper
-              value={interpolate(s.notifClockValue, { time: formatClockMinutesForDisplay(anchor.minutes, uiLanguage) })}
-              decreaseLabel={s.notifClockEarlier}
-              increaseLabel={s.notifClockLater}
-              canDecrease
-              canIncrease
-              onDecrease={() => setAnchor({ kind: "clock", minutes: (anchor.minutes - CLOCK_STEP + 1440) % 1440 })}
-              onIncrease={() => setAnchor({ kind: "clock", minutes: (anchor.minutes + CLOCK_STEP) % 1440 })}
-              iconColor={iconColor}
-            />
-          )}
+          <AnchorEditor anchor={prefs.anchor} onChange={setAnchor} iconColor={iconColor} />
           {whenText && <Text variant="body-sm">{interpolate(s.notifNextReminder, { when: whenText })}</Text>}
 
           {showRamadan && (
@@ -330,11 +360,46 @@ export function ReminderSettingsSection() {
       )}
 
       {prefs.enabled && (
+        <Card elevation="low" className="p-5 gap-3">
+          <ReminderSwitchRow
+            label={s.notifReviewTitle}
+            hint={reviewSwitchDisabled ? s.notifReviewNeedsEarlier : s.notifReviewHint}
+            value={review !== null}
+            disabled={reviewSwitchDisabled}
+            onValueChange={(on) => {
+              if (!on) setReview(null);
+              else if (reviewDefault) setReview(chipAnchor(reviewDefault));
+            }}
+          />
+          {review && (
+            <>
+              <SittingChips
+                label={s.notifReviewTitle}
+                selected={chipOf(review)}
+                onSelect={(chip) => setReview(chipAnchor(chip))}
+                allowed={(chip) => reviewChipAllowed(sittingDay, prefs.anchor, chip)}
+                dir={isRTL ? "rtl" : "ltr"}
+                language={uiLanguage}
+                s={s}
+              />
+              {/* A saved clock time that no chip names stays visible, so it can be kept or replaced. */}
+              {review.kind === "clock" && chipOf(review) === null ? (
+                <Text variant="body-sm">
+                  {interpolate(s.notifClockValue, { time: formatClockMinutesForDisplay(review.minutes, uiLanguage) })}
+                </Text>
+              ) : null}
+              <Text variant="caption">{s.notifReviewSkipNote}</Text>
+            </>
+          )}
+        </Card>
+      )}
+
+      {prefs.enabled && (
         <Card elevation="low" className="p-5 gap-1">
           <Text variant="title-md" className="mb-2">
             {s.notifTypesTitle}
           </Text>
-          {NOTIFICATION_TYPES.map((type) => {
+          {TOGGLEABLE_NOTIFICATION_TYPES.map((type) => {
             if (isWeb && type === "remind_later") return null;
             const [labelKey, hintKey] = TYPE_LABELS[type];
             const label =
@@ -362,7 +427,10 @@ export function ReminderSettingsSection() {
         </Card>
       )}
 
-      <Button variant="outline" className={OUTLINE_BORDER} onPress={() => void addToCalendar()} label={s.notifCalendarButton} />
+      <View className="gap-2">
+        <Button variant="outline" className={OUTLINE_BORDER} onPress={() => void addToCalendar()} label={s.notifCalendarButton} />
+        <Text variant="caption">{s.notifCalendarExportNote}</Text>
+      </View>
       {error && (
         <Text variant="body-sm" accessibilityLiveRegion="polite" className="text-red-600 dark:text-red-400">
           {error}

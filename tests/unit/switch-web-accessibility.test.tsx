@@ -81,9 +81,11 @@ const { SocialToggleRow } =
   require("@/components/social/SocialControls") as typeof import("@/components/social/SocialControls");
 const { ReadingSettingsSheet } =
   require("@/components/mushaf/ReadingSettingsSheet") as typeof import("@/components/mushaf/ReadingSettingsSheet");
-const { DEFAULT_REMINDER_PREFS, NOTIFICATION_TYPES } =
+const { DEFAULT_REMINDER_PREFS, TOGGLEABLE_NOTIFICATION_TYPES } =
   jest.requireActual<typeof import("@/lib/notifications/types")>("@/lib/notifications/types");
-const { writeReminderPref } = jest.requireMock<{ writeReminderPref: jest.Mock }>("@/lib/notifications/settings");
+const { writeReminderPref, readReminderPrefs } = jest.requireMock<{ writeReminderPref: jest.Mock; readReminderPrefs: jest.Mock }>(
+  "@/lib/notifications/settings",
+);
 const { strings } = jest.requireActual<typeof import("@/lib/i18n/strings")>("@/lib/i18n/strings");
 const en = strings.en;
 
@@ -134,11 +136,11 @@ function expectOneTabStop(row: HTMLElement) {
 }
 
 describe("switch rows on web", () => {
-  it("gives each of the nine web reminder rows its state and a single tab stop", async () => {
+  it("gives each of the ten web reminder rows its state and a single tab stop", async () => {
     await show(<ReminderSettingsSection />);
     const rows = [...host.querySelectorAll<HTMLElement>('[role="switch"]')];
-    // The master switch and every type except remind_later, which web cannot offer.
-    expect(rows).toHaveLength(9);
+    // The master switch, the second sitting, and every type except remind_later, which web cannot offer.
+    expect(rows).toHaveLength(10);
 
     expect(switchNamed(en.notifMasterLabel).getAttribute("aria-checked")).toBe("true");
     expect(switchNamed(en.notifTypeWird).getAttribute("aria-checked")).toBe(
@@ -148,12 +150,92 @@ describe("switch rows on web", () => {
     const values = rows.map((row) => row.getAttribute("aria-checked"));
     expect(values).toEqual([
       "true",
-      ...NOTIFICATION_TYPES.filter((type) => type !== "remind_later").map((type) =>
+      "false",
+      ...TOGGLEABLE_NOTIFICATION_TYPES.filter((type) => type !== "remind_later").map((type) =>
         String(DEFAULT_REMINDER_PREFS.types[type]),
       ),
     ]);
     expect(values).toContain("false");
     rows.forEach(expectOneTabStop);
+  });
+
+  it("edits the second sitting with its own switch and no separate review-reminder type row (REMIND-07)", async () => {
+    await show(<ReminderSettingsSection />);
+    const labels = [...host.querySelectorAll<HTMLElement>('[role="switch"]')].map((row) => row.getAttribute("aria-label"));
+    expect(labels.filter((label) => label === en.notifReviewTitle)).toHaveLength(1);
+    expect(host.textContent).toContain(en.notifReviewHint);
+    // The main sitting is after Fajr, so the switch turns on after Maghrib.
+    press(switchNamed(en.notifReviewTitle), " ");
+    await act(async () => {});
+    expect(writeReminderPref).toHaveBeenLastCalledWith(mockDb, {
+      kind: "reviewAnchor",
+      value: { kind: "prayer", prayer: "maghrib", offsetMinutes: 20 },
+    });
+  });
+
+  it("keeps a saved second sitting shown with the skip note when no time is later today, and lets it be turned off", async () => {
+    const prefs = {
+      ...DEFAULT_REMINDER_PREFS,
+      anchor: { kind: "prayer", prayer: "isha", offsetMinutes: 20 },
+      reviewAnchor: { kind: "prayer", prayer: "maghrib", offsetMinutes: 20 },
+    };
+    readReminderPrefs.mockResolvedValue(prefs);
+    try {
+      await show(<ReminderSettingsSection />);
+      const row = switchNamed(en.notifReviewTitle);
+      expect(row.getAttribute("aria-checked")).toBe("true");
+      expect(host.textContent).toContain(en.notifReviewSkipNote);
+      press(row, " ");
+      await act(async () => {});
+      expect(writeReminderPref).toHaveBeenLastCalledWith(mockDb, { kind: "reviewAnchor", value: null });
+
+      // With nothing saved and no later time, the switch stays off and says why.
+      readReminderPrefs.mockResolvedValue({ ...prefs, reviewAnchor: null });
+      act(() => root.unmount());
+      root = createRoot(host);
+      await show(<ReminderSettingsSection />);
+      expect(switchNamed(en.notifReviewTitle).getAttribute("aria-disabled")).toBe("true");
+      expect(host.textContent).toContain(en.notifReviewNeedsEarlier);
+    } finally {
+      readReminderPrefs.mockImplementation(async () => DEFAULT_REMINDER_PREFS);
+    }
+  });
+
+  it("offers only chips later than the main sitting for the second sitting (REMIND-07)", async () => {
+    readReminderPrefs.mockResolvedValue({
+      ...DEFAULT_REMINDER_PREFS,
+      anchor: { kind: "prayer", prayer: "maghrib", offsetMinutes: 20 },
+      reviewAnchor: { kind: "prayer", prayer: "isha", offsetMinutes: 20 },
+    });
+    try {
+      await show(<ReminderSettingsSection />);
+      const radio = (name: string) => {
+        const found = [...host.querySelectorAll<HTMLElement>('[role="radio"]')].filter(
+          (node) => (node.getAttribute("aria-label") ?? node.textContent) === name,
+        );
+        expect(found).toHaveLength(1);
+        return found[0];
+      };
+      const evening = en.hifzWhenEvening.replace("{{time}}", "8:00 PM");
+      // No free prayer, offset or clock editor for the second sitting: only the grouped chips.
+      expect(host.querySelectorAll(`[aria-label="${en.notifOffsetLater}"]`)).toHaveLength(1);
+      expect(radio("After Isha").getAttribute("aria-checked")).toBe("true");
+      expect(radio("After Fajr").getAttribute("aria-disabled")).toBe("true");
+      expect(radio(evening).getAttribute("aria-disabled")).toBe("true");
+      expect(radio("After Isha").getAttribute("aria-disabled")).not.toBe("true");
+      press(radio("After Fajr"), "Enter");
+      press(radio(evening), "Enter");
+      await act(async () => {});
+      expect(writeReminderPref).not.toHaveBeenCalled();
+      press(radio("After Isha"), "Enter");
+      await act(async () => {});
+      expect(writeReminderPref).toHaveBeenLastCalledWith(mockDb, {
+        kind: "reviewAnchor",
+        value: { kind: "prayer", prayer: "isha", offsetMinutes: 20 },
+      });
+    } finally {
+      readReminderPrefs.mockImplementation(async () => DEFAULT_REMINDER_PREFS);
+    }
   });
 
   it("turns a reminder type on with Space without scrolling, and Enter still works", async () => {

@@ -19,6 +19,7 @@ export const notificationsStrings = {
     notifTitleEarnBack: "Bring your streak back",
     notifTitleKahf: "Friday: Surah al-Kahf",
     notifTitleComeback: "Your wird",
+    notifTitleReview: "Second sitting",
 
     // wird_reminder
     notifTWird1: "Your wird is ready: {{pages}} pages, about {{minutes}} minutes.",
@@ -124,6 +125,16 @@ export const notificationsStrings = {
     notifTBack10: "Today is a good day to begin again, one page at a time.",
     notifTBack11: "Ramadan has begun. A page a day is a good way to return.",
 
+    // review_reminder (REMIND-07). 1 to 5 suit any day; 6 to 8 only today, when review is known to be left.
+    notifTReview1: "If you have review left, this is your second sitting.",
+    notifTReview2: "Your second sitting is now. Continue any review you have left.",
+    notifTReview3: "Time for your review sitting, if any of today's review is left.",
+    notifTReview4: "If some review is left, a few quiet minutes now can finish it.",
+    notifTReview5: "Your review sitting: pick up where you left off, if anything remains.",
+    notifTReview6: "Some of today's review is left. Your second sitting is now.",
+    notifTReview7: "Finish today's review in your second sitting.",
+    notifTReview8: "The rest of today's review is ready for your second sitting.",
+
     // Template values
     notifPrayerFajr: "Fajr",
     notifPrayerDhuhr: "Dhuhr",
@@ -186,6 +197,11 @@ export const notificationsStrings = {
     notifTypeKahfHint: "Optional. Friday morning",
     notifTypeComeback: "Welcome-back reminders",
     notifTypeComebackHint: "Fewer reminders after a break, and then they stop",
+    // The second sitting for review (REMIND-07), in setup and Settings.
+    notifReviewTitle: "A second sitting for review",
+    notifReviewHint: "Choose another time to continue any review you have left. It doesn't affect your streak.",
+    notifReviewNeedsEarlier: "Choose an earlier main time to add a second sitting.",
+    notifReviewSkipNote: "On days when prayer times or your Ramadan time put it before your main sitting, this reminder is skipped.",
     notifBadgeLabel: "App icon badge",
     notifBadgeHint: "Shows 1 while today's wird is open",
     notifCalendarButton: "Add a daily wird event to my calendar",
@@ -194,6 +210,10 @@ export const notificationsStrings = {
     notifCalendarEventNote: "A few minutes of review keeps your hifz steady.",
     notifCalendarEventPrayerNote:
       "Set from today's {{prayer}} time. Prayer times shift through the year, so move the event when needed.",
+    notifCalendarReviewEventTitle: "Review sitting (Hafiz)",
+    notifCalendarReviewEventNote: "Your second sitting: continue any review left from today.",
+    notifCalendarExportNote:
+      "Calendar events repeat on their own. They do not know about finished review, pauses or Hafiz's reminder limits, and turning a sitting off here does not remove an event you already added.",
     notifSaveFailed: "The reminder setting could not be saved.",
 
     // Permission ask (onboarding step 9 and session end)
@@ -260,6 +280,7 @@ export const notificationsStrings = {
     notifTitleEarnBack: "استعِد سلسلتك",
     notifTitleKahf: "الجمعة: سورة الكهف",
     notifTitleComeback: "وِردك",
+    notifTitleReview: "الجلسة الثانية",
 
     notifTWird1: "وِردك جاهز. عدد الصفحات: {{pages}}، والمدة بالدقائق نحو {{minutes}}.",
     notifTWird2: "حان موعد مراجعة {{surah}} اليوم.",
@@ -356,6 +377,15 @@ export const notificationsStrings = {
     notifTBack10: "اليوم يوم طيّب لتبدأ من جديد، صفحة بعد صفحة.",
     notifTBack11: "أقبل رمضان. صفحة كل يوم طريق حسن للعودة.",
 
+    notifTReview1: "إن بقي لك شيء من المراجعة، فهذا وقت جلستك الثانية.",
+    notifTReview2: "حان وقت جلستك الثانية. أكمل ما بقي من مراجعتك إن وُجد.",
+    notifTReview3: "هذا موعد جلسة المراجعة، إن بقي شيء من مراجعة اليوم.",
+    notifTReview4: "إن بقي شيء من المراجعة، فدقائق هادئة الآن تكفي لإتمامه.",
+    notifTReview5: "جلسة المراجعة: أكمل من حيث توقفت، إن بقي شيء.",
+    notifTReview6: "بقي شيء من مراجعة اليوم، وهذا وقت جلستك الثانية.",
+    notifTReview7: "أتمّ مراجعة اليوم في جلستك الثانية.",
+    notifTReview8: "ما بقي من مراجعة اليوم ينتظرك في جلستك الثانية.",
+
     notifPrayerFajr: "الفجر",
     notifPrayerDhuhr: "الظهر",
     notifPrayerAsr: "العصر",
@@ -415,6 +445,10 @@ export const notificationsStrings = {
     notifTypeKahfHint: "اختياري. صباح الجمعة",
     notifTypeComeback: "تذكيرات العودة",
     notifTypeComebackHint: "تذكيرات أقل بعد الانقطاع، ثم تتوقف",
+    notifReviewTitle: "جلسة ثانية للمراجعة",
+    notifReviewHint: "اختر وقتًا آخر تكمل فيه ما بقي من مراجعتك. لا يؤثر على سلسلتك.",
+    notifReviewNeedsEarlier: "اختر وقتًا أبكر لجلستك الأولى لتضيف جلسة ثانية.",
+    notifReviewSkipNote: "قد يُتخطّى التذكير في أيام يسبق فيها موعدُه جلستَك الأولى بسبب مواقيت الصلاة أو وقت رمضان.",
     notifBadgeLabel: "شارة أيقونة التطبيق",
     notifBadgeHint: "تُظهر ١ ما دام وِرد اليوم مفتوحًا",
     notifCalendarButton: "أضف موعدًا يوميًا للوِرد إلى تقويمي",
@@ -422,6 +456,10 @@ export const notificationsStrings = {
     notifCalendarEventTitle: "الوِرد اليومي (حافظ)",
     notifCalendarEventNote: "دقائق من المراجعة تُثبّت حفظك.",
     notifCalendarEventPrayerNote: "ضُبط على وقت {{prayer}} اليوم. تتغير مواقيت الصلاة خلال العام، فعدّل الحدث عند الحاجة.",
+    notifCalendarReviewEventTitle: "جلسة المراجعة (حافظ)",
+    notifCalendarReviewEventNote: "جلستك الثانية: أكمل ما بقي من مراجعة اليوم.",
+    notifCalendarExportNote:
+      "تتكرر مواعيد التقويم من تلقاء نفسها، فلا تعرف بما أتممته من مراجعة ولا بالتوقف المؤقت ولا بحدود تذكيرات حافظ، وإيقاف جلسة هنا لا يحذف موعدًا أضفته من قبل.",
     notifSaveFailed: "تعذّر حفظ إعداد التذكير.",
 
     notifPermissionReasonPrayer: "سنذكّرك بعد {{prayer}}، مرة في اليوم غالبًا.",

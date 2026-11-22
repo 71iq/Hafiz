@@ -72,11 +72,10 @@ describe("calendar file (AMB-05)", () => {
   it("builds one daily floating-time event with a reminder", () => {
     const ics = buildWirdCalendar({
       date: "2026-11-12",
-      minutes: 5 * 60 + 20,
-      title: "Daily wird (Hafiz)",
-      description: "A few minutes, then rest; it counts.",
       now: new Date("2026-11-12T09:00:00Z"),
-      uid: "daily-wird@hafizquran.app",
+      events: [
+        { minutes: 5 * 60 + 20, title: "Daily wird (Hafiz)", description: "A few minutes, then rest; it counts.", uid: "daily-wird@hafizquran.app" },
+      ],
     });
     expect(ics).toContain("\r\nDTSTART:20261112T052000\r\n");
     expect(ics).toContain("\r\nRRULE:FREQ=DAILY\r\n");

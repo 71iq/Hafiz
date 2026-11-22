@@ -234,7 +234,6 @@ function FlashcardSessionScreen() {
   const db = useDatabase();
   const { isDark, isRTL, fontSize, lineHeight, tafseerSource, themeSurface, uiLanguage, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
-  const commitLabel = useCommitmentLabel(db, s, uiLanguage);
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
   const navigation = useNavigation();
   const openMushaf = useOpenMushaf();
@@ -253,6 +252,8 @@ function FlashcardSessionScreen() {
   // W03 note entry point: the card back offers Add note for the ayah under review.
   const [noteOpen, setNoteOpen] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
+  // Read again once the session ends, so a finished review is reflected (STR-20, REMIND-07).
+  const commitLabel = useCommitmentLabel(db, s, uiLanguage, summary?.habit ?? null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   /** The queue could not load: an error with Try again, never an empty completion. */
   const [loadError, setLoadError] = useState<string | null>(null);

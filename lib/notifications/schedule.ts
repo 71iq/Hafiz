@@ -31,6 +31,7 @@ import {
 import {
   backoffLevel,
   isCoveredToday,
+  isSetAsideToday,
   PLAN_HORIZON_DAYS,
   planNotifications,
   streakFingerprint,
@@ -54,6 +55,7 @@ import {
   writeLocalSetting,
 } from "@/lib/notifications/settings";
 import { NO_REPEAT_DAYS, renderNotification, type Language, type SurahNames } from "@/lib/notifications/templates";
+import { loadReviewLeft, type ReviewLeft } from "@/lib/hifz/review-left";
 import { HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID } from "@/lib/hifz/units";
 import { WIRD_TYPES, type NotificationLogRow, type PlannedSlot, type ReminderPrefs } from "@/lib/notifications/types";
 
@@ -76,7 +78,11 @@ export type ReminderContext = Readonly<{
   stillScheduled: ReadonlySet<string> | undefined;
   language: Language;
   surahNames: SurahNames;
+  /** REMIND-07: today's review left, read only while the second sitting is on. */
+  reviewLeft: ReviewLeft;
 }>;
+
+const NO_REVIEW_LEFT: ReviewLeft = { hasPlan: false, left: false };
 
 const SURAH_CARD = /^(\d{1,3}):\d{1,3}$/;
 
@@ -124,7 +130,7 @@ function isRamadanStart(date: LocalDate): boolean {
  * NOT-09). Previews leave it out and treat every past reminder as fired.
  */
 export async function loadReminderContext(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   {
     now,
     language,
@@ -168,6 +174,13 @@ export async function loadReminderContext(
     return first ? { surah: first.surah } : {};
   };
   const ignored = advanceIgnoredTally(previous, backoffRows, latestSession, now, stillScheduled);
+  // The review list is read only for the second sitting. A failed read sends no review reminder.
+  const reviewLeft = prefs.reviewAnchor
+    ? await loadReviewLeft(db, now).catch((error: unknown) => {
+        console.warn("[Reminders] Could not read today's review:", error);
+        return NO_REVIEW_LEFT;
+      })
+    : NO_REVIEW_LEFT;
   const asDelivered = (row: NotificationLogRow): DeliveredReminder => ({
     type: row.type,
     templateId: row.template_id,
@@ -206,9 +219,11 @@ export async function loadReminderContext(
     late,
     remindLater,
     facts,
+    // Later dates have an unknown workload, so only a plan is needed; their copy stays conditional.
+    reviewLeft: (date) => (date === today ? reviewLeft.left : reviewLeft.hasPlan),
     preferredTemplates,
   };
-  return { prefs, input, log, sessionStarts, ignored, stillScheduled, language: lang, surahNames };
+  return { prefs, input, log, sessionStarts, ignored, stillScheduled, language: lang, surahNames, reviewLeft };
 }
 
 /** A short stable hash, so an unchanged reminder keeps its OS notification. */
@@ -395,10 +410,11 @@ export function configureReminderPlatform(labels: Readonly<{ channelName: string
   return reminderPlatform.configure(labels);
 }
 
-/** Remove reminders for past dates (NOT-06) and today's wird reminders once the day is covered (NOT-05). */
 /**
- * Today's wird reminders leave the tray once today is covered. Yesterday's make-up reminder stays
- * while the make-up is still open: a day already done does not close it (STR-07).
+ * Remove reminders for past dates (NOT-06) and today's wird reminders once the day is covered (NOT-05).
+ * Yesterday's make-up reminder stays while the make-up is still open: a day already done does not
+ * close it (STR-07). Today's review reminder (REMIND-07) stays after the minimum, and goes once
+ * today's review is finished, the day is set aside, or the second sitting or reminders are off.
  */
 async function dismissStale(
   presented: readonly PresentedReminder[],
@@ -406,11 +422,13 @@ async function dismissStale(
   now: Date,
   covered: boolean,
   makeUpOpen: boolean,
+  reviewStillDue: boolean,
 ): Promise<void> {
   const today = context.input.clock.dateOf(now);
   const stale = presented.filter(
     (item) =>
       item.data.localDate < today ||
+      (item.data.localDate === today && item.data.type === "review_reminder" && !reviewStillDue) ||
       (covered &&
         item.data.localDate === today &&
         WIRD_TYPES.has(item.data.type) &&
@@ -460,10 +478,15 @@ async function runReschedule(db: AppDatabase, now: Date, language?: Language): P
   const snapshot = projectHabit(context.input, today, now).snapshot;
   const covered = isCoveredToday(snapshot);
   const makeUpOpen = snapshot.headline.kind === "make_up_open";
+  const reviewStillDue =
+    context.prefs.enabled &&
+    context.prefs.reviewAnchor !== null &&
+    context.reviewLeft.left &&
+    !isSetAsideToday(snapshot, context.input.habit.pause, today);
   await updateBadge(context, permitted, covered);
   // Expired and covered reminders leave the tray whatever the settings (NOT-06): turning reminders
   // off or losing permission must not leave yesterday's notification behind.
-  await dismissStale(presented, context, now, covered, makeUpOpen);
+  await dismissStale(presented, context, now, covered, makeUpOpen, reviewStillDue);
   if (!permitted || !context.prefs.enabled) {
     const cancelled = await cancelEverything(db, scheduled, now);
     return { status: permitted ? "disabled" : "no_permission", ...empty, cancelled };
@@ -562,7 +585,7 @@ export type ReminderPreview = Readonly<{
 
 /** For the settings screen: the next reminder and whether the chosen time can be used. */
 export async function previewReminders(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   { now = new Date(), language }: { now?: Date; language?: Language } = {},
 ): Promise<ReminderPreview> {
   const context = await loadReminderContext(db, { now, language });
