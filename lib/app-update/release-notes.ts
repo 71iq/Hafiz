@@ -8,6 +8,10 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.11": {
+    en: ["Mushaf pages show the full dots and hamza at the edges of words. Surah headings show all four words of the Basmala."],
+    ar: ["تظهر نقاط الحروف والهمزة كاملة عند أطراف الكلمات في صفحات المصحف، وتظهر البسملة بكلماتها الأربع في مطلع السورة."],
+  },
   "1.0.10": {
     en: ["Quran search matches punctuation exactly as you type it."],
     ar: ["يطابق البحث في القرآن علامات الترقيم كما تكتبها."],
