@@ -102,6 +102,12 @@ export const DEFAULT_HIFZ_PLAN: HifzPlan = {
 
 export type PlanPreset = "part_time_beginner" | "part_time_adult" | "full_time" | "maintenance" | "short_surahs";
 
+/**
+ * The pace a new setup starts on, and the pace a goal other than "keep" returns to. DEFAULT_HIFZ_PLAN
+ * stays on the part-time fields because it is also the fallback for people without a saved plan.
+ */
+export const DEFAULT_PLAN_PRESET: PlanPreset = "part_time_beginner";
+
 /** 4.3.2 presets. */
 const PLAN_PRESETS: Readonly<Record<PlanPreset, Partial<HifzPlan>>> = {
   part_time_beginner: { method: "standard", newPerDay: 0.25, recentEvery: 2, cycleDays: 30, dailyBudgetMin: 20 },

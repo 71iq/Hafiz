@@ -86,6 +86,48 @@ describe("HifzSetupFlow Not now", () => {
   });
 });
 
+describe("HifzSetupFlow default pace", () => {
+  const db = { getAllAsync: jest.fn(async () => []) } as unknown as AppDatabase;
+  const pace = (plan: HifzPlan) => ({ newPerDay: plan.newPerDay, sabqiEvery: plan.sabqiEvery, dailyBudgetMin: plan.dailyBudgetMin });
+  const beginner = { newPerDay: 0.25, sabqiEvery: 2, dailyBudgetMin: 20 };
+
+  beforeEach(() => jest.mocked(applyHifzSetup).mockClear());
+
+  async function saveFrom(initialPlan: HifzPlan | null, beforeSaving: (view: ReturnType<typeof render>) => void = () => {}) {
+    const view = render(
+      <DirectionProvider dir="ltr">
+        <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={initialPlan} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    beforeSaving(view);
+    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    await act(async () => {
+      fireEvent.press(view.getByText(s.hifzSaveMemorized));
+    });
+    expect(applyHifzSetup).toHaveBeenCalledTimes(1);
+    return jest.mocked(applyHifzSetup).mock.calls[0][1].plan;
+  }
+
+  it("starts a new setup on the part-time beginner pace", async () => {
+    expect(pace(await saveFrom(null))).toEqual(beginner);
+  });
+
+  it("returns to the beginner pace when the goal moves away from keep", async () => {
+    const plan = await saveFrom(null, (view) => {
+      fireEvent.press(view.getByText(s.hifzGoalKeep));
+      fireEvent.press(view.getByText(s.hifzGoalBoth));
+    });
+    expect(plan.method).toBe("standard");
+    expect(pace(plan)).toEqual(beginner);
+  });
+
+  it("keeps the stored pace when a saved plan is edited", async () => {
+    const stored = applyPreset(DEFAULT_HIFZ_PLAN, "part_time_adult");
+    expect(pace(await saveFrom(stored))).toEqual({ newPerDay: 0.5, sabqiEvery: 1, dailyBudgetMin: 30 });
+  });
+});
+
 describe("HifzSetupFlow new memorization repetitions (SBQ-01)", () => {
   const db = { getAllAsync: jest.fn(async () => []) } as unknown as AppDatabase;
   const savedPlan: HifzPlan = { ...DEFAULT_HIFZ_PLAN, newPerDay: 1 };
@@ -321,6 +363,61 @@ describe("HifzSetupFlow save and surah list recovery", () => {
     expect(view.getByText(s.setupNoSurahMatches.replace("{{query}}", "zzz"))).toBeTruthy();
     fireEvent.press(view.getByText(s.homeSearchClear));
     expect(view.getByText("2 surahs")).toBeTruthy();
-    expect(view.getByText("Al-Fatiha, Al-Mulk")).toBeTruthy();
+    expect(view.getByLabelText("Remove Al-Fatiha")).toBeTruthy();
+    expect(view.getByLabelText("Remove Al-Mulk")).toBeTruthy();
+  });
+
+  it("shows the selection above the surah list as removable chips in Quran order", async () => {
+    const view = renderFlow({ getAllAsync: jest.fn(async () => surahRows) } as unknown as AppDatabase);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByLabelText("Juz 30"));
+    fireEvent.press(view.getByText(s.hifzBySurah));
+    fireEvent.press(view.getByText("68. Al-Qalam"));
+    fireEvent.press(view.getByText("1. Al-Fatiha"));
+
+    // The count comes before the first surah row, so it is seen without scrolling the list.
+    const tree = JSON.stringify(view.toJSON());
+    expect(tree.indexOf("1 juz · 2 surahs")).toBeGreaterThan(-1);
+    expect(tree.indexOf("1 juz · 2 surahs")).toBeLessThan(tree.indexOf("1. Al-Fatiha"));
+    // Juz first, then surahs by number, whatever order they were chosen in.
+    const chips = view.getAllByLabelText(/^Remove /).map((chip) => chip.props.accessibilityLabel);
+    expect(chips).toEqual(["Remove Juz 30", "Remove Al-Fatiha", "Remove Al-Qalam"]);
+
+    fireEvent.press(view.getByLabelText("Remove Al-Qalam"));
+    expect(view.queryByLabelText("Remove Al-Qalam")).toBeNull();
+    expect(view.getByRole("checkbox", { name: /68\. Al-Qalam/ }).props.accessibilityState).toMatchObject({ checked: false });
+    fireEvent.press(view.getByLabelText("Remove Juz 30"));
+    expect(view.getByText("1 surah")).toBeTruthy();
+  });
+
+  it("collapses a long selection behind a +N chip", async () => {
+    const view = renderFlow({ getAllAsync: jest.fn(async () => surahRows) } as unknown as AppDatabase);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    for (const juz of [1, 2, 3, 4, 5, 6, 7, 8]) fireEvent.press(view.getByLabelText(`Juz ${juz}`));
+    expect(view.getAllByLabelText(/^Remove /)).toHaveLength(6);
+    fireEvent.press(view.getByText("+2"));
+    expect(view.getAllByLabelText(/^Remove /)).toHaveLength(8);
+    expect(view.getByLabelText(s.sharedShowLess)).toBeTruthy();
+  });
+
+  it("marks surahs a chosen juz includes, and keeps the surah view across Back and Continue", async () => {
+    const rows = [
+      { ...surahRows[0], first_page: 1, last_page: 1 },
+      { ...surahRows[1], first_page: 562, last_page: 564 },
+      { number: 78, name_arabic: "النبأ", name_english: "The Tidings", ayah_count: 40, first_page: 582, last_page: 583 },
+    ];
+    const view = renderFlow({ getAllAsync: jest.fn(async () => rows) } as unknown as AppDatabase);
+    await act(async () => {});
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByLabelText("Juz 30"));
+    fireEvent.press(view.getByText(s.hifzBySurah));
+    expect(view.getByRole("checkbox", { name: /78\. An-Naba/ })).toBeTruthy();
+    expect(view.getAllByText("Included in Juz 30")).toHaveLength(1);
+
+    fireEvent.press(view.getByText(s.hifzContinue));
+    fireEvent.press(view.getByText(s.hifzBack));
+    expect(view.getByPlaceholderText(s.setupSurahSearchPlaceholder)).toBeTruthy();
   });
 });

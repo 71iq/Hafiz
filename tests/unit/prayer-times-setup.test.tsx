@@ -41,6 +41,22 @@ function renderSetup() {
   );
 }
 
+describe("PrayerTimesSetup advanced options (REMIND-02)", () => {
+  it("keeps coordinates, method and Asr time closed behind one row that names the current choice", async () => {
+    const view = renderSetup();
+    await waitFor(() => expect(readPrayerLocation).toHaveBeenCalled());
+    expect(view.getByText(s.notifUseMyLocation)).toBeTruthy();
+    for (const hidden of [s.notifSaveCoordinates, s.notifCalculationMethod, s.notifAsrMethod]) expect(view.queryByText(hidden)).toBeNull();
+    const row = view.getByRole("button", { name: new RegExp(s.notifPrayerAdvanced) });
+    expect(row.props.accessibilityState).toMatchObject({ expanded: false });
+    expect(view.getByText(`${s.notifMethodMuslimWorldLeague} · ${s.notifAsrStandard}`)).toBeTruthy();
+
+    fireEvent.press(row);
+    expect(view.getByRole("button", { name: new RegExp(s.notifPrayerAdvanced) }).props.accessibilityState).toMatchObject({ expanded: true });
+    for (const shown of [s.notifSaveCoordinates, s.notifCalculationMethod, s.notifAsrMethod]) expect(view.getByText(shown)).toBeTruthy();
+  });
+});
+
 describe("PrayerTimesSetup messages", () => {
   it("saves an Asr change without a location message, since the times already show it", async () => {
     jest.mocked(readPrayerLocation).mockResolvedValueOnce({
@@ -52,6 +68,9 @@ describe("PrayerTimesSetup messages", () => {
     } as never);
     const view = renderSetup();
     await waitFor(() => expect(readPrayerLocation).toHaveBeenCalled());
+    // Asr time sits under Advanced options, closed until pressed.
+    expect(view.queryByText(s.notifAsrMethod)).toBeNull();
+    fireEvent.press(view.getByText(s.notifPrayerAdvanced));
     fireEvent.press(await view.findByText(s.notifAsrHanafi));
     await waitFor(() => expect(writePrayerLocation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ madhab: "hanafi" })));
     expect(view.queryByText(s.notifLocationSaved)).toBeNull();
@@ -64,7 +83,8 @@ describe("PrayerTimesSetup messages", () => {
     fireEvent.press(view.getByText(s.notifUseMyLocation));
     const denied = await view.findByText(s.notifLocationDenied);
 
-    // The fields open with the message, but the message stays beside the button that caused it.
+    // Advanced options open with the message, but the message stays beside the button that caused it.
+    expect(view.getByRole("button", { name: new RegExp(s.notifPrayerAdvanced) }).props.accessibilityState).toMatchObject({ expanded: true });
     expect(view.getByText(s.notifSaveCoordinates)).toBeTruthy();
     const locationGroup = findAncestorByClassName(denied, "gap-2");
     expect(within(locationGroup as never).getByText(s.notifUseMyLocation)).toBeTruthy();

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AccessibilityInfo, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Minus, Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Switch } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
-import { MemorizedPortionPicker, type SurahChoice } from "@/components/hifz/MemorizedPortionPicker";
+import { MemorizedPortionPicker, type PortionMode, type SurahChoice } from "@/components/hifz/MemorizedPortionPicker";
 import type { AppDatabase } from "@/lib/database/types";
 import { applyHifzSetup } from "@/lib/hifz/setup";
 import { Card } from "@/components/ui/Card";
@@ -13,6 +13,7 @@ import { CALCULATION_METHOD_LABEL_KEYS, PrayerTimesSetup } from "@/components/no
 import {
   applyPreset,
   DEFAULT_HIFZ_PLAN,
+  DEFAULT_PLAN_PRESET,
   presetOf,
   PRAYERS,
   MEMORIZE_REPETITION_BOUNDS,
@@ -32,6 +33,7 @@ import { interpolate } from "@/lib/i18n/useStrings";
 import { readPrayerLocation } from "@/lib/prayer/settings";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import type { PrayerLocation } from "@/lib/prayer/times";
 
 type Goal = "memorize" | "keep" | "both";
@@ -39,6 +41,12 @@ type Step = "goal" | "memorized" | "tracks" | "pace" | "when";
 
 const STEPS: readonly Step[] = ["goal", "memorized", "tracks", "pace", "when"];
 const PRESETS: readonly PlanPreset[] = ["part_time_beginner", "part_time_adult", "full_time", "maintenance", "short_surahs"];
+
+/** The wizard's column width on every screen; onboarding and Settings both open it at this width. */
+export const SETUP_MAX_WIDTH = 640;
+/** From the sidebar breakpoint the wizard is a framed card no taller than this, so Continue stays near the options. */
+const SETUP_CARD_MAX_HEIGHT = 760;
+const SETUP_CARD_MARGIN = 24;
 
 function presetLabel(preset: PlanPreset, s: UIStrings): string {
   switch (preset) {
@@ -271,6 +279,30 @@ export function setupSavedNotice(saved: SetupSaved, s: UIStrings, language: "en"
   return saved.repetitionsChanged && saved.plan.method !== "review_only" ? s.hifzPlanSaved : s.hifzPlanSavedReview;
 }
 
+/**
+ * Wide screens frame the wizard in a card with one top edge on every step, so the title stays put while the card's
+ * height follows the step. Phones keep the footer pinned at the bottom, in thumb reach on every step.
+ */
+function SetupFrame({ framed, top, maxHeight, children }: { framed: boolean; top: number; maxHeight: number; children: ReactNode }) {
+  return (
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      {framed ? (
+        <View style={{ flex: 1, alignItems: "center", paddingTop: top, paddingBottom: SETUP_CARD_MARGIN, paddingHorizontal: SETUP_CARD_MARGIN }}>
+          {/* The card's dark fill matches the page so the surface-low controls inside keep the contrast they have on phones. */}
+          <View
+            className="overflow-hidden border border-surface-high bg-surface-bright dark:border-surface-dark-high dark:bg-surface-dark"
+            style={{ width: "100%", maxWidth: SETUP_MAX_WIDTH, maxHeight, flexShrink: 1, borderRadius: 30 }}
+          >
+            {children}
+          </View>
+        </View>
+      ) : (
+        <View style={{ flex: 1, width: "100%", maxWidth: SETUP_MAX_WIDTH, alignSelf: "center" }}>{children}</View>
+      )}
+    </KeyboardAvoidingView>
+  );
+}
+
 type Props = {
   db: AppDatabase;
   language: "en" | "ar";
@@ -288,11 +320,14 @@ type Props = {
  */
 export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, onCancel }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
+  const { width, height } = useWindowDimensions();
+  const framed = width >= SIDEBAR_BREAKPOINT;
+  const scrollRef = useRef<ScrollView>(null);
   const [stepIndex, setStepIndex] = useState(0);
   // Editing starts from the saved plan as it is: its goal, and its preset only while it still matches.
   const [goal, setGoal] = useState<Goal>(initialPlan?.method === "review_only" ? "keep" : "both");
-  const [plan, setPlan] = useState<HifzPlan>(initialPlan ?? applyPreset(DEFAULT_HIFZ_PLAN, "part_time_adult"));
-  const [preset, setPreset] = useState<PlanPreset | null>(initialPlan ? presetOf(initialPlan) : "part_time_adult");
+  const [plan, setPlan] = useState<HifzPlan>(initialPlan ?? applyPreset(DEFAULT_HIFZ_PLAN, DEFAULT_PLAN_PRESET));
+  const [preset, setPreset] = useState<PlanPreset | null>(initialPlan ? presetOf(initialPlan) : DEFAULT_PLAN_PRESET);
   // The unit chosen on the tracks step. "Short surahs" reviews ayah by ayah; another pace brings this back.
   const [chosenUnit, setChosenUnit] = useState<HifzPlan["unit"]>(
     initialPlan && presetOf(initialPlan) !== "short_surahs" ? initialPlan.unit : DEFAULT_HIFZ_PLAN.unit,
@@ -302,6 +337,8 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   const [surahsAttempt, setSurahsAttempt] = useState(0);
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
+  // Juz or surah view of the memorized step, kept here so Back and Continue return to the same view.
+  const [portionMode, setPortionMode] = useState<PortionMode>("juz");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [prayerTimesOpen, setPrayerTimesOpen] = useState(false);
@@ -318,7 +355,12 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   useEffect(() => {
     let active = true;
     setSurahsState("loading");
-    db.getAllAsync<SurahChoice>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number")
+    // Each surah's first and last page let the surah list say which surahs a chosen juz already covers.
+    db.getAllAsync<SurahChoice>(
+      `SELECT s.number, s.name_arabic, s.name_english, s.ayah_count, MIN(q.v2_page) AS first_page, MAX(q.v2_page) AS last_page
+       FROM surahs s LEFT JOIN quran_text q ON q.surah = s.number AND q.v2_page > 0
+       GROUP BY s.number ORDER BY s.number`,
+    )
       .then((rows) => {
         if (!active) return;
         setSurahs(rows);
@@ -332,6 +374,11 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
       active = false;
     };
   }, [db, surahsAttempt]);
+
+  // Each step opens at its top: the scroll view is shared, so a long surah list would leave the next step scrolled.
+  useEffect(() => {
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false });
+  }, [stepIndex]);
 
   // Saving is announced once when it starts, beside the busy state on both buttons.
   useEffect(() => {
@@ -376,7 +423,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     // Tapping the goal already chosen changes nothing, so it does not reset the saved pace.
     if (next === goal) return;
     setGoal(next);
-    const nextPreset: PlanPreset = next === "keep" ? "maintenance" : "part_time_adult";
+    const nextPreset: PlanPreset = next === "keep" ? "maintenance" : DEFAULT_PLAN_PRESET;
     setPreset(nextPreset);
     setPlan((value) => applyPreset(value, nextPreset));
   };
@@ -451,10 +498,17 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     }
   }, [s, step]);
 
+  // The card sits at one top offset on every step and never runs past the bottom margin.
+  const cardTop = Math.max(SETUP_CARD_MARGIN, Math.round((height - SETUP_CARD_MAX_HEIGHT) / 2));
+  const cardMaxHeight = Math.min(SETUP_CARD_MAX_HEIGHT, height - cardTop - SETUP_CARD_MARGIN);
+
   return (
     // The footer stays above the keyboard while the surah search is focused; dragging the list closes it.
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <SetupFrame framed={framed} top={cardTop} maxHeight={cardMaxHeight}>
       <ScrollView
+        ref={scrollRef}
+        // Framed, the scroll view is only as tall as its step and gives up height to the footer when the step is long.
+        style={framed ? { flexGrow: 0, flexShrink: 1 } : undefined}
         contentContainerStyle={{ padding: 20, gap: 16 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -483,6 +537,8 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
               surahs={surahs}
               selectedSurahs={selectedSurahs}
               selectedJuz={selectedJuz}
+              mode={portionMode}
+              onModeChange={setPortionMode}
               onToggleSurah={(surah) => setSelectedSurahs((value) => toggle(value, surah))}
               onSetSurahs={(numbers, selected) =>
                 setSelectedSurahs((value) => {
@@ -670,7 +726,10 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         ) : null}
       </ScrollView>
 
-      <View className="px-5 pb-5 pt-2" style={{ gap: 8 }}>
+      <View
+        className={framed ? "border-surface-high px-5 pb-5 pt-3 dark:border-surface-dark-high" : "px-5 pb-5 pt-2"}
+        style={framed ? { gap: 8, borderTopWidth: StyleSheet.hairlineWidth } : { gap: 8 }}
+      >
         <Button
           label={saving ? s.hifzSaving : stepIndex === STEPS.length - 1 ? s.hifzSaveMemorized : s.hifzContinue}
           onPress={next}
@@ -706,6 +765,6 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
           ) : null}
         </MirroredRow>
       </View>
-    </KeyboardAvoidingView>
+    </SetupFrame>
   );
 }

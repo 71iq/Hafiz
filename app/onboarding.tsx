@@ -286,21 +286,20 @@ function OnboardingInner() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
         <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
-        <View style={{ flex: 1, width: "100%", maxWidth: 680, alignSelf: "center" }}>
-          <HifzSetupFlow
-            db={db}
-            language={uiLanguage}
-            isDark={isDark}
-            s={s}
-            initialPlan={null}
-            onCancel={() => setScreen("welcome")}
-            onDone={({ plan, declaredPages }) => {
-              const next = firstSession(plan, declaredPages);
-              setSavedNext(next);
-              void complete(next);
-            }}
-          />
-        </View>
+        {/* The flow owns its width and its framed card on wide screens, the same as in Settings. */}
+        <HifzSetupFlow
+          db={db}
+          language={uiLanguage}
+          isDark={isDark}
+          s={s}
+          initialPlan={null}
+          onCancel={() => setScreen("welcome")}
+          onDone={({ plan, declaredPages }) => {
+            const next = firstSession(plan, declaredPages);
+            setSavedNext(next);
+            void complete(next);
+          }}
+        />
       </SafeAreaView>
     );
   }
