@@ -252,8 +252,8 @@ describe("HifzSetupFlow when step and the second sitting (START-02, REMIND-07)",
 
 describe("HifzSetupFlow default pace", () => {
   const db = { getAllAsync: jest.fn(async () => []) } as unknown as AppDatabase;
-  const pace = (plan: HifzPlan) => ({ newPerDay: plan.newPerDay, sabqiEvery: plan.sabqiEvery, dailyBudgetMin: plan.dailyBudgetMin });
-  const beginner = { newPerDay: 0.25, sabqiEvery: 2, dailyBudgetMin: 20 };
+  const pace = (plan: HifzPlan) => ({ newPerDay: plan.newPerDay, recentEvery: plan.recentEvery, dailyBudgetMin: plan.dailyBudgetMin });
+  const beginner = { newPerDay: 0.25, recentEvery: 2, dailyBudgetMin: 20 };
 
   beforeEach(() => jest.mocked(applyHifzSetup).mockClear());
 
@@ -288,7 +288,7 @@ describe("HifzSetupFlow default pace", () => {
 
   it("keeps the stored pace when a saved plan is edited", async () => {
     const stored = applyPreset(DEFAULT_HIFZ_PLAN, "part_time_adult");
-    expect(pace(await saveFrom(stored))).toEqual({ newPerDay: 0.5, sabqiEvery: 1, dailyBudgetMin: 30 });
+    expect(pace(await saveFrom(stored))).toEqual({ newPerDay: 0.5, recentEvery: 1, dailyBudgetMin: 30 });
   });
 });
 
