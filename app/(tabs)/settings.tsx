@@ -1301,15 +1301,19 @@ function SettingsControlRow({ label, isRTL, children }: { label: string; isRTL: 
 }
 
 function ContentSettingsPanel({ children, isRTL }: { children: ReactNode; isRTL: boolean }) {
+  // The hand-mirrored alignment needs an LTR parent; under the RTL tab root it flipped twice and the
+  // capped panel hugged the left in Arabic. The panel restores the reading direction for its rows.
   return (
-    <View
-      style={{
-        alignSelf: isRTL ? "flex-end" : "flex-start",
-        maxWidth: CONTENT_SETTINGS_MAX_WIDTH,
-        width: "100%",
-      }}
-    >
-      {children}
+    <View style={{ direction: "ltr", alignItems: isRTL ? "flex-end" : "flex-start" }}>
+      <View
+        style={{
+          direction: isRTL ? "rtl" : "ltr",
+          maxWidth: CONTENT_SETTINGS_MAX_WIDTH,
+          width: "100%",
+        }}
+      >
+        {children}
+      </View>
     </View>
   );
 }
