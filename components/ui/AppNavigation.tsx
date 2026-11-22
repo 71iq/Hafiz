@@ -149,7 +149,8 @@ function BottomTabItem({
         {/* Android drops a view's rounding when its background arrives after mount, which turned the
             pill into a rectangle on a tab switch. The fill exists from mount and only fades. */}
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.bottomTabPill, { opacity: isFocused ? 1 : 0 }]} />
-        {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
+        {/* The icon sits in a View so web paints it above the absolute pill, like the label; a bare svg is unpositioned and was covered. */}
+        <View pointerEvents="none">{options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}</View>
         {/* Arabic labels keep their natural line height so marks above and below are not clipped. */}
         <Text
           numberOfLines={1}
