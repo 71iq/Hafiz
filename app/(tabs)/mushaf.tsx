@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useIsFocused } from "@react-navigation/native";
 import { useFocusEffect, router } from "expo-router";
 import { AuthReopenSurfaces } from "@/components/auth/AuthReopenSurfaces";
 import { View, Text, Pressable, Platform, useWindowDimensions, BackHandler, AppState } from "react-native";
@@ -202,6 +203,7 @@ export default function MushafScreen() {
 
 function MushafInner() {
   const db = useDatabase();
+  const isFocused = useIsFocused();
   // ERR-06: weak-spot markers for the pages and verses below.
   useWeakSpotsLoader(db);
   const {
@@ -244,7 +246,7 @@ function MushafInner() {
   }, []);
   const markDeliberateMovement = useCallback(() => dispatchPosition("deliberate-move"), [dispatchPosition]);
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    if (!isFocused || Platform.OS !== "web" || typeof window === "undefined") return;
     const markInput = () => {
       lastUserScrollInputRef.current = Date.now();
     };
@@ -259,7 +261,7 @@ function MushafInner() {
       window.removeEventListener("touchmove", markInput);
       window.removeEventListener("keydown", markKey);
     };
-  }, []);
+  }, [isFocused]);
   const [focusModeActive, setFocusModeActive] = useState(false);
   const [focusModePlaying, setFocusModePlaying] = useState(false);
   const [focusControlsVisible, setFocusControlsVisible] = useState(false);
@@ -1673,7 +1675,7 @@ function MushafInner() {
   const keyboardStateRef = useRef({ readerOverlayOpen, focusModeActive, isPageMode, windowHeight });
   keyboardStateRef.current = { readerOverlayOpen, focusModeActive, isPageMode, windowHeight };
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    if (!isFocused || Platform.OS !== "web" || typeof window === "undefined") return;
     const pageBy = (direction: 1 | -1) => {
       const { isPageMode: pageMode, windowHeight: viewportHeight } = keyboardStateRef.current;
       markDeliberateMovement();
@@ -1730,7 +1732,7 @@ function MushafInner() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleOpenHelp, handleOpenSearch, markDeliberateMovement]);
+  }, [handleOpenHelp, handleOpenSearch, isFocused, markDeliberateMovement]);
 
   // Verse view: the current ayah is the first one at least half visible. An ayah taller than twice
   // the viewport can never reach that, so the ayah covering the top edge counts when none does.
@@ -1929,7 +1931,7 @@ function MushafInner() {
                 hifzVisibility={hifzVisibility}
                 arrivalId={arrival?.id ?? 0}
                 topAyahRef={pageTopAyahRef}
-                keyboardPagingEnabled={!readerOverlayOpen}
+                keyboardPagingEnabled={isFocused && !readerOverlayOpen}
                 onUserNavigate={() => {
                   markDeliberateMovement();
                   suspendFollowRef.current();

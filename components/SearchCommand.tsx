@@ -276,8 +276,8 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
              FROM quran_text q
              LEFT JOIN translations t ON q.surah = t.surah AND q.ayah = t.ayah
              JOIN surahs s ON q.surah = s.number
-             WHERE q.text_search LIKE '%' || ? || '%'
-                OR LOWER(t.text_en) LIKE '%' || LOWER(?) || '%'
+             WHERE INSTR(q.text_search, ?) > 0
+                OR INSTR(LOWER(t.text_en), LOWER(?)) > 0
              ORDER BY q.surah, q.ayah
              LIMIT ${TEXT_RESULT_LIMIT}`,
             [stripped, trimmed]

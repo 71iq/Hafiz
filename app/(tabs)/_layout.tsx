@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Platform, View } from "react-native";
-import { Tabs } from "expo-router";
+import { Tabs, usePathname } from "expo-router";
 import { House, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
@@ -54,10 +54,11 @@ function SyncOwner({ children }: { children: ReactNode }) {
   );
 }
 
-/** Ctrl/Cmd+K and `/` open the existing Search outside text editing and open overlays (web). */
+/** Mushaf opens its own Search so closing it takes the reader back to the current ayah. */
 function useSearchShortcut() {
+  const pathname = usePathname();
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    if (Platform.OS !== "web" || typeof document === "undefined" || pathname === "/mushaf") return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isSearchShortcut(event)) return;
       if (document.querySelector('[aria-modal="true"]')) return;
@@ -66,7 +67,7 @@ function useSearchShortcut() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [pathname]);
 }
 
 // Home is the tab navigator's initial route so Back never lands on the hidden index redirect.
