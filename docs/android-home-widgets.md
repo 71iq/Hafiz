@@ -20,17 +20,18 @@ Hafiz takes the escalation: the darkening sky, a character whose state follows t
 
 Android offers **Hafiz streak**, a 2×2 tile, and **Hafiz wird** at 4×2. Both use the same data. The streak tile resizes down to a single row. The wird widget keeps enough height for the week. Each layout has an ideal size. From Android 12 the launcher picks the closest ideal size that fits the widget. Earlier versions apply the same rule to the size in the widget options, so one size gets one layout everywhere. Every minimum leaves room for a three-digit count beside the flame.
 
-| Ideal size, dp    | Layout                                                                                                                                                |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 320×170           | Roomy wide: flame and count, one line and the week row at the start; Zayt up to 165 dp wide at the end.                                               |
-| 250×170           | Wide: the same with Zayt up to 112 dp wide.                                                                                                           |
-| 250×130           | Low wide: the wide layout with a smaller count and line, so a 4×2 on short launcher rows keeps its week row. Hafiz wird is never shorter than 130 dp. |
-| 130×130           | Tile: flame and count centred at the top, one line below, Zayt filling the rest with only its feet cut.                                               |
-| 110×100           | Small tile: flame, count and Zayt, with no line so Zayt's face is never cut; with Zayt off, the plain tile keeps its line.                            |
-| 250×64 and 170×64 | Short: flame, count and line at the start; Zayt fills the height at the end, with only the twig tip and feet cut.                                     |
-| 210×40            | Strip: one row with the line beside the count, and Zayt filling the height.                                                                           |
-| 130×48            | Compact: a short 2×1 with the flame and count at the start and Zayt at the end, no line. With Zayt off, the strip's plain card.                       |
-| 100×40            | Tiny: the flame with the count, or the line when there is no count. No Zayt, so neither is cut.                                                       |
+| Ideal size, dp      | Layout                                                                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 250×210 and 320×210 | Tall wide: the week spans the bottom. Above it, the count and line sit beside a larger Zayt.                                                          |
+| 320×170             | Roomy wide: flame and count, one line and the week row at the start; Zayt up to 165 dp wide at the end.                                               |
+| 250×170             | Wide: the same with Zayt up to 112 dp wide.                                                                                                           |
+| 250×130             | Low wide: the wide layout with a smaller count and line, so a 4×2 on short launcher rows keeps its week row. Hafiz wird is never shorter than 130 dp. |
+| 130×130             | Tile: flame and count centred at the top, one line below, Zayt filling the rest with only its feet cut.                                               |
+| 110×100             | Small tile: flame, count and Zayt, with no line so Zayt's face is never cut; with Zayt off, the plain tile keeps its line.                            |
+| 250×64 and 170×64   | Short: flame, count and line at the start; Zayt fills the height at the end, with only the twig tip and feet cut.                                     |
+| 210×40              | Strip: one row with the line beside the count, and Zayt filling the height.                                                                           |
+| 130×48              | Compact: a short 2×1 with the flame and count at the start and Zayt at the end, no line. With Zayt off, the strip's plain card.                       |
+| 100×40              | Tiny: the flame with the count, or the line when there is no count. No Zayt, so neither is cut.                                                       |
 
 Zayt's face sits low on the drop, so no layout crops more than the feet and the tip of the twig. Android 12 and later round every widget's corners. Before that, launchers do not, so the renderer draws the sky at the widget's reported size with the card's 16 dp radius.
 
