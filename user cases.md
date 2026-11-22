@@ -105,7 +105,7 @@ User flows in the current project, reviewed on 15 November 2026. Shared flows ap
 - WORD-05. Read the word translation/transliteration or Arabic meaning. Add its meaning to vocabulary, then show saving/saved feedback or a retryable failure.
 - WORD-06. When Arabic meaning is absent, enter a custom meaning and save it locally. The saved meaning gains the normal vocabulary action. Empty text cannot save; a failure retains the editor and error. Your own meaning offers Edit and a confirmed Delete; a bundled meaning offers neither.
 - WORD-07. Read I'rab with the selected word highlighted and scrolled into view, or read Tasreef morphology. Loading/missing-data states replace unavailable content.
-- WORD-08. Expand or collapse individual Tajweed rules in the selected UI language. Show the no-rules state when none applies.
+- WORD-08. Read each recorded Tajweed rule with its full description in the selected UI language. Show a no-annotations message when none are recorded.
 - WORD-09. Select a root occurrence. Close word detail and move Mushaf to that ayah/word with a highlight. Missing roots or occurrences show an empty state.
 - SELECT-01. On web, select Quran text with mouse, keyboard, or touch. Copy through the custom menu or normal clipboard command to obtain Unicode Quran text and references.
 - SELECT-02. Open the selected-text color picker and highlight the exact selected words. Show copy/highlight errors when an operation fails. Scrolling or outside interaction dismisses the selection menu; active browser selection suppresses page dragging.
