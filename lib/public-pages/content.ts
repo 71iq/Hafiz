@@ -321,7 +321,8 @@ export const PUBLIC_PAGE_CONTENT: Record<
           bullets: [
             "Email address and authentication identifiers",
             "Profile details such as username or display name",
-            "Settings, study cards, review logs, bookmarks, highlights, and private note metadata",
+            "Settings, study cards, review logs, bookmarks, and highlights",
+            "The text and metadata of your private notes, kept private to your account",
             "Public reflections, comments and likes",
             "Wird days, review sessions and recitation mistakes, kept private to your account",
             "Board participation if you join",
@@ -395,7 +396,8 @@ export const PUBLIC_PAGE_CONTENT: Record<
           bullets: [
             "البريد الإلكتروني ومعرفات المصادقة",
             "بيانات الملف مثل اسم المستخدم أو الاسم المعروض",
-            "الإعدادات، وبطاقات الدراسة، وسجل المراجعة، والإشارات، والتمييزات، وبيانات الملاحظات الخاصة",
+            "الإعدادات، وبطاقات الدراسة، وسجل المراجعة، والإشارات، والتمييزات",
+            "نص ملاحظاتك الخاصة وبياناتها الوصفية، وتبقى خاصة بحسابك",
             "التأملات العامة، والتعليقات، والإعجابات",
             "أيام الوِرد، وجلسات المراجعة، وأخطاء التلاوة، وتبقى خاصة بحسابك",
             "المشاركة في اللوحة إن انضممت إليها",
