@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef } from "react";
-import { Text, Pressable, Platform, View } from "react-native";
+import { Text, Pressable, Platform, PixelRatio, View } from "react-native";
 import { useSettings, type ThemePalette } from "@/lib/settings/context";
 import { useWordTap } from "./useWordTap";
 
@@ -35,13 +35,10 @@ type Props = {
 export const WEAK_SPOT_LIGHT = "#d97706";
 export const WEAK_SPOT_DARK = "#f59e0b";
 
-// Android clips each Text to its own box, but QCF page words draw outside their advance: over all
-// 604 pages, shaped words reach up to 1.77 em past the line-end (left) edge and, rarely, 1.48 em past
-// the right edge. On Android the word's Text keeps its box and tap target but draws no ink. A
-// non-interactive copy widened by this much on both sides draws the glyph. Its right padding keeps the
-// right-aligned glyph exactly where the word box puts it; centering would follow Android's ink
-// bounds and shift it (RF189).
-const INK_OVERFLOW_EM = 2;
+// Shaped word bounds across the 604 Classic and Modern page fonts extend up to 1.77 em
+// left of the advance and 4.99 em right of it. The advance still owns spacing and taps.
+const LEFT_INK_EM = 2;
+const RIGHT_INK_EM = 5;
 
 function WordTokenInner({
   glyph,
@@ -112,6 +109,10 @@ function WordTokenInner({
   const drawsInkLayer = Platform.OS === "android" && !hidden;
   const wordBackgroundColor = bgColor ?? (isTooltipSelected ? "rgba(13, 148, 136, 0.08)" : undefined);
   const wordPadding = compactLayout ? 0 : 1;
+  // Round up to a physical pixel as Android does when it resolves a Text font size.
+  const pixelRatio = PixelRatio.get();
+  const em = Math.ceil(fontSize * PixelRatio.getFontScale() * pixelRatio) / pixelRatio;
+  const rightGutter = RIGHT_INK_EM * em + 1;
   const inkClassName = isTooltipSelected
     ? "text-primary-accent dark:text-primary-bright"
     : "text-charcoal dark:text-neutral-100";
@@ -184,8 +185,8 @@ function WordTokenInner({
             position: "absolute",
             top: 0,
             bottom: 0,
-            left: -fontSize * INK_OVERFLOW_EM,
-            right: -fontSize * INK_OVERFLOW_EM,
+            left: -(LEFT_INK_EM * em + 1),
+            right: -rightGutter,
           }}
         >
           <Text
@@ -194,12 +195,12 @@ function WordTokenInner({
               fontFamily,
               fontSize,
               lineHeight,
-              // The layer is placed from the Pressable's edge; add its and the word Text's padding.
-              paddingRight: fontSize * INK_OVERFLOW_EM + 2 * wordPadding,
               textAlign: "right",
             }}
           >
-            {glyph}
+            {/* Android clips TextView at its padding. Reserve the right inset inside the
+                RTL line instead, so the glyph can paint across it at its original position. */}
+            {"\u200f"}<View style={{ width: rightGutter + 2 * wordPadding, height: 0 }} />{glyph}
           </Text>
         </View>
       )}

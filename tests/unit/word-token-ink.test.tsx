@@ -1,5 +1,5 @@
 import React from "react";
-import { Platform, StyleSheet, type StyleProp, type TextStyle } from "react-native";
+import { Platform, View, StyleSheet, type StyleProp, type TextStyle } from "react-native";
 import { render } from "@testing-library/react-native";
 import { WordToken } from "@/components/mushaf/WordToken";
 
@@ -49,7 +49,9 @@ describe("RF-189 page-view word ink on Android", () => {
     Platform.OS = "android";
     const view = renderWord({ highlightColor: "#0d9488" });
 
-    const [sizing, ink] = view.getAllByText(RAHMAN, { includeHiddenElements: true });
+    const sizing = view.getByText(RAHMAN);
+    const ink = view.getByText("\u200f" + RAHMAN, { includeHiddenElements: true });
+    const spacer = ink.findByType(View);
     // Screen readers hear the word once.
     expect(view.getAllByText(RAHMAN)).toHaveLength(1);
     // Color-font layers ignore the text color, so hide the sizing copy with view opacity.
@@ -68,8 +70,12 @@ describe("RF-189 page-view word ink on Android", () => {
     while (layer && String(layer.type) !== "View") layer = layer.parent;
     if (!layer) throw new Error("ink layer View not found");
     expect(layer.props.pointerEvents).toBe("none");
-    expect(flat(layer)).toMatchObject({ position: "absolute", left: -60, right: -60 });
-    expect(flat(ink)).toMatchObject({ paddingRight: 60, textAlign: "right" });
+    expect(flat(layer).position).toBe("absolute");
+    expect(flat(layer).left).toBeLessThanOrEqual(-60);
+    expect(flat(layer).right).toBeLessThanOrEqual(-150);
+    expect(flat(ink).paddingRight).toBeUndefined();
+    expect(flat(ink).textAlign).toBe("right");
+    expect(flat(spacer).width).toBe(-Number(flat(layer).right));
     expect(flat(ink).opacity).toBeUndefined();
     expect(flat(ink).backgroundColor).toBeUndefined();
   });
@@ -78,11 +84,15 @@ describe("RF-189 page-view word ink on Android", () => {
     Platform.OS = "android";
     const view = renderWord({ compactLayout: false });
 
-    const [sizing, ink] = view.getAllByText(RAHMAN, { includeHiddenElements: true });
+    const sizing = view.getByText(RAHMAN);
+    const ink = view.getByText("\u200f" + RAHMAN, { includeHiddenElements: true });
+    const spacer = ink.findByType(View);
     // The ink layer is offset from the Pressable's edge, which sits 1 px outside the word Text's
-    // 1 px padding, so its padding grows by both.
+    // 1 px padding, so the inline spacer includes both.
     expect(flat(sizing).paddingHorizontal).toBe(1);
-    expect(flat(ink).paddingRight).toBe(62);
+    const compact = renderWord();
+    const compactInk = compact.getByText("\u200f" + RAHMAN, { includeHiddenElements: true });
+    expect(flat(spacer).width).toBe(Number(flat(compactInk.findByType(View)).width) + 2);
     expect(ink.props.className).toBe(sizing.props.className);
   });
 

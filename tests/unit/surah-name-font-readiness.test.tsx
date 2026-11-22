@@ -119,11 +119,13 @@ describe.each(variants)(
     }
 
     function expectReady(view: ReturnType<typeof render>, ready: boolean) {
-      const text = view.getByText(bismillah);
+      const literal = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+      const text = view.getByText(ready ? bismillah : literal);
+      expect(text.props.accessibilityLabel).toBe(literal);
       expect(StyleSheet.flatten(text.props.style)).toMatchObject({
-        opacity: ready ? 1 : 0,
-        fontFamily: "SyntheticSurahFont",
+        fontFamily: ready ? "SyntheticSurahFont" : undefined,
         writingDirection: "rtl",
+        alignSelf: "stretch",
       });
       if (kind === "header") {
         // The compact page-view card shows the calligraphic name in both languages once the font is

@@ -1,8 +1,8 @@
+import { Bismillah } from "./Bismillah";
 import { useState } from "react";
 import { Platform, Pressable, View, Text } from "react-native";
 import { Info } from "lucide-react-native";
 import {
-  surahNameBismillahGlyphs,
   surahNameFontName,
   surahNameGlyph,
 } from "@/lib/fonts/loader";
@@ -22,7 +22,6 @@ type Props = {
   compact?: boolean;
 };
 
-const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 const COMPACT_DECORATIVE_SURAH_NAME_SIZE = 32;
 const COMPACT_DECORATIVE_SURAH_NAME_LINE_HEIGHT = 42;
 
@@ -62,21 +61,6 @@ export function SurahHeader({
   const useDecorativeSurahName = Boolean(decorativeNameGlyph && surahNameFontReady);
   const renderedSurahName = useDecorativeSurahName ? decorativeNameGlyph! : displayName;
   const renderedSurahNameDirection = useDecorativeSurahName ? "ltr" : nameDirection;
-  const bismillahSelectionProps =
-    Platform.OS === "web" && showBismillah
-      ? ({
-          selectable: true,
-          dataSet: {
-            hafizQuranToken: "word",
-            hafizSurah: String(surahNumber),
-            hafizAyah: "1",
-            hafizWordPos: "-1",
-            hafizLiteralText: BISMILLAH_UTHMANI,
-            hafizQuranHidden: "false",
-          },
-        } as any)
-      : {};
-
   if (compact) {
     return (
       <>
@@ -128,20 +112,7 @@ export function SurahHeader({
 
           {showBismillah && (
             <View className="items-center mt-2 mb-1">
-              <Text
-                {...bismillahSelectionProps}
-                className="text-charcoal dark:text-neutral-200 text-center"
-                style={{
-                  fontSize: 18,
-                  lineHeight: 32,
-                  fontFamily: surahNameFontName(),
-                  opacity: surahNameFontReady ? 1 : 0,
-                  writingDirection: "rtl",
-                  ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
-                }}
-              >
-                {surahNameBismillahGlyphs()}
-              </Text>
+              <Bismillah surahNumber={surahNumber} fontReady={surahNameFontReady} fontSize={18} lineHeight={32} />
             </View>
           )}
         </View>
@@ -210,20 +181,7 @@ export function SurahHeader({
 
       {showBismillah && (
         <View className="items-center mt-6 mb-2">
-          <Text
-            {...bismillahSelectionProps}
-            className="text-charcoal dark:text-neutral-200 text-center"
-            style={{
-              fontSize: 24,
-              lineHeight: 48,
-              fontFamily: surahNameFontName(),
-              opacity: surahNameFontReady ? 1 : 0,
-              writingDirection: "rtl",
-              ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
-            }}
-          >
-            {surahNameBismillahGlyphs()}
-          </Text>
+          <Bismillah surahNumber={surahNumber} fontReady={surahNameFontReady} fontSize={24} lineHeight={48} />
         </View>
       )}
     </View>

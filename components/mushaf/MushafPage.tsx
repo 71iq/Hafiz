@@ -3,6 +3,7 @@ import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
 import { useSimilarMarks } from "@/lib/hifz/use-similar-markers";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
+import { Bismillah } from "./Bismillah";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
 import { SimilarVersePageMarker } from "./SimilarVerseMarker";
@@ -12,8 +13,6 @@ import {
   quranPageFontName,
   quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
-  surahNameBismillahGlyphs,
-  surahNameFontName,
 } from "@/lib/fonts/loader";
 import { useSurahNameFont } from "@/lib/fonts/use-surah-name-font";
 import { useSelection } from "@/lib/selection/context";
@@ -128,7 +127,6 @@ type PageGlyph = {
   identity: WordIdentity;
 };
 
-const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
 const MUSHAF_LINE_WIDTH_SCALE = 19.5;
 const MUSHAF_LINE_WIDTH_SCALE_V4_TAJWEED = 21.5;
@@ -440,40 +438,22 @@ function MushafPageInner({
 
       if (line.line_type === "basmallah") {
         const bismHeight = visualLineHeight * 0.85 + 8;
-        const bismillahSelectionProps =
-          Platform.OS === "web" && line.surah_number
-            ? ({
-                selectable: true,
-                dataSet: {
-                  hafizQuranToken: "word",
-                  hafizSurah: String(line.surah_number),
-                  hafizAyah: "1",
-                  hafizWordPos: "-1",
-                  hafizLiteralText: BISMILLAH_UTHMANI,
-                  hafizQuranHidden: "false",
-                },
-              } as any)
-            : {};
+        // The bundled layout records the surah number on the preceding header.
+        const surah = line.surah_number ?? lineLayout.find(
+          (row) => row.line_type === "surah_name" && row.line_number === line.line_number - 1,
+        )?.surah_number;
         return (
           <View
             key={`line-${line.line_number}-bism`}
             className="items-center"
             style={{ height: bismHeight, justifyContent: "center" }}
           >
-            <Text
-              {...bismillahSelectionProps}
-              className="text-charcoal dark:text-neutral-200 text-center"
-              style={{
-                fontFamily: surahNameFontName(),
-                fontSize: fontSize * 0.85,
-                lineHeight: lineHeight * 0.85,
-                opacity: surahNameFontReady ? 1 : 0,
-                writingDirection: "rtl",
-                ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
-              }}
-            >
-              {surahNameBismillahGlyphs()}
-            </Text>
+            <Bismillah
+              surahNumber={surah}
+              fontReady={surahNameFontReady}
+              fontSize={fontSize * 0.85}
+              lineHeight={lineHeight * 0.85}
+            />
           </View>
         );
       }
