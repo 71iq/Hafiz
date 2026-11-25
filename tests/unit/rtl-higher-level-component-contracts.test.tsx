@@ -345,6 +345,7 @@ describe("RTL higher-level component contracts", () => {
       flashcardsNewCards: "New",
       deckCardsFilterDue: "Due",
       progressDefaultDecksEmpty: "No deck progress yet",
+      progressDeckNotDaily: "Not in daily study",
     };
 
     setMockSettings({ isRTL: true, uiLanguage: "ar" });
@@ -360,6 +361,7 @@ describe("RTL higher-level component contracts", () => {
             startedCount: 7,
             newCount: 0,
             dueCount: 7,
+            daily: true,
           },
         ]}
         isDark={false}

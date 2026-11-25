@@ -24,6 +24,7 @@ type DefaultDeckProgressStrings = Pick<
   | "flashcardsNewCards"
   | "progressDefaultDecksEmpty"
   | "deckCardsFilterDue"
+  | "progressDeckNotDaily"
 > &
   Partial<Pick<UIStrings, "progressOpenDeckCards">>;
 
@@ -170,7 +171,17 @@ function DefaultDeckProgressRow({
       <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
         <DeckMetric label={s.progressDeckStarted} value={item.startedCount} isRTL={isRTL} />
         <DeckMetric label={s.flashcardsNewCards} value={item.newCount} isRTL={isRTL} />
-        <DeckMetric label={s.deckCardsFilterDue} value={item.dueCount} isRTL={isRTL} />
+        {/* A deck outside daily study is not work waiting, so it shows no due count (SPEC 3.3). */}
+        {item.daily ? (
+          <DeckMetric label={s.deckCardsFilterDue} value={item.dueCount} isRTL={isRTL} />
+        ) : (
+          <Text
+            className="self-center text-warm-500 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 11, writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.progressDeckNotDaily}
+          </Text>
+        )}
       </View>
     </View>
   );

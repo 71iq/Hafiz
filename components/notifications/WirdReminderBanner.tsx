@@ -1,5 +1,6 @@
+import { router } from "expo-router";
 import { X } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -14,13 +15,18 @@ import {
   loadReminderBanner,
   type ReminderBanner,
 } from "@/lib/notifications/banner";
-import { openReminderRoute } from "@/lib/notifications/reminder-route";
+import { resolveReminderHref } from "@/lib/notifications/reminder-route";
 import type { RamadanAnchor, ReminderRoute } from "@/lib/notifications/types";
 import { useSettings } from "@/lib/settings/context";
 
 export type WirdReminderBannerProps = {
-  /** Called on "Start". Defaults to the reminder's own route: the wird review for the plan, al-Kahf or Home. */
+  /** Called on "Start". Defaults to the reminder's own route: today's next study step, al-Kahf or Home. */
   onStart?: (route: ReminderRoute) => void;
+  /**
+   * False when the study resolver has no step today (no plan, or nothing left). A wird reminder then
+   * shows no Start, since it would open nothing, and stays until the day is done (SPEC 3.3).
+   */
+  wirdStartable?: boolean;
 };
 
 /**
@@ -28,11 +34,15 @@ export type WirdReminderBannerProps = {
  * while notifications are not allowed. It also carries the one-time Ramadan time offer (NOT-10).
  * Renders nothing when there is no reminder due. Refreshes on focus and after reviews.
  */
-export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
+export function WirdReminderBanner({ onStart, wirdStartable = true }: WirdReminderBannerProps) {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, uiLanguage } = useSettings();
   const [banner, setBanner] = useState<ReminderBanner | null>(null);
+  /** Start is resolving its destination; a second press then opens nothing more. */
+  const starting = useRef(false);
+  /** The rendered copy of `starting`, so Start shows it is working. */
+  const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(() => {
     loadReminderBanner(db, { language: uiLanguage })
@@ -78,10 +88,30 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
   }
 
   const start = () => {
-    dismiss();
-    if (onStart) onStart(banner.route);
-    else openReminderRoute(db, banner.route).catch(() => {});
+    if (onStart) {
+      dismiss();
+      onStart(banner.route);
+      return;
+    }
+    if (starting.current) return;
+    starting.current = true;
+    setBusy(true);
+    // Resolve first: the banner is dismissed only when Start opens something. A wird reminder whose
+    // resolver answers Home (no plan, nothing left, or a failed read) stays, since the day is not done.
+    resolveReminderHref(db, banner.route)
+      .then((href) => {
+        if (href === "/(tabs)/home") return;
+        dismiss();
+        router.push(href);
+      })
+      .catch(() => {})
+      .finally(() => {
+        starting.current = false;
+        setBusy(false);
+      });
   };
+  // A Home route has nothing to start; a wird route has nothing when the resolver has no step today.
+  const showStart = banner.route !== "home" && !(banner.route === "wird" && !wirdStartable);
 
   return (
     <Card elevation="mid" className="mt-4 p-4" accessibilityRole="alert" accessibilityLabel={`${s.notifBannerLabel}: ${banner.title}`}>
@@ -100,9 +130,16 @@ export function WirdReminderBanner({ onStart }: WirdReminderBannerProps) {
           <X size={18} color={isDark ? "#E5E5E5" : "#3F3F46"} />
         </Pressable>
       </MirroredRow>
-      {banner.route !== "home" || onStart ? (
+      {showStart ? (
         <MirroredRow className="mt-2">
-          <Button size="sm" className="h-11" onPress={start} label={s.notifBannerStart} />
+          <Button
+            size="sm"
+            className="h-11"
+            onPress={start}
+            disabled={busy}
+            accessibilityState={{ busy, disabled: busy }}
+            label={s.notifBannerStart}
+          />
         </MirroredRow>
       ) : null}
     </Card>

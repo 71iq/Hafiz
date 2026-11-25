@@ -4,9 +4,9 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { HifzSetupFlow } from "@/components/hifz/HifzSetupFlow";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
-import type { HifzPlan } from "@/lib/hifz/plan";
 import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { resolveStudy, studyStepHref } from "@/lib/study/resolve";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useRouter, type Href } from "expo-router";
@@ -19,7 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 /**
  * The first route for a new install (5.1): a welcome, then the hifz setup (goal, memorized portion,
  * review tracks, pace and time), then straight into a first short session so the first recitation
- * starts within about 90 seconds (ONB-01). No account is needed, and every step has "Not now".
+ * starts within about 90 seconds (ONB-01). The session is the study resolver's first step, the same
+ * one the Study button opens (SPEC 3.1). No account is needed, and every step has "Not now".
  */
 function OnboardingInner() {
   const db = useDatabase();
@@ -32,6 +33,8 @@ function OnboardingInner() {
   const [error, setError] = useState<string | null>(null);
   // Set once the plan is saved: a failed completion then retries only the completion, never the plan.
   const [savedNext, setSavedNext] = useState<Href | null>(null);
+  /** The plan is saved and the resolver is choosing the first session. */
+  const [resolving, setResolving] = useState(false);
 
   const isWide = width >= SIDEBAR_BREAKPOINT;
   const dir = isRTL ? "rtl" : "ltr";
@@ -65,12 +68,20 @@ function OnboardingInner() {
     [completing, db, router, s.onboardingSaveFailed],
   );
 
-  /** ONB-01, 5.1 step 8: the first session starts right away, on what the plan offers first. */
-  const firstSession = (plan: HifzPlan, declaredPages: number): Href => {
-    if (plan.unit === "ayah") return "/flashcards/session";
-    if (declaredPages > 0) return "/hifz/review";
-    if (plan.newPerDay > 0) return "/hifz/memorize" as Href;
-    return "/(tabs)/home";
+  /**
+   * ONB-01, 5.1 step 8: the first session starts right away, on the resolver's first step. It resolves
+   * once; a failed read opens Home, and Retry reuses the result.
+   */
+  const finishSetup = () => {
+    // A failed Skip earlier on the welcome step must not keep the saved setup on screen while it resolves.
+    setError(null);
+    setResolving(true);
+    void resolveStudy(db).then((step) => {
+      const next = studyStepHref(step);
+      setSavedNext(next);
+      setResolving(false);
+      return complete(next);
+    });
   };
 
   const renderWelcomeArt = () => (
@@ -242,7 +253,7 @@ function OnboardingInner() {
 
   // The plan is saved but finishing setup failed: retry the completion alone, so the plan is not
   // written twice and the first session still opens once.
-  if (savedNext && !error) {
+  if ((savedNext || resolving) && !error) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -294,11 +305,7 @@ function OnboardingInner() {
           s={s}
           initialPlan={null}
           onCancel={() => setScreen("welcome")}
-          onDone={({ plan, declaredPages }) => {
-            const next = firstSession(plan, declaredPages);
-            setSavedNext(next);
-            void complete(next);
-          }}
+          onDone={finishSetup}
         />
       </SafeAreaView>
     );

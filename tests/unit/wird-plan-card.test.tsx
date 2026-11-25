@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render } from "@testing-library/react-native";
 import { WirdPlanCard } from "@/components/hifz/WirdPlanCard";
 import type { TodayWird } from "@/lib/hifz/pages";
+import type { TodayPart } from "@/lib/study/today";
 import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 
@@ -27,22 +28,20 @@ function wird(
 }
 
 function renderCard(props: {
-  wird: TodayWird;
+  wird: TodayWird | null;
+  parts?: readonly TodayPart[] | null;
   secondLooksDue?: number;
   nextLookAt?: Date | null;
-  ayahDue?: number;
-  ayahNew?: number;
   language?: "en" | "ar";
 }) {
-  const handlers = { onStartReview: jest.fn(), onStartMemorize: jest.fn(), onSetup: jest.fn(), onDrill: jest.fn() };
+  const handlers = { onStartMemorize: jest.fn() };
   const view = render(
     <WirdPlanCard
       wird={props.wird}
-      inboxCount={0}
+      parts={props.parts ?? null}
+      deckTitle={(deckId) => `deck ${deckId}`}
       secondLooksDue={props.secondLooksDue}
       nextLookAt={props.nextLookAt}
-      ayahDue={props.ayahDue}
-      ayahNew={props.ayahNew}
       language={props.language ?? "en"}
       isDark={false}
       s={props.language === "ar" ? strings.ar : s}
@@ -52,13 +51,40 @@ function renderCard(props: {
   return { view, handlers };
 }
 
-describe("the wird card's new lines", () => {
-  it("counts the lines still left of today's allocation, then says they are done", () => {
-    expect(renderCard({ wird: wird({ newLines: 7, todo: 2 }) }).view.getByText(interpolate(s.hifzWirdNew, { lines: "7 lines" }))).toBeTruthy();
-    expect(renderCard({ wird: wird({ newLines: 7, linesToday: 4, todo: 2 }) }).view.getByText(interpolate(s.hifzWirdNew, { lines: "3 lines" }))).toBeTruthy();
-    const done = renderCard({ wird: wird({ newLines: 7, linesToday: 12, todo: 2 }) }).view;
-    expect(done.getByText(s.hifzWirdNewDone)).toBeTruthy();
-    expect(done.queryByText(interpolate(s.hifzWirdNew, { lines: "7 lines" }))).toBeNull();
+describe("the Today card's parts (SPEC 3.3)", () => {
+  const parts: TodayPart[] = [
+    { kind: "review", count: 2, unit: "pages", done: false },
+    { kind: "memorize", count: 3, done: false },
+    { kind: "deck", deckId: "mut", count: 0, done: true },
+    { kind: "deck", deckId: "tails", count: 4, done: false },
+  ];
+
+  it("lists each part with what is left, and a finished part without a count", () => {
+    const { view } = renderCard({ wird: wird({ newLines: 7, linesToday: 4, todo: 2 }), parts });
+    expect(view.getByLabelText(`${s.studyStepReview}, 2`)).toBeTruthy();
+    expect(view.getByLabelText(`${s.studyPartNewLines}, 3 lines`)).toBeTruthy();
+    expect(view.getByLabelText(`deck mut, ${s.flashcardsSummaryDone}`)).toBeTruthy();
+    expect(view.getByLabelText("deck tails, 4 cards")).toBeTruthy();
+  });
+
+  it("counts an ayah plan's review in ayat, in Arabic too", () => {
+    const today = { ...wird({ unit: "ayah" }), done: [], total: 0 } as unknown as TodayWird;
+    const ayahParts: TodayPart[] = [{ kind: "review", count: 12, unit: "ayahs", done: false }];
+    expect(renderCard({ wird: today, parts: ayahParts }).view.getByLabelText(`${s.studyStepReview}, 12 ayahs`)).toBeTruthy();
+    const ar = renderCard({ wird: today, parts: ayahParts, language: "ar" }).view;
+    expect(ar.getByLabelText(`${strings.ar.studyStepReview}, ١٢ آية`)).toBeTruthy();
+  });
+
+  it("has no Start of its own: the Study button above starts the work", () => {
+    const { view } = renderCard({ wird: wird({ newLines: 7, todo: 2 }), parts });
+    expect(view.queryByText(s.hifzWirdStart)).toBeNull();
+    expect(view.queryByText(s.hifzMemorizeStart)).toBeNull();
+  });
+
+  it("without a plan, explains the plan and leaves Set up to the header", () => {
+    const { view } = renderCard({ wird: null });
+    expect(view.getByText(s.hifzSetupTitle)).toBeTruthy();
+    expect(view.queryByText(s.hifzSetupAction)).toBeNull();
   });
 });
 
@@ -99,29 +125,10 @@ describe("Home's second-look cue (SBQ-03)", () => {
     expect(renderCard({ wird: today }).view.getByText("1 / 1")).toBeTruthy();
   });
 
-  it("in ayah review, says how many ayah cards are due and offers Start", () => {
-    const today = { ...wird({ unit: "ayah" }), done: [], total: 0 } as unknown as TodayWird;
-    const { view, handlers } = renderCard({ wird: today, ayahDue: 12 });
-    expect(view.getByText(interpolate(s.hifzAyahModeDue, { n: "12" }))).toBeTruthy();
-    fireEvent.press(view.getByText(s.hifzWirdStart));
-    expect(handlers.onStartReview).toHaveBeenCalledTimes(1);
-    const none = renderCard({ wird: today, ayahDue: 0 }).view;
-    expect(none.getByText(s.hifzAyahModeNone)).toBeTruthy();
-    expect(none.queryByText(s.hifzWirdStart)).toBeNull();
-  });
-
-  it("in ayah review, shows new cards on their own line, apart from those due, and offers Start for them", () => {
-    const today = { ...wird({ unit: "ayah" }), done: [], total: 0 } as unknown as TodayWird;
-    const view = renderCard({ wird: today, ayahDue: 0, ayahNew: 20 }).view;
-    expect(view.getByText(s.hifzAyahModeNone)).toBeTruthy();
-    expect(view.getByText(interpolate(s.hifzAyahModeNew, { n: "20" }))).toBeTruthy();
-    expect(view.getByText(s.hifzWirdStart)).toBeTruthy();
-  });
-
-  it("offers more lines, not new ones, once today's are done", () => {
-    const done = renderCard({ wird: wird({ newLines: 7, linesToday: 12, todo: 2 }) }).view;
-    expect(done.getByText(s.hifzMemorizeMore)).toBeTruthy();
-    expect(done.queryByText(s.hifzMemorizeStart)).toBeNull();
-    expect(renderCard({ wird: wird({ newLines: 7, todo: 2 }) }).view.getByText(s.hifzMemorizeStart)).toBeTruthy();
+  it("offers more lines once today's are done, and nothing before", () => {
+    const { view: done, handlers } = renderCard({ wird: wird({ newLines: 7, linesToday: 12, todo: 2 }) });
+    fireEvent.press(done.getByText(s.hifzMemorizeMore));
+    expect(handlers.onStartMemorize).toHaveBeenCalledTimes(1);
+    expect(renderCard({ wird: wird({ newLines: 7, todo: 2 }) }).view.queryByText(s.hifzMemorizeMore)).toBeNull();
   });
 });

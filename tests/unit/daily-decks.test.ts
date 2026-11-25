@@ -32,7 +32,11 @@ const queued = (key: string) =>
 
 describe("daily decks (SPEC 3.6 to 3.8)", () => {
   it("are Mutashabihat, Similar tails and Meanings by default, and never Retention", async () => {
-    expect(await readDailyDeckIds(store.db)).toEqual([SMART_DECK_IDS.mutashabihat, SMART_DECK_IDS.similarTails, MEANINGS_DECK_ID]);
+    expect(await readDailyDeckIds(store.db)).toEqual([
+      SMART_DECK_IDS.mutashabihat,
+      SMART_DECK_IDS.similarTails,
+      MEANINGS_DECK_ID,
+    ]);
   });
 
   it("leave Meanings out when it is turned off, and sync that choice", async () => {
@@ -70,7 +74,9 @@ describe("deck switches", () => {
   it("raise a zero new-card limit when a deck turns on, so the switch is never empty", async () => {
     await writeDeckReviewSettings(store.db, SMART_DECK_IDS.qiraat, { newCardsLimit: 0, dailyReviewLimit: 20 });
     await writeDeckSwitch(store.db, "qiraat", "on");
-    expect((await readDeckReviewSettings(store.db, SMART_DECK_IDS.qiraat)).newCardsLimit).toBe(DEFAULT_DECK_NEW_CARD_LIMIT);
+    expect((await readDeckReviewSettings(store.db, SMART_DECK_IDS.qiraat)).newCardsLimit).toBe(
+      DEFAULT_DECK_NEW_CARD_LIMIT,
+    );
   });
 
   it("keep a limit the user chose, and leave limits alone when a deck turns off", async () => {
@@ -78,22 +84,36 @@ describe("deck switches", () => {
     await writeDeckSwitch(store.db, "qiraat", "on");
     expect((await readDeckReviewSettings(store.db, SMART_DECK_IDS.qiraat)).newCardsLimit).toBe(5);
 
-    await writeDeckReviewSettings(store.db, SMART_DECK_IDS.reasonsOfRevelation, { newCardsLimit: 0, dailyReviewLimit: 20 });
+    await writeDeckReviewSettings(store.db, SMART_DECK_IDS.reasonsOfRevelation, {
+      newCardsLimit: 0,
+      dailyReviewLimit: 20,
+    });
     await writeDeckSwitch(store.db, "reasons", "off");
     expect((await readDeckReviewSettings(store.db, SMART_DECK_IDS.reasonsOfRevelation)).newCardsLimit).toBe(0);
   });
 
   it("store On for automatic decks once the user is a full hafiz", async () => {
-    await writeDeckReviewSettings(store.db, SMART_DECK_IDS.reasonsOfRevelation, { newCardsLimit: 0, dailyReviewLimit: 20 });
+    await writeDeckReviewSettings(store.db, SMART_DECK_IDS.reasonsOfRevelation, {
+      newCardsLimit: 0,
+      dailyReviewLimit: 20,
+    });
     await settleAutomaticDecks(store.db);
-    expect(store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(STUDY_DECK_SETTING_KEYS.qiraat)).toBeUndefined();
+    expect(
+      store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(STUDY_DECK_SETTING_KEYS.qiraat),
+    ).toBeUndefined();
 
     setSetting(DECLARED_WHOLE_QURAN_KEY, "true");
     await writeDeckSwitch(store.db, "qiraat", "off");
     await settleAutomaticDecks(store.db);
-    expect(store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(STUDY_DECK_SETTING_KEYS.qiraat)).toEqual({ value: "off" });
-    expect(store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(STUDY_DECK_SETTING_KEYS.reasons)).toEqual({ value: "on" });
-    expect((await readDeckReviewSettings(store.db, SMART_DECK_IDS.reasonsOfRevelation)).newCardsLimit).toBe(DEFAULT_DECK_NEW_CARD_LIMIT);
+    expect(
+      store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(STUDY_DECK_SETTING_KEYS.qiraat),
+    ).toEqual({ value: "off" });
+    expect(
+      store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(STUDY_DECK_SETTING_KEYS.reasons),
+    ).toEqual({ value: "on" });
+    expect((await readDeckReviewSettings(store.db, SMART_DECK_IDS.reasonsOfRevelation)).newCardsLimit).toBe(
+      DEFAULT_DECK_NEW_CARD_LIMIT,
+    );
   });
 });
 

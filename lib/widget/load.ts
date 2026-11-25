@@ -1,5 +1,5 @@
 import type { AppDatabase } from "@/lib/database/types";
-import { getAyahReviewsDueToday, getNextEligibleReviewDate } from "@/lib/fsrs/queries";
+import { getNextEligibleReviewDate } from "@/lib/fsrs/queries";
 import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { REVIEW_LEARN_AHEAD_MS } from "@/lib/fsrs/review-transition";
 import { addDays, deviceTimeZone, type LocalDate } from "@/lib/habit/dates";
@@ -17,6 +17,7 @@ import type { ThemeMode, ThemePalette } from "@/lib/settings/context";
 import type { WidgetPlanFacts } from "@/lib/widget/copy";
 import { widgetAppearance } from "@/lib/widget/palette";
 import { readWidgetShowNumbers } from "@/lib/widget/settings";
+import { countAyahReviewsDue } from "@/lib/study/daily-queue";
 import type { WidgetBuildInput } from "@/lib/widget/timeline";
 
 export type { WidgetBuildInput } from "@/lib/widget/timeline";
@@ -53,7 +54,7 @@ async function planFacts(
   if (!wird) return { date, plan: "none", reviewLeft: false, pagesLeft: 0, minutesLeft: 0, moreDueAt: null };
   if (wird.plan.unit === "ayah") {
     const [ayahReviewsDue, nextEligible] = await Promise.all([
-      getAyahReviewsDueToday(db),
+      countAyahReviewsDue(db),
       // The widget follows plan work: for an ayah plan that is Retention's reviews (SPEC 3.5).
       getNextEligibleReviewDate(db, [SMART_DECK_IDS.retention]),
     ]);

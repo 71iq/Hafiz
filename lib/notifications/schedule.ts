@@ -57,6 +57,9 @@ import {
 import { NO_REPEAT_DAYS, renderNotification, type Language, type SurahNames } from "@/lib/notifications/templates";
 import { loadReviewLeft, type ReviewLeft } from "@/lib/hifz/review-left";
 import { HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID } from "@/lib/hifz/units";
+import { readHifzPlan } from "@/lib/hifz/plan";
+import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
+import { readDailyDeckIds } from "@/lib/study/daily-decks";
 import { WIRD_TYPES, type NotificationLogRow, type PlannedSlot, type ReminderPrefs } from "@/lib/notifications/types";
 
 const DAY_MS = 86_400_000;
@@ -84,22 +87,43 @@ export type ReminderContext = Readonly<{
 
 const NO_REVIEW_LEFT: ReviewLeft = { hasPlan: false, left: false };
 
-const SURAH_CARD = /^(\d{1,3}):\d{1,3}$/;
+/** A card id that names its surah: an ayah, a word, a qira'at or a reasons-of-revelation card. */
+const SURAH_IN_ID = /^(?:(?:mutashabihat|word|qiraat|asbab):)?(\d{1,3}):\d{1,3}(?::\d+)?$/;
+const SIMILAR_CARD = /^(?:mutashabihat|similar-tail):(.+):(\d+)$/;
 
 /**
- * The most overdue ayah card's surah for each date, so copy can name it (NOT-14). Hifz decks hold no
- * ayah cards, and their old page and chunk due dates would crowd the ayah cards out of the window.
+ * The most overdue card's surah for each date, so copy can name it (NOT-14). Only the decks the user
+ * studies count (SPEC 3.5): Retention for a plan that reviews by ayah, otherwise the daily decks, so
+ * a hidden Retention card is never named. Hifz decks hold no ayah cards, and their old page and chunk
+ * due dates would crowd the cards out of the window.
  */
 async function readDueSurahs(db: DatabaseExecutor, through: Date): Promise<{ surah: number; due: string }[]> {
+  const plan = await readHifzPlan(db).catch(() => null);
+  const deckIds = plan?.unit === "ayah" ? [SMART_DECK_IDS.retention] : await readDailyDeckIds(db);
+  if (deckIds.length === 0) return [];
   const rows = await db.getAllAsync<{ id: string; due: string }>(
     `SELECT id, due FROM study_cards
      WHERE deleted_at IS NULL AND suspended_at IS NULL AND due <= ? AND deck_id NOT IN (?, ?)
+       AND deck_id IN (${deckIds.map(() => "?").join(", ")})
      ORDER BY due LIMIT 300`,
-    [through.toISOString(), HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID],
+    [through.toISOString(), HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID, ...deckIds],
   );
+  // A similar-verse card names its group and place, so its surah comes from the bundled refs.
+  const groups = [...new Set(rows.flatMap((row) => SIMILAR_CARD.exec(row.id)?.[1] ?? []))];
+  const refSurah = new Map<string, number>();
+  if (groups.length > 0) {
+    const refs = await db.getAllAsync<{ group_id: string; sort_order: number; surah: number }>(
+      `SELECT group_id, sort_order, surah FROM mutashabihat_refs WHERE group_id IN (${groups.map(() => "?").join(", ")})`,
+      groups,
+    );
+    for (const ref of refs) refSurah.set(`${ref.group_id}:${ref.sort_order}`, ref.surah);
+  }
   return rows.flatMap((row) => {
-    const match = SURAH_CARD.exec(row.id);
-    return match ? [{ surah: Number(match[1]), due: row.due }] : [];
+    const direct = SURAH_IN_ID.exec(row.id);
+    if (direct) return [{ surah: Number(direct[1]), due: row.due }];
+    const similar = SIMILAR_CARD.exec(row.id);
+    const surah = similar ? refSurah.get(`${similar[1]}:${similar[2]}`) : undefined;
+    return surah ? [{ surah, due: row.due }] : [];
   });
 }
 

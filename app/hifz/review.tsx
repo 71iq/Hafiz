@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { BookOpenCheck, Eye, Moon, PenLine, Plus, RotateCcw, ScanText, X } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
@@ -93,6 +93,9 @@ import { formatDays, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
+import { addStudyMore } from "@/lib/study/daily-queue";
+import { DAILY_SESSION_HREF, type StudyStep } from "@/lib/study/resolve";
+import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
 import { useSettings } from "@/lib/settings/context";
 import { hapticMedium } from "@/lib/haptics";
 
@@ -332,6 +335,8 @@ function HifzReviewScreen() {
   const gradedAttempt = halves ? combineHalves(halves) : attempt;
 
   const load = useCallback(async () => {
+    // Loading again (new params on this screen) starts a session the remove guard covers again.
+    exiting.current = false;
     setPhase("loading");
     try {
       const now = new Date();
@@ -939,6 +944,21 @@ function HifzReviewScreen() {
     } else exit();
   };
 
+  // SPEC 3.1: the end screen asks the resolver what comes next.
+  const nextStep = useNextStudyStep(db, phase === "summary" || phase === "empty");
+
+  /** Continue replaces this screen, so Back from the next step lands on Home. */
+  const continueTo = (step: Exclude<StudyStep, { kind: "home" }>) => {
+    exiting.current = true;
+    router.replace(step.href);
+  };
+
+  const studyMore = async () => {
+    await addStudyMore(db);
+    exiting.current = true;
+    router.replace(DAILY_SESSION_HREF);
+  };
+
   const close = () => {
     if (hasProgress) setExitOpen(true);
     else leave();
@@ -997,15 +1017,22 @@ function HifzReviewScreen() {
           title={phase === "error" ? s.hifzLoadFailed : drillsOnly ? s.hifzInboxEmpty : s.hifzNothingDue}
           isDark={isDark}
         />
-        <View className="w-full max-w-sm" style={{ gap: 10 }}>
-          {phase === "error" ? <Button label={s.homeLoadRetry} onPress={load} /> : null}
-          <Button
-            variant={phase === "error" ? "outline" : "default"}
-            className={phase === "error" ? OUTLINE_BORDER : undefined}
-            label={s.flashcardsSummaryDone}
-            onPress={leave}
+        {phase === "error" ? (
+          <View className="w-full max-w-sm" style={{ gap: 10 }}>
+            <Button label={s.homeLoadRetry} onPress={load} />
+            <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
+          </View>
+        ) : (
+          <SessionNextStep
+            state={nextStep}
+            commitment={null}
+            onContinue={continueTo}
+            onStudyMore={studyMore}
+            onDone={leave}
+            language={uiLanguage}
+            s={s}
           />
-        </View>
+        )}
       </SafeAreaView>
     );
   }
@@ -1067,10 +1094,14 @@ function HifzReviewScreen() {
           {habitResult && totals.pages + totals.extra > 0 ? (
             <SessionHabitCards input={habitResult} db={db} language={uiLanguage} isDark={isDark} s={s} />
           ) : null}
-          <Button
-            className="w-full max-w-sm"
-            label={habitResult && showsCommitment(habitResult) ? commitLabel : s.flashcardsSummaryDone}
-            onPress={leave}
+          <SessionNextStep
+            state={nextStep}
+            commitment={habitResult && showsCommitment(habitResult) ? commitLabel : null}
+            onContinue={continueTo}
+            onStudyMore={studyMore}
+            onDone={leave}
+            language={uiLanguage}
+            s={s}
           />
         </ScrollView>
       </SafeAreaView>

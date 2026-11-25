@@ -119,6 +119,12 @@ async function readMemorizedPages(db: DatabaseExecutor): Promise<Set<number>> {
   }));
 }
 
+/** Whether new memorization has anywhere left to go: a page in the plan's order not yet memorized. */
+export async function hasMemorizeTarget(db: DatabaseExecutor, plan: Pick<HifzPlan, "method" | "direction">): Promise<boolean> {
+  const memorized = await readMemorizedPages(db);
+  return newPageOrder(plan).some((page) => !memorized.has(page));
+}
+
 /**
  * Choose today's chunk: the first lines not yet memorized on the first page in the plan's order
  * that is not yet memorized, about `wantLines` long and extended up to 2 lines so it ends at an

@@ -20,7 +20,18 @@ import { subscribeSyncCompleted } from "@/lib/sync/events";
  * offered, and at local midnight (useDayBoundaryRefresh). Nothing here depends on the make-up cutoff,
  * so it does not reload then. `wird` is null when no plan is set up; undefined while loading.
  */
-export function useTodayWird(db: AppDatabase) {
+export function useTodayWird(
+  db: AppDatabase,
+  {
+    onBoundary,
+  }: {
+    /**
+     * Called when a timer brings work due (a half page or seam, a page's learning step, a second look,
+     * midnight) while the screen is focused, so the screen can refresh what it derives from that work.
+     */
+    onBoundary?: () => void;
+  } = {},
+) {
   const [wird, setWird] = useState<TodayWird | null | undefined>(undefined);
   const [inboxCount, setInboxCount] = useState(0);
   const [monthlyCheckDue, setMonthlyCheckDue] = useState(false);
@@ -83,6 +94,13 @@ export function useTodayWird(db: AppDatabase) {
   const refreshIfFocused = useCallback(() => {
     if (focused.current) refresh();
   }, [refresh]);
+  const onBoundaryRef = useRef(onBoundary);
+  onBoundaryRef.current = onBoundary;
+  const boundaryReached = useCallback(() => {
+    if (!focused.current) return;
+    refresh();
+    onBoundaryRef.current?.();
+  }, [refresh]);
   useEffect(() => subscribeReviewActivity(refreshIfFocused), [refreshIfFocused]);
   useEffect(() => subscribeHabitChanged(refreshIfFocused), [refreshIfFocused]);
   useEffect(
@@ -92,7 +110,7 @@ export function useTodayWird(db: AppDatabase) {
       }),
     [refreshIfFocused],
   );
-  useDayBoundaryRefresh(boundary, refreshIfFocused);
+  useDayBoundaryRefresh(boundary, boundaryReached);
 
   return { wird, inboxCount, remediationDue, monthlyCheckDue, secondLooksDue, nextLookAt, refresh };
 }

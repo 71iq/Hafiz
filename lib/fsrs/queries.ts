@@ -605,17 +605,6 @@ export async function getDeckTodayStats(
   };
 }
 
-/**
- * Retention's ayah reviews due today, without new cards, under Retention's own daily limit. For a
- * plan that reviews by ayah they are the wird's review (SPEC 3.5, UNIT-02): Home, the wird-left line,
- * reminders and the widget all read this one value. Other decks are daily cards, counted apart.
- */
-export async function getAyahReviewsDueToday(db: AppDatabase): Promise<number> {
-  const deckId = SMART_DECK_IDS.retention;
-  const stats = await getDeckTodayStats(db, deckId, await readDeckReviewSettings(db, deckId));
-  return stats.dueCount;
-}
-
 export async function getTotalCardCount(db: AppDatabase, deckId?: string): Promise<number> {
   if (isSmartDeckId(deckId)) {
     return (await getSmartDeckStats(db, deckId)).total;

@@ -288,6 +288,16 @@ describe("useTodayWird across a day boundary", () => {
     expect(result.current.remediationDue).toBe(1);
   });
 
+  it("tells the screen when a timer brings plan work due, so Home's Study button follows it (SPEC 3.1)", async () => {
+    jest.mocked(nextRemediationAt).mockResolvedValueOnce(at(14, 21, 10)).mockResolvedValue(null);
+    const onBoundary = jest.fn();
+    renderHook(() => useTodayWird(db, { onBoundary }));
+    await flush();
+    expect(onBoundary).not.toHaveBeenCalled();
+    await advanceTo(at(14, 21, 10));
+    expect(onBoundary).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the wird when the second-look count fails, with no cue", async () => {
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
     jest.mocked(countSecondLooks).mockRejectedValue(new Error("synthetic count failure"));

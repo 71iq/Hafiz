@@ -7,6 +7,8 @@ import {
   MUTASHABIHAT_DECK_ID,
 } from "@/lib/fsrs/queries";
 import { getSmartDeckStats, SMART_DECK_IDS, type SmartDeckId } from "@/lib/fsrs/smart-decks";
+import { readHabitSettings } from "@/lib/habit/settings";
+import { readDailyDeckIds } from "@/lib/study/daily-decks";
 
 export type ProfileSurahProgress = {
   surah: number;
@@ -27,9 +29,27 @@ export type DefaultDeckProgressItem = {
   startedCount: number;
   dueCount: number;
   color: string;
+  /**
+   * In today's daily study (SPEC 3.3): a daily deck, or Retention for a plan that reviews by ayah. A
+   * deck turned off, or Retention under another plan, is only in All decks, so its due count is not
+   * shown as work waiting.
+   */
+  daily: boolean;
 };
 
+/** The decks in daily study, or null when they cannot be read, so every deck shows as before. */
+async function readDailyStudyDecks(db: AppDatabase): Promise<Set<string> | null> {
+  try {
+    const [deckIds, habit] = await Promise.all([readDailyDeckIds(db), readHabitSettings(db)]);
+    return new Set(habit.retentionCounts ? [...deckIds, SMART_DECK_IDS.retention] : deckIds);
+  } catch (error) {
+    console.warn("[Progress] Failed to read the daily study decks:", error);
+    return null;
+  }
+}
+
 export async function getDefaultDeckProgress(db: AppDatabase): Promise<DefaultDeckProgressItem[]> {
+  const dailyDecks = await readDailyStudyDecks(db);
   const decks: Pick<DefaultDeckProgressItem, "key" | "deckId" | "isSmartDeck" | "color">[] = [
     { key: "retention", deckId: SMART_DECK_IDS.retention, isSmartDeck: true, color: "#14b8a6" },
     { key: "mutashabihat", deckId: SMART_DECK_IDS.mutashabihat, isSmartDeck: true, color: "#0d9488" },
@@ -39,7 +59,8 @@ export async function getDefaultDeckProgress(db: AppDatabase): Promise<DefaultDe
     { key: "vocabulary", deckId: MEANINGS_DECK_ID, isSmartDeck: false, color: "#be123c" },
   ];
 
-  return Promise.all(decks.map(async (deck) => {
+  return Promise.all(decks.map(async (base) => {
+    const deck = { ...base, daily: dailyDecks?.has(base.deckId) ?? true };
     try {
       if (deck.isSmartDeck) {
         const stats = await getSmartDeckStats(db, deck.deckId as SmartDeckId);

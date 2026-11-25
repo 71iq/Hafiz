@@ -70,7 +70,11 @@ export function StudyDecksSettings({ db, language, s }: Props) {
   ];
   const deckRow = (deck: SwitchableDeck, title: string) => (
     <View style={{ gap: 8 }}>
-      <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
+      <Text
+        dir={dir}
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+        className="text-charcoal dark:text-neutral-200"
+      >
         {title}
       </Text>
       <ToggleGroup<DeckSwitch>
@@ -88,7 +92,11 @@ export function StudyDecksSettings({ db, language, s }: Props) {
       <View style={{ gap: 20 }}>
         <MirroredRow dir={dir} className="items-center justify-between gap-3">
           <View className="flex-1" style={{ gap: 4 }}>
-            <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
+            <Text
+              dir={dir}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+              className="text-charcoal dark:text-neutral-200"
+            >
               {s.studyDecksMeanings}
             </Text>
             <Text dir={dir} variant="caption" style={{ lineHeight: 18 }}>

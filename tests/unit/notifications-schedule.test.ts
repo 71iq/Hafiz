@@ -578,19 +578,21 @@ describe("reconcileReminders", () => {
 });
 
 describe("reminder routes", () => {
-  it("opens the page review for a page or half-page plan and the ayah review otherwise", async () => {
-    expect(await resolveReminderHref(store.db, "wird")).toBe("/flashcards/session");
+  it("asks the study resolver for the wird route: Home without a plan, the next step with one", async () => {
+    expect(await resolveReminderHref(store.db, "wird")).toBe("/(tabs)/home");
+    // A fresh plan has nothing to review yet and new lines to memorize today.
     await writeHifzPlan(store.db, { ...DEFAULT_HIFZ_PLAN, unit: "half" });
-    expect(await resolveReminderHref(store.db, "wird")).toBe("/hifz/review");
-    await writeHifzPlan(store.db, { ...DEFAULT_HIFZ_PLAN, unit: "ayah" });
-    expect(await resolveReminderHref(store.db, "wird")).toBe("/flashcards/session");
+    expect(await resolveReminderHref(store.db, "wird")).toBe("/hifz/memorize");
     expect(await resolveReminderHref(store.db, "kahf")).toEqual({ pathname: "/open", params: { surah: "18", ayah: "1" } });
   });
 
-  it("pushes the review or al-Kahf and navigates back to Home", async () => {
+  it("pushes a study step or al-Kahf and navigates, never pushes, to Home", async () => {
+    await openReminderRoute(store.db, "wird");
+    expect(router.navigate).toHaveBeenLastCalledWith("/(tabs)/home");
+    expect(router.push).not.toHaveBeenCalled();
     await writeHifzPlan(store.db, DEFAULT_HIFZ_PLAN);
     await openReminderRoute(store.db, "wird");
-    expect(router.push).toHaveBeenLastCalledWith("/hifz/review");
+    expect(router.push).toHaveBeenLastCalledWith("/hifz/memorize");
     await openReminderRoute(store.db, "home");
     expect(router.navigate).toHaveBeenLastCalledWith("/(tabs)/home");
   });
@@ -740,21 +742,60 @@ describe("a day already done under another headline (NOT-04, STR-07)", () => {
 });
 
 describe("hifz cards in the surah named by reminder copy (NOT-14)", () => {
-  it("names the overdue ayah card's surah even when hundreds of old chunk and page cards are due first", async () => {
+  const old = "2026-01-01T00:00:00.000Z";
+  const seed = () => {
     store.sql
-      .prepare("INSERT OR REPLACE INTO surahs (number, name_arabic, name_english, ayah_count, revelation_type) VALUES (2, 'سورة البقرة', 'The Cow', 286, 'Medinan')")
-      .run();
-    const insert = store.sql.prepare(
+      .prepare("INSERT OR REPLACE INTO surahs (number, name_arabic, name_english, ayah_count, revelation_type) VALUES (?, ?, ?, 286, 'Medinan')")
+      .run(2, "سورة البقرة", "The Cow");
+    store.sql
+      .prepare("INSERT OR REPLACE INTO surahs (number, name_arabic, name_english, ayah_count, revelation_type) VALUES (?, ?, ?, 200, 'Medinan')")
+      .run(3, "سورة آل عمران", "The Family of Imran");
+    return store.sql.prepare(
       `INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state,
         last_review, created_at, updated_at, deleted_at) VALUES (?, ?, ?, 1, 5, 0, 0, 0, 1, 0, 1, NULL, ?, ?, NULL)`,
     );
-    const old = "2026-01-01T00:00:00.000Z";
+  };
+  const setPlan = (unit: "ayah" | "page") =>
+    store.sql
+      .prepare("INSERT OR REPLACE INTO user_settings (key, value, updated_at) VALUES ('hifz_plan', ?, ?)")
+      .run(JSON.stringify({ ...DEFAULT_HIFZ_PLAN, unit }), old);
+
+  it("names the overdue ayah card's surah for an ayah plan, even when hundreds of old chunk and page cards are due first", async () => {
+    const insert = seed();
+    setPlan("ayah");
     for (let line = 1; line <= 320; line++) insert.run(`chunk:madani15:${line}:1-4`, "hifz-sabaq", old, old, old);
-    insert.run("2:255", "smart-retention", at(addDays(TODAY, -1), 8).toISOString(), old, old);
+    insert.run("2:255", "default-retention", at(addDays(TODAY, -1), 8).toISOString(), old, old);
 
     const context = await loadReminderContext(store.db, { now: at(TODAY, 3), language: "en" });
 
     expect(context.input.facts(TODAY)).toEqual({ surah: 2 });
+  });
+
+  it("never names a hidden Retention card for a page plan, and names a daily card's surah instead", async () => {
+    const insert = seed();
+    setPlan("page");
+    insert.run("2:255", "default-retention", at(addDays(TODAY, -2), 8).toISOString(), old, old);
+    insert.run("word:3:7:2", "meanings", at(addDays(TODAY, -1), 8).toISOString(), old, old);
+
+    const context = await loadReminderContext(store.db, { now: at(TODAY, 3), language: "en" });
+
+    expect(context.input.facts(TODAY)).toEqual({ surah: 3 });
+  });
+
+  it("reads a similar-verse card's surah from its group", async () => {
+    const insert = seed();
+    setPlan("page");
+    store.sql
+      .prepare("INSERT INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES ('g', 'similar', 'cue', 'test', 0)")
+      .run();
+    store.sql
+      .prepare("INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar) VALUES ('g', 1, 3, 7, 'آل عمران')")
+      .run();
+    insert.run("mutashabihat:g:1", "default-mutashabihat", at(addDays(TODAY, -1), 8).toISOString(), old, old);
+
+    const context = await loadReminderContext(store.db, { now: at(TODAY, 3), language: "en" });
+
+    expect(context.input.facts(TODAY)).toEqual({ surah: 3 });
   });
 });
 

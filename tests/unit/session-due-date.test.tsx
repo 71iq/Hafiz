@@ -17,6 +17,7 @@ import type { SmartCardContent, SmartDeckRef } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
 import { DEFAULT_TAFSIR_SOURCE } from "@/lib/tafsir/sources";
 import { endReviewSession, recordSessionProgress, startReviewSession } from "@/lib/fsrs/review-sessions";
+import { DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySessionDeckIds } from "@/lib/study/daily-queue";
 import { loadHabitOverview, makeUpTarget, recordWirdProgress } from "@/lib/habit/queries";
 import { readDhuhrResolver } from "@/lib/prayer/settings";
 import { recordCleanRecitation } from "@/lib/hifz/errors";
@@ -181,10 +182,17 @@ const safeAreaMetrics = {
 const originalWindowDimensions = ReactNative.Dimensions.get("window");
 const originalScreenDimensions = ReactNative.Dimensions.get("screen");
 
+/** The route's params: one deck by default; the daily-scope cases change them. */
+let mockSessionParams: { deckId?: string; scope?: string } = { deckId: "fixture-session-deck" };
 jest.mock("expo-router", () => ({
   router: { replace: (...args: unknown[]) => mockRouterReplace(...args), dismissTo: jest.fn() },
   useNavigation: () => mockNavigation,
-  useLocalSearchParams: () => ({ deckId: "fixture-session-deck" }),
+  useLocalSearchParams: () => mockSessionParams,
+}));
+jest.mock("@/lib/study/daily-queue", () => ({
+  ...jest.requireActual<typeof import("@/lib/study/daily-queue")>("@/lib/study/daily-queue"),
+  loadDailyReviewQueue: jest.fn(),
+  readDailySessionDeckIds: jest.fn(),
 }));
 
 /** Screen focus for useIsFocused; a test takes it away and gives it back like a screen pushed on top. */
@@ -247,6 +255,8 @@ jest.mock("@/lib/fsrs/queries", () => ({
 
 jest.mock("@/lib/fsrs/smart-decks", () => ({
   getSmartCardContent: jest.fn(),
+  // The session compares deck ids (the Retention note), so the real ids stay.
+  SMART_DECK_IDS: jest.requireActual<typeof import("@/lib/fsrs/smart-decks")>("@/lib/fsrs/smart-decks").SMART_DECK_IDS,
 }));
 
 // The wird day is written inside the grade transaction; its rules are covered by habit-wird-progress.
@@ -737,6 +747,7 @@ function expectNoUnrelatedCardActionServiceCalls(): void {
 describe("Flashcard session due-date editor characterization", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockSessionParams = { deckId: "fixture-session-deck" };
     mockPreventRemove = null;
     mockDatabase.getFirstAsync.mockResolvedValue(null);
     jest.mocked(startReviewSession).mockReturnValue(fixtureSession);
@@ -772,6 +783,27 @@ describe("Flashcard session due-date editor characterization", () => {
 
   it("keeps a finite React Native clock after fixture mock reset", () => {
     expect(Number.isFinite(performance.now())).toBe(true);
+  });
+
+  it.each([
+    ["scope=daily", { scope: "daily" }],
+    ["the bare route", {}],
+  ])("opens today's daily session for %s, recorded under the daily deck id so it spends the budget", async (_label, params) => {
+    mockSessionParams = params;
+    jest.mocked(loadDailyReviewQueue).mockResolvedValue(reviewQueue([firstCard, secondCard]));
+    jest.mocked(readDailySessionDeckIds).mockResolvedValue([]);
+    const view = renderSession();
+    await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+    expect(loadDailyReviewQueue).toHaveBeenCalledTimes(1);
+    expect(loadReviewQueue).not.toHaveBeenCalled();
+    expect(startReviewSession).toHaveBeenCalledWith("cards", { deckId: DAILY_SESSION_DECK_ID });
+  });
+
+  it("opens one deck alone, never under the daily deck id", async () => {
+    const view = renderSession();
+    await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+    expect(loadDailyReviewQueue).not.toHaveBeenCalled();
+    expect(startReviewSession).toHaveBeenCalledWith("cards", { deckId: "fixture-session-deck" });
   });
 
   it("characterizes Arabic light validation, native input options, cancel, and reopen", async () => {

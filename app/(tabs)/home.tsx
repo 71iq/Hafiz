@@ -25,6 +25,10 @@ import {
   BookOpenText,
   ListEnd,
   List,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  PenLine,
 } from "lucide-react-native";
 import { useAccountPromo } from "@/lib/auth/account-promo";
 import { AccountPromoCard } from "@/components/auth/AccountPromoCard";
@@ -61,8 +65,11 @@ import { MonthlyCheckCard } from "@/components/hifz/MonthlyCheckCard";
 import { reviewLeftToday } from "@/lib/hifz/pages";
 import { markMonthlyCheck } from "@/lib/hifz/progress";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
-import { settleAutomaticDecks } from "@/lib/study/daily-decks";
-import { reminderHref } from "@/lib/notifications/reminder-route";
+import { readDailyDeckIds, settleAutomaticDecks } from "@/lib/study/daily-decks";
+import { openReminderRoute } from "@/lib/notifications/reminder-route";
+import { addStudyMore } from "@/lib/study/daily-queue";
+import { DAILY_SESSION_HREF, loadStudyState, studyMoreCount, type StudyState } from "@/lib/study/resolve";
+import { queueCardCounts, shortfallCards, todayParts } from "@/lib/study/today";
 import { putUserSetting } from "@/lib/database/user-settings";
 import {
   migrateLegacyRetentionDecks,
@@ -87,7 +94,7 @@ import { consumeSearchRequest, usePendingSearchRequest } from "@/lib/navigation/
 import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { useDayBoundaryRefresh, nextLocalMidnight } from "@/lib/habit/use-day-boundary";
 import { diffDays, localDateOf } from "@/lib/habit/dates";
-import { formatSurahs } from "@/lib/i18n/count";
+import { formatCards, formatNumber, formatSurahs } from "@/lib/i18n/count";
 import { surahTransliteration } from "@/lib/search/surah-match";
 
 type SmartDeckDisplay = {
@@ -116,6 +123,8 @@ const GRACE_NOTE_SEEN_KEY = "device_habit_grace_note_seen";
 const ZAYT_RETURN_SEEN_KEY = "device_zayt_return_seen";
 /** A juz completed on this device; the duplicate first-juz badge and the aggregates get no Zayt. */
 const JUZ_UNLOCK = /^juz_\d{2}_completed$/;
+/** Decks a setting can leave out of daily study (SPEC 3.6, 3.7); the others are always in it or never. */
+const SWITCHABLE_DECKS: readonly string[] = [MEANINGS_DECK_ID, SMART_DECK_IDS.qiraat, SMART_DECK_IDS.reasonsOfRevelation];
 
 function juzZaytEventId(unlock: { achievementId: string; unlockedAt: string }): string {
   return `juz:${unlock.achievementId}:${unlock.unlockedAt}`;
@@ -137,7 +146,7 @@ function formatArabicDate(date: Date): string {
 
 export default function HomeScreen() {
   const db = useDatabase();
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { isDark, isRTL, uiLanguage, effectiveTheme } = useSettings();
   // Arabic uses Arabic-Indic digits, matching the reader.
   const localNumber = (value: number) => (isRTL ? toArabicNumber(value) : value.toLocaleString());
   const s = useStrings();
@@ -158,21 +167,43 @@ export default function HomeScreen() {
   });
   const accountPromo = useAccountPromo("home");
   const openMushaf = useOpenMushaf();
-  // Retention's ayah reviews due now, without new cards: ayah review's daily work (UNIT-02, SPEC 3.5),
-  // the same value as getAyahReviewsDueToday.
-  const ayahReviewsDue = smartDecks.find((deck) => deck.id === SMART_DECK_IDS.retention)?.dueCount ?? 0;
-  // The headline is what the deck rows offer, which is also what Review all loads.
-  const totalDue = smartDecks.reduce(
-    (sum, deck) => sum + deck.dueCount + deck.newCount,
-    vocabStats.dueCount + vocabStats.newCount,
-  );
-  // The counts and Start Review need about 330 px at standard text size; each further digit of the
-  // due count widens the big number by about 38 px, and larger system text widens everything.
-  const headerNeeds = (totalDue >= 1000 ? 420 : totalDue >= 100 ? 370 : 330) * Math.max(1, fontScale);
+  const [decksLoaded, setDecksLoaded] = useState(false);
+  // SPEC 3.1 to 3.3: what the resolver saw. The counter is the daily list cut at today's budget, the
+  // same list the Today card's parts and the daily session use.
+  const [study, setStudy] = useState<StudyState | null>(null);
+  const [dailyDeckIds, setDailyDeckIds] = useState<readonly string[]>([]);
+  const queue = study?.queue ?? null;
+  /** Each read of the study state, from the dashboard or a plan timer; only the latest is applied. */
+  const latestStudyLoad = useRef(0);
+  // A plan timer (a half page or seam, a page's learning step or a second look coming due) changes
+  // what the resolver answers, so the header and Study button read it again then. Only the resolver
+  // is read: the rest of the dashboard does not depend on those timers.
+  const refreshStudy = useCallback(() => {
+    const load = ++latestStudyLoad.current;
+    loadStudyState(db).then((next) => {
+      if (load === latestStudyLoad.current) setStudy(next);
+    });
+  }, [db]);
+  // Retention's ayah reviews due now, without new cards, under its own limit: an ayah plan's review
+  // (UNIT-02, SPEC 3.5). The same deck queue as countAyahReviewsDue, which the wird-left line, the
+  // reminders and the widget read. Zero for other plans.
+  const ayahReviewsDue = queue?.planCards.filter((item) => !item.virtual && item.card.state !== 0).length ?? 0;
+  const cardCounts = queue ? queueCardCounts(queue) : { total: 0, due: 0, fresh: 0 };
+  // The counts and the Study button need about 330 px at standard text size; each further digit of the
+  // counter widens the big number by about 38 px, and larger system text widens everything.
+  const headerNeeds = (cardCounts.total >= 1000 ? 420 : cardCounts.total >= 100 ? 370 : 330) * Math.max(1, fontScale);
   const headerStacked = headerWidth > 0 && headerWidth < headerNeeds;
+  /** All decks starts collapsed; the legacy /flashcards link opens it. */
+  const [decksOpen, setDecksOpen] = useState(false);
   const [memorizedCards, setMemorizedCards] = useState(0);
   const { overview: habit, failed: habitFailed } = useHabitOverview(db);
-  const { wird, inboxCount, remediationDue, monthlyCheckDue, secondLooksDue, nextLookAt, refresh: refreshWird } = useTodayWird(db);
+  const { wird, inboxCount, remediationDue, monthlyCheckDue, secondLooksDue, nextLookAt, refresh: refreshWird } = useTodayWird(db, {
+    // On a new day Home's own day-boundary reload reads the study state with the rest of the
+    // dashboard, so the timer read is skipped then rather than run twice.
+    onBoundary: () => {
+      if (loadedDay.current === localDateOf(new Date())) refreshStudy();
+    },
+  });
   const [habitBreakOpen, setHabitBreakOpen] = useState(false);
   const [graceNoteSeen, setGraceNoteSeen] = useState<string | null>(null);
   /** Whether the played return episode was read, so the wave never starts before it is known. */
@@ -194,7 +225,9 @@ export default function HomeScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const [decksY, setDecksY] = useState<number | null>(null);
   useEffect(() => {
-    if (section !== "decks" || decksY === null) return;
+    if (section !== "decks") return;
+    setDecksOpen(true);
+    if (decksY === null) return;
     scrollRef.current?.scrollTo({ y: Math.max(0, decksY - 16), animated: false });
     router.setParams({ section: undefined });
   }, [section, decksY, router]);
@@ -248,59 +281,16 @@ export default function HomeScreen() {
       // It never blocks the dashboard; the next load tries again.
       await settleAutomaticDecks(db).catch((error: unknown) => console.warn("[Home] Could not settle the study decks:", error));
 
-      const smartDefinitions = [
-        {
-          id: SMART_DECK_IDS.retention,
-          title: s.smartDeckRetentionTitle,
-          subtitle: s.smartDeckRetentionSubtitle,
-          icon: Layers,
-        },
-        {
-          id: SMART_DECK_IDS.mutashabihat,
-          title: s.smartDeckMutashabihatTitle,
-          subtitle: s.smartDeckMutashabihatSubtitle,
-          icon: Sparkles,
-        },
-        {
-          id: SMART_DECK_IDS.similarTails,
-          title: s.smartDeckSimilarTailsTitle,
-          subtitle: s.smartDeckSimilarTailsSubtitle,
-          icon: ListEnd,
-        },
-        {
-          id: SMART_DECK_IDS.qiraat,
-          title: s.smartDeckQiraatTitle,
-          subtitle: s.smartDeckQiraatSubtitle,
-          icon: BookOpenText,
-        },
-        {
-          id: SMART_DECK_IDS.reasonsOfRevelation,
-          title: s.smartDeckReasonsTitle,
-          subtitle: s.smartDeckReasonsSubtitle,
-          icon: BookMarked,
-        },
-      ] as const;
-
-      const smartDisplays = await Promise.all(
-        smartDefinitions.map(async (definition) => {
-          const [settings, filter] = await Promise.all([
-            readDeckReviewSettings(db, definition.id),
-            readSmartDeckFilter(db, definition.id),
-          ]);
-          const stats = await getDeckTodayStats(db, definition.id, settings);
-          return { ...definition, filter, ...stats };
-        }),
-      );
-
-      const vocabSettings = await readDeckReviewSettings(db, MEANINGS_DECK_ID);
-      const [memorizedTotal, vocabTodayStats, reflectionJourneySummary, graceSeen, zaytReturnSeen] =
-        await Promise.all([
-          getMemorizedAyahCardCount(db),
-          getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
-          getReflectionJourneySummary(db),
-          db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [GRACE_NOTE_SEEN_KEY]),
-          db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [ZAYT_RETURN_SEEN_KEY]),
-        ]);
+      const studyLoad = ++latestStudyLoad.current;
+      const [memorizedTotal, reflectionJourneySummary, graceSeen, zaytReturnSeen, studyState, deckIds] = await Promise.all([
+        getMemorizedAyahCardCount(db),
+        getReflectionJourneySummary(db),
+        db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [GRACE_NOTE_SEEN_KEY]),
+        db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [ZAYT_RETURN_SEEN_KEY]),
+        // Never throws: a failed read resolves to Home with no step.
+        loadStudyState(db),
+        readDailyDeckIds(db),
+      ]);
       const currentLevelTitle = reflectionJourneySummary.currentLevelTitle
         ? localizeReflectionJourneyText(reflectionJourneySummary.currentLevelTitle, uiLanguage)
         : null;
@@ -311,12 +301,13 @@ export default function HomeScreen() {
       loadedDay.current = localDateOf(loadedAt);
       setDayBoundary(nextLocalMidnight(loadedAt).getTime());
       setSurahNames(nameMap);
-      setSmartDecks(smartDisplays);
       setMemorizedCards(memorizedTotal);
       setGraceNoteSeen(graceSeen?.value ?? null);
       if (zaytReturnSeen?.value) markZaytPresented(`return:${zaytReturnSeen.value}`);
       setZaytReturnLoaded(true);
-      setVocabStats(vocabTodayStats);
+      // A plan-timer read that started after this one is newer.
+      if (studyLoad === latestStudyLoad.current) setStudy(studyState);
+      setDailyDeckIds(deckIds);
       setDueLoaded(true);
       loadUnlocks();
       setJourneySummary({
@@ -360,9 +351,41 @@ export default function HomeScreen() {
         applyResume(null);
       }
     },
+    [db, loadUnlocks, uiLanguage],
+  );
+
+  /**
+   * Every deck's counts for today, for All decks. Read only while All decks is open: it is closed by
+   * default, and the Study button and the counter need only the daily queue.
+   */
+  const loadDecks = useCallback(
+    async (isCurrent: () => boolean) => {
+      await migrateLegacyRetentionDecks(db);
+      const smartDefinitions = [
+        { id: SMART_DECK_IDS.retention, title: s.smartDeckRetentionTitle, subtitle: s.smartDeckRetentionSubtitle, icon: Layers },
+        { id: SMART_DECK_IDS.mutashabihat, title: s.smartDeckMutashabihatTitle, subtitle: s.smartDeckMutashabihatSubtitle, icon: Sparkles },
+        { id: SMART_DECK_IDS.similarTails, title: s.smartDeckSimilarTailsTitle, subtitle: s.smartDeckSimilarTailsSubtitle, icon: ListEnd },
+        { id: SMART_DECK_IDS.qiraat, title: s.smartDeckQiraatTitle, subtitle: s.smartDeckQiraatSubtitle, icon: BookOpenText },
+        { id: SMART_DECK_IDS.reasonsOfRevelation, title: s.smartDeckReasonsTitle, subtitle: s.smartDeckReasonsSubtitle, icon: BookMarked },
+      ] as const;
+      const [smartDisplays, vocabTodayStats] = await Promise.all([
+        Promise.all(
+          smartDefinitions.map(async (definition) => {
+            const [settings, filter] = await Promise.all([readDeckReviewSettings(db, definition.id), readSmartDeckFilter(db, definition.id)]);
+            const stats = await getDeckTodayStats(db, definition.id, settings);
+            return { ...definition, filter, ...stats };
+          }),
+        ),
+        readDeckReviewSettings(db, MEANINGS_DECK_ID).then((settings) => getDeckTodayStats(db, MEANINGS_DECK_ID, settings)),
+      ]);
+      // Applied only once every deck read, and only for the latest load, as the dashboard is.
+      if (!isCurrent()) return;
+      setSmartDecks(smartDisplays);
+      setVocabStats(vocabTodayStats);
+      setDecksLoaded(true);
+    },
     [
       db,
-      loadUnlocks,
       s.smartDeckRetentionTitle,
       s.smartDeckRetentionSubtitle,
       s.smartDeckMutashabihatTitle,
@@ -373,9 +396,16 @@ export default function HomeScreen() {
       s.smartDeckQiraatSubtitle,
       s.smartDeckReasonsTitle,
       s.smartDeckReasonsSubtitle,
-      uiLanguage,
     ],
   );
+
+  const latestDeckLoad = useRef(0);
+  const refreshDecks = useCallback(async () => {
+    const load = ++latestDeckLoad.current;
+    await loadDecks(() => load === latestDeckLoad.current);
+  }, [loadDecks]);
+  const decksOpenRef = useRef(decksOpen);
+  decksOpenRef.current = decksOpen;
 
   const latestLoad = useRef(0);
   const loadData = useCallback(async () => {
@@ -383,17 +413,30 @@ export default function HomeScreen() {
     const isCurrent = () => load === latestLoad.current;
     try {
       await loadDashboard(isCurrent);
+      if (decksOpenRef.current) await refreshDecks();
       if (isCurrent()) setLoadFailed(false);
     } catch (e) {
       console.warn(e);
       if (isCurrent()) setLoadFailed(true);
     }
-  }, [loadDashboard]);
+  }, [loadDashboard, refreshDecks]);
+
+  // Opening All decks reads the decks; the dashboard's own reloads keep them current while open.
+  useEffect(() => {
+    if (!decksOpen) return;
+    refreshDecks().catch((error: unknown) => {
+      console.warn(error);
+      setLoadFailed(true);
+    });
+  }, [decksOpen, refreshDecks]);
 
   const focused = useRef(false);
+  /** The Study button or Study more already opened a step during this visit to Home. */
+  const studyPending = useRef(false);
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
+      studyPending.current = false;
       loadData();
       return () => {
         focused.current = false;
@@ -416,7 +459,15 @@ export default function HomeScreen() {
     }
   }, [loadData]);
 
-  useEffect(() => subscribeReviewActivity(loadData), [loadData]);
+  // Home behind a session skips each grade's reload: on web every read shares one database worker, so
+  // reloads queued behind a session delay its own end screen. Returning to Home reloads anyway.
+  useEffect(
+    () =>
+      subscribeReviewActivity(() => {
+        if (focused.current) loadData();
+      }),
+    [loadData],
+  );
   useEffect(
     () =>
       subscribeSyncCompleted(({ pulled }) => {
@@ -458,9 +509,42 @@ export default function HomeScreen() {
       });
   }, [db, dismissingUnlockId, latestUnlock]);
 
-  const handleStartReview = (deckId?: string) => {
-    router.push({ pathname: "/flashcards/session", params: deckId ? { deckId } : {} });
+  /** One deck from All decks: a single-deck session, which never spends the daily budget. */
+  const handleStartReview = (deckId: string) => {
+    router.push({ pathname: "/flashcards/session", params: { deckId } });
   };
+
+  // The Study button opens the step Home last resolved (SPEC 3.1). Home resolves again on focus, after
+  // review activity, after a sync that pulled records and at the day boundary, so the step is current
+  // and the press opens at once instead of waiting for another read, which takes seconds on web. One
+  // open per visit: a second tap before Home loses focus is ignored.
+  const startStudy = useCallback(() => {
+    const step = study?.step;
+    if (studyPending.current || !step || step.kind === "home") return;
+    studyPending.current = true;
+    router.push(step.href);
+  }, [router, study]);
+
+  /** Study more: one more budget for today, then the cards it opened. A failed write can be pressed again. */
+  const studyMore = useCallback(() => {
+    if (studyPending.current) return;
+    studyPending.current = true;
+    addStudyMore(db)
+      .then(() => router.push(DAILY_SESSION_HREF))
+      .catch((error: unknown) => {
+        console.warn("[Home] Study more failed:", error);
+        studyPending.current = false;
+      });
+  }, [db, router]);
+
+  const openDecks = useCallback(() => {
+    setDecksOpen(true);
+    if (decksY !== null) scrollRef.current?.scrollTo({ y: Math.max(0, decksY - 16), animated: true });
+  }, [decksY]);
+
+  const openStudySettings = useCallback(() => {
+    router.push({ pathname: "/(tabs)/settings", params: { category: "general", section: "daily-study" } } as Href);
+  }, [router]);
 
   // A readable scope: "Al-Kahf 1-7", "3 surahs" or "Juz 1, 2", in the interface's digits.
   const getSmartFilterLabel = (filter: BuiltInDeckFilter): string => {
@@ -482,18 +566,13 @@ export default function HomeScreen() {
     return s.smartDeckFilterAll;
   };
 
-  // GOAL-04: once the minimum is met and today's pages, new lines and every Home deck are done, the
-  // full wird is complete.
-  const planRemaining =
-    wird === undefined
-      ? 1
-      : wird === null
-        ? 0
-        : wird.todo.length +
-          // A half page or seam due after a missed page is part of today's review (SCH-06, SCH-08).
-          remediationDue +
-          (wird.newLines > 0 && !wird.daily.backlog && !wird.memorizeDoneToday ? 1 : 0);
-  const remainingToday = totalDue + planRemaining;
+  // GOAL-04, SPEC 3.5: once the minimum is met, today's plan work is done and the daily list cut at
+  // the base budget is empty, the full wird is complete. Study more and cards in other decks never
+  // hold it back. Unknown while the wird or the daily queue loads.
+  // All from the resolver's one read (planLeft and the queue), so a value Home's other hooks have not
+  // refreshed yet, such as a second look that came due while Home was behind a session, cannot mark
+  // the day early. A failed read leaves it unknown.
+  const remainingToday = study && queue ? study.planLeft + queue.leftAtBase : 1;
   // MST-01: with page or half-page review, Home counts memorized pages instead of ayah cards.
   const pageMode = !!wird && wird.plan.unit !== "ayah";
   // 6.4: after 7 or more days without a wird, welcome the user back before today's review.
@@ -522,18 +601,39 @@ export default function HomeScreen() {
     putUserSetting(db, GRACE_NOTE_SEEN_KEY, seen).catch(console.warn);
   }, [db, habit?.recentGraceDay]);
 
-  const dueReviews = ayahReviewsDue + vocabStats.dueCount;
-  const newCards = smartDecks.reduce((sum, deck) => sum + deck.newCount, 0) + vocabStats.newCount;
-  // Genuinely done: every deck and today's plan work, not merely one empty deck.
-  const allCaughtUp = dueLoaded && wird !== undefined && remainingToday === 0;
+  const step = study?.step ?? null;
+  // Start until anything was graded today, Continue after.
+  const startedToday =
+    (habit?.minimumProgressToday ?? 0) > 0 || (wird?.done.length ?? 0) > 0 || (queue?.studiedToday ?? 0) > 0 || !!wird?.memorizeDoneToday;
+  const nothingLeft = step?.kind === "home" && step.reason === "done";
+  const heldBack = studyMoreCount(queue);
+  const deckTitles: Record<string, string> = {
+    [SMART_DECK_IDS.retention]: s.smartDeckRetentionTitle,
+    [SMART_DECK_IDS.mutashabihat]: s.smartDeckMutashabihatTitle,
+    [SMART_DECK_IDS.similarTails]: s.smartDeckSimilarTailsTitle,
+    [SMART_DECK_IDS.qiraat]: s.smartDeckQiraatTitle,
+    [SMART_DECK_IDS.reasonsOfRevelation]: s.smartDeckReasonsTitle,
+    [MEANINGS_DECK_ID]: s.vocabDeckTitle,
+  };
+  const deckTitle = (deckId: string) => deckTitles[deckId] ?? deckId;
+  const parts = wird && queue && study ? todayParts(wird, { remediationDue, memorizeOpen: study.memorizeOpen }, queue) : null;
+
   const showDeckLabels = width >= VIEWPORT_BREAKPOINTS.sidebar;
-  const decksWithCards = smartDecks.filter((deck) => deck.total > 0);
-  const emptyDecks = smartDecks.filter((deck) => deck.total === 0);
+  // SPEC 3.3: the daily decks first, then Retention, then the decks a setting left out.
+  const deckOrder = [...dailyDeckIds, SMART_DECK_IDS.retention, ...SWITCHABLE_DECKS.filter((id) => !dailyDeckIds.includes(id))];
+  const deckIsOff = (deckId: string) => SWITCHABLE_DECKS.includes(deckId) && !dailyDeckIds.includes(deckId);
+  const orderedDecks = deckOrder.flatMap((deckId) =>
+    deckId === MEANINGS_DECK_ID ? [{ id: deckId, total: vocabStats.total }] : smartDecks.filter((deck) => deck.id === deckId),
+  );
+  const decksWithCards = orderedDecks.filter((deck) => deck.total > 0);
+  const emptyDecks = orderedDecks.filter((deck) => deck.total === 0 && deck.id !== MEANINGS_DECK_ID);
   const journeyComplete = journeySummary.totalLevels > 0 && journeySummary.completedLevels >= journeySummary.totalLevels;
   const renderSmartDeck = (deck: SmartDeckDisplay) => (
     <SmartDeckCard
       key={deck.id}
       deck={deck}
+      off={deckIsOff(deck.id)}
+      onOpenSetting={openStudySettings}
       filterLabel={getSmartFilterLabel(deck.filter)}
       onStartReview={() =>
         // Only future cards: open the card list to inspect them instead of an empty session.
@@ -639,35 +739,38 @@ export default function HomeScreen() {
               className={`${headerStacked ? "flex-wrap" : "grow shrink-0"} flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
               style={mirroredRowStyle}
             >
-              <View className={isRTL ? "items-end" : "items-start"}>
-                {dueLoaded ? (
+              {/* SPEC 3.2: today's daily cards, cut at the budget. Hidden without a plan. */}
+              {wird === null ? null : (
+                <View className={isRTL ? "items-end" : "items-start"}>
+                  {dueLoaded ? (
+                    <Text
+                      className="text-charcoal dark:text-neutral-100"
+                      // Already display size; larger system text grows it only a little more.
+                      maxFontSizeMultiplier={1.3}
+                      style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}
+                    >
+                      {localNumber(cardCounts.total)}
+                    </Text>
+                  ) : (
+                    <Skeleton isDark={isDark} width={96} height={64} borderRadius={16} accessibilityElementsHidden />
+                  )}
                   <Text
-                    className="text-charcoal dark:text-neutral-100"
-                    // Already display size; larger system text grows it only a little more.
-                    maxFontSizeMultiplier={1.3}
-                    style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}
+                    className="text-warm-400 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                   >
-                    {localNumber(totalDue)}
+                    {s.flashcardsDueToday}
                   </Text>
-                ) : (
-                  <Skeleton isDark={isDark} width={96} height={64} borderRadius={16} accessibilityElementsHidden />
-                )}
-                <Text
-                  className="text-warm-400 dark:text-neutral-400"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
-                >
-                  {s.flashcardsDueToday}
-                </Text>
-                {dueLoaded ? (
-                  // Cards only: the plan's pages are counted on the plan card, never added in here.
-                  <Text
-                    className="text-warm-600 dark:text-neutral-400"
-                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, ...textStartStyle(isRTL) }}
-                  >
-                    {interpolate(s.homeDueNew, { due: localNumber(dueReviews), new: localNumber(newCards) })}
-                  </Text>
-                ) : null}
-              </View>
+                  {dueLoaded ? (
+                    // Cards only: the plan's pages are counted on the Today card, never added in here.
+                    <Text
+                      className="text-warm-600 dark:text-neutral-400"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, ...textStartStyle(isRTL) }}
+                    >
+                      {interpolate(s.homeDueNew, { due: localNumber(cardCounts.due), new: localNumber(cardCounts.fresh) })}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
               <View className={`pb-1 ${isRTL ? "items-end" : "items-start"}`}>
                 {dueLoaded ? (
                   <Text
@@ -692,19 +795,18 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </View>
-            {dueLoaded && totalDue > 0 ? (
-              <Pressable
-                onPress={() => handleStartReview()}
-                className={`min-h-[44px] rounded-full bg-primary-accent px-4 py-3 flex-row items-center gap-2 ${headerStacked ? "justify-center" : ""} ${isRTL ? "flex-row-reverse" : ""}`}
-                accessibilityRole="button"
-                style={({ pressed }) => ({ ...(mirroredRowStyle ?? {}), transform: [{ scale: pressed ? 0.97 : 1 }] })}
-              >
-                <Play size={15} color="#fff" />
-                <Text className="text-white" style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }} numberOfLines={1}>
-                  {s.flashcardsStartReview}
-                </Text>
-              </Pressable>
-            ) : allCaughtUp ? (
+            {!dueLoaded || wird === undefined ? null : wird === null ? (
+              <HeaderAction label={s.studySetUpPlan} onPress={() => router.push("/hifz/setup" as Href)} stacked={headerStacked} isRTL={isRTL} />
+            ) : step && (step.kind === "review" || step.kind === "memorize" || step.kind === "cards") ? (
+              // SPEC 3.1: one Study button. The welcome-back card below takes its place that day.
+              <HeaderAction
+                label={startedToday ? s.studyContinue : s.studyStart}
+                icon={<Play size={15} color="#fff" />}
+                onPress={startStudy}
+                stacked={headerStacked}
+                isRTL={isRTL}
+              />
+            ) : nothingLeft && habit?.streak.doneToday ? (
               <View
                 className={`min-h-[44px] items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
                 style={mirroredRowStyle}
@@ -712,14 +814,47 @@ export default function HomeScreen() {
               >
                 <CheckCircle2 size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
                 <Text className="text-primary-muted dark:text-primary-bright" style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}>
-                  {s.homeAllCaughtUp}
+                  {s.studyAllDone}
                 </Text>
+              </View>
+            ) : nothingLeft && habit && queue ? (
+              // Nothing left and the minimum not met: name the shortfall and offer a way to meet it.
+              <View className={`gap-2 ${headerStacked ? "" : isRTL ? "items-start" : "items-end"}`} style={{ flexShrink: 1 }}>
+                <Text
+                  className="text-warm-600 dark:text-neutral-400"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                >
+                  {interpolate(s.studyShortfall, { cards: formatCards(shortfallCards(queue, habit.minimumProgressToday), uiLanguage) })}
+                </Text>
+                <HeaderAction
+                  label={heldBack > 0 ? s.studyMore : s.studyAllDecks}
+                  onPress={heldBack > 0 ? studyMore : openDecks}
+                  stacked={headerStacked}
+                  isRTL={isRTL}
+                />
+                {heldBack > 0 ? (
+                  // What one press adds, as on the session end screens (SPEC 3.2).
+                  <Text
+                    className="text-warm-500 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 11, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                  >
+                    {interpolate(s.studyMoreAdds, { cards: formatCards(heldBack, uiLanguage) })}
+                  </Text>
+                ) : null}
               </View>
             ) : null}
           </View>
           {/* NOT-03: the in-app reminder, on web and while native notifications are off. Its Start opens
               the same plan-aware route as a notification tap (lib/notifications/reminder-route). */}
-          <WirdReminderBanner />
+          <WirdReminderBanner
+            wirdStartable={!step || step.kind !== "home"}
+            // A wird reminder opens the same step as the Study button, at once and under its guard, so
+            // the two can never stack two sessions. Other reminders open their own route.
+            onStart={(route) => {
+              if (route === "wird" && step && step.kind !== "home") startStudy();
+              else openReminderRoute(db, route).catch(console.warn);
+            }}
+          />
           {habit ? (
             <WirdStreakCard
               overview={habit}
@@ -754,19 +889,14 @@ export default function HomeScreen() {
         {wird !== undefined ? (
           <WirdPlanCard
             wird={wird}
-            inboxCount={inboxCount}
+            parts={parts}
+            deckTitle={deckTitle}
             secondLooksDue={secondLooksDue}
             nextLookAt={nextLookAt}
-            ayahDue={ayahReviewsDue}
-            ayahNew={smartDecks.reduce((sum, deck) => sum + deck.newCount, 0)}
             language={uiLanguage}
             isDark={isDark}
             s={s}
-            // Like the wird reminder: the page review, or the ayah review when the plan reviews ayat (UNIT-02).
-            onStartReview={() => router.push(reminderHref("wird", wird?.plan ?? null))}
             onStartMemorize={() => router.push("/hifz/memorize" as Href)}
-            onSetup={() => router.push("/hifz/setup" as Href)}
-            onDrill={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}
           />
         ) : (
           <Skeleton isDark={isDark} height={160} borderRadius={32} className="mb-6" accessibilityElementsHidden />
@@ -847,46 +977,84 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
 
-        {/* Hand-mirrored alignment pins LTR coordinates; under the RTL tab root it flipped twice. */}
-        <View
-          className={`mb-3 ${isRTL ? "items-end" : "items-start"}`}
-          style={{ direction: "ltr" }}
-          onLayout={(event) => setDecksY(event.nativeEvent.layout.y)}
-        >
-          <Text
-            className="text-charcoal dark:text-neutral-100"
-            style={{
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 16,
-              ...textStartStyle(isRTL),
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
+        {/* SPEC 3.3: every deck, collapsed by default. Study above covers the daily ones. */}
+        <View onLayout={(event) => setDecksY(event.nativeEvent.layout.y)} className="mb-3">
+          <Pressable
+            onPress={() => setDecksOpen((open) => !open)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: decksOpen }}
+            className="min-h-[44px] items-center gap-2"
+            style={({ pressed }) => ({ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", opacity: pressed ? 0.7 : 1 })}
           >
-            {s.flashcardsDecks}
-          </Text>
+            <Text
+              className="text-charcoal dark:text-neutral-100"
+              accessibilityRole="header"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+            >
+              {s.studyAllDecks}
+            </Text>
+            {decksOpen ? (
+              <ChevronDown size={18} color={mutedIconColor(effectiveTheme)} />
+            ) : isRTL ? (
+              <ChevronLeft size={18} color={mutedIconColor(effectiveTheme)} />
+            ) : (
+              <ChevronRight size={18} color={mutedIconColor(effectiveTheme)} />
+            )}
+          </Pressable>
         </View>
 
-        {dueLoaded ? (
+        {!decksOpen ? null : decksLoaded ? (
           <>
             <View className="gap-2 mb-3">
-              {decksWithCards.map(renderSmartDeck)}
-              {vocabStats.total > 0 && (
-                <VocabularyDeckCard
-                  stats={vocabStats}
-                  onStartReview={() =>
-                    vocabStats.dueCount + vocabStats.newCount > 0
-                      ? handleStartReview(MEANINGS_DECK_ID)
-                      : setDeckCardsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })
-                  }
-                  onConfigure={() => setReviewSettingsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })}
-                  onShowCards={() => setDeckCardsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                  compact={compactDeckCards}
-                  showLabels={showDeckLabels}
-                  s={s}
-                />
+              {decksWithCards.map((deck) =>
+                deck.id === MEANINGS_DECK_ID ? (
+                  <VocabularyDeckCard
+                    key={deck.id}
+                    stats={vocabStats}
+                    off={deckIsOff(MEANINGS_DECK_ID)}
+                    onOpenSetting={openStudySettings}
+                    onStartReview={() =>
+                      vocabStats.dueCount + vocabStats.newCount > 0
+                        ? handleStartReview(MEANINGS_DECK_ID)
+                        : setDeckCardsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })
+                    }
+                    onConfigure={() => setReviewSettingsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })}
+                    onShowCards={() => setDeckCardsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })}
+                    isDark={isDark}
+                    isRTL={isRTL}
+                    compact={compactDeckCards}
+                    showLabels={showDeckLabels}
+                    s={s}
+                  />
+                ) : (
+                  renderSmartDeck(deck as SmartDeckDisplay)
+                ),
               )}
+              {/* Mistakes marked in review wait here; remediation due today is plan work under Study. */}
+              {inboxCount > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => router.push({ pathname: "/hifz/review", params: { mode: "mistakes" } } as Href)}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                >
+                  <Card elevation="low" className="px-4 py-3 rounded-3xl">
+                    <View className="items-center gap-3 min-h-[40px]" style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
+                      <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+                        <PenLine size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                      </View>
+                      <Text
+                        className="flex-1 text-charcoal dark:text-neutral-200"
+                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+                      >
+                        {interpolate(s.hifzInboxCount, { n: formatNumber(inboxCount, uiLanguage) })}
+                      </Text>
+                      <Text className="text-primary-muted dark:text-primary-bright" style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}>
+                        {s.hifzInboxAction}
+                      </Text>
+                    </View>
+                  </Card>
+                </Pressable>
+              ) : null}
             </View>
             {emptyDecks.length > 0 ? (
               <>
@@ -899,7 +1067,7 @@ export default function HomeScreen() {
                     {s.homeMoreDecks}
                   </Text>
                 </View>
-                <View className="gap-2 mb-3">{emptyDecks.map(renderSmartDeck)}</View>
+                <View className="gap-2 mb-3">{emptyDecks.map((deck) => renderSmartDeck(deck as SmartDeckDisplay))}</View>
               </>
             ) : null}
           </>
@@ -1059,6 +1227,7 @@ function DeckCardShell({
   textNode,
   actionNodes,
   statsNode,
+  trailingControl,
 }: {
   canStart: boolean;
   onStartReview: () => void;
@@ -1069,11 +1238,14 @@ function DeckCardShell({
   textNode: React.ReactNode;
   actionNodes: React.ReactNode;
   statsNode: React.ReactNode;
+  /** A control shown in place of the stats, such as Off on a deck outside daily study. */
+  trailingControl?: React.ReactNode;
 }) {
   const row = { direction: "ltr" as const, flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const) };
   const passive = <View style={{ pointerEvents: "none" }}>{iconNode}</View>;
   const passiveText = <View style={{ flex: 1, minWidth: 0, pointerEvents: "none" }}>{textNode}</View>;
-  const passiveStats = <View style={{ pointerEvents: "none" }}>{statsNode}</View>;
+  // Off takes the stats' place: a deck outside daily study has no work waiting, so its counts are not shown.
+  const passiveStats = trailingControl ?? <View style={{ pointerEvents: "none" }}>{statsNode}</View>;
   return (
     <Card elevation="low" className="px-4 py-3 rounded-3xl" style={{ opacity: canStart ? 1 : 0.55 }}>
       <Pressable
@@ -1149,8 +1321,60 @@ function DeckActionButton({
   );
 }
 
+/** "Off" on a deck left out of daily study, opening the setting that turns it on (SPEC 3.3). */
+function DeckOffButton({ isRTL, s, onPress }: { isRTL: boolean; s: UIStrings; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={(event) => {
+        event.stopPropagation?.();
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`${s.studyDeckOff}. ${s.studyDeckOffHint}`}
+      className="h-10 px-3 rounded-full border border-warm-300 dark:border-neutral-700 items-center justify-center"
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+      hitSlop={2}
+    >
+      <Text className="text-warm-700 dark:text-neutral-300" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+        {s.studyDeckOff}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** The header's one action: Study, Set up your plan, Study more or All decks. */
+function HeaderAction({
+  label,
+  icon,
+  onPress,
+  stacked,
+  isRTL,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  onPress: () => void;
+  stacked: boolean;
+  isRTL: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`min-h-[44px] rounded-full bg-primary-accent px-4 py-3 flex-row items-center gap-2 ${stacked ? "justify-center" : ""} ${isRTL ? "flex-row-reverse" : ""}`}
+      accessibilityRole="button"
+      style={({ pressed }) => ({ ...(isRTL ? { direction: "ltr" as const } : {}), transform: [{ scale: pressed ? 0.97 : 1 }] })}
+    >
+      {icon}
+      <Text className="text-white" style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function SmartDeckCard({
   deck,
+  off,
+  onOpenSetting,
   filterLabel,
   onStartReview,
   onConfigure,
@@ -1162,6 +1386,9 @@ function SmartDeckCard({
   s,
 }: {
   deck: SmartDeckDisplay;
+  /** Left out of daily study by its setting: marked Off, with a way to the setting. */
+  off: boolean;
+  onOpenSetting: () => void;
   filterLabel: string;
   onStartReview: () => void;
   onConfigure: () => void;
@@ -1247,12 +1474,15 @@ function SmartDeckCard({
       textNode={textNode}
       actionNodes={actionNodes}
       statsNode={statsNode}
+      trailingControl={off ? <DeckOffButton isRTL={isRTL} s={s} onPress={onOpenSetting} /> : undefined}
     />
   );
 }
 
 function VocabularyDeckCard({
   stats,
+  off,
+  onOpenSetting,
   onStartReview,
   onConfigure,
   onShowCards,
@@ -1263,6 +1493,9 @@ function VocabularyDeckCard({
   s,
 }: {
   stats: DeckTodayCounts;
+  /** Left out of daily study by its setting: marked Off, with a way to the setting. */
+  off: boolean;
+  onOpenSetting: () => void;
   onStartReview: () => void;
   onConfigure: () => void;
   onShowCards: () => void;
@@ -1346,6 +1579,7 @@ function VocabularyDeckCard({
       textNode={textNode}
       actionNodes={actionNodes}
       statsNode={statsNode}
+      trailingControl={off ? <DeckOffButton isRTL={isRTL} s={s} onPress={onOpenSetting} /> : undefined}
     />
   );
 }

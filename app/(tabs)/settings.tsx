@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
-import { View, Text, Pressable, ActivityIndicator, Linking, Platform, StyleSheet, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking, Platform, StyleSheet, useWindowDimensions, type ScrollView } from "react-native";
 import { AccountSyncCard, lastSyncedLabel } from "@/components/settings/AccountSyncCard";
 import { LogoutConfirmDialog } from "@/components/settings/LogoutConfirmDialog";
 import { ProfilePrivacySheet } from "@/components/settings/ProfilePrivacySheet";
@@ -161,7 +161,7 @@ export default function SettingsScreen() {
     captureAuthReturn({ route: "settings-account" });
     router.push(pathname);
   };
-  const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string }>();
+  const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string; section?: string }>();
   const configured = isSupabaseConfigured();
   const qfSyncEnabled = isQfSyncEnabled();
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -195,6 +195,44 @@ export default function SettingsScreen() {
   const { isLaptop } = useScreenContentLayout({ maxWidth: SETTINGS_CONTENT_MAX_WIDTH });
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const activeCategory = parseSettingsCategory(categoryParam) ?? "general";
+  // Home's Off marker on a deck opens Settings at the Daily study section (?section=daily-study). The
+  // sections above it (the wird settings, the Quran preview) load after the first layout and push it
+  // down, so the request stays open and is measured again on each layout change until layout has
+  // settled for a moment or the user scrolls. measureLayout is used rather than a stored onLayout y,
+  // which web does not report again when only the position moves.
+  const sectionParam = Array.isArray(params.section) ? params.section[0] : params.section;
+  const scrollRef = useRef<ScrollView>(null);
+  const panelsRef = useRef<View>(null);
+  const panelsY = useRef(0);
+  const dailyStudyRef = useRef<View>(null);
+  const pendingDailyStudy = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollToDailyStudy = useCallback(() => {
+    const target = dailyStudyRef.current;
+    const panels = panelsRef.current;
+    if (!pendingDailyStudy.current || !target || !panels) return;
+    target.measureLayout(
+      panels as never,
+      (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, panelsY.current + y - 16), animated: false }),
+      () => {},
+    );
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      pendingDailyStudy.current = false;
+    }, 1500);
+  }, []);
+  useEffect(() => {
+    if (sectionParam !== "daily-study") return;
+    pendingDailyStudy.current = true;
+    router.setParams({ section: undefined });
+    scrollToDailyStudy();
+  }, [sectionParam, router, scrollToDailyStudy]);
+  useEffect(
+    () => () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    },
+    [],
+  );
   const previewPage = quranPreview?.v2Page ?? 1;
   const previewFontFamily = quranPreview ? quranPageFontName(quranRenderFontStyle, previewPage) : undefined;
   const previewFontPaletteStyle = quranPageFontPaletteStyle(quranRenderFontStyle, previewPage, effectiveTheme);
@@ -765,8 +803,10 @@ export default function SettingsScreen() {
             onOpenPlan={() => router.push("/hifz/setup" as Href)}
           />
 
-          <SectionLabel>{s.studyDecksTitle}</SectionLabel>
-          <StudyDecksSettings db={db} language={uiLanguage} s={s} />
+          <View ref={dailyStudyRef} onLayout={scrollToDailyStudy}>
+            <SectionLabel>{s.studyDecksTitle}</SectionLabel>
+            <StudyDecksSettings db={db} language={uiLanguage} s={s} />
+          </View>
 
           <SectionLabel>{s.notifSettingsTitle}</SectionLabel>
           <ReminderSettingsSection />
@@ -1141,7 +1181,15 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
-      <ScreenScrollView maxWidth={SETTINGS_CONTENT_MAX_WIDTH} bottomInset={COMPACT_SCREEN_BOTTOM_INSET}>
+      <ScreenScrollView
+        ref={scrollRef}
+        maxWidth={SETTINGS_CONTENT_MAX_WIDTH}
+        bottomInset={COMPACT_SCREEN_BOTTOM_INSET}
+        // The user's own scroll ends a pending jump to Daily study.
+        onScrollBeginDrag={() => {
+          pendingDailyStudy.current = false;
+        }}
+      >
         <View
           className="pt-8 pb-5"
           style={{
@@ -1173,7 +1221,17 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <View className="pb-8">{categoryPanels}</View>
+        <View
+          ref={panelsRef}
+          className="pb-8"
+          onLayout={(event) => {
+            panelsY.current = event.nativeEvent.layout.y;
+            // The panels grow as the sections above Daily study load; measure again then.
+            scrollToDailyStudy();
+          }}
+        >
+          {categoryPanels}
+        </View>
       </ScreenScrollView>
       <LogoutConfirmDialog
         visible={logoutDialogVisible}

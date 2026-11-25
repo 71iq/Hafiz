@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, NotebookPen, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
@@ -41,6 +41,9 @@ import {
 } from "@/lib/fsrs/queries";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { computeUniqueFront, type UniqueFrontContextAyah } from "@/lib/fsrs/uniqueness";
+import { addStudyMore, DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySessionDeckIds } from "@/lib/study/daily-queue";
+import { DAILY_SESSION_HREF, opensDailySession, type StudyState, type StudyStep } from "@/lib/study/resolve";
+import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
@@ -75,6 +78,7 @@ import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-setting
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 import { endReviewSession, startReviewSession, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import { loadHabitOverview } from "@/lib/habit/queries";
+import { readHabitSettings } from "@/lib/habit/settings";
 import { useActiveClock } from "@/lib/habit/use-active-clock";
 import {
   SessionHabitCards,
@@ -245,7 +249,8 @@ function FlashcardSessionScreen() {
   const openMushaf = useOpenMushaf();
   const reduceMotion = useReducedMotionPreference();
   const authUserId = useAuthStore((state) => state.user?.id ?? null);
-  const { deckId } = useLocalSearchParams<{ deckId?: string }>();
+  // SPEC 3.2: `scope=daily`, or no deck at all, is today's daily study; `deckId` is one deck from All decks.
+  const { deckId, scope } = useLocalSearchParams<{ deckId?: string; scope?: string }>();
   const { width } = useWindowDimensions();
   const maxWidth = Math.min(width, 600);
 
@@ -280,6 +285,8 @@ function FlashcardSessionScreen() {
   const wirdEventRef = useRef<SessionHabitInput["event"]>(null);
   const againCountRef = useRef(0);
   const [wirdNotice, setWirdNotice] = useState<string | null>(null);
+  /** SPEC 3.4: Retention opened alone under a plan that reviews by page does not count toward the streak. */
+  const [retentionNotCounted, setRetentionNotCounted] = useState(false);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const reviewedCountsRef = useRef({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 });
   // A learning card can come back several times in one session; the summary counts each card once, by
@@ -305,6 +312,8 @@ function FlashcardSessionScreen() {
   const [leavePending, setLeavePending] = useState(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
+  const normalizedScope = Array.isArray(scope) ? scope[0] : scope;
+  const dailyScope = normalizedScope === "daily" || !normalizedDeckId;
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [confirmCardAction, setConfirmCardAction] = useState<"delete" | "reset" | null>(null);
   const [dueDateOpen, setDueDateOpen] = useState(false);
@@ -348,16 +357,20 @@ function FlashcardSessionScreen() {
     let cancelled = false;
 
     async function load() {
+      // A reload in place (Continue, Study more, or new params on this screen) is a new session that
+      // the remove guard covers again.
+      exitingRef.current = false;
       resetSessionProgress();
       setSummary(null);
       setPhase("loading");
       try {
-        sessionRef.current = startReviewSession("cards", { deckId: normalizedDeckId ?? null });
-        const queue = await loadReviewQueue(db, normalizedDeckId);
+        sessionRef.current = startReviewSession("cards", { deckId: dailyScope ? DAILY_SESSION_DECK_ID : normalizedDeckId ?? null });
+        const queue = dailyScope ? await loadDailyReviewQueue(db) : await loadReviewQueue(db, normalizedDeckId);
         if (cancelled) return;
         if (queue.length === 0) {
           // Nothing to review: say when the next card is due instead of a summary of zeros.
-          const nextReviewDate = await getNextEligibleReviewDate(db).catch(() => null);
+          const sessionDecks = dailyScope ? await readDailySessionDeckIds(db).catch(() => undefined) : [normalizedDeckId!];
+          const nextReviewDate = await getNextEligibleReviewDate(db, sessionDecks).catch(() => null);
           if (cancelled) return;
           resetSessionProgress();
           setSummary({ ...emptySummary(), emptyQueue: true, nextReviewDate });
@@ -512,6 +525,16 @@ function FlashcardSessionScreen() {
           return;
         }
 
+        // The note is a courtesy: a settings read that fails leaves it out rather than failing the session.
+        const notCounted =
+          !dailyScope &&
+          normalizedDeckId === SMART_DECK_IDS.retention &&
+          (await readHabitSettings(db).then(
+            (settings) => !settings.retentionCounts,
+            () => false,
+          ));
+        if (cancelled) return;
+        setRetentionNotCounted(notCounted);
         sessionClock.reset();
         setCurrentIndex(0);
         setSessionCardTotal(loaded.length);
@@ -535,6 +558,7 @@ function FlashcardSessionScreen() {
   }, [
     db,
     normalizedDeckId,
+    dailyScope,
     tafseerSource,
     settingsLoaded,
     resetSessionProgress,
@@ -629,10 +653,12 @@ function FlashcardSessionScreen() {
   const buildSummary = useCallback(async (): Promise<SessionSummary> => {
     const session = sessionRef.current;
     const [nextReviewDate, overview] = await Promise.all([
-      getNextEligibleReviewDate(db).catch((error) => {
-        console.warn("[FlashcardSession] Next review date failed:", error);
-        return null;
-      }),
+      (dailyScope ? readDailySessionDeckIds(db) : Promise.resolve([normalizedDeckId!]))
+        .then((decks) => getNextEligibleReviewDate(db, decks))
+        .catch((error) => {
+          console.warn("[FlashcardSession] Next review date failed:", error);
+          return null;
+        }),
       loadHabitOverview(db).catch((error) => {
         console.warn("[FlashcardSession] Habit overview failed:", error);
         return null;
@@ -650,7 +676,7 @@ function FlashcardSessionScreen() {
       nextReviewDate,
       habit: { event: wirdEventRef.current, overview, againCount: againCountRef.current, total: counts.total, durationMs },
     };
-  }, [db, sessionClock]);
+  }, [db, sessionClock, dailyScope, normalizedDeckId]);
 
   const finishSessionWithSummary = useCallback(async () => {
     setSummary(await buildSummary());
@@ -1011,6 +1037,29 @@ function FlashcardSessionScreen() {
     }, () => setFailedGrade(rating));
   };
 
+  // SPEC 3.1: the end screen asks the resolver what comes next.
+  const nextStep = useNextStudyStep(db, phase === "summary");
+
+  /** Continue: the daily session reloads in place; any other step replaces this screen, so Back lands on Home. */
+  const continueTo = (step: Exclude<StudyStep, { kind: "home" }>) => {
+    if (dailyScope && opensDailySession(step)) {
+      setLoadAttempt((n) => n + 1);
+      return;
+    }
+    exitingRef.current = true;
+    router.replace(step.href);
+  };
+
+  /** Study more: one more budget for today, then the daily cards it opened. */
+  const studyMore = async () => {
+    await addStudyMore(db);
+    if (dailyScope) setLoadAttempt((n) => n + 1);
+    else {
+      exitingRef.current = true;
+      router.replace(DAILY_SESSION_HREF);
+    }
+  };
+
   // SES-02: leaving mid-session asks once. Every grade is already saved, so this only confirms.
   const handleEndSession = () => {
     if (hasReviewedProgress()) {
@@ -1132,6 +1181,9 @@ function FlashcardSessionScreen() {
           language={uiLanguage}
           commitLabel={commitLabel}
           ownerId={authUserId}
+          nextStep={nextStep}
+          onContinue={continueTo}
+          onStudyMore={studyMore}
         />
       </SafeAreaView>
     );
@@ -1250,6 +1302,14 @@ function FlashcardSessionScreen() {
               style={{ width: `${progressPercent}%` }}
             />
           </View>
+          {retentionNotCounted ? (
+            <Text
+              className="mt-2 text-center text-warm-600 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, writingDirection: isRTL ? "rtl" : "ltr" }}
+            >
+              {s.studyRetentionNotCounted}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -2454,6 +2514,9 @@ function SessionSummaryView({
   language,
   commitLabel,
   ownerId,
+  nextStep,
+  onContinue,
+  onStudyMore,
 }: {
   summary: SessionSummary;
   onDone: () => void;
@@ -2466,6 +2529,10 @@ function SessionSummaryView({
   commitLabel: string;
   /** The signed-in account, if any: only its confirmed sync may say Synced. */
   ownerId: string | null;
+  /** What the resolver says comes next (SPEC 3.1), null while it loads. */
+  nextStep: StudyState | null;
+  onContinue: (step: Exclude<StudyStep, { kind: "home" }>) => void;
+  onStudyMore: () => Promise<void>;
 }) {
   const { width, height } = useWindowDimensions();
   const compact = width < 430 || height < 760;
@@ -2500,9 +2567,17 @@ function SessionSummaryView({
             {interpolate(s.sessionNextDue, { when: nextReview })}
           </Text>
         ) : null}
-        <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: 28 }}>
-          <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.flashcardsSummaryDone}</Text>
-        </Button>
+        <View className="w-full max-w-sm" style={{ marginTop: 28 }}>
+          <SessionNextStep
+            state={nextStep}
+            commitment={null}
+            onContinue={onContinue}
+            onStudyMore={onStudyMore}
+            onDone={onDone}
+            language={language}
+            s={s}
+          />
+        </View>
       </ScrollView>
     );
   }
@@ -2567,12 +2642,18 @@ function SessionSummaryView({
         </View>
       ) : null}
 
-      {/* Done never waits for the network: grades are already saved here. */}
-      <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
-        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 15 : 16, color: "#fff" }}>
-          {showsCommitment(summary.habit) ? commitLabel : s.flashcardsSummaryDone}
-        </Text>
-      </Button>
+      {/* Done never waits for the network or the resolver: grades are already saved here. */}
+      <View className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
+        <SessionNextStep
+          state={nextStep}
+          commitment={showsCommitment(summary.habit) ? commitLabel : null}
+          onContinue={onContinue}
+          onStudyMore={onStudyMore}
+          onDone={onDone}
+          language={language}
+          s={s}
+        />
+      </View>
       {summary.total > 0 ? (
         <Text
           accessibilityLiveRegion="polite"

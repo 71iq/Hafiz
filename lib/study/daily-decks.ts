@@ -119,7 +119,9 @@ export async function writeDeckSwitch(database: AppDatabase, deck: SwitchableDec
 
 /** Save the Meanings switch. Nothing stored means on. */
 export async function writeMeaningsInDailyStudy(database: AppDatabase, on: boolean): Promise<void> {
-  await database.withTransactionAsync((db) => putUserSetting(db, STUDY_DECK_SETTING_KEYS.meanings, on ? "true" : "false"));
+  await database.withTransactionAsync((db) =>
+    putUserSetting(db, STUDY_DECK_SETTING_KEYS.meanings, on ? "true" : "false"),
+  );
 }
 
 /**

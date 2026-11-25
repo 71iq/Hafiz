@@ -655,52 +655,66 @@ export async function getSmartDeckStats(
   };
 }
 
+/**
+ * A smart deck's cards for today, read-only: its reviewable due rows, sorted by due, and up to
+ * `newCardsLimit` virtual new cards for candidates that have no row yet, in candidate order. Home's
+ * counts and the daily queue read this; only a session that will show a virtual card creates its row
+ * (materializeSmartCardIds).
+ */
+export async function getSmartDeckTodayRows(
+  db: AppDatabase,
+  deckId: SmartDeckId,
+  newCardsLimit: number,
+): Promise<{ total: number; dueRows: StudyCardRow[]; virtualNew: StudyCardRow[] }> {
+  if (deckId === SMART_DECK_IDS.retention) {
+    await migrateLegacyRetentionDecks(db);
+  }
+  const ids = await getSmartDeckCandidateCardIds(db, deckId);
+  if (ids.length === 0) return { total: 0, dueRows: [], virtualNew: [] };
+
+  const now = new Date().toISOString();
+  const dueCutoff = reviewDueCutoff();
+  const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
+  const dueRows = rows
+    .filter((row) => row.due <= dueCutoff && isReviewableCard(row, now))
+    .sort((a, b) => a.due.localeCompare(b.due));
+  const emptyCard = createEmptyCard();
+  const virtualNew = ids
+    .filter((id) => !live.has(id))
+    .slice(0, Math.max(0, newCardsLimit))
+    .map((id) => ({
+      id,
+      deck_id: deckId,
+      due: now,
+      stability: emptyCard.stability,
+      difficulty: emptyCard.difficulty,
+      elapsed_days: emptyCard.elapsed_days,
+      scheduled_days: emptyCard.scheduled_days,
+      learning_steps: emptyCard.learning_steps,
+      reps: emptyCard.reps,
+      lapses: emptyCard.lapses,
+      state: emptyCard.state,
+      last_review: null,
+      suspended_at: null,
+      buried_until: null,
+      marked_at: null,
+      created_at: now,
+      updated_at: now,
+    }));
+  return { total: ids.length, dueRows, virtualNew };
+}
+
 /** `options` null means the daily limit is used up: nothing is queued and every due card is held back. */
 export async function getSmartDeckTodayStats(
   db: AppDatabase,
   deckId: SmartDeckId,
   options?: DueCardsForReviewOptions | null
 ): Promise<DeckTodayStats> {
-  if (deckId === SMART_DECK_IDS.retention) {
-    await migrateLegacyRetentionDecks(db);
-  }
-  const ids = await getSmartDeckCandidateCardIds(db, deckId);
-  if (ids.length === 0) return splitTodayQueue(0, [], []);
-
-  const now = new Date().toISOString();
-  const dueCutoff = reviewDueCutoff();
   const normalized = normalizeDueOptions(options ?? undefined);
-  const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
-  const dueRows = rows
-    .filter((row) => row.due <= dueCutoff && isReviewableCard(row, now))
-    .sort((a, b) => a.due.localeCompare(b.due));
-  const missingRows = ids
-    .filter((id) => !live.has(id))
-    .slice(0, normalized.newCardsLimit)
-    .map((id) => {
-      const emptyCard = createEmptyCard();
-      return {
-        id,
-        deck_id: deckId,
-        due: now,
-        stability: emptyCard.stability,
-        difficulty: emptyCard.difficulty,
-        elapsed_days: emptyCard.elapsed_days,
-        scheduled_days: emptyCard.scheduled_days,
-        learning_steps: emptyCard.learning_steps,
-        reps: emptyCard.reps,
-        lapses: emptyCard.lapses,
-        state: emptyCard.state,
-        last_review: null,
-        suspended_at: null,
-        buried_until: null,
-        marked_at: null,
-        created_at: now,
-        updated_at: now,
-      };
-    });
-  const queuedRows = options === null ? [] : applyReviewQueueOptions([...dueRows, ...missingRows], options);
-  return splitTodayQueue(ids.length, queuedRows, dueRows);
+  const { total, dueRows, virtualNew } = await getSmartDeckTodayRows(db, deckId, normalized.newCardsLimit);
+  if (total === 0) return splitTodayQueue(0, [], []);
+  const queuedRows = options === null ? [] : applyReviewQueueOptions([...dueRows, ...virtualNew], options);
+  return splitTodayQueue(total, queuedRows, dueRows);
 }
 
 export async function materializeSmartDeckCards(
@@ -731,7 +745,17 @@ export async function materializeSmartDeckCards(
   if (createCount === 0) return 0;
 
   const missingIds = ids.filter((id) => !existing.has(id)).slice(0, createCount);
+  return materializeSmartCardIds(db, deckId, missingIds);
+}
+
+/**
+ * Create the rows for these candidate ids of a smart deck, skipping ids that are live in any deck,
+ * and queue their uploads in the same transaction. The daily session uses it for the virtual cards
+ * that survive the budget cut, just before it shows them. Returns how many rows it inserted.
+ */
+export async function materializeSmartCardIds(db: AppDatabase, deckId: SmartDeckId, missingIds: readonly string[]): Promise<number> {
   if (missingIds.length === 0) return 0;
+  const nowIso = new Date().toISOString();
 
   const emptyCard = createEmptyCard();
   const due = emptyCard.due.toISOString();

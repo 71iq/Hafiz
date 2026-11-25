@@ -1,7 +1,7 @@
 import type { AppDatabase } from "@/lib/database/types";
-import { getAyahReviewsDueToday } from "@/lib/fsrs/queries";
 import { loadTodayWird, reviewLeftToday } from "@/lib/hifz/pages";
 import { countDueRemediation } from "@/lib/hifz/remediation";
+import { countAyahReviewsDue } from "@/lib/study/daily-queue";
 
 export type ReviewLeft = Readonly<{
   /** A hifz plan is set up. Without one there is no review list, so the second sitting never reminds. */
@@ -21,7 +21,7 @@ export async function loadReviewLeft(db: AppDatabase, now: Date): Promise<Review
   if (!wird) return { hasPlan: false, left: false };
   const [remediationDue, ayahReviewsDue] = await Promise.all([
     countDueRemediation(db, now),
-    wird.plan.unit === "ayah" ? getAyahReviewsDueToday(db) : Promise.resolve(0),
+    wird.plan.unit === "ayah" ? countAyahReviewsDue(db) : Promise.resolve(0),
   ]);
   return { hasPlan: true, left: reviewLeftToday(wird, { remediationDue, ayahReviewsDue }) };
 }
