@@ -96,6 +96,7 @@ import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { addStudyMore } from "@/lib/study/daily-queue";
 import { DAILY_SESSION_HREF, type StudyStep } from "@/lib/study/resolve";
 import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
+import { useSessionLeaveState } from "@/lib/navigation/entry-route";
 import { useSettings } from "@/lib/settings/context";
 import { hapticMedium } from "@/lib/haptics";
 
@@ -922,6 +923,10 @@ function HifzReviewScreen() {
   // Back presses, gestures and the iOS swipe behave like Close: with progress they ask first, and
   // during an unresolved save they wait for it. usePreventRemove, unlike a bare beforeRemove listener,
   // also tells native-stack to block the native dismissal. `busy` is the rendered copy of the lock.
+  // SPEC 3.9: a widget or notification tap keeps this screen while its guard holds.
+  useSessionLeaveState(
+    busy || hasProgress ? "working" : phase === "summary" || phase === "empty" || phase === "error" ? "ended" : "fresh",
+  );
   usePreventRemove(busy || hasProgress, ({ data }) => {
     // The screen's own exit goes on, as does a back press this render has not caught up with; React
     // Navigation marks the action as already checked for this screen.

@@ -482,14 +482,9 @@ export function describeWidgetEntry(projection: HabitProjection, at: Date, input
   const line = ownLine ?? (count === null ? s.widgetLineDone : null);
   const spokenHeadline = ownLine === null && line !== null ? null : headline === line ? null : headline;
 
-  const tap: WidgetTap =
-    state === "milestone"
-      ? plan.reviewLeft
-        ? "wird"
-        : "home"
-      : state === "begin" || state === "earn_back_done" || state === "done" || state === "kept" || state === "paused"
-        ? "home"
-        : "wird";
+  // SPEC 3.9: every state that can have study left opens the study resolver, which opens Home itself
+  // when nothing is left. Only a kept or paused day, with nothing asked of it, opens Home directly.
+  const tap: WidgetTap = state === "kept" || state === "paused" ? "home" : "wird";
 
   return {
     state,

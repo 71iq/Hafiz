@@ -937,6 +937,15 @@
           "children": []
         },
         {
+          "id": "study.entry",
+          "title": "Widget and notification taps: kept screens, leave first, one tap at a time",
+          "kind": "transition",
+          "cases": [],
+          "uses": ["study.next", "home", "review.session", "hifz.review", "hifz.memorize"],
+          "native": false,
+          "children": []
+        },
+        {
           "id": "study.endscreen",
           "title": "Session end: Continue, Done for now, Study more or Done",
           "kind": "widget",
@@ -1134,7 +1143,7 @@
           "title": "Tap routing and remind later",
           "kind": "transition",
           "cases": ["REMIND-05"],
-          "uses": ["study.next"],
+          "uses": ["study.entry"],
           "native": true,
           "children": []
         },
@@ -1207,7 +1216,7 @@
           "title": "Widget tap routing on cold and warm starts",
           "kind": "transition",
           "cases": ["WIDGET-05"],
-          "uses": ["study.next", "home", "shell.entry"],
+          "uses": ["study.entry", "shell.entry"],
           "native": true,
           "children": []
         },

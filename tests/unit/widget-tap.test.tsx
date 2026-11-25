@@ -1,8 +1,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { Linking } from "react-native";
 import { redirectSystemPath } from "@/app/+native-intent";
-import { openReminderRoute } from "@/lib/notifications/reminder-route";
+import { openEntryRoute } from "@/lib/navigation/entry-route";
 import {
+  consumePendingWidgetTap,
   parseWidgetTapPath,
   peekPendingWidgetTap,
   redirectWidgetTapPath,
@@ -15,21 +16,27 @@ const mockDb = { name: "synthetic" };
 let mockPathname = "/";
 let mockNavigationKey: string | undefined = "root";
 
+const mockContainer = { getRootState: () => ({ index: 0, routes: [{ key: "expo-root", name: "__root" }] }) };
 jest.mock("expo-router", () => ({
   usePathname: () => mockPathname,
   useRootNavigationState: () => (mockNavigationKey ? { key: mockNavigationKey } : undefined),
+  useNavigationContainerRef: () => mockContainer,
 }));
 jest.mock("@/lib/database/provider", () => ({ useDatabaseStatus: () => ({ db: mockDb, isReady: true }) }));
-jest.mock("@/lib/notifications/reminder-route", () => ({ openReminderRoute: jest.fn(async () => undefined) }));
+jest.mock("@/lib/navigation/entry-route", () => ({ openEntryRoute: jest.fn(async () => undefined) }));
 jest.mock("@/lib/widget/platform", () => ({ widgetPlatform: { supported: true } }));
 
 let mockLaunchUrl: string | null = null;
+/** Clears a pending tap the way a handled tap does, without the hook. */
+function setPendingNull() {
+  consumePendingWidgetTap();
+}
 
 beforeEach(() => {
   resetWidgetTapsForTests();
   mockLaunchUrl = null;
   jest.spyOn(Linking, "getInitialURL").mockImplementation(async () => mockLaunchUrl);
-  jest.mocked(openReminderRoute).mockClear();
+  jest.mocked(openEntryRoute).mockClear();
   mockPathname = "/";
   mockNavigationKey = "root";
 });
@@ -83,6 +90,36 @@ describe("redirectWidgetTapPath", () => {
     expect(peekPendingWidgetTap()).toBe("wird");
   });
 
+  it("takes each numbered launch once, so a new launch in a living process still opens", () => {
+    expect(redirectWidgetTapPath("hafiz://widget?to=wird&launch=101", true)).toBe("/");
+    expect(peekPendingWidgetTap()).toBe("wird");
+    takeLaunchWidgetTap("hafiz://widget?to=wird&launch=101");
+    expect(peekPendingWidgetTap()).toBe("wird");
+    // The same launch read again by the other reader is not a second tap.
+    setPendingNull();
+    takeLaunchWidgetTap("hafiz://widget?to=wird&launch=101");
+    expect(peekPendingWidgetTap()).toBeNull();
+    // A later launch has a new number.
+    takeLaunchWidgetTap("hafiz://widget?to=home&launch=202");
+    expect(peekPendingWidgetTap()).toBe("home");
+  });
+
+  it("takes a numbered warm tap once, even when the launch link of the same tap is read later", () => {
+    expect(redirectWidgetTapPath("hafiz://widget?to=wird&launch=303", false)).toBeNull();
+    expect(peekPendingWidgetTap()).toBe("wird");
+    setPendingNull();
+    takeLaunchWidgetTap("hafiz://widget?to=wird&launch=303");
+    expect(peekPendingWidgetTap()).toBeNull();
+    // An unnumbered warm link (a build before the numbers) opens each time, as before.
+    redirectWidgetTapPath("hafiz://widget?to=home", false);
+    expect(peekPendingWidgetTap()).toBe("home");
+  });
+
+  it("opens nothing for a launch whose link MainActivity cleared, as after a replay from Recents", () => {
+    takeLaunchWidgetTap(null);
+    expect(peekPendingWidgetTap()).toBeNull();
+  });
+
   it("leaves other paths alone", () => {
     expect(redirectWidgetTapPath("/hifz/review", true)).toBeUndefined();
     expect(peekPendingWidgetTap()).toBeNull();
@@ -102,10 +139,12 @@ describe("useWidgetTaps", () => {
   it("opens the target after the root redirect on a cold start", async () => {
     redirectWidgetTapPath("hafiz://widget?to=wird", true);
     const hook = renderHook(() => useWidgetTaps());
-    expect(openReminderRoute).not.toHaveBeenCalled();
+    expect(openEntryRoute).not.toHaveBeenCalled();
     mockPathname = "/home";
     hook.rerender({});
-    await waitFor(() => expect(openReminderRoute).toHaveBeenCalledWith(mockDb, "wird"));
+    await waitFor(() =>
+      expect(openEntryRoute).toHaveBeenCalledWith(mockDb, "wird", { pathname: "/home", getRootState: expect.any(Function) }),
+    );
     expect(peekPendingWidgetTap()).toBeNull();
   });
 
@@ -115,8 +154,8 @@ describe("useWidgetTaps", () => {
     await waitFor(() => expect(peekPendingWidgetTap()).toBe("wird"));
     mockPathname = "/home";
     hook.rerender({});
-    await waitFor(() => expect(openReminderRoute).toHaveBeenCalledWith(mockDb, "wird"));
-    expect(openReminderRoute).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(openEntryRoute).toHaveBeenCalledWith(mockDb, "wird", expect.anything()));
+    expect(openEntryRoute).toHaveBeenCalledTimes(1);
   });
 
   it("does not open a launch link Expo Router already handled a second time", async () => {
@@ -124,9 +163,9 @@ describe("useWidgetTaps", () => {
     redirectWidgetTapPath("hafiz://widget?to=wird", true);
     mockPathname = "/home";
     renderHook(() => useWidgetTaps());
-    await waitFor(() => expect(openReminderRoute).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(openEntryRoute).toHaveBeenCalledTimes(1));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(openReminderRoute).toHaveBeenCalledTimes(1);
+    expect(openEntryRoute).toHaveBeenCalledTimes(1);
     expect(peekPendingWidgetTap()).toBeNull();
   });
 
@@ -136,7 +175,9 @@ describe("useWidgetTaps", () => {
     act(() => {
       redirectWidgetTapPath("hafiz://widget?to=home", false);
     });
-    await waitFor(() => expect(openReminderRoute).toHaveBeenCalledWith(mockDb, "home"));
+    await waitFor(() =>
+      expect(openEntryRoute).toHaveBeenCalledWith(mockDb, "home", { pathname: "/settings", getRootState: expect.any(Function) }),
+    );
   });
 
   it("waits for the navigation state", () => {
@@ -144,18 +185,17 @@ describe("useWidgetTaps", () => {
     mockNavigationKey = undefined;
     redirectWidgetTapPath("hafiz://widget?to=wird", true);
     renderHook(() => useWidgetTaps());
-    expect(openReminderRoute).not.toHaveBeenCalled();
+    expect(openEntryRoute).not.toHaveBeenCalled();
     expect(peekPendingWidgetTap()).toBe("wird");
   });
 
-  it.each(["/onboarding", "/flashcards/session", "/hifz/review", "/hifz/memorize", "/hifz/setup"])(
-    "drops the tap on %s",
-    (pathname) => {
-      mockPathname = pathname;
-      redirectWidgetTapPath("hafiz://widget?to=wird", false);
-      renderHook(() => useWidgetTaps());
-      expect(openReminderRoute).not.toHaveBeenCalled();
-      expect(peekPendingWidgetTap()).toBeNull();
-    },
-  );
+  it("hands every tap to the shared entry rules, which decide whether the screen it lands on is kept", async () => {
+    mockPathname = "/flashcards/session";
+    redirectWidgetTapPath("hafiz://widget?to=wird", false);
+    renderHook(() => useWidgetTaps());
+    await waitFor(() =>
+      expect(openEntryRoute).toHaveBeenCalledWith(mockDb, "wird", { pathname: "/flashcards/session", getRootState: expect.any(Function) }),
+    );
+    expect(peekPendingWidgetTap()).toBeNull();
+  });
 });

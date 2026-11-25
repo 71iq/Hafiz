@@ -61,6 +61,7 @@ import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { addStudyMore } from "@/lib/study/daily-queue";
 import { DAILY_SESSION_HREF, type StudyStep } from "@/lib/study/resolve";
 import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
+import { useSessionLeaveState } from "@/lib/navigation/entry-route";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 
@@ -565,6 +566,8 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
   const endScreen =
     !loading && !lookShowing && !(looksDoneStep && target && plan) && (!target || !plan ? !error : habitResult !== null && !outcome?.secondLookNow);
   const nextStep = useNextStudyStep(db, endScreen);
+  // SPEC 3.9: a widget or notification tap keeps this screen while its guard holds.
+  useSessionLeaveState(saving || lessonUnsaved ? "working" : endScreen || !!error ? "ended" : "fresh");
 
   /** Continue replaces this screen, so Back from the next step lands on Home; more memorization starts this screen again. */
   const continueTo = (next: Exclude<StudyStep, { kind: "home" }>) => {

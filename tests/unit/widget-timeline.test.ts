@@ -247,7 +247,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     expect(at(timeline, CLOCK.at(D, 15 * 60))).toMatchObject({
       state: "done",
       count: "5",
-      tap: "home",
+      tap: "wird",
       pose: "shimmer",
     });
     expect(at(timeline, CLOCK.at(next, 0))).toMatchObject({ state: "open_day", count: "5" });
@@ -369,7 +369,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
       flame: "lit",
       count: "2",
       line: "Today counts: 2 of 3",
-      tap: "home",
+      tap: "wird",
     });
 
     const lost = buildWidgetTimeline(input({ days: broken }));
@@ -394,7 +394,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
       tier: 1,
       count: "7",
       line: null,
-      tap: "home",
+      tap: "wird",
     });
     expect(milestone.contentDescription).toBe(
       "Hafiz. Streak: 7 days. 7 days of wird. Wird done for today. Grace days: 1.",
@@ -447,7 +447,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
       moreDueAt,
     };
     const done = buildWidgetTimeline(input({ days: days("done", "2026-11-19", D), plan: finished }));
-    expect(at(done, CLOCK.at(D, 9 * 60))).toMatchObject({ state: "done", tap: "home" });
+    expect(at(done, CLOCK.at(D, 9 * 60))).toMatchObject({ state: "done", tap: "wird" });
     expect(at(done, moreDueAt)).toMatchObject({
       state: "safe",
       line: "Review left today",
@@ -572,7 +572,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
     expect(utf8Length(serializeWidgetTimeline(timeline))).toBeLessThanOrEqual(WIDGET_MAX_BYTES);
   });
 
-  it("15. shows a new person 0 with an unlit flame, by dawn and after dusk, opening Home", () => {
+  it("15. shows a new person 0 with an unlit flame, by dawn and after dusk, opening the study step", () => {
     const timeline = buildWidgetTimeline(input({ days: [] }));
     expect(new Set(timeline.entries.map((entry) => entry.state))).toEqual(new Set(["begin"]));
     expect(timeline.entries[0]).toMatchObject({
@@ -581,7 +581,7 @@ describe("buildWidgetTimeline (spec 7.2)", () => {
       flame: "out",
       count: "0",
       line: "Start your streak",
-      tap: "home",
+      tap: "wird",
     });
     expect(at(timeline, CLOCK.at(D, 21 * 60))).toMatchObject({ scene: "night", pose: "glow_halo", count: "0" });
     expect(at(timeline, CLOCK.at(addDays(D, 1), 9 * 60))).toMatchObject({ scene: "dawn", count: "0" });

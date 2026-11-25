@@ -44,6 +44,7 @@ import { computeUniqueFront, type UniqueFrontContextAyah } from "@/lib/fsrs/uniq
 import { addStudyMore, DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySessionDeckIds } from "@/lib/study/daily-queue";
 import { DAILY_SESSION_HREF, opensDailySession, type StudyState, type StudyStep } from "@/lib/study/resolve";
 import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
+import { useSessionLeaveState } from "@/lib/navigation/entry-route";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
@@ -1082,6 +1083,11 @@ function FlashcardSessionScreen() {
   // during an unresolved grade or card action they wait for it. usePreventRemove, unlike a bare
   // beforeRemove listener, also tells native-stack to block the native dismissal. `mutationBusy` is the
   // rendered copy of the lock.
+  // SPEC 3.9: a widget or notification tap keeps this screen while its guard holds, and may replace
+  // it once the session has ended.
+  useSessionLeaveState(
+    mutationBusy || (phase !== "summary" && hasReviewed) ? "working" : phase === "summary" || phase === "error" ? "ended" : "fresh",
+  );
   usePreventRemove(mutationBusy || (phase !== "summary" && hasReviewed), ({ data }) => {
     // The screen's own leave goes on, as does a back press this render has not caught up with; React
     // Navigation marks the action as already checked for this screen.

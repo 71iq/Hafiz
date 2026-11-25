@@ -1,4 +1,4 @@
-import { usePathname, useRootNavigationState } from "expo-router";
+import { useNavigationContainerRef, usePathname, useRootNavigationState } from "expo-router";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
@@ -10,7 +10,7 @@ import { subscribeSyncCompleted } from "@/lib/sync/events";
 import { subscribeHabitChanged } from "@/lib/habit/use-habit-overview";
 import { reminderPlatform } from "@/lib/notifications/platform";
 import type { ReminderResponse } from "@/lib/notifications/platform-types";
-import { openReminderRoute } from "@/lib/notifications/reminder-route";
+import { openEntryRoute } from "@/lib/navigation/entry-route";
 import {
   configureReminderPlatform,
   recordReminderOpened,
@@ -103,6 +103,7 @@ export function useReminderResponses(): void {
   const { db, isReady } = useDatabaseStatus();
   const pathname = usePathname();
   const navigationKey = useRootNavigationState()?.key;
+  const container = useNavigationContainerRef();
   const [pendingRoute, setPendingRoute] = useState<ReminderRoute | null>(null);
 
   useEffect(() => {
@@ -130,9 +131,11 @@ export function useReminderResponses(): void {
     };
   }, [db, isReady]);
 
+  // The same entry rules as a widget tap (SPEC 3.9): onboarding, setup and a session with work under
+  // way keep their screen; elsewhere the tap leaves the screen it lands on and opens the step.
   useEffect(() => {
     if (!db || !pendingRoute || !navigationKey || pathname === "/") return;
-    if (pathname !== "/onboarding") openReminderRoute(db, pendingRoute).catch(warn);
+    openEntryRoute(db, pendingRoute, { pathname, getRootState: () => container.getRootState() }).catch(warn);
     setPendingRoute(null);
-  }, [db, pendingRoute, navigationKey, pathname]);
+  }, [db, pendingRoute, navigationKey, pathname, container]);
 }

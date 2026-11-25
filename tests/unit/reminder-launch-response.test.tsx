@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import type { ReminderResponse } from "@/lib/notifications/platform-types";
+import { openEntryRoute } from "@/lib/navigation/entry-route";
 import { recordReminderOpened, requestRemindLater } from "@/lib/notifications/schedule";
 import { useReminderResponses } from "@/lib/notifications/use-reminder-scheduling";
 
@@ -13,6 +14,7 @@ let mockLive: ((response: ReminderResponse) => void) | null = null;
 jest.mock("expo-router", () => ({
   usePathname: () => "/(tabs)/home",
   useRootNavigationState: () => ({ key: "root" }),
+  useNavigationContainerRef: () => ({ getRootState: () => undefined }),
 }));
 jest.mock("@/lib/database/provider", () => ({ useDatabaseStatus: () => ({ db: mockDb, isReady: true }) }));
 jest.mock("@/lib/auth/store", () => ({ useAuthStore: () => null }));
@@ -28,7 +30,7 @@ jest.mock("@/lib/notifications/platform", () => ({
     },
   },
 }));
-jest.mock("@/lib/notifications/reminder-route", () => ({ openReminderRoute: jest.fn(async () => undefined) }));
+jest.mock("@/lib/navigation/entry-route", () => ({ openEntryRoute: jest.fn(async () => undefined) }));
 jest.mock("@/lib/notifications/schedule", () => ({
   ...jest.requireActual<object>("@/lib/notifications/schedule"),
   requestRemindLater: jest.fn(async () => true),
@@ -48,6 +50,7 @@ const data: ReminderResponse["data"] = {
 beforeEach(() => {
   jest.mocked(requestRemindLater).mockClear();
   jest.mocked(recordReminderOpened).mockClear();
+  jest.mocked(openEntryRoute).mockClear();
 });
 
 describe("a reminder action that opened the app (NOT-05b)", () => {
@@ -92,5 +95,11 @@ describe("a reminder action that opened the app (NOT-05b)", () => {
     act(() => mockLive!(tap));
     await act(async () => undefined);
     expect(recordReminderOpened).toHaveBeenCalledTimes(1);
+    // Opened once, through the same entry rules as a widget tap (SPEC 3.9).
+    expect(openEntryRoute).toHaveBeenCalledTimes(1);
+    expect(openEntryRoute).toHaveBeenCalledWith(mockDb, data.route, {
+      pathname: "/(tabs)/home",
+      getRootState: expect.any(Function),
+    });
   });
 });
