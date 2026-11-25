@@ -161,6 +161,29 @@ export function isFinished(state: CheckState): boolean {
   return count >= MIN_QUESTIONS && Math.max(...state.probabilities) >= STOP_AT;
 }
 
+/**
+ * The options of the question at place `seed` in a check, in the order shown, the same order each
+ * time. A Fisher-Yates shuffle over mulberry32, whose output is well mixed even for neighbouring
+ * seeds: the earlier generator took the low bits of a plain linear one, which repeat every few steps,
+ * so the right answer came first on every other question.
+ */
+export function shuffledOptions<T>(values: readonly T[], seed: number): T[] {
+  let a = seed >>> 0;
+  const random = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const copy = [...values];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 /** Whether the bank can run a check in this language; with no items the check is not offered. */
 export function hasCheckItems(bank: readonly CheckItem[], language: MeaningLanguage): boolean {
   return bank.some((item) => item.language === language);

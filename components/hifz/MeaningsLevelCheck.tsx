@@ -16,6 +16,7 @@ import {
   KNOWN_WORDS_AT_LEVEL,
   MAX_QUESTIONS,
   nextItem,
+  shuffledOptions,
   startCheck,
   type CheckState,
 } from "@/lib/meanings/level-check";
@@ -53,18 +54,6 @@ export function meaningsLevelText(level: number, s: UIStrings, language: "en" | 
     : interpolate(s.meaningsLevelKnown, { words: formatNumber(words, language) });
 }
 
-/** Shuffles the four options by the item's place in the check, so a check shows the same order again. */
-function shuffled<T>(values: readonly T[], seed: number): T[] {
-  const copy = [...values];
-  let state = seed + 17;
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    state = (Math.imul(state, 1103515245) + 12345) >>> 0;
-    const j = state % (i + 1);
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
 async function loadItem(
   db: DatabaseExecutor,
   language: MeaningLanguage,
@@ -80,7 +69,7 @@ async function loadItem(
     ...item.distractors.map((word) => meaningOf(db, language, word)),
   ]);
   if (!ayah || meanings.some((meaning) => !meaning)) throw new Error("check item missing data");
-  const indexes = shuffled([0, 1, 2, 3], order);
+  const indexes = shuffledOptions([0, 1, 2, 3], order);
   const word =
     mushafWordTexts(item.word.surah, item.word.ayah, ayah.textUthmani, ayah.textQcf2)[item.word.pos - 1] ?? "";
   return { item, ayah, word, options: indexes.map((index) => meanings[index]!), correct: indexes.indexOf(0) };

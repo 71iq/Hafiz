@@ -11,6 +11,7 @@ import {
   nextBoundary,
   nextItem,
   priorFor,
+  shuffledOptions,
   startCheck,
   updateLevels,
   type SelfRating,
@@ -89,4 +90,24 @@ it("draws the same items for the same seed and other items for another", () => {
 
 it("has nothing to ask in a language the bank does not cover", () => {
   expect(nextItem(startCheck(bank, { language: "ar", centre: 5, seed: 1 }))).toBeNull();
+});
+
+it("shows the right answer in each of the four places about equally, with no pattern from one question to the next", () => {
+  const tally = [0, 0, 0, 0];
+  const runs = new Set<string>();
+  for (let seed = 0; seed < 20_000; seed += 1) {
+    const place = shuffledOptions([0, 1, 2, 3], seed).indexOf(0);
+    tally[place] += 1;
+  }
+  for (const count of tally) expect(Math.abs(count / 20_000 - 0.25)).toBeLessThan(0.02);
+  // Setup's first check uses seeds 1 to 12, a retake 7920 onwards, Settings 101 onwards.
+  for (const base of [1, 7920, 101]) {
+    const run = Array.from({ length: 12 }, (_, asked) => shuffledOptions([0, 1, 2, 3], base + asked).indexOf(0));
+    runs.add(run.join(""));
+    // Never the same place on every other question, as the old shuffle did.
+    const evens = new Set(run.filter((_, i) => i % 2 === 0));
+    expect(evens.size).toBeGreaterThan(1);
+  }
+  expect(runs.size).toBe(3);
+  expect(shuffledOptions(["a", "b", "c", "d"], 5)).toEqual(shuffledOptions(["a", "b", "c", "d"], 5));
 });
