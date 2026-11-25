@@ -45,6 +45,15 @@ import { addStudyMore, DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySes
 import { DAILY_SESSION_HREF, opensDailySession, type StudyState, type StudyStep } from "@/lib/study/resolve";
 import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
 import { useSessionLeaveState } from "@/lib/navigation/entry-route";
+import { readMeaningsSettings } from "@/lib/meanings/settings";
+import {
+  acceptLevelOffer,
+  declineLevelOffer,
+  loadMeaningsReviewQueue,
+  recordFirstReview,
+  type LevelOffer,
+} from "@/lib/meanings/session";
+import type { MeaningLanguage } from "@/lib/meanings/lemma-index";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
@@ -288,6 +297,12 @@ function FlashcardSessionScreen() {
   const [wirdNotice, setWirdNotice] = useState<string | null>(null);
   /** SPEC 3.4: Retention opened alone under a plan that reviews by page does not count toward the streak. */
   const [retentionNotCounted, setRetentionNotCounted] = useState(false);
+  /** SPEC 3.6: word cards answer in the meaning language while the deck keeps its default answer sides. */
+  const [meaningLanguage, setMeaningLanguage] = useState<MeaningLanguage | null>(null);
+  /** "I know this" was pressed for the card being graded, so its Easy grade counts as known. */
+  const knownPressRef = useRef(false);
+  /** A level offer earned by first reviews of new word cards, shown as a dialog. */
+  const [levelOffer, setLevelOffer] = useState<LevelOffer | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const reviewedCountsRef = useRef({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 });
   // A learning card can come back several times in one session; the summary counts each card once, by
@@ -366,7 +381,18 @@ function FlashcardSessionScreen() {
       setPhase("loading");
       try {
         sessionRef.current = startReviewSession("cards", { deckId: dailyScope ? DAILY_SESSION_DECK_ID : normalizedDeckId ?? null });
-        const queue = dailyScope ? await loadDailyReviewQueue(db) : await loadReviewQueue(db, normalizedDeckId);
+        const queue = dailyScope
+          ? await loadDailyReviewQueue(db)
+          : normalizedDeckId === MEANINGS_DECK_ID
+            ? await loadMeaningsReviewQueue(db)
+            : await loadReviewQueue(db, normalizedDeckId);
+        // A settings read that fails leaves word cards on their deck's answer sides.
+        const language = await readMeaningsSettings(db).then(
+          (settings) => settings.language,
+          () => null,
+        );
+        if (cancelled) return;
+        setMeaningLanguage(language);
         if (cancelled) return;
         if (queue.length === 0) {
           // Nothing to review: say when the next card is due instead of a summary of zeros.
@@ -597,11 +623,18 @@ function FlashcardSessionScreen() {
       return currentCard.asbabOccasions?.length ? ["asbabReading"] : [];
     }
     if (currentCard.isWordCard) {
-      return currentCard.settings.wordTestModes.filter((mode) => {
-        if (mode === "wordMeaningArabic" && !currentCard.wordMeaningAr && !getCardAnswerOverride(currentCard, mode)) return false;
-        if (mode === "wordMeaningTranslation" && !currentCard.wordMeaningEn && !getCardAnswerOverride(currentCard, mode)) return false;
-        return true;
-      });
+      const available = (mode: WordTestMode) =>
+        !!getCardAnswerOverride(currentCard, mode) ||
+        (mode === "wordMeaningArabic" ? !!currentCard.wordMeaningAr : !!currentCard.wordMeaningEn);
+      const deckModes = currentCard.settings.wordTestModes;
+      // SPEC 3.6: with the deck's default answer sides (both), a word card answers in the meaning
+      // language only, falling back to the other side when that meaning is missing. Sides the user
+      // chose in the deck settings are kept.
+      if (meaningLanguage && deckModes.length === 2) {
+        const preferred: WordTestMode = meaningLanguage === "ar" ? "wordMeaningArabic" : "wordMeaningTranslation";
+        if (available(preferred)) return [preferred];
+      }
+      return deckModes.filter(available);
     }
     return currentCard.settings.testModes.filter((mode) => {
       if (mode === "previousAyah" && (!currentCard.prevAyahText || currentCard.uniqueFront.contextCount > 0) && !getCardAnswerOverride(currentCard, mode)) return false;
@@ -610,7 +643,7 @@ function FlashcardSessionScreen() {
       if (mode === "tafseer" && !currentCard.tafseer && !getCardAnswerOverride(currentCard, mode)) return false;
       return true;
     });
-  }, [currentCard]);
+  }, [currentCard, meaningLanguage]);
 
   const currentMode = activeModes[currentSideIndex] ?? null;
   const isLastSide = currentSideIndex >= activeModes.length - 1;
@@ -974,8 +1007,12 @@ function FlashcardSessionScreen() {
   const handleGrade = (rating: Grade) => {
     const item = currentCard;
     if (!item) return;
+    // "I know this" grades Easy; any other grade path is not a known word.
+    const knownPressed = knownPressRef.current;
+    knownPressRef.current = false;
     void runCardMutation("[FlashcardSession] Failed to grade card:", s.flashcardsReviewSaveFailed, async () => {
       hapticMedium();
+      const firstGrade = !reviewedCardIdsRef.current.has(item.card.id);
       const reviewedAt = new Date();
       const saved = await persistReviewTransition({
         db,
@@ -1013,6 +1050,15 @@ function FlashcardSessionScreen() {
             setWirdNotice(interpolate(s.habitMadeUp, { n: formatNumber(saved.wird.length, uiLanguage), days: formatDays(saved.wird.length, uiLanguage) }));
           } else if (saved.wird.kind === "earned_back") {
             setWirdNotice(interpolate(s.habitEarnedBack, { days: formatDays(saved.wird.length, uiLanguage) }));
+          }
+          // SPEC 3.6: a new word card's first review moves the runs that offer a level change.
+          if (item.isWordCard && item.card.state === State.New && firstGrade) {
+            const outcome = knownPressed && rating === Rating.Easy ? "known" : rating === Rating.Again ? "failed" : "other";
+            recordFirstReview(db, outcome)
+              .then((offer) => {
+                if (offer) setLevelOffer(offer);
+              })
+              .catch((error: unknown) => console.warn("[FlashcardSession] Could not record a first word review:", error));
           }
           if (item.card.id.startsWith("mutashabihat:") || item.card.id.startsWith("similar-tail:")) {
             recordAchievementEvent(db, {
@@ -1118,7 +1164,8 @@ function FlashcardSessionScreen() {
     };
   }, [buildSummary, cardMissing, mutationBusy]);
 
-  const overlayOpen = cardMenuOpen || !!confirmCardAction || dueDateOpen || answerEditOpen || exitConfirmOpen || noteOpen;
+  const overlayOpen =
+    cardMenuOpen || !!confirmCardAction || dueDateOpen || answerEditOpen || exitConfirmOpen || noteOpen || !!levelOffer;
   const gradingVisible = (phase === "side" && revealed && isLastSide) || phase === "grading";
   // The latest handlers and state for the key and Back listeners, which are registered once.
   const inputRef = useRef({ phase, revealed, isLastSide, gradingVisible, overlayOpen, revealFirstSide, handleNext, handleGrade, handleEndSession });
@@ -1509,6 +1556,22 @@ function FlashcardSessionScreen() {
             </Button>
           )}
 
+          {/* SPEC 3.6: a word met for the first time can be marked known; it grades Easy. */}
+          {currentCard.isWordCard &&
+          currentCard.card.state === State.New &&
+          (phase === "front" || (phase === "side" && revealed && isLastSide) || phase === "grading") ? (
+            <Button
+              variant="outline"
+              className="w-full border border-warm-300 dark:border-neutral-700"
+              label={s.meaningsKnowThis}
+              disabled={mutationBusy}
+              onPress={() => {
+                knownPressRef.current = true;
+                handleGrade(Rating.Easy);
+              }}
+            />
+          ) : null}
+
           {phase === "side" && revealed && !isLastSide && (
             <Button onPress={handleNext} className="w-full">
               <View
@@ -1637,6 +1700,24 @@ function FlashcardSessionScreen() {
         onConfirm={() => {
           setExitConfirmOpen(false);
           leave();
+        }}
+      />
+      <ConfirmDialog
+        visible={!!levelOffer}
+        title={levelOffer === "lower" ? s.meaningsLowerTitle : s.meaningsRaiseTitle}
+        message={levelOffer === "lower" ? s.meaningsLowerBody : s.meaningsRaiseBody}
+        tone="neutral"
+        cancelLabel={s.meaningsOfferNotNow}
+        confirmLabel={levelOffer === "lower" ? s.meaningsLowerConfirm : s.meaningsRaiseConfirm}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => {
+          if (levelOffer) declineLevelOffer(db, levelOffer).catch(console.warn);
+          setLevelOffer(null);
+        }}
+        onConfirm={() => {
+          if (levelOffer) acceptLevelOffer(db, levelOffer).catch(console.warn);
+          setLevelOffer(null);
         }}
       />
       {wirdNotice ? <Toast message={wirdNotice} onDismiss={() => setWirdNotice(null)} duration={3500} announce /> : null}

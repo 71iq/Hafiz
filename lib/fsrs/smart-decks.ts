@@ -753,7 +753,15 @@ export async function materializeSmartDeckCards(
  * and queue their uploads in the same transaction. The daily session uses it for the virtual cards
  * that survive the budget cut, just before it shows them. Returns how many rows it inserted.
  */
-export async function materializeSmartCardIds(db: AppDatabase, deckId: SmartDeckId, missingIds: readonly string[]): Promise<number> {
+/**
+ * Creates rows for candidate card ids, skipping any id live in a deck now. Also used for the
+ * meanings deck's generated word cards (lib/meanings), which are candidates in the same way.
+ */
+export async function materializeSmartCardIds(
+  db: AppDatabase,
+  deckId: SmartDeckId | typeof MEANINGS_DECK_ID,
+  missingIds: readonly string[],
+): Promise<number> {
   if (missingIds.length === 0) return 0;
   const nowIso = new Date().toISOString();
 

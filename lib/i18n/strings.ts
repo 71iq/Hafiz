@@ -19,6 +19,7 @@ import { audioStrings } from "@/lib/i18n/features/audio";
 import { detailStrings } from "@/lib/i18n/features/detail";
 import { appUpdateStrings } from "@/lib/i18n/features/app-update";
 import { widgetStrings } from "@/lib/i18n/features/widget";
+import { meaningsStrings } from "@/lib/i18n/features/meanings";
 
 export const strings = {
   en: {
@@ -936,6 +937,7 @@ export const strings = {
     ...audioStrings.en,
     ...detailStrings.en,
     ...appUpdateStrings.en,
+    ...meaningsStrings.en,
   },
   ar: {
     appName: "حافظ",
@@ -1825,6 +1827,7 @@ export const strings = {
     ...audioStrings.ar,
     ...detailStrings.ar,
     ...appUpdateStrings.ar,
+    ...meaningsStrings.ar,
   },
 } as const;
 

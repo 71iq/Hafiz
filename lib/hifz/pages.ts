@@ -499,6 +499,20 @@ export async function ensureLongTermCycleStart(db: DatabaseExecutor, fallback: L
  * suspension with the Unix epoch (UNIT_SWITCH_SUSPENDED_AT in lib/hifz/unit-switch, which imports
  * this module); a page the person suspended by hand stays out.
  */
+/**
+ * The pages of today's review list as first built on this device, or none when today's list has not
+ * been built yet. A read only: loadTodayWird builds and stores the list.
+ */
+export async function readTodayPlanPageNumbers(db: DatabaseExecutor, today: LocalDate): Promise<number[]> {
+  const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [TODAY_PLAN_KEY]);
+  const snapshot = parseSnapshot(row?.value);
+  if (!snapshot || snapshot.date !== today) return [];
+  return snapshot.ids.flatMap((id) => {
+    const unit = parsePageUnit(id);
+    return unit ? [unit.page] : [];
+  });
+}
+
 export async function readMemorizedPageNumbers(db: DatabaseExecutor): Promise<Set<number>> {
   const rows = await db.getAllAsync<{ id: string; suspended_at: string | null }>(
     `SELECT id, suspended_at FROM study_cards

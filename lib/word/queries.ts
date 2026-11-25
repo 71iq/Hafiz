@@ -1,6 +1,7 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import type { WordRef } from "./context";
 import { enqueueSync } from "@/lib/database/sync-queue";
+import { ayahGlyphs, mushafWordOfGlyph, uthmaniWordCount } from "@/lib/mushaf/glyph-words";
 
 export type WordTranslationRow = {
   word_arabic: string | null;
@@ -117,6 +118,23 @@ export async function fetchWordText(
     return words.slice(4)[wordPos - 1] ?? null;
   }
   return words[wordPos - 1] ?? null;
+}
+
+/**
+ * The word-table position of a word the reader names by glyph (SPEC 3.10). The reader numbers every
+ * page-font glyph, so in the 196 ayat with a mark glyph (the hizb-quarter ۞, or the pause mark in
+ * 36:52) its number is one past the word tables' from the mark on, and the word sheet would read and
+ * save the next word. A tap on the mark itself names the word it opens. Unknown layouts keep the
+ * reader's number.
+ */
+export async function fetchTableWordPos(db: DatabaseExecutor, surah: number, ayah: number, readerWordPos: number): Promise<number> {
+  const row = await db.getFirstAsync<{ text_qcf2: string | null; text_uthmani: string | null }>(
+    "SELECT text_qcf2, text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+    [surah, ayah],
+  );
+  if (!row?.text_qcf2 || !row.text_uthmani) return readerWordPos;
+  const layout = ayahGlyphs(surah, ayah, row.text_qcf2, uthmaniWordCount(row.text_uthmani));
+  return (layout && mushafWordOfGlyph(layout, readerWordPos - 1)) ?? readerWordPos;
 }
 
 export async function fetchWordQcf2Glyph(

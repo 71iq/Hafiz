@@ -28,6 +28,7 @@ import {
   fetchWordMeaningAr,
   fetchWordNeighbors,
   fetchWordQcf2Glyph,
+  fetchTableWordPos,
   fetchWordRoot,
   fetchWordText,
   fetchWordTranslation,
@@ -78,6 +79,10 @@ export function WordDetailSheet() {
     next: WordRef | null;
   } | null>(null);
   const adjacentWords = neighbors?.word === detailWord ? neighbors : null;
+  // SPEC 3.10: the reader names a word by its glyph; the word tables and saved cards by the word's
+  // table position, which differs in the ayat that carry a mark glyph. Lookups and saves wait for it.
+  const [tableWord, setTableWord] = useState<{ word: WordRef; pos: number } | null>(null);
+  const tablePos = tableWord && tableWord.word === detailWord ? tableWord.pos : null;
   const headerFontStyle = resolvePageFontStyle(WORD_HEADER_FONT_STYLE, isDark);
   const wordHeaderFontReady = useQuranPageFontReady(headerFontStyle, detailWord?.v2Page);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>(EMPTY_META);
@@ -132,13 +137,27 @@ export function WordDetailSheet() {
   useEffect(() => {
     if (!detailWord) return;
     let cancelled = false;
+    fetchTableWordPos(db, detailWord.surah, detailWord.ayah, detailWord.wordPos)
+      .catch(() => detailWord.wordPos)
+      .then((pos) => {
+        if (!cancelled) setTableWord({ word: detailWord, pos });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [db, detailWord]);
+
+  useEffect(() => {
+    if (!detailWord || tablePos === null) return;
+    let cancelled = false;
     setHeaderMeta(EMPTY_META);
     Promise.all([
-      fetchWordText(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
+      fetchWordText(db, detailWord.surah, detailWord.ayah, tablePos),
+      // The glyph keeps the reader's number: it draws what was tapped.
       fetchWordQcf2Glyph(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
-      fetchWordRoot(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
-      fetchWordTranslation(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
-      fetchWordMeaningAr(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
+      fetchWordRoot(db, detailWord.surah, detailWord.ayah, tablePos),
+      fetchWordTranslation(db, detailWord.surah, detailWord.ayah, tablePos),
+      fetchWordMeaningAr(db, detailWord.surah, detailWord.ayah, tablePos),
       db.getFirstAsync<{ name_arabic: string; name_english: string }>(
         "SELECT name_arabic, name_english FROM surahs WHERE number = ?",
         [detailWord.surah]
@@ -173,8 +192,7 @@ export function WordDetailSheet() {
     return () => {
       cancelled = true;
     };
-  }, [db, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
-
+  }, [db, detailWord, tablePos]);
 
   useEffect(() => {
     if (!detailWord) {
@@ -217,7 +235,9 @@ export function WordDetailSheet() {
 
   if (!detailWord) return null;
 
-  const { surah, ayah, wordPos } = detailWord;
+  const { surah, ayah } = detailWord;
+  // Shown and looked up by table position; the tabs wait for it (a local read of one ayah).
+  const wordPos = tablePos ?? detailWord.wordPos;
   const isArabicMode = uiLanguage === "ar";
   const panelIconColor = isDark ? "#a3a3a3" : effectiveTheme === "white" ? "#71717A" : "#7A634D";
   const accentColor = isDark ? "#2dd4bf" : "#0f766e";
@@ -362,8 +382,8 @@ export function WordDetailSheet() {
             </View>
 
             <OverlayBody scrollRef={contentScrollRef} contentContainerClassName="px-5">
-              {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-              {activeTab === "irab" && (
+              {tablePos === null ? null : activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {tablePos !== null && activeTab === "irab" && (
                 <IrabTab
                   surah={surah}
                   ayah={ayah}
@@ -371,11 +391,11 @@ export function WordDetailSheet() {
                   onScrollToMatch={(y) => contentScrollRef.current?.scrollTo({ y, animated: !reduceMotion })}
                 />
               )}
-              {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-              {activeTab === "tasreef" && (
+              {tablePos !== null && activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {tablePos !== null && activeTab === "tasreef" && (
                 <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} onRootPress={() => setActiveTab("occurrences")} />
               )}
-              {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {tablePos !== null && activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
             </OverlayBody>
           </View>
         </View>

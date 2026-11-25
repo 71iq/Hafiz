@@ -821,6 +821,7 @@ const ACCOUNT_DERIVED_DEVICE_KEYS = new Set([
   "device_wird_extras",
   "device_daily_study_extra",
   "device_meanings_offer",
+  "device_meanings_first_reviews",
   "notif_remind_later",
   "notif_banner_dismissed",
 ]);

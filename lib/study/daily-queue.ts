@@ -2,6 +2,7 @@ import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { putUserSetting } from "@/lib/database/user-settings";
 import {
   getDeckQueueOptions,
+  MEANINGS_DECK_ID,
   readDeckReviewSettings,
   type DeckQueueOptions,
   type ReviewQueueItem,
@@ -17,6 +18,7 @@ import type { DeckReviewSettings, StudyCardRow } from "@/lib/fsrs/types";
 import { localDateOf } from "@/lib/habit/dates";
 import { readHabitSettings } from "@/lib/habit/settings";
 import { readDailyDeckIds } from "@/lib/study/daily-decks";
+import { candidateRows, pickMeaningCandidates } from "@/lib/meanings/candidates";
 
 /**
  * Today's daily study queue (SPEC 3.2): one read-only function that Home's counter, the Today card,
@@ -136,7 +138,7 @@ const byDue = (a: DailyQueueItem, b: DailyQueueItem) => a.card.due.localeCompare
  * then reviews from the most overdue, then new cards. Deck sort settings apply only to single-deck
  * sessions.
  */
-async function deckQueue(db: AppDatabase, deckId: string): Promise<DeckQueue> {
+async function deckQueue(db: AppDatabase, deckId: string, now = new Date()): Promise<DeckQueue> {
   const settings = await readDeckReviewSettings(db, deckId);
   // Null once the deck's daily limit is spent: then only cards on a learning step come back.
   const options: DeckQueueOptions | null = await getDeckQueueOptions(db, deckId, settings);
@@ -149,6 +151,11 @@ async function deckQueue(db: AppDatabase, deckId: string): Promise<DeckQueue> {
     virtualRows = today.virtualNew;
   } else {
     rows = await getDueCardsForReview(db, deckId, { limit: 0, newCardsLimit: Number.MAX_SAFE_INTEGER });
+    // Meanings is not a smart deck: its rows are every saved or generated word, and today's generated
+    // candidates fill its new cards up to its limit (SPEC 3.6).
+    if (deckId === MEANINGS_DECK_ID && newCardsLimit > 0) {
+      virtualRows = candidateRows(await pickMeaningCandidates(db, { now, limit: newCardsLimit }), now);
+    }
   }
   const item = (card: StudyCardRow, virtual = false): DailyQueueItem => ({ card, settings, virtual });
   const learning = rows
@@ -196,10 +203,10 @@ export async function buildDailyQueue(db: AppDatabase, now = new Date()): Promis
   const baseBudget = streakCards * 2;
   const budget = baseBudget * (1 + presses);
 
-  const planDeck = habit.retentionCounts ? await deckQueue(db, SMART_DECK_IDS.retention) : null;
+  const planDeck = habit.retentionCounts ? await deckQueue(db, SMART_DECK_IDS.retention, now) : null;
   const planCards = planDeck ? [...planDeck.learning, ...planDeck.reviews, ...planDeck.fresh] : [];
 
-  const decks = await Promise.all(deckIds.map((deckId) => deckQueue(db, deckId)));
+  const decks = await Promise.all(deckIds.map((deckId) => deckQueue(db, deckId, now)));
   const ordered = [
     ...decks.flatMap((deck) => deck.learning).sort(byDue),
     ...decks.flatMap((deck) => deck.reviews).sort(byDue),
@@ -274,7 +281,7 @@ export async function loadDailyReviewQueue(db: AppDatabase, now = new Date()): P
   }
   const created = new Map<string, StudyCardRow>();
   for (const [deckId, ids] of virtualByDeck) {
-    if (!isSmartDeckId(deckId)) continue;
+    if (!isSmartDeckId(deckId) && deckId !== MEANINGS_DECK_ID) continue;
     await materializeSmartCardIds(db, deckId, ids);
     const rows = await db.getAllAsync<StudyCardRow>(
       `SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND id IN (${ids.map(() => "?").join(", ")})`,
