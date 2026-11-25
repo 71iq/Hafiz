@@ -61,6 +61,7 @@ import { MonthlyCheckCard } from "@/components/hifz/MonthlyCheckCard";
 import { reviewLeftToday } from "@/lib/hifz/pages";
 import { markMonthlyCheck } from "@/lib/hifz/progress";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
+import { settleAutomaticDecks } from "@/lib/study/daily-decks";
 import { reminderHref } from "@/lib/notifications/reminder-route";
 import { putUserSetting } from "@/lib/database/user-settings";
 import {
@@ -157,8 +158,9 @@ export default function HomeScreen() {
   });
   const accountPromo = useAccountPromo("home");
   const openMushaf = useOpenMushaf();
-  // Ayah reviews due now in the ayah decks, without new cards: ayah review's daily work (UNIT-02).
-  const ayahReviewsDue = smartDecks.reduce((sum, deck) => sum + deck.dueCount, 0);
+  // Retention's ayah reviews due now, without new cards: ayah review's daily work (UNIT-02, SPEC 3.5),
+  // the same value as getAyahReviewsDueToday.
+  const ayahReviewsDue = smartDecks.find((deck) => deck.id === SMART_DECK_IDS.retention)?.dueCount ?? 0;
   // The headline is what the deck rows offer, which is also what Review all loads.
   const totalDue = smartDecks.reduce(
     (sum, deck) => sum + deck.dueCount + deck.newCount,
@@ -242,6 +244,9 @@ export default function HomeScreen() {
           uiLanguage === "ar" ? row.name_arabic : (surahTransliteration(row.number) ?? row.name_english);
       }
       await migrateLegacyRetentionDecks(db);
+      // A user who becomes a full hafiz turns automatic Qira'at and Reasons of revelation on (SPEC 3.7).
+      // It never blocks the dashboard; the next load tries again.
+      await settleAutomaticDecks(db).catch((error: unknown) => console.warn("[Home] Could not settle the study decks:", error));
 
       const smartDefinitions = [
         {

@@ -21,16 +21,19 @@ describe("starting deck limits from the pace (issue 14)", () => {
     [90, { retention: 15, mutashabihat: 5, similarTails: 5, daily: 30 }],
   ])("gives %i minutes a day lighter limits on the settings steps", (dailyBudgetMin, expected) => {
     const limits = startingDeckLimits({ dailyBudgetMin });
-    expect(limits[SMART_DECK_IDS.retention].newCardsLimit).toBe(expected.retention);
-    expect(limits[SMART_DECK_IDS.mutashabihat].newCardsLimit).toBe(expected.mutashabihat);
-    expect(limits[SMART_DECK_IDS.similarTails].newCardsLimit).toBe(expected.similarTails);
-    expect(limits[SMART_DECK_IDS.qiraat].newCardsLimit).toBe(0);
-    expect(limits[SMART_DECK_IDS.reasonsOfRevelation].newCardsLimit).toBe(0);
-    for (const deckId of SMART) {
-      expect(limits[deckId].dailyReviewLimit).toBe(expected.daily);
-      expect(limits[deckId].dailyReviewLimit % 10).toBe(0);
-      expect(limits[deckId].dailyReviewLimit).toBeGreaterThanOrEqual(10);
-      expect(limits[deckId].newCardsLimit % 5).toBe(0);
+    expect(limits[SMART_DECK_IDS.retention]?.newCardsLimit).toBe(expected.retention);
+    expect(limits[SMART_DECK_IDS.mutashabihat]?.newCardsLimit).toBe(expected.mutashabihat);
+    expect(limits[SMART_DECK_IDS.similarTails]?.newCardsLimit).toBe(expected.similarTails);
+    // Qira'at and Reasons of revelation keep the deck defaults: being off keeps them out of daily
+    // study, and a zero would leave a deck turned on later with nothing to offer (SPEC 3.7).
+    expect(limits[SMART_DECK_IDS.qiraat]).toBeUndefined();
+    expect(limits[SMART_DECK_IDS.reasonsOfRevelation]).toBeUndefined();
+    for (const deckId of [SMART_DECK_IDS.retention, SMART_DECK_IDS.mutashabihat, SMART_DECK_IDS.similarTails]) {
+      const limit = limits[deckId]!;
+      expect(limit.dailyReviewLimit).toBe(expected.daily);
+      expect(limit.dailyReviewLimit % 10).toBe(0);
+      expect(limit.dailyReviewLimit).toBeGreaterThanOrEqual(10);
+      expect(limit.newCardsLimit % 5).toBe(0);
     }
   });
 });
@@ -87,12 +90,12 @@ describe("applyHifzSetup writes starting limits only on a true first setup", () 
     expect(stored(AYAH_NEW_CARDS_LIMIT_KEY)).toBe("10");
     expect(await limits(SMART_DECK_IDS.mutashabihat)).toEqual({ newCardsLimit: 5, dailyReviewLimit: 20 });
     expect(await limits(SMART_DECK_IDS.similarTails)).toEqual({ newCardsLimit: 0, dailyReviewLimit: 20 });
-    expect(await limits(SMART_DECK_IDS.qiraat)).toEqual({ newCardsLimit: 0, dailyReviewLimit: 20 });
-    expect(await limits(SMART_DECK_IDS.reasonsOfRevelation)).toEqual({ newCardsLimit: 0, dailyReviewLimit: 20 });
-    // The meanings deck is not a smart deck and keeps its defaults.
+    // Qira'at and Reasons of revelation keep the deck defaults (SPEC 3.7), and so does Meanings.
+    expect(stored(`review_settings_${SMART_DECK_IDS.qiraat}`)).toBeNull();
+    expect(stored(`review_settings_${SMART_DECK_IDS.reasonsOfRevelation}`)).toBeNull();
     expect(stored("review_settings_meanings")).toBeNull();
     // Each setting queued its upload, so the limits reach the account like any deck setting.
-    for (const deckId of SMART) {
+    for (const deckId of [SMART_DECK_IDS.retention, SMART_DECK_IDS.mutashabihat, SMART_DECK_IDS.similarTails]) {
       const upload = lastQueued(`review_settings_${deckId}`);
       expect(upload).not.toBeNull();
       expect(JSON.parse(String(upload!.value))).toMatchObject(await limits(deckId));
@@ -100,7 +103,7 @@ describe("applyHifzSetup writes starting limits only on a true first setup", () 
     expect(lastQueued(AYAH_NEW_CARDS_LIMIT_KEY)).toMatchObject({ value: "10" });
   });
 
-  it("starts ayah review at the pace's new-card limit and adds no rows to decks that start at 0", async () => {
+  it("starts ayah review at the pace's new-card limit and adds no rows to decks that start at 0 or are off", async () => {
     await setup(shortSurahs);
 
     expect(await limits(SMART_DECK_IDS.retention)).toEqual({ newCardsLimit: 5, dailyReviewLimit: 10 });
@@ -157,5 +160,54 @@ describe("applyHifzSetup writes starting limits only on a true first setup", () 
 
     expect(await limits(SMART_DECK_IDS.qiraat)).toEqual({ newCardsLimit: 15, dailyReviewLimit: 50 });
     expect(await limits(SMART_DECK_IDS.mutashabihat)).toEqual({ newCardsLimit: 5, dailyReviewLimit: 20 });
+  });
+});
+
+describe("plan setup and the full-hafiz flag (SPEC 3.7)", () => {
+  let store: OutboxDatabase;
+  const now = atLocalTime("2026-11-13", 9 * 60);
+
+  beforeEach(async () => {
+    store = await openOutboxDatabase();
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    // One ayah per page, so the whole Quran is 604 pages across the 30 juz.
+    const ayah = store.sql.prepare(
+      "INSERT INTO quran_text (surah, ayah, text_uthmani, text_clean, text_qcf2, v2_page) VALUES (2, ?, 'x', 'x', 'x', ?)",
+    );
+    for (let page = 1; page <= 604; page += 1) ayah.run(page, page);
+  });
+
+  afterEach(async () => {
+    await store.close();
+    jest.restoreAllMocks();
+  });
+
+  const flag = () =>
+    (store.sql.prepare("SELECT value FROM user_settings WHERE key = 'habit_declared_whole_quran'").get() as { value: string } | undefined)
+      ?.value ?? null;
+  const switchOf = (deck: string) =>
+    (store.sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(`habit_study_${deck}`) as { value: string } | undefined)
+      ?.value ?? null;
+  const allJuz = Array.from({ length: 30 }, (_, index) => index + 1);
+
+  it("declares the whole Quran, turns both decks on and gives them new cards", async () => {
+    await applyHifzSetup(store.db, { plan: pagePlan, memorizedSurahs: [], memorizedJuz: allJuz, now });
+
+    expect(flag()).toBe("true");
+    expect(switchOf("qiraat")).toBe("on");
+    expect(switchOf("reasons")).toBe("on");
+    expect((await readDeckReviewSettings(store.db, SMART_DECK_IDS.qiraat)).newCardsLimit).toBe(DEFAULT_DECK_NEW_CARD_LIMIT);
+  });
+
+  it("clears the flag for a smaller portion and leaves it alone when the step is empty", async () => {
+    await applyHifzSetup(store.db, { plan: pagePlan, memorizedSurahs: [], memorizedJuz: [30], now });
+    expect(flag()).toBe("false");
+    expect(switchOf("qiraat")).toBeNull();
+
+    await applyHifzSetup(store.db, { plan: pagePlan, memorizedSurahs: [], memorizedJuz: allJuz, now });
+    expect(flag()).toBe("true");
+    // A plan edit opens the memorized step empty: it says nothing about the portion.
+    await applyHifzSetup(store.db, { plan: pagePlan, memorizedSurahs: [], memorizedJuz: [], now });
+    expect(flag()).toBe("true");
   });
 });

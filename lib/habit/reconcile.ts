@@ -3,7 +3,7 @@ import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import { deviceTimeZone, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { meetsMinimum, memorizeStepFlags, tallyReviews } from "@/lib/habit/minimum";
 import { putHabitDay } from "@/lib/habit/queries";
-import { readHabitSettings } from "@/lib/habit/settings";
+import { readHabitSettings, tallyOptionsOf } from "@/lib/habit/settings";
 import type { HabitDayRow } from "@/lib/habit/types";
 
 type LoggedReview = {
@@ -72,7 +72,7 @@ export async function reconcileHabitDaysFromLogs(
 ): Promise<number> {
   const today = localDateOf(now);
   // Each chunk's reviews: a pass with no review before it, or right after a failed one, is
-  // a completed step 6 (STR-01), as DAY_TALLY_SQL reads it. Compared as instants, since sync can
+  // a completed step 6 (STR-01), as dayTallySql reads it. Compared as instants, since sync can
   // change a timestamp's spelling.
   const chunkReviews = await db.getAllAsync<{
     card_id: string;
@@ -131,8 +131,9 @@ export async function reconcileHabitDaysFromLogs(
           cardId: review.card_id,
           durationMs: review.duration_ms,
           memorizeStep: review.rating >= 3 && (stepsAt.get(review.card_id)?.has(Date.parse(review.reviewed_at)) ?? false),
+          localDate: review.local_date,
         })),
-        { studyCounts: settings.studyCountsTowardMinimum },
+        tallyOptionsOf(settings),
       ),
       settings.minimum,
     );

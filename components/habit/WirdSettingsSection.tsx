@@ -51,8 +51,7 @@ function Row({ label, hint, dir, children }: { label: string; hint?: string; dir
 }
 
 /**
- * Wird settings (spec 7.6): the minimum wird, whether meaning reviews count toward it, the week
- * start for steady weeks (STR-28), the streak goal (STR-19) and the excused days and pause sheet.
+ * Wird settings (spec 7.6): the minimum wird, the week start for steady weeks (STR-28), the streak goal (STR-19) and the excused days and pause sheet.
  * All are synced settings, so a change follows the account.
  */
 export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Props) {
@@ -132,28 +131,6 @@ export function WirdSettingsSection({ db, language, isDark, s, onOpenPlan }: Pro
             accessibilityLabel={s.habitSettingsMinutes}
           />
         </Row>
-
-        <MirroredRow dir={dir} className="items-center justify-between gap-3">
-          <View className="flex-1" style={{ gap: 4 }}>
-            <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }} className="text-charcoal dark:text-neutral-200">
-              {s.habitSettingsMeanings}
-            </Text>
-            <Text dir={dir} variant="caption" style={{ lineHeight: 18 }}>
-              {s.habitSettingsMeaningsHint}
-            </Text>
-          </View>
-          <Switch
-            accessibilityLabel={s.habitSettingsMeanings}
-            value={settings.studyCountsTowardMinimum}
-            onValueChange={(value) =>
-              save(() =>
-                value
-                  ? writeUserSetting(db, HABIT_SETTING_KEYS.studyCountsTowardMinimum, "true")
-                  : deleteUserSetting(db, HABIT_SETTING_KEYS.studyCountsTowardMinimum),
-              )
-            }
-          />
-        </MirroredRow>
 
         <MirroredRow dir={dir} className="items-center justify-between gap-3">
           {/* The still shows what the switch controls, and leaves with every other Zayt when it is off. */}

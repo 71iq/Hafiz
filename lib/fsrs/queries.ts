@@ -494,14 +494,14 @@ async function getTodayIntroducedNewCount(db: DatabaseExecutor, deckId: string):
   return row?.count ?? 0;
 }
 
-type DeckQueueOptions = Exclude<DueCardsForReviewOptions, number> & { limit: number; newCardsLimit: number };
+export type DeckQueueOptions = Exclude<DueCardsForReviewOptions, number> & { limit: number; newCardsLimit: number };
 
 /**
  * One deck's queue options for the rest of today: its review limit less the cards studied today and
  * its new-card limit less the new cards introduced today, so neither limit restarts with each
  * session. Null once the daily review limit is used up.
  */
-async function getDeckQueueOptions(
+export async function getDeckQueueOptions(
   db: DatabaseExecutor,
   deckId: string,
   settings: DeckReviewSettings
@@ -606,17 +606,14 @@ export async function getDeckTodayStats(
 }
 
 /**
- * Ayah reviews due today across the ayah decks, without new cards: the same sum Home computes as
- * ayahReviewsDue for ayah review's daily work (UNIT-02).
+ * Retention's ayah reviews due today, without new cards, under Retention's own daily limit. For a
+ * plan that reviews by ayah they are the wird's review (SPEC 3.5, UNIT-02): Home, the wird-left line,
+ * reminders and the widget all read this one value. Other decks are daily cards, counted apart.
  */
 export async function getAyahReviewsDueToday(db: AppDatabase): Promise<number> {
-  const counts = await Promise.all(
-    Object.values(SMART_DECK_IDS).map(async (deckId) => {
-      const stats = await getDeckTodayStats(db, deckId, await readDeckReviewSettings(db, deckId));
-      return stats.dueCount;
-    }),
-  );
-  return counts.reduce((sum, count) => sum + count, 0);
+  const deckId = SMART_DECK_IDS.retention;
+  const stats = await getDeckTodayStats(db, deckId, await readDeckReviewSettings(db, deckId));
+  return stats.dueCount;
 }
 
 export async function getTotalCardCount(db: AppDatabase, deckId?: string): Promise<number> {
@@ -937,17 +934,23 @@ export async function setStudyCardDueDate(
 /**
  * The flashcard summary's next review: the earliest card the flashcard queues will show. Hifz page,
  * half-page, seam, gap and chunk cards are reviewed in the hifz flows, and a chunk past its day
- * keeps a due date no flow shows (SBQ-03), so their decks are left out.
+ * keeps a due date no flow shows (SBQ-03), so their decks are left out. `deckIds` limits it to those
+ * decks: the widget asks about Retention alone for an ayah plan, a session about its own decks.
  */
-export async function getNextEligibleReviewDate(db: DatabaseExecutor): Promise<string | null> {
+export async function getNextEligibleReviewDate(
+  db: DatabaseExecutor,
+  deckIds?: readonly string[],
+): Promise<string | null> {
+  if (deckIds && deckIds.length === 0) return null;
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT *
        FROM study_cards
       WHERE deleted_at IS NULL
         AND suspended_at IS NULL
         AND deck_id NOT IN (?, ?)
+        ${deckIds ? `AND deck_id IN (${deckIds.map(() => "?").join(", ")})` : ""}
       ORDER BY due ASC`,
-    [HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID]
+    [HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID, ...(deckIds ?? [])]
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
   const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(

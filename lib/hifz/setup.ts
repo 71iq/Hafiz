@@ -1,5 +1,6 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { putUserSetting } from "@/lib/database/user-settings";
+import { putUserSetting, writeUserSetting } from "@/lib/database/user-settings";
+import { DECLARED_WHOLE_QURAN_KEY, readDailyDeckIds, settleAutomaticDecks } from "@/lib/study/daily-decks";
 import { readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { materializeSmartDeckCards, SMART_DECK_IDS, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
 import { declareMemorizedPages } from "@/lib/hifz/pages";
@@ -79,16 +80,26 @@ export async function applyHifzSetup(
   for (const juz of setup.memorizedJuz) for (const page of pagesOfJuz(juz)) pages.add(page);
   const surahs = new Set<number>([...setup.memorizedSurahs, ...(await surahsOnPages(db, [...pages]))]);
   if (surahs.size > 0) await writeAllDecksFilter(db, { type: "surah", surahs: [...surahs].sort((a, b) => a - b) });
+  // SPEC 3.7: the whole Quran declared turns Qira'at and Reasons of revelation on. An empty choice, as
+  // on most plan edits, leaves the flag as it was.
+  if (setup.memorizedSurahs.length > 0 || setup.memorizedJuz.length > 0) {
+    await writeUserSetting(db, DECLARED_WHOLE_QURAN_KEY, pages.size >= 604 ? "true" : "false");
+  }
 
+  let declaredPages = 0;
   if (plan.unit === "ayah") {
-    // Each deck's own limits, so a deck that starts with no new cards gets no new rows.
+    // Retention (the wird for an ayah plan) and the daily smart decks, each with its own limits, so a
+    // deck that starts with no new cards gets no new rows. Decks that are off get none.
+    const dailyDecks = new Set(await readDailyDeckIds(db));
     for (const deckId of Object.values(SMART_DECK_IDS)) {
+      if (deckId !== SMART_DECK_IDS.retention && !dailyDecks.has(deckId)) continue;
       const settings = await readDeckReviewSettings(db, deckId);
       await materializeSmartDeckCards(db, deckId, settings.dailyReviewLimit, settings.newCardsLimit);
     }
-    return { declaredPages: 0, migratedPages: 0 };
+  } else {
+    // Pages that now have a card, including those just made from ayah cards, are left alone.
+    declaredPages = await declareMemorizedPages(db, { pages: [...pages], cycleDays: plan.cycleDays, now });
   }
-  // Pages that now have a card, including those just made from ayah cards, are left alone.
-  const declaredPages = await declareMemorizedPages(db, { pages: [...pages], cycleDays: plan.cycleDays, now });
-  return { declaredPages, migratedPages };
+  await settleAutomaticDecks(db);
+  return { declaredPages, migratedPages: plan.unit === "ayah" ? 0 : migratedPages };
 }

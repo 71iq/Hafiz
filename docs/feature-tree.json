@@ -1665,6 +1665,15 @@
           "children": []
         },
         {
+          "id": "settings.dailystudy",
+          "title": "Daily study decks: meanings, qira'at and reasons of revelation",
+          "kind": "widget",
+          "cases": ["SET-23"],
+          "uses": ["settings.general"],
+          "native": false,
+          "children": []
+        },
+        {
           "id": "settings.reminders",
           "title": "Reminders section",
           "kind": "widget",

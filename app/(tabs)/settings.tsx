@@ -52,6 +52,7 @@ import {
 import { classicFontCopy, isTajweedStyle, quranBaseFont, styleForBaseFont, styleForTajweed, type QuranBaseFont } from "@/lib/settings/quran-font-choice";
 import { useDatabase } from "@/lib/database/provider";
 import { WirdSettingsSection } from "@/components/habit/WirdSettingsSection";
+import { StudyDecksSettings } from "@/components/settings/StudyDecksSettings";
 import { ReminderSettingsSection } from "@/components/notifications/ReminderSettingsSection";
 import { HomeWidgetSettings } from "@/components/settings/HomeWidgetSettings";
 import { widgetPlatform } from "@/lib/widget/platform";
@@ -763,6 +764,9 @@ export default function SettingsScreen() {
             s={s}
             onOpenPlan={() => router.push("/hifz/setup" as Href)}
           />
+
+          <SectionLabel>{s.studyDecksTitle}</SectionLabel>
+          <StudyDecksSettings db={db} language={uiLanguage} s={s} />
 
           <SectionLabel>{s.notifSettingsTitle}</SectionLabel>
           <ReminderSettingsSection />
