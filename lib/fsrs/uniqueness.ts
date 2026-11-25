@@ -12,9 +12,20 @@ import type { DatabaseExecutor } from "@/lib/database/types";
  * 4. Always show surah name subtly as secondary context.
  */
 
+/** One ayah shown before the card's own ayah, with its page-font glyphs so the front can draw it. */
+export type UniqueFrontContextAyah = {
+  surah: number;
+  ayah: number;
+  textUthmani: string;
+  textQcf2: string;
+  v2Page: number;
+};
+
 type UniqueFront = {
   /** The primary text to show (may include context ayahs) */
   text: string;
+  /** The context ayahs before the card's own ayah, in order; empty when none are needed. */
+  context: UniqueFrontContextAyah[];
   /** Surah name (always provided as secondary context) */
   surahName: string;
   /** The ayah number */
@@ -59,7 +70,7 @@ export async function computeUniqueFront(
     [surah, ayah]
   );
   if (!row) {
-    return { text: "", surahName: "", ayahNumber: ayah, contextCount: 0, needsExplicitLabel: false };
+    return { text: "", context: [], surahName: "", ayahNumber: ayah, contextCount: 0, needsExplicitLabel: false };
   }
 
   // Get surah name
@@ -73,6 +84,7 @@ export async function computeUniqueFront(
   if (!dupes.has(row.text_clean)) {
     return {
       text: row.text_uthmani,
+      context: [],
       surahName,
       ayahNumber: ayah,
       contextCount: 0,
@@ -85,8 +97,8 @@ export async function computeUniqueFront(
     const prevAyah = ayah - ctx;
     if (prevAyah < 1) break;
 
-    const prevRows = await db.getAllAsync<{ text_uthmani: string; text_clean: string }>(
-      `SELECT text_uthmani, text_clean FROM quran_text
+    const prevRows = await db.getAllAsync<{ ayah: number; text_uthmani: string; text_clean: string; text_qcf2: string; v2_page: number }>(
+      `SELECT ayah, text_uthmani, text_clean, text_qcf2, v2_page FROM quran_text
        WHERE surah = ? AND ayah >= ? AND ayah <= ?
        ORDER BY ayah`,
       [surah, ayah - ctx, ayah]
@@ -95,6 +107,13 @@ export async function computeUniqueFront(
     if (prevRows.length !== ctx + 1) break; // Can't go further back (start of surah)
 
     const combinedUthmani = prevRows.map((r) => r.text_uthmani).join(" ﴿...﴾ ");
+    const context = prevRows.slice(0, -1).map((r) => ({
+      surah,
+      ayah: r.ayah,
+      textUthmani: r.text_uthmani,
+      textQcf2: r.text_qcf2,
+      v2Page: r.v2_page,
+    }));
 
     // For practical purposes, prepending even 1 ayah makes it unique in nearly all cases
     // The few remaining cases (e.g., repeated consecutive ayahs) get the explicit label
@@ -110,6 +129,7 @@ export async function computeUniqueFront(
       if (!otherMatches || otherMatches.cnt === 0) {
         return {
           text: combinedUthmani,
+          context,
           surahName,
           ayahNumber: ayah,
           contextCount: ctx,
@@ -133,6 +153,7 @@ export async function computeUniqueFront(
       if (!otherMatches || otherMatches.cnt === 0) {
         return {
           text: combinedUthmani,
+          context,
           surahName,
           ayahNumber: ayah,
           contextCount: ctx,
@@ -145,6 +166,7 @@ export async function computeUniqueFront(
   // Still not unique after 2 context ayahs → use explicit surah + ayah label
   return {
     text: row.text_uthmani,
+    context: [],
     surahName,
     ayahNumber: ayah,
     contextCount: 0,

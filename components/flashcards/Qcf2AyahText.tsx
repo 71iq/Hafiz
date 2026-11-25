@@ -7,6 +7,7 @@ import {
 } from "@/lib/fonts/loader";
 import { useSettings } from "@/lib/settings/context";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
+import { ayahGlyphs, glyphsOfMushafWord, uthmaniWordCount, type GlyphRange } from "@/lib/mushaf/glyph-words";
 
 type Props = {
   textQcf2: string;
@@ -15,10 +16,33 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   colorClassName?: string;
+  /**
+   * A word to highlight, by its position in the word tables (meaning card ids). With `surah` and
+   * `ayah` it maps to its glyphs past any hizb or pause mark (lib/mushaf/glyph-words); without them
+   * position n is glyph n - 1.
+   */
   highlightWordPos?: number;
   hasAyahMarker?: boolean;
+  surah?: number;
   ayah?: number;
 };
+
+/** The glyph indexes a highlighted word covers, inclusive, or null for none. */
+function highlightedGlyphs(
+  textQcf2: string,
+  textUthmani: string,
+  position: number | undefined,
+  surah: number | undefined,
+  ayah: number | undefined,
+): GlyphRange | null {
+  if (typeof position !== "number") return null;
+  const layout =
+    typeof surah === "number" && typeof ayah === "number" && textUthmani
+      ? ayahGlyphs(surah, ayah, textQcf2, uthmaniWordCount(textUthmani))
+      : null;
+  if (layout) return glyphsOfMushafWord(layout, position);
+  return { from: position - 1, to: position - 1 };
+}
 
 export function Qcf2AyahText({
   textQcf2,
@@ -29,6 +53,8 @@ export function Qcf2AyahText({
   colorClassName = "text-charcoal dark:text-neutral-100",
   highlightWordPos,
   hasAyahMarker = true,
+  surah,
+  ayah,
 }: Props) {
   const { quranRenderFontStyle: quranFontStyle, showAyahMarkers, quranMarkerStyle, effectiveTheme } = useSettings();
   const visible = useQuranPageFontReady(quranFontStyle, v2Page);
@@ -40,7 +66,8 @@ export function Qcf2AyahText({
   const showMarker = hasAyahMarker && showAyahMarkers;
   const tokens = hasAyahMarker && !showMarker ? allTokens.slice(0, -1) : allTokens;
   if (tokens.length === 0) return null;
-  const highlightIndex = typeof highlightWordPos === "number" ? highlightWordPos - 1 : -1;
+  const highlight = highlightedGlyphs(textQcf2, textUthmani, highlightWordPos, surah, ayah);
+  const isHighlighted = (index: number) => highlight !== null && index >= highlight.from && index <= highlight.to;
   const fontFamily = quranPageFontName(quranFontStyle, v2Page);
   const fontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, v2Page, effectiveTheme);
   const markerFontPaletteStyle = quranPageMarkerFontPaletteStyle(
@@ -64,7 +91,7 @@ export function Qcf2AyahText({
         style={{ fontFamily, ...fontPaletteStyle, fontSize, lineHeight, textAlign: "center", alignSelf: "stretch" }}
       >
         {tokens.map((token, index) => {
-          const highlighted = index === highlightIndex;
+          const highlighted = isHighlighted(index);
           const isMarker = showMarker && index === tokens.length - 1;
           return (
             <Fragment key={`${token}-${index}`}>
@@ -113,7 +140,7 @@ export function Qcf2AyahText({
         </span>
       ) : null}
       {tokens.map((token, index) => {
-        const highlighted = index === highlightIndex;
+        const highlighted = isHighlighted(index);
         const isMarker = showMarker && index === tokens.length - 1;
         return (
           <Text

@@ -55,6 +55,28 @@ describe("Quran page font readiness", () => {
     expect(view.getByLabelText(verse)).toHaveTextContent("\uFC7A \uFC7B \uFC7C");
   });
 
+  it("highlights a word-table position past a quarter's ۞ mark glyph", () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    mockLoaded.add("qcf2:5");
+    // 2:26 opens a hizb quarter: glyph 0 is the mark, so word 2 (ٱللَّهَ) is glyph 2. Stand-in glyphs.
+    const verse = "إِنَّ ٱللَّهَ لَا";
+    const view = render(
+      <Qcf2AyahText
+        textQcf2="MARK W1 W2 W3 END"
+        textUthmani={verse}
+        v2Page={5}
+        fontSize={28}
+        lineHeight={48}
+        highlightWordPos={2}
+        surah={2}
+        ayah={26}
+      />,
+    );
+    const highlighted = (glyph: string) =>
+      view.getByText(glyph, { includeHiddenElements: true }).props.style.backgroundColor !== "transparent";
+    expect(["MARK", "W1", "W2", "W3"].filter(highlighted)).toEqual(["W2"]);
+  });
+
   it("reports an already loaded font as ready without a pending pass", () => {
     mockLoaded.add("qcf2:12");
     const seen: boolean[] = [];

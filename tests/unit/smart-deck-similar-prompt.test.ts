@@ -86,7 +86,7 @@ test("the preceding ayah cue carries its own Unicode text", async () => {
   });
 });
 
-test("a tail card uses Unicode slices when a mark shifts the page-font word boundary", async () => {
+test("a tail card keeps a leading hizb mark with the first word, and uses Unicode only for an unknown layout", async () => {
   store.sql.exec("UPDATE mutashabihat_groups SET kind = 'tail', cue = 'للمؤمنين' WHERE id = 'g'");
   const cardId = "similar-tail:g:0";
   const words = AYAT[1][2].split(" ");
@@ -99,6 +99,16 @@ test("a tail card uses Unicode slices when a mark shifts the page-font word boun
     hiddenAnswerUthmani: tail,
   });
 
+  // A quarter's opening ayah has the ۞ mark as glyph 0 (lib/mushaf/glyph-words).
+  store.sql.exec("UPDATE quran_text SET text_qcf2 = 'mark ' || text_qcf2 WHERE surah = 15 AND ayah = 88");
+  await expect(getSmartCardContent(store.db, cardId)).resolves.toMatchObject({
+    promptUthmani: prefix,
+    promptQcf2: ["mark", ...Array.from({ length: words.length - 1 }, (_, index) => `G88-${index}`)].join(" "),
+    hiddenAnswerQcf2: `G88-${words.length - 1} E88`,
+    hiddenAnswerUthmani: tail,
+  });
+
+  // Two extra glyphs match no known layout, so both sides stay Unicode.
   store.sql.exec("UPDATE quran_text SET text_qcf2 = 'mark ' || text_qcf2 WHERE surah = 15 AND ayah = 88");
   await expect(getSmartCardContent(store.db, cardId)).resolves.toMatchObject({
     promptUthmani: prefix,

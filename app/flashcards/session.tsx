@@ -40,7 +40,7 @@ import {
   setStudyCardSuspended,
 } from "@/lib/fsrs/queries";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
-import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
+import { computeUniqueFront, type UniqueFrontContextAyah } from "@/lib/fsrs/uniqueness";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
@@ -115,7 +115,13 @@ type CardData = {
   textUthmani: string;
   textQcf2?: string;
   v2Page?: number;
-  uniqueFront: { text: string; surahName: string; contextCount: number; needsExplicitLabel: boolean };
+  uniqueFront: {
+    text: string;
+    context: UniqueFrontContextAyah[];
+    surahName: string;
+    contextCount: number;
+    needsExplicitLabel: boolean;
+  };
   translation: string;
   tafseer: string;
   prevAyahText: string | null;
@@ -377,6 +383,7 @@ function FlashcardSessionScreen() {
               v2Page: targetRef.v2Page,
               uniqueFront: {
                 text: smartContent.promptUthmani ?? smartContent.cue,
+                context: [],
                 surahName: targetRef.surahNameAr,
                 contextCount: 0,
                 needsExplicitLabel: true,
@@ -1275,6 +1282,7 @@ function FlashcardSessionScreen() {
                   fontSize={fontSize * 0.85}
                   lineHeight={lineHeight * 0.85}
                   highlightWordPos={currentCard.wordPos}
+                  surah={currentCard.surah}
                   ayah={currentCard.ayah}
                 />
               ) : (
@@ -1289,8 +1297,28 @@ function FlashcardSessionScreen() {
                   })}
                 </Text>
               )}
-              {!currentCard.isWordCard && currentCard.uniqueFront.contextCount === 0 && currentCard.textQcf2 && currentCard.v2Page ? (
-                <Qcf2AyahText textQcf2={currentCard.textQcf2} textUthmani={currentCard.textUthmani} v2Page={currentCard.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={currentCard.ayah} />
+              {/* A repeated ayah shows the ayahs before it, each in its own page font, dimmed like the
+                  similar-verse context, then the card's own ayah. */}
+              {!currentCard.isWordCard &&
+              currentCard.textQcf2 &&
+              currentCard.v2Page &&
+              currentCard.uniqueFront.context.length === currentCard.uniqueFront.contextCount ? (
+                <View>
+                  {currentCard.uniqueFront.context.map((context) => (
+                    <View key={`${context.surah}:${context.ayah}`} className="mb-2 opacity-80">
+                      <Qcf2AyahText
+                        textQcf2={context.textQcf2}
+                        textUthmani={context.textUthmani}
+                        v2Page={context.v2Page}
+                        fontSize={fontSize * 0.82}
+                        lineHeight={lineHeight * 0.82}
+                        surah={context.surah}
+                        ayah={context.ayah}
+                      />
+                    </View>
+                  ))}
+                  <Qcf2AyahText textQcf2={currentCard.textQcf2} textUthmani={currentCard.textUthmani} v2Page={currentCard.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={currentCard.ayah} />
+                </View>
               ) : (
                 <Text
                   className="text-charcoal dark:text-neutral-100 text-center"
@@ -1941,6 +1969,7 @@ function TestModePrompt({
           fontSize={fontSize}
           lineHeight={lineHeight}
           highlightWordPos={wordMode ? card.wordPos : undefined}
+          surah={card.surah}
           ayah={card.ayah}
         />
       ) : (
@@ -2020,8 +2049,13 @@ function TestModeAnswer({
         </Text>
       );
     case "wordMeaningArabic":
+      // A meaning is prose about the word, so it takes the tafsir answer's face, a little larger
+      // because it is short, not the Quran text size.
       return (
-        <Text className="text-charcoal dark:text-neutral-100 text-center" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
+        <Text
+          className="text-charcoal dark:text-neutral-100 text-center"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 17, lineHeight: 28, writingDirection: "rtl" }}
+        >
           {card.wordMeaningAr ?? "—"}
         </Text>
       );

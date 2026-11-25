@@ -4,6 +4,7 @@ import { putUserSetting, removeUserSetting, writeUserSetting } from "@/lib/datab
 import { createEmptyCard } from "./scheduler";
 import { reviewDueCutoff } from "./review-transition";
 import { stampsOverDeletedCards } from "./card-stamps";
+import { ayahGlyphs, glyphsBeforeWord, glyphsFromWord } from "@/lib/mushaf/glyph-words";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
   ALL_NEW_REVIEW_ORDERS,
@@ -1112,18 +1113,21 @@ function buildTailPrompt(
   cue: string,
   targetRef: SmartDeckRef
 ): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "hiddenAnswerQcf2" | "hiddenAnswerUthmani" | "prefixWordCount"> | null {
-  const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
   const uthmaniWords = splitQuranWords(targetRef.textUthmani);
   const hiddenCount = inferTailWordCount(cue, targetRef.tail5, targetRef.textClean);
   const prefixWordCount = uthmaniWords.length - hiddenCount;
   if (prefixWordCount <= 0) return null;
 
-  // Some verses have separate mark glyphs. Use Unicode for slices when the word boundary is ambiguous.
-  const aligned = qcf2Tokens.length === uthmaniWords.length + 1;
+  // Mark glyphs and one two-word glyph shift some page-font boundaries (lib/mushaf/glyph-words).
+  // Where a boundary cannot be drawn in glyphs, both sides stay Unicode.
+  const layout = ayahGlyphs(targetRef.surah, targetRef.ayah, targetRef.textQcf2, uthmaniWords.length);
+  const promptQcf2 = layout ? glyphsBeforeWord(layout, prefixWordCount) : null;
+  const hiddenAnswerQcf2 = layout ? glyphsFromWord(layout, prefixWordCount) : null;
+  const drawable = promptQcf2 !== null && hiddenAnswerQcf2 !== null;
   return {
-    promptQcf2: aligned ? qcf2Tokens.slice(0, prefixWordCount).join(" ") : undefined,
+    promptQcf2: drawable ? promptQcf2 : undefined,
     promptUthmani: uthmaniWords.slice(0, prefixWordCount).join(" "),
-    hiddenAnswerQcf2: aligned ? qcf2Tokens.slice(prefixWordCount).join(" ") : undefined,
+    hiddenAnswerQcf2: drawable ? hiddenAnswerQcf2 : undefined,
     hiddenAnswerUthmani: uthmaniWords.slice(prefixWordCount).join(" "),
     prefixWordCount,
   };
@@ -1159,7 +1163,7 @@ function buildMutashabihatPrompt(
   }
 
   return {
-    ...buildPrefixPrompt(targetRef.textQcf2, uthmaniWords, Math.min(prefixWordCount, uthmaniWords.length)),
+    ...buildPrefixPrompt(targetRef, uthmaniWords, Math.min(prefixWordCount, uthmaniWords.length)),
     needsExplicitRefLabel,
   };
 }
@@ -1192,20 +1196,25 @@ function buildSegmentedMutashabihatPrompt(
   const needsExplicitRefLabel = !(matches.length === 1 && matches[0].ref.sortOrder === targetRef.sortOrder);
 
   return {
-    ...buildPrefixPrompt(targetRef.textQcf2, uthmaniWords, safePrefixCount),
+    ...buildPrefixPrompt(targetRef, uthmaniWords, safePrefixCount),
     needsExplicitRefLabel,
   };
 }
 
-function buildPrefixPrompt(textQcf2: string, uthmaniWords: string[], prefixWordCount: number) {
-  const wordGlyphs = splitQcf2Words(textQcf2).slice(0, -1);
+/**
+ * The prompt's first words in the page font through lib/mushaf/glyph-words, which keeps a hizb mark
+ * with the first word. A whole ayah is all of its word glyphs even when its layout is unknown.
+ */
+function buildPrefixPrompt(targetRef: SmartDeckRef, uthmaniWords: string[], prefixWordCount: number) {
+  const layout = ayahGlyphs(targetRef.surah, targetRef.ayah, targetRef.textQcf2, uthmaniWords.length);
   const wholeAyah = prefixWordCount === uthmaniWords.length;
+  const promptQcf2 = layout
+    ? glyphsBeforeWord(layout, prefixWordCount)
+    : wholeAyah
+      ? splitQcf2Words(targetRef.textQcf2).slice(0, -1).join(" ")
+      : null;
   return {
-    promptQcf2: wholeAyah
-      ? wordGlyphs.join(" ")
-      : wordGlyphs.length === uthmaniWords.length
-        ? wordGlyphs.slice(0, prefixWordCount).join(" ")
-        : undefined,
+    promptQcf2: promptQcf2 ?? undefined,
     promptUthmani: uthmaniWords.slice(0, prefixWordCount).join(" "),
     prefixWordCount,
   };
