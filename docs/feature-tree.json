@@ -409,10 +409,10 @@
       "children": [
         {
           "id": "onboarding.setup",
-          "title": "Hifz setup: goal, tracks, pace, when",
+          "title": "Hifz setup: goal, tracks, word meanings, pace, when",
           "kind": "screen",
           "cases": ["START-02"],
-          "uses": ["hifz.setup.memorized", "reminders.prayer"],
+          "uses": ["hifz.setup.memorized", "hifz.setup.meanings", "reminders.prayer"],
           "native": false,
           "children": []
         },
@@ -1257,6 +1257,24 @@
               "children": []
             },
             {
+              "id": "hifz.setup.meanings",
+              "title": "Word meanings step: daily switch, two questions, meaning language, starting level",
+              "kind": "widget",
+              "cases": ["START-06"],
+              "uses": ["hifz.setup.levelcheck"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "hifz.setup.levelcheck",
+              "title": "Check my level: a word in its ayah, four meanings, up to 12 questions",
+              "kind": "widget",
+              "cases": ["START-07"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
               "id": "hifz.setup.repetitions",
               "title": "New memorization repetition counts: presets or custom",
               "kind": "widget",
@@ -1721,10 +1739,10 @@
         },
         {
           "id": "settings.dailystudy",
-          "title": "Daily study decks: meanings, qira'at and reasons of revelation",
+          "title": "Daily study: word meanings, their language and level, qira'at and reasons of revelation",
           "kind": "widget",
           "cases": ["SET-23"],
-          "uses": ["settings.general"],
+          "uses": ["settings.general", "hifz.setup.levelcheck"],
           "native": false,
           "children": []
         },

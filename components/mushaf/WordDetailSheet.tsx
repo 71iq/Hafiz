@@ -28,7 +28,7 @@ import {
   fetchWordMeaningAr,
   fetchWordNeighbors,
   fetchWordQcf2Glyph,
-  fetchTableWordPos,
+  fetchReaderWordPositions,
   fetchWordRoot,
   fetchWordText,
   fetchWordTranslation,
@@ -81,7 +81,7 @@ export function WordDetailSheet() {
   const adjacentWords = neighbors?.word === detailWord ? neighbors : null;
   // SPEC 3.10: the reader names a word by its glyph; the word tables and saved cards by the word's
   // table position, which differs in the ayat that carry a mark glyph. Lookups and saves wait for it.
-  const [tableWord, setTableWord] = useState<{ word: WordRef; pos: number } | null>(null);
+  const [tableWord, setTableWord] = useState<{ word: WordRef; pos: number; unicodePos: number } | null>(null);
   const tablePos = tableWord && tableWord.word === detailWord ? tableWord.pos : null;
   const headerFontStyle = resolvePageFontStyle(WORD_HEADER_FONT_STYLE, isDark);
   const wordHeaderFontReady = useQuranPageFontReady(headerFontStyle, detailWord?.v2Page);
@@ -137,10 +137,10 @@ export function WordDetailSheet() {
   useEffect(() => {
     if (!detailWord) return;
     let cancelled = false;
-    fetchTableWordPos(db, detailWord.surah, detailWord.ayah, detailWord.wordPos)
-      .catch(() => detailWord.wordPos)
-      .then((pos) => {
-        if (!cancelled) setTableWord({ word: detailWord, pos });
+    fetchReaderWordPositions(db, detailWord.surah, detailWord.ayah, detailWord.wordPos)
+      .catch(() => ({ table: detailWord.wordPos, unicode: detailWord.wordPos }))
+      .then((positions) => {
+        if (!cancelled) setTableWord({ word: detailWord, pos: positions.table, unicodePos: positions.unicode });
       });
     return () => {
       cancelled = true;
@@ -391,7 +391,7 @@ export function WordDetailSheet() {
                   onScrollToMatch={(y) => contentScrollRef.current?.scrollTo({ y, animated: !reduceMotion })}
                 />
               )}
-              {tablePos !== null && activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {tablePos !== null && activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={tableWord?.unicodePos ?? wordPos} />}
               {tablePos !== null && activeTab === "tasreef" && (
                 <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} onRootPress={() => setActiveTab("occurrences")} />
               )}

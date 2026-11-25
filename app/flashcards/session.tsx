@@ -123,6 +123,8 @@ type CardData = {
   isWordCard?: boolean;
   wordText?: string;
   wordMeaningAr?: string;
+  /** Whether the word has an Arabic meaning of its own; `wordMeaningAr` holds the fallback text when not. */
+  hasWordMeaningAr?: boolean;
   wordMeaningEn?: string;
   customAnswers?: Partial<Record<ReviewMode, string>>;
   surahName: string;
@@ -527,6 +529,7 @@ function FlashcardSessionScreen() {
             isWordCard,
             wordText: wordText ?? undefined,
             wordMeaningAr: wordMeaningAr ?? undefined,
+            hasWordMeaningAr: !!wordMeaningArRow?.meaning?.trim(),
             wordMeaningEn: wordMeaningEn ?? undefined,
             customAnswers,
             surahName: surahRow?.name_arabic ?? "",
@@ -628,11 +631,16 @@ function FlashcardSessionScreen() {
         (mode === "wordMeaningArabic" ? !!currentCard.wordMeaningAr : !!currentCard.wordMeaningEn);
       const deckModes = currentCard.settings.wordTestModes;
       // SPEC 3.6: with the deck's default answer sides (both), a word card answers in the meaning
-      // language only, falling back to the other side when that meaning is missing. Sides the user
-      // chose in the deck settings are kept.
+      // language only, or in the other language when the word has no meaning in it (most words have no
+      // Arabic entry). Sides the user chose in the deck settings are kept.
       if (meaningLanguage && deckModes.length === 2) {
+        const hasMeaning = (mode: WordTestMode) =>
+          !!getCardAnswerOverride(currentCard, mode) ||
+          (mode === "wordMeaningArabic" ? !!currentCard.hasWordMeaningAr : !!currentCard.wordMeaningEn);
         const preferred: WordTestMode = meaningLanguage === "ar" ? "wordMeaningArabic" : "wordMeaningTranslation";
-        if (available(preferred)) return [preferred];
+        const other: WordTestMode = preferred === "wordMeaningArabic" ? "wordMeaningTranslation" : "wordMeaningArabic";
+        if (hasMeaning(preferred)) return [preferred];
+        if (hasMeaning(other)) return [other];
       }
       return deckModes.filter(available);
     }

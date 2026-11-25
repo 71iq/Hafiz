@@ -67,7 +67,6 @@ import { markMonthlyCheck } from "@/lib/hifz/progress";
 import { useTodayWird } from "@/lib/hifz/use-today-wird";
 import { readDailyDeckIds, settleAutomaticDecks } from "@/lib/study/daily-decks";
 import { getMeaningsTodayStats } from "@/lib/meanings/candidates";
-import { settleMeaningsDefaults } from "@/lib/meanings/settings";
 import { openReminderRoute } from "@/lib/notifications/reminder-route";
 import { addStudyMore } from "@/lib/study/daily-queue";
 import { DAILY_SESSION_HREF, loadStudyState, studyMoreCount, type StudyState } from "@/lib/study/resolve";
@@ -282,8 +281,6 @@ export default function HomeScreen() {
       // A user who becomes a full hafiz turns automatic Qira'at and Reasons of revelation on (SPEC 3.7).
       // It never blocks the dashboard; the next load tries again.
       await settleAutomaticDecks(db).catch((error: unknown) => console.warn("[Home] Could not settle the study decks:", error));
-      // The meaning language, level and rate are derived until written once (SPEC 3.6).
-      await settleMeaningsDefaults(db).catch((error: unknown) => console.warn("[Home] Could not settle the meanings defaults:", error));
 
       const studyLoad = ++latestStudyLoad.current;
       const [memorizedTotal, reflectionJourneySummary, graceSeen, zaytReturnSeen, studyState, deckIds] = await Promise.all([

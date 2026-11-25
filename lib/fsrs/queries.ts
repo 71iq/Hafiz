@@ -128,6 +128,12 @@ function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
 }
 
 export const MEANINGS_DECK_ID = "meanings";
+/**
+ * New word-meaning cards a day for a user who never stored the meanings deck's settings (SPEC 3.6).
+ * It is read as a default, never written, so a device that has not synced yet cannot replace a rate
+ * chosen on another device, and a fresh device has nothing of its own to restore over.
+ */
+export const DEFAULT_MEANINGS_NEW_CARD_LIMIT = 5;
 export const MUTASHABIHAT_DECK_ID = "mutashabihat";
 const DECK_REVIEW_SETTINGS_PREFIX = "review_settings_";
 
@@ -263,7 +269,8 @@ export async function readDeckReviewSettings(
     keys
   );
   const stored = new Map(rows.map((row) => [row.key, row.value]));
-  const fallback = legacyReviewSettings(stored);
+  const legacy = legacyReviewSettings(stored);
+  const fallback = deckId === MEANINGS_DECK_ID ? { ...legacy, newCardsLimit: DEFAULT_MEANINGS_NEW_CARD_LIMIT } : legacy;
   const deckValue = deckKey ? stored.get(deckKey) : undefined;
   if (!deckValue) return fallback;
 

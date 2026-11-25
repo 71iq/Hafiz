@@ -1,15 +1,17 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
+import { mushafWordTexts } from "@/lib/mushaf/glyph-words";
 
 /**
  * The lemma index behind generated word-meaning cards (SPEC 3.6): one entry per (lemma, root) pair
  * from `word_roots`, its band by how often it occurs, and the word positions a card may sit on.
  *
  * Positions are word-table positions (the numbering of `word_roots` and `word_translations`), which a
- * card id `word:surah:ayah:position` carries. A position is eligible when it has its own `word_roots`
- * row whose word, reduced to its consonant skeleton, appears inside the `word_irab` word at the same
- * position: that is the check that the two numberings agree there. It drops 88 positions in 15 ayat
- * where they do not. An Arabic card also needs a one-word entry in `word_meanings_ar`, since a card
- * highlights one word; an English card reads `word_translations`, which covers every word.
+ * card id `word:surah:ayah:position` carries. Both tables count the same words as the text in every
+ * ayah, so an English card, which reads `word_translations`, is eligible wherever the word a card
+ * highlights (lib/mushaf/glyph-words) holds the `word_roots` stem at that position. `word_irab` is
+ * one word behind in ten ayat, such as 5:117 and 23:44, and is not used. An Arabic card also needs a
+ * one-word `word_meanings_ar` entry whose word is the highlighted word, letter for letter after
+ * spelling differences: a few entries, such as 2:214:4 and 5:117:28, belong to another word.
  *
  * Built once per database and held in memory.
  */
@@ -67,6 +69,11 @@ const MARKS = /[ؐ-ًؚ-ٰٟۖ-ۭـ]/g;
  * long vowels dropped, since the Uthmani and standard spellings differ in exactly those letters.
  */
 export function wordSkeleton(text: string): string {
+  return spelling(text).replace(/[اوي]/g, "");
+}
+
+/** Marks and tatweel removed, alef forms and hamza seats unified, bare hamza dropped. */
+function spelling(text: string): string {
   return text
     .replace(MARKS, "")
     .replace(/[ٱأإآ]/g, "ا")
@@ -74,8 +81,33 @@ export function wordSkeleton(text: string): string {
     .replace(/ة/g, "ه")
     .replace(/ؤ/g, "و")
     .replace(/ئ/g, "ي")
-    .replace(/ء/g, "")
-    .replace(/[اوي]/g, "");
+    .replace(/ء/g, "");
+}
+
+/** Doubled letters joined and spaces removed: Uthmani writes "ٱلَّيْل" where the tables write "اللَّيْل". */
+function squashed(text: string): string {
+  return text.replace(/\s+/g, "").replace(/(.)\1+/g, "$1");
+}
+
+/**
+ * Whether two spellings write the same whole word, ignoring the long vowels and hamza seats the
+ * Uthmani and standard spellings differ in. A word of only those letters, such as أي or آوى, has no
+ * skeleton, so it is compared with them kept.
+ */
+export function sameWord(a: string, b: string): boolean {
+  const skeletonA = squashed(wordSkeleton(a));
+  const skeletonB = squashed(wordSkeleton(b));
+  if (skeletonA !== "" || skeletonB !== "") return skeletonA === skeletonB;
+  const lightA = squashed(spelling(a));
+  return lightA !== "" && lightA === squashed(spelling(b));
+}
+
+/** Whether a word holds a `word_roots` stem, which leaves out its prefixes and suffixes ("جنود" in "وجنوده"). */
+export function holdsStem(word: string, stem: string): boolean {
+  const skeleton = squashed(wordSkeleton(stem));
+  if (skeleton !== "") return squashed(wordSkeleton(word)).includes(skeleton);
+  const light = squashed(spelling(stem));
+  return light !== "" && squashed(spelling(word)).includes(light);
 }
 
 type WordRow = {
@@ -84,8 +116,7 @@ type WordRow = {
   pos: number;
   lemma: string;
   root: string | null;
-  text: string;
-  irab: string | null;
+  stem: string;
   arWord: string | null;
   arMeaning: string | null;
 };
@@ -106,14 +137,32 @@ export function loadLemmaIndex(db: DatabaseExecutor): Promise<LemmaIndex> {
 
 async function buildLemmaIndex(db: DatabaseExecutor): Promise<LemmaIndex> {
   const rows = await db.getAllAsync<WordRow>(
-    `SELECT wr.surah, wr.ayah, wr.word_pos AS pos, wr.lemma, wr.root, wr.word_text AS text,
-            wi.arabic_word AS irab, wm.word AS arWord, wm.meaning AS arMeaning
+    `SELECT wr.surah, wr.ayah, wr.word_pos AS pos, wr.lemma, wr.root, wr.word_text AS stem,
+            wm.word AS arWord, wm.meaning AS arMeaning
        FROM word_roots wr
-       LEFT JOIN word_irab wi ON wi.surah = wr.surah AND wi.ayah = wr.ayah AND wi.word_pos = wr.word_pos
        LEFT JOIN word_meanings_ar wm ON wm.surah = wr.surah AND wm.ayah = wr.ayah AND wm.word_pos = wr.word_pos
       WHERE wr.lemma IS NOT NULL AND wr.lemma <> ''
       ORDER BY wr.surah, wr.ayah, wr.word_pos`,
   );
+  const ayat = new Map(
+    (
+      await db.getAllAsync<{ surah: number; ayah: number; uthmani: string; qcf2: string }>(
+        "SELECT surah, ayah, text_uthmani AS uthmani, text_qcf2 AS qcf2 FROM quran_text",
+      )
+    ).map((row) => [`${row.surah}:${row.ayah}`, row]),
+  );
+  // Rows come in mushaf order, so each ayah's highlighted words are worked out once.
+  let shownKey = "";
+  let shown: string[] = [];
+  const shownAt = (surah: number, ayah: number, pos: number): string => {
+    const key = `${surah}:${ayah}`;
+    if (key !== shownKey) {
+      const row = ayat.get(key);
+      shownKey = key;
+      shown = row ? mushafWordTexts(surah, ayah, row.uthmani ?? "", row.qcf2 ?? "") : [];
+    }
+    return shown[pos - 1] ?? "";
+  };
   type Draft = {
     key: string;
     lemma: string;
@@ -136,11 +185,11 @@ async function buildLemmaIndex(db: DatabaseExecutor): Promise<LemmaIndex> {
     draft.occurrences += 1;
     const position = { surah: row.surah, ayah: row.ayah, pos: row.pos };
     draftAt.set(positionKey(row.surah, row.ayah, row.pos), draft);
-    const aligned = row.irab !== null && wordSkeleton(row.irab).includes(wordSkeleton(row.text));
-    if (!aligned) return;
+    const word = shownAt(row.surah, row.ayah, row.pos);
+    if (!holdsStem(word, row.stem)) return;
     draft.en.push(position);
     const oneWord = !!row.arWord && row.arWord.trim().split(/\s+/).length === 1 && !!row.arMeaning?.trim();
-    if (oneWord) draft.ar.push(position);
+    if (oneWord && sameWord(word, row.arWord!)) draft.ar.push(position);
   });
 
   const entries = new Map<Draft, LemmaEntry>();

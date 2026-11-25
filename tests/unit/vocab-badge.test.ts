@@ -36,3 +36,21 @@ it("unlocks when the user saves a word, and the backfill keeps that unlock", asy
   await backfillAchievements(store.db);
   expect(unlocked()).toEqual({ n: 1 });
 });
+
+it("does not bring the badge back from progress an account restore left behind", async () => {
+  // A restore clears achievement_unlocks but keeps achievement_progress, so a previous person's
+  // progress row can sit on the device with no unlock.
+  await addMeaningCard(store.db, 2, 255, 10);
+  await flush();
+  store.sql.exec("DELETE FROM achievement_unlocks; DELETE FROM sync_queue;");
+  await backfillAchievements(store.db);
+  expect(unlocked()).toEqual({ n: 0 });
+  expect(
+    store.sql.prepare("SELECT COUNT(*) AS n FROM sync_queue WHERE table_name = 'achievement_unlocks'").get(),
+  ).toEqual({ n: 0 });
+  expect(
+    store.sql
+      .prepare("SELECT current_value FROM achievement_progress WHERE achievement_id = 'first_vocab_saved'")
+      .get(),
+  ).toEqual({ current_value: 0 });
+});

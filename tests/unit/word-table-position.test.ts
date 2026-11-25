@@ -1,5 +1,5 @@
 import path from "node:path";
-import { fetchTableWordPos } from "@/lib/word/queries";
+import { fetchReaderWordPositions, fetchTableWordPos } from "@/lib/word/queries";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 /** The reader's glyph number to the word tables' position (SPEC 3.10), over the bundled Quran text. */
@@ -36,4 +36,14 @@ it("steps back past the pause mark in 36:52 only after it", async () => {
 
 it("keeps the reader's number for an ayah it cannot read", async () => {
   expect(await fetchTableWordPos(store.db, 999, 1, 4)).toBe(4);
+});
+
+it("gives the Tajweed tab the Unicode word where the word tables join two glyphs", async () => {
+  // 8:6 counts "بَعْدَ مَا" as one table word and 37:130 "إِلْ يَاسِينَ"; text_uthmani keeps two words,
+  // so later glyphs are one table position back but the same Unicode word.
+  expect(await fetchReaderWordPositions(store.db, 8, 6, 7)).toEqual({ table: 6, unicode: 7 });
+  expect(await fetchReaderWordPositions(store.db, 37, 130, 4)).toEqual({ table: 3, unicode: 4 });
+  // Past a hizb mark both step back, since text_uthmani has no mark.
+  expect(await fetchReaderWordPositions(store.db, 2, 26, 3)).toEqual({ table: 2, unicode: 2 });
+  expect(await fetchReaderWordPositions(store.db, 2, 255, 10)).toEqual({ table: 10, unicode: 10 });
 });

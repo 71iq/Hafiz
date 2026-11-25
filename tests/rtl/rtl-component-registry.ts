@@ -155,6 +155,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Session-end streak and prompt cards mirror icon rows; counts use the interface digits.",
   ),
   entry(
+    "components/habit/SessionNextStep.tsx",
+    "card",
+    "rntl",
+    "End-screen Continue, Study more and Done stack vertically; captions follow the interface direction and counts use the interface digits.",
+  ),
+  entry(
     "components/habit/WidgetOfferCard.tsx",
     "card",
     "source",
@@ -203,6 +209,18 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Setup steps mirror option rows through MirroredRow; the step text follows the interface direction.",
   ),
   entry(
+    "components/hifz/MeaningsLevelCheck.tsx",
+    "card",
+    "rntl",
+    "The prompt and progress follow the interface direction; the ayah stays right to left in the page font, and each meaning follows the meaning language's direction.",
+  ),
+  entry(
+    "components/hifz/MeaningsSetupStep.tsx",
+    "form-field",
+    "rntl",
+    "Answer and language chips wrap in MirroredRow rows; the switch row mirrors, and the level cards stack and align to the reading side.",
+  ),
+  entry(
     "components/hifz/MemorizeSecondLook.tsx",
     "card",
     "rntl",
@@ -231,6 +249,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "quran-text",
     "source",
     "Quran lines are always right to left in the page font; hidden words keep their place and the layout never mirrors with the interface.",
+  ),
+  entry(
+    "components/hifz/SetupOptionCard.tsx",
+    "form-field",
+    "source",
+    "A stacked radio card; title and hint align to the reading side.",
   ),
   entry(
     "components/hifz/SimilarVerseComparison.tsx",
@@ -639,6 +663,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "button",
     "source",
     "Settings links mirror the icon, text and navigation chevron.",
+  ),
+  entry(
+    "components/settings/StudyDecksSettings.tsx",
+    "form-field",
+    "rntl",
+    "Switch and level rows mirror through MirroredRow and ToggleGroup direction; level text uses the interface digits.",
   ),
   entry(
     "components/settings/TafsirSourcePicker.tsx",

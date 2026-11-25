@@ -140,7 +140,7 @@ async function backfillAllAchievements(db: AchievementScope, notify: UnlockSink)
   await backfillCompletionAchievements(db, notify);
   await backfillPrivateNoteAchievements(db, notify);
   await backfillReflectionAchievements(db, notify);
-  await backfillVocabAchievements(db, notify);
+  await backfillVocabAchievements(db);
 }
 
 export async function getAchievementDashboard(db: AppDatabase): Promise<AchievementDashboard> {
@@ -197,13 +197,13 @@ export async function getRecentUnlocks(
     .map(rowToUnlock);
 }
 
-/** Unseen unlocks of active achievements, newest first (at most ten), for Home's notice queue. */
 /** Whether an achievement is unlocked on this device, locally or from a synced unlock. */
 export async function isAchievementUnlocked(db: DatabaseExecutor, achievementId: string): Promise<boolean> {
   const row = await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM achievement_unlocks WHERE achievement_id = ?", [achievementId]);
   return (row?.n ?? 0) > 0;
 }
 
+/** Unseen unlocks of active achievements, newest first (at most ten), for Home's notice queue. */
 export async function getUnseenUnlocks(db: DatabaseExecutor): Promise<AchievementUnlock[]> {
   const activeIds = new Set(ACHIEVEMENTS.filter((achievement) => achievement.active).map((achievement) => achievement.id));
   const rows = await db.getAllAsync<UnlockRow>(
@@ -449,15 +449,13 @@ async function backfillReflectionAchievements(db: AchievementScope, notify: Unlo
 
 /**
  * SPEC 3.6: daily study now creates word cards too, so word rows no longer show a saved word. The
- * badge comes only from the vocab_saved event; the backfill keeps progress and unlocks already
- * recorded or synced, and counts nothing.
+ * badge comes only from the vocab_saved event, which writes the progress and the unlock together.
+ * The backfill unlocks nothing: it sets the progress from the unlocks on this device, local or
+ * synced. Progress rows survive an account restore, so unlocking from them would hand the previous
+ * person's badge to the account just restored.
  */
-async function backfillVocabAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
-  const first = db.progress.get("first_vocab_saved");
-  await upsertProgress(db, "first_vocab_saved", first?.current_value ?? 0, 1);
-  if ((first?.current_value ?? 0) >= 1) {
-    await unlockAchievement(db, "first_vocab_saved", new Date().toISOString(), parseJsonRecord(first?.payload), parseJsonRecord(first?.payload), notify);
-  }
+async function backfillVocabAchievements(db: AchievementScope): Promise<void> {
+  await upsertProgress(db, "first_vocab_saved", db.unlocked.has("first_vocab_saved") ? 1 : 0, 1);
 }
 
 async function upsertProgress(

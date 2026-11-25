@@ -5,7 +5,8 @@ import { readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { materializeSmartDeckCards, SMART_DECK_IDS, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
 import { declareMemorizedPages } from "@/lib/hifz/pages";
 import { putHifzPlan, readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
-import { writeStartingDeckLimits } from "@/lib/hifz/starting-limits";
+import { writeMeaningsRate, writeStartingDeckLimits } from "@/lib/hifz/starting-limits";
+import { putMeaningsSetup, type MeaningsSetup } from "@/lib/meanings/settings";
 import { pagesOfJuz } from "@/lib/hifz/units";
 import { applyUnitSwitch } from "@/lib/hifz/unit-applied";
 import { REVIEW_ANCHOR_KEY, reviewAnchorValue } from "@/lib/notifications/settings";
@@ -47,6 +48,11 @@ export type HifzSetup = Readonly<{
    * the saved value stays as it is.
    */
   reviewAnchor?: ReminderAnchor | null;
+  /**
+   * SPEC 3.6: the "Word meanings" step's choices. Left out (its settings never loaded and the step was
+   * not changed), the stored values stay. The meanings rate follows the pace on every save either way.
+   */
+  meanings?: MeaningsSetup;
   now?: Date;
 }>;
 
@@ -57,7 +63,8 @@ export type HifzSetup = Readonly<{
  * the other memorized pages, unverified with first checks spread over the first cycle (ONB-04). Ayah
  * review restores the ayah cards page review set aside and keeps the existing ayah decks. The
  * similar-verse, qira'at and asbab decks follow the memorized surahs either way. A first setup also
- * gives the smart decks lighter daily limits from the pace (lib/hifz/starting-limits).
+ * gives the smart decks lighter daily limits from the pace (lib/hifz/starting-limits). Every save
+ * stores the word-meaning choices and sets the meanings rate from the pace (SPEC 3.6).
  */
 export async function applyHifzSetup(
   db: AppDatabase,
@@ -73,6 +80,8 @@ export async function applyHifzSetup(
     await writeStartingDeckLimits(tx, { plan, hadPlan: previousPlan !== null });
     await putHifzPlan(tx, plan);
     if (setup.reviewAnchor !== undefined) await putUserSetting(tx, REVIEW_ANCHOR_KEY, reviewAnchorValue(setup.reviewAnchor));
+    if (setup.meanings) await putMeaningsSetup(tx, setup.meanings);
+    await writeMeaningsRate(tx, plan);
     // Only a change between page and ayah review switches the cards (lib/hifz/unit-applied).
     migratedPages = await applyUnitSwitch(tx, { unit: plan.unit, previousPlanUnit, now });
   });

@@ -47,7 +47,10 @@ jest.mock("@/lib/word/queries", () => ({
   fetchWordTranslation: async () => ({ translation_en: "Allah" }),
   fetchWordMeaningAr: async () => null,
   // These fixture ayat have one glyph per word, so the reader's number is the table position.
-  fetchTableWordPos: async (_db: unknown, _surah: number, _ayah: number, readerWordPos: number) => readerWordPos,
+  fetchReaderWordPositions: async (_db: unknown, _surah: number, _ayah: number, readerWordPos: number) => ({
+    table: readerWordPos,
+    unicode: readerWordPos,
+  }),
 }));
 jest.mock("@/lib/fonts/use-quran-page-font", () => ({ useQuranPageFontReady: () => true }));
 jest.mock("@/lib/fonts/loader", () => ({

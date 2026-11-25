@@ -1,10 +1,10 @@
 import path from "node:path";
-import { MEANINGS_DECK_ID, writeDeckReviewSettings } from "@/lib/fsrs/queries";
+import { MEANINGS_DECK_ID, readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
 import { localDateOf } from "@/lib/habit/dates";
 import { applyPreset, DEFAULT_HIFZ_PLAN, writeHifzPlan } from "@/lib/hifz/plan";
 import { pickMeaningCandidates } from "@/lib/meanings/candidates";
 import { loadLemmaIndex, positionKey } from "@/lib/meanings/lemma-index";
-import { MEANINGS_SETTING_KEYS, readMeaningsSettings, settleMeaningsDefaults } from "@/lib/meanings/settings";
+import { MEANINGS_SETTING_KEYS, readMeaningsSettings } from "@/lib/meanings/settings";
 import { buildDailyQueue, loadDailyReviewQueue } from "@/lib/study/daily-queue";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
@@ -22,6 +22,7 @@ beforeEach(async () => {
 }, 60_000);
 
 afterEach(async () => {
+  jest.restoreAllMocks();
   await store.close();
 });
 
@@ -139,24 +140,33 @@ it("fills the daily list's meanings share read-only, and a session creates rows 
   expect(store.sql.prepare("SELECT COUNT(*) AS n FROM achievement_unlocks").get()).toEqual({ n: 0 });
 });
 
-it("derives the meaning language and level, and writes them and the rate once", async () => {
+it("derives the meaning language, level and rate from the interface language without writing them", async () => {
   set("ui_language", "ar");
   expect(await readMeaningsSettings(store.db)).toEqual({
     language: "ar",
     level: 3,
     stored: { language: false, level: false },
   });
-  await settleMeaningsDefaults(store.db);
-  expect(await readMeaningsSettings(store.db)).toEqual({
-    language: "ar",
-    level: 3,
-    stored: { language: true, level: true },
-  });
-  const rate = store.sql
-    .prepare("SELECT value FROM user_settings WHERE key = ?")
-    .get(`review_settings_${MEANINGS_DECK_ID}`) as { value: string };
-  expect(JSON.parse(rate.value).newCardsLimit).toBe(5);
-  // A later interface language change keeps both.
+  // Five new word cards a day unless the deck's settings say otherwise.
+  expect((await readDeckReviewSettings(store.db, MEANINGS_DECK_ID)).newCardsLimit).toBe(5);
+  // Nothing is written: a written default would beat a choice made on another device, and would give
+  // a fresh device settings of its own for the account restore to ask about.
+  const written = store.sql
+    .prepare("SELECT key FROM user_settings WHERE key IN (?, ?, ?)")
+    .all(MEANINGS_SETTING_KEYS.language, MEANINGS_SETTING_KEYS.level, `review_settings_${MEANINGS_DECK_ID}`);
+  expect(written).toEqual([]);
+  // The derived values follow the interface language; a stored choice does not.
   set("ui_language", "en");
-  expect((await readMeaningsSettings(store.db)).language).toBe("ar");
+  expect(await readMeaningsSettings(store.db)).toMatchObject({ language: "en", level: 0 });
+  set(MEANINGS_SETTING_KEYS.language, "ar");
+  set("ui_language", "en");
+  expect(await readMeaningsSettings(store.db)).toMatchObject({ language: "ar", level: 3, stored: { language: true, level: false } });
+});
+
+it("follows the interface the app shows when no interface language is stored", async () => {
+  jest.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({
+    ...new Intl.DateTimeFormat("en-US").resolvedOptions(),
+    locale: "ar-SA",
+  });
+  expect(await readMeaningsSettings(store.db)).toMatchObject({ language: "ar", level: 3 });
 });

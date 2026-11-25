@@ -4,7 +4,8 @@ import { DEFAULT_DECK_DAILY_REVIEW_LIMIT, DEFAULT_DECK_NEW_CARD_LIMIT } from "@/
 import { atLocalTime } from "@/lib/habit/dates";
 import { applyPreset, DEFAULT_HIFZ_PLAN, type HifzPlan } from "@/lib/hifz/plan";
 import { applyHifzSetup } from "@/lib/hifz/setup";
-import { startingDeckLimits } from "@/lib/hifz/starting-limits";
+import { meaningsRateFor, startingDeckLimits } from "@/lib/hifz/starting-limits";
+import { MEANINGS_SETTING_KEYS } from "@/lib/meanings/settings";
 import { AYAH_NEW_CARDS_LIMIT_KEY } from "@/lib/hifz/unit-switch";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
@@ -28,6 +29,8 @@ describe("starting deck limits from the pace (issue 14)", () => {
     // study, and a zero would leave a deck turned on later with nothing to offer (SPEC 3.7).
     expect(limits[SMART_DECK_IDS.qiraat]).toBeUndefined();
     expect(limits[SMART_DECK_IDS.reasonsOfRevelation]).toBeUndefined();
+    // New word-meaning cards a day: 5, 5 or 10 for the short, medium and long tiers (SPEC 3.6).
+    expect(meaningsRateFor({ dailyBudgetMin })).toBe(dailyBudgetMin > 30 ? 10 : 5);
     for (const deckId of [SMART_DECK_IDS.retention, SMART_DECK_IDS.mutashabihat, SMART_DECK_IDS.similarTails]) {
       const limit = limits[deckId]!;
       expect(limit.dailyReviewLimit).toBe(expected.daily);
@@ -90,9 +93,11 @@ describe("applyHifzSetup writes starting limits only on a true first setup", () 
     expect(stored(AYAH_NEW_CARDS_LIMIT_KEY)).toBe("10");
     expect(await limits(SMART_DECK_IDS.mutashabihat)).toEqual({ newCardsLimit: 5, dailyReviewLimit: 20 });
     expect(await limits(SMART_DECK_IDS.similarTails)).toEqual({ newCardsLimit: 0, dailyReviewLimit: 20 });
-    // Qira'at and Reasons of revelation keep the deck defaults (SPEC 3.7), and so does Meanings.
+    // Qira'at and Reasons of revelation keep the deck defaults (SPEC 3.7). Meanings gets the pace's rate.
     expect(stored(`review_settings_${SMART_DECK_IDS.qiraat}`)).toBeNull();
     expect(stored(`review_settings_${SMART_DECK_IDS.reasonsOfRevelation}`)).toBeNull();
+    expect(await limits("meanings")).toEqual({ newCardsLimit: 5, dailyReviewLimit: DEFAULT_DECK_DAILY_REVIEW_LIMIT });
+    // Five is already the unstored default, so nothing is written for it.
     expect(stored("review_settings_meanings")).toBeNull();
     // Each setting queued its upload, so the limits reach the account like any deck setting.
     for (const deckId of [SMART_DECK_IDS.retention, SMART_DECK_IDS.mutashabihat, SMART_DECK_IDS.similarTails]) {
@@ -117,24 +122,96 @@ describe("applyHifzSetup writes starting limits only on a true first setup", () 
     expect(rows).toEqual([{ deck_id: SMART_DECK_IDS.retention, n: 5 }]);
   });
 
-  it("leaves the limits alone on a later setup, even with another pace", async () => {
+  it("leaves the limits alone on a later setup, even with another pace, but moves the meanings rate with the pace", async () => {
     await setup(pagePlan);
     await writeDeckReviewSettings(store.db, SMART_DECK_IDS.mutashabihat, {
       ...(await readDeckReviewSettings(store.db, SMART_DECK_IDS.mutashabihat)),
       newCardsLimit: 15,
     });
-    const queued = store.sql
-      .prepare("SELECT COUNT(*) AS n FROM sync_queue WHERE row_id LIKE 'review_settings_%'")
-      .get();
+    const queuedFor = (rowId: string) =>
+      (store.sql.prepare("SELECT COUNT(*) AS n FROM sync_queue WHERE row_id = ?").get(rowId) as { n: number }).n;
+    const smartQueued = () =>
+      store.sql
+        .prepare("SELECT COUNT(*) AS n FROM sync_queue WHERE row_id LIKE 'review_settings_%' AND row_id != 'review_settings_meanings'")
+        .get();
+    const queued = smartQueued();
+    const meaningsQueued = queuedFor("review_settings_meanings");
 
     await setup(applyPreset(DEFAULT_HIFZ_PLAN, "full_time"), new Date(now.getTime() + 60_000));
 
     expect(await limits(SMART_DECK_IDS.mutashabihat)).toEqual({ newCardsLimit: 15, dailyReviewLimit: 20 });
     expect(await limits(SMART_DECK_IDS.similarTails)).toEqual({ newCardsLimit: 0, dailyReviewLimit: 20 });
     expect(stored(AYAH_NEW_CARDS_LIMIT_KEY)).toBe("10");
-    expect(
-      store.sql.prepare("SELECT COUNT(*) AS n FROM sync_queue WHERE row_id LIKE 'review_settings_%'").get(),
-    ).toEqual(queued);
+    expect(smartQueued()).toEqual(queued);
+    // SPEC 3.6: every save sets the meanings rate from the pace; ninety minutes is the long tier.
+    expect((await limits("meanings")).newCardsLimit).toBe(10);
+    expect(queuedFor("review_settings_meanings")).toBe(meaningsQueued + 1);
+
+    // The same pace again writes nothing new.
+    await setup(applyPreset(DEFAULT_HIFZ_PLAN, "full_time"), new Date(now.getTime() + 120_000));
+    expect(queuedFor("review_settings_meanings")).toBe(meaningsQueued + 1);
+  });
+
+  it("saves the word-meaning step's choices, writing only values that change", async () => {
+    const meaningsSetup = { inDailyStudy: false, language: "ar", languagePicked: true, level: 2 } as const;
+    await applyHifzSetup(store.db, { plan: pagePlan, memorizedSurahs: [], memorizedJuz: [], meanings: meaningsSetup, now });
+
+    expect(stored("habit_study_meanings")).toBe("false");
+    expect(stored(MEANINGS_SETTING_KEYS.language)).toBe("ar");
+    expect(stored(MEANINGS_SETTING_KEYS.level)).toBe("2");
+    const queuedCount = () =>
+      (store.sql.prepare("SELECT COUNT(*) AS n FROM sync_queue WHERE row_id IN ('habit_study_meanings', ?, ?)").get(
+        MEANINGS_SETTING_KEYS.language,
+        MEANINGS_SETTING_KEYS.level,
+      ) as { n: number }).n;
+    const before = queuedCount();
+
+    // A plan edit that keeps everything, with Keep for the level, queues no uploads for them.
+    await applyHifzSetup(store.db, {
+      plan: pagePlan,
+      memorizedSurahs: [],
+      memorizedJuz: [],
+      meanings: { ...meaningsSetup, level: null },
+      now,
+    });
+    expect(queuedCount()).toBe(before);
+    expect(stored(MEANINGS_SETTING_KEYS.level)).toBe("2");
+
+    // Without the step's choices, the stored values stay.
+    await applyHifzSetup(store.db, { plan: pagePlan, memorizedSurahs: [], memorizedJuz: [], now });
+    expect(stored("habit_study_meanings")).toBe("false");
+    expect(queuedCount()).toBe(before);
+  });
+
+  it("writes nothing for a step passed unchanged when nothing was ever stored", async () => {
+    store.sql
+      .prepare("INSERT INTO user_settings (key, value, updated_at) VALUES ('ui_language', 'en', ?)")
+      .run(now.toISOString());
+    // An untouched step sends what it showed: on, the interface language, and Keep (no level).
+    await applyHifzSetup(store.db, {
+      plan: pagePlan,
+      memorizedSurahs: [],
+      memorizedJuz: [],
+      meanings: { inDailyStudy: true, language: "en", languagePicked: false, level: null },
+      now,
+    });
+    const meaningsRows = store.sql
+      .prepare("SELECT row_id FROM sync_queue WHERE row_id IN ('habit_study_meanings', ?, ?)")
+      .all(MEANINGS_SETTING_KEYS.language, MEANINGS_SETTING_KEYS.level);
+    expect(meaningsRows).toEqual([]);
+    expect(stored("habit_study_meanings")).toBeNull();
+    expect(stored(MEANINGS_SETTING_KEYS.language)).toBeNull();
+
+    // A tapped language is a choice: stored even when it matches the interface language, so a later
+    // interface change does not move it.
+    await applyHifzSetup(store.db, {
+      plan: pagePlan,
+      memorizedSurahs: [],
+      memorizedJuz: [],
+      meanings: { inDailyStudy: true, language: "en", languagePicked: true, level: null },
+      now,
+    });
+    expect(stored(MEANINGS_SETTING_KEYS.language)).toBe("en");
   });
 
   it("leaves the defaults for someone who has already reviewed", async () => {

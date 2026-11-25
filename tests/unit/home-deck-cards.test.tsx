@@ -183,7 +183,6 @@ jest.mock("@/lib/meanings/candidates", () => ({
   getMeaningsTodayStats: (db: unknown, settings: unknown) =>
     jest.requireMock<typeof import("@/lib/fsrs/queries")>("@/lib/fsrs/queries").getDeckTodayStats(db as never, "meanings", settings as never),
 }));
-jest.mock("@/lib/meanings/settings", () => ({ settleMeaningsDefaults: jest.fn(async () => undefined) }));
 jest.mock("@/lib/study/daily-queue", () => ({
   ...jest.requireActual<typeof import("@/lib/study/daily-queue")>("@/lib/study/daily-queue"),
   addStudyMore: jest.fn(async () => undefined),

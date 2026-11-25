@@ -53,12 +53,33 @@ function splitGlyphTokens(textQcf2: string): string[] {
   return textQcf2.split(/\s+/).filter(Boolean);
 }
 
-/** The number of Unicode words in `text_uthmani`, split as the card prompts split it. */
-export function uthmaniWordCount(textUthmani: string): number {
+/** The Unicode words of `text_uthmani`, split as the card prompts split it. */
+function uthmaniWords(textUthmani: string): string[] {
   return textUthmani
     .replace(/[۞۩﴿﴾0-9٠-٩]/g, " ")
     .split(/\s+/)
-    .filter(Boolean).length;
+    .filter(Boolean);
+}
+
+/** The number of Unicode words in `text_uthmani`, split as the card prompts split it. */
+export function uthmaniWordCount(textUthmani: string): number {
+  return uthmaniWords(textUthmani).length;
+}
+
+/**
+ * The Unicode text of each mushaf word of an ayah (position 1 is index 0): the words a card
+ * highlights by word-table position, as `Qcf2AyahText` maps them. With no known layout, position n is
+ * Unicode word n, as that component's fallback draws it.
+ */
+export function mushafWordTexts(surah: number, ayah: number, textUthmani: string, textQcf2: string): string[] {
+  const words = uthmaniWords(textUthmani);
+  const layout = ayahGlyphs(surah, ayah, textQcf2, words.length);
+  if (!layout) return words;
+  return layout.mushafWords.map((range) =>
+    words
+      .filter((_, i) => layout.unicodeWords[i].from >= range.from && layout.unicodeWords[i].to <= range.to)
+      .join(" "),
+  );
 }
 
 /**
@@ -129,6 +150,16 @@ export function glyphsFromWord(layout: AyahGlyphs, wordIndex: number): string | 
 /** The glyph indexes that draw mushaf word `position` (1-based, as in the word tables), or null. */
 export function glyphsOfMushafWord(layout: AyahGlyphs, position: number): GlyphRange | null {
   return layout.mushafWords[position - 1] ?? null;
+}
+
+/**
+ * The Unicode word of `text_uthmani` (1-based, split on spaces) whose glyphs include a glyph counted
+ * the way the reader counts, marks included: the first of two words one glyph draws. Null for the end
+ * marker or out of range.
+ */
+export function unicodeWordOfGlyph(layout: AyahGlyphs, glyphIndex: number): number | null {
+  const index = layout.unicodeWords.findIndex((range) => glyphIndex >= range.from && glyphIndex <= range.to);
+  return index < 0 ? null : index + 1;
 }
 
 /**

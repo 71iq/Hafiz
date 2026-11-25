@@ -4,6 +4,8 @@ import {
   loadLemmaIndex,
   parseMeaningCardId,
   positionKey,
+  holdsStem,
+  sameWord,
   wordSkeleton,
   type LemmaIndex,
 } from "@/lib/meanings/lemma-index";
@@ -16,7 +18,7 @@ let index: LemmaIndex;
 beforeAll(async () => {
   store = await openOutboxDatabase();
   store.sql.exec(`ATTACH DATABASE '${path.resolve(__dirname, "../../assets/data/quran.db")}' AS bundled`);
-  for (const table of ["word_roots", "word_irab", "word_meanings_ar"]) {
+  for (const table of ["word_roots", "word_irab", "word_meanings_ar", "quran_text"]) {
     store.sql.exec(`DELETE FROM main.${table}`);
     store.sql.exec(`INSERT INTO main.${table} SELECT * FROM bundled.${table}`);
   }
@@ -39,17 +41,20 @@ it("has one entry per (lemma, root) pair, banded by occurrences as the spec's ta
 it("offers an Arabic card only on a one-word meaning entry, and an English card on any aligned word", () => {
   const withArabic = [0, 0, 0, 0, 0, 0];
   for (const entry of index.lemmas) if (entry.positions.ar.length > 0) withArabic[entry.band] += 1;
-  expect(withArabic).toEqual([117, 246, 311, 762, 840, 1204]);
+  expect(withArabic).toEqual([116, 246, 311, 762, 840, 1202]);
   expect(index.lemmas.every((entry) => entry.positions.en.length >= entry.positions.ar.length)).toBe(true);
 });
 
-it("drops the 88 positions in 15 ayat where the two word numberings disagree", () => {
-  const eligible = new Set(
-    index.lemmas.flatMap((entry) => entry.positions.en.map((p) => positionKey(p.surah, p.ayah, p.pos))),
-  );
-  const dropped = [...index.lemmaAt.keys()].filter((key) => !eligible.has(key));
-  expect(dropped).toHaveLength(88);
-  expect(new Set(dropped.map((key) => key.split(":").slice(0, 2).join(":"))).size).toBe(15);
+it("offers English cards on every position, and Arabic ones only where the meaning entry is for the highlighted word", () => {
+  const key = (p: { surah: number; ayah: number; pos: number }) => positionKey(p.surah, p.ayah, p.pos);
+  const english = new Set(index.lemmas.flatMap((entry) => entry.positions.en.map(key)));
+  const arabic = new Set(index.lemmas.flatMap((entry) => entry.positions.ar.map(key)));
+  // word_roots and word_translations count the text's words in every ayah, so the highlighted word
+  // always holds its stem. word_irab is a word behind in ten ayat and is not read.
+  expect([...index.lemmaAt.keys()].filter((position) => !english.has(position))).toEqual([]);
+  expect(english.has("5:117:28")).toBe(true);
+  // These Arabic entries belong to another word: شهيد at 5:117:28, خلوا at 2:214:4.
+  for (const position of ["5:117:28", "2:214:4", "5:110:11", "46:3:12"]) expect(arabic.has(position)).toBe(false);
 });
 
 it("is built once per database", async () => {
@@ -60,6 +65,13 @@ it("keeps the helpers' rules", () => {
   expect([70, 69, 23, 22, 11, 10, 4, 3, 2, 1].map(bandOf)).toEqual([0, 1, 1, 2, 2, 3, 3, 4, 4, 5]);
   expect(wordSkeleton("بِسْمِ")).toBe("بسم");
   expect(wordSkeleton("ٱلرَّحْمَٰنِ")).toBe(wordSkeleton("الرَّحْمَنِ"));
+  expect(sameWord("ٱلَّيْلِ", "اللَّيْلِ")).toBe(true);
+  expect(sameWord("أَىُّ", "أَيُّ")).toBe(true);
+  expect(sameWord("شَىْءٍ", "شَهِيدٌ")).toBe(false);
+  expect(sameWord("كُلَّ", "كُلَّمَا")).toBe(false);
+  expect(holdsStem("وَجُنُودِهِ", "جُنُودِ")).toBe(true);
+  expect(holdsStem("ءَاوَوا۟", "ءَاوَ")).toBe(true);
+  expect(holdsStem("شَهِيدٌ", "قَالُ")).toBe(false);
   expect(parseMeaningCardId("word:2:255:10")).toEqual({ surah: 2, ayah: 255, pos: 10 });
   expect(parseMeaningCardId("mutashabihat:2:255")).toBeNull();
 });
