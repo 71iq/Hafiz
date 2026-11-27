@@ -222,19 +222,31 @@ function quranRow(key: string) {
 const uthmani = (key: string) => quranRow(key).text_uthmani;
 const plain = (key: string) => quranRow(key).text_clean;
 
+/**
+ * The shipped last five words (`tail_5`) of each tail ref's ayah. The old matcher fell back to them
+ * when the cue did not match, which is how it hid "تسبيحهم" in 17:44, so the fixture carries them.
+ */
+const SHIPPED_TAIL_5 = new Map<string, string | null>(
+  (
+    JSON.parse(
+      readFileSync(path.join(__dirname, "..", "..", "assets", "data", "mutashabihat", "nourquran_hafiz_rows.json"), "utf8"),
+    ).refs as [string, number, number, number, string | null, string | null][]
+  ).map(([, , surah, ayah, , tail5]) => [`${surah}:${ayah}`, tail5]),
+);
+
 /** A group of refs, each "surah:ayah" or [surah:ayah, pre_text, similar_text]. */
 function addGroup(id: string, kind: "similar" | "tail", cue: string, refs: (string | [string, string, string])[]): void {
   store.sql
     .prepare("INSERT INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES (?, ?, ?, 'test', 9)")
     .run(id, kind, cue);
   const insert = store.sql.prepare(
-    "INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, pre_text, similar_text) VALUES (?, ?, ?, ?, '', ?, ?)",
+    "INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, tail_5, pre_text, similar_text) VALUES (?, ?, ?, ?, '', ?, ?, ?)",
   );
   refs.forEach((ref, sortOrder) => {
     const [key, pre, similar] = typeof ref === "string" ? [ref, null, null] : ref;
     addAyat(key);
     const [surahNumber, ayahNumber] = key.split(":").map(Number);
-    insert.run(id, sortOrder, surahNumber, ayahNumber, pre, similar);
+    insert.run(id, sortOrder, surahNumber, ayahNumber, kind === "tail" ? SHIPPED_TAIL_5.get(key) ?? null : null, pre, similar);
   });
 }
 

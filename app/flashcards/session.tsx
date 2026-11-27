@@ -283,6 +283,22 @@ function FlashcardSessionScreen() {
   /** The queue could not load: an error with Try again, never an empty completion. */
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  // The queue and what each card shows (its related ayat follow the known surahs) belong to the account
+  // they were loaded for. Another account, or this one's data restored or replaced on the device,
+  // loads the session again; the load effect's cleanup drops a load still running.
+  const loadedOwnerRef = useRef(authUserId);
+  useEffect(() => {
+    if (loadedOwnerRef.current === authUserId) return;
+    loadedOwnerRef.current = authUserId;
+    setLoadAttempt((attempt) => attempt + 1);
+  }, [authUserId]);
+  useEffect(
+    () =>
+      subscribeSyncCompleted((summary) => {
+        if (summary.accountRestored || summary.localDataReplaced) setLoadAttempt((attempt) => attempt + 1);
+      }),
+    [],
+  );
   /** The grade whose save failed, repeated as is by Try again. */
   const [failedGrade, setFailedGrade] = useState<Grade | null>(null);
   /** A short confirmation such as "Card moved to 19 Nov". */

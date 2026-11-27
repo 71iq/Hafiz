@@ -3,7 +3,7 @@
 import { once } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { rebuildRef } from "./mutashabihat-align.mjs";
 
@@ -590,7 +590,7 @@ function generateMutashabihatData(quranData, outputDir) {
   ];
 }
 
-/** A data-only rebuild starts from the committed bundle so it preserves the original schema. */
+/** A data-only rebuild starts from the bundled database in the checkout, so it keeps its schema and every other table. */
 async function rebuildMutashabihatOnly() {
   const { DatabaseSync } = await import("node:sqlite");
   const staging = fs.mkdtempSync(path.join(DATA_DIR, ".mutashabihat-build-"));
@@ -598,12 +598,12 @@ async function rebuildMutashabihatOnly() {
     fs.mkdirSync(path.join(staging, "mutashabihat"));
     const tables = generateMutashabihatData(readJson("quran-data.json"), staging);
     const stagedDb = path.join(staging, "quran.db");
-    const fd = fs.openSync(stagedDb, "wx");
-    try {
-      execFileSync("git", ["show", "HEAD:assets/data/quran.db"], { cwd: ROOT, stdio: ["ignore", fd, "inherit"] });
-    } finally {
-      fs.closeSync(fd);
+    // Start from the database in the checkout, so other uncommitted edits to it survive. A leftover
+    // write-ahead log would mean an open or unfinished writer, whose pages the copy would miss.
+    for (const suffix of ["-wal", "-shm"]) {
+      if (fs.existsSync(`${DB_PATH}${suffix}`)) throw new Error(`${DB_PATH}${suffix} exists; close the database first`);
     }
+    fs.copyFileSync(DB_PATH, stagedDb, fs.constants.COPYFILE_EXCL);
 
     const db = new DatabaseSync(stagedDb);
     try {

@@ -838,6 +838,32 @@ describe("Flashcard session due-date editor characterization", () => {
     expect(editor.props.value).toBe([nextAyah, firstRef, related[0], related[1]].map((ref) => ref.textUthmani).join("\n\n"));
   });
 
+  it("loads an open session again for another account, so related ayahs follow that account's surahs", async () => {
+    configureSettings("en", true);
+    const { useAuthStore } = jest.requireActual<typeof import("@/lib/auth/store")>("@/lib/auth/store");
+    const { emitSyncCompleted } = jest.requireActual<typeof import("@/lib/sync/events")>("@/lib/sync/events");
+    const related = [3, 4].map((surah, i) => ({ ...makeSmartRef("fixture-one", surah, 15), sortOrder: i + 1, textQcf2: "" }));
+    jest.mocked(readKnownSurahs).mockResolvedValue(new Set([3]));
+    jest.mocked(getSmartCardContent).mockResolvedValue({ ...firstSmartContent, refs: [firstRef, ...related] });
+    const before = useAuthStore.getState().user;
+    act(() => useAuthStore.setState({ user: { id: "fixture-a" } as never }));
+    try {
+      const view = renderSession();
+      await view.findByText(firstCue);
+      await act(async () => {
+        jest.mocked(readKnownSurahs).mockResolvedValue(new Set([4]));
+        useAuthStore.setState({ user: { id: "fixture-b" } as never });
+        emitSyncCompleted({ pushed: 0, pulled: 2, accountRestored: true, localDataReplaced: true, restoreCompleted: true });
+      });
+      await view.findByText(firstCue);
+      fireEvent.press(getTextButton(view, strings.en.flashcardsReveal));
+      expect(await view.findByText(related[1].textUthmani)).toBeTruthy();
+      expect(view.queryByText(related[0].textUthmani)).toBeNull();
+    } finally {
+      act(() => useAuthStore.setState({ user: before }));
+    }
+  });
+
   it("answers a whole final ayah with the named surah ending and keeps the Unicode context", async () => {
     const s = strings.ar;
     const target = { ...makeSmartRef("end", 1, 7), surahNameAr: "الفاتحة" };
