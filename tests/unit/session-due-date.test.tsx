@@ -18,6 +18,7 @@ import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
 import { DEFAULT_TAFSIR_SOURCE } from "@/lib/tafsir/sources";
 import { endReviewSession, recordSessionProgress, startReviewSession } from "@/lib/fsrs/review-sessions";
 import { DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySessionDeckIds } from "@/lib/study/daily-queue";
+import { readKnownSurahs } from "@/lib/study/known-surahs";
 import { loadHabitOverview, makeUpTarget, recordWirdProgress } from "@/lib/habit/queries";
 import { readDhuhrResolver } from "@/lib/prayer/settings";
 import { recordCleanRecitation } from "@/lib/hifz/errors";
@@ -258,6 +259,7 @@ jest.mock("@/lib/fsrs/smart-decks", () => ({
   // The session compares deck ids (the Retention note), so the real ids stay.
   SMART_DECK_IDS: jest.requireActual<typeof import("@/lib/fsrs/smart-decks")>("@/lib/fsrs/smart-decks").SMART_DECK_IDS,
 }));
+jest.mock("@/lib/study/known-surahs", () => ({ readKnownSurahs: jest.fn() }));
 
 // The wird day is written inside the grade transaction; its rules are covered by habit-wird-progress.
 jest.mock("@/lib/habit/queries", () => ({
@@ -767,6 +769,7 @@ describe("Flashcard session due-date editor characterization", () => {
     });
     jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard, secondCard]));
     jest.mocked(getSmartCardContent).mockImplementation(async (_db, cardId) => smartContentById.get(cardId) ?? null);
+    jest.mocked(readKnownSurahs).mockResolvedValue(null);
     jest.mocked(setStudyCardDueDate).mockResolvedValue(firstCard);
     jest.mocked(loadQuranPageFont).mockResolvedValue();
     jest.mocked(isQuranPageFontLoaded).mockReturnValue(true);
@@ -804,6 +807,52 @@ describe("Flashcard session due-date editor characterization", () => {
     await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
     expect(loadDailyReviewQueue).not.toHaveBeenCalled();
     expect(startReviewSession).toHaveBeenCalledWith("cards", { deckId: "fixture-session-deck" });
+  });
+
+  it("reveals the next ayah first and uses the session's known surahs for related ayahs and answer text", async () => {
+    configureSettings("en", true);
+    const s = strings.en;
+    const nextAyah = { ...makeSmartRef("fixture-one", 2, 11), v2Page: firstRef.v2Page + 1 };
+    const related = [2, 3, 4].map((surah, i) => ({
+      ...makeSmartRef("fixture-one", surah, 15), sortOrder: i + 1, textQcf2: "",
+    }));
+    jest.mocked(readKnownSurahs).mockResolvedValue(new Set([3]));
+    jest.mocked(getSmartCardContent).mockResolvedValueOnce({
+      ...firstSmartContent, refs: [firstRef, ...related], answerKind: "nextAyah", nextAyah,
+      promptContextQcf2: "previous-glyph previous-marker", promptContextUthmani: "Previous ayah", promptContextV2Page: 8,
+    });
+    const view = renderSession();
+    expect(await view.findByText(s.smartDeckNextAyahPrompt)).toBeTruthy();
+    expect(view.getByLabelText("Previous ayah")).toBeTruthy();
+    expect(view.queryByLabelText(nextAyah.textUthmani)).toBeNull();
+    expect(readKnownSurahs).toHaveBeenCalledTimes(1);
+    fireEvent.press(getTextButton(view, s.flashcardsReveal));
+    expect(await view.findByLabelText(nextAyah.textUthmani)).toBeTruthy();
+    expect(quranPageFontName).toHaveBeenCalledWith(mockSettings.quranRenderFontStyle, nextAyah.v2Page);
+    expect(view.getByText("2:11")).toBeTruthy();
+    expect(view.getAllByRole("header").map((header) => header.props.children)).toEqual([s.nextAyah, s.smartDeckTargetAyah, s.smartDeckRelatedAyahs]);
+    expect(view.getByText(related[0].textUthmani)).toBeTruthy();
+    expect(view.getByText(related[1].textUthmani)).toBeTruthy();
+    expect(view.queryByText(related[2].textUthmani)).toBeNull();
+    const editor = await openAnswerEditor(view, s, "revealed", false);
+    expect(editor.props.value).toBe([nextAyah, firstRef, related[0], related[1]].map((ref) => ref.textUthmani).join("\n\n"));
+  });
+
+  it("answers a whole final ayah with the named surah ending and keeps the Unicode context", async () => {
+    const s = strings.ar;
+    const target = { ...makeSmartRef("end", 1, 7), surahNameAr: "الفاتحة" };
+    jest.mocked(getSmartCardContent).mockResolvedValueOnce({
+      ...firstSmartContent, targetRef: target, refs: [target], answerKind: "surahEnd",
+      promptContextUthmani: "Previous ayah", promptUthmani: target.textUthmani, promptQcf2: "front-glyph",
+    });
+    const view = renderSession();
+    expect(await view.findByText(s.smartDeckNextAyahPrompt)).toBeTruthy();
+    expect(view.getByText("Previous ayah")).toBeTruthy();
+    expect(view.getByLabelText(target.textUthmani)).toBeTruthy();
+    fireEvent.press(getTextButton(view, s.flashcardsReveal));
+    expect(await view.findByRole("header", { name: "نهاية سورة الفاتحة" })).toBeTruthy();
+    expect(view.queryByRole("header", { name: s.nextAyah })).toBeNull();
+    expect(view.queryByText(s.smartDeckRelatedAyahs)).toBeNull();
   });
 
   it("characterizes Arabic light validation, native input options, cancel, and reopen", async () => {

@@ -973,6 +973,15 @@
           "native": false,
           "children": [
             {
+              "id": "review.session.mutashabihat",
+              "title": "Mutashabihat prompts, next ayah and related ayahs from known surahs",
+              "kind": "widget",
+              "cases": ["REVIEW-13"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
               "id": "review.session.grade",
               "title": "Grade Again/Hard/Good/Easy",
               "kind": "transition",

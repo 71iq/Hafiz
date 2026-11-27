@@ -42,6 +42,7 @@ import {
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { computeUniqueFront, type UniqueFrontContextAyah } from "@/lib/fsrs/uniqueness";
 import { addStudyMore, DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySessionDeckIds } from "@/lib/study/daily-queue";
+import { readKnownSurahs } from "@/lib/study/known-surahs";
 import { DAILY_SESSION_HREF, opensDailySession, type StudyState, type StudyStep } from "@/lib/study/resolve";
 import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
 import { useSessionLeaveState } from "@/lib/navigation/entry-route";
@@ -78,6 +79,7 @@ import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/co
 import {
   getSmartCardContent,
   SMART_DECK_IDS,
+  type SmartCardContent,
   type SmartCardKind,
   type SmartDeckRef,
 } from "@/lib/fsrs/smart-decks";
@@ -112,7 +114,7 @@ const FOCUSED_CONTROL_SELECTOR = ["button", "a", ...["button", "link", "menuitem
 
 type SessionPhase = "loading" | "error" | "front" | "side" | "grading" | "summary";
 
-type CardData = {
+type CardData = Pick<SmartCardContent, "answerKind" | "nextAyah"> & {
   kind: "ayah" | "word" | SmartCardKind;
   card: StudyCardRow;
   /** The review settings of the card's own deck, also in Review all. */
@@ -408,6 +410,9 @@ function FlashcardSessionScreen() {
         }
 
         const loaded: CardData[] = [];
+        const knownSurahs = queue.some(({ card }) => card.id.startsWith("mutashabihat:"))
+          ? await readKnownSurahs(db)
+          : null;
         for (const { card: row, settings } of queue) {
           if (cancelled) return;
           const smartContent = await getSmartCardContent(db, row.id);
@@ -437,7 +442,11 @@ function FlashcardSessionScreen() {
               smartDeckTitle: getSmartDeckTitleForKind(smartContent.kind, s),
               smartTargetRef: targetRef,
               smartCue: smartContent.cue,
-              smartRefs: smartContent.refs,
+              answerKind: smartContent.answerKind,
+              nextAyah: smartContent.nextAyah,
+              smartRefs: smartContent.kind === "mutashabihat" && knownSurahs
+                ? smartContent.refs.filter((ref) => ref.surah === targetRef.surah || knownSurahs.has(ref.surah))
+                : smartContent.refs,
               smartPromptContextQcf2: smartContent.promptContextQcf2,
               smartPromptContextUthmani: smartContent.promptContextUthmani,
               smartPromptContextV2Page: smartContent.promptContextV2Page,
@@ -955,9 +964,9 @@ function FlashcardSessionScreen() {
     setSessionError(null);
     setCardMenuOpen(false);
     setAnswerEditMode(mode);
-    setAnswerEditText(getCardAnswerOverride(currentCard, mode) ?? getDefaultAnswerText(currentCard, mode, s));
+    setAnswerEditText(getCardAnswerOverride(currentCard, mode) ?? getDefaultAnswerText(currentCard, mode, s, isRTL));
     setAnswerEditOpen(true);
-  }, [activeModes, currentCard, currentMode, currentSideIndex, s]);
+  }, [activeModes, currentCard, currentMode, currentSideIndex, s, isRTL]);
 
   const handleSaveAnswerEdit = () => {
     if (!currentCard || !answerEditMode) return;
@@ -1644,8 +1653,8 @@ function FlashcardSessionScreen() {
       <AnswerEditSheet
         visible={answerEditOpen}
         value={answerEditText}
-        defaultValue={currentCard && answerEditMode ? getDefaultAnswerText(currentCard, answerEditMode, s) : ""}
-        baseline={currentCard && answerEditMode ? (getCardAnswerOverride(currentCard, answerEditMode) ?? getDefaultAnswerText(currentCard, answerEditMode, s)) : ""}
+        defaultValue={currentCard && answerEditMode ? getDefaultAnswerText(currentCard, answerEditMode, s, isRTL) : ""}
+        baseline={currentCard && answerEditMode ? (getCardAnswerOverride(currentCard, answerEditMode) ?? getDefaultAnswerText(currentCard, answerEditMode, s, isRTL)) : ""}
         error={sessionError}
         busy={mutationBusy}
         isDark={isDark}
@@ -1755,7 +1764,13 @@ function getCardAnswerOverride(card: CardData, mode: ReviewMode): string | null 
   return value ? value : null;
 }
 
-function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: UIStrings): string {
+function endOfSurahText(card: CardData, s: UIStrings, isRTL: boolean): string {
+  return interpolate(s.smartDeckSurahEnd, {
+    surah: isRTL ? card.surahName : (surahTransliteration(card.surah) ?? card.surahName),
+  });
+}
+
+function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: UIStrings, isRTL: boolean): string {
   switch (mode) {
     case "nextAyah":
       return card.nextAyahText ?? "";
@@ -1771,8 +1786,12 @@ function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: UIStrings): s
       return card.wordMeaningAr ?? s.noWordMeaningFallback;
     case "wordMeaningTranslation":
       return card.wordMeaningEn ?? "";
-    case "smartRefs":
-      return card.smartRefs?.map((ref) => ref.textUthmani).join("\n\n") ?? "";
+    case "smartRefs": {
+      const texts = card.smartRefs?.map((ref) => ref.textUthmani) ?? [];
+      if (card.answerKind === "nextAyah" && card.nextAyah) texts.unshift(card.nextAyah.textUthmani);
+      if (card.answerKind === "surahEnd") texts.unshift(endOfSurahText(card, s, isRTL));
+      return texts.join("\n\n");
+    }
     case "qiraatReading":
       return card.qiraatText ?? card.qiraatGroup?.join("\n\n") ?? "";
     case "asbabReading":
@@ -2328,15 +2347,25 @@ function SmartCueText({
           {card.surahName} {card.surah}:{card.ayah}
         </Text>
       )}
-      {card.kind === "mutashabihat" && card.smartPromptContextQcf2 && card.smartPromptContextUthmani && card.smartPromptContextV2Page ? (
+      {card.kind === "mutashabihat" && card.smartPromptContextUthmani ? (
         <View className="mb-2 opacity-80">
-          <Qcf2AyahText
-            textQcf2={card.smartPromptContextQcf2}
-            textUthmani={card.smartPromptContextUthmani}
-            v2Page={card.smartPromptContextV2Page}
-            fontSize={fontSize * 0.82}
-            lineHeight={lineHeight * 0.82}
-          />
+          {card.smartPromptContextQcf2 && card.smartPromptContextV2Page ? (
+            <Qcf2AyahText
+              textQcf2={card.smartPromptContextQcf2}
+              textUthmani={card.smartPromptContextUthmani}
+              v2Page={card.smartPromptContextV2Page}
+              fontSize={fontSize * 0.82}
+              lineHeight={lineHeight * 0.82}
+            />
+          ) : (
+            <Text
+              className="text-charcoal dark:text-neutral-100 text-center"
+              accessibilityLanguage="ar"
+              style={{ fontSize: fontSize * 0.82, lineHeight: lineHeight * 0.82, writingDirection: "rtl" }}
+            >
+              {card.smartPromptContextUthmani}
+            </Text>
+          )}
         </View>
       ) : null}
       {card.smartPromptQcf2 && card.smartPromptUthmani && card.v2Page ? (
@@ -2380,11 +2409,36 @@ function SmartRefsAnswer({
     ? refs.filter((ref) => ref.groupId !== target.groupId || ref.sortOrder !== target.sortOrder)
     : refs;
   const title = card.kind === "similarTail" ? s.smartDeckCorrectTail : s.smartDeckTargetAyah;
+  const headingStyle = {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 11,
+    letterSpacing: 1.1,
+    ...textStartStyle(isRTL),
+    writingDirection: isRTL ? "rtl" : "ltr",
+  } as const;
   return (
-    <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
+    <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: 12 }} nestedScrollEnabled>
+      {card.answerKind === "nextAyah" && card.nextAyah && (
+        <>
+          <Text accessibilityRole="header" className="text-warm-400 dark:text-neutral-500 uppercase" style={headingStyle}>
+            {s.nextAyah}
+          </Text>
+          <SmartRefCard refData={{ ...card.nextAyah, surahNameAr: card.surahName }} fontSize={fontSize} lineHeight={lineHeight} />
+        </>
+      )}
+      {card.answerKind === "surahEnd" && (
+        <Text
+          accessibilityRole="header"
+          className="text-primary-accent dark:text-primary-bright"
+          style={{ ...headingStyle, fontSize: 15, letterSpacing: 0 }}
+        >
+          {endOfSurahText(card, s, isRTL)}
+        </Text>
+      )}
       <Text
-        className="text-warm-400 dark:text-neutral-500 uppercase mb-3"
-        style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+        accessibilityRole="header"
+        className="text-warm-400 dark:text-neutral-500 uppercase"
+        style={headingStyle}
       >
         {title}
       </Text>
@@ -2428,8 +2482,9 @@ function SmartRefsAnswer({
         {card.kind !== "similarTail" && related.length > 0 && (
           <>
             <Text
+              accessibilityRole="header"
               className="text-warm-400 dark:text-neutral-500 uppercase mt-2"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              style={headingStyle}
             >
               {s.smartDeckRelatedAyahs}
             </Text>
@@ -2453,7 +2508,7 @@ function SmartRefCard({
   fontSize,
   lineHeight,
 }: {
-  refData: SmartDeckRef;
+  refData: Pick<SmartDeckRef, "surah" | "ayah" | "surahNameAr" | "textQcf2" | "textUthmani" | "v2Page">;
   fontSize: number;
   lineHeight: number;
 }) {
@@ -2474,7 +2529,13 @@ function SmartRefCard({
           {refData.surahNameAr}
         </Text>
       </View>
-      <Qcf2AyahText textQcf2={refData.textQcf2} textUthmani={refData.textUthmani} v2Page={refData.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={refData.ayah} />
+      {refData.textQcf2 && refData.v2Page ? (
+        <Qcf2AyahText textQcf2={refData.textQcf2} textUthmani={refData.textUthmani} v2Page={refData.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={refData.ayah} />
+      ) : (
+        <Text className="text-charcoal dark:text-neutral-100 text-center" accessibilityLanguage="ar" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
+          {refData.textUthmani}
+        </Text>
+      )}
     </View>
   );
 }
@@ -2891,6 +2952,7 @@ function getSmartPrompt(card: CardData, s: UIStrings): string {
   if (card.kind === "similarTail") return s.smartDeckTailCompletePrompt;
   if (card.kind === "qiraat") return s.smartDeckQiraatPrompt;
   if (card.kind === "asbab") return s.smartDeckReasonsPrompt;
+  if (card.answerKind === "nextAyah" || card.answerKind === "surahEnd") return s.smartDeckNextAyahPrompt;
   return s.smartDeckMutashabihatPrefixPrompt;
 }
 

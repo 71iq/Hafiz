@@ -2,6 +2,7 @@ import retiredCardsFile from "../../assets/data/mutashabihat/nourquran_hafiz_ret
 import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { deleteStudyCardRow } from "@/lib/fsrs/queries";
+import { EXCLUDED_SIMILAR_CARD_IDS } from "@/lib/fsrs/similar-card-exclusions";
 
 /**
  * The similar-verse rows the app ships besides quran.db: exactly the mutashabihat_groups and
@@ -22,27 +23,25 @@ export const MUTASHABIHAT_DATA_VERSION = "a8243922afe594d4";
 export const MUTASHABIHAT_VERSION_SETTING = "device_mutashabihat_data_version";
 
 /**
- * The study card ids of the similar-verse slots (a group id and a sort order) that held a verse in an
- * earlier version of the rows and hold none now, as scripts/build-quran-db.mjs writes them beside the
- * rows file. A ref relabelled to the ayah whose words it holds takes a new sort order, so the card of
- * its old one would stay with nothing to show. The build never gives a listed slot a ref again.
+ * Retired slots never hold a ref again. Excluded cards still have a ref for reader comparisons,
+ * but their answer is already asked by the Similar tails deck. Both use the same sync deletion.
  */
-const RETIRED_SIMILAR_CARDS: ReadonlySet<string> = new Set(retiredCardsFile.cards);
+const CARDS_TO_RETIRE: ReadonlySet<string> = new Set([...retiredCardsFile.cards, ...EXCLUDED_SIMILAR_CARD_IDS]);
 
 export function isRetiredSimilarCard(cardId: string): boolean {
-  return RETIRED_SIMILAR_CARDS.has(cardId);
+  return CARDS_TO_RETIRE.has(cardId);
 }
 
 /**
- * Deletes the live cards among `cardIds` (every retired id by default) whose slot is retired, in the
- * caller's transaction, each with its upload queued (deleteStudyCardRow); no other card is touched.
+ * Deletes live retired or excluded cards among `cardIds` in the caller's transaction, queuing
+ * each deletion for upload (deleteStudyCardRow). With no ids supplied it checks the whole set.
  * A card made on the old rows can reach a device after its refresh, from the account restore or a
  * pull (lib/database/sync.ts), so this runs wherever cards arrive and at every launch. Review logs
  * stay, as for any deleted card. Returns the ids deleted.
  */
 export async function retireSimilarCards(
   db: DatabaseExecutor,
-  cardIds: Iterable<string> = RETIRED_SIMILAR_CARDS,
+  cardIds: Iterable<string> = CARDS_TO_RETIRE,
 ): Promise<string[]> {
   const ids = [...new Set(cardIds)].filter(isRetiredSimilarCard);
   if (ids.length === 0) return [];
@@ -251,7 +250,7 @@ export async function refreshMutashabihatRows(
  * is deleted in its own transaction. Usually there is none, and nothing is written.
  */
 async function retireLiveCards(db: AppDatabase): Promise<string[]> {
-  const ids = [...RETIRED_SIMILAR_CARDS];
+  const ids = [...CARDS_TO_RETIRE];
   if (ids.length === 0) return [];
   const live = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) AS count FROM study_cards WHERE deleted_at IS NULL AND id IN (${ids.map(() => "?").join(", ")})`,
