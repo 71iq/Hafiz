@@ -16,7 +16,7 @@ export const MUTASHABIHAT_ROWS_FILE = "mutashabihat/nourquran_hafiz_rows.json";
  * rows. tests/unit/mutashabihat-data.test.ts checks that they match, so rebuilt rows come with a new
  * version and installed apps refresh to them.
  */
-export const MUTASHABIHAT_DATA_VERSION = "0071dd8f83fae6bc";
+export const MUTASHABIHAT_DATA_VERSION = "a8243922afe594d4";
 
 /** Device-only setting (lib/database/user-settings.ts): the version of the rows this database holds. */
 export const MUTASHABIHAT_VERSION_SETTING = "device_mutashabihat_data_version";

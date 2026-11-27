@@ -36,6 +36,19 @@ type Ref = {
 type Group = { id: string; kind: "similar" | "tail"; cue: string; source: string; sort_order: number };
 type SourceGroup = { id: string; refs?: { surah: unknown; ayah: unknown }[] };
 
+const source = JSON.parse(
+  fs.readFileSync(path.join(ROOT, "assets/data/mutashabihat/nourquran_hafiz.json"), "utf8"),
+) as {
+  similar_groups: SourceGroup[];
+  tail_groups: SourceGroup[];
+};
+const sourceRefs = new Map(
+  [...source.similar_groups, ...source.tail_groups].map((group) => [
+    group.id,
+    (group.refs ?? []).filter((ref) => Number.isInteger(ref.surah) && Number.isInteger(ref.ayah)),
+  ]),
+);
+
 const words = (text: string | null) => (text ?? "").split(/\s+/).filter(Boolean);
 
 const db = new DatabaseSync(path.join(ROOT, "assets/data/quran.db"), { readOnly: true });
@@ -109,18 +122,6 @@ describe("the bundled similar-verse passages", () => {
   });
 
   it("keep each source sort order on its source ayah, give relabelled refs new ones, and leave no group with one verse", () => {
-    const source = JSON.parse(
-      fs.readFileSync(path.join(ROOT, "assets/data/mutashabihat/nourquran_hafiz.json"), "utf8"),
-    ) as {
-      similar_groups: SourceGroup[];
-      tail_groups: SourceGroup[];
-    };
-    const sourceRefs = new Map(
-      [...source.similar_groups, ...source.tail_groups].map((group) => [
-        group.id,
-        (group.refs ?? []).filter((ref) => Number.isInteger(ref.surah) && Number.isInteger(ref.ayah)),
-      ]),
-    );
     const moved: string[] = [];
     const relabelled: string[] = [];
     for (const ref of refs) {
@@ -147,19 +148,31 @@ describe("the bundled similar-verse passages", () => {
     expect(refs.some((ref) => ref.group_id === "nq-sim-7d0576c830de2e" && ref.sort_order === 2)).toBe(false);
 
     const versesPerGroup = new Map<string, Set<string>>();
-    for (const ref of similarRefs) {
+    for (const ref of refs) {
       const set = versesPerGroup.get(ref.group_id) ?? new Set<string>();
       set.add(`${ref.surah}:${ref.ayah}`);
       versesPerGroup.set(ref.group_id, set);
     }
-    const lonely = [...versesPerGroup].filter(([, verses]) => verses.size < 2).map(([id]) => id);
+    const lonely = groups.filter((group) => (versesPerGroup.get(group.id)?.size ?? 0) < 2).map((group) => group.id);
     expect(lonely).toEqual([]);
   });
 
+  it("remove reviewed tail refs after numbering and drop a group when fewer than two verses remain", () => {
+    const { refs_by_group: decisions } = JSON.parse(
+      fs.readFileSync(path.join(ROOT, "scripts/mutashabihat-ref-exclusions.json"), "utf8"),
+    ) as { refs_by_group: Record<string, string[]> };
+    for (const [groupId, excluded] of Object.entries(decisions)) {
+      const original = (sourceRefs.get(groupId) ?? []).map((ref, slot) => [slot, `${ref.surah}:${ref.ayah}`] as const);
+      expect(original.map(([, ayah]) => ayah)).toEqual(expect.arrayContaining(excluded));
+      const remaining = original.filter(([, ayah]) => !excluded.includes(ayah));
+      const keepGroup = new Set(remaining.map(([, ayah]) => ayah)).size >= 2;
+      expect(kinds.has(groupId)).toBe(keepGroup);
+      const shipped = refs.filter((ref) => ref.group_id === groupId);
+      expect(shipped.map((ref) => [ref.sort_order, `${ref.surah}:${ref.ayah}`])).toEqual(keepGroup ? remaining : []);
+    }
+  });
+
   it("list every source sort order left without its ayah as retired, and give no retired slot a ref", () => {
-    const source = JSON.parse(
-      fs.readFileSync(path.join(ROOT, "assets/data/mutashabihat/nourquran_hafiz.json"), "utf8"),
-    ) as { similar_groups: SourceGroup[]; tail_groups: SourceGroup[] };
     const retired = new Set(
       (
         JSON.parse(
@@ -167,27 +180,25 @@ describe("the bundled similar-verse passages", () => {
         ) as { cards: string[] }
       ).cards,
     );
+    const tailIds = new Set(source.tail_groups.map((group) => group.id));
     const cardId = (groupId: string, sortOrder: number) =>
-      `${kinds.get(groupId) === "tail" ? "similar-tail" : "mutashabihat"}:${groupId}:${sortOrder}`;
+      `${tailIds.has(groupId) ? "similar-tail" : "mutashabihat"}:${groupId}:${sortOrder}`;
     const live = new Map(refs.map((ref) => [cardId(ref.group_id, ref.sort_order), `${ref.surah}:${ref.ayah}`]));
     const unlisted: string[] = [];
-    for (const group of [...source.similar_groups, ...source.tail_groups]) {
-      if (!kinds.has(group.id)) continue;
-      const list = (group.refs ?? []).filter((ref) => Number.isInteger(ref.surah) && Number.isInteger(ref.ayah));
+    for (const [groupId, list] of sourceRefs) {
+      if (list.length < 2) continue;
       list.forEach((ref, sortOrder) => {
-        const id = cardId(group.id, sortOrder);
+        const id = cardId(groupId, sortOrder);
         if (live.get(id) !== `${ref.surah}:${ref.ayah}` && !retired.has(id)) unlisted.push(id);
       });
     }
     expect(unlisted).toEqual([]);
     expect([...retired].filter((id) => live.has(id))).toEqual([]);
-    expect(
-      [...retired].filter((id) => !/^(mutashabihat|similar-tail):(.+):\d+$/.test(id) || !kinds.has(id.split(":")[1])),
-    ).toEqual([]);
+    expect([...retired].filter((id) => !/^(mutashabihat|similar-tail):[^:]+:\d+$/.test(id))).toEqual([]);
     expect([...retired]).toEqual(
       expect.arrayContaining(["mutashabihat:nq-sim-6b0cb090bae7db:1", "mutashabihat:nq-sim-7d0576c830de2e:2"]),
     );
-    expect(retired.size).toBe(20);
+    expect(retired.size).toBe(38);
   });
 
   it("are the rows of the rows file the app refreshes from, at the version it expects", () => {
