@@ -128,7 +128,7 @@ function picker() {
   if (!mockPickerProps) throw new Error("Missing actual picker props");
   return mockPickerProps;
 }
-function Wrapper({ children }: React.PropsWithChildren) {
+function Wrapper({ children, ready }: React.PropsWithChildren<{ ready: boolean }>) {
   const window = Dimensions.get("window");
   return (
     <SafeAreaProvider
@@ -137,7 +137,7 @@ function Wrapper({ children }: React.PropsWithChildren) {
         insets: { top: 0, left: 0, bottom: 0, right: 0 },
       }}
     >
-      <OperationNoticeProvider ready>
+      <OperationNoticeProvider ready={ready}>
         <DirectionProvider dir={mockSettings.isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
       </OperationNoticeProvider>
     </SafeAreaProvider>
@@ -169,11 +169,15 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
     if (!found) throw new Error("Missing row for " + sourceId);
     return found;
   }
-  async function open() {
-    const view = render(
-      owner === "settings" ? <SettingsScreen /> : <ReadingSettingsSheet visible onClose={() => undefined} />,
-      { wrapper: Wrapper },
+  function tree(ready: boolean) {
+    return (
+      <Wrapper ready={ready}>
+        {ready && (owner === "settings" ? <SettingsScreen /> : <ReadingSettingsSheet visible onClose={() => undefined} />)}
+      </Wrapper>
     );
+  }
+  async function open() {
+    const view = render(tree(true));
     await act(async () => {});
     fireEvent.press(view.getByText(s.tafseerSourceLabel));
     await act(async () => {});
@@ -264,6 +268,19 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
     await act(async () => pending.reject(new Error("Synthetic offline failure")));
     expect(view.getByText(s.tafsirDownloadOffline)).toBeTruthy();
     expect(view.queryByText(s.tafsirDownloadFailed)).toBeNull();
+  });
+
+  it("retains the failure notice when database recovery removes the inline retry", async () => {
+    const view = await open();
+    fireEvent.press(row(view, download));
+    expectedWarnings = 1;
+    await act(async () => pending.reject(new Error("Synthetic database failure")));
+    expect(view.getByText(s.detailRetry)).toBeTruthy();
+    view.rerender(tree(false));
+    view.rerender(tree(true));
+    await act(async () => {});
+    expect(view.getByText(s.tafseerSourceImportFailed)).toBeTruthy();
+    expect(mockSetSource).not.toHaveBeenCalled();
   });
 
   it("does not select a download that finishes after the picker closed", async () => {

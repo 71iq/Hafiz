@@ -67,6 +67,7 @@ export function TafsirSourcePicker({
   const { importingSource, failedSource, select, cancel } = useTafsirSourceSelection({
     db,
     onSelected,
+    recoveryMessage: s.tafseerSourceImportFailed,
     onError: handleError,
   });
 

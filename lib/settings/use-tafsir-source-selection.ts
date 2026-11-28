@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useInlineOperationNotice, type InlineNoticeAttempt } from "@/components/ui/OperationNoticeProvider";
 import { importTafsirSource } from "@/lib/tafsir/import";
 import type { TafsirSourceId } from "@/lib/tafsir/sources";
 
 type Options = {
   db: Parameters<typeof importTafsirSource>[0];
   onSelected: (sourceId: TafsirSourceId) => void;
+  recoveryMessage: string;
   /** Logs a failure; the picker shows it inline with Retry. */
   onError?: (error: unknown) => void;
 };
@@ -18,46 +20,44 @@ export type TafsirSelectionOutcome = "selected" | "failed" | "superseded";
  * current, so a late import never replaces a newer choice or selects itself after close. The
  * import itself keeps running and stays installed.
  */
-export function useTafsirSourceSelection({ db, onSelected, onError }: Options) {
-  const generation = useRef(0);
+export function useTafsirSourceSelection({ db, onSelected, onError, recoveryMessage }: Options) {
+  const createAttempt = useInlineOperationNotice();
+  const current = useRef<InlineNoticeAttempt | null>(null);
   const [importingSource, setImportingSource] = useState<TafsirSourceId | null>(null);
   const [failedSource, setFailedSource] = useState<TafsirSourceId | null>(null);
 
-  // An owner that unmounts (a screen left mid-download) no longer wants its choice applied.
-  useEffect(
-    () => () => {
-      generation.current += 1;
-    },
-    [],
-  );
+  // Recovery removes the picker and its inline Retry. The notice owner can still report that failure.
+  useEffect(() => () => current.current?.retire(), []);
 
   const cancel = useCallback(() => {
-    generation.current += 1;
+    current.current?.retire("normal");
     setImportingSource(null);
     setFailedSource(null);
   }, []);
 
   const select = useCallback(
     async (sourceId: TafsirSourceId, needsDownload: boolean): Promise<TafsirSelectionOutcome> => {
-      const current = ++generation.current;
-      const isCurrent = () => generation.current === current;
+      current.current?.retire("normal");
+      const attempt = createAttempt();
+      current.current = attempt;
       setFailedSource(null);
       setImportingSource(needsDownload ? sourceId : null);
       try {
         if (needsDownload) await importTafsirSource(db, sourceId);
-        if (!isCurrent()) return "superseded";
+        if (!attempt.isCurrent()) return "superseded";
         onSelected(sourceId);
+        attempt.finish();
         setImportingSource(null);
         return "selected";
       } catch (error) {
         onError?.(error);
-        if (!isCurrent()) return "superseded";
+        if (attempt.report(recoveryMessage) !== "inline") return "superseded";
         setImportingSource(null);
         setFailedSource(sourceId);
         return "failed";
       }
     },
-    [db, onError, onSelected],
+    [createAttempt, db, onError, onSelected, recoveryMessage],
   );
 
   return { importingSource, failedSource, select, cancel };
