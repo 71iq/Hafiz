@@ -305,11 +305,11 @@ describe("reflection state follows active viewer and ayah", () => {
       .mockRejectedValueOnce(new Error("Synthetic page failure"))
       .mockResolvedValueOnce(page(true, false, "retry-row"));
     const view = render(screen());
-    await waitFor(() => expect(view.getByText(strings.en.reflectionLoadMore)).toBeTruthy());
-    fireEvent.press(view.getByText(strings.en.reflectionLoadMore));
+    await waitFor(() => expect(view.getByRole("button", { name: strings.en.reflectionLoadMore })).toBeTruthy());
+    fireEvent.press(view.getByRole("button", { name: strings.en.reflectionLoadMore }));
     await waitFor(() => expect(view.getByText(strings.en.reflectionLoadFailed)).toBeTruthy());
     expect(view.getByTestId("synthetic-post")).toBeTruthy();
-    fireEvent.press(view.getByText(strings.en.reflectionLoadMore));
+    fireEvent.press(view.getByRole("button", { name: strings.en.reflectionLoadMore }));
     await waitFor(() => expect(view.getByTestId("retry-row")).toBeTruthy());
     expect(view.queryByText(strings.en.reflectionLoadFailed)).toBeNull();
   });

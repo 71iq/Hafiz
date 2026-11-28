@@ -289,6 +289,9 @@ function ReflectionsSectionContent({
           {/* Load more */}
           {hasMore && (
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={s.reflectionLoadMore}
+              aria-busy={loadingMore}
               onPress={handleLoadMore}
               disabled={loadingMore}
               className="items-center py-2.5"
