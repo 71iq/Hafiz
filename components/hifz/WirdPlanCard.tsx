@@ -1,63 +1,49 @@
 import { Pressable, View } from "react-native";
-import { BookOpenCheck, ChevronLeft, ChevronRight, Eye, PenLine, Sparkles } from "lucide-react-native";
+import { BookOpenCheck, CheckCircle2, ChevronLeft, ChevronRight, Circle, Eye, Sparkles } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Progress } from "@/components/ui/Progress";
 import { Text } from "@/components/ui/Text";
 import { newMemorizationOpen, type TodayWird } from "@/lib/hifz/pages";
-import { formatLines, formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
+import { formatAyahs, formatCards, formatLines, formatMinutes, formatNumber, formatPages } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { useSettings } from "@/lib/settings/context";
+import type { TodayPart } from "@/lib/study/today";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 
 type Props = {
   wird: TodayWird | null;
-  inboxCount: number;
+  /** Today's parts in order (SPEC 3.3), or null while the daily queue loads. */
+  parts: readonly TodayPart[] | null;
+  /** A daily deck's name, for its part. */
+  deckTitle: (deckId: string) => string;
   /** SBQ-03: chunks memorized earlier today whose second look is due now. */
   secondLooksDue?: number;
   /** When the next of today's second looks opens, while none is due yet. */
   nextLookAt?: Date | null;
-  /** Ayah review: the ayah cards due now, since the plan lists no pages then (UNIT-02). */
-  ayahDue?: number;
-  /** Ayah review: the new ayah cards on offer, shown apart from those due, as extra (ETH-05). */
-  ayahNew?: number;
   language: "en" | "ar";
   isDark: boolean;
   s: UIStrings;
-  onStartReview: () => void;
+  /** Opens memorization: the second look, or more lines once today's are done. */
   onStartMemorize: () => void;
-  onSetup: () => void;
-  onDrill: () => void;
 };
 
 /**
- * Home's wird card (4.3, GOAL-01, GOAL-04): today's pages as recent and long-term counts, new lines,
- * the time left, and a clear "Wird complete" state with nothing more asked. Without a plan it offers
- * setup instead.
+ * Home's Today card (SPEC 3.3, GOAL-01, GOAL-04): today's parts in order, each with what is left or a
+ * check once finished, the pages left and the time they take, and a clear "Wird complete" once the
+ * pages are reviewed. The Study button above it starts the work, so the card has no Start of its own.
+ * Without a plan it says what a plan is; the Set up button sits where the Study button would be.
  */
-export function WirdPlanCard({
-  wird,
-  inboxCount,
-  secondLooksDue = 0,
-  nextLookAt = null,
-  ayahDue = 0,
-  ayahNew = 0,
-  language,
-  isDark,
-  s,
-  onStartReview,
-  onStartMemorize,
-  onSetup,
-  onDrill,
-}: Props) {
+export function WirdPlanCard({ wird, parts, deckTitle, secondLooksDue = 0, nextLookAt = null, language, isDark, s, onStartMemorize }: Props) {
   const { effectiveTheme } = useSettings();
   const dir = language === "ar" ? "rtl" : "ltr";
   const accent = isDark ? "#2dd4bf" : "#0d9488";
   // Teal text under 14 px uses the darker token in light mode.
   const accentText = isDark ? "#2dd4bf" : "#0f766e";
+  const muted = mutedIconColor(effectiveTheme);
 
   if (wird === null) {
     return (
@@ -73,9 +59,6 @@ export function WirdPlanCard({
             <Text dir={dir} variant="caption" style={{ lineHeight: 18 }}>
               {s.hifzSetupBody}
             </Text>
-            <View className="mt-2" style={{ alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}>
-              <Button size="sm" className="h-11" label={s.hifzSetupAction} onPress={onSetup} />
-            </View>
           </View>
         </MirroredRow>
       </Card>
@@ -88,12 +71,20 @@ export function WirdPlanCard({
   const recent = wird.todo.filter((page) => page.tier === "recent").length;
   const longTerm = wird.todo.length - recent;
   const showMemorize = newMemorizationOpen(wird);
-  // Ayah review lists no pages; its work is the ayah cards (Start opens the flashcard session).
-  const ayahMode = wird.plan.unit === "ayah";
   const secondLookLabel =
     secondLooksDue > 1 ? interpolate(s.hifzSecondLooksReady, { n: formatNumber(secondLooksDue, language) }) : s.hifzSecondLookReady;
-  const muted = mutedIconColor(effectiveTheme);
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
+
+  const partLabel = (part: TodayPart) =>
+    part.kind === "review" ? s.studyStepReview : part.kind === "memorize" ? s.studyPartNewLines : deckTitle(part.deckId);
+  const partCount = (part: TodayPart) =>
+    part.kind === "review"
+      ? part.unit === "ayahs"
+        ? formatAyahs(part.count, language)
+        : formatNumber(part.count, language)
+      : part.kind === "memorize"
+        ? formatLines(part.count, language)
+        : formatCards(part.count, language);
 
   // Hand-mirrored alignSelf below pins LTR coordinates; under the RTL tab root it flipped twice.
   return (
@@ -120,7 +111,7 @@ export function WirdPlanCard({
 
       {total > 0 ? <Progress value={(wird.done.length / total) * 100} dir={dir} className="mt-3 h-1" /> : null}
 
-      {!complete ? (
+      {!complete && recent + longTerm > 0 ? (
         <MirroredRow dir={dir} className="mt-3 flex-wrap gap-x-4 gap-y-1">
           {recent > 0 ? (
             <Text dir={dir} variant="caption">
@@ -132,36 +123,51 @@ export function WirdPlanCard({
               {interpolate(s.hifzWirdLongTerm, { n: formatNumber(longTerm, language) })}
             </Text>
           ) : null}
-          {showMemorize ? (
-            // The lines still left of today's allocation, so a finished lesson does not read as work left.
-            <Text dir={dir} variant="caption">
-              {wird.memorizeDoneToday
-                ? s.hifzWirdNewDone
-                : interpolate(s.hifzWirdNew, { lines: formatLines(Math.max(1, wird.newLines - wird.memorizeLinesToday), language) })}
-            </Text>
-          ) : null}
         </MirroredRow>
       ) : null}
 
+      {parts && parts.length > 0 ? (
+        <View className="mt-3" style={{ gap: 6 }}>
+          {parts.map((part) => {
+            const label = partLabel(part);
+            const count = part.done ? null : partCount(part);
+            return (
+              <MirroredRow
+                key={part.kind === "deck" ? part.deckId : part.kind}
+                dir={dir}
+                className="items-center gap-2"
+                accessible
+                accessibilityLabel={count ? `${label}, ${count}` : `${label}, ${s.flashcardsSummaryDone}`}
+              >
+                {part.done ? <CheckCircle2 size={15} color={accent} /> : <Circle size={15} color={muted} />}
+                <Text
+                  dir={dir}
+                  className={`flex-1 ${part.done ? "text-warm-500 dark:text-neutral-400" : "text-charcoal dark:text-neutral-200"}`}
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
+                >
+                  {label}
+                </Text>
+                {count ? (
+                  <Text dir={dir} className="text-warm-600 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                    {count}
+                  </Text>
+                ) : null}
+              </MirroredRow>
+            );
+          })}
+        </View>
+      ) : null}
+
       {wird.todo.length > 0 ? (
-        <Text dir={dir} className="mt-2 text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
+        <Text dir={dir} className="mt-3 text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
           {interpolate(s.hifzPagesLeft, {
             pages: formatPages(wird.todo.length, language),
             minutes: formatMinutes(Math.max(1, Math.round(wird.remainingMinutes)), language),
           })}
         </Text>
-      ) : total === 0 ? (
-        <Text dir={dir} className="mt-2" variant="caption">
-          {ayahMode
-            ? ayahDue > 0
-              ? interpolate(s.hifzAyahModeDue, { n: formatNumber(ayahDue, language) })
-              : s.hifzAyahModeNone
-            : s.hifzNothingDue}
-        </Text>
-      ) : null}
-      {total === 0 && ayahMode && ayahNew > 0 ? (
-        <Text dir={dir} className="mt-1" variant="caption">
-          {interpolate(s.hifzAyahModeNew, { n: formatNumber(ayahNew, language) })}
+      ) : total === 0 && wird.plan.unit !== "ayah" ? (
+        <Text dir={dir} className="mt-3" variant="caption">
+          {s.hifzNothingDue}
         </Text>
       ) : null}
 
@@ -171,36 +177,19 @@ export function WirdPlanCard({
         </Text>
       ) : null}
 
-      {complete ? (
-        // Once the wird is complete, new lines stay on offer but nothing more is pressed on the user.
-        showMemorize ? (
-          <MirroredRow dir={dir} className="mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              // Small text and width, but still a 44 px touch target.
-              className="h-11 border border-warm-300 dark:border-neutral-700"
-              label={wird.memorizeDoneToday ? s.hifzMemorizeMore : s.hifzMemorizeStart}
-              onPress={onStartMemorize}
-            />
-          </MirroredRow>
-        ) : null
-      ) : (
-        // Capped on wide layouts like the rows below, so the buttons line up with them.
-        <View className="mt-4 w-full max-w-md" style={{ gap: 8, alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}>
-          {wird.todo.length > 0 || (ayahMode && ayahDue + ayahNew > 0) ? (
-            <Button label={wird.done.length > 0 ? s.hifzWirdContinue : s.hifzWirdStart} onPress={onStartReview} />
-          ) : null}
-          {showMemorize ? (
-            <Button
-              variant={wird.todo.length > 0 ? "outline" : "default"}
-              className={wird.todo.length > 0 ? "border border-warm-300 dark:border-neutral-700" : undefined}
-              label={wird.memorizeDoneToday ? s.hifzMemorizeMore : s.hifzMemorizeStart}
-              onPress={onStartMemorize}
-            />
-          ) : null}
-        </View>
-      )}
+      {/* Once today's lines are done, more stay on offer, but nothing more is pressed on the user. */}
+      {showMemorize && wird.memorizeDoneToday ? (
+        <MirroredRow dir={dir} className="mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            // Small text and width, but still a 44 px touch target.
+            className="h-11 border border-warm-300 dark:border-neutral-700"
+            label={s.hifzMemorizeMore}
+            onPress={onStartMemorize}
+          />
+        </MirroredRow>
+      ) : null}
 
       {/* SBQ-03: the second look is offered even with a backlog or a complete wird; the memorize screen shows it first. */}
       {secondLooksDue > 0 ? (
@@ -237,28 +226,6 @@ export function WirdPlanCard({
             })}
           </Text>
         </MirroredRow>
-      ) : null}
-
-      {inboxCount > 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={onDrill}
-          className="mt-3 w-full max-w-md min-h-[48px] justify-center rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/15 px-4"
-          style={{ alignSelf: dir === "rtl" ? "flex-end" : "flex-start" }}
-        >
-          <MirroredRow dir={dir} className="items-center justify-between gap-3">
-            <MirroredRow dir={dir} className="flex-shrink items-center gap-2">
-              <PenLine size={15} color={accent} style={{ flexShrink: 0 }} />
-              <Text dir={dir} style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }} className="flex-shrink text-charcoal dark:text-neutral-200">
-                {interpolate(s.hifzInboxCount, { n: formatNumber(inboxCount, language) })}
-              </Text>
-            </MirroredRow>
-            <MirroredRow dir={dir} className="items-center gap-1">
-              <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 13, color: accentText }}>{s.hifzInboxAction}</Text>
-              <Chevron size={16} color={accentText} />
-            </MirroredRow>
-          </MirroredRow>
-        </Pressable>
       ) : null}
     </Card>
   );

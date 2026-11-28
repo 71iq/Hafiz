@@ -18,7 +18,9 @@ import {
 } from "@/lib/habit/queries";
 import { reconcileHabitDaysFromLogs } from "@/lib/habit/reconcile";
 import type { HabitDayRow } from "@/lib/habit/types";
-import { DAY_TALLY_SQL, tallyReviews } from "@/lib/habit/minimum";
+import { dayTallySql, STUDY_RULES_FROM, tallyReviews } from "@/lib/habit/minimum";
+
+const PAGE_PLAN = { studyCounts: false, retentionCounts: false };
 import { countMistakeInbox, readMistakeInbox } from "@/lib/hifz/errors";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
@@ -396,10 +398,25 @@ describe("reconciling wird days from the review log", () => {
   });
 });
 
-describe("SQL day tally (DAY_TALLY_SQL)", () => {
-  const prefixes = ["page:madani15:", "chunk:", "half:", "seam:", "word:", "qiraat:", "asbab:", "2:", "similar:"];
+describe("SQL day tally (dayTallySql)", () => {
+  const prefixes = [
+    "page:madani15:",
+    "chunk:",
+    "half:",
+    "seam:",
+    "word:",
+    "qiraat:",
+    "asbab:",
+    "2:",
+    "similar:",
+    "mutashabihat:2:",
+    "mutashabihat:nq-sim-8b30dec1a07d6e:",
+    "similar-tail:nq-tail-52e3e141729932:",
+  ];
+  // Either side of the date the daily-study rules start.
+  const days = [addDays(STUDY_RULES_FROM, -1), STUDY_RULES_FROM, addDays(STUDY_RULES_FROM, 3)];
 
-  it("matches tallyReviews for any mix of cards and durations", async () => {
+  it("matches tallyReviews for any mix of cards, durations, flags and dates", async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.array(
@@ -411,21 +428,21 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
           { maxLength: 40 },
         ),
         fc.boolean(),
-        async (reviews, studyCounts) => {
+        fc.boolean(),
+        fc.constantFrom(...days),
+        async (reviews, studyCounts, retentionCounts, day) => {
           store.sql.prepare("DELETE FROM study_log").run();
           const insert = store.sql.prepare(
             `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days,
               reviewed_at, local_date, duration_ms) VALUES (?, 3, 2, ?, 1, 1, 0, 1, ?, ?, ?)`,
           );
-          const at = atLocalTime(TODAY, 600).toISOString();
-          for (const review of reviews) insert.run(`${review.prefix}${review.n}`, at, at, TODAY, review.duration);
-          const row = await store.db.getFirstAsync<{ page_units: number; counted_ms: number }>(DAY_TALLY_SQL, [
-            studyCounts ? 1 : 0,
-            TODAY,
-          ]);
+          const at = atLocalTime(day, 600).toISOString();
+          for (const review of reviews) insert.run(`${review.prefix}${review.n}`, at, at, day, review.duration);
+          const options = { studyCounts, retentionCounts };
+          const row = await store.db.getFirstAsync<{ page_units: number; counted_ms: number }>(dayTallySql(options), [day]);
           const expected = tallyReviews(
-            reviews.map((review) => ({ cardId: `${review.prefix}${review.n}`, durationMs: review.duration })),
-            { studyCounts },
+            reviews.map((review) => ({ cardId: `${review.prefix}${review.n}`, durationMs: review.duration, localDate: day })),
+            options,
           );
           expect({ pageUnits: Number(row?.page_units), countedMs: Number(row?.counted_ms) }).toEqual({
             pageUnits: expected.pageUnits,
@@ -433,7 +450,7 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
           });
         },
       ),
-      { numRuns: 60 },
+      { numRuns: 80 },
     );
   });
 
@@ -462,10 +479,10 @@ describe("SQL day tally (DAY_TALLY_SQL)", () => {
         );
         const at = atLocalTime(TODAY, 600).toISOString();
         for (const id of ids) insert.run(id, at, at, TODAY);
-        const row = await store.db.getFirstAsync<{ page_units: number }>(DAY_TALLY_SQL, [0, TODAY]);
+        const row = await store.db.getFirstAsync<{ page_units: number }>(dayTallySql(PAGE_PLAN), [TODAY]);
         const expected = tallyReviews(
-          ids.map((cardId) => ({ cardId, durationMs: 0 })),
-          { studyCounts: false },
+          ids.map((cardId) => ({ cardId, durationMs: 0, localDate: TODAY })),
+          PAGE_PLAN,
         );
         expect(Number(row?.page_units)).toBe(expected.pageUnits);
       }),
@@ -485,7 +502,7 @@ describe("a completed new memorization step 6 (STR-01)", () => {
       .run(cardId, rating, at, at, date, makeupFor);
   }
   const tally = async (day: string) => {
-    const row = await store.db.getFirstAsync<{ memorize_step: number }>(DAY_TALLY_SQL, [0, day]);
+    const row = await store.db.getFirstAsync<{ memorize_step: number }>(dayTallySql(PAGE_PLAN), [day]);
     return Number(row?.memorize_step) > 0;
   };
 

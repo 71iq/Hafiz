@@ -67,7 +67,7 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
   },
   {
     file: "components/mushaf/WordToken.tsx",
-    pattern: /left: -fontSize|right: -fontSize|paddingRight: fontSize|textAlign: "right"/,
+    pattern: /^\s*(?:left: -\(LEFT_INK_EM \* em \+ 1\)|right: -rightGutter|textAlign: "right"),\s*$/,
     reason: "Android ink layer for QCF page glyphs: physical offsets in the font's own geometry inside the reader's fixed LTR word row (RF189).",
   },
   {

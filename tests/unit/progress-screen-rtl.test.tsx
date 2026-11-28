@@ -86,6 +86,10 @@ jest.mock("@/lib/supabase", () => ({
 }));
 
 let mockReviewListener: (() => void) | null = null;
+jest.mock("@/lib/study/resolve", () => ({
+  ...jest.requireActual<typeof import("@/lib/study/resolve")>("@/lib/study/resolve"),
+  resolveStudy: jest.fn(async () => ({ kind: "cards", href: { pathname: "/flashcards/session", params: { scope: "daily" } } })),
+}));
 jest.mock("@/lib/fsrs/review-events", () => ({
   subscribeReviewActivity: (listener: () => void) => {
     mockReviewListener = listener;
@@ -419,8 +423,12 @@ describe("ProgressScreen RTL behavior", () => {
     const view = renderProgress();
     await waitFor(() => expect(view.getByText(strings.ar.progressEmptyTitle)).toBeTruthy());
     expect(view.queryByText(strings.ar.progressRetention)).toBeNull();
-    fireEvent.press(view.getByText(strings.ar.progressStartReviewing));
-    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/flashcards/session" });
+    // The start asks the study resolver (SPEC 3.1); a second press while it resolves opens nothing more.
+    await act(async () => {
+      fireEvent.press(view.getByText(strings.ar.progressStartReviewing));
+      fireEvent.press(view.getByText(strings.ar.progressStartReviewing));
+    });
+    expect(mockRouterPush.mock.calls).toEqual([[{ pathname: "/flashcards/session", params: { scope: "daily" } }]]);
   });
 
   it("shows the Journey row with its completed count under Achievements", async () => {

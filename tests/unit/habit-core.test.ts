@@ -6,7 +6,7 @@ import { findEarnBack } from "@/lib/habit/earn-back";
 import { graceBalance } from "@/lib/habit/grace";
 import { mergeHabitDays } from "@/lib/habit/merge";
 import { isEveOfStreakTier, isStreakMilestone, nextStreakMilestone, streakTier } from "@/lib/habit/milestones";
-import { meetsMinimum, minimumProgress, PAGE_UNITS, tallyReviews } from "@/lib/habit/minimum";
+import { meetsMinimum, minimumProgress, PAGE_UNITS, STUDY_RULES_FROM, tallyReviews } from "@/lib/habit/minimum";
 import { isMakeUpOpen, planSettlement } from "@/lib/habit/settle";
 import { buildHabitSnapshot } from "@/lib/habit/snapshot";
 import { computeStreak, countSteadyWeeks, longestStreak, toDayMap } from "@/lib/habit/streak";
@@ -390,43 +390,71 @@ describe("habit day merge (DB-02)", () => {
 
 describe("minimum wird (STR-01)", () => {
   const minimum = { pages: 1, minutes: 5 };
+  // An ayah plan, where Retention's ayah cards count (SPEC 3.4).
+  const ayahPlan = { studyCounts: false, retentionCounts: true };
+  const pagePlan = { studyCounts: false, retentionCounts: false };
 
   it("counts ten ayah reviews as one page exactly", () => {
     const reviews = Array.from({ length: 10 }, (_, i) => ({ cardId: `2:${i + 1}`, durationMs: null }));
-    const tally = tallyReviews(reviews, { studyCounts: false });
+    const tally = tallyReviews(reviews, ayahPlan);
     expect(tally.pageUnits).toBe(PAGE_UNITS);
     expect(meetsMinimum(tally, minimum)).toBe(true);
-    expect(meetsMinimum(tallyReviews(reviews.slice(1), { studyCounts: false }), minimum)).toBe(false);
+    expect(meetsMinimum(tallyReviews(reviews.slice(1), ayahPlan), minimum)).toBe(false);
   });
 
   it("meets the minimum by time, capping each review at 10 minutes", () => {
-    const idle = tallyReviews([{ cardId: "2:1", durationMs: 4 * 60 * 60_000 }], { studyCounts: false });
+    const idle = tallyReviews([{ cardId: "2:1", durationMs: 4 * 60 * 60_000 }], ayahPlan);
     expect(idle.countedMs).toBe(10 * 60_000);
-    expect(meetsMinimum(tallyReviews([{ cardId: "2:1", durationMs: 299_000 }], { studyCounts: false }), minimum)).toBe(false);
-    expect(meetsMinimum(tallyReviews([{ cardId: "2:1", durationMs: 300_000 }], { studyCounts: false }), minimum)).toBe(true);
+    expect(meetsMinimum(tallyReviews([{ cardId: "2:1", durationMs: 299_000 }], ayahPlan), minimum)).toBe(false);
+    expect(meetsMinimum(tallyReviews([{ cardId: "2:1", durationMs: 300_000 }], ayahPlan), minimum)).toBe(true);
   });
 
-  it("counts meanings only when the user turned that on, and only by time", () => {
-    const words = Array.from({ length: 40 }, (_, i) => ({ cardId: `word:2:255:${i + 1}`, durationMs: 10_000 }));
-    expect(tallyReviews(words, { studyCounts: false })).toEqual({ pageUnits: 0, countedMs: 0, memorizeStep: false });
-    expect(tallyReviews(words, { studyCounts: true })).toEqual({ pageUnits: 0, countedMs: 400_000, memorizeStep: false });
+  it("counts word meanings, qira'at and reasons of revelation like an ayah card, units and time", () => {
+    const study = ["word:2:255:1", "qiraat:2:255", "asbab:2:189"].flatMap((cardId) =>
+      Array.from({ length: 4 }, () => ({ cardId, durationMs: 10_000 })),
+    );
+    expect(tallyReviews(study, pagePlan)).toEqual({ pageUnits: 12 * (PAGE_UNITS / 10), countedMs: 120_000, memorizeStep: false });
+  });
+
+  it("counts Retention's ayah cards only while the plan reviews by ayah, neither units nor time otherwise", () => {
+    const retention = [
+      { cardId: "2:255", durationMs: 60_000 },
+      // The legacy id that restored logs can still carry.
+      { cardId: "mutashabihat:2:255", durationMs: 60_000 },
+    ];
+    expect(tallyReviews(retention, pagePlan)).toEqual({ pageUnits: 0, countedMs: 0, memorizeStep: false });
+    expect(tallyReviews(retention, ayahPlan)).toEqual({ pageUnits: 2 * (PAGE_UNITS / 10), countedMs: 120_000, memorizeStep: false });
+    // A current similar-verse card has a group id, not an ayah, and always counts.
+    expect(tallyReviews([{ cardId: "mutashabihat:nq-sim-8b30dec1a07d6e:0", durationMs: 0 }], pagePlan).pageUnits).toBe(PAGE_UNITS / 10);
+  });
+
+  it("weighs reviews before STUDY_RULES_FROM by the earlier rules, so a past day never changes", () => {
+    const before = addDays(STUDY_RULES_FROM, -1);
+    const words = Array.from({ length: 40 }, (_, i) => ({ cardId: `word:2:255:${i + 1}`, durationMs: 10_000, localDate: before }));
+    expect(tallyReviews(words, { studyCounts: false, retentionCounts: false })).toEqual({ pageUnits: 0, countedMs: 0, memorizeStep: false });
+    expect(tallyReviews(words, { studyCounts: true, retentionCounts: false })).toEqual({ pageUnits: 0, countedMs: 400_000, memorizeStep: false });
+    const ayat = Array.from({ length: 10 }, (_, i) => ({ cardId: `2:${i + 1}`, durationMs: null, localDate: before }));
+    expect(tallyReviews(ayat, pagePlan).pageUnits).toBe(PAGE_UNITS);
+    // The same reviews on the first day of the rules follow them.
+    const onTheDay = ayat.map((review) => ({ ...review, localDate: STUDY_RULES_FROM }));
+    expect(tallyReviews(onTheDay, pagePlan).pageUnits).toBe(0);
   });
 
   it("counts a page card or a finished chunk on its own", () => {
-    expect(meetsMinimum(tallyReviews([{ cardId: "page:madani15:582", durationMs: 0 }], { studyCounts: false }), minimum)).toBe(true);
+    expect(meetsMinimum(tallyReviews([{ cardId: "page:madani15:582", durationMs: 0 }], pagePlan), minimum)).toBe(true);
     // A chunk counts by its share of the page's 15 lines (STR-01): a short second look on 4 lines
     // is not a page, while a chunk that covers the whole page is.
-    expect(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(PAGE_UNITS * 4 / 15);
-    expect(tallyReviews([{ cardId: "chunk:madani15:582:1-15", durationMs: 0 }], { studyCounts: false }).pageUnits).toBe(PAGE_UNITS);
+    expect(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 0 }], pagePlan).pageUnits).toBe(PAGE_UNITS * 4 / 15);
+    expect(tallyReviews([{ cardId: "chunk:madani15:582:1-15", durationMs: 0 }], pagePlan).pageUnits).toBe(PAGE_UNITS);
     // Chunks that together cover a page are exactly one page, whatever their sizes.
     const coverPage = ["1-4", "5-8", "9-12", "13-15"].map((lines) => ({ cardId: `chunk:madani15:582:${lines}`, durationMs: 30_000 }));
-    expect(tallyReviews(coverPage, { studyCounts: false }).pageUnits).toBe(PAGE_UNITS);
-    expect(meetsMinimum(tallyReviews(coverPage, { studyCounts: false }), minimum)).toBe(true);
+    expect(tallyReviews(coverPage, pagePlan).pageUnits).toBe(PAGE_UNITS);
+    expect(meetsMinimum(tallyReviews(coverPage, pagePlan), minimum)).toBe(true);
     // Halves, seam quarters and ayah tenths stay whole too.
-    expect(tallyReviews([{ cardId: "seam:madani15:582", durationMs: 0 }], { studyCounts: false }).pageUnits * 4).toBe(PAGE_UNITS);
-    expect(tallyReviews([{ cardId: "2:255", durationMs: 0 }], { studyCounts: false }).pageUnits * 10).toBe(PAGE_UNITS);
-    expect(meetsMinimum(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 120_000 }], { studyCounts: false }), minimum)).toBe(false);
-    expect(minimumProgress(tallyReviews([{ cardId: "half:madani15:582:a", durationMs: 0 }], { studyCounts: false }), minimum)).toBe(0.5);
+    expect(tallyReviews([{ cardId: "seam:madani15:582", durationMs: 0 }], pagePlan).pageUnits * 4).toBe(PAGE_UNITS);
+    expect(tallyReviews([{ cardId: "2:255", durationMs: 0 }], ayahPlan).pageUnits * 10).toBe(PAGE_UNITS);
+    expect(meetsMinimum(tallyReviews([{ cardId: "chunk:madani15:582:1-4", durationMs: 120_000 }], pagePlan), minimum)).toBe(false);
+    expect(minimumProgress(tallyReviews([{ cardId: "half:madani15:582:a", durationMs: 0 }], pagePlan), minimum)).toBe(0.5);
   });
 });
 

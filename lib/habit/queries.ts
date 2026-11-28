@@ -6,8 +6,8 @@ import { readDhuhrResolver } from "@/lib/prayer/settings";
 import { addDays, datesBetween, deviceTimeZone, diffDays, localDateOf, type LocalDate } from "@/lib/habit/dates";
 import { findEarnBack } from "@/lib/habit/earn-back";
 import { mergeHabitDays } from "@/lib/habit/merge";
-import { DAY_TALLY_SQL, MAKEUP_TALLY_SQL, meetsMinimum, minimumProgress, type WirdTally } from "@/lib/habit/minimum";
-import { readHabitSettings, MAX_PAUSE_DAYS, HABIT_SETTING_KEYS, type HabitSettings } from "@/lib/habit/settings";
+import { dayTallySql, makeUpTallySql, meetsMinimum, minimumProgress, type WirdTally } from "@/lib/habit/minimum";
+import { readHabitSettings, MAX_PAUSE_DAYS, HABIT_SETTING_KEYS, tallyOptionsOf, type HabitSettings } from "@/lib/habit/settings";
 import { planSettlement, type SettlementWrite } from "@/lib/habit/settle";
 import { buildHabitSnapshot, type HabitSnapshot } from "@/lib/habit/snapshot";
 import { canStillMakeUp, computeStreak, toDayMap } from "@/lib/habit/streak";
@@ -156,9 +156,10 @@ export async function readWirdTally(
   db: DatabaseExecutor,
   { day, makeUp, settings }: { day: LocalDate; makeUp: boolean; settings: HabitSettings },
 ): Promise<WirdTally> {
+  const options = tallyOptionsOf(settings);
   const row = await db.getFirstAsync<{ page_units: number; counted_ms: number; memorize_step: number }>(
-    makeUp ? MAKEUP_TALLY_SQL : DAY_TALLY_SQL,
-    [settings.studyCountsTowardMinimum ? 1 : 0, day],
+    makeUp ? makeUpTallySql(options) : dayTallySql(options),
+    [day],
   );
   return { pageUnits: Number(row?.page_units ?? 0), countedMs: Number(row?.counted_ms ?? 0), memorizeStep: Number(row?.memorize_step ?? 0) > 0 };
 }

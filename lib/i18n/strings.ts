@@ -19,6 +19,7 @@ import { audioStrings } from "@/lib/i18n/features/audio";
 import { detailStrings } from "@/lib/i18n/features/detail";
 import { appUpdateStrings } from "@/lib/i18n/features/app-update";
 import { widgetStrings } from "@/lib/i18n/features/widget";
+import { meaningsStrings } from "@/lib/i18n/features/meanings";
 
 export const strings = {
   en: {
@@ -611,6 +612,8 @@ export const strings = {
     smartDeckMutashabihatPrompt: "Recall the similar ayahs for this cue.",
     smartDeckSimilarTailPrompt: "Recall the ayahs with this similar ending.",
     smartDeckMutashabihatPrefixPrompt: "Recall what follows this mutashabih phrase.",
+    smartDeckNextAyahPrompt: "What is the next ayah?",
+    smartDeckSurahEnd: "End of Surah {{surah}}",
     smartDeckTailCompletePrompt: "Complete the ending of this ayah.",
     smartDeckQiraatPrompt: "Recall the qira'at notes for this ayah.",
     smartDeckReasonsPrompt: "Recall the reason of revelation for this ayah.",
@@ -936,6 +939,7 @@ export const strings = {
     ...audioStrings.en,
     ...detailStrings.en,
     ...appUpdateStrings.en,
+    ...meaningsStrings.en,
   },
   ar: {
     appName: "حافظ",
@@ -1476,6 +1480,8 @@ export const strings = {
     smartDeckMutashabihatPrompt: "تذكّر الآيات المتشابهة لهذا الموضع.",
     smartDeckSimilarTailPrompt: "تذكّر الآيات ذات هذه الخاتمة المتشابهة.",
     smartDeckMutashabihatPrefixPrompt: "تذكّر ما يأتي بعد هذا الموضع المتشابه.",
+    smartDeckNextAyahPrompt: "ما الآية التالية؟",
+    smartDeckSurahEnd: "نهاية سورة {{surah}}",
     smartDeckTailCompletePrompt: "أكمل خاتمة هذه الآية.",
     smartDeckQiraatPrompt: "تذكّر ملاحظات القراءات لهذه الآية.",
     smartDeckReasonsPrompt: "تذكّر سبب نزول هذه الآية.",
@@ -1825,6 +1831,7 @@ export const strings = {
     ...audioStrings.ar,
     ...detailStrings.ar,
     ...appUpdateStrings.ar,
+    ...meaningsStrings.ar,
   },
 } as const;
 

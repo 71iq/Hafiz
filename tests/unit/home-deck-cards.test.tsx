@@ -18,6 +18,11 @@ import { toArabicNumber } from "@/lib/arabic";
 import { consumePendingDeepLink } from "@/lib/deep-link";
 import { clearAuthReturn, peekAuthReturn } from "@/lib/auth/return-origin";
 import type { AchievementUnlock } from "@/lib/achievements/types";
+import { DAILY_SESSION_HREF, loadStudyState, resolveStudy, type StudyState } from "@/lib/study/resolve";
+import { readDailyDeckIds } from "@/lib/study/daily-decks";
+import { addStudyMore, type DailyQueue, type DailyQueueItem } from "@/lib/study/daily-queue";
+import { markFullWirdIfComplete, type HabitOverview } from "@/lib/habit/queries";
+import type { TodayWird } from "@/lib/hifz/pages";
 
 type CardsProps = React.ComponentProps<typeof DeckCardsSheet>;
 type ReviewProps = React.ComponentProps<typeof DeckReviewSettingsSheet>;
@@ -62,9 +67,10 @@ jest.mock("@react-navigation/native", () => {
   const { useEffect } = jest.requireActual<typeof import("react")>("react");
   return { useFocusEffect: (effect: () => void) => useEffect(effect, [effect]) };
 });
+let mockParams: { section?: string } = {};
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockRouterPush, setParams: jest.fn() }),
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockParams,
   useNavigation: () => ({ getState: () => ({ type: "tab" }) }),
   router: { navigate: jest.fn() },
 }));
@@ -136,13 +142,50 @@ jest.mock("@/components/flashcards/SmartDeckFilterSheet", () => ({
   },
 }));
 jest.mock("@/components/SearchCommand", () => ({ SearchCommand: () => null }));
-// The wird card and break sheet have their own tests; this file covers the deck rows.
+// The wird card and break sheet have their own tests; this file covers the header and the deck rows.
+let mockHabit: HabitOverview | null = null;
 jest.mock("@/lib/habit/use-habit-overview", () => ({
-  useHabitOverview: () => ({ overview: null, failed: false, refresh: async () => {} }),
+  useHabitOverview: () => ({ overview: mockHabit, failed: false, refresh: async () => {} }),
 }));
 jest.mock("@/components/habit/HabitBreakSheet", () => ({ HabitBreakSheet: () => null }));
+jest.mock("@/components/habit/WirdStreakCard", () => ({ WirdStreakCard: () => null }));
+let mockWird: TodayWird | null | undefined = undefined;
+let mockInbox = 0;
+let mockLooksDue = 0;
 jest.mock("@/lib/hifz/use-today-wird", () => ({
-  useTodayWird: () => ({ wird: undefined, inboxCount: 0, remediationDue: 0, monthlyCheckDue: false, secondLooksDue: 0, nextLookAt: null, refresh: async () => {} }),
+  useTodayWird: () => ({
+    wird: mockWird,
+    inboxCount: mockInbox,
+    remediationDue: 0,
+    monthlyCheckDue: false,
+    secondLooksDue: mockLooksDue,
+    nextLookAt: null,
+    refresh: async () => {},
+  }),
+}));
+jest.mock("@/lib/habit/queries", () => ({
+  ...jest.requireActual<typeof import("@/lib/habit/queries")>("@/lib/habit/queries"),
+  markFullWirdIfComplete: jest.fn(async () => undefined),
+}));
+jest.mock("@/lib/study/resolve", () => ({
+  ...jest.requireActual<typeof import("@/lib/study/resolve")>("@/lib/study/resolve"),
+  loadStudyState: jest.fn(),
+  resolveStudy: jest.fn(),
+}));
+jest.mock("@/lib/study/daily-decks", () => ({
+  ...jest.requireActual<typeof import("@/lib/study/daily-decks")>("@/lib/study/daily-decks"),
+  readDailyDeckIds: jest.fn(),
+  settleAutomaticDecks: jest.fn(async () => undefined),
+}));
+// The meanings deck's count adds generated candidates over the bundled word tables; here it is the
+// plain deck count, so this file stays on the deck rows.
+jest.mock("@/lib/meanings/candidates", () => ({
+  getMeaningsTodayStats: (db: unknown, settings: unknown) =>
+    jest.requireMock<typeof import("@/lib/fsrs/queries")>("@/lib/fsrs/queries").getDeckTodayStats(db as never, "meanings", settings as never),
+}));
+jest.mock("@/lib/study/daily-queue", () => ({
+  ...jest.requireActual<typeof import("@/lib/study/daily-queue")>("@/lib/study/daily-queue"),
+  addStudyMore: jest.fn(async () => undefined),
 }));
 jest.mock("@/components/ui/Toast", () => ({ Toast: () => null }));
 jest.mock("@/components/achievements/AchievementUnlockToast", () => ({ AchievementUnlockToast: () => null }));
@@ -169,11 +212,58 @@ function card(view: ReturnType<typeof render>, title: string) {
 function startTarget(view: ReturnType<typeof render>, title: string) {
   return within(card(view, title)).getByLabelText(title);
 }
-async function home() {
+/** Home once loaded, with All decks opened unless the test looks at it closed. */
+async function home({ openDecks = true }: { openDecks?: boolean } = {}) {
   const view = render(<HomeScreen />);
-  await waitFor(() => expect(jest.mocked(getDeckTodayStats)).toHaveBeenCalledTimes(6));
+  await waitFor(() => expect(jest.mocked(loadStudyState)).toHaveBeenCalled());
   await act(async () => {});
+  if (openDecks) {
+    fireEvent.press(view.getByText(strings[mockSettings.uiLanguage].studyAllDecks));
+    await waitFor(() => expect(jest.mocked(getDeckTodayStats)).toHaveBeenCalledTimes(6));
+    await act(async () => {});
+  }
   return view;
+}
+
+/** A page plan with nothing scheduled, enough for the Today card. */
+function pagePlanWird(): TodayWird {
+  return {
+    plan: { unit: "page" },
+    daily: { backlog: false },
+    todo: [],
+    done: [],
+    total: 0,
+    newLines: 0,
+    memorizeLinesToday: 0,
+    memorizeDoneToday: false,
+    remainingMinutes: 0,
+    memorizedPages: 3,
+  } as unknown as TodayWird;
+}
+
+function queueOf(cards: { state: number; virtual?: boolean }[], overrides: Partial<DailyQueue> = {}): DailyQueue {
+  const items = cards.map(
+    ({ state, virtual = false }, index): DailyQueueItem =>
+      ({ card: { id: `card-${index}`, deck_id: SMART_DECK_IDS.mutashabihat, state }, settings: {}, virtual }) as unknown as DailyQueueItem,
+  );
+  return {
+    planCards: [],
+    cards: items,
+    heldBack: 0,
+    streakCards: 10,
+    baseBudget: 20,
+    budget: 20,
+    studiedToday: 0,
+    deckIds: [SMART_DECK_IDS.mutashabihat, SMART_DECK_IDS.similarTails, MEANINGS_DECK_ID],
+    perDeck: items.length > 0 ? { [SMART_DECK_IDS.mutashabihat]: items.length } : {},
+    studiedPerDeck: {},
+    leftAtBase: items.length,
+    ...overrides,
+  };
+}
+
+function habitOverview(doneToday: boolean, minimumProgressToday: number): HabitOverview {
+  return { streak: { doneToday, makeUpPending: false }, minimumProgressToday, days: [], today: "2026-11-25", settings: { showZayt: false } } as unknown as HabitOverview;
 }
 function width(value: number) {
   jest.mocked(useWindowDimensions).mockReturnValue({ width: value, height: 900, scale: 1, fontScale: 1 });
@@ -181,6 +271,23 @@ function width(value: number) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockParams = {};
+  mockHabit = null;
+  mockWird = undefined;
+  mockInbox = 0;
+  mockLooksDue = 0;
+  jest.mocked(loadStudyState).mockResolvedValue({
+    step: { kind: "home", reason: "no_plan" },
+    queue: null,
+    remediationDue: 0,
+    memorizeOpen: false,
+    secondLooksDue: 0,
+    planLeft: 0,
+  });
+  jest.mocked(resolveStudy).mockResolvedValue({ kind: "home", reason: "no_plan" });
+  jest
+    .mocked(readDailyDeckIds)
+    .mockResolvedValue([SMART_DECK_IDS.mutashabihat, SMART_DECK_IDS.similarTails, MEANINGS_DECK_ID]);
   mockCards = undefined;
   mockReview = undefined;
   mockFilter = undefined;
@@ -382,22 +489,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(stop).toHaveBeenCalledTimes(1);
     expect(cards()).toMatchObject({ visible: true, deckId: SMART_DECK_IDS.retention });
   });
-  it("heads the dashboard with what the deck rows offer and starts Review all over every deck", async () => {
-    jest
-      .mocked(getDeckTodayStats)
-      .mockImplementation(async (_db, id) =>
-        id === MEANINGS_DECK_ID
-          ? { ...vocabStats }
-          : { total: 40, newCount: 4, dueCount: 2, learningCount: 1, reviewCount: 1, heldBack: 6 },
-      );
-    const view = await home();
-    const s = strings[language];
-    // Five smart decks offer 4 new and 2 due each; the vocabulary deck offers 7 new and 11 due. Cards
-    // the daily limit holds back are not offered today, so they stay out of the headline.
-    expect(view.getByText(num(48))).toBeTruthy();
-    fireEvent.press(view.getByText(s.flashcardsStartReview));
-    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/flashcards/session", params: {} });
-  });
   it("says how many due cards wait past today's limit only when the limit holds some back", async () => {
     jest.mocked(getDeckTodayStats).mockImplementation(async (_db, id) =>
       id === SMART_DECK_IDS.retention
@@ -421,8 +512,6 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     const vocab = within(card(view, s.vocabDeckTitle));
     expect(vocab.queryByText(s.homeDeckNothingDue, { includeHiddenElements: true })).toBeNull();
     expect(vocab.queryByText(interpolate(s.deckHeldBackToday, { n: num(0) }), { includeHiddenElements: true })).toBeNull();
-    // The headline is what the rows offer: 5 + 12 from the ayah deck and 7 + 11 from meanings.
-    expect(view.getByText(num(35))).toBeTruthy();
   });
   it("uses the shared phoneLarge breakpoint inclusively and changes layout after resize", async () => {
     width(VIEWPORT_BREAKPOINTS.phoneLarge);
@@ -483,6 +572,158 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
       expect(within(card(view, s.vocabDeckTitle)).getByText(s.vocabDeckSubtitle)).toBeTruthy();
     },
   );
+});
+
+describe.each(["en", "ar"] satisfies ("en" | "ar")[])("the daily study header in %s (SPEC 3.1 to 3.3)", (language) => {
+  const num = (value: number) => (language === "ar" ? toArabicNumber(value) : String(value));
+  const s = strings[language];
+  const state = (step: StudyState["step"], queue: DailyQueue | null): StudyState => ({
+    step,
+    queue,
+    remediationDue: 0,
+    memorizeOpen: false,
+    secondLooksDue: 0,
+    planLeft: 0,
+  });
+  beforeEach(() => {
+    Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar" });
+    jest.replaceProperty(I18nManager, "isRTL", language === "ar");
+    mockWird = pagePlanWird();
+  });
+
+  it("counts the daily list cut at the budget, and Study opens the resolved step at once, once per visit", async () => {
+    const cards = [...Array.from({ length: 7 }, () => ({ state: 2 })), ...Array.from({ length: 5 }, () => ({ state: 0, virtual: true }))];
+    jest.mocked(loadStudyState).mockResolvedValue(state({ kind: "cards", href: DAILY_SESSION_HREF }, queueOf(cards)));
+    const view = await home({ openDecks: false });
+    expect(view.getByText(num(12))).toBeTruthy();
+    expect(view.getByText(interpolate(s.homeDueNew, { due: num(7), new: num(5) }))).toBeTruthy();
+    fireEvent.press(view.getByText(s.studyStart));
+    fireEvent.press(view.getByText(s.studyStart));
+    // The step Home resolved, without another read, and a second tap opens nothing more.
+    expect(resolveStudy).not.toHaveBeenCalled();
+    expect(mockRouterPush.mock.calls).toEqual([[DAILY_SESSION_HREF]]);
+  });
+
+  it("reads Continue once anything was graded today", async () => {
+    mockHabit = habitOverview(false, 0.4);
+    jest.mocked(loadStudyState).mockResolvedValue(state({ kind: "review", href: "/hifz/review" }, queueOf([])));
+    const view = await home({ openDecks: false });
+    expect(view.getByText(s.studyContinue)).toBeTruthy();
+    expect(view.queryByText(s.studyStart)).toBeNull();
+  });
+
+  it("says All done for today only when nothing is left and the minimum is met", async () => {
+    mockHabit = habitOverview(true, 1);
+    jest.mocked(loadStudyState).mockResolvedValue(state({ kind: "home", reason: "done" }, queueOf([])));
+    const view = await home({ openDecks: false });
+    expect(view.getByText(s.studyAllDone)).toBeTruthy();
+    expect(view.queryByText(s.studyStart)).toBeNull();
+    expect(view.queryByText(s.studyContinue)).toBeNull();
+  });
+
+  it("names the shortfall and opens Study more when the budget held cards back", async () => {
+    mockHabit = habitOverview(false, 0.5);
+    jest.mocked(loadStudyState).mockResolvedValue(state({ kind: "home", reason: "done" }, queueOf([], { heldBack: 30 })));
+    const view = await home({ openDecks: false });
+    expect(view.queryByText(s.studyAllDone)).toBeNull();
+    expect(view.getByText(interpolate(s.studyShortfall, { cards: language === "ar" ? "٥ بطاقات" : "5 cards" }))).toBeTruthy();
+    // What one press adds, as on the end screens: one budget of 20, fewer than the 30 held back.
+    expect(view.getByText(interpolate(s.studyMoreAdds, { cards: language === "ar" ? "٢٠ بطاقة" : "20 cards" }))).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(view.getByText(s.studyMore));
+    });
+    expect(addStudyMore).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).toHaveBeenCalledWith(DAILY_SESSION_HREF);
+  });
+
+  it("offers All decks for the shortfall when nothing was held back", async () => {
+    mockHabit = habitOverview(false, 0.5);
+    jest.mocked(loadStudyState).mockResolvedValue(state({ kind: "home", reason: "done" }, queueOf([])));
+    const view = await home({ openDecks: false });
+    expect(view.queryByText(s.studyMore)).toBeNull();
+    expect(view.queryByText(s.smartDeckRetentionTitle)).toBeNull();
+    fireEvent.press(view.getAllByText(s.studyAllDecks)[0]);
+    // The decks are read once All decks opens.
+    expect(await view.findByText(s.smartDeckRetentionTitle)).toBeTruthy();
+    expect(getDeckTodayStats).toHaveBeenCalledTimes(6);
+  });
+
+  it("shows Set up your plan instead of the counter without a plan", async () => {
+    mockWird = null;
+    const view = await home({ openDecks: false });
+    expect(view.queryByText(s.flashcardsDueToday)).toBeNull();
+    fireEvent.press(view.getByText(s.studySetUpPlan));
+    expect(mockRouterPush).toHaveBeenCalledWith("/hifz/setup");
+  });
+
+  it("keeps All decks closed until opened, and the legacy deck link opens it", async () => {
+    const closed = await home({ openDecks: false });
+    expect(closed.queryByText(s.smartDeckRetentionTitle)).toBeNull();
+    // Closed, Home reads no deck counts: the counter comes from the daily queue alone.
+    expect(getDeckTodayStats).not.toHaveBeenCalled();
+    closed.unmount();
+    mockParams = { section: "decks" };
+    const opened = await home({ openDecks: false });
+    expect(await opened.findByText(s.smartDeckRetentionTitle)).toBeTruthy();
+  });
+
+  it("lists the daily decks first, then Retention, then the decks left out, marked Off with a way to the setting", async () => {
+    const view = await home();
+    const order = [
+      s.smartDeckMutashabihatTitle,
+      s.smartDeckSimilarTailsTitle,
+      s.vocabDeckTitle,
+      s.smartDeckRetentionTitle,
+      s.smartDeckQiraatTitle,
+      s.smartDeckReasonsTitle,
+    ];
+    const titles = view
+      .getAllByText(/.+/)
+      .map((node) => node.props.children)
+      .filter((text) => order.includes(text));
+    expect(titles).toEqual(order);
+    expect(within(card(view, s.vocabDeckTitle)).queryByText(s.studyDeckOff)).toBeNull();
+    const qiraat = within(card(view, s.smartDeckQiraatTitle));
+    // Off takes the counts' place: a deck outside daily study has no work waiting.
+    expect(qiraat.queryByText(s.deckCardsFilterNew)).toBeNull();
+    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(s.deckCardsFilterNew)).toBeTruthy();
+    const off = qiraat.getByLabelText(`${s.studyDeckOff}. ${s.studyDeckOffHint}`);
+    fireEvent.press(off, { stopPropagation: jest.fn() });
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/settings",
+      params: { category: "general", section: "daily-study" },
+    });
+  });
+
+  it("marks the full wird by the resolver's own read: new lines with nowhere to go do not hold it, a due second look does", async () => {
+    mockHabit = habitOverview(true, 1);
+    // New lines are open on paper, but the resolver found no page left to memorize.
+    mockWird = { ...pagePlanWird(), newLines: 5, total: 2, done: [{}, {}] } as unknown as TodayWird;
+    jest.mocked(loadStudyState).mockResolvedValue(state({ kind: "home", reason: "done" }, queueOf([])));
+    const view = await home({ openDecks: false });
+    expect(markFullWirdIfComplete).toHaveBeenCalledTimes(1);
+    expect(view.queryByText(s.studyPartNewLines)).toBeNull();
+    view.unmount();
+
+    // A second look came due while Home was behind a session: the resolver sees it even though
+    // Home's wird hook has not refreshed yet.
+    jest.mocked(markFullWirdIfComplete).mockClear();
+    mockLooksDue = 0;
+    jest.mocked(loadStudyState).mockResolvedValue({
+      ...state({ kind: "memorize", href: "/hifz/memorize" }, queueOf([])),
+      secondLooksDue: 1,
+      planLeft: 1,
+    });
+    await home({ openDecks: false });
+    expect(markFullWirdIfComplete).not.toHaveBeenCalled();
+  });
+
+  it("puts the mistakes drill under All decks, counting only marked mistakes", async () => {
+    mockInbox = 3;
+    const view = await home();
+    fireEvent.press(view.getByText(interpolate(s.hifzInboxCount, { n: num(3) })));
+    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/hifz/review", params: { mode: "mistakes" } });
+  });
 });
 
 describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failure in %s", (language) => {

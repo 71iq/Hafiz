@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.18": {
+    en: [
+      "Home has one Study button for today's work, and your widget opens the same. Other decks are under All decks, and Study more goes past the day's cards.",
+      "Word meanings are part of daily study, with a short level check during setup.",
+      "Mutashabihat and Similar tails cards hide only what you need to recall. A card that shows a whole ayah asks for the next one.",
+    ],
+    ar: [
+      "في الصفحة الرئيسية زر دراسة واحد يفتح عمل اليوم، والأداة تفتحه أيضًا. وبقية المجموعات تحت «كل المجموعات»، ويتيح «ادرس المزيد» تجاوز بطاقات اليوم.",
+      "صارت معاني الكلمات جزءًا من الدراسة اليومية، مع اختبار قصير لتحديد المستوى أثناء الإعداد.",
+      "تخفي بطاقات المتشابهات والخواتيم المتشابهة ما عليك تذكّره فقط، والبطاقة التي تعرض آية كاملة تسألك عن الآية التالية.",
+    ],
+  },
   "1.0.17": {
     en: [
       "Setup starts on a lighter pace with fewer cards, shows the juz and surahs you chose at the top, and can add an optional second sitting for review.",

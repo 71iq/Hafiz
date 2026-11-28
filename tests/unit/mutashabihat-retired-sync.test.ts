@@ -12,6 +12,11 @@ import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sql
  * 1 was labelled 2:264 but held 2:265's text; the rows now relabel it to 2:265 at sort order 2, so the
  * card for sort order 1 must not come back. Supabase is mocked; SQLite and the sync queue are real.
  */
+// The account can bring back a duplicate-answer card even though its reference still exists.
+jest.mock("../../assets/data/mutashabihat/nourquran_hafiz_excluded_cards.json", () => ({
+  cards: ["mutashabihat:synthetic-excluded:0"],
+}));
+const EXCLUDED = "mutashabihat:synthetic-excluded:0";
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const OLD = "2026-01-01T00:00:00.000Z";
 const NEW = "2026-02-01T00:00:00.000Z";
@@ -83,7 +88,8 @@ const refs = [
 ] as const;
 const rowsFile = { schema_version: "1.0", version: MUTASHABIHAT_DATA_VERSION, groups, refs };
 
-function remoteCard(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+type CardValues = Record<string, string | number | null>;
+function remoteCard(id: string, overrides: CardValues = {}): CardValues {
   return {
     id,
     deck_id: id.startsWith("mutashabihat:")
@@ -179,25 +185,25 @@ afterEach(async () => {
 });
 
 describe("a retired similar-verse card arriving from the account", () => {
-  it("is deleted when an old account is restored after the launch refresh, its upload queued and its log kept", async () => {
-    mockRows.set("study_cards:restore", [remoteCard(RETIRED), remoteCard(KEPT), remoteCard("2:255")]);
-    mockRows.set("study_log:restore", [remoteLog(RETIRED, "2026-01-10T08:00:00.000Z"), remoteLog(RETIRED, OLD)]);
+  it.each([RETIRED, EXCLUDED])("deletes %s on restore, queues its upload and keeps its log", async (id) => {
+    mockRows.set("study_cards:restore", [remoteCard(id), remoteCard(KEPT), remoteCard("2:255")]);
+    mockRows.set("study_log:restore", [remoteLog(id, "2026-01-10T08:00:00.000Z"), remoteLog(id, OLD)]);
 
     const result = await fullSync(store.db);
 
     expect(result.accountRestored).toBe(true);
-    expect(card(RETIRED)?.deleted_at).toEqual(expect.any(String));
-    expect(queued().map((entry) => [entry.operation, entry.row_id])).toEqual([["DELETE", RETIRED]]);
+    expect(card(id)?.deleted_at).toEqual(expect.any(String));
+    expect(queued().map((entry) => [entry.operation, entry.row_id])).toEqual([["DELETE", id]]);
     // The upload carries the whole card, so the server keeps its schedule with the deletion.
-    expect(JSON.parse(queued()[0].data)).toMatchObject({ id: RETIRED, deck_id: SMART_DECK_IDS.mutashabihat, reps: 3 });
-    expect(logCount(RETIRED)).toBe(2);
+    expect(JSON.parse(queued()[0].data)).toMatchObject({ id, deck_id: SMART_DECK_IDS.mutashabihat, reps: 3 });
+    expect(logCount(id)).toBe(2);
 
     // The next launch finds nothing more to do.
     await refreshMutashabihatRows(store.db, async () => rowsFile);
     expect(queued()).toHaveLength(1);
   });
 
-  it("is deleted when a pull brings it in after the launch refresh, and no later pull brings it back", async () => {
+  it.each([RETIRED, EXCLUDED])("deletes %s on a pull and keeps it deleted across later pulls", async (id) => {
     putSetting(`sync_account_restore_${USER_ID}_20260614_account_restore_v1`, "true");
     putSetting(`sync_initial_backfill_${USER_ID}_20260525_sync_v1`, "true");
     putSetting(`sync_user_settings_backfill_${USER_ID}_20260528_user_settings_v1`, "true");
@@ -205,32 +211,49 @@ describe("a retired similar-verse card arriving from the account", () => {
     putSetting("last_pull_at", OLD);
 
     // A device still on the old data uploads the card after this device's refresh.
-    mockRows.set("study_cards:incremental", [remoteCard(RETIRED)]);
-    mockRows.set("study_log:incremental", [remoteLog(RETIRED, "2026-01-20T08:00:00.000Z")]);
+    mockRows.set("study_cards:incremental", [remoteCard(id)]);
+    mockRows.set("study_log:incremental", [remoteLog(id, "2026-01-20T08:00:00.000Z")]);
     await fullSync(store.db);
-    const deletedAt = card(RETIRED)?.deleted_at as string;
+    const deletedAt = card(id)?.deleted_at as string;
     expect(deletedAt).toEqual(expect.any(String));
-    expect(queued().map((entry) => [entry.operation, entry.row_id])).toEqual([["DELETE", RETIRED]]);
-    expect(logCount(RETIRED)).toBe(1);
+    expect(queued().map((entry) => [entry.operation, entry.row_id])).toEqual([["DELETE", id]]);
+    expect(logCount(id)).toBe(1);
 
     // Reviewed there again after this device deleted it, it comes down live and newer. A pull never
     // makes a deleted card live again, so it stays deleted and there is nothing more to upload.
     const reviewedAgain = minutesAfter(deletedAt, 1);
     mockRows.set("study_cards:incremental", [
-      remoteCard(RETIRED, { updated_at: reviewedAgain, last_review: reviewedAgain, reps: 4, synced_at: reviewedAgain }),
+      remoteCard(id, { updated_at: reviewedAgain, last_review: reviewedAgain, reps: 4, synced_at: reviewedAgain }),
     ]);
     await fullSync(store.db);
-    expect(card(RETIRED)?.deleted_at).toBe(deletedAt);
+    expect(card(id)?.deleted_at).toBe(deletedAt);
     expect(queued()).toHaveLength(1);
 
     // The server's copy of the deletion comes back down: nothing more is queued either.
     const echoed = minutesAfter(reviewedAgain, 1);
     mockRows.set("study_cards:incremental", [
-      remoteCard(RETIRED, { updated_at: echoed, deleted_at: echoed, synced_at: echoed }),
+      remoteCard(id, { updated_at: echoed, deleted_at: echoed, synced_at: echoed }),
     ]);
     await fullSync(store.db);
-    expect(card(RETIRED)?.deleted_at).toEqual(expect.any(String));
+    expect(card(id)?.deleted_at).toEqual(expect.any(String));
     expect(queued()).toHaveLength(1);
+  });
+
+  it("catches a live excluded card on launch when the rows are current and no retired slot is live", async () => {
+    const row = remoteCard(EXCLUDED);
+    const columns = Object.keys(row);
+    store.sql
+      .prepare(`INSERT INTO study_cards (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`)
+      .run(...Object.values(row));
+    const load = jest.fn(async () => rowsFile);
+
+    await expect(refreshMutashabihatRows(store.db, load)).resolves.toEqual({
+      replaced: false,
+      retiredCards: [EXCLUDED],
+    });
+    expect(load).not.toHaveBeenCalled();
+    expect(card(EXCLUDED)?.deleted_at).toEqual(expect.any(String));
+    expect(queued().map((entry) => [entry.operation, entry.row_id])).toEqual([["DELETE", EXCLUDED]]);
   });
 
   it("leaves every live card alone, on kept and relabelled slots and in other decks", async () => {

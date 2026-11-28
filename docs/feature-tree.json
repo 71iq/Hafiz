@@ -409,10 +409,10 @@
       "children": [
         {
           "id": "onboarding.setup",
-          "title": "Hifz setup: goal, tracks, pace, when",
+          "title": "Hifz setup: goal, tracks, word meanings, pace, when",
           "kind": "screen",
           "cases": ["START-02"],
-          "uses": ["hifz.setup.memorized", "reminders.prayer"],
+          "uses": ["hifz.setup.memorized", "hifz.setup.meanings", "reminders.prayer"],
           "native": false,
           "children": []
         },
@@ -421,7 +421,7 @@
           "title": "Save setup and open the first session, or skip",
           "kind": "transition",
           "cases": ["START-04", "START-05"],
-          "uses": ["hifz.review", "hifz.memorize", "review.session", "home"],
+          "uses": ["study.next", "home"],
           "native": false,
           "children": []
         }
@@ -473,10 +473,10 @@
         },
         {
           "id": "home.hifzplan",
-          "title": "Today's hifz plan card",
+          "title": "Today card: parts with what is left, pages left, second look",
           "kind": "widget",
           "cases": ["PLAN-01"],
-          "uses": ["hifz.review", "hifz.memorize", "hifz.review.drills"],
+          "uses": ["study.queue", "hifz.memorize"],
           "native": false,
           "children": []
         },
@@ -526,11 +526,20 @@
           "children": []
         },
         {
-          "id": "home.decks",
-          "title": "Deck cards: start review, configure, card list",
+          "id": "home.study",
+          "title": "Header: daily card count, Study, Study more, All done or the shortfall",
           "kind": "widget",
-          "cases": ["HOME-05", "HOME-06"],
-          "uses": ["review.session", "decks.config", "decks.cards"],
+          "cases": ["HOME-05"],
+          "uses": ["study.next", "study.queue", "home.decks", "hifz.setup"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "home.decks",
+          "title": "All decks: deck cards, Off decks, mistakes drill",
+          "kind": "widget",
+          "cases": ["HOME-06"],
+          "uses": ["review.session", "decks.config", "decks.cards", "settings.dailystudy", "hifz.review.drills"],
           "native": false,
           "children": []
         },
@@ -902,6 +911,52 @@
       ]
     },
     {
+      "id": "study",
+      "title": "Daily study flow",
+      "kind": "group",
+      "cases": [],
+      "uses": [],
+      "native": false,
+      "children": [
+        {
+          "id": "study.next",
+          "title": "Next step of today's study: welcome back, review, memorize, cards or Home",
+          "kind": "transition",
+          "cases": [],
+          "uses": ["hifz.review", "hifz.memorize", "review.session", "study.queue", "home"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "study.queue",
+          "title": "Daily card list cut at the budget, and Study more",
+          "kind": "transition",
+          "cases": [],
+          "uses": ["settings.dailystudy", "wird.minimum"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "study.entry",
+          "title": "Widget and notification taps: kept screens, leave first, one tap at a time",
+          "kind": "transition",
+          "cases": [],
+          "uses": ["study.next", "home", "review.session", "hifz.review", "hifz.memorize"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "study.endscreen",
+          "title": "Session end: Continue, Done for now, Study more or Done",
+          "kind": "widget",
+          "cases": [],
+          "uses": ["study.next", "study.queue"],
+          "native": false,
+          "children": []
+        }
+      ]
+    },
+    {
       "id": "review",
       "title": "Review",
       "kind": "group",
@@ -917,6 +972,15 @@
           "uses": [],
           "native": false,
           "children": [
+            {
+              "id": "review.session.mutashabihat",
+              "title": "Mutashabihat prompts, next ayah and related ayahs from known surahs",
+              "kind": "widget",
+              "cases": ["REVIEW-13"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
             {
               "id": "review.session.grade",
               "title": "Grade Again/Hard/Good/Easy",
@@ -946,10 +1010,10 @@
             },
             {
               "id": "review.session.summary",
-              "title": "Session summary and Done",
+              "title": "Session summary and the next step",
               "kind": "screen",
               "cases": ["REVIEW-11"],
-              "uses": ["wird.sessioncards"],
+              "uses": ["wird.sessioncards", "study.endscreen"],
               "native": false,
               "children": []
             }
@@ -1088,7 +1152,7 @@
           "title": "Tap routing and remind later",
           "kind": "transition",
           "cases": ["REMIND-05"],
-          "uses": ["hifz.review", "review.session"],
+          "uses": ["study.entry"],
           "native": true,
           "children": []
         },
@@ -1097,7 +1161,7 @@
           "title": "Home banner and calendar export",
           "kind": "widget",
           "cases": ["REMIND-06"],
-          "uses": [],
+          "uses": ["study.next"],
           "native": false,
           "children": []
         },
@@ -1161,7 +1225,7 @@
           "title": "Widget tap routing on cold and warm starts",
           "kind": "transition",
           "cases": ["WIDGET-05"],
-          "uses": ["hifz.review", "review.session", "home", "shell.entry"],
+          "uses": ["study.entry", "shell.entry"],
           "native": true,
           "children": []
         },
@@ -1197,6 +1261,24 @@
               "title": "Memorized portion picker: by juz or surah",
               "kind": "widget",
               "cases": ["START-03"],
+              "uses": [],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "hifz.setup.meanings",
+              "title": "Word meanings step: daily switch, two questions, meaning language, starting level",
+              "kind": "widget",
+              "cases": ["START-06"],
+              "uses": ["hifz.setup.levelcheck"],
+              "native": false,
+              "children": []
+            },
+            {
+              "id": "hifz.setup.levelcheck",
+              "title": "Check my level: a word in its ayah, four meanings, up to 12 questions",
+              "kind": "widget",
+              "cases": ["START-07"],
               "uses": [],
               "native": false,
               "children": []
@@ -1297,7 +1379,7 @@
               "title": "Exit confirmation and summary",
               "kind": "screen",
               "cases": ["PLAN-12"],
-              "uses": ["wird.sessioncards", "shared.overlay"],
+              "uses": ["wird.sessioncards", "shared.overlay", "study.endscreen"],
               "native": false,
               "children": []
             }
@@ -1308,7 +1390,7 @@
           "title": "New memorization: new lines",
           "kind": "screen",
           "cases": ["PLAN-08"],
-          "uses": ["wird.minimum", "wird.sessioncards", "wird.zayt", "hifz.setup.repetitions"],
+          "uses": ["wird.minimum", "wird.sessioncards", "wird.zayt", "hifz.setup.repetitions", "study.endscreen"],
           "native": false,
           "children": [
             {
@@ -1366,7 +1448,7 @@
       "title": "Progress",
       "kind": "screen",
       "cases": ["PROGRESS-01", "PROGRESS-05"],
-      "uses": ["shell.nav.destinations"],
+      "uses": ["shell.nav.destinations", "study.next", "settings.dailystudy"],
       "native": false,
       "children": [
         {
@@ -1661,6 +1743,15 @@
           "kind": "widget",
           "cases": ["SET-16"],
           "uses": ["hifz.setup", "wird.zayt"],
+          "native": false,
+          "children": []
+        },
+        {
+          "id": "settings.dailystudy",
+          "title": "Daily study: word meanings, their language and level, qira'at and reasons of revelation",
+          "kind": "widget",
+          "cases": ["SET-23"],
+          "uses": ["settings.general", "hifz.setup.levelcheck"],
           "native": false,
           "children": []
         },

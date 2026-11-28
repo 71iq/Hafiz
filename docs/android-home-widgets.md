@@ -66,19 +66,21 @@ The make-up window has its own dawn, which turns rose from 4 hours before the cu
 
 | State                    | Scene                         | Zayt                                     | Line                                     | Tap                                    |
 | ------------------------ | ----------------------------- | ---------------------------------------- | ---------------------------------------- | -------------------------------------- |
-| Begin                    | Dawn, or night in the evening | Wave, or glowing                         | Start your streak                        | Home                                   |
-| After a lost streak      | Dawn                          | Lonely but hopeful                       | Start again today · Your wird misses you | Wird                                   |
-| Open day                 | By level                      | By level                                 | By level                                 | Wird                                   |
-| Make-up available        | Dawn, then rose, then red     | By level                                 | Make up by the cutoff, then last chance  | Wird                                   |
-| Earning back, open       | By level                      | By level                                 | Earning back: n of 3                     | Wird                                   |
-| Earning back, today done | Sunrise, or gold night        | Arms open                                | Today counts: n of 3                     | Home                                   |
-| Done                     | Gold, or gold night           | Shimmer, or relieved after a late finish | None                                     | Home                                   |
-| Safe, review left        | Gold, or gold night           | Warm smile                               | Review left today                        | Wird                                   |
-| Milestone                | Gold burst                    | Milestone still                          | None, or review left                     | Wird if review remains, otherwise Home |
+| Begin                    | Dawn, or night in the evening | Wave, or glowing                         | Start your streak                        | Study                                  |
+| After a lost streak      | Dawn                          | Lonely but hopeful                       | Start again today · Your wird misses you | Study                                  |
+| Open day                 | By level                      | By level                                 | By level                                 | Study                                  |
+| Make-up available        | Dawn, then rose, then red     | By level                                 | Make up by the cutoff, then last chance  | Study                                  |
+| Earning back, open       | By level                      | By level                                 | Earning back: n of 3                     | Study                                  |
+| Earning back, today done | Sunrise, or gold night        | Arms open                                | Today counts: n of 3                     | Study                                  |
+| Done                     | Gold, or gold night           | Shimmer, or relieved after a late finish | None                                     | Study                                  |
+| Safe, review left        | Gold, or gold night           | Warm smile                               | Review left today                        | Study                                  |
+| Milestone                | Gold burst                    | Milestone still                          | None, or review left                     | Study                                  |
 | Kept                     | Calm                          | Seated                                   | Streak kept for today                    | Home                                   |
 | Paused                   | Calm                          | Seated                                   | Paused until the date                    | Home                                   |
 
 The evening scenes for done and begin start at the evening start or 20:00, whichever comes first. A late finish is one with under 4 hours left before midnight, read from when today's habit day was recorded, or from the review session that earned it when an excuse came first. The widget never displays Quran text, an excuse category or a count of days away. These changes send no notification.
+
+Study opens today's next step, the same one as Home's Study button: the welcome-back review, the plan's review, memorization or a second look, then the daily cards, and Home when nothing is left. The link is `hafiz://widget?to=wird`; Home is `?to=home`. A tap on a session screen whose work would be lost, on onboarding or on plan setup only brings Hafiz forward. From any other pushed screen, including a finished session's summary, the tap first returns to the tabs and then opens the step, so Back lands on Home; a tap that would open the session already on screen, with nothing done there yet, changes nothing. Notification taps follow the same rules (`lib/navigation/entry-route.ts`). MainActivity adds a one-time `launch` number to a fresh widget launch and clears the link of a launch restored from saved state or from Recents, so a launch is acted on once and an old tap never replays.
 
 ## Motion and event ownership
 

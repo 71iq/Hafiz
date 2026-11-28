@@ -1,10 +1,10 @@
 import type { AppDatabase } from "@/lib/database/types";
-import { getAyahReviewsDueToday } from "@/lib/fsrs/queries";
+import { countAyahReviewsDue } from "@/lib/study/daily-queue";
 import { loadTodayWird, type TodayWird } from "@/lib/hifz/pages";
 import { countDueRemediation } from "@/lib/hifz/remediation";
 import { loadReviewLeft } from "@/lib/hifz/review-left";
 
-jest.mock("@/lib/fsrs/queries", () => ({ getAyahReviewsDueToday: jest.fn() }));
+jest.mock("@/lib/study/daily-queue", () => ({ countAyahReviewsDue: jest.fn() }));
 jest.mock("@/lib/hifz/remediation", () => ({ countDueRemediation: jest.fn() }));
 jest.mock("@/lib/hifz/pages", () => ({
   ...jest.requireActual("@/lib/hifz/pages"),
@@ -19,7 +19,7 @@ const wird = (unit: "page" | "ayah", todo: number) =>
 describe("today's review left for the second sitting (REMIND-07)", () => {
   beforeEach(() => {
     jest.mocked(countDueRemediation).mockResolvedValue(0);
-    jest.mocked(getAyahReviewsDueToday).mockResolvedValue(0);
+    jest.mocked(countAyahReviewsDue).mockResolvedValue(0);
   });
 
   it("has nothing without a plan", async () => {
@@ -30,7 +30,7 @@ describe("today's review left for the second sitting (REMIND-07)", () => {
   it("counts an ayah-only plan's ayah reviews due, which have no pages", async () => {
     jest.mocked(loadTodayWird).mockResolvedValue(wird("ayah", 0));
     expect(await loadReviewLeft(db, NOW)).toEqual({ hasPlan: true, left: false });
-    jest.mocked(getAyahReviewsDueToday).mockResolvedValue(4);
+    jest.mocked(countAyahReviewsDue).mockResolvedValue(4);
     expect(await loadReviewLeft(db, NOW)).toEqual({ hasPlan: true, left: true });
   });
 
@@ -41,7 +41,7 @@ describe("today's review left for the second sitting (REMIND-07)", () => {
     expect((await loadReviewLeft(db, NOW)).left).toBe(true);
     // Ayah cards due do not hold back a page plan, as on Home.
     jest.mocked(countDueRemediation).mockResolvedValue(0);
-    jest.mocked(getAyahReviewsDueToday).mockResolvedValue(9);
+    jest.mocked(countAyahReviewsDue).mockResolvedValue(9);
     expect((await loadReviewLeft(db, NOW)).left).toBe(false);
   });
 

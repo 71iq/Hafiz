@@ -46,6 +46,7 @@ import {
   type ProfileSurahProgress,
 } from "@/lib/profile/progress";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
+import { resolveStudy } from "@/lib/study/resolve";
 import { textStartStyle } from "@/lib/ui/direction";
 import { errorIconColor } from "@/lib/ui/theme-icons";
 import { isBoardEnabled } from "@/lib/board/config";
@@ -72,6 +73,21 @@ export default function ProgressScreen() {
   const [boundary, setBoundary] = useState<number | null>(null);
   const latestLoad = useRef(0);
   const focused = useRef(false);
+  /**
+   * The empty state's start: the resolver's next step (SPEC 3.1), or Home when nothing is left. A
+   * second press while it resolves opens nothing more; leaving and returning to Progress allows another.
+   */
+  const starting = useRef(false);
+  const startStudy = useCallback(() => {
+    if (starting.current) return;
+    starting.current = true;
+    resolveStudy(db)
+      .then((step) => (step.kind === "home" ? router.navigate("/(tabs)/home") : router.push(step.href)))
+      .catch((error: unknown) => {
+        console.warn("[Progress] Could not open the next step:", error);
+        starting.current = false;
+      });
+  }, [db]);
   // Home's achievement notice opens this list once through ?achievements=1.
   const { achievements: openAchievements } = useLocalSearchParams<{ achievements?: string }>();
   useEffect(() => {
@@ -121,6 +137,7 @@ export default function ProgressScreen() {
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
+      starting.current = false;
       void loadData();
       return () => {
         focused.current = false;
@@ -304,7 +321,7 @@ export default function ProgressScreen() {
                   >
                     {s.progressEmptyTitle}
                   </Text>
-                  <Button onPress={() => router.push({ pathname: "/flashcards/session" })}>
+                  <Button onPress={startStudy}>
                     <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
                       {s.progressStartReviewing}
                     </Text>

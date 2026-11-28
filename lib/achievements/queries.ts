@@ -113,7 +113,9 @@ async function applyAchievementEvent(db: AchievementScope, event: AchievementEve
       await unlockIfProgressReached(db, "public_reflections_10", event.createdAt, notify);
       break;
     case "vocab_saved":
-      await backfillVocabAchievements(db, notify);
+      // SPEC 3.6: only a word the user saves unlocks this, never a generated daily-study card.
+      await upsertProgress(db, "first_vocab_saved", 1, 1, { cardId: event.cardId });
+      await unlockAchievement(db, "first_vocab_saved", event.createdAt, { cardId: event.cardId }, { cardId: event.cardId }, notify);
       break;
     case "mutashabih_pair_reviewed":
       await upsertProgress(db, "first_mutashabih_pair", 1, 1, { pairId: event.pairId });
@@ -138,7 +140,7 @@ async function backfillAllAchievements(db: AchievementScope, notify: UnlockSink)
   await backfillCompletionAchievements(db, notify);
   await backfillPrivateNoteAchievements(db, notify);
   await backfillReflectionAchievements(db, notify);
-  await backfillVocabAchievements(db, notify);
+  await backfillVocabAchievements(db);
 }
 
 export async function getAchievementDashboard(db: AppDatabase): Promise<AchievementDashboard> {
@@ -193,6 +195,12 @@ export async function getRecentUnlocks(
     .filter((row) => activeIds.has(row.achievement_id))
     .slice(0, limit)
     .map(rowToUnlock);
+}
+
+/** Whether an achievement is unlocked on this device, locally or from a synced unlock. */
+export async function isAchievementUnlocked(db: DatabaseExecutor, achievementId: string): Promise<boolean> {
+  const row = await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM achievement_unlocks WHERE achievement_id = ?", [achievementId]);
+  return (row?.n ?? 0) > 0;
 }
 
 /** Unseen unlocks of active achievements, newest first (at most ten), for Home's notice queue. */
@@ -439,18 +447,15 @@ async function backfillReflectionAchievements(db: AchievementScope, notify: Unlo
   }
 }
 
-async function backfillVocabAchievements(db: AchievementScope, notify: UnlockSink): Promise<void> {
-  const countRow = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_cards WHERE id LIKE 'word:%' AND deleted_at IS NULL"
-  );
-  const count = countRow?.count ?? 0;
-  await upsertProgress(db, "first_vocab_saved", Math.min(count, 1), 1);
-  if (count > 0) {
-    const first = await db.getFirstAsync<{ id: string; created_at: string }>(
-      "SELECT id, created_at FROM study_cards WHERE id LIKE 'word:%' AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 1"
-    );
-    await unlockAchievement(db, "first_vocab_saved", first?.created_at ?? new Date().toISOString(), { cardId: first?.id }, { cardId: first?.id }, notify);
-  }
+/**
+ * SPEC 3.6: daily study now creates word cards too, so word rows no longer show a saved word. The
+ * badge comes only from the vocab_saved event, which writes the progress and the unlock together.
+ * The backfill unlocks nothing: it sets the progress from the unlocks on this device, local or
+ * synced. Progress rows survive an account restore, so unlocking from them would hand the previous
+ * person's badge to the account just restored.
+ */
+async function backfillVocabAchievements(db: AchievementScope): Promise<void> {
+  await upsertProgress(db, "first_vocab_saved", db.unlocked.has("first_vocab_saved") ? 1 : 0, 1);
 }
 
 async function upsertProgress(

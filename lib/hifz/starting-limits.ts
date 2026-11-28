@@ -1,5 +1,5 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
-import { putDeckReviewSettings, readDeckReviewSettings } from "@/lib/fsrs/queries";
+import { MEANINGS_DECK_ID, putDeckReviewSettings, readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { SMART_DECK_IDS, type SmartDeckId } from "@/lib/fsrs/smart-decks";
 import {
   DECK_DAILY_REVIEW_LIMIT_STEP,
@@ -16,16 +16,40 @@ type Tier = Readonly<{
   mutashabihatNew: number;
   similarTailsNew: number;
   dailyReviewLimit: number;
+  /** New word-meaning cards a day (SPEC 3.6). Unlike the others, setup writes it on every save. */
+  meaningsNew: number;
 }>;
 
-// Starting numbers by daily minutes. Qira'at and asbab start with no new cards; the person raises
-// them in the deck settings when they want them.
-const SHORT: Tier = { retentionNew: 5, mutashabihatNew: 0, similarTailsNew: 0, dailyReviewLimit: 10 };
-const MEDIUM: Tier = { retentionNew: 10, mutashabihatNew: 5, similarTailsNew: 0, dailyReviewLimit: 20 };
-const LONG: Tier = { retentionNew: 15, mutashabihatNew: 5, similarTailsNew: 5, dailyReviewLimit: 30 };
+// Starting numbers by daily minutes. Qira'at and Reasons of revelation are left at the deck defaults:
+// they are off unless the user is a full hafiz or turns them on (SPEC 3.7), and writing 0 here made a
+// deck turned on later offer nothing.
+const SHORT: Tier = { retentionNew: 5, mutashabihatNew: 0, similarTailsNew: 0, dailyReviewLimit: 10, meaningsNew: 5 };
+const MEDIUM: Tier = { retentionNew: 10, mutashabihatNew: 5, similarTailsNew: 0, dailyReviewLimit: 20, meaningsNew: 5 };
+const LONG: Tier = { retentionNew: 15, mutashabihatNew: 5, similarTailsNew: 5, dailyReviewLimit: 30, meaningsNew: 10 };
+
+function tierOf(plan: Pick<HifzPlan, "dailyBudgetMin">): Tier {
+  return plan.dailyBudgetMin <= 10 ? SHORT : plan.dailyBudgetMin <= 30 ? MEDIUM : LONG;
+}
 
 function onStep(value: number, step: number, min: number): number {
   return Math.max(min, Math.round(value / step) * step);
+}
+
+/** The meanings deck's new-card limit for a pace: 5, 5 or 10 for the short, medium and long tiers. */
+export function meaningsRateFor(plan: Pick<HifzPlan, "dailyBudgetMin">): number {
+  return onStep(tierOf(plan).meaningsNew, DECK_NEW_CARD_LIMIT_STEP, MIN_DECK_NEW_CARD_LIMIT);
+}
+
+/**
+ * SPEC 3.6: every setup save sets the meanings rate from the pace, plan edits included, keeping the
+ * deck's review limit. A rate the deck already has, stored or the unstored default of five, is not
+ * written again, so the save adds no sync row for it.
+ */
+export async function writeMeaningsRate(db: DatabaseExecutor, plan: Pick<HifzPlan, "dailyBudgetMin">): Promise<void> {
+  const rate = meaningsRateFor(plan);
+  const settings = await readDeckReviewSettings(db, MEANINGS_DECK_ID);
+  if (settings.newCardsLimit === rate) return;
+  await putDeckReviewSettings(db, MEANINGS_DECK_ID, { ...settings, newCardsLimit: rate });
 }
 
 /**
@@ -35,8 +59,8 @@ function onStep(value: number, step: number, min: number): number {
  */
 export function startingDeckLimits(
   plan: Pick<HifzPlan, "dailyBudgetMin">,
-): Readonly<Record<SmartDeckId, StartingDeckLimit>> {
-  const tier = plan.dailyBudgetMin <= 10 ? SHORT : plan.dailyBudgetMin <= 30 ? MEDIUM : LONG;
+): Readonly<Partial<Record<SmartDeckId, StartingDeckLimit>>> {
+  const tier = tierOf(plan);
   const daily = onStep(tier.dailyReviewLimit, DECK_DAILY_REVIEW_LIMIT_STEP, MIN_DECK_DAILY_REVIEW_LIMIT);
   const limit = (newCards: number): StartingDeckLimit => ({
     newCardsLimit: onStep(newCards, DECK_NEW_CARD_LIMIT_STEP, MIN_DECK_NEW_CARD_LIMIT),
@@ -46,8 +70,6 @@ export function startingDeckLimits(
     [SMART_DECK_IDS.retention]: limit(tier.retentionNew),
     [SMART_DECK_IDS.mutashabihat]: limit(tier.mutashabihatNew),
     [SMART_DECK_IDS.similarTails]: limit(tier.similarTailsNew),
-    [SMART_DECK_IDS.qiraat]: limit(0),
-    [SMART_DECK_IDS.reasonsOfRevelation]: limit(0),
   };
 }
 
@@ -65,6 +87,7 @@ export async function writeStartingDeckLimits(
   if (hadPlan) return;
   if (await db.getFirstAsync("SELECT 1 FROM study_log LIMIT 1")) return;
   for (const [deckId, limits] of Object.entries(startingDeckLimits(plan))) {
+    if (!limits) continue;
     const stored = await db.getFirstAsync("SELECT 1 FROM user_settings WHERE key = ?", [`review_settings_${deckId}`]);
     if (stored) continue;
     await putDeckReviewSettings(db, deckId, { ...(await readDeckReviewSettings(db, deckId)), ...limits });

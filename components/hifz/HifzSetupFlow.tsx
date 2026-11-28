@@ -3,8 +3,17 @@ import { AccessibilityInfo, BackHandler, KeyboardAvoidingView, Platform, Pressab
 import { Minus, Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { MirroredRow } from "@/components/ui/MirroredRow";
-import { Switch, SwitchRow, SwitchTrack } from "@/components/ui/Switch";
+import { SwitchRow, SwitchTrack } from "@/components/ui/Switch";
 import { Text } from "@/components/ui/Text";
+import { SetupOptionCard } from "@/components/hifz/SetupOptionCard";
+import {
+  initialMeaningsDraft,
+  loadStoredMeanings,
+  MeaningsSetupStep,
+  meaningsSetupOf,
+  type MeaningsDraft,
+  type StoredMeanings,
+} from "@/components/hifz/MeaningsSetupStep";
 import { MemorizedPortionPicker, type PortionMode, type SurahChoice } from "@/components/hifz/MemorizedPortionPicker";
 import type { AppDatabase } from "@/lib/database/types";
 import { applyHifzSetup } from "@/lib/hifz/setup";
@@ -48,9 +57,9 @@ import { VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
 import { createPrayerTimesLookup, type PrayerLocation } from "@/lib/prayer/times";
 
 type Goal = "memorize" | "keep" | "both";
-type Step = "goal" | "memorized" | "tracks" | "pace" | "when";
+type Step = "goal" | "memorized" | "tracks" | "meanings" | "pace" | "when";
 
-const STEPS: readonly Step[] = ["goal", "memorized", "tracks", "pace", "when"];
+const STEPS: readonly Step[] = ["goal", "memorized", "tracks", "meanings", "pace", "when"];
 const PRESETS: readonly PlanPreset[] = ["part_time_beginner", "part_time_adult", "full_time", "maintenance", "short_surahs"];
 
 /** The wizard's column width on every screen; onboarding and Settings both open it at this width. */
@@ -112,28 +121,10 @@ type StepEntry = Readonly<{
   juz: Set<number>;
   /** The unit chosen on the tracks step, so skipping that step does not leave its choice behind. */
   chosenUnit: HifzPlan["unit"];
+  meanings: MeaningsDraft;
+  /** Whether the word-meaning choices had been changed, so skipping that step does not save them. */
+  meaningsTouched: boolean;
 }>;
-
-function OptionCard({ title, hint, selected, onPress }: { title: string; hint?: string; selected: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      className={`min-h-[56px] justify-center rounded-3xl px-4 py-3 ${selected ? "bg-primary-accent/10 dark:bg-primary-bright/15 border border-primary-accent dark:border-primary-bright" : "bg-surface-low dark:bg-surface-dark-low border border-transparent"}`}
-    >
-      <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className={selected ? "text-primary-muted dark:text-primary-bright" : "text-charcoal dark:text-neutral-100"}>
-        {title}
-      </Text>
-      {hint ? (
-        // Readable on the selected teal tint in both themes; the shared caption tone is lighter.
-        <Text variant="caption" className="mt-0.5 text-warm-700 dark:text-neutral-400" style={{ lineHeight: 18 }}>
-          {hint}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
 
 /** A count with 44 px fewer and more buttons; the pair mirrors in RTL like the reading steppers. */
 function CountStepper({
@@ -235,19 +226,19 @@ function MemorizeRepetitionsSection({
         </Text>
       </View>
       <View accessibilityRole="radiogroup" accessibilityLabel={s.hifzRepsTitle} style={{ gap: 10 }}>
-        <OptionCard
+        <SetupOptionCard
           title={s.hifzRepsLookingThenMemory}
           hint={s.hifzRepsLookingThenMemoryHint}
           selected={choice === "looking_then_memory"}
           onPress={() => choosePreset("looking_then_memory")}
         />
-        <OptionCard
+        <SetupOptionCard
           title={s.hifzRepsTwentyTimes}
           hint={s.hifzRepsTwentyTimesHint}
           selected={choice === "twenty_times"}
           onPress={() => choosePreset("twenty_times")}
         />
-        <OptionCard title={s.hifzRepsCustom} hint={s.hifzRepsCustomHint} selected={choice === "custom"} onPress={() => setCustomOpen(true)} />
+        <SetupOptionCard title={s.hifzRepsCustom} hint={s.hifzRepsCustomHint} selected={choice === "custom"} onPress={() => setCustomOpen(true)} />
       </View>
       {choice === "custom" ? (
         <View className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-2" style={{ gap: 8 }}>
@@ -332,8 +323,9 @@ type Props = {
 };
 
 /**
- * Hifz setup (5.1 steps 2 to 6): goal, memorized portion, review tracks (UNIT-02), pace (4.3.2)
- * and the time anchor (ANC-01). Every step can be skipped with sensible defaults (ONB-06).
+ * Hifz setup (5.1 steps 2 to 6): goal, memorized portion, review tracks (UNIT-02), word meanings
+ * (SPEC 3.6), pace (4.3.2) and the time anchor (ANC-01). Every step can be skipped with sensible
+ * defaults (ONB-06).
  */
 export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, onCancel }: Props) {
   const dir = language === "ar" ? "rtl" : "ltr";
@@ -366,11 +358,34 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
   const [reviewAnchor, setReviewAnchor] = useState<ReminderAnchor | null>(null);
   const savedReview = useRef<ReminderAnchor | null | undefined>(undefined);
   const reviewTouched = useRef(false);
+  // SPEC 3.6: the word-meaning choices start from the stored settings once they load. A failed load
+  // leaves them unsaved unless the user changes the step.
+  const { fontSize, lineHeight } = useSettings();
+  const [meanings, setMeanings] = useState<MeaningsDraft>(() => initialMeaningsDraft(null));
+  const [storedMeanings, setStoredMeanings] = useState<StoredMeanings | null>(null);
+  const meaningsTouched = useRef(false);
+  const changeMeanings = (update: (draft: MeaningsDraft) => MeaningsDraft) => {
+    meaningsTouched.current = true;
+    setMeanings(update);
+  };
+  // The level check opens below the fold on a phone, so what the level choice shows is scrolled into
+  // view. measureLayout against the step's wrapper, whose own place in the scroll content onLayout gives.
+  const meaningsStepRef = useRef<View>(null);
+  const meaningsStepY = useRef(0);
+  const revealInMeanings = useCallback((target: View | null) => {
+    const wrapper = meaningsStepRef.current;
+    if (!target || !wrapper) return;
+    target.measureLayout(
+      wrapper as never,
+      (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, meaningsStepY.current + y - 12), animated: true }),
+      () => {},
+    );
+  }, []);
   const step = STEPS[stepIndex];
   // What the current step showed when it opened, so "Not now" can leave it untouched.
   const stepEntry = useRef<StepEntry | null>(null);
   const goToStep = (index: number) => {
-    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit };
+    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit, meanings, meaningsTouched: meaningsTouched.current };
     setStepIndex(index);
   };
 
@@ -422,6 +437,20 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
     };
   }, [db]);
 
+  useEffect(() => {
+    let active = true;
+    loadStoredMeanings(db)
+      .then((stored) => {
+        if (!active) return;
+        setStoredMeanings(stored);
+        if (!meaningsTouched.current) setMeanings(initialMeaningsDraft(stored));
+      })
+      .catch((loadError) => console.warn("[HifzSetup] Word meaning settings failed to load:", loadError));
+    return () => {
+      active = false;
+    };
+  }, [db]);
+
   // The optional prayer-times row says whether a location is already saved on this device.
   useEffect(() => {
     if (step !== "when") return;
@@ -441,9 +470,9 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
       onCancel?.();
       return;
     }
-    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit };
+    stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit, meanings, meaningsTouched: meaningsTouched.current };
     setStepIndex(stepIndex - 1);
-  }, [chosenUnit, onCancel, plan, preset, selectedJuz, selectedSurahs, stepIndex]);
+  }, [chosenUnit, meanings, onCancel, plan, preset, selectedJuz, selectedSurahs, stepIndex]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -482,6 +511,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         memorizedSurahs: [...selectedSurahs],
         memorizedJuz: [...selectedJuz],
         ...(reviewChanged ? { reviewAnchor } : {}),
+        ...(storedMeanings || meaningsTouched.current ? { meanings: meaningsSetupOf(meanings, storedMeanings, language) } : {}),
       });
       if (reviewChanged) savedReview.current = reviewAnchor;
       onDone({
@@ -516,8 +546,14 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
       setSelectedSurahs(entry.surahs);
       setSelectedJuz(entry.juz);
       setChosenUnit(entry.chosenUnit);
+      // An untouched step shows the stored choices, which may have loaded after this snapshot was taken.
+      const restoredMeanings = entry.meaningsTouched ? entry.meanings : initialMeaningsDraft(storedMeanings);
+      setMeanings(restoredMeanings);
+      meaningsTouched.current = entry.meaningsTouched;
+      stepEntry.current = { ...entry, meanings: restoredMeanings };
+    } else {
+      stepEntry.current = { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit, meanings, meaningsTouched: meaningsTouched.current };
     }
-    stepEntry.current = entry ? { ...entry } : { plan, preset, surahs: selectedSurahs, juz: selectedJuz, chosenUnit };
     setStepIndex(stepIndex + 1);
   };
 
@@ -536,6 +572,8 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
         return s.hifzMemorizedTitle;
       case "tracks":
         return s.hifzTracksTitle;
+      case "meanings":
+        return s.meaningsStepTitle;
       case "pace":
         return s.hifzPaceTitle;
       case "when":
@@ -583,9 +621,9 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
 
         {step === "goal" ? (
           <View accessibilityRole="radiogroup" accessibilityLabel={title} style={{ gap: 10 }}>
-            <OptionCard title={s.hifzGoalMemorize} selected={goal === "memorize"} onPress={() => chooseGoal("memorize")} />
-            <OptionCard title={s.hifzGoalKeep} selected={goal === "keep"} onPress={() => chooseGoal("keep")} />
-            <OptionCard title={s.hifzGoalBoth} selected={goal === "both"} onPress={() => chooseGoal("both")} />
+            <SetupOptionCard title={s.hifzGoalMemorize} selected={goal === "memorize"} onPress={() => chooseGoal("memorize")} />
+            <SetupOptionCard title={s.hifzGoalKeep} selected={goal === "keep"} onPress={() => chooseGoal("keep")} />
+            <SetupOptionCard title={s.hifzGoalBoth} selected={goal === "both"} onPress={() => chooseGoal("both")} />
           </View>
         ) : null}
 
@@ -631,7 +669,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                   ["ayah", s.hifzUnitAyah, s.hifzUnitAyahHint],
                 ] as const
               ).map(([unit, label, hint]) => (
-                <OptionCard
+                <SetupOptionCard
                   key={unit}
                   title={label}
                   hint={hint}
@@ -649,21 +687,27 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
                 {s.hifzUnitSwitchKeepsSchedule}
               </Text>
             ) : null}
-            <MirroredRow dir={dir} className="mt-2 items-center justify-between gap-3 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
-              <View className="flex-1">
-                <Text dir={dir} style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }} className="text-charcoal dark:text-neutral-100">
-                  {s.hifzReviewMeanings}
-                </Text>
-                <Text dir={dir} variant="caption">
-                  {s.hifzTracksMeaningsHint}
-                </Text>
-              </View>
-              <Switch
-                accessibilityLabel={s.hifzReviewMeanings}
-                value={plan.meanings}
-                onValueChange={(meanings) => setPlan((value) => ({ ...value, meanings }))}
-              />
-            </MirroredRow>
+          </View>
+        ) : null}
+
+        {step === "meanings" ? (
+          <View
+            ref={meaningsStepRef}
+            onLayout={(event) => {
+              meaningsStepY.current = event.nativeEvent.layout.y;
+            }}
+          >
+            <MeaningsSetupStep
+              db={db}
+              draft={meanings}
+              stored={storedMeanings}
+              onChange={changeMeanings}
+              language={language}
+              fontSize={fontSize}
+              lineHeight={lineHeight}
+              s={s}
+              onReveal={revealInMeanings}
+            />
           </View>
         ) : null}
 
@@ -671,7 +715,7 @@ export function HifzSetupFlow({ db, language, isDark, s, initialPlan, onDone, on
           <View style={{ gap: 10 }}>
             <View accessibilityRole="radiogroup" accessibilityLabel={s.hifzPaceTitle} style={{ gap: 10 }}>
               {PRESETS.filter((candidate) => (goal === "keep" ? candidate === "maintenance" : candidate !== "maintenance")).map((candidate) => (
-                <OptionCard
+                <SetupOptionCard
                   key={candidate}
                   title={presetLabel(candidate, s)}
                   hint={

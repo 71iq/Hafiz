@@ -1,6 +1,7 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import type { WordRef } from "./context";
 import { enqueueSync } from "@/lib/database/sync-queue";
+import { ayahGlyphs, mushafWordOfGlyph, unicodeWordOfGlyph, uthmaniWordCount } from "@/lib/mushaf/glyph-words";
 
 export type WordTranslationRow = {
   word_arabic: string | null;
@@ -117,6 +118,47 @@ export async function fetchWordText(
     return words.slice(4)[wordPos - 1] ?? null;
   }
   return words[wordPos - 1] ?? null;
+}
+
+/** A word the reader names by glyph, in the two numberings the word sheet's tabs read. */
+export type ReaderWordPositions = Readonly<{
+  /** The word-table position, for `word_*` tables and meaning card ids. */
+  table: number;
+  /** The Unicode word of `text_uthmani` split on spaces, for the Tajweed tab's offsets. */
+  unicode: number;
+}>;
+
+/**
+ * The positions of a word the reader names by glyph (SPEC 3.10). The reader numbers every page-font
+ * glyph, so in the 196 ayat with a mark glyph (the hizb-quarter ۞, or the pause mark in 36:52) its
+ * number is one past the word tables' from the mark on, and the word sheet would read and save the
+ * next word. A tap on the mark itself names the word it opens. In 8:6 and 37:130 the word tables
+ * count two glyphs as one word while `text_uthmani` keeps two, so the two numberings differ there.
+ * Unknown layouts keep the reader's number for both.
+ */
+export async function fetchReaderWordPositions(
+  db: DatabaseExecutor,
+  surah: number,
+  ayah: number,
+  readerWordPos: number,
+): Promise<ReaderWordPositions> {
+  const row = await db.getFirstAsync<{ text_qcf2: string | null; text_uthmani: string | null }>(
+    "SELECT text_qcf2, text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+    [surah, ayah],
+  );
+  const reader = { table: readerWordPos, unicode: readerWordPos };
+  if (!row?.text_qcf2 || !row.text_uthmani) return reader;
+  const layout = ayahGlyphs(surah, ayah, row.text_qcf2, uthmaniWordCount(row.text_uthmani));
+  if (!layout) return reader;
+  return {
+    table: mushafWordOfGlyph(layout, readerWordPos - 1) ?? readerWordPos,
+    unicode: unicodeWordOfGlyph(layout, readerWordPos - 1) ?? readerWordPos,
+  };
+}
+
+/** The word-table position of a word the reader names by glyph; see fetchReaderWordPositions. */
+export async function fetchTableWordPos(db: DatabaseExecutor, surah: number, ayah: number, readerWordPos: number): Promise<number> {
+  return (await fetchReaderWordPositions(db, surah, ayah, readerWordPos)).table;
 }
 
 export async function fetchWordQcf2Glyph(

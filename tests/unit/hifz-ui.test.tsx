@@ -81,7 +81,7 @@ describe("HifzSetupFlow Not now", () => {
 
   it("states the chosen time in the intention line", async () => {
     const view = await renderFlow();
-    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    for (let step = 0; step < 5; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
     expect(view.getByText(/^I'll start my wird after Fajr\. A fixed time makes the habit easier/)).toBeTruthy();
     fireEvent.press(view.getByText(interpolate(s.hifzWhenEvening, { time: formatClockMinutesForDisplay(20 * 60, "en") })));
     expect(view.getByText(/^I'll start my wird in the evening\./)).toBeTruthy();
@@ -109,7 +109,7 @@ describe("HifzSetupFlow when step and the second sitting (START-02, REMIND-07)",
       </DirectionProvider>,
     );
     await act(async () => {});
-    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    for (let step = 0; step < 5; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
     return view;
   }
   async function saved(view: ReturnType<typeof render>) {
@@ -241,7 +241,7 @@ describe("HifzSetupFlow when step and the second sitting (START-02, REMIND-07)",
       </DirectionProvider>,
     );
     await act(async () => {});
-    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(ar.hifzContinue));
+    for (let step = 0; step < 5; step += 1) fireEvent.press(view.getByText(ar.hifzContinue));
     expect(view.getByText("متى تجلس لوِردك؟")).toBeTruthy();
     expect(view.getByText(/^سأبدأ وِردي بعد الفجر\. الوقت الثابت يجعل العادة أيسر/)).toBeTruthy();
     expect(view.getByText("جلسة ثانية للمراجعة")).toBeTruthy();
@@ -265,7 +265,7 @@ describe("HifzSetupFlow default pace", () => {
     );
     await act(async () => {});
     beforeSaving(view);
-    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    for (let step = 0; step < 5; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
     await act(async () => {
       fireEvent.press(view.getByText(s.hifzSaveMemorized));
     });
@@ -307,7 +307,7 @@ describe("HifzSetupFlow new memorization repetitions (SBQ-01)", () => {
       </DirectionProvider>,
     );
     await act(async () => {});
-    for (let step = 0; step < 3; step += 1) fireEvent.press(view.getByText(text.hifzContinue));
+    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(text.hifzContinue));
     expect(view.getByText(text.hifzPaceTitle)).toBeTruthy();
     return view;
   }
@@ -341,6 +341,8 @@ describe("HifzSetupFlow new memorization repetitions (SBQ-01)", () => {
     // On the tracks step: choose ayah, then skip the step, which drops that choice.
     fireEvent.press(radio(view, s.hifzUnitAyah));
     fireEvent.press(view.getByText(s.hifzNotNow));
+    expect(view.getByText(s.meaningsStepTitle)).toBeTruthy();
+    fireEvent.press(view.getByText(s.hifzContinue));
     expect(view.getByText(s.hifzPaceTitle)).toBeTruthy();
     fireEvent.press(radio(view, s.hifzPresetFullTime));
     expect((await saveAndReadPlan(view)).unit).toBe("page");
@@ -409,7 +411,7 @@ describe("HifzSetupFlow new memorization repetitions (SBQ-01)", () => {
     );
     await act(async () => {});
     fireEvent.press(view.getByText(s.hifzGoalKeep));
-    for (let step = 0; step < 3; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
     expect(view.getByText(s.hifzPaceTitle)).toBeTruthy();
     expect(view.queryByText(s.hifzRepsTitle)).toBeNull();
   });
@@ -484,7 +486,7 @@ describe("HifzSetupFlow save and surah list recovery", () => {
     await act(async () => {});
     fireEvent.press(view.getByText(s.hifzContinue));
     fireEvent.press(view.getByLabelText("Juz 30"));
-    for (let step = 0; step < 3; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    for (let step = 0; step < 4; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
     fireEvent.press(view.getByText(s.hifzSaveMemorized));
     // Pending: both controls report busy and Back cannot leave the step.
     expect(view.getByText(s.hifzSaving)).toBeTruthy();
@@ -583,5 +585,96 @@ describe("HifzSetupFlow save and surah list recovery", () => {
     fireEvent.press(view.getByText(s.hifzContinue));
     fireEvent.press(view.getByText(s.hifzBack));
     expect(view.getByPlaceholderText(s.setupSurahSearchPlaceholder)).toBeTruthy();
+  });
+});
+
+describe("HifzSetupFlow word meanings step (SPEC 3.6)", () => {
+  beforeEach(() => jest.mocked(applyHifzSetup).mockReset());
+
+  async function openMeanings(db: AppDatabase) {
+    const view = render(
+      <DirectionProvider dir="ltr">
+        <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={null} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    for (let step = 0; step < 3; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    expect(view.getByText(s.meaningsStepTitle)).toBeTruthy();
+    return view;
+  }
+  async function saveFrom(view: ReturnType<typeof render>) {
+    for (let step = 0; step < 2; step += 1) fireEvent.press(view.getByText(s.hifzContinue));
+    await act(async () => fireEvent.press(view.getByText(s.hifzSaveMemorized)));
+    return jest.mocked(applyHifzSetup).mock.calls.at(-1)![1];
+  }
+  const radio = (view: ReturnType<typeof render>, name: string) => view.getByRole("radio", { name: new RegExp(`^${name}`) });
+
+  it("saves the answers' level and language with the plan", async () => {
+    const view = await openMeanings({ getAllAsync: jest.fn(async () => []) } as unknown as AppDatabase);
+    fireEvent.press(radio(view, s.meaningsRateArabic2));
+    fireEvent.press(radio(view, s.meaningsRateRecited2));
+    fireEvent.press(radio(view, s.meaningsChooseForMe));
+    // Two and two of six is level 3; simple sentences suggest Arabic meanings.
+    expect(view.getByText("You know the commonest 700 words.")).toBeTruthy();
+    expect((await saveFrom(view)).meanings).toEqual({ inDailyStudy: true, language: "ar", languagePicked: false, level: 3 });
+  });
+
+  it("drops the step's changes on Not now and saves the defaults", async () => {
+    const view = await openMeanings({ getAllAsync: jest.fn(async () => []) } as unknown as AppDatabase);
+    fireEvent.press(view.getByRole("switch", { name: s.studyDecksMeaningsHint }));
+    fireEvent.press(view.getByText(s.hifzNotNow));
+    fireEvent.press(view.getByText(s.hifzContinue));
+    await act(async () => fireEvent.press(view.getByText(s.hifzSaveMemorized)));
+    expect(jest.mocked(applyHifzSetup).mock.calls.at(-1)![1].meanings).toEqual({ inDailyStudy: true, language: "en", languagePicked: false, level: null });
+  });
+
+  it("keeps the stored choices that load after the first step when an earlier step is skipped", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const stored = [
+      { key: "habit_study_meanings", value: "false" },
+      { key: "habit_meanings_language", value: "ar" },
+      { key: "habit_meanings_level", value: "2" },
+    ];
+    const db = {
+      getAllAsync: jest.fn(async (sql: string) => {
+        if (!sql.includes("user_settings")) return [];
+        await gate;
+        return stored;
+      }),
+    } as unknown as AppDatabase;
+    const view = render(
+      <DirectionProvider dir="ltr">
+        <HifzSetupFlow db={db} language="en" isDark={false} s={s} initialPlan={DEFAULT_HIFZ_PLAN} onDone={jest.fn()} onCancel={jest.fn()} />
+      </DirectionProvider>,
+    );
+    await act(async () => {});
+    // Continue on the goal step while the stored choices are still loading, then they arrive.
+    fireEvent.press(view.getByText(s.hifzContinue));
+    await act(async () => release());
+    fireEvent.press(view.getByText(s.hifzNotNow));
+    fireEvent.press(view.getByText(s.hifzContinue));
+    expect(view.getByText(s.meaningsStepTitle)).toBeTruthy();
+    expect(view.getByRole("switch", { name: s.studyDecksMeaningsHint }).props.accessibilityState).toMatchObject({ checked: false });
+    expect((await saveFrom(view)).meanings).toEqual({ inDailyStudy: false, language: "ar", languagePicked: false, level: null });
+  });
+
+  it("leaves the stored choices alone when they did not load and the step was not changed", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const db = {
+      getAllAsync: jest.fn(async (sql: string) => {
+        if (sql.includes("user_settings")) throw new Error("synthetic settings failure");
+        return [];
+      }),
+    } as unknown as AppDatabase;
+    const view = await openMeanings(db);
+    // A change undone by Not now counts as no change.
+    fireEvent.press(view.getByRole("switch", { name: s.studyDecksMeaningsHint }));
+    fireEvent.press(view.getByText(s.hifzNotNow));
+    fireEvent.press(view.getByText(s.hifzContinue));
+    await act(async () => fireEvent.press(view.getByText(s.hifzSaveMemorized)));
+    expect(jest.mocked(applyHifzSetup).mock.calls.at(-1)![1].meanings).toBeUndefined();
   });
 });

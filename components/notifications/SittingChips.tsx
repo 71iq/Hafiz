@@ -21,7 +21,8 @@ const PRAYER_LABEL_KEYS: Readonly<Record<Prayer, keyof UIStrings>> = {
   isha: "hifzPrayerIsha",
 };
 
-function Chip({ label, accessibilityLabel, selected, disabled, onPress }: { label: string; accessibilityLabel?: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
+/** A pill radio choice; Setup and Settings use it for sittings and the word-meaning answers. */
+export function ChoiceChip({ label, accessibilityLabel, selected, disabled, onPress }: { label: string; accessibilityLabel?: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="radio"
@@ -73,7 +74,7 @@ export function SittingChips({
         {PRAYERS.map((prayer) => {
           const name = s[PRAYER_LABEL_KEYS[prayer]];
           return (
-            <Chip
+            <ChoiceChip
               key={prayer}
               label={name}
               accessibilityLabel={interpolate(s.hifzAfterPrayer, { prayer: name })}
@@ -89,7 +90,7 @@ export function SittingChips({
       </Text>
       <MirroredRow dir={dir} className="flex-wrap gap-2">
         {CLOCK_CHIPS.map((option) => (
-          <Chip
+          <ChoiceChip
             key={option.chip}
             label={interpolate(s[option.key], { time: formatClockMinutesForDisplay(option.minutes, language) })}
             selected={selected === option.chip}

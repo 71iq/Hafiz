@@ -1,6 +1,6 @@
 import React from "react";
 import * as ReactNative from "react-native";
-import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, fireEventAsync, render, waitFor, within } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import FlashcardSessionScreenWrapper from "@/app/flashcards/session";
 import { Card } from "@/components/ui/Card";
@@ -17,6 +17,8 @@ import type { SmartCardContent, SmartDeckRef } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
 import { DEFAULT_TAFSIR_SOURCE } from "@/lib/tafsir/sources";
 import { endReviewSession, recordSessionProgress, startReviewSession } from "@/lib/fsrs/review-sessions";
+import { DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySessionDeckIds } from "@/lib/study/daily-queue";
+import { readKnownSurahs } from "@/lib/study/known-surahs";
 import { loadHabitOverview, makeUpTarget, recordWirdProgress } from "@/lib/habit/queries";
 import { readDhuhrResolver } from "@/lib/prayer/settings";
 import { recordCleanRecitation } from "@/lib/hifz/errors";
@@ -181,10 +183,17 @@ const safeAreaMetrics = {
 const originalWindowDimensions = ReactNative.Dimensions.get("window");
 const originalScreenDimensions = ReactNative.Dimensions.get("screen");
 
+/** The route's params: one deck by default; the daily-scope cases change them. */
+let mockSessionParams: { deckId?: string; scope?: string } = { deckId: "fixture-session-deck" };
 jest.mock("expo-router", () => ({
   router: { replace: (...args: unknown[]) => mockRouterReplace(...args), dismissTo: jest.fn() },
   useNavigation: () => mockNavigation,
-  useLocalSearchParams: () => ({ deckId: "fixture-session-deck" }),
+  useLocalSearchParams: () => mockSessionParams,
+}));
+jest.mock("@/lib/study/daily-queue", () => ({
+  ...jest.requireActual<typeof import("@/lib/study/daily-queue")>("@/lib/study/daily-queue"),
+  loadDailyReviewQueue: jest.fn(),
+  readDailySessionDeckIds: jest.fn(),
 }));
 
 /** Screen focus for useIsFocused; a test takes it away and gives it back like a screen pushed on top. */
@@ -247,7 +256,10 @@ jest.mock("@/lib/fsrs/queries", () => ({
 
 jest.mock("@/lib/fsrs/smart-decks", () => ({
   getSmartCardContent: jest.fn(),
+  // The session compares deck ids (the Retention note), so the real ids stay.
+  SMART_DECK_IDS: jest.requireActual<typeof import("@/lib/fsrs/smart-decks")>("@/lib/fsrs/smart-decks").SMART_DECK_IDS,
 }));
+jest.mock("@/lib/study/known-surahs", () => ({ readKnownSurahs: jest.fn() }));
 
 // The wird day is written inside the grade transaction; its rules are covered by habit-wird-progress.
 jest.mock("@/lib/habit/queries", () => ({
@@ -737,6 +749,7 @@ function expectNoUnrelatedCardActionServiceCalls(): void {
 describe("Flashcard session due-date editor characterization", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockSessionParams = { deckId: "fixture-session-deck" };
     mockPreventRemove = null;
     mockDatabase.getFirstAsync.mockResolvedValue(null);
     jest.mocked(startReviewSession).mockReturnValue(fixtureSession);
@@ -756,6 +769,7 @@ describe("Flashcard session due-date editor characterization", () => {
     });
     jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard, secondCard]));
     jest.mocked(getSmartCardContent).mockImplementation(async (_db, cardId) => smartContentById.get(cardId) ?? null);
+    jest.mocked(readKnownSurahs).mockResolvedValue(null);
     jest.mocked(setStudyCardDueDate).mockResolvedValue(firstCard);
     jest.mocked(loadQuranPageFont).mockResolvedValue();
     jest.mocked(isQuranPageFontLoaded).mockReturnValue(true);
@@ -772,6 +786,99 @@ describe("Flashcard session due-date editor characterization", () => {
 
   it("keeps a finite React Native clock after fixture mock reset", () => {
     expect(Number.isFinite(performance.now())).toBe(true);
+  });
+
+  it.each([
+    ["scope=daily", { scope: "daily" }],
+    ["the bare route", {}],
+  ])("opens today's daily session for %s, recorded under the daily deck id so it spends the budget", async (_label, params) => {
+    mockSessionParams = params;
+    jest.mocked(loadDailyReviewQueue).mockResolvedValue(reviewQueue([firstCard, secondCard]));
+    jest.mocked(readDailySessionDeckIds).mockResolvedValue([]);
+    const view = renderSession();
+    await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+    expect(loadDailyReviewQueue).toHaveBeenCalledTimes(1);
+    expect(loadReviewQueue).not.toHaveBeenCalled();
+    expect(startReviewSession).toHaveBeenCalledWith("cards", { deckId: DAILY_SESSION_DECK_ID });
+  });
+
+  it("opens one deck alone, never under the daily deck id", async () => {
+    const view = renderSession();
+    await waitFor(() => expect(view.getByText(firstCue)).toBeTruthy());
+    expect(loadDailyReviewQueue).not.toHaveBeenCalled();
+    expect(startReviewSession).toHaveBeenCalledWith("cards", { deckId: "fixture-session-deck" });
+  });
+
+  it("reveals the next ayah first and uses the session's known surahs for related ayahs and answer text", async () => {
+    configureSettings("en", true);
+    const s = strings.en;
+    const nextAyah = { ...makeSmartRef("fixture-one", 2, 11), v2Page: firstRef.v2Page + 1 };
+    const related = [2, 3, 4].map((surah, i) => ({
+      ...makeSmartRef("fixture-one", surah, 15), sortOrder: i + 1, textQcf2: "",
+    }));
+    jest.mocked(readKnownSurahs).mockResolvedValue(new Set([3]));
+    jest.mocked(getSmartCardContent).mockResolvedValueOnce({
+      ...firstSmartContent, refs: [firstRef, ...related], answerKind: "nextAyah", nextAyah,
+      promptContextQcf2: "previous-glyph previous-marker", promptContextUthmani: "Previous ayah", promptContextV2Page: 8,
+    });
+    const view = renderSession();
+    expect(await view.findByText(s.smartDeckNextAyahPrompt)).toBeTruthy();
+    expect(view.getByLabelText("Previous ayah")).toBeTruthy();
+    expect(view.queryByLabelText(nextAyah.textUthmani)).toBeNull();
+    expect(readKnownSurahs).toHaveBeenCalledTimes(1);
+    fireEvent.press(getTextButton(view, s.flashcardsReveal));
+    expect(await view.findByLabelText(nextAyah.textUthmani)).toBeTruthy();
+    expect(quranPageFontName).toHaveBeenCalledWith(mockSettings.quranRenderFontStyle, nextAyah.v2Page);
+    expect(view.getByText("2:11")).toBeTruthy();
+    expect(view.getAllByRole("header").map((header) => header.props.children)).toEqual([s.nextAyah, s.smartDeckTargetAyah, s.smartDeckRelatedAyahs]);
+    expect(view.getByText(related[0].textUthmani)).toBeTruthy();
+    expect(view.getByText(related[1].textUthmani)).toBeTruthy();
+    expect(view.queryByText(related[2].textUthmani)).toBeNull();
+    const editor = await openAnswerEditor(view, s, "revealed", false);
+    expect(editor.props.value).toBe([nextAyah, firstRef, related[0], related[1]].map((ref) => ref.textUthmani).join("\n\n"));
+  });
+
+  it("loads an open session again for another account, so related ayahs follow that account's surahs", async () => {
+    configureSettings("en", true);
+    const { useAuthStore } = jest.requireActual<typeof import("@/lib/auth/store")>("@/lib/auth/store");
+    const { emitSyncCompleted } = jest.requireActual<typeof import("@/lib/sync/events")>("@/lib/sync/events");
+    const related = [3, 4].map((surah, i) => ({ ...makeSmartRef("fixture-one", surah, 15), sortOrder: i + 1, textQcf2: "" }));
+    jest.mocked(readKnownSurahs).mockResolvedValue(new Set([3]));
+    jest.mocked(getSmartCardContent).mockResolvedValue({ ...firstSmartContent, refs: [firstRef, ...related] });
+    const before = useAuthStore.getState().user;
+    act(() => useAuthStore.setState({ user: { id: "fixture-a" } as never }));
+    try {
+      const view = renderSession();
+      await view.findByText(firstCue);
+      await act(async () => {
+        jest.mocked(readKnownSurahs).mockResolvedValue(new Set([4]));
+        useAuthStore.setState({ user: { id: "fixture-b" } as never });
+        emitSyncCompleted({ pushed: 0, pulled: 2, accountRestored: true, localDataReplaced: true, restoreCompleted: true });
+      });
+      await view.findByText(firstCue);
+      fireEvent.press(getTextButton(view, strings.en.flashcardsReveal));
+      expect(await view.findByText(related[1].textUthmani)).toBeTruthy();
+      expect(view.queryByText(related[0].textUthmani)).toBeNull();
+    } finally {
+      act(() => useAuthStore.setState({ user: before }));
+    }
+  });
+
+  it("answers a whole final ayah with the named surah ending and keeps the Unicode context", async () => {
+    const s = strings.ar;
+    const target = { ...makeSmartRef("end", 1, 7), surahNameAr: "الفاتحة" };
+    jest.mocked(getSmartCardContent).mockResolvedValueOnce({
+      ...firstSmartContent, targetRef: target, refs: [target], answerKind: "surahEnd",
+      promptContextUthmani: "Previous ayah", promptUthmani: target.textUthmani, promptQcf2: "front-glyph",
+    });
+    const view = renderSession();
+    expect(await view.findByText(s.smartDeckNextAyahPrompt)).toBeTruthy();
+    expect(view.getByText("Previous ayah")).toBeTruthy();
+    expect(view.getByLabelText(target.textUthmani)).toBeTruthy();
+    fireEvent.press(getTextButton(view, s.flashcardsReveal));
+    expect(await view.findByRole("header", { name: "نهاية سورة الفاتحة" })).toBeTruthy();
+    expect(view.queryByRole("header", { name: s.nextAyah })).toBeNull();
+    expect(view.queryByText(s.smartDeckRelatedAyahs)).toBeNull();
   });
 
   it("characterizes Arabic light validation, native input options, cancel, and reopen", async () => {
@@ -1700,14 +1807,9 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(hapticMedium).toHaveBeenCalledTimes(1);
           expect(loadReviewQueue).toHaveBeenCalledTimes(1);
 
-          fireEvent.press(view.getByRole("button", { name: directCardActionLabel(s, action) }));
-          // The sheet closes once the retried action is saved, then plays its exit.
-          await waitFor(() => expect(view.queryByText(s.cardActionsTitle)).toBeNull(), { timeout: 4000 });
-          await waitFor(() =>
-            expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(
-              false,
-            ),
-          );
+          await fireEventAsync.press(view.getByRole("button", { name: directCardActionLabel(s, action) }));
+          expect(view.queryByText(s.cardActionsTitle)).toBeNull();
+          expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
           expectDirectCardActionCalls(action);
           expect(hapticMedium).toHaveBeenCalledTimes(2);
           expect(setStudyCardDueDate).not.toHaveBeenCalled();
@@ -1746,7 +1848,7 @@ describe("Flashcard session due-date editor characterization", () => {
         warnSpy.mockRestore();
       }
     },
-    // Each case saves, fails, retries and waits for the sheet's exit.
+    // Each case exercises the failed save and its successful retry through the session screen.
     15000,
   );
 

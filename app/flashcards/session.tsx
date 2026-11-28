@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, NotebookPen, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
@@ -40,7 +40,21 @@ import {
   setStudyCardSuspended,
 } from "@/lib/fsrs/queries";
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
-import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
+import { computeUniqueFront, type UniqueFrontContextAyah } from "@/lib/fsrs/uniqueness";
+import { addStudyMore, DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySessionDeckIds } from "@/lib/study/daily-queue";
+import { readKnownSurahs } from "@/lib/study/known-surahs";
+import { DAILY_SESSION_HREF, opensDailySession, type StudyState, type StudyStep } from "@/lib/study/resolve";
+import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
+import { useSessionLeaveState } from "@/lib/navigation/entry-route";
+import { readMeaningsSettings } from "@/lib/meanings/settings";
+import {
+  acceptLevelOffer,
+  declineLevelOffer,
+  loadMeaningsReviewQueue,
+  recordFirstReview,
+  type LevelOffer,
+} from "@/lib/meanings/session";
+import type { MeaningLanguage } from "@/lib/meanings/lemma-index";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
@@ -65,6 +79,7 @@ import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/co
 import {
   getSmartCardContent,
   SMART_DECK_IDS,
+  type SmartCardContent,
   type SmartCardKind,
   type SmartDeckRef,
 } from "@/lib/fsrs/smart-decks";
@@ -75,6 +90,7 @@ import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-setting
 import { textStartStyle, inputTextStartStyle } from "@/lib/ui/direction";
 import { endReviewSession, startReviewSession, type ReviewSessionRef } from "@/lib/fsrs/review-sessions";
 import { loadHabitOverview } from "@/lib/habit/queries";
+import { readHabitSettings } from "@/lib/habit/settings";
 import { useActiveClock } from "@/lib/habit/use-active-clock";
 import {
   SessionHabitCards,
@@ -98,7 +114,7 @@ const FOCUSED_CONTROL_SELECTOR = ["button", "a", ...["button", "link", "menuitem
 
 type SessionPhase = "loading" | "error" | "front" | "side" | "grading" | "summary";
 
-type CardData = {
+type CardData = Pick<SmartCardContent, "answerKind" | "nextAyah"> & {
   kind: "ayah" | "word" | SmartCardKind;
   card: StudyCardRow;
   /** The review settings of the card's own deck, also in Review all. */
@@ -109,13 +125,21 @@ type CardData = {
   isWordCard?: boolean;
   wordText?: string;
   wordMeaningAr?: string;
+  /** Whether the word has an Arabic meaning of its own; `wordMeaningAr` holds the fallback text when not. */
+  hasWordMeaningAr?: boolean;
   wordMeaningEn?: string;
   customAnswers?: Partial<Record<ReviewMode, string>>;
   surahName: string;
   textUthmani: string;
   textQcf2?: string;
   v2Page?: number;
-  uniqueFront: { text: string; surahName: string; contextCount: number; needsExplicitLabel: boolean };
+  uniqueFront: {
+    text: string;
+    context: UniqueFrontContextAyah[];
+    surahName: string;
+    contextCount: number;
+    needsExplicitLabel: boolean;
+  };
   translation: string;
   tafseer: string;
   prevAyahText: string | null;
@@ -239,7 +263,8 @@ function FlashcardSessionScreen() {
   const openMushaf = useOpenMushaf();
   const reduceMotion = useReducedMotionPreference();
   const authUserId = useAuthStore((state) => state.user?.id ?? null);
-  const { deckId } = useLocalSearchParams<{ deckId?: string }>();
+  // SPEC 3.2: `scope=daily`, or no deck at all, is today's daily study; `deckId` is one deck from All decks.
+  const { deckId, scope } = useLocalSearchParams<{ deckId?: string; scope?: string }>();
   const { width } = useWindowDimensions();
   const maxWidth = Math.min(width, 600);
 
@@ -258,6 +283,22 @@ function FlashcardSessionScreen() {
   /** The queue could not load: an error with Try again, never an empty completion. */
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  // The queue and what each card shows (its related ayat follow the known surahs) belong to the account
+  // they were loaded for. Another account, or this one's data restored or replaced on the device,
+  // loads the session again; the load effect's cleanup drops a load still running.
+  const loadedOwnerRef = useRef(authUserId);
+  useEffect(() => {
+    if (loadedOwnerRef.current === authUserId) return;
+    loadedOwnerRef.current = authUserId;
+    setLoadAttempt((attempt) => attempt + 1);
+  }, [authUserId]);
+  useEffect(
+    () =>
+      subscribeSyncCompleted((summary) => {
+        if (summary.accountRestored || summary.localDataReplaced) setLoadAttempt((attempt) => attempt + 1);
+      }),
+    [],
+  );
   /** The grade whose save failed, repeated as is by Try again. */
   const [failedGrade, setFailedGrade] = useState<Grade | null>(null);
   /** A short confirmation such as "Card moved to 19 Nov". */
@@ -274,6 +315,14 @@ function FlashcardSessionScreen() {
   const wirdEventRef = useRef<SessionHabitInput["event"]>(null);
   const againCountRef = useRef(0);
   const [wirdNotice, setWirdNotice] = useState<string | null>(null);
+  /** SPEC 3.4: Retention opened alone under a plan that reviews by page does not count toward the streak. */
+  const [retentionNotCounted, setRetentionNotCounted] = useState(false);
+  /** SPEC 3.6: word cards answer in the meaning language while the deck keeps its default answer sides. */
+  const [meaningLanguage, setMeaningLanguage] = useState<MeaningLanguage | null>(null);
+  /** "I know this" was pressed for the card being graded, so its Easy grade counts as known. */
+  const knownPressRef = useRef(false);
+  /** A level offer earned by first reviews of new word cards, shown as a dialog. */
+  const [levelOffer, setLevelOffer] = useState<LevelOffer | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const reviewedCountsRef = useRef({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 });
   // A learning card can come back several times in one session; the summary counts each card once, by
@@ -299,6 +348,8 @@ function FlashcardSessionScreen() {
   const [leavePending, setLeavePending] = useState(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
+  const normalizedScope = Array.isArray(scope) ? scope[0] : scope;
+  const dailyScope = normalizedScope === "daily" || !normalizedDeckId;
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [confirmCardAction, setConfirmCardAction] = useState<"delete" | "reset" | null>(null);
   const [dueDateOpen, setDueDateOpen] = useState(false);
@@ -342,16 +393,31 @@ function FlashcardSessionScreen() {
     let cancelled = false;
 
     async function load() {
+      // A reload in place (Continue, Study more, or new params on this screen) is a new session that
+      // the remove guard covers again.
+      exitingRef.current = false;
       resetSessionProgress();
       setSummary(null);
       setPhase("loading");
       try {
-        sessionRef.current = startReviewSession("cards", { deckId: normalizedDeckId ?? null });
-        const queue = await loadReviewQueue(db, normalizedDeckId);
+        sessionRef.current = startReviewSession("cards", { deckId: dailyScope ? DAILY_SESSION_DECK_ID : normalizedDeckId ?? null });
+        const queue = dailyScope
+          ? await loadDailyReviewQueue(db)
+          : normalizedDeckId === MEANINGS_DECK_ID
+            ? await loadMeaningsReviewQueue(db)
+            : await loadReviewQueue(db, normalizedDeckId);
+        // A settings read that fails leaves word cards on their deck's answer sides.
+        const language = await readMeaningsSettings(db).then(
+          (settings) => settings.language,
+          () => null,
+        );
+        if (cancelled) return;
+        setMeaningLanguage(language);
         if (cancelled) return;
         if (queue.length === 0) {
           // Nothing to review: say when the next card is due instead of a summary of zeros.
-          const nextReviewDate = await getNextEligibleReviewDate(db).catch(() => null);
+          const sessionDecks = dailyScope ? await readDailySessionDeckIds(db).catch(() => undefined) : [normalizedDeckId!];
+          const nextReviewDate = await getNextEligibleReviewDate(db, sessionDecks).catch(() => null);
           if (cancelled) return;
           resetSessionProgress();
           setSummary({ ...emptySummary(), emptyQueue: true, nextReviewDate });
@@ -360,6 +426,9 @@ function FlashcardSessionScreen() {
         }
 
         const loaded: CardData[] = [];
+        const knownSurahs = queue.some(({ card }) => card.id.startsWith("mutashabihat:"))
+          ? await readKnownSurahs(db)
+          : null;
         for (const { card: row, settings } of queue) {
           if (cancelled) return;
           const smartContent = await getSmartCardContent(db, row.id);
@@ -377,6 +446,7 @@ function FlashcardSessionScreen() {
               v2Page: targetRef.v2Page,
               uniqueFront: {
                 text: smartContent.promptUthmani ?? smartContent.cue,
+                context: [],
                 surahName: targetRef.surahNameAr,
                 contextCount: 0,
                 needsExplicitLabel: true,
@@ -388,7 +458,11 @@ function FlashcardSessionScreen() {
               smartDeckTitle: getSmartDeckTitleForKind(smartContent.kind, s),
               smartTargetRef: targetRef,
               smartCue: smartContent.cue,
-              smartRefs: smartContent.refs,
+              answerKind: smartContent.answerKind,
+              nextAyah: smartContent.nextAyah,
+              smartRefs: smartContent.kind === "mutashabihat" && knownSurahs
+                ? smartContent.refs.filter((ref) => ref.surah === targetRef.surah || knownSurahs.has(ref.surah))
+                : smartContent.refs,
               smartPromptContextQcf2: smartContent.promptContextQcf2,
               smartPromptContextUthmani: smartContent.promptContextUthmani,
               smartPromptContextV2Page: smartContent.promptContextV2Page,
@@ -480,6 +554,7 @@ function FlashcardSessionScreen() {
             isWordCard,
             wordText: wordText ?? undefined,
             wordMeaningAr: wordMeaningAr ?? undefined,
+            hasWordMeaningAr: !!wordMeaningArRow?.meaning?.trim(),
             wordMeaningEn: wordMeaningEn ?? undefined,
             customAnswers,
             surahName: surahRow?.name_arabic ?? "",
@@ -505,6 +580,16 @@ function FlashcardSessionScreen() {
           return;
         }
 
+        // The note is a courtesy: a settings read that fails leaves it out rather than failing the session.
+        const notCounted =
+          !dailyScope &&
+          normalizedDeckId === SMART_DECK_IDS.retention &&
+          (await readHabitSettings(db).then(
+            (settings) => !settings.retentionCounts,
+            () => false,
+          ));
+        if (cancelled) return;
+        setRetentionNotCounted(notCounted);
         sessionClock.reset();
         setCurrentIndex(0);
         setSessionCardTotal(loaded.length);
@@ -528,6 +613,7 @@ function FlashcardSessionScreen() {
   }, [
     db,
     normalizedDeckId,
+    dailyScope,
     tafseerSource,
     settingsLoaded,
     resetSessionProgress,
@@ -565,11 +651,23 @@ function FlashcardSessionScreen() {
       return currentCard.asbabOccasions?.length ? ["asbabReading"] : [];
     }
     if (currentCard.isWordCard) {
-      return currentCard.settings.wordTestModes.filter((mode) => {
-        if (mode === "wordMeaningArabic" && !currentCard.wordMeaningAr && !getCardAnswerOverride(currentCard, mode)) return false;
-        if (mode === "wordMeaningTranslation" && !currentCard.wordMeaningEn && !getCardAnswerOverride(currentCard, mode)) return false;
-        return true;
-      });
+      const available = (mode: WordTestMode) =>
+        !!getCardAnswerOverride(currentCard, mode) ||
+        (mode === "wordMeaningArabic" ? !!currentCard.wordMeaningAr : !!currentCard.wordMeaningEn);
+      const deckModes = currentCard.settings.wordTestModes;
+      // SPEC 3.6: with the deck's default answer sides (both), a word card answers in the meaning
+      // language only, or in the other language when the word has no meaning in it (most words have no
+      // Arabic entry). Sides the user chose in the deck settings are kept.
+      if (meaningLanguage && deckModes.length === 2) {
+        const hasMeaning = (mode: WordTestMode) =>
+          !!getCardAnswerOverride(currentCard, mode) ||
+          (mode === "wordMeaningArabic" ? !!currentCard.hasWordMeaningAr : !!currentCard.wordMeaningEn);
+        const preferred: WordTestMode = meaningLanguage === "ar" ? "wordMeaningArabic" : "wordMeaningTranslation";
+        const other: WordTestMode = preferred === "wordMeaningArabic" ? "wordMeaningTranslation" : "wordMeaningArabic";
+        if (hasMeaning(preferred)) return [preferred];
+        if (hasMeaning(other)) return [other];
+      }
+      return deckModes.filter(available);
     }
     return currentCard.settings.testModes.filter((mode) => {
       if (mode === "previousAyah" && (!currentCard.prevAyahText || currentCard.uniqueFront.contextCount > 0) && !getCardAnswerOverride(currentCard, mode)) return false;
@@ -578,7 +676,7 @@ function FlashcardSessionScreen() {
       if (mode === "tafseer" && !currentCard.tafseer && !getCardAnswerOverride(currentCard, mode)) return false;
       return true;
     });
-  }, [currentCard]);
+  }, [currentCard, meaningLanguage]);
 
   const currentMode = activeModes[currentSideIndex] ?? null;
   const isLastSide = currentSideIndex >= activeModes.length - 1;
@@ -622,10 +720,12 @@ function FlashcardSessionScreen() {
   const buildSummary = useCallback(async (): Promise<SessionSummary> => {
     const session = sessionRef.current;
     const [nextReviewDate, overview] = await Promise.all([
-      getNextEligibleReviewDate(db).catch((error) => {
-        console.warn("[FlashcardSession] Next review date failed:", error);
-        return null;
-      }),
+      (dailyScope ? readDailySessionDeckIds(db) : Promise.resolve([normalizedDeckId!]))
+        .then((decks) => getNextEligibleReviewDate(db, decks))
+        .catch((error) => {
+          console.warn("[FlashcardSession] Next review date failed:", error);
+          return null;
+        }),
       loadHabitOverview(db).catch((error) => {
         console.warn("[FlashcardSession] Habit overview failed:", error);
         return null;
@@ -643,7 +743,7 @@ function FlashcardSessionScreen() {
       nextReviewDate,
       habit: { event: wirdEventRef.current, overview, againCount: againCountRef.current, total: counts.total, durationMs },
     };
-  }, [db, sessionClock]);
+  }, [db, sessionClock, dailyScope, normalizedDeckId]);
 
   const finishSessionWithSummary = useCallback(async () => {
     setSummary(await buildSummary());
@@ -880,9 +980,9 @@ function FlashcardSessionScreen() {
     setSessionError(null);
     setCardMenuOpen(false);
     setAnswerEditMode(mode);
-    setAnswerEditText(getCardAnswerOverride(currentCard, mode) ?? getDefaultAnswerText(currentCard, mode, s));
+    setAnswerEditText(getCardAnswerOverride(currentCard, mode) ?? getDefaultAnswerText(currentCard, mode, s, isRTL));
     setAnswerEditOpen(true);
-  }, [activeModes, currentCard, currentMode, currentSideIndex, s]);
+  }, [activeModes, currentCard, currentMode, currentSideIndex, s, isRTL]);
 
   const handleSaveAnswerEdit = () => {
     if (!currentCard || !answerEditMode) return;
@@ -940,8 +1040,12 @@ function FlashcardSessionScreen() {
   const handleGrade = (rating: Grade) => {
     const item = currentCard;
     if (!item) return;
+    // "I know this" grades Easy; any other grade path is not a known word.
+    const knownPressed = knownPressRef.current;
+    knownPressRef.current = false;
     void runCardMutation("[FlashcardSession] Failed to grade card:", s.flashcardsReviewSaveFailed, async () => {
       hapticMedium();
+      const firstGrade = !reviewedCardIdsRef.current.has(item.card.id);
       const reviewedAt = new Date();
       const saved = await persistReviewTransition({
         db,
@@ -980,6 +1084,15 @@ function FlashcardSessionScreen() {
           } else if (saved.wird.kind === "earned_back") {
             setWirdNotice(interpolate(s.habitEarnedBack, { days: formatDays(saved.wird.length, uiLanguage) }));
           }
+          // SPEC 3.6: a new word card's first review moves the runs that offer a level change.
+          if (item.isWordCard && item.card.state === State.New && firstGrade) {
+            const outcome = knownPressed && rating === Rating.Easy ? "known" : rating === Rating.Again ? "failed" : "other";
+            recordFirstReview(db, outcome)
+              .then((offer) => {
+                if (offer) setLevelOffer(offer);
+              })
+              .catch((error: unknown) => console.warn("[FlashcardSession] Could not record a first word review:", error));
+          }
           if (item.card.id.startsWith("mutashabihat:") || item.card.id.startsWith("similar-tail:")) {
             recordAchievementEvent(db, {
               type: "mutashabih_pair_reviewed",
@@ -1004,6 +1117,29 @@ function FlashcardSessionScreen() {
     }, () => setFailedGrade(rating));
   };
 
+  // SPEC 3.1: the end screen asks the resolver what comes next.
+  const nextStep = useNextStudyStep(db, phase === "summary");
+
+  /** Continue: the daily session reloads in place; any other step replaces this screen, so Back lands on Home. */
+  const continueTo = (step: Exclude<StudyStep, { kind: "home" }>) => {
+    if (dailyScope && opensDailySession(step)) {
+      setLoadAttempt((n) => n + 1);
+      return;
+    }
+    exitingRef.current = true;
+    router.replace(step.href);
+  };
+
+  /** Study more: one more budget for today, then the daily cards it opened. */
+  const studyMore = async () => {
+    await addStudyMore(db);
+    if (dailyScope) setLoadAttempt((n) => n + 1);
+    else {
+      exitingRef.current = true;
+      router.replace(DAILY_SESSION_HREF);
+    }
+  };
+
   // SES-02: leaving mid-session asks once. Every grade is already saved, so this only confirms.
   const handleEndSession = () => {
     if (hasReviewedProgress()) {
@@ -1026,6 +1162,11 @@ function FlashcardSessionScreen() {
   // during an unresolved grade or card action they wait for it. usePreventRemove, unlike a bare
   // beforeRemove listener, also tells native-stack to block the native dismissal. `mutationBusy` is the
   // rendered copy of the lock.
+  // SPEC 3.9: a widget or notification tap keeps this screen while its guard holds, and may replace
+  // it once the session has ended.
+  useSessionLeaveState(
+    mutationBusy || (phase !== "summary" && hasReviewed) ? "working" : phase === "summary" || phase === "error" ? "ended" : "fresh",
+  );
   usePreventRemove(mutationBusy || (phase !== "summary" && hasReviewed), ({ data }) => {
     // The screen's own leave goes on, as does a back press this render has not caught up with; React
     // Navigation marks the action as already checked for this screen.
@@ -1056,7 +1197,8 @@ function FlashcardSessionScreen() {
     };
   }, [buildSummary, cardMissing, mutationBusy]);
 
-  const overlayOpen = cardMenuOpen || !!confirmCardAction || dueDateOpen || answerEditOpen || exitConfirmOpen || noteOpen;
+  const overlayOpen =
+    cardMenuOpen || !!confirmCardAction || dueDateOpen || answerEditOpen || exitConfirmOpen || noteOpen || !!levelOffer;
   const gradingVisible = (phase === "side" && revealed && isLastSide) || phase === "grading";
   // The latest handlers and state for the key and Back listeners, which are registered once.
   const inputRef = useRef({ phase, revealed, isLastSide, gradingVisible, overlayOpen, revealFirstSide, handleNext, handleGrade, handleEndSession });
@@ -1125,6 +1267,9 @@ function FlashcardSessionScreen() {
           language={uiLanguage}
           commitLabel={commitLabel}
           ownerId={authUserId}
+          nextStep={nextStep}
+          onContinue={continueTo}
+          onStudyMore={studyMore}
         />
       </SafeAreaView>
     );
@@ -1243,6 +1388,14 @@ function FlashcardSessionScreen() {
               style={{ width: `${progressPercent}%` }}
             />
           </View>
+          {retentionNotCounted ? (
+            <Text
+              className="mt-2 text-center text-warm-600 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 18, writingDirection: isRTL ? "rtl" : "ltr" }}
+            >
+              {s.studyRetentionNotCounted}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -1275,6 +1428,7 @@ function FlashcardSessionScreen() {
                   fontSize={fontSize * 0.85}
                   lineHeight={lineHeight * 0.85}
                   highlightWordPos={currentCard.wordPos}
+                  surah={currentCard.surah}
                   ayah={currentCard.ayah}
                 />
               ) : (
@@ -1289,8 +1443,28 @@ function FlashcardSessionScreen() {
                   })}
                 </Text>
               )}
-              {!currentCard.isWordCard && currentCard.uniqueFront.contextCount === 0 && currentCard.textQcf2 && currentCard.v2Page ? (
-                <Qcf2AyahText textQcf2={currentCard.textQcf2} textUthmani={currentCard.textUthmani} v2Page={currentCard.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={currentCard.ayah} />
+              {/* A repeated ayah shows the ayahs before it, each in its own page font, dimmed like the
+                  similar-verse context, then the card's own ayah. */}
+              {!currentCard.isWordCard &&
+              currentCard.textQcf2 &&
+              currentCard.v2Page &&
+              currentCard.uniqueFront.context.length === currentCard.uniqueFront.contextCount ? (
+                <View>
+                  {currentCard.uniqueFront.context.map((context) => (
+                    <View key={`${context.surah}:${context.ayah}`} className="mb-2 opacity-80">
+                      <Qcf2AyahText
+                        textQcf2={context.textQcf2}
+                        textUthmani={context.textUthmani}
+                        v2Page={context.v2Page}
+                        fontSize={fontSize * 0.82}
+                        lineHeight={lineHeight * 0.82}
+                        surah={context.surah}
+                        ayah={context.ayah}
+                      />
+                    </View>
+                  ))}
+                  <Qcf2AyahText textQcf2={currentCard.textQcf2} textUthmani={currentCard.textUthmani} v2Page={currentCard.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={currentCard.ayah} />
+                </View>
               ) : (
                 <Text
                   className="text-charcoal dark:text-neutral-100 text-center"
@@ -1415,6 +1589,22 @@ function FlashcardSessionScreen() {
             </Button>
           )}
 
+          {/* SPEC 3.6: a word met for the first time can be marked known; it grades Easy. */}
+          {currentCard.isWordCard &&
+          currentCard.card.state === State.New &&
+          (phase === "front" || (phase === "side" && revealed && isLastSide) || phase === "grading") ? (
+            <Button
+              variant="outline"
+              className="w-full border border-warm-300 dark:border-neutral-700"
+              label={s.meaningsKnowThis}
+              disabled={mutationBusy}
+              onPress={() => {
+                knownPressRef.current = true;
+                handleGrade(Rating.Easy);
+              }}
+            />
+          ) : null}
+
           {phase === "side" && revealed && !isLastSide && (
             <Button onPress={handleNext} className="w-full">
               <View
@@ -1479,8 +1669,8 @@ function FlashcardSessionScreen() {
       <AnswerEditSheet
         visible={answerEditOpen}
         value={answerEditText}
-        defaultValue={currentCard && answerEditMode ? getDefaultAnswerText(currentCard, answerEditMode, s) : ""}
-        baseline={currentCard && answerEditMode ? (getCardAnswerOverride(currentCard, answerEditMode) ?? getDefaultAnswerText(currentCard, answerEditMode, s)) : ""}
+        defaultValue={currentCard && answerEditMode ? getDefaultAnswerText(currentCard, answerEditMode, s, isRTL) : ""}
+        baseline={currentCard && answerEditMode ? (getCardAnswerOverride(currentCard, answerEditMode) ?? getDefaultAnswerText(currentCard, answerEditMode, s, isRTL)) : ""}
         error={sessionError}
         busy={mutationBusy}
         isDark={isDark}
@@ -1545,6 +1735,24 @@ function FlashcardSessionScreen() {
           leave();
         }}
       />
+      <ConfirmDialog
+        visible={!!levelOffer}
+        title={levelOffer === "lower" ? s.meaningsLowerTitle : s.meaningsRaiseTitle}
+        message={levelOffer === "lower" ? s.meaningsLowerBody : s.meaningsRaiseBody}
+        tone="neutral"
+        cancelLabel={s.meaningsOfferNotNow}
+        confirmLabel={levelOffer === "lower" ? s.meaningsLowerConfirm : s.meaningsRaiseConfirm}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => {
+          if (levelOffer) declineLevelOffer(db, levelOffer).catch(console.warn);
+          setLevelOffer(null);
+        }}
+        onConfirm={() => {
+          if (levelOffer) acceptLevelOffer(db, levelOffer).catch(console.warn);
+          setLevelOffer(null);
+        }}
+      />
       {wirdNotice ? <Toast message={wirdNotice} onDismiss={() => setWirdNotice(null)} duration={3500} announce /> : null}
       {actionNotice && !wirdNotice ? <Toast message={actionNotice} onDismiss={() => setActionNotice(null)} announce /> : null}
     </SafeAreaView>
@@ -1572,7 +1780,13 @@ function getCardAnswerOverride(card: CardData, mode: ReviewMode): string | null 
   return value ? value : null;
 }
 
-function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: UIStrings): string {
+function endOfSurahText(card: CardData, s: UIStrings, isRTL: boolean): string {
+  return interpolate(s.smartDeckSurahEnd, {
+    surah: isRTL ? card.surahName : (surahTransliteration(card.surah) ?? card.surahName),
+  });
+}
+
+function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: UIStrings, isRTL: boolean): string {
   switch (mode) {
     case "nextAyah":
       return card.nextAyahText ?? "";
@@ -1588,8 +1802,12 @@ function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: UIStrings): s
       return card.wordMeaningAr ?? s.noWordMeaningFallback;
     case "wordMeaningTranslation":
       return card.wordMeaningEn ?? "";
-    case "smartRefs":
-      return card.smartRefs?.map((ref) => ref.textUthmani).join("\n\n") ?? "";
+    case "smartRefs": {
+      const texts = card.smartRefs?.map((ref) => ref.textUthmani) ?? [];
+      if (card.answerKind === "nextAyah" && card.nextAyah) texts.unshift(card.nextAyah.textUthmani);
+      if (card.answerKind === "surahEnd") texts.unshift(endOfSurahText(card, s, isRTL));
+      return texts.join("\n\n");
+    }
     case "qiraatReading":
       return card.qiraatText ?? card.qiraatGroup?.join("\n\n") ?? "";
     case "asbabReading":
@@ -1941,6 +2159,7 @@ function TestModePrompt({
           fontSize={fontSize}
           lineHeight={lineHeight}
           highlightWordPos={wordMode ? card.wordPos : undefined}
+          surah={card.surah}
           ayah={card.ayah}
         />
       ) : (
@@ -2020,8 +2239,13 @@ function TestModeAnswer({
         </Text>
       );
     case "wordMeaningArabic":
+      // A meaning is prose about the word, so it takes the tafsir answer's face, a little larger
+      // because it is short, not the Quran text size.
       return (
-        <Text className="text-charcoal dark:text-neutral-100 text-center" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
+        <Text
+          className="text-charcoal dark:text-neutral-100 text-center"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 17, lineHeight: 28, writingDirection: "rtl" }}
+        >
           {card.wordMeaningAr ?? "—"}
         </Text>
       );
@@ -2139,15 +2363,25 @@ function SmartCueText({
           {card.surahName} {card.surah}:{card.ayah}
         </Text>
       )}
-      {card.kind === "mutashabihat" && card.smartPromptContextQcf2 && card.smartPromptContextUthmani && card.smartPromptContextV2Page ? (
+      {card.kind === "mutashabihat" && card.smartPromptContextUthmani ? (
         <View className="mb-2 opacity-80">
-          <Qcf2AyahText
-            textQcf2={card.smartPromptContextQcf2}
-            textUthmani={card.smartPromptContextUthmani}
-            v2Page={card.smartPromptContextV2Page}
-            fontSize={fontSize * 0.82}
-            lineHeight={lineHeight * 0.82}
-          />
+          {card.smartPromptContextQcf2 && card.smartPromptContextV2Page ? (
+            <Qcf2AyahText
+              textQcf2={card.smartPromptContextQcf2}
+              textUthmani={card.smartPromptContextUthmani}
+              v2Page={card.smartPromptContextV2Page}
+              fontSize={fontSize * 0.82}
+              lineHeight={lineHeight * 0.82}
+            />
+          ) : (
+            <Text
+              className="text-charcoal dark:text-neutral-100 text-center"
+              accessibilityLanguage="ar"
+              style={{ fontSize: fontSize * 0.82, lineHeight: lineHeight * 0.82, writingDirection: "rtl" }}
+            >
+              {card.smartPromptContextUthmani}
+            </Text>
+          )}
         </View>
       ) : null}
       {card.smartPromptQcf2 && card.smartPromptUthmani && card.v2Page ? (
@@ -2191,11 +2425,36 @@ function SmartRefsAnswer({
     ? refs.filter((ref) => ref.groupId !== target.groupId || ref.sortOrder !== target.sortOrder)
     : refs;
   const title = card.kind === "similarTail" ? s.smartDeckCorrectTail : s.smartDeckTargetAyah;
+  const headingStyle = {
+    fontFamily: "Manrope_700Bold",
+    fontSize: 11,
+    letterSpacing: 1.1,
+    ...textStartStyle(isRTL),
+    writingDirection: isRTL ? "rtl" : "ltr",
+  } as const;
   return (
-    <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
+    <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: 12 }} nestedScrollEnabled>
+      {card.answerKind === "nextAyah" && card.nextAyah && (
+        <>
+          <Text accessibilityRole="header" className="text-warm-400 dark:text-neutral-500 uppercase" style={headingStyle}>
+            {s.nextAyah}
+          </Text>
+          <SmartRefCard refData={{ ...card.nextAyah, surahNameAr: card.surahName }} fontSize={fontSize} lineHeight={lineHeight} />
+        </>
+      )}
+      {card.answerKind === "surahEnd" && (
+        <Text
+          accessibilityRole="header"
+          className="text-primary-accent dark:text-primary-bright"
+          style={{ ...headingStyle, fontSize: 15, letterSpacing: 0 }}
+        >
+          {endOfSurahText(card, s, isRTL)}
+        </Text>
+      )}
       <Text
-        className="text-warm-400 dark:text-neutral-500 uppercase mb-3"
-        style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+        accessibilityRole="header"
+        className="text-warm-400 dark:text-neutral-500 uppercase"
+        style={headingStyle}
       >
         {title}
       </Text>
@@ -2239,8 +2498,9 @@ function SmartRefsAnswer({
         {card.kind !== "similarTail" && related.length > 0 && (
           <>
             <Text
+              accessibilityRole="header"
               className="text-warm-400 dark:text-neutral-500 uppercase mt-2"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
+              style={headingStyle}
             >
               {s.smartDeckRelatedAyahs}
             </Text>
@@ -2264,7 +2524,7 @@ function SmartRefCard({
   fontSize,
   lineHeight,
 }: {
-  refData: SmartDeckRef;
+  refData: Pick<SmartDeckRef, "surah" | "ayah" | "surahNameAr" | "textQcf2" | "textUthmani" | "v2Page">;
   fontSize: number;
   lineHeight: number;
 }) {
@@ -2285,7 +2545,13 @@ function SmartRefCard({
           {refData.surahNameAr}
         </Text>
       </View>
-      <Qcf2AyahText textQcf2={refData.textQcf2} textUthmani={refData.textUthmani} v2Page={refData.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={refData.ayah} />
+      {refData.textQcf2 && refData.v2Page ? (
+        <Qcf2AyahText textQcf2={refData.textQcf2} textUthmani={refData.textUthmani} v2Page={refData.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={refData.ayah} />
+      ) : (
+        <Text className="text-charcoal dark:text-neutral-100 text-center" accessibilityLanguage="ar" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
+          {refData.textUthmani}
+        </Text>
+      )}
     </View>
   );
 }
@@ -2420,6 +2686,9 @@ function SessionSummaryView({
   language,
   commitLabel,
   ownerId,
+  nextStep,
+  onContinue,
+  onStudyMore,
 }: {
   summary: SessionSummary;
   onDone: () => void;
@@ -2432,6 +2701,10 @@ function SessionSummaryView({
   commitLabel: string;
   /** The signed-in account, if any: only its confirmed sync may say Synced. */
   ownerId: string | null;
+  /** What the resolver says comes next (SPEC 3.1), null while it loads. */
+  nextStep: StudyState | null;
+  onContinue: (step: Exclude<StudyStep, { kind: "home" }>) => void;
+  onStudyMore: () => Promise<void>;
 }) {
   const { width, height } = useWindowDimensions();
   const compact = width < 430 || height < 760;
@@ -2466,9 +2739,17 @@ function SessionSummaryView({
             {interpolate(s.sessionNextDue, { when: nextReview })}
           </Text>
         ) : null}
-        <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: 28 }}>
-          <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.flashcardsSummaryDone}</Text>
-        </Button>
+        <View className="w-full max-w-sm" style={{ marginTop: 28 }}>
+          <SessionNextStep
+            state={nextStep}
+            commitment={null}
+            onContinue={onContinue}
+            onStudyMore={onStudyMore}
+            onDone={onDone}
+            language={language}
+            s={s}
+          />
+        </View>
       </ScrollView>
     );
   }
@@ -2533,12 +2814,18 @@ function SessionSummaryView({
         </View>
       ) : null}
 
-      {/* Done never waits for the network: grades are already saved here. */}
-      <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
-        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 15 : 16, color: "#fff" }}>
-          {showsCommitment(summary.habit) ? commitLabel : s.flashcardsSummaryDone}
-        </Text>
-      </Button>
+      {/* Done never waits for the network or the resolver: grades are already saved here. */}
+      <View className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
+        <SessionNextStep
+          state={nextStep}
+          commitment={showsCommitment(summary.habit) ? commitLabel : null}
+          onContinue={onContinue}
+          onStudyMore={onStudyMore}
+          onDone={onDone}
+          language={language}
+          s={s}
+        />
+      </View>
       {summary.total > 0 ? (
         <Text
           accessibilityLiveRegion="polite"
@@ -2681,6 +2968,7 @@ function getSmartPrompt(card: CardData, s: UIStrings): string {
   if (card.kind === "similarTail") return s.smartDeckTailCompletePrompt;
   if (card.kind === "qiraat") return s.smartDeckQiraatPrompt;
   if (card.kind === "asbab") return s.smartDeckReasonsPrompt;
+  if (card.answerKind === "nextAyah" || card.answerKind === "surahEnd") return s.smartDeckNextAyahPrompt;
   return s.smartDeckMutashabihatPrefixPrompt;
 }
 

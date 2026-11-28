@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import { usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { BookOpenCheck, Pause, Play, RotateCcw, X } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
@@ -58,6 +58,10 @@ import { formatNumber } from "@/lib/i18n/count";
 import { formatClockMinutesForDisplay } from "@/lib/notifications/clock";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { returnToTabs } from "@/lib/navigation/return-to-tabs";
+import { addStudyMore } from "@/lib/study/daily-queue";
+import { DAILY_SESSION_HREF, type StudyStep } from "@/lib/study/resolve";
+import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
+import { useSessionLeaveState } from "@/lib/navigation/entry-route";
 import { useSettings } from "@/lib/settings/context";
 import { mutedIconColor } from "@/lib/ui/theme-icons";
 
@@ -556,6 +560,33 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
   const currentAyah = target?.ayahs[ayahIndex] ?? null;
   const chainedAyahs = useMemo(() => target?.ayahs.slice(0, ayahIndex + 1) ?? [], [ayahIndex, target]);
 
+  // SPEC 3.1: an end screen asks the resolver what comes next. The second look offered after a check
+  // graded Again, and the new lines offered after the looks, are this screen's own Continue.
+  const lookShowing = Boolean(looks[lookIndex] && plan);
+  const endScreen =
+    !loading && !lookShowing && !(looksDoneStep && target && plan) && (!target || !plan ? !error : habitResult !== null && !outcome?.secondLookNow);
+  const nextStep = useNextStudyStep(db, endScreen);
+  // SPEC 3.9: a widget or notification tap keeps this screen while its guard holds.
+  useSessionLeaveState(saving || lessonUnsaved ? "working" : endScreen || !!error ? "ended" : "fresh");
+
+  /** Continue replaces this screen, so Back from the next step lands on Home; more memorization starts this screen again. */
+  const continueTo = (next: Exclude<StudyStep, { kind: "home" }>) => {
+    stop();
+    if (next.kind === "memorize") {
+      onRestart();
+      return;
+    }
+    exiting.current = true;
+    router.replace(next.href);
+  };
+
+  const studyMore = async () => {
+    await addStudyMore(db);
+    exiting.current = true;
+    stop();
+    router.replace(DAILY_SESSION_HREF);
+  };
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -635,15 +666,22 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
             }
             isDark={isDark}
           />
-          <View className="w-full max-w-sm" style={{ gap: 10 }}>
-            {error ? <Button label={s.homeLoadRetry} onPress={load} /> : null}
-            <Button
-              variant={error ? "outline" : "default"}
-              className={error ? OUTLINE_BORDER : undefined}
-              label={s.flashcardsSummaryDone}
-              onPress={leave}
+          {error ? (
+            <View className="w-full max-w-sm" style={{ gap: 10 }}>
+              <Button label={s.homeLoadRetry} onPress={load} />
+              <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
+            </View>
+          ) : (
+            <SessionNextStep
+              state={nextStep}
+              commitment={null}
+              onContinue={continueTo}
+              onStudyMore={studyMore}
+              onDone={leave}
+              language={uiLanguage}
+              s={s}
             />
-          </View>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -979,16 +1017,22 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
                 <Button variant="outline" className={OUTLINE_BORDER} label={s.flashcardsSummaryDone} onPress={leave} />
               </>
             ) : (
-              <Button
-                label={
+              <SessionNextStep
+                state={nextStep}
+                commitment={
                   !showsCommitment(habitResult)
-                    ? s.flashcardsSummaryDone
+                    ? null
                     : outcome?.secondLookAt
                       ? // The look later today is the next return, not tomorrow (STR-20).
                         interpolate(s.hifzMemorizeBackAt, { time: formatClockTime(outcome.secondLookAt, uiLanguage) })
                       : commitLabel
                 }
-                onPress={leave}
+                onContinue={continueTo}
+                onStudyMore={studyMore}
+                onDone={leave}
+                language={uiLanguage}
+                s={s}
+                className="w-full"
               />
             )
           ) : null}

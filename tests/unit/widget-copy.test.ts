@@ -264,16 +264,16 @@ describe("widget copy rules (spec 4.3)", () => {
 
   it("chooses the scene, Zayt, flame and tap of each state (spec 4.2, 4.6)", () => {
     const expected: Record<WidgetState, [string, readonly string[], string, string]> = {
-      begin: ["dawn", ["wave"], "out", "home"],
+      begin: ["dawn", ["wave"], "out", "wird"],
       fresh_start: ["dawn", ["lonely"], "out", "wird"],
       open_day: ["morning", ["rest", "wave"], "unlit", "wird"],
       open_evening: ["dusk", ["worried", "fretful"], "unlit", "wird"],
       make_up: ["dawn_rose", ["worried", "fretful"], "unlit", "wird"],
       earn_back_open: ["morning", ["rest", "wave"], "out", "wird"],
-      earn_back_done: ["sunrise", ["open"], "lit", "home"],
-      done: ["radiant", ["shimmer"], "lit", "home"],
+      earn_back_done: ["sunrise", ["open"], "lit", "wird"],
+      done: ["radiant", ["shimmer"], "lit", "wird"],
       safe: ["radiant", ["warm"], "lit", "wird"],
-      milestone: ["milestone", ["milestone"], "lit", "home"],
+      milestone: ["milestone", ["milestone"], "lit", "wird"],
       kept: ["calm", ["sit"], "lit", "home"],
       paused: ["calm", ["sit"], "unlit", "home"],
     };

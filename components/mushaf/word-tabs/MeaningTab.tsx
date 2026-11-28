@@ -13,7 +13,8 @@ import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DiscardChangesDialog, isEditableTextDirty, useDiscardGuard } from "@/components/ui/DiscardChangesDialog";
-import { addMeaningCard, fetchMeaningCardDue, getTotalCardCount, isMeaningCardSaved, MEANINGS_DECK_ID } from "@/lib/fsrs/queries";
+import { addMeaningCard, fetchMeaningCardDue, isMeaningCardSaved } from "@/lib/fsrs/queries";
+import { isAchievementUnlocked } from "@/lib/achievements/queries";
 import { formatDays } from "@/lib/i18n/count";
 import { useDelayedLoading } from "./use-delayed-loading";
 
@@ -86,15 +87,17 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
     setSavingToVocab(true);
     setSaveError(false);
     try {
-      let deckWasEmpty = false;
+      // The first saved word is told apart by its badge, not by an empty deck: daily study fills the
+      // deck with generated words (SPEC 3.6).
+      let firstSave = false;
       try {
-        deckWasEmpty = (await getTotalCardCount(db, MEANINGS_DECK_ID)) === 0;
+        firstSave = !(await isAchievementUnlocked(db, "first_vocab_saved"));
       } catch {
-        // Only the notice depends on this count; the save goes ahead without it.
+        // Only the notice depends on this read; the save goes ahead without it.
       }
       const { created } = await addMeaningCard(db, surah, ayah, wordPos);
       setSavedToVocab(true);
-      setFirstVocabWord(created && deckWasEmpty);
+      setFirstVocabWord(created && firstSave);
       fetchMeaningCardDue(db, surah, ayah, wordPos)
         .then(setReviewDue)
         .catch(() => undefined);

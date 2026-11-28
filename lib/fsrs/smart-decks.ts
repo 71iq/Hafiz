@@ -4,6 +4,9 @@ import { putUserSetting, removeUserSetting, writeUserSetting } from "@/lib/datab
 import { createEmptyCard } from "./scheduler";
 import { reviewDueCutoff } from "./review-transition";
 import { stampsOverDeletedCards } from "./card-stamps";
+import { ayahGlyphs, glyphsBeforeWord, glyphsFromWord } from "@/lib/mushaf/glyph-words";
+import { isExcludedSimilarCard } from "./similar-card-exclusions";
+import { mutashabihatFront, splitQuranWords, tailHiddenWordCount } from "./similar-card-text";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
   ALL_NEW_REVIEW_ORDERS,
@@ -67,6 +70,11 @@ export type SmartCardContent = {
   hiddenAnswerUthmani?: string;
   prefixWordCount?: number;
   needsExplicitRefLabel?: boolean;
+  /** What the back answers. "rest": the target ayah after the front (hiddenAnswer*). "nextAyah": the front is
+   * the whole ayah; the answer is the ayah after it (nextAyah). "surahEnd": the front is the whole last ayah of
+   * its surah; the answer is that the surah ends there. */
+  answerKind?: "rest" | "nextAyah" | "surahEnd";
+  nextAyah?: { surah: number; ayah: number; textQcf2: string; textUthmani: string; v2Page: number };
   qiraatText?: string;
   qiraatGroup?: string[];
   asbabOccasions?: string[];
@@ -536,12 +544,15 @@ export async function getSmartDeckCandidateCardIds(
       ORDER BY g.sort_order, r.sort_order`,
     params
   );
+  // A tail card whose cue covers the whole ayah has no front to show. A similar-verse card the
+  // generated exclusion list names asks what the Similar tails card of its ayah asks.
   return rows
     .filter((row) =>
       kind !== "tail" ||
-      splitQuranWords(row.text_uthmani).length > inferTailWordCount(row.cue, row.tail_5, row.text_clean)
+      splitQuranWords(row.text_uthmani).length > tailHiddenWordCount(row.cue, row.tail_5, row.text_clean)
     )
-    .map((row) => `${prefix}${row.id}:${row.ref_sort_order}`);
+    .map((row) => `${prefix}${row.id}:${row.ref_sort_order}`)
+    .filter((id) => !isExcludedSimilarCard(id));
 }
 
 export async function getAllMatchingSmartCardIdSet(db: DatabaseExecutor): Promise<Set<string>> {
@@ -654,52 +665,66 @@ export async function getSmartDeckStats(
   };
 }
 
+/**
+ * A smart deck's cards for today, read-only: its reviewable due rows, sorted by due, and up to
+ * `newCardsLimit` virtual new cards for candidates that have no row yet, in candidate order. Home's
+ * counts and the daily queue read this; only a session that will show a virtual card creates its row
+ * (materializeSmartCardIds).
+ */
+export async function getSmartDeckTodayRows(
+  db: AppDatabase,
+  deckId: SmartDeckId,
+  newCardsLimit: number,
+): Promise<{ total: number; dueRows: StudyCardRow[]; virtualNew: StudyCardRow[] }> {
+  if (deckId === SMART_DECK_IDS.retention) {
+    await migrateLegacyRetentionDecks(db);
+  }
+  const ids = await getSmartDeckCandidateCardIds(db, deckId);
+  if (ids.length === 0) return { total: 0, dueRows: [], virtualNew: [] };
+
+  const now = new Date().toISOString();
+  const dueCutoff = reviewDueCutoff();
+  const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
+  const dueRows = rows
+    .filter((row) => row.due <= dueCutoff && isReviewableCard(row, now))
+    .sort((a, b) => a.due.localeCompare(b.due));
+  const emptyCard = createEmptyCard();
+  const virtualNew = ids
+    .filter((id) => !live.has(id))
+    .slice(0, Math.max(0, newCardsLimit))
+    .map((id) => ({
+      id,
+      deck_id: deckId,
+      due: now,
+      stability: emptyCard.stability,
+      difficulty: emptyCard.difficulty,
+      elapsed_days: emptyCard.elapsed_days,
+      scheduled_days: emptyCard.scheduled_days,
+      learning_steps: emptyCard.learning_steps,
+      reps: emptyCard.reps,
+      lapses: emptyCard.lapses,
+      state: emptyCard.state,
+      last_review: null,
+      suspended_at: null,
+      buried_until: null,
+      marked_at: null,
+      created_at: now,
+      updated_at: now,
+    }));
+  return { total: ids.length, dueRows, virtualNew };
+}
+
 /** `options` null means the daily limit is used up: nothing is queued and every due card is held back. */
 export async function getSmartDeckTodayStats(
   db: AppDatabase,
   deckId: SmartDeckId,
   options?: DueCardsForReviewOptions | null
 ): Promise<DeckTodayStats> {
-  if (deckId === SMART_DECK_IDS.retention) {
-    await migrateLegacyRetentionDecks(db);
-  }
-  const ids = await getSmartDeckCandidateCardIds(db, deckId);
-  if (ids.length === 0) return splitTodayQueue(0, [], []);
-
-  const now = new Date().toISOString();
-  const dueCutoff = reviewDueCutoff();
   const normalized = normalizeDueOptions(options ?? undefined);
-  const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
-  const dueRows = rows
-    .filter((row) => row.due <= dueCutoff && isReviewableCard(row, now))
-    .sort((a, b) => a.due.localeCompare(b.due));
-  const missingRows = ids
-    .filter((id) => !live.has(id))
-    .slice(0, normalized.newCardsLimit)
-    .map((id) => {
-      const emptyCard = createEmptyCard();
-      return {
-        id,
-        deck_id: deckId,
-        due: now,
-        stability: emptyCard.stability,
-        difficulty: emptyCard.difficulty,
-        elapsed_days: emptyCard.elapsed_days,
-        scheduled_days: emptyCard.scheduled_days,
-        learning_steps: emptyCard.learning_steps,
-        reps: emptyCard.reps,
-        lapses: emptyCard.lapses,
-        state: emptyCard.state,
-        last_review: null,
-        suspended_at: null,
-        buried_until: null,
-        marked_at: null,
-        created_at: now,
-        updated_at: now,
-      };
-    });
-  const queuedRows = options === null ? [] : applyReviewQueueOptions([...dueRows, ...missingRows], options);
-  return splitTodayQueue(ids.length, queuedRows, dueRows);
+  const { total, dueRows, virtualNew } = await getSmartDeckTodayRows(db, deckId, normalized.newCardsLimit);
+  if (total === 0) return splitTodayQueue(0, [], []);
+  const queuedRows = options === null ? [] : applyReviewQueueOptions([...dueRows, ...virtualNew], options);
+  return splitTodayQueue(total, queuedRows, dueRows);
 }
 
 export async function materializeSmartDeckCards(
@@ -730,7 +755,25 @@ export async function materializeSmartDeckCards(
   if (createCount === 0) return 0;
 
   const missingIds = ids.filter((id) => !existing.has(id)).slice(0, createCount);
+  return materializeSmartCardIds(db, deckId, missingIds);
+}
+
+/**
+ * Create the rows for these candidate ids of a smart deck, skipping ids that are live in any deck,
+ * and queue their uploads in the same transaction. The daily session uses it for the virtual cards
+ * that survive the budget cut, just before it shows them. Returns how many rows it inserted.
+ */
+/**
+ * Creates rows for candidate card ids, skipping any id live in a deck now. Also used for the
+ * meanings deck's generated word cards (lib/meanings), which are candidates in the same way.
+ */
+export async function materializeSmartCardIds(
+  db: AppDatabase,
+  deckId: SmartDeckId | typeof MEANINGS_DECK_ID,
+  missingIds: readonly string[],
+): Promise<number> {
   if (missingIds.length === 0) return 0;
+  const nowIso = new Date().toISOString();
 
   const emptyCard = createEmptyCard();
   const due = emptyCard.due.toISOString();
@@ -994,9 +1037,11 @@ async function getMutashabihatCardContent(
     text_uthmani: string;
     text_clean: string;
     text_qcf2: string;
+    text_search: string;
     v2_page: number;
     name_arabic: string;
     name_english: string;
+    ayah_count: number;
     pre_text: string | null;
     similar_text: string | null;
     post_text: string | null;
@@ -1004,7 +1049,8 @@ async function getMutashabihatCardContent(
     `SELECT g.cue, g.id AS group_id, r.sort_order AS ref_sort_order,
             r.surah AS ref_surah, r.ayah AS ref_ayah, r.surah_name_ar, r.tail_5,
             r.pre_text, r.similar_text, r.post_text,
-            qt.text_uthmani, qt.text_clean, qt.text_qcf2, qt.v2_page, s.name_arabic, s.name_english
+            qt.text_uthmani, qt.text_clean, qt.text_qcf2, qt.text_search, qt.v2_page,
+            s.name_arabic, s.name_english, s.ayah_count
        FROM mutashabihat_groups g
        JOIN mutashabihat_refs r ON r.group_id = g.id
        JOIN quran_text qt ON qt.surah = r.surah AND qt.ayah = r.ayah
@@ -1030,8 +1076,10 @@ async function getMutashabihatCardContent(
       similarText: row.similar_text,
       postText: row.post_text,
   }));
-  const targetRef = refs.find((ref) => ref.sortOrder === targetSortOrder);
-  if (!targetRef) return null;
+  const targetIndex = refs.findIndex((ref) => ref.sortOrder === targetSortOrder);
+  if (targetIndex < 0) return null;
+  const targetRef = refs[targetIndex];
+  const targetRow = rows[targetIndex];
 
   if (kind === "similarTail") {
     const prompt = buildTailPrompt(rows[0].cue, targetRef);
@@ -1045,8 +1093,19 @@ async function getMutashabihatCardContent(
     };
   }
 
-  const prompt = buildMutashabihatPrompt(targetRef, refs);
-  const previousAyahContext = prompt.needsExplicitRefLabel
+  const { plainWordCount, ...prompt } = buildMutashabihatPrompt(targetRef, refs);
+  const wholeAyah = prompt.answerKind !== "rest";
+  // A front its group tells apart can still open another ayah elsewhere in the Quran; it is named too.
+  // So is a whole first ayah, which has no ayah before it to set the scene: the label names its surah.
+  const needsExplicitRefLabel =
+    prompt.needsExplicitRefLabel ||
+    (wholeAyah && targetRef.ayah === 1) ||
+    (await frontOpensAnotherAyah(db, targetRef, targetRow.text_search, plainWordCount));
+  const answerKind = wholeAyah && targetRef.ayah >= targetRow.ayah_count ? "surahEnd" : prompt.answerKind;
+  const nextAyah = answerKind === "nextAyah" ? await getAyahPromptText(db, targetRef.surah, targetRef.ayah + 1) : null;
+  // The ayah before sets the scene for a front that names its ayah or asks what follows it. A surah's
+  // first ayah has none: the label names the surah instead.
+  const previousAyahContext = wholeAyah || needsExplicitRefLabel
     ? await getPreviousAyahPromptContext(db, targetRef)
     : null;
 
@@ -1063,36 +1122,62 @@ async function getMutashabihatCardContent(
         }
       : {}),
     ...prompt,
+    needsExplicitRefLabel,
+    answerKind,
+    ...(nextAyah ? { nextAyah: { surah: targetRef.surah, ayah: targetRef.ayah + 1, ...nextAyah } } : {}),
   };
 }
 
+/**
+ * Whether the front's words (`plainWordCount` of them), in the diacritic-free `text_search` text, open another ayah of the
+ * Quran. One lookup on the indexed column: the ayah whose text is the front, or starts with it and a
+ * space ("!" is the character after the space). An empty `text_search` (a database not yet
+ * migrated) reads as no.
+ */
+async function frontOpensAnotherAyah(
+  db: DatabaseExecutor,
+  targetRef: SmartDeckRef,
+  textSearch: string | null | undefined,
+  plainWordCount: number
+): Promise<boolean> {
+  const words = (textSearch ?? "").split(" ").filter(Boolean);
+  if (!plainWordCount || words.length === 0) return false;
+  const front = words.slice(0, plainWordCount).join(" ");
+  const row = await db.getFirstAsync<{ surah: number }>(
+    `SELECT surah FROM quran_text
+      WHERE (text_search = ? OR (text_search >= ? AND text_search < ?))
+        AND NOT (surah = ? AND ayah = ?)
+      LIMIT 1`,
+    [front, `${front} `, `${front}!`, targetRef.surah, targetRef.ayah]
+  );
+  return !!row;
+}
+
+async function getAyahPromptText(
+  db: DatabaseExecutor,
+  surah: number,
+  ayah: number
+): Promise<Pick<SmartDeckRef, "textQcf2" | "textUthmani" | "v2Page"> | null> {
+  const row = await db.getFirstAsync<{ text_qcf2: string; text_uthmani: string; v2_page: number }>(
+    "SELECT text_qcf2, text_uthmani, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+    [surah, ayah]
+  );
+  // Without page glyphs the ayah still shows in Unicode (empty glyphs and page 0 mean none).
+  if (!row?.text_uthmani) return null;
+  return {
+    textQcf2: row.text_qcf2 ?? "",
+    textUthmani: row.text_uthmani,
+    v2Page: row.v2_page ?? 0,
+  };
+}
+
+/** The ayah before the target in its own surah, or null for a surah's first ayah. */
 async function getPreviousAyahPromptContext(
   db: DatabaseExecutor,
   targetRef: SmartDeckRef
 ): Promise<Pick<SmartDeckRef, "textQcf2" | "textUthmani" | "v2Page"> | null> {
-  let previousSurah = targetRef.surah;
-  let previousAyah = targetRef.ayah - 1;
-  if (previousAyah < 1) {
-    if (targetRef.surah <= 1) return null;
-    previousSurah = targetRef.surah - 1;
-    const previousSurahRow = await db.getFirstAsync<{ ayah_count: number }>(
-      "SELECT ayah_count FROM surahs WHERE number = ?",
-      [previousSurah]
-    );
-    previousAyah = previousSurahRow?.ayah_count ?? 0;
-  }
-  if (previousAyah < 1) return null;
-
-  const row = await db.getFirstAsync<{ text_qcf2: string; text_uthmani: string; v2_page: number }>(
-    "SELECT text_qcf2, text_uthmani, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
-    [previousSurah, previousAyah]
-  );
-  if (!row?.text_uthmani || !row.text_qcf2 || !row.v2_page) return null;
-  return {
-    textQcf2: row.text_qcf2,
-    textUthmani: row.text_uthmani,
-    v2Page: row.v2_page,
-  };
+  if (targetRef.ayah <= 1) return null;
+  return getAyahPromptText(db, targetRef.surah, targetRef.ayah - 1);
 }
 
 function parseMutashabihatCardId(
@@ -1112,221 +1197,77 @@ function buildTailPrompt(
   cue: string,
   targetRef: SmartDeckRef
 ): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "hiddenAnswerQcf2" | "hiddenAnswerUthmani" | "prefixWordCount"> | null {
-  const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
   const uthmaniWords = splitQuranWords(targetRef.textUthmani);
-  const hiddenCount = inferTailWordCount(cue, targetRef.tail5, targetRef.textClean);
+  const hiddenCount = tailHiddenWordCount(cue, targetRef.tail5, targetRef.textClean);
   const prefixWordCount = uthmaniWords.length - hiddenCount;
   if (prefixWordCount <= 0) return null;
 
-  // Some verses have separate mark glyphs. Use Unicode for slices when the word boundary is ambiguous.
-  const aligned = qcf2Tokens.length === uthmaniWords.length + 1;
+  // Mark glyphs and one two-word glyph shift some page-font boundaries (lib/mushaf/glyph-words).
+  // Where a boundary cannot be drawn in glyphs, both sides stay Unicode.
+  const layout = ayahGlyphs(targetRef.surah, targetRef.ayah, targetRef.textQcf2, uthmaniWords.length);
+  const promptQcf2 = layout ? glyphsBeforeWord(layout, prefixWordCount) : null;
+  const hiddenAnswerQcf2 = layout ? glyphsFromWord(layout, prefixWordCount) : null;
+  const drawable = promptQcf2 !== null && hiddenAnswerQcf2 !== null;
   return {
-    promptQcf2: aligned ? qcf2Tokens.slice(0, prefixWordCount).join(" ") : undefined,
+    promptQcf2: drawable ? promptQcf2 : undefined,
     promptUthmani: uthmaniWords.slice(0, prefixWordCount).join(" "),
-    hiddenAnswerQcf2: aligned ? qcf2Tokens.slice(prefixWordCount).join(" ") : undefined,
+    hiddenAnswerQcf2: drawable ? hiddenAnswerQcf2 : undefined,
     hiddenAnswerUthmani: uthmaniWords.slice(prefixWordCount).join(" "),
     prefixWordCount,
   };
 }
 
+/**
+ * A similar-verse card's front (lib/fsrs/similar-card-text) and what its back answers: the rest of
+ * the ayah, or, when the front is the whole ayah, the ayah after it.
+ */
 function buildMutashabihatPrompt(
   targetRef: SmartDeckRef,
   refs: SmartDeckRef[]
-): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "prefixWordCount" | "needsExplicitRefLabel"> {
-  const segmentedPrompt = buildSegmentedMutashabihatPrompt(targetRef, refs);
-  if (segmentedPrompt) return segmentedPrompt;
-
+): Pick<
+  SmartCardContent,
+  "promptQcf2" | "promptUthmani" | "prefixWordCount" | "needsExplicitRefLabel" | "hiddenAnswerQcf2" | "hiddenAnswerUthmani"
+> & { answerKind: "rest" | "nextAyah"; plainWordCount: number } {
+  const front = mutashabihatFront(targetRef, refs);
   const uthmaniWords = splitQuranWords(targetRef.textUthmani);
-  const targetWords = normalizeArabicWords(targetRef.textClean);
-  let prefixWordCount = uthmaniWords.length;
-  let needsExplicitRefLabel = true;
-
-  if (targetWords.length > 0) {
-    const normalizedRefs = refs.map((ref) => ({
-      ref,
-      words: normalizeArabicWords(ref.textClean),
-    }));
-
-    for (let count = 1; count <= targetWords.length; count++) {
-      const targetPrefix = targetWords.slice(0, count).join(" ");
-      const matches = normalizedRefs.filter((item) => item.words.slice(0, count).join(" ") === targetPrefix);
-      if (matches.length === 1 && matches[0].ref.sortOrder === targetRef.sortOrder) {
-        prefixWordCount = count;
-        needsExplicitRefLabel = false;
-        break;
-      }
-    }
+  const prompt = buildPrefixPrompt(targetRef, uthmaniWords, front.prefixWordCount);
+  if (front.prefixWordCount >= uthmaniWords.length) {
+    return { ...prompt, needsExplicitRefLabel: front.needsExplicitRefLabel, plainWordCount: front.plainWordCount, answerKind: "nextAyah" };
   }
-
+  // As on a tail card, the rest of the ayah is drawn in glyphs only when the front is too.
+  const layout = ayahGlyphs(targetRef.surah, targetRef.ayah, targetRef.textQcf2, uthmaniWords.length);
+  const hiddenAnswerQcf2 = layout && prompt.promptQcf2 !== undefined ? glyphsFromWord(layout, front.prefixWordCount) : null;
   return {
-    ...buildPrefixPrompt(targetRef.textQcf2, uthmaniWords, Math.min(prefixWordCount, uthmaniWords.length)),
-    needsExplicitRefLabel,
+    ...prompt,
+    needsExplicitRefLabel: front.needsExplicitRefLabel,
+    plainWordCount: front.plainWordCount,
+    answerKind: "rest",
+    hiddenAnswerUthmani: uthmaniWords.slice(front.prefixWordCount).join(" "),
+    hiddenAnswerQcf2: hiddenAnswerQcf2 ?? undefined,
   };
 }
 
-function buildSegmentedMutashabihatPrompt(
-  targetRef: SmartDeckRef,
-  refs: SmartDeckRef[]
-): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "prefixWordCount" | "needsExplicitRefLabel"> | null {
-  const similarWords = normalizeArabicWords(targetRef.similarText ?? "");
-  if (similarWords.length === 0) return null;
-
-  const targetWords = normalizeArabicWords(targetRef.textClean);
-  if (targetWords.length === 0) return null;
-
-  const promptWordCount =
-    findSegmentPromptWordCount(targetWords, normalizeArabicWords(targetRef.preText ?? ""), similarWords) ||
-    uthmaniSegmentEnd(targetRef);
-  if (promptWordCount <= 0) return null;
-
-  const uthmaniWords = splitQuranWords(targetRef.textUthmani);
-  const safePrefixCount = Math.min(promptWordCount, targetWords.length, uthmaniWords.length);
-  if (safePrefixCount <= 0) return null;
-
-  const normalizedRefs = refs.map((ref) => ({
-    ref,
-    words: normalizeArabicWords(ref.textClean),
-  }));
-  const targetPrefix = targetWords.slice(0, safePrefixCount).join(" ");
-  const matches = normalizedRefs.filter((item) => item.words.slice(0, safePrefixCount).join(" ") === targetPrefix);
-  const needsExplicitRefLabel = !(matches.length === 1 && matches[0].ref.sortOrder === targetRef.sortOrder);
-
-  return {
-    ...buildPrefixPrompt(targetRef.textQcf2, uthmaniWords, safePrefixCount),
-    needsExplicitRefLabel,
-  };
-}
-
-function buildPrefixPrompt(textQcf2: string, uthmaniWords: string[], prefixWordCount: number) {
-  const wordGlyphs = splitQcf2Words(textQcf2).slice(0, -1);
+/**
+ * The prompt's first words in the page font through lib/mushaf/glyph-words, which keeps a hizb mark
+ * with the first word. A whole ayah is all of its word glyphs even when its layout is unknown.
+ */
+function buildPrefixPrompt(targetRef: SmartDeckRef, uthmaniWords: string[], prefixWordCount: number) {
+  const layout = ayahGlyphs(targetRef.surah, targetRef.ayah, targetRef.textQcf2, uthmaniWords.length);
   const wholeAyah = prefixWordCount === uthmaniWords.length;
+  const promptQcf2 = layout
+    ? glyphsBeforeWord(layout, prefixWordCount)
+    : wholeAyah
+      ? splitQcf2Words(targetRef.textQcf2).slice(0, -1).join(" ")
+      : null;
   return {
-    promptQcf2: wholeAyah
-      ? wordGlyphs.join(" ")
-      : wordGlyphs.length === uthmaniWords.length
-        ? wordGlyphs.slice(0, prefixWordCount).join(" ")
-        : undefined,
+    promptQcf2: promptQcf2 ?? undefined,
     promptUthmani: uthmaniWords.slice(0, prefixWordCount).join(" "),
     prefixWordCount,
   };
 }
 
-/**
- * Where the similar words end in the ayah, matched word for word against its Uthmani text. The bundled
- * segments are built from the Uthmani text, whose spelling the plain text does not always share
- * ("أَزْوَٰجًا", "أَزْوَاجًا"), so this is tried when the plain text does not hold them. Similar words
- * that cross an ayah end are only partly in the ayah (crossingSimilarEnd).
- */
-function uthmaniSegmentEnd(ref: SmartDeckRef): number {
-  const keys = (text: string) => splitQuranWords(text).map((word) => normalizeArabicWords(word).join(""));
-  const ayahWords = keys(ref.textUthmani);
-  const similarWords = keys(ref.similarText ?? "");
-  return (
-    findSegmentPromptWordCount(ayahWords, keys(ref.preText ?? ""), similarWords) ||
-    crossingSimilarEnd(ayahWords, similarWords)
-  );
-}
-
-/**
- * The prompt end for similar words that cross an ayah end, or 0: ones that start in the ayah and run
- * on into the next (101:6's "فَأَمَّا مَن ثَقُلَتْ مَوَٰزِينُهُۥ" into 101:7) end with the ayah; ones that
- * run in from the ayah before end at their last word here. The longest overlap counts, and it takes
- * two words, so a word that merely recurs does not (a one-word ayah such as "طسٓمٓ" keeps the prompt
- * buildMutashabihatPrompt gives it).
- */
-function crossingSimilarEnd(ayahWords: string[], similarWords: string[]): number {
-  for (let overlap = Math.min(ayahWords.length, similarWords.length - 1); overlap >= 2; overlap--) {
-    const tail = ayahWords.slice(ayahWords.length - overlap);
-    if (similarWords.slice(0, overlap).every((word, k) => word === tail[k])) return ayahWords.length;
-    if (similarWords.slice(similarWords.length - overlap).every((word, k) => word === ayahWords[k])) return overlap;
-  }
-  return 0;
-}
-
-function findSegmentPromptWordCount(
-  targetWords: string[],
-  preWords: string[],
-  similarWords: string[]
-): number {
-  if (preWords.length > 0) {
-    const combinedWords = [...preWords, ...similarWords];
-    const combinedStart = findSubsequenceStart(targetWords, combinedWords);
-    if (combinedStart >= 0) return combinedStart + combinedWords.length;
-  }
-
-  const similarStart = findSubsequenceStart(targetWords, similarWords);
-  if (similarStart >= 0) return similarStart + similarWords.length;
-
-  return 0;
-}
-
-function findSubsequenceStart(words: string[], needle: string[]): number {
-  if (needle.length === 0 || needle.length > words.length) return -1;
-  for (let start = 0; start <= words.length - needle.length; start++) {
-    let matched = true;
-    for (let i = 0; i < needle.length; i++) {
-      if (words[start + i] !== needle[i]) {
-        matched = false;
-        break;
-      }
-    }
-    if (matched) return start;
-  }
-  return -1;
-}
-
-function inferTailWordCount(cue: string, tail5: string | null, textClean: string): number {
-  const ayahWords = normalizeArabicWords(textClean);
-  if (ayahWords.length === 0) return 0;
-
-  const cueWords = normalizeArabicWords(cue);
-  const tail5Words = normalizeArabicWords(tail5 ?? "");
-  const cueMatch = suffixMatchCount(ayahWords, cueWords);
-  if (cueMatch > 0) return cueMatch;
-
-  const tail5Match = suffixMatchCount(ayahWords, tail5Words);
-  if (tail5Match > 0) return tail5Match;
-
-  const fallback = cueWords.length || tail5Words.length || 1;
-  return Math.min(fallback, ayahWords.length);
-}
-
-function suffixMatchCount(words: string[], suffix: string[]): number {
-  if (suffix.length === 0 || suffix.length > words.length) return 0;
-  const start = words.length - suffix.length;
-  for (let i = 0; i < suffix.length; i++) {
-    if (words[start + i] !== suffix[i]) return 0;
-  }
-  return suffix.length;
-}
-
 function splitQcf2Words(text: string): string[] {
   return text.split(/\s+/).filter(Boolean);
-}
-
-function splitQuranWords(text: string): string[] {
-  return text
-    .replace(/[۞۩﴿﴾0-9٠-٩]/g, " ")
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter(Boolean);
-}
-
-function normalizeArabicWords(text: string): string[] {
-  const normalized = text
-    .replace(/\(و\)/g, " ")
-    .replace(/لا(?=[\u0621-\u064A])/g, "لا ")
-    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
-    .replace(/[ٱأإآ]/g, "ا")
-    .replace(/ى/g, "ي")
-    .replace(/ؤ/g, "و")
-    .replace(/ئ/g, "ي")
-    .replace(/ة/g, "ه")
-    .replace(/ـ/g, "")
-    .replace(/[^\u0621-\u064A\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return normalized ? normalized.split(" ") : [];
 }
 
 async function getSmartDeckDueRows(
