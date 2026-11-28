@@ -11,6 +11,7 @@ export type HabitHeadline =
   | { kind: "done_today"; length: number }
   | { kind: "excused_today"; length: number }
   | { kind: "paused"; length: number; until: LocalDate }
+  | { kind: "kept_today"; length: number }
   | { kind: "at_risk"; length: number }
   | { kind: "make_up_open"; length: number; cutoff: Date }
   | { kind: "earn_back"; earnBack: EarnBack }
@@ -72,8 +73,11 @@ export function buildHabitSnapshot(input: SnapshotInput): HabitSnapshot {
   else if (streak.makeUpPending) headline = { kind: "make_up_open", length: streak.length, cutoff: makeUpCutoff };
   else if (todayStatus === "done") headline = { kind: "done_today", length: streak.length };
   else if (todayStatus === "excused") headline = { kind: "excused_today", length: streak.length };
-  else if (todayStatus === "paused" || (pause && pause.start <= today && today <= pause.end)) {
-    headline = { kind: "paused", length: streak.length, until: pause?.end ?? today };
+  else if (pause && pause.start <= today && today <= pause.end) {
+    headline = { kind: "paused", length: streak.length, until: pause.end };
+  } else if (todayStatus === "paused") {
+    // Ending a pause keeps days already covered, including today.
+    headline = { kind: "kept_today", length: streak.length };
   } else if (streak.length > 0) headline = { kind: "at_risk", length: streak.length };
   else if (longest > 0) headline = { kind: "fresh_start", longest };
   else headline = { kind: "empty" };

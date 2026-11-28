@@ -8,7 +8,9 @@ import { Rating, type Grade } from "@/lib/fsrs/scheduler";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import {
   clearExcusedDay,
+  endHabitPause,
   loadHabitOverview,
+  setHabitPause,
   markExcusedDays,
   markFullWirdIfComplete,
   applyRemoteHabitDay,
@@ -265,6 +267,24 @@ describe("settle pass, excuses and pause", () => {
     await clearExcusedDay(store.db, { date: addDays(TODAY, 1), now: atLocalTime(TODAY, 800) });
     expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "done", reason: null });
     expect(await readHabitDayRow(store.db, addDays(TODAY, 1))).toMatchObject({ status: null, reason: null });
+  });
+
+  it("ends the active pause and keeps days already paused when Home reopens", async () => {
+    const yesterday = addDays(TODAY, -1);
+    const end = addDays(TODAY, 5);
+    const now = atLocalTime(TODAY, 15 * 60);
+    await setHabitPause(store.db, { start: yesterday, end, now: atLocalTime(yesterday, 15 * 60) });
+    await settleHabitDays(store.db, { now });
+    expect((await loadHabitOverview(store.db, { now })).headline).toMatchObject({ kind: "paused", until: end });
+
+    await endHabitPause(store.db);
+    const overview = await loadHabitOverview(store.db, { now });
+    expect(overview.settings.pause).toBeNull();
+    expect(overview.headline).toEqual({ kind: "kept_today", length: 0 });
+    expect(await readHabitDayRow(store.db, yesterday)).toMatchObject({ status: "paused" });
+    expect(await readHabitDayRow(store.db, TODAY)).toMatchObject({ status: "paused" });
+    await reciteMinimum(TODAY, 16 * 60);
+    expect((await loadHabitOverview(store.db, { now: atLocalTime(TODAY, 17 * 60) })).headline.kind).toBe("done_today");
   });
 
   it("marks the full wird only after the minimum and when nothing is left", async () => {

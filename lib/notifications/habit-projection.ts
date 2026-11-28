@@ -304,6 +304,7 @@ function restoreHeadline(
   switch (headline.kind) {
     case "done_today":
     case "excused_today":
+    case "kept_today":
     case "paused":
     case "at_risk":
     case "make_up_open":

@@ -128,7 +128,7 @@ export function streakFingerprint(snapshot: HabitSnapshot): string {
   return `${snapshot.streak.length}|${snapshot.graceHeld}|${snapshot.headline.kind}`;
 }
 
-const COVERED_TODAY = new Set(["done_today", "excused_today", "paused"]);
+const COVERED_TODAY = new Set(["done_today", "excused_today", "kept_today", "paused"]);
 
 /**
  * Today already has its wird, an excuse or a pause. The headline alone is not enough: an open

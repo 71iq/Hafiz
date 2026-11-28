@@ -297,6 +297,7 @@ function stateOf(projection: HabitProjection, at: Date, input: WidgetCopyInput, 
       if (isStreakMilestone(headline.length)) return "milestone";
       return reviewLeft ? "safe" : "done";
     case "excused_today":
+    case "kept_today":
       return "kept";
     case "paused":
       return "paused";

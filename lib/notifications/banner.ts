@@ -102,7 +102,7 @@ export async function loadReminderBanner(
   if (!latest) return null;
 
   const current = snapshot.headline.kind;
-  if (["excused_today", "paused"].includes(current) && latest.type !== "friday_kahf") return null;
+  if (["excused_today", "kept_today", "paused"].includes(current) && latest.type !== "friday_kahf") return null;
   if (current === "done_today" && !SHOWN_WHEN_DONE.has(latest.type)) return null;
   if (latest.type === "review_reminder") {
     // Today's review state at `now`, not when the plan was made, and never on a day set aside.

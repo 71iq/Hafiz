@@ -54,6 +54,8 @@ function headlineMessage(overview: HabitOverview, language: "en" | "ar", s: UISt
       return wirdLeft ? s.habitMinimumMet : s.habitDoneToday;
     case "excused_today":
       return s.habitExcusedToday;
+    case "kept_today":
+      return s.habitKeptToday;
     case "paused":
       return interpolate(s.habitPausedUntil, { date: formatShortDate(headline.until, language) });
     case "make_up_open":
