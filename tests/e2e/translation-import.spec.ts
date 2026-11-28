@@ -1,6 +1,13 @@
 import { strings } from "@/lib/i18n/strings";
 import { expect, test } from "@playwright/test";
-import { assertHealthyPage, captureConsole, databaseSql, waitForQaReady } from "./helpers";
+import {
+  assertHealthyPage,
+  assertReadableNotice,
+  captureConsole,
+  databaseSql,
+  prepareContentImportPreview,
+  waitForQaReady,
+} from "./helpers";
 
 for (const language of ["en", "ar"] as const) {
   const s = strings[language];
@@ -20,10 +27,7 @@ for (const language of ["en", "ar"] as const) {
         { surah: 1, ayah: 2, text: "RF164 synthetic failure" },
       ];
       try {
-        await context.addInitScript((language) => {
-          if (location.hostname === "127.0.0.1" || location.hostname === "localhost")
-            localStorage.setItem("hafiz_ui_language", language);
-        }, language);
+        await prepareContentImportPreview(context, language);
         await context.route(/\/data\/translations\/fr\.json$/, async (route) => {
           await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(candidate) });
         });
@@ -46,11 +50,13 @@ for (const language of ["en", "ar"] as const) {
           "SELECT surah,ayah,text FROM translation_active ORDER BY surah,ayah",
         );
         expect(Array.isArray(retained) && retained.length > 0).toBe(true);
-        const active = await databaseSql(
-          page,
-          "getFirst",
-          "SELECT value FROM user_settings WHERE key='translation_active_lang'",
-        );
+        const storedLanguages = () =>
+          databaseSql(
+            page,
+            "getAll",
+            "SELECT key,value FROM user_settings WHERE key IN ('translation_language','translation_active_lang') ORDER BY key",
+          );
+        const previousLanguages = await storedLanguages();
         await databaseSql(
           page,
           "exec",
@@ -59,7 +65,8 @@ for (const language of ["en", "ar"] as const) {
         BEGIN SELECT RAISE(ABORT,'RF164 synthetic translation failure'); END;`,
         );
         await setting.click();
-        const french = page.getByRole("dialog").getByText("French", { exact: true });
+        const frenchName = language === "ar" ? "الفرنسية" : "French";
+        const french = page.getByRole("radio", { name: frenchName + " Français", exact: true });
         await expect(french).toBeVisible();
         const failure = page.waitForEvent("console", {
           predicate: (message) =>
@@ -71,33 +78,13 @@ for (const language of ["en", "ar"] as const) {
         await failure;
         await expect(french).not.toBeVisible();
         await expect(setting).toBeVisible();
-        const alert = page.getByRole("alert").filter({ hasText: s.translationLoadFailed });
-        await expect(alert).toBeVisible();
-        await expect(alert).toHaveText(s.translationLoadFailed);
-        await expect(alert).toHaveAttribute("aria-live", "polite");
-        const unoccluded = await alert.evaluate((element: HTMLElement) => {
-          const previous = element.style.pointerEvents;
-          element.style.pointerEvents = "auto";
-          try {
-            const bounds = element.getBoundingClientRect();
-            return [0.25, 0.5, 0.75].every((x) =>
-              [0.25, 0.5, 0.75].every((y) => {
-                const hit = document.elementFromPoint(bounds.x + bounds.width * x, bounds.y + bounds.height * y);
-                return hit === element || element.contains(hit);
-              }),
-            );
-          } finally {
-            element.style.pointerEvents = previous;
-          }
-        });
-        expect(unoccluded).toBe(true);
+        const notice = page.getByText(s.translationLoadFailed, { exact: true });
+        await assertReadableNotice(notice);
         await page.screenshot({ path: testInfo.outputPath("translation-failure.png") });
         expect(
           await databaseSql(page, "getAll", "SELECT surah,ayah,text FROM translation_active ORDER BY surah,ayah"),
         ).toEqual(retained);
-        expect(
-          await databaseSql(page, "getFirst", "SELECT value FROM user_settings WHERE key='translation_active_lang'"),
-        ).toEqual(active);
+        expect(await storedLanguages()).toEqual(previousLanguages);
         // A fresh SQLite connection has no former connection's TEMP trigger.
         expect(
           await databaseSql(
@@ -106,21 +93,15 @@ for (const language of ["en", "ar"] as const) {
             "SELECT name FROM sqlite_temp_master WHERE type='trigger' AND name='fail_rf164_candidate'",
           ),
         ).toEqual([]);
-        await expect(alert).not.toBeVisible();
+        await expect(notice).toBeHidden();
         await setting.click();
         await french.click();
         await expect(french).not.toBeVisible();
-        await expect(setting).toContainText("French");
+        await expect(setting).toContainText(frenchName);
         expect(
           await databaseSql(page, "getAll", "SELECT surah,ayah,text FROM translation_active ORDER BY surah,ayah"),
         ).toEqual(candidate);
-        expect(
-          await databaseSql(
-            page,
-            "getAll",
-            "SELECT key,value FROM user_settings WHERE key IN ('translation_language','translation_active_lang') ORDER BY key",
-          ),
-        ).toEqual([
+        expect(await storedLanguages()).toEqual([
           { key: "translation_active_lang", value: "fr" },
           { key: "translation_language", value: "fr" },
         ]);

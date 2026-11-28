@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type BrowserContext, type Locator, type Page } from "@playwright/test";
 
 const frameworkOverlayPatterns = [
   /Failed to compile/i,
@@ -58,6 +58,36 @@ export async function assertHealthyPage(page: Page, capture: ConsoleCapture) {
 
   expect(unexpectedPageErrors, "unexpected page errors").toEqual([]);
   expect(unexpectedConsoleErrors, "unexpected console errors").toEqual([]);
+}
+
+export async function prepareContentImportPreview(context: BrowserContext, language: "en" | "ar") {
+  // Local exports acquire their release metadata only when packaged for deployment.
+  await context.route("/__release.json", (route) => route.fulfill({ json: { commit: "0".repeat(40) } }));
+  await context.addInitScript((language) => {
+    if (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+      localStorage.setItem("hafiz_ui_language", language);
+  }, language);
+}
+
+export async function assertReadableNotice(notice: Locator) {
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveAttribute("aria-live", "polite");
+  const unoccluded = await notice.evaluate((element: HTMLElement) => {
+    const previous = element.style.pointerEvents;
+    element.style.pointerEvents = "auto";
+    try {
+      const bounds = element.getBoundingClientRect();
+      return [0.25, 0.5, 0.75].every((x) =>
+        [0.25, 0.5, 0.75].every((y) => {
+          const hit = document.elementFromPoint(bounds.x + bounds.width * x, bounds.y + bounds.height * y);
+          return hit === element || element.contains(hit);
+        }),
+      );
+    } finally {
+      element.style.pointerEvents = previous;
+    }
+  });
+  expect(unoccluded).toBe(true);
 }
 
 export async function databaseSql(

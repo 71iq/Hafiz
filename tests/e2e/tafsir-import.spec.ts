@@ -1,7 +1,14 @@
 import { gzipSync } from "node:zlib";
 import { strings } from "@/lib/i18n/strings";
 import { expect, test } from "@playwright/test";
-import { assertHealthyPage, captureConsole, databaseSql, waitForQaReady } from "./helpers";
+import {
+  assertHealthyPage,
+  assertReadableNotice,
+  captureConsole,
+  databaseSql,
+  prepareContentImportPreview,
+  waitForQaReady,
+} from "./helpers";
 
 const cases = [
   { failureKind: "commit", language: "en", width: 1280 },
@@ -27,10 +34,7 @@ for (const { failureKind, language, width } of cases) {
         storageState: { cookies: [], origins: [] },
       });
       try {
-        await context.addInitScript((language) => {
-          if (location.hostname === "127.0.0.1" || location.hostname === "localhost")
-            localStorage.setItem("hafiz_ui_language", language);
-        }, language);
+        await prepareContentImportPreview(context, language);
         const page = await context.newPage();
         const capture = captureConsole(page);
         await waitForQaReady(page);
@@ -91,7 +95,11 @@ for (const { failureKind, language, width } of cases) {
           "getAll",
           "SELECT source,COUNT(*) AS count FROM tafseer WHERE source<>'qurtubi' GROUP BY source ORDER BY source",
         );
-        await page.getByRole("button", { name: new RegExp("^" + s.tafseerSourceLabel) }).click();
+        const storedSource = () =>
+          databaseSql(page, "getFirst", "SELECT value FROM user_settings WHERE key='tafseer_source'");
+        const previousSource = await storedSource();
+        const setting = page.getByRole("button", { name: new RegExp("^" + s.tafseerSourceLabel) });
+        await setting.click();
         const qurtubi = page.getByRole("button", { name: new RegExp("^" + s.tafseerQurtubi) });
         await expect(qurtubi.getByText(s.tafseerDownloadAction, { exact: true })).toBeVisible();
         const failure = page.waitForEvent("console", {
@@ -106,55 +114,21 @@ for (const { failureKind, language, width } of cases) {
         });
         await qurtubi.click();
         await failure;
-        if (failureKind === "insert") {
-          await expect(qurtubi).not.toBeVisible();
-          await expect(page.getByRole("button", { name: new RegExp("^" + s.tafseerSourceLabel) })).toBeVisible();
+        const retry = page.getByRole("button", { name: s.detailRetry + ", " + s.tafseerQurtubi, exact: true });
+        if (failureKind === "commit") {
+          await expect(qurtubi.getByText(s.tafsirDownloadFailed, { exact: true })).toBeVisible();
+          await expect(retry).toBeVisible();
+        } else {
+          // The insert error replaces the SQLite connection and the picker unmounts.
+          await expect(page.getByRole("dialog")).toBeHidden();
+          const notice = page.getByText(s.tafseerSourceImportFailed, { exact: true });
+          await assertReadableNotice(notice);
+          await expect(setting).toContainText(s.tafseerMuyassar);
+          await setting.click();
+          await expect(qurtubi.getByText(s.tafseerDownloadAction, { exact: true })).toBeVisible();
         }
-        const notice = page.getByText(s.tafseerSourceImportFailed, { exact: true });
-        await expect(notice).toBeVisible();
-        const unoccluded = await notice.evaluate((element: HTMLElement) => {
-          const previous = element.style.pointerEvents;
-          element.style.pointerEvents = "auto";
-          try {
-            const bounds = element.getBoundingClientRect();
-            return [0.25, 0.5, 0.75].every((x) =>
-              [0.25, 0.5, 0.75].every((y) => {
-                const hit = document.elementFromPoint(bounds.x + bounds.width * x, bounds.y + bounds.height * y);
-                return hit === element || element.contains(hit);
-              }),
-            );
-          } finally {
-            element.style.pointerEvents = previous;
-          }
-        });
-        expect(unoccluded, "Failure notice must be readable above the modal").toBe(true);
-        const alert = page.getByRole("alert").filter({ hasText: s.tafseerSourceImportFailed });
-        await expect(alert).toBeVisible();
-        await expect(alert).toHaveText(s.tafseerSourceImportFailed);
-        await expect(alert).toHaveAttribute("aria-live", "polite");
-        await page.screenshot({ path: testInfo.outputPath("tafsir-failure.png") });
-        if (failureKind === "insert") {
-          await expect
-            .poll(
-              async () => {
-                try {
-                  return await databaseSql(
-                    page,
-                    "getAll",
-                    "SELECT surah,ayah,source,text FROM tafseer WHERE source='qurtubi' ORDER BY surah,ayah",
-                  );
-                } catch {
-                  return null;
-                }
-              },
-              { timeout: 60_000 },
-            )
-            .toEqual(retained);
-          if (!(await qurtubi.isVisible()))
-            await page.getByRole("button", { name: new RegExp("^" + s.tafseerSourceLabel) }).click();
-        }
-        await expect(qurtubi.getByText(s.tafseerDownloadAction, { exact: true })).toBeVisible();
         await page.screenshot({ path: testInfo.outputPath("tafsir-retry-ready.png") });
+        expect(await storedSource()).toEqual(previousSource);
         expect(
           await databaseSql(
             page,
@@ -175,8 +149,12 @@ for (const { failureKind, language, width } of cases) {
             .getByText(s.tafseerSelected, { exact: true }),
         ).toBeVisible();
         await databaseSql(page, "exec", "DROP TRIGGER IF EXISTS fail_rf104_candidate");
-        await qurtubi.click();
-        await expect(qurtubi.getByText(s.tafseerSelected, { exact: true })).toBeVisible({ timeout: 60_000 });
+        await (failureKind === "commit" ? retry : qurtubi).click();
+        await expect(page.getByRole("dialog")).toBeHidden({ timeout: 60_000 });
+        await expect(setting).toContainText(s.tafseerQurtubi);
+        await expect.poll(storedSource).toEqual({ value: "qurtubi" });
+        await setting.click();
+        await expect(qurtubi.getByText(s.tafseerSelected, { exact: true })).toBeVisible();
         await page.screenshot({ path: testInfo.outputPath("tafsir-success.png") });
         expect(
           await databaseSql(
