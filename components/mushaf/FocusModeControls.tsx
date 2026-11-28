@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { PanResponder, Pressable, Text, View, Platform } from "react-native";
 import { Pause, Play, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -107,6 +107,11 @@ export function FocusModeControls({
     minutes: formatDecimal(FOCUS_BASE_SECONDS_PER_PAGE / clampedSpeed / 60, isRTL),
   });
 
+  const commitSpeed = useCallback((value: number) => {
+    const bounded = Math.max(FOCUS_SCROLL_SPEED_MIN, Math.min(FOCUS_SCROLL_SPEED_MAX, value));
+    onSpeedChange(Math.round(bounded * 10) / 10);
+  }, [onSpeedChange]);
+
   const commitSpeedFromX = useCallback(
     (x: number) => {
       if (trackWidth <= 0) return;
@@ -114,10 +119,36 @@ export function FocusModeControls({
       const position = Math.max(0, Math.min(1, x / trackWidth));
       const ratio = isRTL ? 1 - position : position;
       const next = FOCUS_SCROLL_SPEED_MIN + ratio * (FOCUS_SCROLL_SPEED_MAX - FOCUS_SCROLL_SPEED_MIN);
-      onSpeedChange(Math.round(next * 10) / 10);
+      commitSpeed(next);
     },
-    [isRTL, onSpeedChange, trackWidth]
+    [commitSpeed, isRTL, trackWidth]
   );
+
+  function onSpeedKeyDown(event: ReactKeyboardEvent) {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.nativeEvent.isComposing) return;
+    let next: number;
+    switch (event.key) {
+      case "ArrowUp":
+      case isRTL ? "ArrowLeft" : "ArrowRight":
+        next = clampedSpeed + SPEED_STEP;
+        break;
+      case "ArrowDown":
+      case isRTL ? "ArrowRight" : "ArrowLeft":
+        next = clampedSpeed - SPEED_STEP;
+        break;
+      case "Home":
+        next = FOCUS_SCROLL_SPEED_MIN;
+        break;
+      case "End":
+        next = FOCUS_SCROLL_SPEED_MAX;
+        break;
+      default:
+        return;
+    }
+    // These arrows belong to the slider while focused. The reader also uses them to turn pages.
+    event.preventDefault();
+    commitSpeed(next);
+  }
 
   const panResponder = useMemo(
     () =>
@@ -227,12 +258,18 @@ export function FocusModeControls({
               className="h-5 justify-center"
               accessibilityRole="adjustable"
               accessibilityLabel={s.autoScrollSpeed}
-              accessibilityValue={{ text: `${speedText}, ${minutesText}` }}
+              aria-valuetext={`${speedText}, ${minutesText}`}
+              {...(Platform.OS === "web" && {
+                tabIndex: 0 as const,
+                "aria-valuemin": FOCUS_SCROLL_SPEED_MIN,
+                "aria-valuemax": FOCUS_SCROLL_SPEED_MAX,
+                "aria-valuenow": clampedSpeed,
+                onKeyDown: onSpeedKeyDown,
+              })}
               accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
               onAccessibilityAction={(event) => {
                 const delta = event.nativeEvent.actionName === "increment" ? SPEED_STEP : -SPEED_STEP;
-                const next = Math.max(FOCUS_SCROLL_SPEED_MIN, Math.min(FOCUS_SCROLL_SPEED_MAX, clampedSpeed + delta));
-                onSpeedChange(Math.round(next * 10) / 10);
+                commitSpeed(clampedSpeed + delta);
               }}
               style={{ direction: "ltr" }}
             >
