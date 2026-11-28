@@ -2,7 +2,7 @@ import { Fragment, memo, useEffect, useState, useMemo, useRef, useCallback } fro
 import { useWeakSpotMarker } from "@/lib/hifz/use-weak-spots";
 import { useSimilarMarks } from "@/lib/hifz/use-similar-markers";
 import { useDatabaseStatus } from "@/lib/database/provider";
-import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Platform, type GestureResponderEvent } from "react-native";
 import { Bismillah } from "./Bismillah";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
@@ -573,6 +573,11 @@ function MushafPageInner({
                   }}
                   {...(Platform.OS === "web"
                     ? ({
+                        // touchend still belongs to the marker. Its compatibility click would hit
+                        // the action sheet now under the finger, including its dismiss backdrop.
+                        onTouchEnd: (event: GestureResponderEvent) => {
+                          if (isSelectedAyah(identity.surah, identity.ayah)) event.preventDefault();
+                        },
                         // Shift+F10 or the context-menu key on a focused marker selects the ayah.
                         onContextMenu: (event: any) => {
                           event?.preventDefault?.();
