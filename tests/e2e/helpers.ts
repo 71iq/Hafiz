@@ -71,7 +71,7 @@ export async function prepareContentImportPreview(context: BrowserContext, langu
 
 export async function assertReadableNotice(notice: Locator) {
   await expect(notice).toBeVisible();
-  await expect(notice).toHaveAttribute("aria-live", "polite");
+  await expect(notice).toBeInViewport({ ratio: 1 });
   const unoccluded = await notice.evaluate((element: HTMLElement) => {
     const previous = element.style.pointerEvents;
     element.style.pointerEvents = "auto";

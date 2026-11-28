@@ -1,18 +1,11 @@
 import { strings } from "@/lib/i18n/strings";
 import { expect, test } from "@playwright/test";
-import {
-  assertHealthyPage,
-  assertReadableNotice,
-  captureConsole,
-  databaseSql,
-  prepareContentImportPreview,
-  waitForQaReady,
-} from "./helpers";
+import { assertHealthyPage, captureConsole, databaseSql, prepareContentImportPreview, waitForQaReady } from "./helpers";
 
 for (const language of ["en", "ar"] as const) {
   const s = strings[language];
   test(
-    "translation failure survives database recovery and retries " + language,
+    "translation keeps the previous selection after an insert failure and retries " + language,
     async ({ browser, baseURL }, testInfo) => {
       expect(new URL(baseURL ?? "").hostname).toMatch(/^(127\.0\.0\.1|localhost)$/);
       const context = await browser.newContext({
@@ -76,27 +69,21 @@ for (const language of ["en", "ar"] as const) {
         });
         await french.click();
         await failure;
-        await expect(french).not.toBeVisible();
-        await expect(setting).toBeVisible();
-        const notice = page.getByText(s.translationLoadFailed, { exact: true });
-        await assertReadableNotice(notice);
+        const dialog = page.getByRole("dialog");
+        const notice = dialog.getByText(s.translationLoadFailed, { exact: true });
+        const retry = dialog.getByRole("button", { name: s.translationTryAgain, exact: true });
+        await expect(notice).toBeVisible();
+        await expect(retry).toBeVisible();
+        await expect(dialog.getByRole("radio", { name: /Bridges/ })).toBeChecked();
+        await expect(french).not.toBeChecked();
         await page.screenshot({ path: testInfo.outputPath("translation-failure.png") });
         expect(
           await databaseSql(page, "getAll", "SELECT surah,ayah,text FROM translation_active ORDER BY surah,ayah"),
         ).toEqual(retained);
         expect(await storedLanguages()).toEqual(previousLanguages);
-        // A fresh SQLite connection has no former connection's TEMP trigger.
-        expect(
-          await databaseSql(
-            page,
-            "getAll",
-            "SELECT name FROM sqlite_temp_master WHERE type='trigger' AND name='fail_rf164_candidate'",
-          ),
-        ).toEqual([]);
-        await expect(notice).toBeHidden();
-        await setting.click();
-        await french.click();
-        await expect(french).not.toBeVisible();
+        await databaseSql(page, "exec", "DROP TRIGGER fail_rf164_candidate");
+        await retry.click();
+        await expect(dialog).toBeHidden();
         await expect(setting).toContainText(frenchName);
         expect(
           await databaseSql(page, "getAll", "SELECT surah,ayah,text FROM translation_active ORDER BY surah,ayah"),

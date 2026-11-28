@@ -115,18 +115,9 @@ for (const { failureKind, language, width } of cases) {
         await qurtubi.click();
         await failure;
         const retry = page.getByRole("button", { name: s.detailRetry + ", " + s.tafseerQurtubi, exact: true });
-        if (failureKind === "commit") {
-          await expect(qurtubi.getByText(s.tafsirDownloadFailed, { exact: true })).toBeVisible();
-          await expect(retry).toBeVisible();
-        } else {
-          // The insert error replaces the SQLite connection and the picker unmounts.
-          await expect(page.getByRole("dialog")).toBeHidden();
-          const notice = page.getByText(s.tafseerSourceImportFailed, { exact: true });
-          await assertReadableNotice(notice);
-          await expect(setting).toContainText(s.tafseerMuyassar);
-          await setting.click();
-          await expect(qurtubi.getByText(s.tafseerDownloadAction, { exact: true })).toBeVisible();
-        }
+        const notice = qurtubi.getByText(s.tafsirDownloadFailed, { exact: true });
+        await assertReadableNotice(notice);
+        await expect(retry).toBeInViewport();
         await page.screenshot({ path: testInfo.outputPath("tafsir-retry-ready.png") });
         expect(await storedSource()).toEqual(previousSource);
         expect(
@@ -148,8 +139,8 @@ for (const { failureKind, language, width } of cases) {
             .getByRole("button", { name: new RegExp("^" + s.tafseerMuyassar) })
             .getByText(s.tafseerSelected, { exact: true }),
         ).toBeVisible();
-        await databaseSql(page, "exec", "DROP TRIGGER IF EXISTS fail_rf104_candidate");
-        await (failureKind === "commit" ? retry : qurtubi).click();
+        await databaseSql(page, "exec", "DROP TRIGGER fail_rf104_candidate");
+        await retry.click();
         await expect(page.getByRole("dialog")).toBeHidden({ timeout: 60_000 });
         await expect(setting).toContainText(s.tafseerQurtubi);
         await expect.poll(storedSource).toEqual({ value: "qurtubi" });
