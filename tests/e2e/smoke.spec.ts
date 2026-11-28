@@ -284,3 +284,38 @@ test("auth language radios announce the checked option and support keyboard sele
   await expect(english).toBeChecked();
   await expect(arabic).not.toBeChecked();
 });
+
+test("System theme follows the browser while explicit palettes keep their colors", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await waitForQaReady(page);
+  await page.goto("/settings", { waitUntil: "domcontentloaded" });
+  const body = page.locator("body");
+  const theme = (name: string) => page.getByRole("radio", { name, exact: true });
+  const white = "rgb(255, 255, 255)";
+  const dark = "rgb(10, 10, 10)";
+
+  await expect(theme("System")).toBeChecked();
+  await expect(page.getByText("Now: Dark", { exact: true })).toBeVisible();
+  await expect(body).toHaveCSS("background-color", dark);
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.getByText("Now: White", { exact: true })).toBeVisible();
+  await expect(body).toHaveCSS("background-color", white);
+
+  for (const [name, background, scheme] of [
+    ["White", white, "dark"],
+    ["Dark", dark, "light"],
+    ["Beige", "rgb(255, 248, 241)", "dark"],
+    ["Tahajjud (black)", "rgb(0, 0, 0)", "light"],
+  ] as const) {
+    await theme(name).click();
+    await page.emulateMedia({ colorScheme: scheme });
+    await expect(theme(name)).toBeChecked();
+    await expect(body).toHaveCSS("background-color", background);
+  }
+
+  await theme("System").click();
+  await expect(body).toHaveCSS("background-color", white);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.getByText("Now: Dark", { exact: true })).toBeVisible();
+  await expect(body).toHaveCSS("background-color", dark);
+});

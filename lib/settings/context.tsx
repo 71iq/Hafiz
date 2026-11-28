@@ -8,7 +8,7 @@ import React, {
   useRef,
   useLayoutEffect,
 } from "react";
-import { Platform, useColorScheme as useSystemColorScheme, useWindowDimensions, View } from "react-native";
+import { Platform, useWindowDimensions, View } from "react-native";
 import { useColorScheme as useNativeWindColorScheme, vars } from "nativewind";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { useDatabaseStatus } from "@/lib/database/provider";
@@ -27,6 +27,7 @@ import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { setHapticsEnabled } from "@/lib/haptics";
 import { getResolvedUiBootstrap, writeUiBootstrap } from "@/lib/settings/ui-bootstrap";
 import { emitSettingSaveFailed } from "@/lib/settings/save-feedback";
+import { useSystemColorScheme } from "./use-system-color-scheme";
 
 // Desktop / large-viewport scale. Also the canonical length (10 levels) used
 // by UI controls like the font size picker.
