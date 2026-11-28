@@ -131,9 +131,11 @@ describe("the bundled similar-verse passages", () => {
       else if (was.surah !== ref.surah || was.ayah !== ref.ayah) moved.push(`${ref.group_id}#${ref.sort_order}`);
     }
     expect(moved).toEqual([]);
-    expect(relabelled).toHaveLength(20);
+    expect(relabelled).toHaveLength(22);
     expect(relabelled).toEqual(
       expect.arrayContaining([
+        "nq-tail-e3a870147c9f10#7 3:94",
+        "nq-tail-29827878016486#3 11:17",
         "nq-sim-6b0cb090bae7db#2 2:265",
         "nq-sim-f58bbe09e8ddf0#2 65:2",
         "nq-sim-1b532f39044afd#3 11:13",
@@ -198,7 +200,7 @@ describe("the bundled similar-verse passages", () => {
     expect([...retired]).toEqual(
       expect.arrayContaining(["mutashabihat:nq-sim-6b0cb090bae7db:1", "mutashabihat:nq-sim-7d0576c830de2e:2"]),
     );
-    expect(retired.size).toBe(38);
+    expect(retired.size).toBe(41);
   });
 
   it("are the rows of the rows file the app refreshes from, at the version it expects", () => {

@@ -356,7 +356,7 @@ function buildQiraatRows(data) {
  * the slots of the rows before any relabelling (retiredSimilarCards).
  */
 function buildMutashabihatRows(data, quran) {
-  const { refs_by_group: exclusions } = JSON.parse(
+  const { refs_by_group: exclusions, corrected_tail_refs: correctedRefs, corrected_tail_cues: correctedCues } = JSON.parse(
     fs.readFileSync(new URL("./mutashabihat-ref-exclusions.json", import.meta.url), "utf8"),
   );
   const groupRows = [];
@@ -380,7 +380,7 @@ function buildMutashabihatRows(data, quran) {
       if (validRefs.length < 2) continue;
 
       const id = typeof group.id === "string" ? group.id : null;
-      const cue = kind === "similar" ? group.phrase : group.tail;
+      const cue = kind === "similar" ? group.phrase : (correctedCues[id] ?? group.tail);
       if (!id || typeof cue !== "string" || cue.trim().length === 0) continue;
 
       const groupSortOrder = sortOrder++;
@@ -397,6 +397,14 @@ function buildMutashabihatRows(data, quran) {
           segments: { pre: null, similar: null, post: null },
           relabelled: false,
         };
+        const corrected = kind === "tail" && correctedRefs[id]?.[`${ref.surah}:${ref.ayah}`];
+        if (corrected) {
+          [row.surah, row.ayah] = corrected;
+          row.surahName = surahNames.get(row.surah) ?? null;
+          row.tail5 = quran.ayahWords(row.surah, row.ayah).slice(-5).join(" ");
+          row.relabelled = true;
+          return row;
+        }
         const hasSegments = [ref.pre_text, ref.similar_text, ref.post_text].some((text) => typeof text === "string");
         if (kind !== "similar" || !hasSegments) return row;
         const siblings = validRefs
