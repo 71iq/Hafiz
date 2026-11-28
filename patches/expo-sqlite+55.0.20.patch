@@ -335,3 +335,27 @@ diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/w
 +  _vfsMemory = null;
 +  statementIdMap.clear();
 +  sessionIdMap.clear();
+diff --git a/node_modules/expo-sqlite/web/wa-sqlite/sqlite-api.js b/node_modules/expo-sqlite/web/wa-sqlite/sqlite-api.js
+--- a/node_modules/expo-sqlite/web/wa-sqlite/sqlite-api.js
++++ b/node_modules/expo-sqlite/web/wa-sqlite/sqlite-api.js
+@@ -90,2 +90,3 @@
+   const mapStmtToDB = new Map();
++  const reportedConstraints = new Map();
+   function verifyStatement(stmt) {
+@@ -505,3 +506,7 @@
+       const result = await f(stmt);
+-      mapStmtToDB.delete(stmt)
++      mapStmtToDB.delete(stmt);
++      // sqlite3_finalize frees the statement and returns its last evaluation error.
++      const reported = reportedConstraints.get(stmt);
++      reportedConstraints.delete(stmt);
++      if (reported !== undefined && result === reported) return SQLite.SQLITE_OK;
+-
++
+@@ -847,3 +852,5 @@
+       // Allow retry operations.
++      reportedConstraints.delete(stmt);
+       const rc = await retry(() => f(stmt));
++      if ((rc & 0xff) === SQLite.SQLITE_CONSTRAINT) reportedConstraints.set(stmt, rc);
+-
++

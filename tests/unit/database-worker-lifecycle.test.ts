@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
@@ -277,6 +278,11 @@ const open = (nativeDatabaseId: number, databasePath = `db-${nativeDatabaseId}.s
 function replyFor(harness: ReturnType<typeof createHarness>, id: number) {
   return harness.replies.find((reply) => reply.id === id);
 }
+
+test("a rejected write reports its constraint once and leaves the SQLite handle usable for retry", () => {
+  // Run the installed WASM engine with its native async functions intact, outside Jest's RN transforms.
+  execFileSync(process.execPath, [path.join(process.cwd(), "tests/fixtures/sqlite-constraint.mjs")]);
+});
 
 describe("installed Expo SQLite web worker lifecycle (current source)", () => {
   test("serializes concurrent first opens through one WASM and VFS initialization", async () => {
