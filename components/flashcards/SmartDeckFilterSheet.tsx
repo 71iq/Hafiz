@@ -54,7 +54,7 @@ type Props = {
 type FilterType = BuiltInDeckFilter["type"];
 type SettingInfo = { title: string; body: string };
 type Language = "en" | "ar";
-type Baseline = { filter: BuiltInDeckFilter; settings: DeckReviewSettings };
+type Baseline = { deckId: SmartDeckId; filter: BuiltInDeckFilter; settings: DeckReviewSettings };
 
 const JUZ_NUMBERS = Array.from({ length: 30 }, (_, i) => i + 1);
 
@@ -83,7 +83,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const compact = width >= SIDEBAR_BREAKPOINT;
-  const [baseline, setBaseline] = useState<Baseline | null>(null);
+  const [loaded, setLoaded] = useState<Baseline | null>(null);
+  const baseline = visible && loaded?.deckId === deckId ? loaded : null;
   const [draft, setDraft] = useState<SchedulerDraft | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
@@ -95,15 +96,25 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [activeInfo, setActiveInfo] = useState<SettingInfo | null>(null);
   const [surahSelectorOpen, setSurahSelectorOpen] = useState(false);
   const [rangeTarget, setRangeTarget] = useState<ScopeSurah | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [failedDeck, setFailedDeck] = useState<SmartDeckId | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const visit = useRef(0);
+  // Format the draft in the current language when it loads. A language change must keep edits.
+  const rtl = useRef(isRTL);
+  rtl.current = isRTL;
 
   useEffect(() => {
-    if (!visible || !deckId) return;
-    let cancelled = false;
-    setLoadError(null);
+    const request = ++visit.current;
+    setLoaded(null);
+    setDraft(null);
+    setFailedDeck(null);
+    setSaving(false);
     setSaveError(null);
+    setActiveInfo(null);
+    setSurahSelectorOpen(false);
+    setRangeTarget(null);
+    if (!visible || !deckId) return;
     Promise.all([
       db.getAllAsync<ScopeSurah>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number"),
       db.getAllAsync<JuzMapRow>("SELECT juz, surah, ayah_start, ayah_end FROM juz_map ORDER BY juz, surah, ayah_start"),
@@ -111,35 +122,25 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       readDeckReviewSettings(db, deckId),
     ])
       .then(([rows, juzRows, filter, settings]) => {
-        if (cancelled) return;
+        if (visit.current !== request) return;
         setSurahs(rows);
         setJuzMap(juzRows);
         setFilterType(filter.type);
         setSelectedSurahs(new Set(filter.type === "surah" ? filter.surahs : []));
         setSelectedJuz(new Set(filter.type === "juz" ? filter.juzNumbers : []));
         setSelectedSurahRanges(filter.type === "surah" ? initialRangeState(rows, filter.surahs, filter.ranges) : {});
-        setDraft(schedulerDraftFromSettings(settings, isRTL));
-        setBaseline({ filter, settings });
+        setDraft(schedulerDraftFromSettings(settings, rtl.current));
+        setLoaded({ deckId, filter, settings });
       })
       .catch((e) => {
+        if (visit.current !== request) return;
         console.warn("[SmartDeckFilterSheet] Failed to load filter:", e);
-        if (cancelled) return;
-        setBaseline(null);
-        setDraft(null);
-        setLoadError(s.genericActionFailed);
+        setFailedDeck(deckId);
       });
     return () => {
-      cancelled = true;
+      visit.current += 1;
     };
-  }, [db, visible, deckId, isRTL, loadAttempt]);
-
-  useEffect(() => {
-    if (!visible) {
-      setActiveInfo(null);
-      setSurahSelectorOpen(false);
-      setRangeTarget(null);
-    }
-  }, [visible]);
+  }, [db, visible, deckId, loadAttempt]);
 
   const surahByNumber = useMemo(() => new Map(surahs.map((row) => [row.number, row])), [surahs]);
   const sortedSelection = useMemo(() => [...selectedSurahs].sort((a, b) => a - b), [selectedSurahs]);
@@ -255,6 +256,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
 
   const handleSave = async () => {
     if (!deckId || !baseline || !fields || !scopeFilter || saving) return;
+    const request = visit.current;
     setSaveError(null);
     setSaving(true);
     try {
@@ -266,6 +268,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       });
     } catch (e) {
       console.warn("[SmartDeckFilterSheet] Failed to save filter:", e);
+      if (visit.current !== request) return;
       setSaveError(s.deckFilterSaveFailed);
       setSaving(false);
       return;
@@ -277,6 +280,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     } catch (e) {
       console.warn("[SmartDeckFilterSheet] Saved settings; preparing today's cards failed:", e);
     }
+    if (visit.current !== request) return;
     setSaving(false);
     onSaved(interpolate(s.deckSettingsSavedNamed, { deck: title }));
     onClose();
@@ -316,18 +320,19 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
             style={{ maxHeight: 52 }}
           >
             {tabs.map((tab) => {
-              const selected = filterType === tab.value;
+              const selected = !!baseline && filterType === tab.value;
               return (
                 <Pressable
                   key={tab.value}
+                  disabled={!baseline}
                   onPress={() => {
                     setSaveError(null);
                     setFilterType(tab.value);
                   }}
                   accessibilityRole="tab"
-                  accessibilityState={{ selected }}
+                  accessibilityState={{ selected, disabled: !baseline }}
                   aria-selected={selected}
-                  className={`h-11 rounded-full px-5 items-center justify-center ${
+                  className={`h-11 rounded-full px-5 items-center justify-center ${baseline ? "" : "opacity-50"} ${
                     selected ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
                   }`}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
@@ -349,11 +354,13 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         </View>
 
         <OverlayBody contentContainerClassName="px-5 pb-8" contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}>
-          {loadError ? (
-            <LoadErrorRow message={loadError} onRetry={() => setLoadAttempt((n) => n + 1)} isRTL={isRTL} />
+          {deckId && failedDeck === deckId ? (
+            <LoadErrorRow message={s.genericActionFailed} onRetry={() => setLoadAttempt((n) => n + 1)} isRTL={isRTL} />
+          ) : !baseline ? (
+            <ActivityIndicator accessibilityLabel={s.loading} />
           ) : null}
 
-          {filterType === "all" && (
+          {baseline && filterType === "all" && (
             <Card elevation="low" className="p-5">
               <Text
                 className="text-charcoal dark:text-neutral-200"
@@ -369,18 +376,18 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
             </Card>
           )}
 
-          {filterType === "surah" && (
+          {baseline && filterType === "surah" && (
             <ScopeSummaryCard
               heading={selectedSurahs.size > 0 ? surahSummary.size : s.deckNoSurahsSelected}
               names={selectedSurahs.size > 0 ? summaryNames(surahSummary) : null}
-              error={baseline ? scopeError : null}
+              error={scopeError}
               actionLabel={selectedSurahs.size > 0 ? s.deckChangeSurahs : s.flashcardsSelectSurahs}
               isRTL={isRTL}
               onPress={() => setSurahSelectorOpen(true)}
             />
           )}
 
-          {filterType === "juz" && (
+          {baseline && filterType === "juz" && (
             <View className="gap-3">
               <SelectAllClearRow
                 onSelectAll={() => setSelectedJuz(new Set(JUZ_NUMBERS))}
@@ -402,13 +409,13 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
               </View>
               {selectedJuz.size > 0 ? (
                 <ScopeSummaryCard heading={juzSummary.size} names={summaryNames(juzSummary)} isRTL={isRTL} />
-              ) : baseline && scopeError ? (
+              ) : scopeError ? (
                 <InlineMessage text={scopeError} isRTL={isRTL} tone="error" />
               ) : null}
             </View>
           )}
 
-          {draft ? (
+          {baseline && draft ? (
             <View className="mt-6">
               <SchedulerOptionsPanel
                 draft={draft}
@@ -437,7 +444,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       </ResponsiveSheet>
 
       <SurahSelectorSheet
-        visible={visible && surahSelectorOpen}
+        visible={!!baseline && surahSelectorOpen}
         surahs={surahs}
         selectedSurahs={selectedSurahs}
         selectedSurahRanges={selectedSurahRanges}
@@ -454,7 +461,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       />
 
       <ReviewSettingInfoSheet
-        visible={visible}
+        visible={!!baseline}
         info={activeInfo}
         onClose={() => setActiveInfo(null)}
         isPhone={isPhone}
@@ -462,7 +469,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       />
 
       <SurahRangeEditor
-        visible={visible && rangeTarget !== null}
+        visible={!!baseline && rangeTarget !== null}
         surah={rangeTarget}
         range={rangeTarget ? (selectedSurahRanges[rangeTarget.number] ?? { from: "1", to: String(rangeTarget.ayah_count) }) : null}
         rangeLabels={{

@@ -17,7 +17,7 @@ import { THEME_COLORS, useSettings } from "@/lib/settings/context";
 import { strings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { putDeckReviewSettings, readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
-import { materializeSmartDeckCards, putSmartDeckFilter, readSmartDeckFilter } from "@/lib/fsrs/smart-decks";
+import { materializeSmartDeckCards, putSmartDeckFilter, readSmartDeckFilter, type SmartDeckId } from "@/lib/fsrs/smart-decks";
 import type { DeckReviewSettings } from "@/lib/fsrs/types";
 import { flattenStyle } from "../rtl/rtl-test-utils";
 
@@ -88,6 +88,7 @@ function editor(
   onClose: () => void,
   onSaved: (notice: string) => void,
   visible = true,
+  smartDeckId: SmartDeckId = "default-retention",
 ) {
   return (
     <SafeAreaProvider
@@ -103,7 +104,7 @@ function editor(
             onSaved={onSaved}
           />
         ) : (
-          <SmartDeckFilterSheet visible={visible} deckId="default-retention" onClose={onClose} onSaved={onSaved} />
+          <SmartDeckFilterSheet visible={visible} deckId={smartDeckId} onClose={onClose} onSaved={onSaved} />
         )}
       </DirectionProvider>
     </SafeAreaProvider>
@@ -583,6 +584,44 @@ describe("review-setting help caller characterization", () => {
       );
     });
 
+    it("keeps an old deck's pending load out of the active deck's surah range", async () => {
+      const s = strings.en;
+      const show = (id: SmartDeckId) => editor("smart", 390, "en", jest.fn(), jest.fn(), true, id);
+      mockDatabase.getAllAsync.mockImplementation(async (sql) => sql.includes("FROM surahs")
+        ? [{ number: 1, name_arabic: "الفاتحة", name_english: "The Opening", ayah_count: 7 }]
+        : []);
+      const view = render(show("default-retention"));
+      await loaded(view);
+      fireEvent.press(view.getByText(s.deckScopeBySurah));
+      fireEvent.press(view.getByRole("button", { name: s.flashcardsSelectSurahs }));
+
+      let finishLoad!: (value: DeckReviewSettings) => void;
+      jest.mocked(readDeckReviewSettings).mockReturnValueOnce(new Promise((resolve) => { finishLoad = resolve; }));
+      view.rerender(show("default-mutashabihat"));
+      expect(view.getByRole("tab", { name: s.deckScopeBySurah })).toBeDisabled();
+      fireEvent.press(view.getByText(s.deckScopeBySurah));
+      expect(view.queryByLabelText(s.deckScopeSearchSurahs)).toBeNull();
+      expect(view.queryByLabelText(s.flashcardsDailyLimit)).toBeNull();
+      expect(save(view, "smart")).toBeDisabled();
+
+      view.rerender(show("default-qiraat"));
+      await loaded(view);
+      fireEvent.press(view.getByText(s.deckScopeBySurah));
+      fireEvent.press(view.getByRole("button", { name: s.flashcardsSelectSurahs }));
+      fireEvent.press(view.getByRole("checkbox", { name: /The Opening/ }));
+      fireEvent.press(view.getByLabelText(`${s.deckSpecifyAyahRange}: ${s.deckScopeFullSurah}`), { stopPropagation: jest.fn() });
+      fireEvent.changeText(view.getByLabelText(`${s.flashcardsFrom} ${s.reflectionAyahLabel}`), "2");
+      fireEvent.changeText(view.getByLabelText(`${s.flashcardsTo} ${s.reflectionAyahLabel}`), "4");
+      await act(async () => finishLoad(settings));
+      fireEvent.press(view.getAllByText(s.deckAyahRangeDone).at(-1)!);
+      fireEvent.press(view.getByText(s.deckAyahRangeDone));
+      expect(save(view, "smart")).toBeEnabled();
+      fireEvent.press(save(view, "smart"));
+      await waitFor(() => expect(putSmartDeckFilter).toHaveBeenCalledWith(mockTx, "default-qiraat", {
+        type: "surah", surahs: [1], ranges: [{ surah: 1, ayahStart: 2, ayahEnd: 4 }],
+      }));
+    });
+
     it("filters the surah list by name or number and selects or clears the visible rows", async () => {
       const en = strings.en;
       mockDatabase.getAllAsync.mockImplementation(async (sql: string) =>
@@ -657,6 +696,7 @@ describe("review-setting help caller characterization", () => {
       await waitFor(() => expect(view.getByText(strings.en.genericActionFailed)).toBeTruthy());
       // Nothing loaded, so nothing can be saved over the stored settings.
       expect(save(view, kind).props.accessibilityState.disabled).toBe(true);
+      if (kind === "smart") expect(view.getByRole("tab", { name: strings.en.deckScopeBySurah })).toBeDisabled();
       expect(writeDeckReviewSettings).not.toHaveBeenCalled();
       expect(saved).not.toHaveBeenCalled();
       expect(close).not.toHaveBeenCalled();
