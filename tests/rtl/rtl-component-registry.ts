@@ -292,6 +292,18 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "playwright",
     "Detail overlay chrome and tabs mirror; Quran text remains unflipped.",
   ),
+  entry(
+    "components/mushaf/AyahReadout.tsx",
+    "quran-text",
+    "source",
+    "The screen reader reads the Unicode ayah in Arabic in both interface languages.",
+  ),
+  entry(
+    "components/mushaf/Bismillah.tsx",
+    "quran-text",
+    "rntl",
+    "The centered Bismillah keeps its Arabic direction with either page glyphs or Unicode text.",
+  ),
   entry("components/mushaf/BookmarksSheet.tsx", "overlay", "playwright", "Bookmark rows and sheet actions mirror."),
   entry(
     "components/mushaf/DetailTabRow.tsx",
