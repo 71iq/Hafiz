@@ -1,6 +1,6 @@
 import React from "react";
 import * as ReactNative from "react-native";
-import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, fireEventAsync, render, waitFor, within } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import FlashcardSessionScreenWrapper from "@/app/flashcards/session";
 import { Card } from "@/components/ui/Card";
@@ -1807,14 +1807,9 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(hapticMedium).toHaveBeenCalledTimes(1);
           expect(loadReviewQueue).toHaveBeenCalledTimes(1);
 
-          fireEvent.press(view.getByRole("button", { name: directCardActionLabel(s, action) }));
-          // The sheet closes once the retried action is saved, then plays its exit.
-          await waitFor(() => expect(view.queryByText(s.cardActionsTitle)).toBeNull(), { timeout: 4000 });
-          await waitFor(() =>
-            expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(
-              false,
-            ),
-          );
+          await fireEventAsync.press(view.getByRole("button", { name: directCardActionLabel(s, action) }));
+          expect(view.queryByText(s.cardActionsTitle)).toBeNull();
+          expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
           expectDirectCardActionCalls(action);
           expect(hapticMedium).toHaveBeenCalledTimes(2);
           expect(setStudyCardDueDate).not.toHaveBeenCalled();
@@ -1853,7 +1848,7 @@ describe("Flashcard session due-date editor characterization", () => {
         warnSpy.mockRestore();
       }
     },
-    // Each case saves, fails, retries and waits for the sheet's exit.
+    // Each case exercises the failed save and its successful retry through the session screen.
     15000,
   );
 
