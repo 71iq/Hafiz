@@ -185,12 +185,16 @@ test("clearing search on a narrow screen returns to history and keeps focus", as
   await expect(input).toBeHidden();
 });
 
-test("the offline banner follows browser connectivity and local Quran search still works", async ({ page, context }) => {
+test("the offline banner follows browser connectivity and local Quran search still works", async ({
+  page,
+  context,
+}) => {
   await waitForQaReady(page);
   await page.goto("/home");
-  await expect(page.getByRole("button", { name: "Mushaf", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Search", exact: true }).first()).toBeVisible();
 
   const banner = page.getByText("Offline. Your study is saved on this device.", { exact: true });
+  await expect(banner).toBeHidden();
   try {
     await context.setOffline(true);
     await expect(banner).toBeVisible({ timeout: 5_000 });
