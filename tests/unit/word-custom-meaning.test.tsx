@@ -1,6 +1,9 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { MeaningTab } from "@/components/mushaf/word-tabs/MeaningTab";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
+import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
+import type { WordRef } from "@/lib/word/context";
 import { strings } from "@/lib/i18n/strings";
 import type { WordMeaningArRow } from "@/lib/word/queries";
 
@@ -8,12 +11,35 @@ const s = strings.ar;
 const mockUpsert = jest.fn();
 const mockDelete = jest.fn();
 const mockFetchMeaning = jest.fn<Promise<WordMeaningArRow | null>, unknown[]>();
-const mockDb = {};
+const mockDb = { getFirstAsync: jest.fn(async () => null) };
+const mockWord = React.createContext<WordRef | null>(null);
+
+jest.mock("@/lib/word/context", () => ({
+  useWordInteraction: () => ({
+    detailWord: jest.requireActual<typeof React>("react").useContext(mockWord),
+    openDetail: jest.fn(),
+    closeDetail: jest.fn(),
+  }),
+}));
+jest.mock("@/lib/fonts/use-quran-page-font", () => ({ useQuranPageFontReady: () => false }));
+jest.mock("@/components/mushaf/AyahDetailModal", () => ({ AyahDetailModal: () => null }));
+
+function WordSheet({ surah, ayah, wordPos }: Omit<WordRef, "v2Page">) {
+  return (
+    <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } }}>
+      <OperationNoticeProvider ready>
+        <mockWord.Provider value={{ surah, ayah, wordPos, v2Page: 1 }}>
+          <WordDetailSheet />
+        </mockWord.Provider>
+      </OperationNoticeProvider>
+    </SafeAreaProvider>
+  );
+}
 
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDb }));
 jest.mock("@/lib/settings/context", () => ({
   ...jest.requireActual("@/lib/settings/context"),
-  useSettings: () => ({ uiLanguage: "ar", isRTL: true, isDark: false, themeColors: { surfaceDim: "#ccc" } }),
+  useSettings: () => ({ effectiveTheme: "white", uiLanguage: "ar", isRTL: true, isDark: false, themeColors: { surfaceDim: "#ccc" } }),
 }));
 jest.mock("@/lib/i18n/useStrings", () => ({
   ...jest.requireActual("@/lib/i18n/useStrings"),
@@ -24,6 +50,10 @@ jest.mock("@/lib/fsrs/queries", () => ({
   isMeaningCardSaved: jest.fn(async () => false),
 }));
 jest.mock("@/lib/word/queries", () => ({
+  fetchWordNeighbors: async () => ({ previous: null, next: null }),
+  fetchWordText: async () => "ٱلضَّآلِّينَ",
+  fetchWordQcf2Glyph: async () => null,
+  fetchWordRoot: async () => null,
   fetchWordMeaningAr: (...args: unknown[]) => mockFetchMeaning(...args),
   fetchWordTranslation: jest.fn(async () => ({ word_arabic: "ٱلضَّآلِّينَ", translation_en: "those who go astray" })),
   upsertUserWordMeaning: (...args: unknown[]) => mockUpsert(...args),
@@ -81,7 +111,7 @@ describe("custom Arabic word meaning", () => {
 
   it("saves a meaning for a word without one and shows it", async () => {
     mockUpsert.mockResolvedValue(undefined);
-    render(<MeaningTab surah={1} ayah={7} wordPos={8} />);
+    render(<WordSheet surah={1} ayah={7} wordPos={8} />);
 
     expect(await screen.findByText(s.noWordMeaningFallback)).toBeTruthy();
     mockFetchMeaning.mockResolvedValue(row({ meaning: "الذين ضلوا الطريق" }));
@@ -97,14 +127,14 @@ describe("custom Arabic word meaning", () => {
         meaning: "الذين ضلوا الطريق",
       }),
     );
-    expect(await screen.findByText("الذين ضلوا الطريق")).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByText("الذين ضلوا الطريق")).toHaveLength(2));
     expect(screen.getByText(s.customWordMeaningYours)).toBeTruthy();
   });
 
   it("keeps the draft and reports a failed save", async () => {
     mockUpsert.mockRejectedValue(new Error("disk full"));
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    render(<MeaningTab surah={1} ayah={7} wordPos={8} />);
+    render(<WordSheet surah={1} ayah={7} wordPos={8} />);
 
     fireEvent.changeText(await screen.findByPlaceholderText(s.customWordMeaningPlaceholder), "معنى");
     fireEvent.press(screen.getByText(s.saveCustomWordMeaning));
@@ -115,9 +145,9 @@ describe("custom Arabic word meaning", () => {
 
   it("offers no Edit or Delete for a bundled meaning", async () => {
     mockFetchMeaning.mockResolvedValue(row({ meaning: "المعنى المضمن", source: "bundled", custom_created_at: null }));
-    render(<MeaningTab surah={1} ayah={7} wordPos={8} />);
+    render(<WordSheet surah={1} ayah={7} wordPos={8} />);
 
-    expect(await screen.findByText("المعنى المضمن")).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByText("المعنى المضمن")).toHaveLength(2));
     expect(screen.queryByText(s.customWordMeaningEdit)).toBeNull();
     expect(screen.queryByText(s.customWordMeaningDelete)).toBeNull();
     expect(screen.queryByText(s.customWordMeaningYours)).toBeNull();
@@ -126,7 +156,7 @@ describe("custom Arabic word meaning", () => {
   it("edits the account's custom meaning and asks before discarding a changed draft", async () => {
     mockFetchMeaning.mockResolvedValue(row());
     mockUpsert.mockResolvedValue(undefined);
-    render(<MeaningTab surah={1} ayah={7} wordPos={8} />);
+    render(<WordSheet surah={1} ayah={7} wordPos={8} />);
 
     fireEvent.press(await screen.findByLabelText(s.customWordMeaningEditLabel));
     const input = screen.getByDisplayValue("معنى كتبته");
@@ -147,14 +177,14 @@ describe("custom Arabic word meaning", () => {
         meaning: "معنى أدق",
       }),
     );
-    expect(await screen.findByText("معنى أدق")).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByText("معنى أدق")).toHaveLength(2));
     expect(screen.queryByDisplayValue("معنى أدق")).toBeNull();
   });
 
   it("deletes only after confirmation, by canonical key with the original content and creation time", async () => {
     mockFetchMeaning.mockResolvedValue(row());
     mockDelete.mockResolvedValue("deleted");
-    render(<MeaningTab surah={1} ayah={7} wordPos={8} />);
+    render(<WordSheet surah={1} ayah={7} wordPos={8} />);
 
     fireEvent.press(await screen.findByLabelText(s.customWordMeaningDeleteLabel));
     expect(screen.getByText(s.customWordMeaningDeleteTitle)).toBeTruthy();
@@ -178,7 +208,7 @@ describe("custom Arabic word meaning", () => {
     mockFetchMeaning.mockResolvedValue(row());
     mockDelete.mockRejectedValue(new Error("disk full"));
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    render(<MeaningTab surah={1} ayah={7} wordPos={8} />);
+    render(<WordSheet surah={1} ayah={7} wordPos={8} />);
 
     fireEvent.press(await screen.findByLabelText(s.customWordMeaningDeleteLabel));
     fireEvent.press(screen.getByText("dialog:" + s.customWordMeaningDelete));
@@ -192,17 +222,17 @@ describe("custom Arabic word meaning", () => {
     mockFetchMeaning.mockResolvedValue(row());
     let finish!: (value: "deleted") => void;
     mockDelete.mockReturnValue(new Promise((resolve) => (finish = resolve)));
-    const view = render(<MeaningTab surah={1} ayah={7} wordPos={8} />);
+    const view = render(<WordSheet surah={1} ayah={7} wordPos={8} />);
 
     fireEvent.press(await screen.findByLabelText(s.customWordMeaningDeleteLabel));
     fireEvent.press(screen.getByText("dialog:" + s.customWordMeaningDelete));
     mockFetchMeaning.mockResolvedValue(row({ word_pos: 9, meaning: "معنى الكلمة الأخرى" }));
-    view.rerender(<MeaningTab surah={1} ayah={7} wordPos={9} />);
-    expect(await screen.findByText("معنى الكلمة الأخرى")).toBeTruthy();
+    view.rerender(<WordSheet surah={1} ayah={7} wordPos={9} />);
+    await waitFor(() => expect(screen.getAllByText("معنى الكلمة الأخرى")).toHaveLength(2));
 
     await act(async () => finish("deleted"));
 
-    expect(screen.getByText("معنى الكلمة الأخرى")).toBeTruthy();
+    expect(screen.getAllByText("معنى الكلمة الأخرى")).toHaveLength(2);
     expect(screen.queryByText(s.noWordMeaningFallback)).toBeNull();
     expect(screen.queryByText(s.customWordMeaningDeleteTitle)).toBeNull();
   });

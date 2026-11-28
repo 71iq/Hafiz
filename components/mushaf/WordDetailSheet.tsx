@@ -16,6 +16,7 @@ import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { quranPageFontName, quranPageFontPaletteStyle } from "@/lib/fonts/loader";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
+import { useArabicWordMeaning } from "./word-tabs/use-arabic-word-meaning";
 import { MeaningTab } from "./word-tabs/MeaningTab";
 import { IrabTab } from "./word-tabs/IrabTab";
 import { TasreefTab } from "./word-tabs/TasreefTab";
@@ -25,7 +26,6 @@ import { AyahDetailModal } from "./AyahDetailModal";
 import { DetailTabRow } from "./DetailTabRow";
 import { useDetailArrowKeys } from "./use-detail-arrow-keys";
 import {
-  fetchWordMeaningAr,
   fetchWordNeighbors,
   fetchWordQcf2Glyph,
   fetchReaderWordPositions,
@@ -45,7 +45,6 @@ type WordHeaderMeta = {
   lemma: string | null;
   rootCount: number | null;
   translationEn: string | null;
-  meaningAr: string | null;
   surahNameArabic: string | null;
   surahNameEnglish: string | null;
 };
@@ -57,7 +56,6 @@ const EMPTY_META: WordHeaderMeta = {
   lemma: null,
   rootCount: null,
   translationEn: null,
-  meaningAr: null,
   surahNameArabic: null,
   surahNameEnglish: null,
 };
@@ -83,6 +81,12 @@ export function WordDetailSheet() {
   // table position, which differs in the ayat that carry a mark glyph. Lookups and saves wait for it.
   const [tableWord, setTableWord] = useState<{ word: WordRef; pos: number; unicodePos: number } | null>(null);
   const tablePos = tableWord && tableWord.word === detailWord ? tableWord.pos : null;
+  const { meaning, updateMeaning } = useArabicWordMeaning(
+    db,
+    uiLanguage === "ar" && detailWord && tablePos !== null
+      ? { surah: detailWord.surah, ayah: detailWord.ayah, wordPos: tablePos }
+      : null,
+  );
   const headerFontStyle = resolvePageFontStyle(WORD_HEADER_FONT_STYLE, isDark);
   const wordHeaderFontReady = useQuranPageFontReady(headerFontStyle, detailWord?.v2Page);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>(EMPTY_META);
@@ -157,13 +161,12 @@ export function WordDetailSheet() {
       fetchWordQcf2Glyph(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
       fetchWordRoot(db, detailWord.surah, detailWord.ayah, tablePos),
       fetchWordTranslation(db, detailWord.surah, detailWord.ayah, tablePos),
-      fetchWordMeaningAr(db, detailWord.surah, detailWord.ayah, tablePos),
       db.getFirstAsync<{ name_arabic: string; name_english: string }>(
         "SELECT name_arabic, name_english FROM surahs WHERE number = ?",
         [detailWord.surah]
       ),
     ])
-      .then(async ([wordText, qcf2Glyph, rootMeta, wordTranslation, meaningAr, surahRow]) => {
+      .then(async ([wordText, qcf2Glyph, rootMeta, wordTranslation, surahRow]) => {
         if (cancelled) return;
         let rootCount: number | null = null;
         if (rootMeta?.root) {
@@ -181,7 +184,6 @@ export function WordDetailSheet() {
           lemma: rootMeta?.lemma ?? null,
           rootCount,
           translationEn: wordTranslation?.translation_en ?? null,
-          meaningAr: meaningAr?.meaning?.trim().split(/\r?\n/)[0]?.trim() || null,
           surahNameArabic: surahRow?.name_arabic ?? null,
           surahNameEnglish: surahRow?.name_english ?? null,
         });
@@ -244,7 +246,7 @@ export function WordDetailSheet() {
   const surahName = isArabicMode ? headerMeta.surahNameArabic : headerMeta.surahNameEnglish;
   const reference = formatAyahRef(isRTL, surah, ayah, wordPos);
   const referenceLabel = surahName ? `${surahName} ${reference}` : reference;
-  const gloss = isArabicMode ? headerMeta.meaningAr : headerMeta.translationEn;
+  const gloss = isArabicMode ? meaning?.meaning?.trim().split(/\r?\n/)[0]?.trim() : headerMeta.translationEn;
 
   return (
     <>
@@ -382,7 +384,7 @@ export function WordDetailSheet() {
             </View>
 
             <OverlayBody scrollRef={contentScrollRef} contentContainerClassName="px-5">
-              {tablePos === null ? null : activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {tablePos === null ? null : activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} arMeaning={meaning} onMeaningChange={updateMeaning} />}
               {tablePos !== null && activeTab === "irab" && (
                 <IrabTab
                   surah={surah}

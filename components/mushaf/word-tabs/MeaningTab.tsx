@@ -24,6 +24,8 @@ type Props = {
   surah: number;
   ayah: number;
   wordPos: number;
+  arMeaning: WordMeaningArRow | null | undefined;
+  onMeaningChange: (row: WordMeaningArRow) => void;
 };
 
 type EnglishMeaning = {
@@ -32,15 +34,14 @@ type EnglishMeaning = {
   transliteration: string | null;
 };
 
-export function MeaningTab({ surah, ayah, wordPos }: Props) {
+export function MeaningTab({ surah, ayah, wordPos, arMeaning, onMeaningChange }: Props) {
   const db = useDatabase();
   const s = useStrings();
   const { uiLanguage, isRTL, isDark, themeColors } = useSettings();
   const isArabicMode = uiLanguage === "ar";
 
   const [enData, setEnData] = useState<EnglishMeaning | null>(null);
-  const [arMeaning, setArMeaning] = useState<WordMeaningArRow | null>(null);
-  const [wordArabic, setWordArabic] = useState<string | null>(null);
+  const wordArabic = arMeaning?.word ?? enData?.wordArabic ?? null;
   const [customMeaningDraft, setCustomMeaningDraft] = useState("");
   const [customMeaningSaving, setCustomMeaningSaving] = useState(false);
   const [customMeaningError, setCustomMeaningError] = useState(false);
@@ -58,7 +59,8 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const [reviewDue, setReviewDue] = useState<string | null>(null);
   // The first saved word also makes the Vocabulary Review deck appear on Home; say where it went.
   const [firstVocabWord, setFirstVocabWord] = useState(false);
-  const showLoading = useDelayedLoading(loading);
+  const pending = loading || (isArabicMode && arMeaning === undefined);
+  const showLoading = useDelayedLoading(pending);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,38 +122,23 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
     setDeleteOpen(false);
     setDeleting(false);
     setDeleteError(false);
-    setArMeaning(null);
     setEnData(null);
-    setWordArabic(null);
-    if (isArabicMode) {
-      Promise.all([
-        fetchWordMeaningAr(db, surah, ayah, wordPos),
-        fetchWordTranslation(db, surah, ayah, wordPos),
-      ])
-        .then(([meaning, translation]) => {
-          if (cancelled) return;
-          setArMeaning(meaning);
-          setWordArabic(meaning?.word ?? translation?.word_arabic ?? null);
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
+    fetchWordTranslation(db, surah, ayah, wordPos)
+      .then((wt) => {
+        if (cancelled) return;
+        setEnData({
+          wordArabic: wt?.word_arabic ?? null,
+          translationEn: wt?.translation_en ?? null,
+          transliteration: wt?.transliteration ?? null,
         });
-    } else {
-      fetchWordTranslation(db, surah, ayah, wordPos)
-        .then((wt) => {
-          if (cancelled) return;
-          setEnData({
-            wordArabic: wt?.word_arabic ?? null,
-            translationEn: wt?.translation_en ?? null,
-            transliteration: wt?.transliteration ?? null,
-          });
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-    }
+      })
+      .catch((error) => console.warn("[MeaningTab] Could not read the word translation:", error))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
+      generation.current += 1;
     };
   }, [db, surah, ayah, wordPos, isArabicMode]);
 
@@ -171,12 +158,12 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
       });
       // Reload so the shown row carries its real provenance and original created_at.
       const saved = await fetchWordMeaningAr(db, surah, ayah, wordPos).catch(() => null);
-      if (generation.current !== own) return;
-      setArMeaning(
+      onMeaningChange(
         saved?.meaning
           ? saved
           : { surah, ayah, word_pos: wordPos, word: wordArabic, meaning, source: "custom", custom_created_at: null },
       );
+      if (generation.current !== own) return;
       setCustomMeaningDraft("");
       setEditingCustom(false);
     } catch (e) {
@@ -220,16 +207,15 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         meaning: shown.meaning,
         createdAt: shown.custom_created_at,
       });
-      if (generation.current !== own) return;
       if (outcome === "deleted") {
-        setDeleteOpen(false);
-        setArMeaning({ ...shown, meaning: null, source: null, custom_created_at: null });
+        onMeaningChange({ ...shown, meaning: null, source: null, custom_created_at: null });
+        if (generation.current === own) setDeleteOpen(false);
         return;
       }
       // The row changed since it was shown: keep the dialog's error and show the current meaning.
-      setDeleteError(true);
+      if (generation.current === own) setDeleteError(true);
       const current = await fetchWordMeaningAr(db, surah, ayah, wordPos).catch(() => null);
-      if (generation.current === own && current) setArMeaning(current);
+      if (current) onMeaningChange(current);
     } catch (e) {
       if (generation.current !== own) return;
       console.warn("[MeaningTab] deleteCustomMeaning failed:", e);
@@ -239,7 +225,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
     }
   };
 
-  if (loading) {
+  if (pending) {
     return (
       <View className="py-6 items-center">
         {showLoading ? <Text className="text-warm-500 dark:text-neutral-400 text-sm">{s.loading}</Text> : null}
