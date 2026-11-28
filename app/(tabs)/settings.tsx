@@ -247,6 +247,11 @@ export default function SettingsScreen() {
   // by the live store user, before showing results. A switch clears the previous account's message.
   const latestQfStatusRequest = useRef(0);
   const handledQfCallback = useRef<string | null>(null);
+  const latestQfCallback = useRef(0);
+  useEffect(() => () => {
+    latestQfCallback.current += 1;
+    handledQfCallback.current = null;
+  }, []);
   const accountGeneration = useRef(0);
   const accountId = user?.id ?? null;
   useEffect(() => {
@@ -314,22 +319,20 @@ export default function SettingsScreen() {
       handledQfCallback.current = null;
       return;
     }
-    // Handle each OAuth return once: the route keeps its params after the URL is cleared, and an
-    // account switch must not replay the previous account's callback.
     const callbackKey = `${qf ?? ""}|${qfError ?? ""}`;
     if (handledQfCallback.current === callbackKey) return;
     handledQfCallback.current = callbackKey;
-
-    let cancelled = false;
+    // Consume the result in the router before starting the sync. Its lifetime belongs to this
+    // account and callback, so removing the params does not cancel its eventual feedback.
+    router.setParams({ category: "account", qf: undefined, qf_error: undefined });
+    const callback = ++latestQfCallback.current;
     const isCurrentAccount = captureAccount();
-    const showMessage = (message: string | null) => {
-      if (!cancelled && isCurrentAccount()) setQfMessage(message);
-    };
+    const isCurrent = () => callback === latestQfCallback.current && isCurrentAccount();
     const finishCallback = async () => {
       if (qfError) {
-        setQfMessage(safeDecode(qfError));
+        setQfBusy(false);
+        setQfMessage(qfError);
         await refreshQfStatus();
-        clearQfSettingsQuery();
         return;
       }
       if (qf === "connected") {
@@ -337,9 +340,11 @@ export default function SettingsScreen() {
         setQfMessage(null);
         try {
           const status = await refreshQfStatus();
+          if (!isCurrent()) return;
           if (status === "connected") {
             const result = await runInitialQfUserSync(db);
-            showMessage(
+            if (!isCurrent()) return;
+            setQfMessage(
               result.status === "synced"
                 ? s.qfSyncComplete
                 : result.status === "failed"
@@ -349,26 +354,23 @@ export default function SettingsScreen() {
                     : s.qfFinishConnection,
             );
           } else {
-            showMessage(s.qfFinishConnection);
+            setQfMessage(s.qfFinishConnection);
           }
         } catch (err) {
-          showMessage(errorMessage(err) || s.qfSyncFailed);
+          if (isCurrent()) setQfMessage(errorMessage(err) || s.qfSyncFailed);
         } finally {
-          if (!cancelled) setQfBusy(false);
-          clearQfSettingsQuery();
+          if (isCurrent()) setQfBusy(false);
         }
       }
     };
     finishCallback().catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
   }, [
     captureAccount,
     db,
     params.qf,
     params.qf_error,
     refreshQfStatus,
+    router,
     s.qfFinishConnection,
     s.qfSyncComplete,
     s.qfSyncFailed,
@@ -1560,20 +1562,6 @@ function SectionLabel({ children }: { children: string }) {
       {children}
     </Text>
   );
-}
-
-function clearQfSettingsQuery() {
-  const history = (globalThis as any).history;
-  if (!history?.replaceState) return;
-  history.replaceState(history.state, "", "/settings");
-}
-
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
 }
 
 async function openQfAuthorizationUrl(url: string): Promise<void> {

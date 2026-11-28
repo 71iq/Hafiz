@@ -6,6 +6,7 @@ import { completeQfOAuthConnection } from "@/lib/quran-foundation/user";
 import { strings } from "@/lib/i18n/strings";
 import { useAppLanguage } from "@/lib/i18n/useStrings";
 import { getQfOAuthRedirectUri } from "@/lib/quran-foundation/oauth-redirect";
+import { errorMessage } from "@/lib/error-message";
 
 // redirectUri must match the address the authorization began with. The app callback route passes
 // its own, so a browser that opens it, without the app, still completes against that address.
@@ -17,39 +18,35 @@ export default function QfCallbackScreen({ redirectUri }: { redirectUri?: string
 
   useEffect(() => {
     let cancelled = false;
+    const returnToAccount = (error?: string) => {
+      if (cancelled) return;
+      if (error !== undefined) setMessage(error);
+      router.replace({
+        pathname: "/settings",
+        params:
+          error === undefined ? { category: "account", qf: "connected" } : { category: "account", qf_error: error },
+      });
+    };
     const finish = async () => {
       const error = firstParam(params.error);
       const errorDescription = firstParam(params.error_description);
       if (error) {
-        const text = errorDescription || error;
-        if (!cancelled) setMessage(text);
-        router.replace(`/settings?qf_error=${encodeURIComponent(text)}`);
+        returnToAccount(errorDescription || error);
         return;
       }
 
       const code = firstParam(params.code);
       const state = firstParam(params.state);
       if (!code || !state) {
-        if (!cancelled) setMessage(s.qfAuthCallbackFailed);
-        router.replace(`/settings?qf_error=${encodeURIComponent(s.qfAuthCallbackFailed)}`);
+        returnToAccount(s.qfAuthCallbackFailed);
         return;
       }
 
       const response = await completeQfOAuthConnection(code, state, redirectUri ?? getQfOAuthRedirectUri());
-      if (response.ok) {
-        router.replace("/settings?qf=connected");
-        return;
-      }
-
-      if (!cancelled) setMessage(response.message);
-      router.replace(`/settings?qf_error=${encodeURIComponent(response.message)}`);
+      returnToAccount(response.ok ? undefined : response.message || s.qfAuthCallbackFailed);
     };
 
-    finish().catch((err: any) => {
-      const text = err?.message || s.qfAuthCallbackFailed;
-      if (!cancelled) setMessage(text);
-      router.replace(`/settings?qf_error=${encodeURIComponent(text)}`);
-    });
+    finish().catch((err: unknown) => returnToAccount(errorMessage(err) || s.qfAuthCallbackFailed));
 
     return () => {
       cancelled = true;

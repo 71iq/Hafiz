@@ -6,10 +6,12 @@ import QfCallbackScreen from "@/app/auth/qf-callback";
 
 const mockReplace = jest.fn();
 const mockComplete = jest.fn();
+const mockRouter = { replace: mockReplace };
+let mockParams: Record<string, string>;
 
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockReplace }),
-  useLocalSearchParams: () => ({ code: "synthetic-code", state: "synthetic-state" }),
+  useRouter: () => mockRouter,
+  useLocalSearchParams: () => mockParams,
 }));
 jest.mock("react-native-safe-area-context", () => {
   const { View } = jest.requireActual<typeof import("react-native")>("react-native");
@@ -29,6 +31,7 @@ describe("Quran Foundation callback routes", () => {
       value: { origin: "https://hafizquran.app" },
       configurable: true,
     });
+    mockParams = { code: "synthetic-code", state: "synthetic-state" };
     mockComplete.mockResolvedValue({ ok: true });
   });
 
@@ -49,6 +52,26 @@ describe("Quran Foundation callback routes", () => {
     await act(async () => {});
 
     expect(mockComplete).toHaveBeenCalledWith("synthetic-code", "synthetic-state", redirectUri);
-    expect(mockReplace).toHaveBeenCalledWith("/settings?qf=connected");
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: "/settings",
+      params: { category: "account", qf: "connected" },
+    });
+  });
+
+  it.each([
+    ["missing parameters", {}, "Quran Foundation connection failed"],
+    ["provider denial", { error: "access_denied", error_description: "Synthetic denial" }, "Synthetic denial"],
+    ["failed completion", { code: "invalid", state: "synthetic" }, "Synthetic completion failure"],
+  ] as const)("returns %s to the Account category", async (_name, params, expected) => {
+    mockParams = { ...params };
+    mockComplete.mockResolvedValue({ ok: false, message: "Synthetic completion failure" });
+    render(<QfCallbackScreen />);
+    await act(async () => {});
+
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: "/settings",
+      params: { category: "account", qf_error: expected },
+    });
   });
 });

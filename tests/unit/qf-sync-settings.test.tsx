@@ -39,7 +39,12 @@ const mockManualResult: QfSyncResult = { status: "synced", pushed: 1, pulled: 2 
 const mockCallbackResult: QfSyncResult = { status: "synced", pushed: 1, pulled: 2 };
 const mockFullQfUserSync = jest.fn(async (_db: SQLiteDatabase): Promise<QfSyncResult> => mockManualResult);
 const mockRunInitialQfUserSync = jest.fn(async (_db: SQLiteDatabase): Promise<QfSyncResult> => mockCallbackResult);
-let mockParams: { category: string; qf?: string } = { category: "account" };
+type SettingsParams = { category?: string; qf?: string; qf_error?: string };
+let mockParams: SettingsParams = { category: "account" };
+const mockSetParams = jest.fn((patch: SettingsParams) => {
+  mockParams = { ...mockParams, ...patch };
+});
+const mockRouter = { push: mockPush, setParams: mockSetParams, replace: mockUnexpected };
 const mockSettings: Partial<ReturnType<typeof useSettings>> = {};
 const originalWindow = Dimensions.get("window");
 const originalScreen = Dimensions.get("screen");
@@ -50,7 +55,7 @@ jest.mock("@/lib/settings/context", () => {
   return { ...actual, useSettings: () => ({ ...actual.useSettings(), ...mockSettings }) };
 });
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: mockPush, setParams: mockUnexpected, replace: mockUnexpected }),
+  useRouter: () => mockRouter,
   useLocalSearchParams: () => mockParams,
 }));
 jest.mock("expo-web-browser", () => ({ openAuthSessionAsync: jest.fn() }));
@@ -140,10 +145,6 @@ beforeEach(() => {
   });
   if (typeof globalThis.fetch === "function") {
     jest.spyOn(globalThis, "fetch").mockImplementation(() => mockUnexpected("fetch") as never);
-  }
-  const history = (globalThis as { history?: History }).history;
-  if (history?.replaceState) {
-    jest.spyOn(history, "replaceState").mockImplementation(() => undefined);
   }
 });
 
@@ -242,6 +243,42 @@ describe.each(["en", "ar"] as const)("QF disconnect in %s", (language) => {
       if (online) jest.mocked(getQfConnectionStatus).mockImplementation(online);
     }
   });
+});
+
+it("consumes a callback error once in Account and does not replay it on refresh", async () => {
+  configure("en");
+  mockParams = { qf_error: "Synthetic denial" };
+  const view = await openSettings();
+  expect(mockSetParams).toHaveBeenCalledTimes(1);
+  expect(mockParams).toEqual({ category: "account", qf: undefined, qf_error: undefined });
+  view.rerender(<SettingsScreen />);
+  expect(view.getByText("Synthetic denial")).toBeTruthy();
+
+  fireEvent.press(view.getByText(strings.en.settingsCategoryGeneral));
+  view.rerender(<SettingsScreen />);
+  fireEvent.press(view.getByText(strings.en.settingsCategoryAccount));
+  view.unmount();
+  const refreshed = await openSettings();
+  expect(refreshed.queryByText("Synthetic denial")).toBeNull();
+  expect(mockRunInitialQfUserSync).not.toHaveBeenCalled();
+});
+
+it("finishes the initial sync after the callback params have been consumed", async () => {
+  configure("en", "connected");
+  let finish!: (result: QfSyncResult) => void;
+  mockRunInitialQfUserSync.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const view = await openSettings();
+  expect(mockParams).toEqual({ category: "account", qf: undefined, qf_error: undefined });
+  view.rerender(<SettingsScreen />);
+  await act(async () => finish(mockCallbackResult));
+  expect(view.getByText(strings.en.qfSyncComplete)).toBeTruthy();
+  expect(mockRunInitialQfUserSync).toHaveBeenCalledTimes(1);
+  expect(mockSetParams).toHaveBeenCalledTimes(1);
 });
 
 describe.each(callbackCases)("QF callback sync $language/$status", ({ language, status }) => {
