@@ -1783,12 +1783,22 @@ function MushafInner() {
     })()
   ).current;
 
+  // An inactive web route measures its rows at zero height. FlashList then tries to fill its
+  // viewport with thousands of ayahs before the next screen can paint.
+  const showVerseList = Platform.OS !== "web" || isFocused;
   const initialVerseIndex = useMemo(() => {
-    if (items.length === 0) return undefined;
+    if (!showVerseList || items.length === 0) return undefined;
     const page = pendingVersePageRef.current ?? currentPageRef.current;
+    const anchor = Platform.OS === "web" && pendingVersePageRef.current === null ? topAyahRef.current : null;
+    if (anchor) {
+      const exact = items.findIndex(
+        (item) => item.type === "ayah" && item.v2Page === page && item.surah === anchor.surah && item.ayah === anchor.ayah,
+      );
+      if (exact >= 0) return exact;
+    }
     const index = items.findIndex((item) => item.type === "ayah" && item.v2Page === page);
     return index >= 0 ? index : undefined;
-  }, [currentPage, items, viewMode]);
+  }, [currentPage, items, showVerseList, viewMode]);
 
   useEffect(() => {
     if (viewMode !== "verse" || pendingVersePageRef.current == null || items.length === 0) return;
@@ -1990,20 +2000,20 @@ function MushafInner() {
           <View className="flex-1" {...readerTapProps}>
             {quranLoadFailed && items.length === 0 ? (
               <QuranLoadError onRetry={() => setQuranLoadAttempt((attempt) => attempt + 1)} />
-            ) : (
-            <FlashList
-              ref={flashListRef}
-              data={items}
-              renderItem={renderItem}
-              getItemType={getItemType}
-              keyExtractor={keyExtractor}
-              extraData={{ fontSize, verseHideMode, verseReveals, highlightedKey: displayedHighlightKey, highlightedWord }}
-              contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
-              onScroll={handleScrollChrome}
-              scrollEventThrottle={16}
-              viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs}
-              initialScrollIndex={initialVerseIndex}
-            />
+            ) : showVerseList && (
+              <FlashList
+                ref={flashListRef}
+                data={items}
+                renderItem={renderItem}
+                getItemType={getItemType}
+                keyExtractor={keyExtractor}
+                extraData={{ fontSize, verseHideMode, verseReveals, highlightedKey: displayedHighlightKey, highlightedWord }}
+                contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
+                onScroll={handleScrollChrome}
+                scrollEventThrottle={16}
+                viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs}
+                initialScrollIndex={initialVerseIndex}
+              />
             )}
           </View>
         )}

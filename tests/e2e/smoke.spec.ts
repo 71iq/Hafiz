@@ -319,3 +319,22 @@ test("System theme follows the browser while explicit palettes keep their colors
   await expect(page.getByText("Now: Dark", { exact: true })).toBeVisible();
   await expect(body).toHaveCSS("background-color", dark);
 });
+
+test("a guest can leave a verse for reflection login and return to the same ayah", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await waitForQaReady(page);
+  await page.goto("/settings", { waitUntil: "domcontentloaded" });
+  await page.getByText("Verse by Verse", { exact: true }).click();
+  await page.goto("/open?surah=2&ayah=255", { waitUntil: "domcontentloaded" });
+  const ayah = page.getByRole("button", { name: "2:255", exact: true });
+  await expect(ayah).toBeInViewport({ timeout: 30_000 });
+  await ayah.click();
+  await page.getByRole("button", { name: "Share reflection", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Log In", exact: true }).click();
+  await expect(page).toHaveURL(/\/auth\/login$/);
+  // Either account configuration has a usable exit, even with the verse reader in history.
+  const exit = page.getByRole("button", { name: /^(Back|Continue offline)$/ }).first();
+  await expect(exit).toBeVisible({ timeout: 10_000 });
+  await page.goBack({ waitUntil: "commit" });
+  await expect(ayah).toBeInViewport({ timeout: 20_000 });
+});
