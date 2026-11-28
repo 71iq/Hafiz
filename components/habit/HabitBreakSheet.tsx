@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
-import { X as XIcon } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, X as XIcon } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { MirroredRow } from "@/components/ui/MirroredRow";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Text } from "@/components/ui/Text";
@@ -24,7 +25,8 @@ import {
 import type { HabitPause } from "@/lib/habit/types";
 import { EXCUSE_REASONS, type ExcuseReason } from "@/lib/habit/types";
 import { emitHabitChanged } from "@/lib/habit/use-habit-overview";
-import { formatDays } from "@/lib/i18n/count";
+import { normalizeDateDigits } from "@/lib/date";
+import { formatDays, formatNumber } from "@/lib/i18n/count";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { interpolate } from "@/lib/i18n/useStrings";
 
@@ -40,8 +42,7 @@ type Props = {
 
 type Tab = "excuse" | "pause";
 
-const START_OFFSETS = [-3, -2, -1, 0, 1] as const;
-const LENGTHS = [1, 2, 3, 5, 7, 14] as const;
+const DATE_PAGE_SIZE = 7;
 const PAUSE_LENGTHS = [7, 14, 30, 60] as const;
 
 function reasonLabel(reason: ExcuseReason, s: UIStrings): string {
@@ -72,6 +73,7 @@ function Chip({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected, disabled }}
+      aria-pressed={selected}
       onPress={onPress}
       disabled={disabled}
       className={`min-h-[44px] justify-center rounded-full px-3.5 ${selected ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"}`}
@@ -96,7 +98,8 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
   const [tab, setTab] = useState<Tab>("excuse");
   const [reason, setReason] = useState<ExcuseReason>("illness");
   const [startOffset, setStartOffset] = useState<number>(0);
-  const [length, setLength] = useState<number>(1);
+  const [firstOffset, setFirstOffset] = useState(-EXCUSE_DAYS_BACK);
+  const [lengthText, setLengthText] = useState("1");
   const [pauseLength, setPauseLength] = useState<number>(7);
   const [marked, setMarked] = useState<ExcusedDay[]>([]);
   const [busy, setBusy] = useState(false);
@@ -115,11 +118,13 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
   }, [loadMarked, open]);
 
   const from = addDays(today, startOffset);
-  const to = useMemo(() => {
-    const end = addDays(from, length - 1);
-    const limit = addDays(today, EXCUSE_DAYS_AHEAD);
-    return end > limit ? limit : end;
-  }, [from, length, today]);
+  const lastOffset = Math.min(firstOffset + DATE_PAGE_SIZE - 1, EXCUSE_DAYS_AHEAD);
+  const visibleOffsets = Array.from({ length: lastOffset - firstOffset + 1 }, (_, i) => firstOffset + i);
+  const maxLength = EXCUSE_DAYS_AHEAD - startOffset + 1;
+  const length = Number(lengthText);
+  const to = /^\d+$/.test(lengthText) && length >= 1 && length <= maxLength ? addDays(from, length - 1) : null;
+  const Previous = dir === "rtl" ? ChevronRight : ChevronLeft;
+  const Next = dir === "rtl" ? ChevronLeft : ChevronRight;
 
   const run = useCallback(
     async (work: () => Promise<void>) => {
@@ -150,7 +155,7 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
   const pauseActive = pause !== null && pause.end >= today;
 
   return (
-    <ResponsiveSheet open={open} onClose={onClose} maxWidth={480} maxHeight={720}>
+    <ResponsiveSheet open={open} onClose={onClose} maxWidth={480} maxHeight={720} avoidKeyboard>
       <OverlayHeader title={s.habitBreakTitle} subtitle={s.habitBreakSubtitle} onClose={onClose} isRTL={dir === "rtl"} showHandle />
       <OverlayBody contentContainerClassName="px-5 py-4" contentContainerStyle={{ gap: 16 }}>
         <ToggleGroup<Tab>
@@ -187,11 +192,29 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
             </View>
 
             <View style={{ gap: 8 }}>
-              <Text dir={dir} variant="label-lg">
-                {s.habitExcuseFrom}
-              </Text>
+              <MirroredRow dir={dir} className="items-center justify-between gap-2">
+                <Text dir={dir} variant="label-lg" className="flex-1">
+                  {s.habitExcuseFrom} · {formatShortDate(from, language)}
+                </Text>
+                <Button
+                  variant="ghost" size="icon" className="h-11 w-11"
+                  accessibilityLabel={s.habitExcuseEarlierDates}
+                  disabled={firstOffset === -EXCUSE_DAYS_BACK}
+                  onPress={() => setFirstOffset(firstOffset - DATE_PAGE_SIZE)}
+                >
+                  <Previous size={18} color={mutedIcon} />
+                </Button>
+                <Button
+                  variant="ghost" size="icon" className="h-11 w-11"
+                  accessibilityLabel={s.habitExcuseLaterDates}
+                  disabled={lastOffset === EXCUSE_DAYS_AHEAD}
+                  onPress={() => setFirstOffset(firstOffset + DATE_PAGE_SIZE)}
+                >
+                  <Next size={18} color={mutedIcon} />
+                </Button>
+              </MirroredRow>
               <MirroredRow dir={dir} className="flex-wrap gap-2">
-                {START_OFFSETS.map((offset) => (
+                {visibleOffsets.map((offset) => (
                   <Chip key={offset} label={startLabel(offset)} selected={startOffset === offset} onPress={() => setStartOffset(offset)} />
                 ))}
               </MirroredRow>
@@ -201,10 +224,22 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
               <Text dir={dir} variant="label-lg">
                 {s.habitExcuseDays}
               </Text>
-              <MirroredRow dir={dir} className="flex-wrap gap-2">
-                {LENGTHS.map((days) => (
-                  <Chip key={days} label={formatDays(days, language)} selected={length === days} onPress={() => setLength(days)} />
-                ))}
+              <MirroredRow dir={dir} className="items-center gap-3">
+                <Input
+                  accessibilityLabel={s.habitExcuseDays}
+                  dir={dir}
+                  inputMode="numeric"
+                  selectTextOnFocus
+                  className="w-20 bg-surface-low"
+                  value={language === "ar" ? lengthText.replace(/\d/g, (digit) => formatNumber(Number(digit), language)) : lengthText}
+                  onChangeText={(text) => setLengthText(normalizeDateDigits(text))}
+                  invalid={to === null}
+                />
+                <Text dir={dir} variant="caption" className="flex-1" accessibilityLiveRegion="polite">
+                  {to
+                    ? interpolate(s.habitExcuseThrough, { date: formatShortDate(to, language) })
+                    : interpolate(s.habitExcuseDurationRange, { max: formatNumber(maxLength, language) })}
+                </Text>
               </MirroredRow>
             </View>
 
@@ -277,8 +312,10 @@ export function HabitBreakSheet({ open, onClose, db, pause, language, isDark, s 
         {tab === "excuse" ? (
           <Button
             className="flex-1"
-            disabled={busy}
-            onPress={() => run(() => markExcusedDays(db, { from, to, reason }))}
+            disabled={busy || to === null}
+            onPress={() => {
+              if (to) void run(() => markExcusedDays(db, { from, to, reason }));
+            }}
             label={s.habitExcuseSave}
           />
         ) : pauseActive ? (

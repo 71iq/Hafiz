@@ -3,11 +3,11 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { HabitBreakSheet } from "@/components/habit/HabitBreakSheet";
 import { WirdExtras } from "@/components/habit/WirdExtras";
-import { WirdStreakCard } from "@/components/habit/WirdStreakCard";
+import { formatShortDate, WirdStreakCard } from "@/components/habit/WirdStreakCard";
 import { addDays, atLocalTime, localDateOf } from "@/lib/habit/dates";
 import { makeUpCutoffFor } from "@/lib/habit/cutoff";
 import { DEFAULT_WIRD_MINIMUM } from "@/lib/habit/minimum";
-import { readHabitDayRow, type HabitOverview } from "@/lib/habit/queries";
+import { EXCUSE_DAYS_AHEAD, EXCUSE_DAYS_BACK, readHabitDayRow, type HabitOverview } from "@/lib/habit/queries";
 import { buildHabitSnapshot } from "@/lib/habit/snapshot";
 import type { DayStatus, HabitDay } from "@/lib/habit/types";
 import { strings } from "@/lib/i18n/strings";
@@ -130,11 +130,11 @@ describe("HabitBreakSheet", () => {
     jest.restoreAllMocks();
   });
 
-  function renderSheet() {
+  function renderSheet(language: "en" | "ar" = "en") {
     return render(
       <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
-        <DirectionProvider dir="ltr">
-          <HabitBreakSheet open onClose={jest.fn()} db={store.db} pause={null} language="en" isDark={false} s={s} />
+        <DirectionProvider dir={language === "ar" ? "rtl" : "ltr"}>
+          <HabitBreakSheet open onClose={jest.fn()} db={store.db} pause={null} language={language} isDark={false} s={strings[language]} />
         </DirectionProvider>
       </SafeAreaProvider>,
     );
@@ -144,7 +144,7 @@ describe("HabitBreakSheet", () => {
     const today = localDateOf(new Date());
     const view = renderSheet();
     fireEvent.press(view.getByText(s.habitExcuseTravel));
-    fireEvent.press(view.getByText("2 days"));
+    fireEvent.changeText(view.getByLabelText(s.habitExcuseDays), "2");
     fireEvent.press(view.getByText(s.habitExcuseSave));
     await waitFor(() => expect(view.getByText(s.habitBreakSaved)).toBeTruthy());
     expect(await readHabitDayRow(store.db, today)).toMatchObject({ status: "excused", reason: "travel" });
@@ -153,6 +153,39 @@ describe("HabitBreakSheet", () => {
     expect(removeButtons).toHaveLength(2);
     fireEvent.press(removeButtons[0]);
     await waitFor(async () => expect(await readHabitDayRow(store.db, today)).toMatchObject({ status: null }));
+  });
+
+  it("schedules one day beyond tomorrow and leaves today and tomorrow alone", async () => {
+    const today = localDateOf(new Date());
+    const target = addDays(today, 2);
+    const view = renderSheet();
+    fireEvent.press(view.getByRole("button", { name: formatShortDate(target, "en") }));
+    fireEvent.press(view.getByText(s.habitExcuseSave));
+    await waitFor(() => expect(view.getByText(s.habitBreakSaved)).toBeTruthy());
+    expect(await readHabitDayRow(store.db, target)).toMatchObject({ status: "excused" });
+    expect(await readHabitDayRow(store.db, today)).toBeNull();
+    expect(await readHabitDayRow(store.db, addDays(today, 1))).toBeNull();
+  });
+
+  it("accepts the whole allowed window and rejects a length past its last day in Arabic", async () => {
+    const today = localDateOf(new Date());
+    const first = addDays(today, -EXCUSE_DAYS_BACK);
+    const last = addDays(today, EXCUSE_DAYS_AHEAD);
+    const view = renderSheet("ar");
+    const ar = strings.ar;
+    const save = view.getByRole("button", { name: ar.habitExcuseSave });
+    fireEvent.press(view.getByRole("button", { name: formatShortDate(first, "ar") }));
+    fireEvent.changeText(view.getByLabelText(ar.habitExcuseDays), "٣٤");
+    fireEvent.press(save);
+    await waitFor(() => expect(view.getByText(ar.habitBreakSaved)).toBeTruthy());
+    expect(await readHabitDayRow(store.db, first)).toMatchObject({ status: "excused" });
+    expect(await readHabitDayRow(store.db, last)).toMatchObject({ status: "excused" });
+    for (let page = 0; page < 4; page++) fireEvent.press(view.getByLabelText(ar.habitExcuseLaterDates));
+    expect(view.getByLabelText(ar.habitExcuseLaterDates)).toBeDisabled();
+    fireEvent.press(view.getByRole("button", { name: formatShortDate(last, "ar") }));
+    expect(save).toBeDisabled();
+    fireEvent.changeText(view.getByLabelText(ar.habitExcuseDays), "١");
+    expect(save).toBeEnabled();
   });
 
   it("shows the menstruation note without issuing a ruling", () => {
