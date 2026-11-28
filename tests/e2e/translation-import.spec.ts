@@ -1,6 +1,13 @@
 import { strings } from "@/lib/i18n/strings";
 import { expect, test } from "@playwright/test";
-import { assertHealthyPage, captureConsole, databaseSql, prepareContentImportPreview, waitForQaReady } from "./helpers";
+import {
+  assertHealthyPage,
+  assertReadableNotice,
+  captureConsole,
+  databaseSql,
+  prepareContentImportPreview,
+  waitForQaReady,
+} from "./helpers";
 
 for (const language of ["en", "ar"] as const) {
   const s = strings[language];
@@ -72,8 +79,10 @@ for (const language of ["en", "ar"] as const) {
         const dialog = page.getByRole("dialog");
         const notice = dialog.getByText(s.translationLoadFailed, { exact: true });
         const retry = dialog.getByRole("button", { name: s.translationTryAgain, exact: true });
-        await expect(notice).toBeVisible();
-        await expect(retry).toBeVisible();
+        await expect(retry).toBeFocused();
+        await expect(retry).toHaveAccessibleDescription(s.translationLoadFailed);
+        await assertReadableNotice(notice);
+        await expect(retry).toBeInViewport();
         await expect(dialog.getByRole("radio", { name: /Bridges/ })).toBeChecked();
         await expect(french).not.toBeChecked();
         await page.screenshot({ path: testInfo.outputPath("translation-failure.png") });

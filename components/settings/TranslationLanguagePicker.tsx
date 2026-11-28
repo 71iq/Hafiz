@@ -1,5 +1,5 @@
 import { useInlineOperationNotice, type InlineNoticeAttempt } from "@/components/ui/OperationNoticeProvider";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, TextInput, View, Text } from "react-native";
 import { Check, ChevronLeft, ChevronRight, RotateCcw, Search } from "lucide-react-native";
 import { DisclosureRow } from "@/components/ui/MirroredRow";
@@ -24,6 +24,11 @@ type Props = {
   onClose: () => void;
 };
 
+// The failed language can be far below the error. Focusing Retry brings both back into view.
+function focusRetry(button: View | null) {
+  button?.focus();
+}
+
 export function TranslationLanguagePicker({ visible, onClose }: Props) {
   const { translationLanguage, setTranslationLanguage, isDark, isRTL, uiLanguage } =
     useSettings();
@@ -32,6 +37,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
   const [pressedCode, setPressedCode] = useState<string | null>(null);
   const [selectingCode, setSelectingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const errorId = useId();
   const [failedCode, setFailedCode] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
@@ -237,6 +243,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
             style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row", flexWrap: "wrap" }}
           >
             <Text
+              nativeID={Platform.OS === "web" ? errorId : undefined}
               className="min-w-0 flex-1 text-red-600 dark:text-red-400"
               style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
             >
@@ -244,6 +251,8 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
             </Text>
             {failedCode ? (
               <Pressable
+                ref={Platform.OS === "web" ? focusRetry : undefined}
+                aria-describedby={Platform.OS === "web" ? errorId : undefined}
                 onPress={() => void handleSelect(failedCode)}
                 accessibilityRole="button"
                 accessibilityLabel={s.translationTryAgain}
