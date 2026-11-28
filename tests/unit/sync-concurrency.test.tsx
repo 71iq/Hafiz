@@ -1,11 +1,16 @@
 import React, { Suspense } from "react";
-import { act, renderHook, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, renderHook, waitFor } from "@testing-library/react-native";
 import NetInfo from "@react-native-community/netinfo";
 import type { Session } from "@supabase/supabase-js";
 import { observeAuthSession } from "@/lib/auth/commands";
 import { emitSyncCompleted } from "@/lib/sync/events";
 import { RECONNECT_SYNC_DEBOUNCE_MS, useSync } from "@/lib/sync/useSync";
 import { getRestoreConsentView, useRestoreConsent, useSyncRestorePause } from "@/lib/sync/restore-consent";
+import { RestoreConsentDialog } from "@/components/sync/RestoreConsent";
+import { strings } from "@/lib/i18n/strings";
+
+jest.mock("react-native-safe-area-context", () => require("react-native-safe-area-context/jest/mock").default);
+jest.mock("@/lib/ui/reduced-motion", () => ({ useReducedMotionPreference: () => true }));
 
 type Summary = import("@/lib/database/sync").SyncResult;
 type QfResult = import("@/lib/quran-foundation/user-sync").QfSyncResult;
@@ -25,7 +30,7 @@ const mockCount = jest.fn(async (..._args: unknown[]) => 0);
 const mockQfCount = jest.fn(async (..._args: unknown[]) => 0);
 
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDb }));
-jest.mock("@/lib/settings/context", () => ({ useSettings: () => mockSettings }));
+jest.mock("@/lib/settings/context", () => ({ useSettings: () => ({ ...mockSettings, uiLanguage: "en" }) }));
 jest.mock("@/lib/auth/store", () => ({
   useAuthStore: Object.assign(
     (selector: (state: { user: Session["user"] | null; session: Session | null }) => unknown) =>
@@ -37,12 +42,14 @@ jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: () => true }));
 const mockPause = jest.fn(async (..._args: unknown[]): Promise<"pending_consent" | "cancelled" | null> => null);
 const mockAccept = jest.fn(async (..._args: unknown[]): Promise<Summary> => HEALTHY);
 const mockCancel = jest.fn(async (..._args: unknown[]) => true);
+const mockRefreshConsent = jest.fn<ReturnType<typeof import("@/lib/database/sync").refreshRestoreConsent>, unknown[]>();
 const mockClearConsent = jest.fn();
 jest.mock("@/lib/database/sync", () => ({
   fullSync: (...args: unknown[]) => mockFullSync(...args),
   readRestorePause: (...args: unknown[]) => mockPause(...args),
   acceptRestoreConsent: (...args: unknown[]) => mockAccept(...args),
   cancelRestoreConsent: (...args: unknown[]) => mockCancel(...args),
+  refreshRestoreConsent: (...args: unknown[]) => mockRefreshConsent(...args),
   clearRestoreConsentRequests: () => mockClearConsent(),
   hasCompletedAccountRestore: async () => false,
 }));
@@ -752,20 +759,34 @@ describe("W07 restore pause and consent", () => {
     expect(emitSyncCompleted).toHaveBeenCalledTimes(1);
   });
 
-  it("prepares fresh consent after a stale acceptance", async () => {
+  it.each(["stale", "expired", "failed"])("requires preparation and a separate confirmation after %s consent", async (issue) => {
     mockFullSync.mockResolvedValueOnce(consent("old"));
     renderHook(() => useSync());
     await waitFor(() => expect(getRestoreConsentView().request?.token).toBe("old"));
-    mockAccept.mockResolvedValueOnce({ ...HEALTHY, pushed: 0, status: "restore_consent_stale" });
-    mockFullSync.mockResolvedValueOnce(consent("fresh"));
-    const consentHook = renderHook(() => useRestoreConsent(A));
-    await act(async () => {
-      consentHook.result.current.accept();
+    if (issue === "failed") mockAccept.mockRejectedValueOnce(new Error("restore rolled back"));
+    else mockAccept.mockResolvedValueOnce({ ...HEALTHY, status: issue === "stale" ? "restore_consent_stale" : "restore_consent_invalid" });
+    const fresh = consent("fresh").request;
+    mockRefreshConsent.mockResolvedValueOnce({
+      request: { ...fresh, summary: { categories: [{ key: "bookmarks", count: 3 }], pendingChanges: 2 } },
+      pause: "pending_consent",
     });
-    await waitFor(() => expect(getRestoreConsentView().request?.token).toBe("fresh"));
-    expect(getRestoreConsentView().issue).toBe("stale");
-    expect(mockFullSync).toHaveBeenLastCalledWith(mockDb, { resume: true });
+    const dialog = render(<RestoreConsentDialog />);
+    const useAccount = strings.en.syncRestoreUseAccount;
+    await act(async () => fireEvent.press(dialog.getByText(useAccount)));
+    expect(getRestoreConsentView().issue).toBe(issue);
+    expect(mockRefreshConsent).not.toHaveBeenCalled();
+    expect(dialog.queryByText(useAccount)).toBeNull();
+    expect(dialog.queryByText(strings.en.sharedTryAgain)).toBeNull();
+
+    await act(async () => fireEvent.press(dialog.getByText(strings.en.syncRestorePrepareAgain)));
+    expect(dialog.getByText(/Bookmarks: 3/)).toBeTruthy();
+    expect(dialog.getByText(/Pending sync changes: 2/)).toBeTruthy();
+    expect(getRestoreConsentView().issue).toBeNull();
+    expect(mockAccept).toHaveBeenCalledTimes(1);
+    expect(mockFullSync).toHaveBeenCalledTimes(1);
     expect(mockStats).not.toHaveBeenCalled();
+    await act(async () => fireEvent.press(dialog.getByText(useAccount)));
+    expect(mockAccept).toHaveBeenLastCalledWith(mockDb, "fresh");
   });
 
   it("cancels into a stored pause, and Resume sync asks for a fresh snapshot", async () => {

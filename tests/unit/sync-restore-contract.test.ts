@@ -11,6 +11,7 @@ import {
   clearRestoreConsentRequests,
   fullSync,
   readRestorePause,
+  refreshRestoreConsent,
   restorePauseKey,
   RESTORE_CONSENT_TTL_MS,
   type SyncResult,
@@ -489,6 +490,24 @@ describe("W07 restore consent", () => {
     });
     expect(sql.prepare("SELECT COUNT(*) AS count FROM bookmarks").get()).toEqual({ count: 1 });
     expect(await readRestorePause(restoreDb, USER_A)).toBe("pending_consent");
+  });
+
+  it("refreshes counts without applying account data even when only derived local rows remain", async () => {
+    bookmark(1, 1);
+    const { request } = await prepare();
+    sql.exec("DELETE FROM bookmarks");
+    put("device_hifz_today_plan", "{}");
+    const before = localState();
+    await expect(acceptRestoreConsent(restoreDb, request.token)).resolves.toMatchObject({ status: "restore_consent_stale" });
+    const fresh = await refreshRestoreConsent(restoreDb);
+    expect(fresh.request?.summary).toEqual({ categories: [], pendingChanges: 0 });
+    expect(fresh.request?.token).not.toBe(request.token);
+    expect(localState()).toEqual(before);
+    expect(mockUploads).toEqual([]);
+    await cancelRestoreConsent(restoreDb);
+    expect(localState()).toEqual(before);
+    await expect(refreshRestoreConsent(restoreDb)).resolves.toEqual({ pause: "cancelled", request: null });
+    expect(localState()).toEqual(before);
   });
 
   it("rolls back everything when the owner changes after the comparison", async () => {

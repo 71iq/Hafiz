@@ -48,7 +48,7 @@ export function RestoreConsentDialog() {
   const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   if (!request) return null;
-  const needsPreparation = issue === "expired" || issue === "failed";
+  const needsPreparation = issue !== null;
   const issueText =
     issue === "stale"
       ? s.syncRestoreStale
@@ -63,7 +63,8 @@ export function RestoreConsentDialog() {
       title={s.syncRestoreTitle}
       message={consentMessage(request, s, uiLanguage)}
       cancelLabel={s.syncRestoreCancel}
-      confirmLabel={needsPreparation ? s.syncRestorePrepareAgain : s.syncRestoreUseAccount}
+      confirmLabel={s.syncRestoreUseAccount}
+      retryLabel={s.syncRestorePrepareAgain}
       destructive={!needsPreparation}
       emphasis="cancel"
       confirmLoading={busy === "accepting" || busy === "resuming"}

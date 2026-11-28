@@ -534,7 +534,7 @@ async function restoreAccountDataIfNeeded(
     return { pulled: 0, accountRestored: false, localDataReplaced: false, restoreCompleted: true };
   }
 
-  if (!(await requiresRestoreConsent(db))) {
+  if (!hadPause && !(await requiresRestoreConsent(db))) {
     owner.requireCurrent();
     let replaced = false;
     await db.withTransactionAsync(async (tx) => {
@@ -894,6 +894,28 @@ function newConsentToken(): string {
   return random ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
+/** Refresh an open confirmation without applying a snapshot or running ordinary sync. */
+export async function refreshRestoreConsent(db: AppDatabase) {
+  const owner = captureSyncOwner();
+  if (!owner || !isSupabaseConfigured()) throw new Error("Restore account unavailable");
+  const snapshotStartedAt = new Date().toISOString();
+  const remoteRows = await fetchRemoteAccountRows(owner.userId, owner);
+  owner.requireCurrent();
+  // Another tab may have cancelled or finished the restore during the fetch.
+  const captured: { pause: RestorePauseState | null; state?: ReplacedLocalState } = { pause: null };
+  await db.withTransactionAsync(async (tx) => {
+    captured.pause = await readRestorePause(tx, owner.userId);
+    if (captured.pause === "pending_consent" && countRemoteRows(remoteRows) > 0) {
+      captured.state = await readReplacedLocalState(tx);
+    }
+  });
+  owner.requireCurrent();
+  return {
+    pause: captured.pause,
+    request: captured.state ? createPreparedRequest(owner, remoteRows, snapshotStartedAt, captured.state) : null,
+  };
+}
+
 async function prepareRestoreConsent(
   db: AppDatabase,
   owner: SyncOwner,
@@ -913,6 +935,15 @@ async function prepareRestoreConsent(
   owner.requireCurrent();
   const state = captured.state;
   if (!state) throw new Error("Restore consent was not prepared");
+  return createPreparedRequest(owner, remoteRows, snapshotStartedAt, state);
+}
+
+function createPreparedRequest(
+  owner: SyncOwner,
+  remoteRows: RemoteAccountRows,
+  snapshotStartedAt: string,
+  state: ReplacedLocalState,
+): RestoreConsentRequest {
   const preparedAt = Date.now();
   const token = newConsentToken();
   preparedConsent = {

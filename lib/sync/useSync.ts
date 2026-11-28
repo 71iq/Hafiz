@@ -13,6 +13,7 @@ import {
   fullSync,
   hasCompletedAccountRestore,
   readRestorePause,
+  refreshRestoreConsent,
   type SyncResult,
   type SyncStatus,
 } from "@/lib/database/sync";
@@ -26,7 +27,6 @@ import {
   registerRestoreConsentHandlers,
   resetRestoreConsent,
   updateRestoreConsent,
-  type RestoreConsentIssue,
 } from "@/lib/sync/restore-consent";
 import { useSettings } from "@/lib/settings/context";
 
@@ -38,9 +38,9 @@ export const RECONNECT_SYNC_DEBOUNCE_MS = 2_000;
 /**
  * `auto` is every automatic trigger and obeys a stored restore pause. `manual` is the owner's Sync now
  * or Retry: it waits for a run in progress instead of dropping, and still obeys the pause. `resume` is
- * the owner's explicit Resume sync or Prepare again. `accept` submits a prepared consent token.
+ * the owner's explicit Resume sync. `prepare` refreshes the dialog. `accept` submits its displayed token.
  */
-type SyncMode = { kind: "auto" } | { kind: "manual" } | { kind: "resume" } | { kind: "accept"; token: string };
+type SyncMode = { kind: "auto" | "manual" | "resume" | "prepare" } | { kind: "accept"; token: string };
 const AUTO: SyncMode = { kind: "auto" };
 const MANUAL: SyncMode = { kind: "manual" };
 
@@ -206,7 +206,7 @@ export function useSync() {
       });
       clearIdleTimer();
       if (mode.kind === "accept") updateRestoreConsent(userId, { busy: "accepting", issue: null });
-      else if (mode.kind === "resume") updateRestoreConsent(userId, { busy: "resuming" });
+      else if (mode.kind === "resume" || mode.kind === "prepare") updateRestoreConsent(userId, { busy: "resuming" });
 
       try {
         if (obeysPause) {
@@ -235,6 +235,14 @@ export function useSync() {
         }
         setStatus("syncing");
         setFailure(null);
+        if (mode.kind === "prepare") {
+          const refreshed = await refreshRestoreConsent(db);
+          if (isCurrent()) {
+            updateRestoreConsent(userId, { ...refreshed, busy: null, issue: null });
+            setStatus("idle");
+          }
+          return;
+        }
         // The rows a run moved are in the database whatever becomes of the view that started it, so
         // they are announced as soon as the result is known, before follow-up work can outlast the
         // view: an account restore that finished as the app navigated after sign-in otherwise left
@@ -250,7 +258,7 @@ export function useSync() {
             emitSyncCompleted(moved);
           }
         };
-        let result =
+        const result =
           mode.kind === "accept"
             ? await acceptRestoreConsent(db, mode.token)
             : mode.kind === "resume"
@@ -260,23 +268,13 @@ export function useSync() {
           announce(result);
           return;
         }
-        let issue: RestoreConsentIssue = null;
-        if (result.status === "restore_consent_stale") {
-          // Local data changed after the prompt was prepared: prepare fresh counts and a fresh token.
-          issue = "stale";
-          result = await fullSync(db, { resume: true });
-          if (!isCurrent()) {
-            announce(result);
-            return;
-          }
-        }
-        if (result.status === "restore_consent_invalid") {
-          updateRestoreConsent(userId, { busy: null, issue: "expired" });
+        if (result.status === "restore_consent_stale" || result.status === "restore_consent_invalid") {
+          updateRestoreConsent(userId, { busy: null, issue: result.status === "restore_consent_stale" ? "stale" : "expired" });
           setStatus("idle");
           return;
         }
         if (result.status === "needs_restore_consent") {
-          updateRestoreConsent(userId, { request: result.request, pause: "pending_consent", busy: null, issue });
+          updateRestoreConsent(userId, { request: result.request, pause: "pending_consent", busy: null, issue: null });
           setStatus("idle");
           return;
         }
@@ -339,7 +337,7 @@ export function useSync() {
           setStatus("error");
           setFailure("failed");
           // A failed acceptance rolled back and retired its token; consent must be prepared again.
-          if (mode.kind === "accept") updateRestoreConsent(userId, { busy: null, issue: "failed" });
+          if (mode.kind === "accept" || mode.kind === "prepare") updateRestoreConsent(userId, { busy: null, issue: "failed" });
           else if (mode.kind === "resume") updateRestoreConsent(userId, { busy: null });
           try {
             const count = await readPendingCount(db);
@@ -398,6 +396,7 @@ export function useSync() {
     () =>
       registerRestoreConsentHandlers({
         accept: (token) => runSync({ kind: "accept", token }),
+        prepareAgain: () => runSync({ kind: "prepare" }),
         cancel: cancelRestore,
         resume: () => runSync({ kind: "resume" }),
       }),

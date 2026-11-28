@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import type { RestoreConsentRequest, RestorePauseState } from "@/lib/database/sync";
 
 /**
@@ -19,6 +19,7 @@ export type RestoreConsentView = Readonly<{
 
 type Handlers = Readonly<{
   accept: (token: string) => Promise<void>;
+  prepareAgain: () => Promise<void>;
   cancel: () => Promise<void>;
   resume: () => Promise<void>;
 }>;
@@ -72,24 +73,33 @@ function useView(userId: string | null): RestoreConsentView {
 /** The confirmation's state and actions for the signed-in account. */
 export function useRestoreConsent(userId: string | null) {
   const current = useView(userId);
+  const request = current.request;
+  useEffect(() => {
+    if (!request || current.issue || current.busy) return;
+    const timer = setTimeout(() => {
+      if (request === view.request && !view.issue && !view.busy) {
+        updateRestoreConsent(request.userId, { issue: "expired" });
+      }
+    }, Math.max(0, request.expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [request, current.issue, current.busy]);
   const accept = useCallback(() => {
-    const request = view.request;
-    if (!request || view.busy || view.userId !== userId) return;
+    if (!request || request !== view.request || view.issue || view.busy || view.userId !== userId) return;
     // An expired request is never submitted; the confirmation offers Prepare again instead.
     if (Date.now() >= request.expiresAt) {
       updateRestoreConsent(request.userId, { issue: "expired" });
       return;
     }
     void handlers?.accept(request.token);
-  }, [userId]);
+  }, [request, userId]);
   const cancel = useCallback(() => {
     if (view.busy || view.userId !== userId) return;
     void handlers?.cancel();
   }, [userId]);
   const prepareAgain = useCallback(() => {
-    if (view.busy || view.userId !== userId) return;
-    void handlers?.resume();
-  }, [userId]);
+    if (!request || request !== view.request || !view.issue || view.busy || view.userId !== userId) return;
+    void handlers?.prepareAgain();
+  }, [request, userId]);
   return { ...current, accept, cancel, prepareAgain };
 }
 

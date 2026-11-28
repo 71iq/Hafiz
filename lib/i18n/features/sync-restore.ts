@@ -11,7 +11,7 @@ export const syncRestoreStrings = {
     syncRestoreUseAccount: "Use account progress",
     syncRestoreCancel: "Cancel sync",
     syncRestorePrepareAgain: "Prepare again",
-    syncRestoreStale: "Your local data changed after this was prepared. Check the updated list.",
+    syncRestoreStale: "Your local data changed. Prepare the request again to review the updated list.",
     syncRestoreExpired: "This request expired. Prepare it again to check the latest account data.",
     syncRestoreFailed:
       "Account progress could not be applied. Your local data is unchanged. Prepare it again to retry.",
@@ -52,7 +52,7 @@ export const syncRestoreStrings = {
     syncRestoreUseAccount: "استخدام تقدم الحساب",
     syncRestoreCancel: "إلغاء المزامنة",
     syncRestorePrepareAgain: "تجهيز الطلب مجددًا",
-    syncRestoreStale: "تغيرت بياناتك المحلية بعد تجهيز هذا الطلب. راجع القائمة المحدثة.",
+    syncRestoreStale: "تغيّرت بياناتك المحلية. جهّز الطلب مجددًا لمراجعة القائمة المحدّثة.",
     syncRestoreExpired: "انتهت صلاحية هذا الطلب. جهّزه مجددًا لمراجعة أحدث بيانات الحساب.",
     syncRestoreFailed: "تعذر تطبيق تقدم الحساب. بياناتك المحلية لم تتغير. جهّز الطلب مجددًا لإعادة المحاولة.",
     syncRestoreCategoryStudyCards: "بطاقات المراجعة",

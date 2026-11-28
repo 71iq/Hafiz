@@ -69,7 +69,7 @@
           "children": [
             {
               "id": "shell.sync.restore",
-              "title": "Restore consent dialog, Sync paused status and Resume sync",
+              "title": "Restore consent dialog, Prepare again before confirming, Sync paused status and Resume sync",
               "kind": "widget",
               "cases": ["UI-14"],
               "uses": ["shared.confirm"],
