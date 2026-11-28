@@ -1324,7 +1324,7 @@ function DeckActionButton({
 }
 
 /** "Off" on a deck left out of daily study, opening the setting that turns it on (SPEC 3.3). */
-function DeckOffButton({ isRTL, s, onPress }: { isRTL: boolean; s: UIStrings; onPress: () => void }) {
+function DeckOffButton({ title, isRTL, s, onPress }: { title: string; isRTL: boolean; s: UIStrings; onPress: () => void }) {
   return (
     <Pressable
       onPress={(event) => {
@@ -1332,7 +1332,7 @@ function DeckOffButton({ isRTL, s, onPress }: { isRTL: boolean; s: UIStrings; on
         onPress();
       }}
       accessibilityRole="button"
-      accessibilityLabel={`${s.studyDeckOff}. ${s.studyDeckOffHint}`}
+      accessibilityLabel={`${title}. ${s.studyDeckOff}. ${s.studyDeckOffHint}`}
       className="h-10 px-3 rounded-full border border-warm-300 dark:border-neutral-700 items-center justify-center"
       style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
       hitSlop={2}
@@ -1446,7 +1446,7 @@ function SmartDeckCard({
       <DeckActionButton
         icon={<List size={14} color={mutedIcon} />}
         label={s.homeDeckCardsLabel}
-        accessibilityLabel={s.deckCardsTitle}
+        accessibilityLabel={interpolate(s.progressOpenDeckCards, { deck: deck.title })}
         showLabel={showLabels}
         isRTL={isRTL}
         onPress={onShowCards}
@@ -1454,7 +1454,7 @@ function SmartDeckCard({
       <DeckActionButton
         icon={<Settings2 size={14} color={mutedIcon} />}
         label={s.homeDeckFilterLabel}
-        accessibilityLabel={s.smartDeckFilterTitle}
+        accessibilityLabel={interpolate(s.homeDeckFilterSettings, { deck: deck.title })}
         showLabel={showLabels}
         isRTL={isRTL}
         onPress={onConfigure}
@@ -1476,7 +1476,7 @@ function SmartDeckCard({
       textNode={textNode}
       actionNodes={actionNodes}
       statsNode={statsNode}
-      trailingControl={off ? <DeckOffButton isRTL={isRTL} s={s} onPress={onOpenSetting} /> : undefined}
+      trailingControl={off ? <DeckOffButton title={deck.title} isRTL={isRTL} s={s} onPress={onOpenSetting} /> : undefined}
     />
   );
 }
@@ -1551,7 +1551,7 @@ function VocabularyDeckCard({
       <DeckActionButton
         icon={<List size={14} color={mutedIcon} />}
         label={s.homeDeckCardsLabel}
-        accessibilityLabel={s.deckCardsTitle}
+        accessibilityLabel={interpolate(s.progressOpenDeckCards, { deck: s.vocabDeckTitle })}
         showLabel={showLabels}
         isRTL={isRTL}
         onPress={onShowCards}
@@ -1559,7 +1559,7 @@ function VocabularyDeckCard({
       <DeckActionButton
         icon={<Settings2 size={14} color={mutedIcon} />}
         label={s.homeDeckSettingsLabel}
-        accessibilityLabel={s.deckReviewSettingsTitle}
+        accessibilityLabel={interpolate(s.homeDeckSettingsFor, { deck: s.vocabDeckTitle })}
         showLabel={showLabels}
         isRTL={isRTL}
         onPress={onConfigure}
@@ -1581,7 +1581,7 @@ function VocabularyDeckCard({
       textNode={textNode}
       actionNodes={actionNodes}
       statsNode={statsNode}
-      trailingControl={off ? <DeckOffButton isRTL={isRTL} s={s} onPress={onOpenSetting} /> : undefined}
+      trailingControl={off ? <DeckOffButton title={s.vocabDeckTitle} isRTL={isRTL} s={s} onPress={onOpenSetting} /> : undefined}
     />
   );
 }

@@ -410,17 +410,19 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
       expect(start.props.accessibilityRole).toBe("button");
       expect(StyleSheet.flatten(start.props.style)).toMatchObject({ position: "absolute", backgroundColor: "transparent" });
       // The card-list control is a sibling of the start target, never a button nested inside it.
-      let parent = scope.getByLabelText(s.deckCardsTitle).parent;
+      let parent = scope.getByRole("button", { name: interpolate(s.progressOpenDeckCards, { deck: title }) }).parent;
       while (parent && parent !== node) {
         expect(parent).not.toBe(start);
         parent = parent.parent;
       }
     }
     // Both settings controls are labeled buttons.
-    const smartControl = within(smart).getByLabelText(s.smartDeckFilterTitle);
+    const smartCardsName = interpolate(s.progressOpenDeckCards, { deck: s.smartDeckRetentionTitle });
+    const vocabCardsName = interpolate(s.progressOpenDeckCards, { deck: s.vocabDeckTitle });
+    const smartControl = view.getByRole("button", { name: interpolate(s.homeDeckFilterSettings, { deck: s.smartDeckRetentionTitle }) });
     expect(smartControl.props.accessibilityRole).toBe("button");
     const stop = jest.fn();
-    fireEvent.press(within(smart).getByLabelText(s.deckCardsTitle), { stopPropagation: stop });
+    fireEvent.press(view.getByRole("button", { name: smartCardsName }), { stopPropagation: stop });
     expect(stop).toHaveBeenCalledTimes(1);
     expect(cards()).toMatchObject({
       visible: true,
@@ -436,11 +438,11 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(review().visible).toBe(false);
     expect(mockRouterPush).not.toHaveBeenCalled();
     act(() => filter().onClose());
-    fireEvent.press(within(vocab).getByLabelText(s.deckCardsTitle), { stopPropagation: stop });
+    fireEvent.press(view.getByRole("button", { name: vocabCardsName }), { stopPropagation: stop });
     expect(stop).toHaveBeenCalledTimes(3);
     expect(cards()).toMatchObject({ visible: true, deckId: MEANINGS_DECK_ID, deckTitle: s.vocabDeckTitle });
     act(() => cards().onClose());
-    const vocabControl = within(vocab).getByLabelText(s.deckReviewSettingsTitle);
+    const vocabControl = view.getByRole("button", { name: interpolate(s.homeDeckSettingsFor, { deck: s.vocabDeckTitle }) });
     expect(vocabControl.props.accessibilityRole).toBe("button");
     fireEvent.press(vocabControl, { stopPropagation: stop });
     expect(stop).toHaveBeenCalledTimes(4);
@@ -453,13 +455,13 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(mockRouterPush).not.toHaveBeenCalled();
     act(() => review().onClose());
     // All four handlers also accept an event without stopPropagation.
-    fireEvent.press(within(smart).getByLabelText(s.deckCardsTitle), {});
+    fireEvent.press(view.getByRole("button", { name: smartCardsName }), {});
     expect(cards().deckId).toBe(SMART_DECK_IDS.retention);
     act(() => cards().onClose());
     fireEvent.press(smartControl, {});
     expect(filter().deckId).toBe(SMART_DECK_IDS.retention);
     act(() => filter().onClose());
-    fireEvent.press(within(vocab).getByLabelText(s.deckCardsTitle), {});
+    fireEvent.press(view.getByRole("button", { name: vocabCardsName }), {});
     expect(cards().deckId).toBe(MEANINGS_DECK_ID);
     act(() => cards().onClose());
     fireEvent.press(vocabControl, {});
@@ -485,7 +487,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(mockRouterPush).not.toHaveBeenCalled();
     expect(view.queryByText(s.vocabDeckTitle)).toBeNull();
     const stop = jest.fn();
-    fireEvent.press(within(node).getByLabelText(s.deckCardsTitle), { stopPropagation: stop });
+    fireEvent.press(view.getByRole("button", { name: interpolate(s.progressOpenDeckCards, { deck: s.smartDeckRetentionTitle }) }), { stopPropagation: stop });
     expect(stop).toHaveBeenCalledTimes(1);
     expect(cards()).toMatchObject({ visible: true, deckId: SMART_DECK_IDS.retention });
   });
@@ -682,12 +684,17 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("the daily study header in
       .map((node) => node.props.children)
       .filter((text) => order.includes(text));
     expect(titles).toEqual(order);
+    for (const deck of order) {
+      const settingsLabel = deck === s.vocabDeckTitle ? s.homeDeckSettingsFor : s.homeDeckFilterSettings;
+      expect(view.getByRole("button", { name: interpolate(s.progressOpenDeckCards, { deck }) })).toBeTruthy();
+      expect(view.getByRole("button", { name: interpolate(settingsLabel, { deck }) })).toBeTruthy();
+    }
     expect(within(card(view, s.vocabDeckTitle)).queryByText(s.studyDeckOff)).toBeNull();
     const qiraat = within(card(view, s.smartDeckQiraatTitle));
     // Off takes the counts' place: a deck outside daily study has no work waiting.
     expect(qiraat.queryByText(s.deckCardsFilterNew)).toBeNull();
     expect(within(card(view, s.smartDeckRetentionTitle)).getByText(s.deckCardsFilterNew)).toBeTruthy();
-    const off = qiraat.getByLabelText(`${s.studyDeckOff}. ${s.studyDeckOffHint}`);
+    const off = qiraat.getByLabelText(`${s.smartDeckQiraatTitle}. ${s.studyDeckOff}. ${s.studyDeckOffHint}`);
     fireEvent.press(off, { stopPropagation: jest.fn() });
     expect(mockRouterPush).toHaveBeenCalledWith({
       pathname: "/(tabs)/settings",

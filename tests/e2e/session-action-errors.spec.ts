@@ -467,13 +467,12 @@ test("deck date-save failure stays inside the active date editor", async ({ brow
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await page.getByRole("radio", { name: "Dark", exact: true }).click();
     await expect(page.getByRole("radio", { name: "Dark", exact: true })).toBeChecked();
-    await page.goto("/home", { waitUntil: "domcontentloaded" });
+    await page.goto("/home?section=decks", { waitUntil: "domcontentloaded" });
     await expect(page.locator("html")).toHaveClass(/dark/);
-    // Home renders Retention first in its fixed smart-deck definition order.
-    await page.getByRole("button", { name: "Deck Cards", exact: true }).first().click();
+    await page.getByRole("button", { name: "Open the cards in Retention", exact: true }).click();
     const deck = page.getByRole("dialog").filter({ has: page.getByPlaceholder("Search cards...", { exact: true }) });
     await expect(deck).toBeVisible();
-    await expect(deck.getByText("Retention", { exact: true })).toBeVisible();
+    await expect(deck.getByText("Retention · 2 cards", { exact: true })).toBeVisible();
     const actions = deck.getByRole("button", { name: "Card Actions", exact: true });
     await expect(actions).toHaveCount(2);
     await actions.nth(1).click();
@@ -601,13 +600,12 @@ test("deck delete failure stays inside the active confirmation dialog", async ({
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await page.getByRole("radio", { name: "Dark", exact: true }).click();
     await expect(page.getByRole("radio", { name: "Dark", exact: true })).toBeChecked();
-    await page.goto("/home", { waitUntil: "domcontentloaded" });
+    await page.goto("/home?section=decks", { waitUntil: "domcontentloaded" });
     await expect(page.locator("html")).toHaveClass(/dark/);
-    // Home renders Retention first in its fixed smart-deck definition order.
-    await page.getByRole("button", { name: "Deck Cards", exact: true }).first().click();
+    await page.getByRole("button", { name: "Open the cards in Retention", exact: true }).click();
     const deck = page.getByRole("dialog").filter({ has: page.getByPlaceholder("Search cards...", { exact: true }) });
     await expect(deck).toBeVisible();
-    await expect(deck.getByText("Retention", { exact: true })).toBeVisible();
+    await expect(deck.getByText("Retention · 2 cards", { exact: true })).toBeVisible();
     const actions = deck.getByRole("button", { name: "Card Actions", exact: true });
     await expect(actions).toHaveCount(2);
     await actions.nth(1).click();
