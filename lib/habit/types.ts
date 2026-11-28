@@ -63,7 +63,7 @@ export type HabitDayRow = {
   /** A long-term cycle completed this day (MST-04). The column keeps its original name, which released apps and the server use. */
   manzil_cycle_completed: number;
   source_session_id: string | null;
-  /** For made_up: the review that completed yesterday's make-up. Later reviews today count for today. */
+  /** For made_up: the latest review credited when yesterday's make-up was recorded. */
   credited_through: string | null;
   tz: string | null;
   created_at: string;

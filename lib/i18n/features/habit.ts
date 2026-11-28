@@ -66,7 +66,7 @@ export const habitStrings = {
     habitBreakSaved: "Saved",
     habitBreakFailed: "Couldn't save. Try again.",
     // Session end
-    habitMadeUp: "Yesterday's wird is made up. Your {{n}}-day streak continues.",
+    habitMadeUp: "Yesterday's wird is made up. Your {{n}}-day streak continues. Start a new session for today's wird.",
     habitMinimumMet: "Your streak is safe for today",
     habitEarnedBack: "Your streak is back: {{days}}",
     habitStreakDay: "Day {{n}}",
@@ -220,7 +220,7 @@ export const habitStrings = {
     habitPauseHint: "حتى ٦٠ يومًا. تحتفظ السلسلة بطولها دون أن تزيد، وتتوقف التذكيرات.",
     habitBreakSaved: "تم الحفظ",
     habitBreakFailed: "تعذّر الحفظ. حاول مجددًا.",
-    habitMadeUp: "قُضي وِرد الأمس، وتستمر سلسلتك: {{days}}.",
+    habitMadeUp: "قُضي وِرد الأمس، وتستمر سلسلتك: {{days}}. ابدأ جلسة جديدة لوِرد اليوم.",
     habitMinimumMet: "سلسلتك محفوظة لهذا اليوم",
     habitEarnedBack: "عادت سلسلتك: {{days}}",
     habitStreakDay: "اليوم {{n}} من السلسلة",

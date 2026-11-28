@@ -2810,7 +2810,7 @@ describe("Flashcard session due-date editor characterization", () => {
       fireEvent.press(getTextButton(view, s.flashcardsEasy));
       await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
       expect(view.getByText("7 days of wird")).toBeTruthy();
-      expect(view.getAllByText("Yesterday's wird is made up. Your 7-day streak continues.").length).toBeGreaterThan(0);
+      expect(view.getAllByText("Yesterday's wird is made up. Your 7-day streak continues. Start a new session for today's wird.").length).toBeGreaterThan(0);
     });
 
     it("cancels pending queue loading before fetching card content after unmount", async () => {
