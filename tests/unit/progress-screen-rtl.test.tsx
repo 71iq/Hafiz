@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount } from "@/lib/fsrs/queries";
 import { getAchievementDashboard } from "@/lib/achievements/queries";
 import { getDefaultDeckProgress, getLocalSurahProgress } from "@/lib/profile/progress";
+import { loadHifzProgress } from "@/lib/hifz/progress";
 import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
 import { strings } from "@/lib/i18n/strings";
 import { findAncestorByClassName, flattenStyle, type RtlTestNode } from "../rtl/rtl-test-utils";
@@ -429,6 +430,20 @@ describe("ProgressScreen RTL behavior", () => {
       fireEvent.press(view.getByText(strings.ar.progressStartReviewing));
     });
     expect(mockRouterPush.mock.calls).toEqual([[{ pathname: "/flashcards/session", params: { scope: "daily" } }]]);
+  });
+
+  it("offers setup for empty surah progress only after confirming there is no plan", async () => {
+    jest.mocked(loadHifzProgress).mockResolvedValueOnce({
+      memorizedPages: 0, bands: { steady: 0, fair: 0, needsReview: 0 }, juzComplete: [],
+    });
+    const view = renderProgress();
+    expect(view.queryByText(strings.ar.surahSetUpPlan)).toBeNull();
+    await view.findByText(strings.ar.achievementsTitle);
+    expect(view.getByText(strings.ar.surahProgressEmpty)).toBeTruthy();
+    expect(view.queryByText(strings.ar.surahSetUpPlan)).toBeNull();
+    await act(async () => mockReviewListener?.());
+    fireEvent.press(await view.findByText(strings.ar.surahSetUpPlan));
+    expect(mockRouterPush).toHaveBeenCalledWith("/hifz/setup");
   });
 
   it("shows the Journey row with its completed count under Achievements", async () => {

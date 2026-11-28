@@ -66,7 +66,8 @@ export default function ProgressScreen() {
   const [defaultDeckProgress, setDefaultDeckProgress] = useState<DefaultDeckProgressItem[]>([]);
   const [achievementDashboard, setAchievementDashboard] = useState<AchievementDashboard | null>(null);
   const [journeySummary, setJourneySummary] = useState<ReflectionJourneySummary | null>(null);
-  const [hifzProgress, setHifzProgress] = useState<HifzProgress | null>(null);
+  // Only a successful null result means there is no plan and setup can be offered.
+  const [hifzProgress, setHifzProgress] = useState<HifzProgress | null>();
   const [surahProgressModalOpen, setSurahProgressModalOpen] = useState(false);
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
   const [deckCardsTarget, setDeckCardsTarget] = useState<{ id: string; title: string } | null>(null);
@@ -391,7 +392,7 @@ export default function ProgressScreen() {
           isRTL={isRTL}
           previewLimit={10}
           onViewAll={() => setSurahProgressModalOpen(true)}
-          onSetUpPlan={() => router.push("/hifz/setup" as Href)}
+          onSetUpPlan={hifzProgress === null ? () => router.push("/hifz/setup" as Href) : undefined}
           s={s}
         />
 

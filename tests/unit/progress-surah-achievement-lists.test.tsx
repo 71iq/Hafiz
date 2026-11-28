@@ -17,7 +17,8 @@ jest.mock("@/lib/settings/context", () => {
   return { ...actual, useSettings: () => mockSettings };
 });
 jest.mock("nativewind", () => ({ useColorScheme: () => ({ colorScheme: "light" }) }));
-jest.mock("@/lib/navigation/open-mushaf", () => ({ useOpenMushaf: () => jest.fn() }));
+const mockOpenMushaf = jest.fn();
+jest.mock("@/lib/navigation/open-mushaf", () => ({ useOpenMushaf: () => mockOpenMushaf }));
 
 const surahs = [
   { surah: 1, nameEnglish: "Al-Fatihah", nameArabic: "الفاتحة", totalCards: 7, memorized: 7 },
@@ -42,6 +43,8 @@ describe("surah progress View all", () => {
     const search = view.getByLabelText(strings.en.surahSearchPlaceholder);
     fireEvent.changeText(search, "baq");
     expect(names(view)).toEqual(["Al-Baqarah"]);
+    fireEvent.press(view.getByRole("button", { name: /Al-Baqarah/ }));
+    expect(mockOpenMushaf).toHaveBeenCalledWith({ surah: 2, ayah: 1 });
     fireEvent.changeText(search, "الإخلاص");
     expect(names(view)).toEqual(["Al-Ikhlas"]);
     fireEvent.changeText(search, "١١٢");

@@ -28,7 +28,7 @@ type Props = {
   previewLimit?: number;
   onItemPress?: () => void;
   onViewAll?: () => void;
-  /** Offered from the empty state: progress appears after study under the current plan. */
+  /** Offered on one's own Progress screen when there is no memorization plan. */
   onSetUpPlan?: () => void;
   readOnly?: boolean;
   s: UIStrings;
@@ -188,6 +188,8 @@ export function SurahProgressList({
     return (
       <Pressable
         key={item.surah}
+        accessibilityRole="button"
+        accessibilityHint={s.cardOpenInMushaf}
         onPress={() => handlePress(item.surah)}
         style={({ pressed }) => ({
           transform: [{ scale: pressed ? 0.98 : 1 }],

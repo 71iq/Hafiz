@@ -430,7 +430,7 @@ export const strings = {
     heatmapTotalReviews: "Total reviews",
     // Surah progress
     surahProgressEmpty: "No surahs tracked yet",
-    surahProgressEmptyDesc: "Progress appears here after you study. Set up a memorization plan to begin.",
+    surahProgressEmptyDesc: "Surahs appear here when ayah cards are added for them.",
     // QiraatTab
     // TranslationLanguagePicker
     translationLanguagePickerTitle: "Translation Language",
@@ -1304,7 +1304,7 @@ export const strings = {
     heatmapTotalReviews: "إجمالي المراجعات",
     // Surah progress
     surahProgressEmpty: "لا توجد سور قيد التتبع",
-    surahProgressEmptyDesc: "يظهر التقدم هنا بعد الدراسة. أعدّ خطة حفظ للبدء.",
+    surahProgressEmptyDesc: "تظهر السور هنا عند إضافة بطاقات لآياتها.",
     translationLanguagePickerTitle: "لغة الترجمة",
     preparingDatabase: "جارٍ تجهيز البيانات المحلية...",
     appSubtitle: "احفظ بالتدبر",
