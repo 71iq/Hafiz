@@ -237,6 +237,9 @@ export function ResponsiveOverlay({
   const reduceMotion = useReducedMotionPreference();
   const animation = useRef(new Animated.Value(0)).current;
   const overlayId = useOverlayLayerId();
+  const [webModalShown, setWebModalShown] = useState(false);
+  const markWebModalShown = useCallback(() => setWebModalShown(true), []);
+  const markWebModalDismissed = useCallback(() => setWebModalShown(false), []);
   const contentRef = useRef<View>(null);
   const titleRef = useRef<unknown>(null);
   const chrome = useMemo<OverlayChrome>(() => ({ titleRef }), []);
@@ -284,9 +287,11 @@ export function ResponsiveOverlay({
   }, [dismissOnEscape, open, overlayId]);
 
   useEffect(() => {
-    if (!open) return;
-    const activeElement = Platform.OS === "web" && typeof document !== "undefined" ? document.activeElement : null;
+    // RNW transfers the parent's focus trap in the update it schedules with Modal.onShow.
+    // Focusing a nested sheet before that update lets its parent take focus back.
+    if (!open || (Platform.OS === "web" && !webModalShown)) return;
     const focusTimer = requestAnimationFrame(() => {
+      if (!isTopOverlayLayer(overlayId)) return;
       if (initialFocusRef?.current?.focus) {
         initialFocusRef.current.focus();
         return;
@@ -295,18 +300,26 @@ export function ResponsiveOverlay({
       // itself when there is no title.
       if (Platform.OS === "web" && !focusWebElement(titleRef.current)) focusWebElement(contentRef.current);
     });
+    return () => cancelAnimationFrame(focusTimer);
+  }, [initialFocusRef, open, overlayId, webModalShown]);
+
+  // Capture the opener before the trap activates. Restore it after RNW releases the trap on dismiss.
+  const modalPresent = open || webModalShown;
+  useEffect(() => {
+    if (!modalPresent) return;
+    const activeElement = Platform.OS === "web" && typeof document !== "undefined" ? document.activeElement : null;
     return () => {
-      cancelAnimationFrame(focusTimer);
-      const restoreTarget = restoreFocusRef?.current;
-      if (restoreTarget?.focus) {
-        requestAnimationFrame(() => restoreTarget.focus?.());
-        return;
-      }
-      if (Platform.OS === "web" && activeElement instanceof HTMLElement) {
-        requestAnimationFrame(() => activeElement.focus());
-      }
+      if (!restoreFocusRef && !activeElement) return;
+      requestAnimationFrame(() => {
+        const target = restoreFocusRef?.current ?? asHTMLElement(activeElement);
+        const element = asHTMLElement(target);
+        // A replacement dialog owns focus while its predecessor's opener is behind it.
+        const dialog = element?.ownerDocument.querySelector('[role="dialog"][aria-modal="true"]');
+        if (dialog && element && !dialog.contains(element)) return;
+        target?.focus?.();
+      });
     };
-  }, [initialFocusRef, open, restoreFocusRef]);
+  }, [modalPresent, restoreFocusRef]);
 
   // Edge-to-edge Android ignores adjustResize, and KeyboardAvoidingView kept a navigation-bar-sized
   // padding after the keyboard hid, leaving every sheet lifted off the bottom. Android pads from the
@@ -421,6 +434,8 @@ export function ResponsiveOverlay({
       visible={open}
       transparent
       animationType="none"
+      onShow={Platform.OS === "web" ? markWebModalShown : undefined}
+      onDismiss={Platform.OS === "web" ? markWebModalDismissed : undefined}
       statusBarTranslucent
       onRequestClose={Platform.OS === "web" ? undefined : handleRequestClose}
     >

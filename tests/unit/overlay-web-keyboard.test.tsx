@@ -122,6 +122,37 @@ it("moves focus to the title on open and back to the opener on close", () => {
   opener.remove();
 });
 
+it("focuses the nested sheet's search field after its modal becomes active and restores its trigger", () => {
+  const inputRef = React.createRef<HTMLInputElement>();
+  const triggerRef = React.createRef<HTMLButtonElement>();
+  const tree = (open: boolean, confirmDelete = false) => sheet("Profile", jest.fn(), {}, (
+    <>
+      <button ref={triggerRef}>Search notes</button>
+      <ResponsiveSheet open={open} onClose={jest.fn()} initialFocusRef={inputRef} restoreFocusRef={triggerRef}>
+        <OverlayHeader title="My Notes" />
+        <input ref={inputRef} aria-label="Search notes" />
+      </ResponsiveSheet>
+      {confirmDelete && sheet("Delete note?", jest.fn())}
+    </>
+  ));
+  show(tree(false));
+  const trigger = triggerRef.current!;
+  act(() => trigger.focus());
+  // A frame can arrive before React has committed RNW's transfer of the focus trap.
+  jest.mocked(window.requestAnimationFrame).mockImplementation((callback) => {
+    callback(0);
+    return 1;
+  });
+  show(tree(true));
+  expect(document.activeElement).toBe(inputRef.current);
+  show(tree(false, true));
+  expect(document.activeElement?.textContent).toBe("Delete note?");
+  show(tree(true));
+  expect(document.activeElement).toBe(inputRef.current);
+  show(tree(false));
+  expect(document.activeElement).toBe(trigger);
+});
+
 it("lets only the topmost overlay handle Escape and keeps it from the reader", () => {
   const outer = jest.fn();
   const inner = jest.fn();

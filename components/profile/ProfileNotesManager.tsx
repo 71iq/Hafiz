@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { BookOpen, Edit3, NotebookPen, Search, Trash2, type LucideIcon } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
@@ -59,6 +59,8 @@ export function ProfileNotesManager() {
   const [results, setResults] = useState<PrivateNoteSearchResult[] | null>(null);
   const [searchFailed, setSearchFailed] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
+  const searchTriggerRef = useRef<View>(null);
+  const viewAllTriggerRef = useRef<View>(null);
   const [focusSearch, setFocusSearch] = useState(false);
   const origin = useRef<NoteActionOrigin>("preview");
   const editSaved = useRef(false);
@@ -173,10 +175,10 @@ export function ProfileNotesManager() {
     setDeletingNote(note);
   }, []);
 
-  const openSearch = useCallback(() => {
-    setFocusSearch(true);
+  const openAllNotes = (search: boolean) => {
+    setFocusSearch(search);
     setAllNotesOpen(true);
-  }, []);
+  };
 
   const title = s.profileNotesEmptyTitle;
   const subtitle = s.profileNotesEmptySubtitle;
@@ -221,9 +223,10 @@ export function ProfileNotesManager() {
             </Text>
           </View>
           <Pressable
+            ref={searchTriggerRef}
             accessibilityRole="button"
             accessibilityLabel={s.notesSearchOpen}
-            onPress={openSearch}
+            onPress={() => openAllNotes(true)}
             className="h-11 w-11 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
             style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
           >
@@ -269,7 +272,8 @@ export function ProfileNotesManager() {
           ))}
           {hasMoreNotes && (
             <Pressable
-              onPress={() => setAllNotesOpen(true)}
+              ref={viewAllTriggerRef}
+              onPress={() => openAllNotes(false)}
               accessibilityRole="button"
               accessibilityLabel={s.profileNotesViewAll}
               className={`min-h-11 items-center justify-center gap-2 rounded-full bg-surface-high px-4 py-3 dark:bg-surface-dark-high ${
@@ -291,22 +295,17 @@ export function ProfileNotesManager() {
 
       <ResponsiveSheet
         open={allNotesOpen}
-        onClose={() => {
-          setAllNotesOpen(false);
-          setFocusSearch(false);
-        }}
+        onClose={() => setAllNotesOpen(false)}
         maxWidth={720}
         maxHeight={maxOverlayHeight}
         phoneSheetHeight="max"
         initialFocusRef={focusSearch ? searchInputRef : undefined}
+        restoreFocusRef={Platform.OS === "web" ? (focusSearch ? searchTriggerRef : viewAllTriggerRef) : undefined}
       >
         <OverlayHeader
           title={s.profileNotesTitle}
           subtitle={countLabel}
-          onClose={() => {
-            setAllNotesOpen(false);
-            setFocusSearch(false);
-          }}
+          onClose={() => setAllNotesOpen(false)}
           showHandle={isPhone}
           isRTL={isRTL}
         />
