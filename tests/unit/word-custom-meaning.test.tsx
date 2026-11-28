@@ -50,6 +50,10 @@ jest.mock("@/lib/fsrs/queries", () => ({
   isMeaningCardSaved: jest.fn(async () => false),
 }));
 jest.mock("@/lib/word/queries", () => ({
+  fetchReaderWordPositions: async (_db: unknown, _surah: number, _ayah: number, glyph: number) => ({
+    table: glyph === 10 ? 8 : glyph,
+    unicode: glyph,
+  }),
   fetchWordNeighbors: async () => ({ previous: null, next: null }),
   fetchWordText: async () => "ٱلضَّآلِّينَ",
   fetchWordQcf2Glyph: async () => null,
@@ -111,9 +115,11 @@ describe("custom Arabic word meaning", () => {
 
   it("saves a meaning for a word without one and shows it", async () => {
     mockUpsert.mockResolvedValue(undefined);
-    render(<WordSheet surah={1} ayah={7} wordPos={8} />);
+    // A reader glyph and a saved word can have different positions.
+    render(<WordSheet surah={1} ayah={7} wordPos={10} />);
 
     expect(await screen.findByText(s.noWordMeaningFallback)).toBeTruthy();
+    expect(mockFetchMeaning).toHaveBeenCalledWith(mockDb, 1, 7, 8);
     mockFetchMeaning.mockResolvedValue(row({ meaning: "الذين ضلوا الطريق" }));
     fireEvent.changeText(screen.getByPlaceholderText(s.customWordMeaningPlaceholder), "  الذين ضلوا الطريق ");
     fireEvent.press(screen.getByText(s.saveCustomWordMeaning));
