@@ -700,6 +700,11 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
     done: s.hifzMemorizeDoneTitle,
   };
   const hidden = step === "ayah" || step === "chunk" || step === "link" || step === "check";
+  const linkPages = step === "link" ? target.linkPages : [];
+  const passages = [
+    ...linkPages.map((link) => ({ ...link, lineNumbers: null })),
+    { pageData: target.pageData, lineNumbers: target.lineNumbers, ayahs: step === "ayah" ? chainedAyahs : undefined },
+  ];
   // Teal text under 14 px uses the darker token in light mode.
   const accent = isDark ? "#2dd4bf" : "#0f766e";
   const muted = mutedIconColor(effectiveTheme);
@@ -846,9 +851,9 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
               {chainedAyahs.map((ayah) => formatAyahRef(isRTL, ayah.surah, ayah.ayah)).join(isRTL ? "، " : ", ")}
             </Text>
           ) : null}
-          {step === "link" && target.linkAyahs.length > 0 ? (
+          {linkPages.length > 0 ? (
             <Text dir={dir} variant="caption" style={{ color: accent }}>
-              {target.linkAyahs.map((ayah) => formatAyahRef(isRTL, ayah.surah, ayah.ayah)).join(isRTL ? "، " : ", ")}
+              {linkPages.flatMap(({ ayahs }) => ayahs.map((ayah) => formatAyahRef(isRTL, ayah.surah, ayah.ayah))).join(isRTL ? "، " : ", ")}
             </Text>
           ) : null}
         </View>
@@ -869,16 +874,20 @@ function MemorizeScreen({ onRestart }: { onRestart: () => void }) {
 
         {step !== "intention" && step !== "meaning" && step !== "similar" && step !== "done" ? (
           <Card elevation="low" className="py-4 rounded-3xl" style={{ width: pageWidth - 16 }}>
-            <RecitationPage
-              page={target.pageData}
-              level={hidden ? 4 : 0}
-              reveal={hidden && !shown ? HIDDEN : { ...HIDDEN, all: true }}
-              lineNumbers={target.lineNumbers}
-              surahNames={surahNames}
-              isDark={isDark}
-              width={pageWidth - 16}
-              wordLabel={ayahLabel}
-            />
+            {passages.map(({ pageData, lineNumbers, ayahs }) => (
+              <RecitationPage
+                key={lineNumbers ? "chunk" : pageData.page}
+                page={pageData}
+                level={hidden ? 4 : 0}
+                reveal={hidden && !shown ? HIDDEN : { ...HIDDEN, all: true }}
+                lineNumbers={lineNumbers}
+                ayahs={ayahs}
+                surahNames={surahNames}
+                isDark={isDark}
+                width={pageWidth - 16}
+                wordLabel={ayahLabel}
+              />
+            ))}
           </Card>
         ) : null}
 

@@ -1,16 +1,19 @@
 import React from "react";
+import { readFileSync } from "node:fs";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import MemorizeRoute from "@/app/hifz/memorize";
 import { endReviewSession, startReviewSession } from "@/lib/fsrs/review-sessions";
 import { loadHabitOverview } from "@/lib/habit/queries";
 import { readHabitSettings } from "@/lib/habit/settings";
-import type { PageToken, RecitationPage } from "@/lib/hifz/page-data";
+import type { PageToken, PageWordsLines, RecitationPage } from "@/lib/hifz/page-data";
 import { loadTodayWird, readMemorizedPageNumbers } from "@/lib/hifz/pages";
 import { DEFAULT_HIFZ_PLAN, type HifzPlan } from "@/lib/hifz/plan";
 import { loadSecondLooks, nextMemorizeTarget, saveMemorizeCleanRun, type MemorizeTarget } from "@/lib/hifz/memorize";
 import { similarGroupsForAyahs, withMemorizedSiblings } from "@/lib/hifz/similar";
 import { strings } from "@/lib/i18n/strings";
+import { pagesOfJuz } from "@/lib/hifz/units";
+import { openOutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 /** SBQ-01: the new memorization steps follow the repetition counts saved in the plan, not fixed numbers. */
 
@@ -44,10 +47,7 @@ jest.mock("@/lib/settings/context", () => {
 });
 jest.mock("@/lib/audio/ayah-audio", () => ({ useAyahAudio: () => mockAudio }));
 jest.mock("@/components/mushaf/MushafPage", () => ({ loadPageWordsData: jest.fn(async () => null) }));
-jest.mock("@/components/hifz/RecitationPage", () => ({
-  HIDDEN: { all: false, count: 0, touchedLines: new Set() },
-  RecitationPage: () => null,
-}));
+jest.mock("@/lib/fonts/use-quran-page-font", () => ({ useQuranPageFontReady: () => true }));
 jest.mock("@/components/flashcards/GradingButtons", () => ({ GradingButtons: () => null }));
 jest.mock("@/components/habit/SessionHabitCards", () => ({
   SessionHabitCards: () => null,
@@ -91,7 +91,7 @@ const target = {
   toLine: 1,
   lineNumbers: new Set([1]),
   ayahs: [{ surah: 2, ayah: 1 }],
-  linkAyahs: [],
+  linkPages: [],
   completesPage: false,
 } satisfies MemorizeTarget;
 
@@ -195,4 +195,58 @@ describe("new memorization repetition counts (SBQ-01)", () => {
     expect(saveMemorizeCleanRun).toHaveBeenCalledTimes(1);
     expect(screen.getByText(s.hifzMemorizeStepLink)).toBeTruthy();
   });
+});
+
+it("checks the growing ayah chain, the chunk and its link across pages 580 and 581 (PLAN-08)", async () => {
+  const store = await openOutboxDatabase();
+  try {
+    store.sql.exec(`
+      ATTACH DATABASE 'file:assets/data/quran.db?mode=ro' AS bundled;
+      CREATE TEMP VIEW quran_text AS SELECT * FROM bundled.quran_text;
+      CREATE TEMP VIEW page_lines AS SELECT * FROM bundled.page_lines;
+    `);
+    const { declareMemorizedPages } = jest.requireActual<typeof import("@/lib/hifz/pages")>("@/lib/hifz/pages");
+    const memorize = jest.requireActual<typeof import("@/lib/hifz/memorize")>("@/lib/hifz/memorize");
+    await declareMemorizedPages(store.db, { pages: pagesOfJuz(30), cycleDays: 30 });
+    const pageWords: PageWordsLines[] = JSON.parse(readFileSync("assets/data/layout/page-words.json", "utf8"));
+    const lesson = await memorize.nextMemorizeTarget(store.db, { plan: DEFAULT_HIFZ_PLAN, wantLines: 3, pageWords: (page) => pageWords[page - 1] });
+    expect(lesson).toMatchObject({ page: 581, fromLine: 1, toLine: 4 });
+    jest.mocked(nextMemorizeTarget).mockResolvedValue(lesson);
+    const ayahs = await store.db.getAllAsync<{ ayah: number; text: string }>(
+      "SELECT ayah, text_uthmani AS text FROM quran_text WHERE surah = 77 AND ayah BETWEEN 18 AND 28 ORDER BY ayah",
+    );
+    const expected = (first: number, last: number) => ayahs.filter(({ ayah }) => ayah >= first && ayah <= last).map((row) => row.text).join(" ");
+    const recitation = () => screen.queryAllByLabelText(/[\u0621-\u064a]/).map((line) => line.props.accessibilityLabel).join(" ");
+
+    await openWith({ listen: 1, looking: 1, cleanInARow: 1 });
+    for (let step = 0; step < 3; step += 1) press(s.hifzMemorizeNext);
+    expect(recitation()).toBe(expected(20, 28));
+    press(s.hifzMemorizeReadOnce);
+    press(s.hifzMemorizeNext);
+    for (let last = 20; last <= 28; last += 1) {
+      expect(recitation()).toBe("");
+      press(s.hifzDrillShow);
+      expect(recitation()).toBe(expected(20, last));
+      press(s.hifzMemorizeClean);
+    }
+    // Whole chunk, link, then the graded check of the chunk.
+    expect(recitation()).toBe("");
+    press(s.hifzDrillShow);
+    expect(recitation()).toBe(expected(20, 28));
+    press(s.hifzMemorizeClean);
+    await flush();
+    expect(recitation()).toBe("");
+    press(s.hifzDrillShow);
+    expect(recitation()).toBe(expected(18, 28));
+    press(s.hifzMemorizeNotYet);
+    expect(recitation()).toBe("");
+    press(s.hifzDrillShow);
+    expect(recitation()).toBe(expected(18, 28));
+    press(s.hifzMemorizeClean);
+    expect(recitation()).toBe("");
+    press(s.hifzDrillShow);
+    expect(recitation()).toBe(expected(20, 28));
+  } finally {
+    await store.close();
+  }
 });

@@ -56,9 +56,9 @@ export type MemorizeTarget = Readonly<{
   toLine: number;
   lineNumbers: ReadonlySet<number>;
   /** The ayat in the chunk, in order. */
-  ayahs: readonly { surah: number; ayah: number }[];
-  /** The last two ayat recited before the chunk, for the link step (4.4.1 step 7). */
-  linkAyahs: readonly { surah: number; ayah: number }[];
+  ayahs: RecitationPage["ayahs"];
+  /** The last two ayat before the chunk, grouped by their printed page in recitation order. */
+  linkPages: readonly { pageData: RecitationPage; ayahs: RecitationPage["ayahs"] }[];
   /**
    * With the chunk, every line of the page was memorized when the target was chosen. The grade that
    * adds the page checks again in its own transaction (addPageIfComplete), since a failed second look
@@ -189,11 +189,19 @@ async function chunkTarget(
   }
   const first = ayahs[0];
   const linkRows = first
-    ? await db.getAllAsync<{ surah: number; ayah: number }>(
-        `SELECT surah, ayah FROM quran_text WHERE (surah < ? OR (surah = ? AND ayah < ?)) ORDER BY surah DESC, ayah DESC LIMIT 2`,
+    ? await db.getAllAsync<{ surah: number; ayah: number; v2_page: number }>(
+        `SELECT surah, ayah, v2_page FROM quran_text WHERE (surah < ? OR (surah = ? AND ayah < ?)) ORDER BY surah DESC, ayah DESC LIMIT 2`,
         [first.surah, first.surah, first.ayah],
       )
     : [];
+  linkRows.reverse();
+  const linkPageNumbers = [...new Set(linkRows.map((row) => row.v2_page))];
+  const linkPages = await Promise.all(
+    linkPageNumbers.map(async (linkPage) => ({
+      pageData: linkPage === page ? pageData : await loadRecitationPage(db, linkPage, pageWords(linkPage)),
+      ayahs: linkRows.filter((row) => row.v2_page === linkPage).map(({ surah, ayah }) => ({ surah, ayah })),
+    })),
+  );
   return {
     page,
     pageData,
@@ -201,7 +209,7 @@ async function chunkTarget(
     toLine: chunk[chunk.length - 1].lineNumber,
     lineNumbers: chunkLines,
     ayahs,
-    linkAyahs: linkRows.reverse(),
+    linkPages,
     completesPage: lines.every((line) => chunkLines.has(line.lineNumber) || covered(line)),
   };
 }

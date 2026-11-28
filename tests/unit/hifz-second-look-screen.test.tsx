@@ -135,7 +135,7 @@ const target = {
   toLine: 2,
   lineNumbers: new Set([2]),
   ayahs: [{ surah: 2, ayah: 2 }],
-  linkAyahs: [],
+  linkPages: [],
   completesPage: false,
 } satisfies MemorizeTarget;
 type LookSave = Awaited<ReturnType<typeof saveSecondLook>>;

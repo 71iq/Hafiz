@@ -166,7 +166,9 @@ describe("chunks (SBQ-02)", () => {
 
     const second = (await nextMemorizeTarget(store.db, { plan, wantLines: 4, pageWords }))!;
     expect(second).toMatchObject({ page: 1, fromLine: 6, toLine: 8, completesPage: true });
-    expect(second.linkAyahs.map((ayah) => ayah.ayah)).toEqual([3, 4]);
+    expect(second.linkPages).toHaveLength(1);
+    expect(second.linkPages[0].pageData).toBe(second.pageData);
+    expect(second.linkPages[0].ayahs).toEqual([{ surah: 1, ayah: 3 }, { surah: 1, ayah: 4 }]);
     const secondSave = await learn(second, Rating.Good, atLocalTime(TODAY, 600));
     expect(secondSave.cleanRun.pageAdded).toBe(true);
     // The fluent check is a second review of the chunk and adds no second page.

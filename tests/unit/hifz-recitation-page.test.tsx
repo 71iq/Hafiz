@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
+import { Platform } from "react-native";
 import { HIDDEN, RecitationPage } from "@/components/hifz/RecitationPage";
 import { buildRecitationPage } from "@/lib/hifz/page-data";
 
@@ -22,6 +23,28 @@ it("exposes Unicode for a readable line while rendering the page-font glyphs", (
   expect(screen.getByLabelText(text)).toBeOnTheScreen();
   expect(screen.queryByText(glyphs)).toBeNull();
   expect(screen.getByText(glyphs, { includeHiddenElements: true })).toHaveStyle({ fontFamily: "test-page-font" });
+});
+
+it("keeps neighboring web glyphs in their printed positions while revealing only the selected ayah", () => {
+  const platform = jest.replaceProperty(Platform, "OS", "web");
+  try {
+    const nextGlyphs = "\ue004 \ue005";
+    const line = `${glyphs} ${nextGlyphs}`;
+    const shared = buildRecitationPage(1, [
+      { surah: 1, ayah: 1, text_qcf2: glyphs, text_uthmani: text },
+      { surah: 2, ayah: 1, text_qcf2: nextGlyphs, text_uthmani: "الٓمٓ" },
+    ], [], { "1": line });
+    render(<RecitationPage {...props} page={shared} level={4} reveal={shown} ayahs={[{ surah: 1, ayah: 1 }]} />);
+
+    const printed = { includeHiddenElements: true };
+    expect(screen.getByText(line, printed)).toHaveStyle({ fontFamily: "test-page-font" });
+    expect(screen.getByText("\ue001", printed)).not.toHaveStyle({ opacity: 0 });
+    for (const glyph of nextGlyphs.split(" ")) expect(screen.getByText(glyph, printed)).toHaveStyle({ opacity: 0 });
+    expect(screen.getByText(text)).toBeOnTheScreen();
+    expect(screen.queryByText("الٓمٓ")).toBeNull();
+  } finally {
+    platform.restore();
+  }
 });
 
 it("only exposes the available cue and keeps cloze answers and hidden words private", () => {

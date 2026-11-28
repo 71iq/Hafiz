@@ -67,6 +67,8 @@ type Props = {
   reveal: RevealState;
   /** Line numbers to show, for a half page; null shows the whole page. */
   lineNumbers?: ReadonlySet<number> | null;
+  /** Limit practice to these ayat within the selected lines. Other glyphs on a shared line keep their space. */
+  ayahs?: PageData["ayahs"];
   /** ERR-06 "Fill the gap": this one word stays hidden until the check, whatever the level. */
   cloze?: Readonly<{ surah: number; ayah: number; wordPos: number }> | null;
   surahNames: ReadonlyMap<number, string>;
@@ -90,6 +92,7 @@ export function RecitationPage({
   level,
   reveal,
   lineNumbers = null,
+  ayahs,
   cloze = null,
   surahNames,
   marked,
@@ -101,7 +104,11 @@ export function RecitationPage({
 }: Props) {
   const { quranRenderFontStyle, effectiveTheme, quranMarkerStyle } = useSettings();
   const ready = useQuranPageFontReady(quranRenderFontStyle, page.page);
-  const lines = useMemo(() => visibleLines(page, lineNumbers), [page, lineNumbers]);
+  const ayahKeys = useMemo(() => ayahs && new Set(ayahs.map(ayahKey)), [ayahs]);
+  const lines = useMemo(() => {
+    const selected = visibleLines(page, lineNumbers);
+    return ayahKeys ? selected.filter((line) => line.tokens.some((token) => ayahKeys.has(ayahKey(token)))) : selected;
+  }, [page, lineNumbers, ayahKeys]);
   const selectedTokenCounts = useMemo(() => {
     if (lineNumbers === null) return null;
     const counts = new Map<string, number>();
@@ -193,10 +200,12 @@ export function RecitationPage({
         const words = line.tokens.map((token, offset) => {
           const index = start + offset;
           const key = tokenKey(token, index);
-          const isGap = cloze !== null && token.surah === cloze.surah && token.ayah === cloze.ayah && token.wordPos === cloze.wordPos;
+          const inPassage = !ayahKeys || ayahKeys.has(ayahKey(token));
+          const isGap = inPassage && cloze !== null && token.surah === cloze.surah && token.ayah === cloze.ayah && token.wordPos === cloze.wordPos;
           const visible =
-            reveal.all || (!isGap && (level === 0 || token.isMarker || index < reveal.count || (level === 3 && lineTouched)));
-          const firstLetterOnly = !visible && !isGap && level === 1;
+            inPassage && (reveal.all || (!isGap && (level === 0 || token.isMarker || index < reveal.count || (level === 3 && lineTouched))));
+          const firstLetterOnly = inPassage && !visible && !isGap && level === 1;
+          const faintWord = inPassage && !isGap && level === 3;
           const unaligned = token.unalignedAyah;
           const wholeAyahVisible =
             unaligned !== undefined &&
@@ -205,10 +214,10 @@ export function RecitationPage({
           const spoken = visible
             ? token.text ?? (wholeAyahVisible ? unaligned.text : undefined)
             : firstLetterOnly ? token.firstLetter : undefined;
-          const isMarked = marked?.has(key) ?? false;
-          const onPress = markWord && !token.isMarker ? () => markWord(token, key) : undefined;
+          const isMarked = inPassage && (marked?.has(key) ?? false);
+          const onPress = inPassage && markWord && !token.isMarker ? () => markWord(token, key) : undefined;
           const label = onPress ? [spoken, wordLabel(token)].filter(Boolean).join(", ") : undefined;
-          return { token, key, isGap, visible, firstLetterOnly, spoken, isMarked, onPress, label };
+          return { token, key, isGap, visible, firstLetterOnly, faintWord, spoken, isMarked, onPress, label };
         });
         const spokenLine = markWord ? "" : words.map((word) => word.spoken).filter(Boolean).join(" ");
         return (
@@ -224,7 +233,7 @@ export function RecitationPage({
               selectable={false}
               style={{ fontFamily, ...palette, fontSize, lineHeight, textAlign: "center", color: ink, writingDirection: "rtl" }}
             >
-              {words.map(({ token, key, isGap, visible, firstLetterOnly, isMarked, onPress, label }, offset) => (
+              {words.map(({ token, key, isGap, visible, firstLetterOnly, faintWord, isMarked, onPress, label }, offset) => (
                 <Fragment key={key}>
                   {firstLetterOnly ? (
                     <Text style={{ fontFamily: undefined, fontSize: fontSize * 0.9, color: ink }}>
@@ -239,7 +248,7 @@ export function RecitationPage({
                       aria-hidden={web && markWord && !onPress ? true : undefined}
                       style={{
                         ...(token.isMarker ? markerPalette : null),
-                        color: web || visible ? undefined : level === 3 && !isGap ? faint : HIDDEN_INK,
+                        color: web || visible ? undefined : faintWord ? faint : HIDDEN_INK,
                         // The gap keeps its place and shows as a soft box, so the reciter knows where it is.
                         backgroundColor: isMarked ? markedBackground : isGap && !visible ? gapBackground : undefined,
                         ...(isGap && !visible ? { borderRadius: 6 } : null),
@@ -247,7 +256,7 @@ export function RecitationPage({
                     >
                       {web && (onPress || !visible) ? (
                         // Color fonts can paint independently of the text color.
-                        <Text aria-hidden style={visible ? undefined : { opacity: level === 3 && !isGap ? faintOpacity : 0 }}>
+                        <Text aria-hidden style={visible ? undefined : { opacity: faintWord ? faintOpacity : 0 }}>
                           {token.glyph}
                         </Text>
                       ) : token.glyph}

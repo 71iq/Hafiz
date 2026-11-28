@@ -793,7 +793,7 @@ describe("new memorization screen", () => {
     toLine: 1,
     lineNumbers: new Set([1]),
     ayahs: [{ surah: 2, ayah: 1 }],
-    linkAyahs: [],
+    linkPages: [],
     completesPage: false,
   } satisfies MemorizeTarget;
 
