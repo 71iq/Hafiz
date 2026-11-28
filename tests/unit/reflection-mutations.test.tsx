@@ -1158,8 +1158,8 @@ it("comment pagination admits one pending page and retains rows through error an
   const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={jest.fn()} />, {
     wrapper,
   });
-  await waitFor(() => expect(view.getByText(strings.en.reflectionLoadMore)).toBeTruthy());
-  twice(view.getByText(strings.en.reflectionLoadMore));
+  await waitFor(() => expect(view.getByRole("button", { name: strings.en.reflectionLoadMore })).toBeTruthy());
+  twice(view.getByRole("button", { name: strings.en.reflectionLoadMore }));
   expect(fetchComments).toHaveBeenCalledTimes(2);
   pending.reject(new Error("synthetic page rejected"));
   await waitFor(() => expect(view.getByText(strings.en.commentLoadFailed)).toBeTruthy());
@@ -1169,7 +1169,7 @@ it("comment pagination admits one pending page and retains rows through error an
   expect(tree.indexOf(strings.en.commentLoadFailed)).toBeGreaterThan(tree.indexOf(strings.en.reflectionLoadMore));
   expect(tree.indexOf(strings.en.commentLoadFailed)).toBeGreaterThan(tree.indexOf("Synthetic comment"));
   jest.mocked(fetchComments).mockResolvedValue({ data: [comment("next")], hasMore: false });
-  fireEvent.press(view.getByText(strings.en.reflectionLoadMore));
+  fireEvent.press(view.getByRole("button", { name: strings.en.reflectionLoadMore }));
   await waitFor(() => expect(view.getByText("Synthetic next")).toBeTruthy());
   expect(view.getByText("Synthetic comment")).toBeTruthy();
   expect(fetchComments).toHaveBeenLastCalledWith("post", 1, "oldest", user(1).id);

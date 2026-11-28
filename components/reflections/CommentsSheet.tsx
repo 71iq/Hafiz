@@ -600,6 +600,9 @@ export function CommentsSheet({
 
                 {commentsQuery.hasNextPage && (
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={s.reflectionLoadMore}
+                    aria-busy={commentsQuery.isFetchingNextPage}
                     onPress={handleLoadMore}
                     disabled={commentsQuery.isFetchingNextPage}
                     className="items-center py-3"
