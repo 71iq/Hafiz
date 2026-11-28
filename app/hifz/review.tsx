@@ -142,8 +142,8 @@ const HELPER_BUTTON = "flex-1 h-11 px-2 bg-surface-low dark:bg-surface-dark-low"
  * `pages` and `clean` take each page once per session, like the session record; `marked` counts the
  * marks of every recitation. `extra` counts half pages and seams reviewed on their own.
  */
-type Totals = { pages: number; clean: number; marked: number; extra: number };
-const NO_TOTALS: Totals = { pages: 0, clean: 0, marked: 0, extra: 0 };
+type Totals = { pages: number; clean: number; marked: number; extra: number; cleanDrills: number; repeatDrills: number; dismissedDrills: number };
+const NO_TOTALS: Totals = { pages: 0, clean: 0, marked: 0, extra: 0, cleanDrills: 0, repeatDrills: 0, dismissedDrills: 0 };
 
 /**
  * What a saved item leaves behind: the totals with its save, the page again when a learning step is
@@ -618,6 +618,9 @@ function HifzReviewScreen() {
       clean: value.clean + (delta.clean ?? 0),
       marked: value.marked + (delta.marked ?? 0),
       extra: value.extra + (delta.extra ?? 0),
+      cleanDrills: value.cleanDrills + (delta.cleanDrills ?? 0),
+      repeatDrills: value.repeatDrills + (delta.repeatDrills ?? 0),
+      dismissedDrills: value.dismissedDrills + (delta.dismissedDrills ?? 0),
     };
     totalsRef.current = next;
     setTotals(next);
@@ -865,10 +868,10 @@ function HifzReviewScreen() {
         // ERR-06: the dismissal can end a weak spot, so the reader's markers reload.
         refreshWeakSpots(db).catch((refreshError) => console.warn("[HifzReview] Weak spots failed to refresh:", refreshError));
         // A drift that was not a mistake no longer needs its sibling page or pair prompt (SCH-07, MUT-04).
-        return { totals: totalsRef.current, dismissed: id };
+        return { totals: addTotals({ dismissedDrills: 1 }), dismissed: id };
       }
       await recordDrillResult(db, { id, clean: result === "clean" });
-      return { totals: totalsRef.current };
+      return { totals: addTotals(result === "clean" ? { cleanDrills: 1 } : { repeatDrills: 1 }) };
     });
   };
 
@@ -1044,6 +1047,19 @@ function HifzReviewScreen() {
 
   if (phase === "summary") {
     const minutes = Math.max(1, Math.round((habitResult?.durationMs ?? 0) / 60_000));
+    const summaryRows: [string, number][] = [];
+    if (drillsOnly && totals.cleanDrills + totals.repeatDrills + totals.dismissedDrills > 0) {
+      summaryRows.push(
+        [s.hifzDrillClean, totals.cleanDrills],
+        [s.hifzDrillAgain, totals.repeatDrills],
+        [s.hifzSummaryDismissed, totals.dismissedDrills],
+      );
+    }
+    if (!drillsOnly || totals.pages > 0) {
+      summaryRows.push([s.hifzSummaryPages, totals.pages], [s.hifzSummaryClean, totals.clean], [s.hifzSummaryMarked, totals.marked]);
+    }
+    if (totals.extra > 0) summaryRows.push([s.hifzSummaryStrengthened, totals.extra]);
+    summaryRows.push([s.hifzSummaryMinutes, minutes]);
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
         <ScrollView
@@ -1055,19 +1071,13 @@ function HifzReviewScreen() {
             style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}
             className="text-charcoal dark:text-neutral-100"
           >
-            {s.hifzSummaryTitle}
+            {drillsOnly ? s.hifzDrillSummaryTitle : s.hifzSummaryTitle}
           </Text>
           <Card elevation="low" className="w-full max-w-sm px-5 py-4" style={{ gap: 10 }}>
-            {[
-              [s.hifzSummaryPages, totals.pages],
-              [s.hifzSummaryClean, totals.clean],
-              [s.hifzSummaryMarked, totals.marked],
-              ...(totals.extra > 0 ? [[s.hifzSummaryStrengthened, totals.extra]] : []),
-              [s.hifzSummaryMinutes, minutes],
-            ].map(([label, value]) => (
-              <MirroredRow key={String(label)} dir={dir} className="items-center justify-between">
+            {summaryRows.map(([label, value]) => (
+              <MirroredRow key={label} dir={dir} className="items-center justify-between">
                 <Text dir={dir} variant="muted">
-                  {label as string}
+                  {label}
                 </Text>
                 <Text
                   dir={dir}
@@ -1075,7 +1085,7 @@ function HifzReviewScreen() {
                   style={{ fontFamily: value === 0 ? "Manrope_400Regular" : "Manrope_700Bold", fontSize: 17 }}
                   className={value === 0 ? "text-warm-600 dark:text-neutral-400" : "text-charcoal dark:text-neutral-100"}
                 >
-                  {formatNumber(value as number, uiLanguage)}
+                  {formatNumber(value, uiLanguage)}
                 </Text>
               </MirroredRow>
             ))}

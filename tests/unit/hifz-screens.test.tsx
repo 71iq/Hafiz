@@ -1,10 +1,11 @@
 import React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 import { AppState, type AppStateStatus } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import HifzReviewRoute from "@/app/hifz/review";
 import MemorizeRoute from "@/app/hifz/memorize";
 import type { GradingButtons } from "@/components/flashcards/GradingButtons";
+import { MirroredRow } from "@/components/ui/MirroredRow";
 import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
 import type { SessionHabitInput } from "@/components/habit/SessionHabitCards";
 import type { RecitationPage as RecitationPageView } from "@/components/hifz/RecitationPage";
@@ -686,9 +687,9 @@ describe("hifz review screen", () => {
     expect(returnToTabs).not.toHaveBeenCalled();
   });
 
-  it("dismisses a drill once and refreshes the reader's weak-spot markers (ERR-06)", async () => {
+  it("summarizes each saved drill outcome once, including a dismissed weak spot (PLAN-07)", async () => {
     mockParams = { mode: "mistakes" };
-    jest.mocked(readMistakeInbox).mockResolvedValue([inboxItem]);
+    jest.mocked(readMistakeInbox).mockResolvedValue([inboxItem, { ...inboxItem, id: "second" }, { ...inboxItem, id: "third" }]);
     const verse = "عَمَّ يَتَسَآءَلُونَ";
     mockDatabase.getFirstAsync.mockResolvedValue({ text_qcf2: "a b e", text_uthmani: verse, v2_page: 5 });
     const dismissal = deferred<void>();
@@ -709,6 +710,17 @@ describe("hifz review screen", () => {
     await flush();
     expect(refreshWeakSpots).toHaveBeenCalledWith(mockDatabase);
     expect(dismissInboxItem).toHaveBeenCalledTimes(1);
+    for (const action of [s.hifzDrillClean, s.hifzDrillAgain]) {
+      fireEvent.press(screen.getByRole("button", { name: s.hifzDrillShow }));
+      await act(async () => fireEvent.press(screen.getByRole("button", { name: action })));
+    }
+    expect(screen.getByText(s.hifzDrillSummaryTitle)).toBeTruthy();
+    for (const label of [s.hifzDrillClean, s.hifzDrillAgain, s.hifzSummaryDismissed]) {
+      const row = screen.UNSAFE_getAllByType(MirroredRow).find((item) => within(item).queryByText(label));
+      expect(within(row!).getByText("1")).toBeTruthy();
+    }
+    expect(screen.queryByText(s.hifzSummaryPages)).toBeNull();
+    expect(screen.queryByText(s.hifzSummaryMarked)).toBeNull();
     mockDatabase.getFirstAsync.mockResolvedValue(null);
   });
 
