@@ -136,8 +136,10 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah, initialQuery
 
   const loadRootIndex = useCallback(async () => {
     if (rootIndexRef.current) return rootIndexRef.current;
+    // Building the dictionary reads every word with a root. A table scan avoids scattered reads
+    // for the lemma and spelling, which the root index does not contain.
     const rows = await db.getAllAsync<{ root: string; lemma: string | null; word_text: string | null }>(
-      `SELECT root, lemma, word_text FROM word_roots WHERE root IS NOT NULL GROUP BY root, lemma, word_text`
+      `SELECT root, lemma, word_text FROM word_roots NOT INDEXED WHERE root IS NOT NULL GROUP BY root, lemma, word_text`
     );
     const lemmaMap = new Map<string, Set<string>>();
     const wordMap = new Map<string, Set<string>>();
