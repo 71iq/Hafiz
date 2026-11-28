@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { ChevronLeft, ChevronRight, ListMusic, LocateFixed, Minus, Play, Plus, Repeat2, Square, Timer } from "lucide-react-native";
@@ -68,7 +68,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
     audioDelaySeconds,
     setAudioDelaySeconds,
   } = useSettings();
-  const { playRange, rangeState, stop } = useAyahAudio();
+  const { playRange, rangeState, session, stop } = useAyahAudio();
   const [mode, setMode] = useState<RecitationMode>("single");
   const [singleRef, setSingleRef] = useState("1:1");
   const [rangeStartRef, setRangeStartRef] = useState("1:1");
@@ -86,14 +86,18 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
   const reciterLabel = formatReciterLabel(reciter, uiLanguage);
   const accent = isDark ? "#2dd4bf" : "#0d9488";
 
-  useEffect(() => {
-    if (!visible) return;
+  // Following a recitation can move the reader behind the sheet. Keep the submitted references for Retry.
+  const initializeReferences = useEffectEvent(() => {
     const ref = `${current.surah}:${current.ayah}`;
     setSingleRef(ref);
     setRangeStartRef(ref);
     setRangeEndRef(ref);
     setErrors({});
-  }, [current.ayah, current.surah, visible]);
+  });
+
+  useEffect(() => {
+    if (visible) initializeReferences();
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -200,8 +204,10 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
     }
   }, [audioDelaySeconds, audioRepeatEach, audioRepeatRange, onClose, playRange, recitationId, resolveAyahs, s, starting]);
 
-  const handlePrimary = rangeState.active ? stop : handleStart;
-  const primaryLabel = rangeState.active ? s.recitationStop : s.recitationStart;
+  const failed = session?.kind === "range" && session.status === "error";
+  const canStop = rangeState.active && !failed && !starting;
+  const handlePrimary = canStop ? stop : handleStart;
+  const primaryLabel = canStop ? s.recitationStop : failed ? s.audioRetry : s.recitationStart;
   const clearFieldError = (field: FieldKey) =>
     setErrors((prev) => (prev[field] || prev.general ? { ...prev, [field]: undefined, general: undefined } : prev));
 
@@ -415,7 +421,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
           </SwitchRow>
         </View>
 
-        {rangeState.active && (
+        {canStop && (
           <View className="mt-4 rounded-3xl bg-primary-accent/10 dark:bg-primary-bright/10 p-4">
             <Text
               className="text-primary-accent dark:text-primary-bright"
@@ -456,7 +462,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
           disabled={starting}
           accessibilityRole="button"
           accessibilityState={{ disabled: starting, busy: starting }}
-          className={`h-12 flex-1 items-center justify-center rounded-full ${rangeState.active ? "bg-surface-high dark:bg-surface-dark-high" : "bg-primary-accent"}`}
+          className={`h-12 flex-1 items-center justify-center rounded-full ${canStop ? "bg-surface-high dark:bg-surface-dark-high" : "bg-primary-accent"}`}
           style={({ pressed }) => ({
             opacity: starting ? 0.55 : pressed ? 0.82 : 1,
             transform: [{ scale: pressed && !starting ? 0.98 : 1 }],
@@ -465,13 +471,13 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
           <View className={isRTL ? "flex-row-reverse items-center gap-2" : "flex-row items-center gap-2"}>
             {starting ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : rangeState.active ? (
+            ) : canStop ? (
               <Square size={16} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             ) : (
               <Play size={16} color="#FFFFFF" />
             )}
             <Text
-              className={rangeState.active ? "text-charcoal dark:text-neutral-100" : "text-white"}
+              className={canStop ? "text-charcoal dark:text-neutral-100" : "text-white"}
               style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }}
             >
               {primaryLabel}

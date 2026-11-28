@@ -145,6 +145,45 @@ test("keyboard search stays in Mushaf and reader shortcuts stop on other tabs", 
   await expect(page).toHaveURL(/\/home$/);
 });
 
+const playbackFailure = "Could not play this recitation. Check your connection and try again.";
+
+test("a failed ayah stream offers Retry for the same audio", async ({ page }) => {
+  await waitForQaReady(page);
+  await page.route("**/*.mp3", (route) => route.abort("failed"));
+  await page.goto("/settings");
+  await page.getByText("Verse by Verse", { exact: true }).click();
+  await page.goto("/open?surah=1&ayah=1");
+  const request = page.waitForRequest("**/*.mp3");
+  await page.getByRole("button", { name: "Play ayah audio", exact: true }).first().click();
+  const url = (await request).url();
+  const retry = page.getByRole("button", { name: "Retry", exact: true });
+  await expect(retry).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(playbackFailure, { exact: true }).first()).toBeVisible();
+  await Promise.all([page.waitForRequest(url), retry.click()]);
+  await expect(retry).toBeVisible({ timeout: 5_000 });
+});
+
+test("a failed recitation start keeps the reference and recovery in the sheet", async ({ page, context }) => {
+  await waitForQaReady(page);
+  await page.route("**/*.mp3", (route) => route.abort("failed"));
+  await page.goto("/mushaf");
+  await page.getByRole("button", { name: "Recitation", exact: true }).click();
+  const sheet = page.getByRole("dialog");
+  const reference = sheet.getByRole("textbox");
+  await reference.fill("1:5");
+  await sheet.getByRole("button", { name: "Start recitation", exact: true }).click();
+  await expect(sheet.getByText(playbackFailure, { exact: true })).toBeVisible({ timeout: 5_000 });
+  await expect(reference).toHaveValue("1:5");
+  await context.setOffline(true);
+  try {
+    await sheet.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect(sheet.getByText("You are offline. Recitation needs an internet connection.")).toBeVisible();
+    await expect(reference).toHaveValue("1:5");
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
 test("text search looks for literal punctuation in Quran text and translation", async ({ page }) => {
   await waitForQaReady(page);
   await page.goto("/home");

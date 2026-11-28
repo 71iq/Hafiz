@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import {
   setAudioModeAsync,
   setIsAudioActiveAsync,
@@ -128,7 +128,7 @@ type PendingLoad = {
   gen: number;
   kind: AudioSessionKind;
   phase: "source" | "player";
-  /** Ranges report success once the file is handed to the player; single ayahs wait until it loads. */
+  /** Native ranges hand off to the player immediately. Web starts wait for the media to play. */
   settleOnDispatch: boolean;
   settled: boolean;
   settle: (result: ToggleResult) => void;
@@ -245,6 +245,7 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
   /** Starts a new generation: an older load can no longer start, and its caller hears it was cancelled. */
   const beginGeneration = useCallback(() => {
     generationRef.current += 1;
+    playbackModeRef.current = null;
     clearLoadTimer();
     clearPreviewTimer();
     const pending = pendingRef.current;
@@ -318,9 +319,9 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
       generationRef.current += 1;
       clearLoadTimer();
       clearPreviewTimer();
+      playbackModeRef.current = null;
       player.pause();
       releaseLockScreen();
-      playbackModeRef.current = null;
       setLoadingKey(null);
       setActiveAyah(null);
       const range = rangeSessionRef.current;
@@ -397,16 +398,16 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         if (names) setCore((prev) => (prev ? { ...prev, surahNames: names } : prev));
+        const pending = pendingRef.current;
+        if (!pending || pending.gen !== gen) return;
+        pending.phase = "player";
         playbackModeRef.current = kind;
         playUrl(player, response.audio.url);
+        if (generationRef.current !== gen) return;
         if (kind !== "preview") showLockScreen(target, recitationId, names);
-        const pending = pendingRef.current;
-        if (pending?.gen === gen) {
-          pending.phase = "player";
-          if (pending.settleOnDispatch && !pending.settled) {
-            pending.settled = true;
-            pending.settle({ ok: true });
-          }
+        if (pending.settleOnDispatch && !pending.settled) {
+          pending.settled = true;
+          pending.settle({ ok: true });
         }
       } catch (error) {
         console.warn("[AyahAudio] Playback failed:", error);
@@ -461,11 +462,9 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     setCore(null);
   }, [beginGeneration, clearRangeSession, player, releaseLockScreen, setCore]);
 
-  // The file is loaded: the request has succeeded, so the timeout no longer applies.
-  useEffect(() => {
+  const finishLoad = useCallback(() => {
     const pending = pendingRef.current;
     if (!pending || pending.phase !== "player" || pending.gen !== generationRef.current) return;
-    if (!status.isLoaded && !status.playing) return;
     clearLoadTimer();
     pendingRef.current = null;
     setLoadingKey(null);
@@ -483,7 +482,22 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
         if (gen === generationRef.current && coreRef.current?.kind === "preview") stop();
       }, RECITER_PREVIEW_LIMIT_MS);
     }
-  }, [clearLoadTimer, clearPreviewTimer, setCore, status.isLoaded, status.playing, stop]);
+  }, [clearLoadTimer, clearPreviewTimer, setCore, stop]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" && (status.isLoaded || status.playing)) finishLoad();
+  }, [finishLoad, status.isLoaded, status.playing]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    // Listen at delivery so a later pause or time update cannot mask a start or failure.
+    const subscription = player.addListener("playbackStatusUpdate", (update) => {
+      if (!playbackModeRef.current) return;
+      if (update.playbackState === "playing") finishLoad();
+      if (update.playbackState === "failed") void failRequest(generationRef.current, "detect");
+    });
+    return () => subscription.remove();
+  }, [failRequest, finishLoad, player]);
 
   const playCurrentRangeAyah = useCallback((): Promise<ToggleResult> => {
     const session = rangeSessionRef.current;
@@ -504,7 +518,7 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
       repeatEachAyah: session.repeatEachAyah,
     });
 
-    return startRequest("range", target, session.recitationId, true);
+    return startRequest("range", target, session.recitationId, Platform.OS !== "web");
   }, [startRequest]);
 
   const advanceRange = useCallback(() => {
