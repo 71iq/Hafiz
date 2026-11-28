@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
+import { OnboardingGate } from "@/components/OnboardingGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { HifzSetupFlow } from "@/components/hifz/HifzSetupFlow";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
@@ -370,5 +371,9 @@ export default function OnboardingScreen() {
     return <LoadingScreen progress={progress} />;
   }
 
-  return <OnboardingInner />;
+  return (
+    <OnboardingGate>
+      <OnboardingInner />
+    </OnboardingGate>
+  );
 }

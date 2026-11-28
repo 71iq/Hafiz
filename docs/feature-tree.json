@@ -421,7 +421,7 @@
           "title": "Save setup and open the first session, or skip",
           "kind": "transition",
           "cases": ["START-04", "START-05"],
-          "uses": ["study.next", "home"],
+          "uses": ["shell.entry", "study.next", "home"],
           "native": false,
           "children": []
         }
