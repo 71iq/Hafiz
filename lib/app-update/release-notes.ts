@@ -8,6 +8,18 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.19": {
+    en: [
+      "During memorization, Check reveals only the ayahs you were asked to recite. The linking step also shows the preceding ayahs.",
+      "Ending a review early shows the pages you finished. After a mistake drill, you can see which spots still need work.",
+      "You can schedule an excused day up to 30 days ahead. If your local progress changes during account restore, Hafiz asks you to confirm again before replacing it.",
+    ],
+    ar: [
+      "أثناء الحفظ، يكشف زر التحقق الآيات المطلوب تسميعها فقط. وتعرض خطوة الربط أيضًا الآيات السابقة للمقطع.",
+      "إذا أنهيت المراجعة مبكرًا، يظهر لك عدد الصفحات التي راجعتها. وبعد التدريب على الأخطاء، ترى المواضع التي ما زالت تحتاج إلى تثبيت.",
+      "يمكنك تسجيل يوم عذر قبل موعده بما يصل إلى ٣٠ يومًا. وإذا تغيّر تقدّمك على الجهاز أثناء استعادة بيانات الحساب، يطلب منك حافظ التأكيد مجددًا قبل استبداله.",
+    ],
+  },
   "1.0.18": {
     en: [
       "Home has one Study button for today's work, and your widget opens the same. Other decks are under All decks, and Study more goes past the day's cards.",

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hafiz",
     "slug": "hafiz",
-    "version": "1.0.18",
+    "version": "1.0.19",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hafiz",
@@ -24,7 +24,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.hafiz",
-      "versionCode": 19,
+      "versionCode": 20,
       "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
       "blockedPermissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"],
       "intentFilters": [
