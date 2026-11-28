@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { useIsFocused } from "@react-navigation/native";
 import { useFocusEffect, router } from "expo-router";
 import { AuthReopenSurfaces } from "@/components/auth/AuthReopenSurfaces";
@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
-import { useChrome } from "@/lib/ui/chrome";
+import { hiddenChromeProps, useChrome } from "@/lib/ui/chrome";
 import { Undo2 } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useWeakSpotMarker, useWeakSpotsLoader } from "@/lib/hifz/use-weak-spots";
@@ -235,6 +235,14 @@ function MushafInner() {
   const { selection } = useSelection();
   const { detailWord } = useWordInteraction();
   const { visible: chromeVisible, setVisible: setChromeVisible, setImmersive } = useChrome();
+  const readingAreaRef = useRef<View>(null);
+  useLayoutEffect(() => {
+    if (Platform.OS !== "web" || !isFocused || chromeVisible || typeof document === "undefined") return;
+    // Continue from the reading area when the focused control hides, without scrolling the page.
+    if (document.activeElement?.closest('[data-reader-chrome="hidden"]') && readingAreaRef.current instanceof HTMLElement) {
+      readingAreaRef.current.focus({ preventScroll: true });
+    }
+  }, [chromeVisible, isFocused]);
   const lastScrollYRef = useRef(0);
   const touchStartRef = useRef<{ x: number; y: number; at?: number } | null>(null);
   const touchMovedRef = useRef(false);
@@ -362,6 +370,10 @@ function MushafInner() {
 
   const readerTapProps = Platform.OS === "web"
     ? ({
+        ref: readingAreaRef,
+        role: "region",
+        "aria-label": s.tabMushaf,
+        tabIndex: -1,
         onPointerDown: (e: any) => {
           if (isFromFocusModeControls(e) || isFromReaderInteraction(e)) {
             touchStartRef.current = null;
@@ -1845,6 +1857,7 @@ function MushafInner() {
         {/* Reader toolbar: six 44px targets below 768px (or whenever the full toolbar does not fit). */}
         <Animated.View
           pointerEvents={chromeVisible ? "auto" : "none"}
+          {...(!chromeVisible && hiddenChromeProps)}
           style={[pageHeaderOverlayStyle, headerAnimStyle]}
         >
           <View
@@ -1884,7 +1897,11 @@ function MushafInner() {
         </Animated.View>
 
         {!isPhone && !isPageMode && (
-          <Animated.View pointerEvents={chromeVisible ? "box-none" : "none"} style={headerAnimStyle}>
+          <Animated.View
+            pointerEvents={chromeVisible ? "box-none" : "none"}
+            {...(!chromeVisible && hiddenChromeProps)}
+            style={headerAnimStyle}
+          >
             <MushafIndicator
               surahName={indicator.name}
               juz={indicator.juz}
@@ -2086,6 +2103,7 @@ function MushafInner() {
           <Animated.View
             // The reveal rail stays on screen with the chrome hidden, like the player bar.
             pointerEvents={chromeVisible || showHifzControls ? "box-none" : "none"}
+            {...(!chromeVisible && !showHifzControls && hiddenChromeProps)}
             style={[
               {
                 position: Platform.OS === "web" && (isPhone || isTablet) ? "fixed" as any : "absolute",

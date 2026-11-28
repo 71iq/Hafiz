@@ -21,7 +21,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
-import { useChrome } from "@/lib/ui/chrome";
+import { hiddenChromeProps, useChrome } from "@/lib/ui/chrome";
 import { useSettings, withThemeOpacity, type ThemePalette } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
@@ -197,6 +197,7 @@ function BottomBar(props: BottomTabBarProps & { isRTL?: boolean }) {
   return (
     <Animated.View
       pointerEvents={chromeVisible ? "auto" : "none"}
+      {...(!chromeVisible && hiddenChromeProps)}
       style={[
         styles.bottomContainer,
         compact && styles.bottomContainerCompact,

@@ -8,6 +8,12 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { Platform } from "react-native";
+
+// The bars stay mounted for their exit animations. Pointer events alone leave their children tabbable.
+export const hiddenChromeProps = Platform.OS === "web"
+  ? { inert: true, dataSet: { readerChrome: "hidden" } }
+  : undefined;
 
 type ChromeState = {
   visible: boolean;
