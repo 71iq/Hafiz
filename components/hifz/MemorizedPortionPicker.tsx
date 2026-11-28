@@ -111,6 +111,7 @@ export function MemorizedPortionPicker({
         key={juz}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: selected }}
+        aria-checked={selected}
         accessibilityLabel={interpolate(s.hifzJuzN, { n: formatNumber(juz, language) })}
         onPress={() => onToggleJuz(juz)}
         style={{ flexBasis: "22%", flexGrow: 1 }}
@@ -252,6 +253,7 @@ export function MemorizedPortionPicker({
                 key={surah.number}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: selected }}
+                aria-checked={selected}
                 onPress={() => onToggleSurah(surah.number)}
                 className="min-h-[48px] justify-center rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-2"
               >

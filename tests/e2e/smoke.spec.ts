@@ -174,3 +174,28 @@ test("the offline banner follows browser connectivity and local Quran search sti
   }
   await expect(banner).toBeHidden();
 });
+
+test("plan setup exposes the chosen juz, surah, and review unit to assistive technology", async ({ page }) => {
+  await waitForQaReady(page);
+  await page.goto("/hifz/setup");
+  const next = page.getByRole("button", { name: "Continue", exact: true });
+  await next.click();
+  const juz = page.getByRole("checkbox", { name: "Juz 30", exact: true });
+  await juz.click();
+  await expect(juz).toBeChecked();
+  await juz.click();
+  await expect(juz).toHaveAttribute("aria-checked", "false");
+
+  await page.getByText("By surah", { exact: true }).click();
+  const surah = page.getByRole("checkbox").first();
+  await surah.click();
+  await expect(surah).toBeChecked();
+
+  await next.click();
+  const whole = page.getByRole("radio", { name: /^Page\b/ });
+  const half = page.getByRole("radio", { name: /^Half page\b/ });
+  await expect(whole).toBeChecked();
+  await half.click();
+  await expect(half).toBeChecked();
+  await expect(whole).toHaveAttribute("aria-checked", "false");
+});
