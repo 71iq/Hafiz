@@ -202,7 +202,7 @@ describe.each(manualCases)("manual QF sync $language/$status", ({ language, stat
     configure(language);
     mockManualResult.status = status;
     const view = await openSettings();
-    const manualSync = await view.findByText(strings[language].qfManualSync);
+    const manualSync = await view.findByRole("button", { name: strings[language].qfManualSync });
 
     await act(async () => {
       fireEvent.press(manualSync);
@@ -213,6 +213,28 @@ describe.each(manualCases)("manual QF sync $language/$status", ({ language, stat
     expect(mockRunInitialQfUserSync).not.toHaveBeenCalled();
     expectMessageOutcome(view, language, status);
   });
+});
+
+it("keeps the named sync and disconnect buttons disabled until manual sync finishes", async () => {
+  configure("en");
+  let finish!: (result: QfSyncResult) => void;
+  mockFullQfUserSync.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const view = await openSettings();
+  const sync = view.getByRole("button", { name: strings.en.qfManualSync });
+  fireEvent.press(sync);
+  expect(sync).toBeDisabled();
+  expect(view.getByRole("button", { name: strings.en.qfDisconnect })).toBeDisabled();
+  fireEvent.press(sync);
+  expect(mockFullQfUserSync).toHaveBeenCalledTimes(1);
+
+  await act(async () => finish(mockManualResult));
+  expect(sync).toBeEnabled();
+  expect(view.getByRole("button", { name: strings.en.qfDisconnect })).toBeEnabled();
 });
 
 describe.each(["en", "ar"] as const)("QF disconnect in %s", (language) => {
@@ -245,7 +267,9 @@ describe.each(["en", "ar"] as const)("QF disconnect in %s", (language) => {
       expect(getQfConnectionStatus).toHaveBeenCalledTimes(2);
       expect(view.getByText(locale.qfDisconnectFailed)).toBeTruthy();
       expect(view.getByText(status === "offline" ? locale.qfConnected : locale.qfNeedsReauth)).toBeTruthy();
-      expect(view.getByText(status === "offline" ? locale.qfManualSync : locale.qfReconnect)).toBeTruthy();
+      expect(
+        view.getByRole("button", { name: status === "offline" ? locale.qfManualSync : locale.qfReconnect }),
+      ).toBeEnabled();
     },
   );
 
@@ -404,7 +428,7 @@ describe.each(["en", "ar"] as const)("native QF connect in %s", (language) => {
     jest.mocked(WebBrowser.openAuthSessionAsync).mockResolvedValueOnce(result);
     const view = await openSettings();
     await act(async () => {
-      fireEvent.press(await view.findByText(strings[language].qfConnect));
+      fireEvent.press(await view.findByRole("button", { name: strings[language].qfConnect }));
     });
     expect(mockBeginQfOAuthConnection).toHaveBeenCalledWith(redirectUri, "/settings");
     expect(WebBrowser.openAuthSessionAsync).toHaveBeenCalledTimes(1);

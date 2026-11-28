@@ -172,6 +172,8 @@ export default function SettingsScreen() {
   // The account the privacy sheet was opened for; it closes when that account is no longer signed in.
   const [privacyFor, setPrivacyFor] = useState<string | null>(null);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
+  const qfActionLabel =
+    qfStatus === "connected" ? s.qfManualSync : qfStatus === "disconnected" ? s.qfConnect : s.qfReconnect;
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -962,49 +964,34 @@ export default function SettingsScreen() {
                       </Text>
                     )}
                     <View className="mt-4 flex-row gap-2">
-                      {qfStatus === "connected" ? (
-                        <>
-                          <Pressable
-                            onPress={handleQfManualSync}
-                            disabled={qfBusy}
-                            className="flex-1 flex-row items-center justify-center gap-2 rounded-full bg-primary-accent px-3 py-2.5"
-                            style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}
-                          >
-                            {qfBusy ? (
-                              <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                              <RefreshCw size={15} color="#FFFFFF" />
-                            )}
-                            <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                              {s.qfManualSync}
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={handleQfDisconnect}
-                            accessibilityRole="button"
-                            accessibilityLabel={s.qfDisconnect}
-                            disabled={qfBusy}
-                            className="h-10 w-10 items-center justify-center rounded-full bg-surface-high dark:bg-surface-dark-high"
-                            style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}
-                          >
-                            <Unlink size={16} color={isDark ? "#ef4444" : "#dc2626"} />
-                          </Pressable>
-                        </>
-                      ) : (
+                      <Button
+                        onPress={qfStatus === "connected" ? handleQfManualSync : handleQfConnect}
+                        disabled={qfBusy}
+                        accessibilityLabel={qfActionLabel}
+                        accessibilityState={{ disabled: qfBusy, busy: qfBusy }}
+                        className="h-auto flex-1 px-3 py-2.5"
+                      >
+                        {qfBusy ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : qfStatus === "connected" ? (
+                          <RefreshCw size={15} color="#FFFFFF" />
+                        ) : (
+                          <BookOpen size={15} color="#FFFFFF" />
+                        )}
+                        <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                          {qfActionLabel}
+                        </Text>
+                      </Button>
+                      {qfStatus === "connected" && (
                         <Pressable
-                          onPress={handleQfConnect}
+                          onPress={handleQfDisconnect}
+                          accessibilityRole="button"
+                          accessibilityLabel={s.qfDisconnect}
                           disabled={qfBusy}
-                          className="flex-1 flex-row items-center justify-center gap-2 rounded-full bg-primary-accent px-3 py-2.5"
+                          className="h-10 w-10 items-center justify-center rounded-full bg-surface-high dark:bg-surface-dark-high"
                           style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}
                         >
-                          {qfBusy ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <BookOpen size={15} color="#FFFFFF" />
-                          )}
-                          <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                            {qfStatus === "needs_reauth" || qfStatus === "linked_no_sync" ? s.qfReconnect : s.qfConnect}
-                          </Text>
+                          <Unlink size={16} color={isDark ? "#ef4444" : "#dc2626"} />
                         </Pressable>
                       )}
                     </View>
