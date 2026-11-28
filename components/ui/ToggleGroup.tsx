@@ -1,4 +1,4 @@
-import { View, Pressable, Text, type ViewProps } from "react-native";
+import { Platform, View, Pressable, Text, type ViewProps } from "react-native";
 import { cn } from "@/lib/utils";
 import { useUIDirection, type Direction } from "@/lib/ui/direction";
 
@@ -26,8 +26,10 @@ export function ToggleGroup<T extends string>({
   ...props
 }: ToggleGroupProps<T>) {
   const dir = useUIDirection(explicitDir);
+  const web = Platform.OS === "web";
   return (
     <View
+      role={web ? "group" : undefined}
       className={cn(
         "flex-row rounded-full bg-surface-high dark:bg-surface-dark-high p-1",
         dir === "rtl" && "flex-row-reverse",
@@ -41,6 +43,9 @@ export function ToggleGroup<T extends string>({
         return (
           <Pressable
             key={item.value}
+            role={web ? "button" : undefined}
+            aria-label={web ? item.label : undefined}
+            aria-pressed={web ? active : undefined}
             onPress={() => onValueChange(item.value)}
             className={cn(
               "flex-1 flex-row items-center justify-center gap-1.5 rounded-full py-2 px-3",

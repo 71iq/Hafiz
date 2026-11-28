@@ -267,6 +267,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
 
         <View className="mt-4">
           <ToggleGroup<RecitationMode>
+            aria-label={Platform.OS === "web" ? s.recitationSettingsLabel : undefined}
             value={mode}
             onValueChange={(value) => {
               setMode(value);

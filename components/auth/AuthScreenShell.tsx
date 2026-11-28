@@ -454,6 +454,31 @@ function LanguageToggle({ label }: { label?: string }) {
     { value: "en" as const, text: "English" },
     { value: "ar" as const, text: "العربية" },
   ];
+  const radios = useRef<(View | null)[]>([]);
+  const select = (language: typeof uiLanguage) => {
+    if (language !== uiLanguage) setUiLanguage(language);
+  };
+
+  function handleRadioKey(event: React.KeyboardEvent, index: number) {
+    switch (event.key) {
+      case " ":
+        event.preventDefault();
+        select(options[index].value);
+        break;
+      case "ArrowLeft":
+      case "ArrowRight":
+      case "ArrowUp":
+      case "ArrowDown": {
+        event.preventDefault();
+        // With two radios, the previous and next option are the same.
+        const next = 1 - index;
+        radios.current[next]?.focus();
+        select(options[next].value);
+        break;
+      }
+    }
+  }
+
   return (
     <View
       accessibilityRole="radiogroup"
@@ -471,11 +496,17 @@ function LanguageToggle({ label }: { label?: string }) {
               </Text>
             ) : null}
             <Pressable
-              onPress={() => {
-                if (!selected) setUiLanguage(option.value);
-              }}
+              onPress={() => select(option.value)}
+              {...(Platform.OS === "web" && {
+                ref: (node: View | null) => {
+                  radios.current[index] = node;
+                },
+                onKeyDown: (event: React.KeyboardEvent) => handleRadioKey(event, index),
+                tabIndex: selected ? 0 : -1,
+              })}
               accessibilityRole="radio"
               accessibilityState={{ selected, checked: selected }}
+              aria-checked={selected}
               accessibilityLanguage={option.value}
               className="min-h-11 min-w-11 items-center justify-center px-2"
               style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}

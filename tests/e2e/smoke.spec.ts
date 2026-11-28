@@ -230,3 +230,53 @@ test("plan setup exposes the chosen juz, surah, and review unit to assistive tec
   await expect(half).toBeChecked();
   await expect(whole).toHaveAttribute("aria-checked", "false");
 });
+
+test("Settings announces category and language selections", async ({ page }) => {
+  await waitForQaReady(page);
+  await page.goto("/settings");
+  const categories = page.getByRole("group", { name: "Settings", exact: true });
+  const general = categories.getByRole("button", { name: "General" });
+  const content = categories.getByRole("button", { name: "Content" });
+  await expect(general).toHaveAttribute("aria-pressed", "true");
+  await content.press("Enter");
+  await expect(content).toHaveAttribute("aria-pressed", "true");
+  await expect(general).toHaveAttribute("aria-pressed", "false");
+  await general.press("Space");
+
+  const english = page.getByRole("button", { name: "English", exact: true });
+  const arabic = page.getByRole("button", { name: "العربية", exact: true });
+  await expect(english).toHaveAttribute("aria-pressed", "true");
+  await arabic.click();
+  await expect(arabic).toHaveAttribute("aria-pressed", "true");
+  await expect(english).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("group", { name: "لغة التطبيق", exact: true })).toBeVisible();
+});
+
+test("Space selects Range and shows its fields in Recitation", async ({ page }) => {
+  await waitForQaReady(page);
+  await page.goto("/mushaf");
+  await page.getByRole("button", { name: "Recitation", exact: true }).click();
+  const modes = page.getByRole("group", { name: "Recitation", exact: true });
+  const single = modes.getByRole("button", { name: "Single" });
+  const range = modes.getByRole("button", { name: "Range" });
+  await expect(single).toHaveAttribute("aria-pressed", "true");
+  await range.press("Space");
+  await expect(range).toHaveAttribute("aria-pressed", "true");
+  await expect(single).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByText("End ayah", { exact: true })).toBeVisible();
+});
+
+test("auth language radios announce the checked option and support keyboard selection", async ({ page }) => {
+  await page.goto("/auth/login");
+  const english = page.getByRole("radio", { name: "English", exact: true });
+  const arabic = page.getByRole("radio", { name: "العربية", exact: true });
+  await expect(english).toBeChecked();
+  await expect(arabic).not.toBeChecked();
+  await english.press("ArrowRight");
+  await expect(arabic).toBeFocused();
+  await expect(arabic).toBeChecked();
+  await expect(english).not.toBeChecked();
+  await english.press("Space");
+  await expect(english).toBeChecked();
+  await expect(arabic).not.toBeChecked();
+});

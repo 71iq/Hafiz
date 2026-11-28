@@ -503,6 +503,7 @@ export default function SettingsScreen() {
               {s.appLanguageLabel}
             </Text>
             <ToggleGroup<UILanguage>
+              aria-label={Platform.OS === "web" ? s.appLanguageLabel : undefined}
               value={uiLanguage}
               onValueChange={setUiLanguage}
               items={[
@@ -562,6 +563,7 @@ export default function SettingsScreen() {
             <View className="gap-4">
               <SettingsControlRow label={s.mushafViewModeLabel} isRTL={isRTL}>
                 <ToggleGroup<ViewMode>
+                  aria-label={Platform.OS === "web" ? s.mushafViewModeLabel : undefined}
                   value={viewMode}
                   onValueChange={setViewMode}
                   items={[
@@ -624,6 +626,7 @@ export default function SettingsScreen() {
               {Platform.OS === "web" && quranRenderFontStyle !== "qcf2" && (
                 <SettingsControlRow label={s.quranMarkerStyleLabel} isRTL={isRTL}>
                   <ToggleGroup<QuranMarkerStyle>
+                    aria-label={s.quranMarkerStyleLabel}
                     value={quranMarkerStyle}
                     onValueChange={setQuranMarkerStyle}
                     items={[
@@ -720,6 +723,7 @@ export default function SettingsScreen() {
 
               <SettingsControlRow label={s.pageScrollLabel} isRTL={isRTL}>
                 <ToggleGroup<PageScroll>
+                  aria-label={Platform.OS === "web" ? s.pageScrollLabel : undefined}
                   value={pageScroll}
                   onValueChange={setPageScroll}
                   items={[
@@ -1213,6 +1217,7 @@ export default function SettingsScreen() {
           </Text>
           <SettingsCategoryTabs
             categories={settingsCategories}
+            label={s.settingsTitle}
             activeCategory={activeCategory}
             isDark={isDark}
             isRTL={isRTL}
@@ -1283,6 +1288,7 @@ function parseSettingsCategory(value: string | undefined): SettingsCategoryId | 
 
 function SettingsCategoryTabs({
   categories,
+  label,
   activeCategory,
   isDark,
   isRTL,
@@ -1290,6 +1296,7 @@ function SettingsCategoryTabs({
   compact,
 }: {
   categories: SettingsCategory[];
+  label: string;
   activeCategory: SettingsCategoryId;
   isDark: boolean;
   isRTL: boolean;
@@ -1314,6 +1321,7 @@ function SettingsCategoryTabs({
 
   return (
     <ToggleGroup<SettingsCategoryId>
+      aria-label={Platform.OS === "web" ? label : undefined}
       value={activeCategory}
       onValueChange={onSelect}
       items={items}
