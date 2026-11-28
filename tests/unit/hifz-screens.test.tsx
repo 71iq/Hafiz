@@ -603,14 +603,13 @@ describe("hifz review screen", () => {
     expect(endReviewSession).toHaveBeenCalled();
   });
 
-  it("asks before a back press leaves graded pages, and goes back once confirmed", async () => {
-    // Two pages, so grading the first leaves the session open with graded work in it.
-    const row6 = { ...row, id: "page:madani15:6" } as StudyCardRow;
+  async function gradeFirstPage(pages = [5, 6]) {
     jest.mocked(loadTodayWird).mockResolvedValue({
       plan: DEFAULT_HIFZ_PLAN,
       minutesPerReviewPage: 3,
       done: [],
-      todo: [5, 6].map((page) => ({
+      total: pages.length,
+      todo: pages.map((page) => ({
         cardId: `page:madani15:${page}`,
         page,
         tier: "long_term",
@@ -620,13 +619,56 @@ describe("hifz review screen", () => {
         retrievability: 0.95,
       })),
     } as never);
-    jest.mocked(loadPageCards).mockResolvedValue([pageCard, { ...pageCard, row: row6, page: 6 }]);
+    jest.mocked(loadPageCards).mockResolvedValue(pages.map((page) => ({ ...pageCard, page, row: { ...row, id: `page:madani15:${page}` } })));
     jest.mocked(savePageGrade).mockResolvedValue(saved);
     const buttons = await openCheck();
     await act(async () => {
       await buttons.onGrade(3);
     });
     await flush();
+  }
+
+  it("keeps reviewing on cancel and shows the saved partial review before Done leaves (PLAN-12)", async () => {
+    await gradeFirstPage();
+    const close = () => fireEvent.press(screen.getByRole("button", { name: s.genericClose }));
+    close();
+    fireEvent.press(screen.getByText(s.habitExitStay));
+    expect(screen.queryByText(s.hifzSummaryTitle)).toBeNull();
+    expect(endReviewSession).not.toHaveBeenCalled();
+    close();
+    fireEvent.press(screen.getByText(s.habitExitLeave));
+    await flush();
+    expect(screen.getByText(s.hifzSummaryTitle)).toBeTruthy();
+    expect(screen.getByText("Wird 1 of 2 pages")).toBeTruthy();
+    expect(mockHabitInput).toMatchObject({ total: 1 });
+    expect(savePageGrade).toHaveBeenCalledTimes(1);
+    expect(recordReviewPace).toHaveBeenCalledTimes(1);
+    expect(endReviewSession).toHaveBeenCalledTimes(1);
+    expect(returnToTabs).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole("button", { name: s.flashcardsSummaryDone }));
+    expect(returnToTabs).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes the grade still saving when a partial review is confirmed", async () => {
+    await gradeFirstPage([5, 6, 7]);
+    const save = deferred<typeof saved>();
+    jest.mocked(savePageGrade).mockReturnValueOnce(save.promise);
+    fireEvent.press(screen.getByRole("button", { name: s.hifzDone }));
+    await act(async () => { void grading().onGrade(3); });
+    fireEvent.press(screen.getByRole("button", { name: s.genericClose }));
+    fireEvent.press(screen.getByText(s.habitExitLeave));
+    expect(endReviewSession).not.toHaveBeenCalled();
+    await act(async () => save.resolve(saved));
+    await flush();
+    expect(screen.getByText("Wird 2 of 3 pages")).toBeTruthy();
+    expect(mockHabitInput).toMatchObject({ total: 2 });
+    expect(savePageGrade).toHaveBeenCalledTimes(2);
+    expect(recordReviewPace).toHaveBeenCalledTimes(1);
+    expect(returnToTabs).not.toHaveBeenCalled();
+  });
+
+  it("asks before a back press leaves graded pages, and goes back once confirmed", async () => {
+    await gradeFirstPage();
     // The page is saved, so leaving now would leave graded work: the screen holds the press and asks.
     let held = false;
     act(() => {

@@ -291,11 +291,8 @@ function HifzReviewScreen() {
   const actionLock = useRef(false);
   /** The queue index actions may act on. It moves past an item once its save succeeds, so a stale handler for that item does nothing. */
   const actionIndex = useRef(0);
-  /**
-   * Close was pressed while an action held the lock. The screen leaves once the action succeeds, or
-   * stays with the item open to show a failed save, which would otherwise reach a departed screen.
-   */
-  const leaveWhenSettled = useRef(false);
+  /** Where to go after the active save succeeds. A failure keeps the item open to retry. */
+  const leaveWhenSettled = useRef<"exit" | "summary" | null>(null);
   /** Set once the screen leaves on purpose, so the remove guard below lets that navigation through. */
   const exiting = useRef(false);
   /** A back press or gesture held for the leave confirmation or a save; leaving carries it out. */
@@ -561,7 +558,7 @@ function HifzReviewScreen() {
 
   /** End the session with the totals that include the last save, passed in rather than read from a render. */
   const finish = useCallback(
-    async (final: Totals) => {
+    async (final: Totals, queueFinished: boolean) => {
       const session = sessionRef.current;
       const durationMs = sessionClock.elapsedMs();
       const [overview] = await Promise.all([
@@ -575,7 +572,7 @@ function HifzReviewScreen() {
             }).catch(console.warn)
           : null,
       ]);
-      if (monthlyCheck && final.pages > 0) await markMonthlyCheck(db).catch(console.warn);
+      if (queueFinished && monthlyCheck && final.pages > 0) await markMonthlyCheck(db).catch(console.warn);
       setHabitResult({
         event: wirdEvent.current,
         overview,
@@ -600,8 +597,9 @@ function HifzReviewScreen() {
       actionIndex.current = from + 1;
       const next = nextQueue(queue, from, outcome);
       if (next !== queue) setQueue([...next]);
-      if (from + 1 >= next.length) {
-        await finish(outcome.totals);
+      const queueFinished = from + 1 >= next.length;
+      if (queueFinished || leaveWhenSettled.current === "summary") {
+        await finish(outcome.totals, queueFinished);
         return;
       }
       setIndex(from + 1);
@@ -643,16 +641,19 @@ function HifzReviewScreen() {
         outcome = await save();
       } catch (saveError) {
         console.warn(`[HifzReview] ${label} failed:`, saveError);
-        leaveWhenSettled.current = false;
+        leaveWhenSettled.current = null;
         pendingBack.current = null;
         setLeavePending(false);
+        setExitOpen(false);
         setError(s.hifzSaveFailed);
         return;
       }
-      if (!leaveWhenSettled.current) await advance(from, outcome);
+      if (leaveWhenSettled.current !== "exit") await advance(from, outcome);
       if (leaveWhenSettled.current) {
-        leaveWhenSettled.current = false;
-        exit();
+        if (leaveWhenSettled.current === "exit") exit();
+        leaveWhenSettled.current = null;
+        setLeavePending(false);
+        setExitOpen(false);
       }
     } finally {
       actionLock.current = false;
@@ -939,7 +940,7 @@ function HifzReviewScreen() {
       setExitOpen(true);
     } else if (actionLock.current) {
       pendingBack.current = data.action;
-      leaveWhenSettled.current = true;
+      leaveWhenSettled.current = "exit";
       setLeavePending(true);
     } else navigation.dispatch(data.action);
   });
@@ -947,7 +948,7 @@ function HifzReviewScreen() {
   /** Leave now, or once the action holding the lock settles (see leaveWhenSettled). */
   const leave = () => {
     if (actionLock.current) {
-      leaveWhenSettled.current = true;
+      leaveWhenSettled.current = "exit";
       setLeavePending(true);
     } else exit();
   };
@@ -970,6 +971,26 @@ function HifzReviewScreen() {
   const close = () => {
     if (hasProgress) setExitOpen(true);
     else leave();
+  };
+
+  const confirmLeave = async () => {
+    if (pendingBack.current) {
+      setExitOpen(false);
+      leave();
+      return;
+    }
+    if (actionLock.current) {
+      leaveWhenSettled.current = "summary";
+      setLeavePending(true);
+      return;
+    }
+    if (actionIndex.current !== index) return;
+    // Close ends the review at its saved totals. Retire the open item before preparing the summary.
+    actionIndex.current = -1;
+    setLeavePending(true);
+    await finish(totalsRef.current, false);
+    setLeavePending(false);
+    setExitOpen(false);
   };
 
   // A page in halves proposes the lower of its halves' grades, capped by the lower of their levels.
@@ -1692,16 +1713,14 @@ function HifzReviewScreen() {
         message={inHalves && current?.kind === "page" ? s.habitExitBodyHalf : s.habitExitBody}
         cancelLabel={s.habitExitStay}
         confirmLabel={s.habitExitLeave}
+        confirmLoading={leavePending}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={() => {
           setExitOpen(false);
           pendingBack.current = null;
         }}
-        onConfirm={() => {
-          setExitOpen(false);
-          leave();
-        }}
+        onConfirm={confirmLeave}
       />
       {notice ? <Toast message={notice} onDismiss={() => setNotice(null)} duration={3500} announce /> : null}
     </SafeAreaView>
