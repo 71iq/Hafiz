@@ -286,8 +286,9 @@ test("Settings announces category and language selections", async ({ page }) => 
   await expect(general).toHaveAttribute("aria-pressed", "false");
   await general.press("Space");
 
-  const english = page.getByRole("button", { name: "English", exact: true });
-  const arabic = page.getByRole("button", { name: "العربية", exact: true });
+  const appLanguage = page.getByRole("group", { name: /^(App Language|لغة التطبيق)$/ });
+  const english = appLanguage.getByRole("button", { name: "English", exact: true });
+  const arabic = appLanguage.getByRole("button", { name: "العربية", exact: true });
   await expect(english).toHaveAttribute("aria-pressed", "true");
   await arabic.click();
   await expect(arabic).toHaveAttribute("aria-pressed", "true");
