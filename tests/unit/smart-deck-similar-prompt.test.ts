@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { getSmartCardContent, getSmartDeckCandidateCardIds, SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
+import { getDueCardsForReview, getSmartDeckTodayRows, getSmartCardContent, getSmartDeckCandidateCardIds, SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { splitQuranWords, tailLetters } from "@/lib/fsrs/similar-card-text";
+import { recordMemorizedPortion } from "@/lib/hifz/memorized-ayahs";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 // One fixture card stands in for a card on the generated exclusion list.
@@ -382,8 +383,31 @@ describe("what a similar-verse card's back answers", () => {
     });
   });
 
+  test("only offers a memorized target with a different memorized ayah, including outside the target filter", async () => {
+    addGroup("pair", "similar", "shared", ["2:1", "3:1", "3:2"]);
+    addGroup("same", "similar", "shared", ["2:1", "2:2"]);
+    const deck = SMART_DECK_IDS.mutashabihat;
+    const candidates = () => getSmartDeckCandidateCardIds(store.db, deck, { type: "surah", surahs: [2] });
+    const saved = "mutashabihat:pair:0";
+    store.sql.prepare(`INSERT INTO study_cards
+      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, state, created_at, updated_at)
+      VALUES (?, ?, '2025-01-01', 4, 2, 0, 1, 0, 3, 2, '2025-01-01', '2025-01-01')`).run(saved, deck);
+    expect(await candidates()).toEqual([]);
+    await recordMemorizedPortion(store.db, [2], []);
+    expect(await candidates()).toEqual(["mutashabihat:same:0", "mutashabihat:same:1"]);
+    const today = await getSmartDeckTodayRows(store.db, deck, 5);
+    expect(today.dueRows).toEqual([]);
+    expect(today.virtualNew.map(row => row.id)).toEqual(["mutashabihat:same:0", "mutashabihat:same:1"]);
+    expect(await getDueCardsForReview(store.db, deck)).toEqual([]);
+    await recordMemorizedPortion(store.db, [2, 3], []);
+    expect(await candidates()).toContain(saved);
+    expect(await candidates()).not.toContain("mutashabihat:pair:1");
+    expect(await getDueCardsForReview(store.db, deck)).toEqual([expect.objectContaining({ id: saved, reps: 3, stability: 4 })]);
+  });
+
   test("a card on the exclusion list is not offered", async () => {
     addGroup("excluded", "similar", "فسبح باسم ربك العظيم", ["56:74", "56:96", "69:52"]);
+    store.sql.exec("INSERT INTO user_settings (key, value, updated_at) VALUES ('habit_declared_whole_quran', 'true', '2026-11-01')");
     const ids = await getSmartDeckCandidateCardIds(store.db, SMART_DECK_IDS.mutashabihat, { type: "all" });
     expect(ids).toEqual(expect.arrayContaining(["mutashabihat:excluded:0", "mutashabihat:excluded:2"]));
     expect(ids).not.toContain("mutashabihat:excluded:1");

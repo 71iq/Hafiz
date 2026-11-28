@@ -5,6 +5,7 @@ import { createEmptyCard } from "./scheduler";
 import { reviewDueCutoff } from "./review-transition";
 import { stampsOverDeletedCards } from "./card-stamps";
 import { ayahGlyphs, glyphsBeforeWord, glyphsFromWord } from "@/lib/mushaf/glyph-words";
+import { readMemorizedAyahs } from "@/lib/hifz/memorized-ayahs";
 import { isExcludedSimilarCard } from "./similar-card-exclusions";
 import { mutashabihatFront, splitQuranWords, tailHiddenWordCount } from "./similar-card-text";
 import {
@@ -521,38 +522,53 @@ export async function getSmartDeckCandidateCardIds(
     return rows.map((row) => `qiraat:${row.surah}:${row.ayah}`);
   }
 
-  const kind = deckId === SMART_DECK_IDS.mutashabihat ? "similar" : "tail";
-  const prefix = deckId === SMART_DECK_IDS.mutashabihat ? "mutashabihat:" : "similar-tail:";
-  const params: any[] = [kind];
+  if (deckId === SMART_DECK_IDS.mutashabihat) {
+    const known = await readMemorizedAyahs(db);
+    if (known?.size === 0) return [];
+    const params: (string | number)[] = known ? [JSON.stringify([...known])] : [];
+    const scope = buildFilterClause("r", activeFilter, params);
+    // A memorized partner can lie outside the target's deck filter.
+    const rows = await db.getAllAsync<{ id: string }>(
+      `WITH memorized AS (
+         SELECT r.group_id, r.sort_order, r.surah, r.ayah, g.sort_order AS group_order
+           FROM mutashabihat_refs r JOIN mutashabihat_groups g ON g.id = r.group_id
+          WHERE g.kind = 'similar'
+            ${known ? "AND (r.surah || ':' || r.ayah) IN (SELECT value FROM json_each(?))" : ""}
+       )
+       SELECT 'mutashabihat:' || r.group_id || ':' || r.sort_order AS id FROM memorized r
+        WHERE r.group_id IN (
+          SELECT group_id FROM memorized GROUP BY group_id HAVING COUNT(DISTINCT surah || ':' || ayah) >= 2
+        ) ${scope ? `AND ${scope}` : ""}
+        ORDER BY r.group_order, r.sort_order`,
+      params,
+    );
+    return rows.map((row) => row.id).filter((id) => !isExcludedSimilarCard(id));
+  }
+
+  const params: (string | number)[] = [];
   const clause = buildFilterClause("r", activeFilter, params);
   const rows = await db.getAllAsync<{
     id: string;
-    group_sort_order: number;
     ref_sort_order: number;
     cue: string;
     tail_5: string | null;
     text_clean: string;
     text_uthmani: string;
   }>(
-    `SELECT g.id, g.sort_order AS group_sort_order, r.sort_order AS ref_sort_order,
+    `SELECT g.id, r.sort_order AS ref_sort_order,
             g.cue, r.tail_5, qt.text_clean, qt.text_uthmani
        FROM mutashabihat_groups g
        JOIN mutashabihat_refs r ON r.group_id = g.id
        JOIN quran_text qt ON qt.surah = r.surah AND qt.ayah = r.ayah
-      WHERE g.kind = ?
+      WHERE g.kind = 'tail'
         ${clause ? `AND ${clause}` : ""}
       ORDER BY g.sort_order, r.sort_order`,
     params
   );
-  // A tail card whose cue covers the whole ayah has no front to show. A similar-verse card the
-  // generated exclusion list names asks what the Similar tails card of its ayah asks.
+  // A tail card whose cue covers the whole ayah has no front to show.
   return rows
-    .filter((row) =>
-      kind !== "tail" ||
-      splitQuranWords(row.text_uthmani).length > tailHiddenWordCount(row.cue, row.tail_5, row.text_clean)
-    )
-    .map((row) => `${prefix}${row.id}:${row.ref_sort_order}`)
-    .filter((id) => !isExcludedSimilarCard(id));
+    .filter((row) => splitQuranWords(row.text_uthmani).length > tailHiddenWordCount(row.cue, row.tail_5, row.text_clean))
+    .map((row) => `similar-tail:${row.id}:${row.ref_sort_order}`);
 }
 
 export async function getAllMatchingSmartCardIdSet(db: DatabaseExecutor): Promise<Set<string>> {

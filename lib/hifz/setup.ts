@@ -3,6 +3,7 @@ import { putUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { DECLARED_WHOLE_QURAN_KEY, readDailyDeckIds, settleAutomaticDecks } from "@/lib/study/daily-decks";
 import { readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { materializeSmartDeckCards, SMART_DECK_IDS, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
+import { recordMemorizedPortion } from "@/lib/hifz/memorized-ayahs";
 import { declareMemorizedPages } from "@/lib/hifz/pages";
 import { putHifzPlan, readHifzPlan, type HifzPlan } from "@/lib/hifz/plan";
 import { writeMeaningsRate, writeStartingDeckLimits } from "@/lib/hifz/starting-limits";
@@ -79,6 +80,7 @@ export async function applyHifzSetup(
     // Before the unit switch, so page review records the pace's ayah limit and then sets 0.
     await writeStartingDeckLimits(tx, { plan, hadPlan: previousPlan !== null });
     await putHifzPlan(tx, plan);
+    await recordMemorizedPortion(tx, setup.memorizedSurahs, setup.memorizedJuz);
     if (setup.reviewAnchor !== undefined) await putUserSetting(tx, REVIEW_ANCHOR_KEY, reviewAnchorValue(setup.reviewAnchor));
     if (setup.meanings) await putMeaningsSetup(tx, setup.meanings);
     await writeMeaningsRate(tx, plan);

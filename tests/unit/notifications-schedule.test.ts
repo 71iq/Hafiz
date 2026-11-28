@@ -782,7 +782,7 @@ describe("hifz cards in the surah named by reminder copy (NOT-14)", () => {
     expect(context.input.facts(TODAY)).toEqual({ surah: 3 });
   });
 
-  it("reads a similar-verse card's surah from its group", async () => {
+  it("names a similar-verse card only after its group has another memorized ayah", async () => {
     const insert = seed();
     setPlan("page");
     store.sql
@@ -792,6 +792,14 @@ describe("hifz cards in the surah named by reminder copy (NOT-14)", () => {
       .prepare("INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar) VALUES ('g', 1, 3, 7, 'آل عمران')")
       .run();
     insert.run("mutashabihat:g:1", "default-mutashabihat", at(addDays(TODAY, -1), 8).toISOString(), old, old);
+
+    const initial = await loadReminderContext(store.db, { now: at(TODAY, 3), language: "en" });
+    expect(initial.input.facts(TODAY)).toEqual({});
+    store.sql.exec("INSERT INTO mutashabihat_refs (group_id, sort_order, surah, ayah) VALUES ('g', 2, 2, 1)");
+    for (const id of ["3:7", "2:1"]) {
+      insert.run(id, "default-retention", old, old, old);
+      store.sql.prepare("UPDATE study_cards SET reps = 1 WHERE id = ?").run(id);
+    }
 
     const context = await loadReminderContext(store.db, { now: at(TODAY, 3), language: "en" });
 

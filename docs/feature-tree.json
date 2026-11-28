@@ -974,7 +974,7 @@
           "children": [
             {
               "id": "review.session.mutashabihat",
-              "title": "Mutashabihat prompts, next ayah and related ayahs from known surahs",
+              "title": "Mutashabihat prompts and comparisons between memorized ayahs",
               "kind": "widget",
               "cases": ["REVIEW-13"],
               "uses": [],

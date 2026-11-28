@@ -13,7 +13,7 @@ import {
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 /**
- * The daily queue (SPEC 3.2) over the bundled similar-verse data. With nothing studied, Mutashabihat
+ * The daily queue (SPEC 3.2) over the bundled similar-verse data. With memorized comparisons and nothing studied today, Mutashabihat
  * and Similar tails each offer their new cards as virtual rows, and the default 1-page minimum gives a
  * budget of 20.
  */
@@ -25,6 +25,9 @@ const TAILS = SMART_DECK_IDS.similarTails;
 
 beforeEach(async () => {
   store = await openOutboxDatabase();
+  store.sql.prepare("INSERT INTO user_settings (key, value, updated_at) VALUES (?, ?, ?)").run(
+    "habit_declared_memorized_portion", JSON.stringify({ surahs: [1, 6, 18, 34, 35], juz: [] }), now.toISOString(),
+  );
   store.sql.exec(`ATTACH DATABASE '${path.resolve(__dirname, "../../assets/data/quran.db")}' AS bundled`);
   for (const table of ["quran_text", "surahs", "mutashabihat_groups", "mutashabihat_refs"]) {
     store.sql.exec(`DELETE FROM main.${table}`);

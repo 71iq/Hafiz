@@ -58,7 +58,7 @@ import { NO_REPEAT_DAYS, renderNotification, type Language, type SurahNames } fr
 import { loadReviewLeft, type ReviewLeft } from "@/lib/hifz/review-left";
 import { HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID } from "@/lib/hifz/units";
 import { readHifzPlan } from "@/lib/hifz/plan";
-import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
+import { getSmartDeckCandidateCardIds, SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { readDailyDeckIds } from "@/lib/study/daily-decks";
 import { WIRD_TYPES, type NotificationLogRow, type PlannedSlot, type ReminderPrefs } from "@/lib/notifications/types";
 
@@ -101,12 +101,16 @@ async function readDueSurahs(db: DatabaseExecutor, through: Date): Promise<{ sur
   const plan = await readHifzPlan(db).catch(() => null);
   const deckIds = plan?.unit === "ayah" ? [SMART_DECK_IDS.retention] : await readDailyDeckIds(db);
   if (deckIds.length === 0) return [];
+  const includesSimilar = deckIds.includes(SMART_DECK_IDS.mutashabihat);
+  const eligible = includesSimilar ? await getSmartDeckCandidateCardIds(db, SMART_DECK_IDS.mutashabihat) : [];
   const rows = await db.getAllAsync<{ id: string; due: string }>(
     `SELECT id, due FROM study_cards
      WHERE deleted_at IS NULL AND suspended_at IS NULL AND due <= ? AND deck_id NOT IN (?, ?)
        AND deck_id IN (${deckIds.map(() => "?").join(", ")})
+       ${includesSimilar ? "AND (deck_id <> ? OR id IN (SELECT value FROM json_each(?)))" : ""}
      ORDER BY due LIMIT 300`,
-    [through.toISOString(), HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID, ...deckIds],
+    [through.toISOString(), HIFZ_PAGES_DECK_ID, HIFZ_NEW_LINES_DECK_ID, ...deckIds,
+      ...(includesSimilar ? [SMART_DECK_IDS.mutashabihat, JSON.stringify(eligible)] : [])],
   );
   // A similar-verse card names its group and place, so its surah comes from the bundled refs.
   const groups = [...new Set(rows.flatMap((row) => SIMILAR_CARD.exec(row.id)?.[1] ?? []))];

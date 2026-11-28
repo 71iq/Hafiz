@@ -30,8 +30,10 @@ describe("review queue shared by Home and sessions", () => {
     sql = new DatabaseSync(":memory:");
     sql.exec(`
       CREATE TABLE user_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT, deleted_at TEXT);
+      CREATE TABLE achievement_unlocks (achievement_id TEXT PRIMARY KEY);
+      CREATE TABLE juz_map (juz INTEGER, surah INTEGER, ayah_start INTEGER, ayah_end INTEGER);
       CREATE TABLE qiraat_encyclopedia (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, text TEXT, ayah_group TEXT, PRIMARY KEY(surah, ayah));
-      CREATE TABLE quran_text (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, text_clean TEXT, text_uthmani TEXT, text_qcf2 TEXT, PRIMARY KEY(surah, ayah));
+      CREATE TABLE quran_text (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, text_clean TEXT, text_uthmani TEXT, text_qcf2 TEXT, v2_page INTEGER DEFAULT 0, PRIMARY KEY(surah, ayah));
       CREATE TABLE asbab_al_nuzul (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, occasions_json TEXT);
       CREATE TABLE mutashabihat_groups (id TEXT PRIMARY KEY, sort_order INTEGER, cue TEXT, kind TEXT);
       CREATE TABLE mutashabihat_refs (group_id TEXT, sort_order INTEGER, surah INTEGER, ayah INTEGER, tail_5 TEXT);

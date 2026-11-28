@@ -8,6 +8,10 @@ type ReleaseNotes = Readonly<{ en: readonly string[]; ar: readonly string[] }>;
 export const MAX_RELEASE_NOTE_BULLETS = 3;
 
 export const BUNDLED_RELEASE_NOTES: Readonly<Record<string, ReleaseNotes>> = {
+  "1.0.21": {
+    en: ["A Mutashabihat card appears once you have memorized its ayah and another ayah from the same group. The back shows the comparisons you know."],
+    ar: ["تظهر بطاقة المتشابهات بعد أن تحفظ آيتها وآية أخرى من المجموعة نفسها، ويعرض ظهر البطاقة الآيات التي حفظتها للمقارنة."],
+  },
   "1.0.20": {
     en: ["Similar Tails now uses the correct ayahs for two endings, fixes a shared cue, and removes the unmatched card for Ibrahim 14:45."],
     ar: ["صُحّح موضعان في بطاقات الخواتيم المتشابهة، وعُدّلت عبارة خاتمة مشتركة، وأُزيلت بطاقة الآية ٤٥ من سورة إبراهيم لعدم وجود خاتمة مماثلة لها."],

@@ -513,15 +513,4 @@ export async function readTodayPlanPageNumbers(db: DatabaseExecutor, today: Loca
   });
 }
 
-export async function readMemorizedPageNumbers(db: DatabaseExecutor): Promise<Set<number>> {
-  const rows = await db.getAllAsync<{ id: string; suspended_at: string | null }>(
-    `SELECT id, suspended_at FROM study_cards
-      WHERE deck_id = ? AND id LIKE 'page:%' AND deleted_at IS NULL`,
-    [HIFZ_PAGES_DECK_ID],
-  );
-  return new Set(rows.flatMap((row) => {
-    if (row.suspended_at && Date.parse(row.suspended_at) !== 0) return [];
-    const unit = parsePageUnit(row.id);
-    return unit?.kind === "page" ? [unit.page] : [];
-  }));
-}
+export { readMemorizedPageNumbers } from "./memorized-ayahs";

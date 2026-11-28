@@ -160,6 +160,7 @@ describe("the similar-verse rows refresh", () => {
     await expect(getSmartCardContent(store.db, `mutashabihat:${GROUP}:1`)).resolves.toBeNull();
     const relabelled = await getSmartCardContent(store.db, `mutashabihat:${GROUP}:2`);
     expect(relabelled?.targetRef).toMatchObject({ surah: 2, ayah: 265, similarText: words(265, 0, 4) });
+    store.sql.exec("INSERT INTO user_settings (key, value, updated_at) VALUES ('habit_declared_whole_quran', 'true', '2026-11-01')");
     await expect(getSmartDeckCandidateCardIds(store.db, SMART_DECK_IDS.mutashabihat)).resolves.toEqual([
       `mutashabihat:${GROUP}:0`,
       `mutashabihat:${GROUP}:2`,

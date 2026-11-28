@@ -3,7 +3,9 @@ import { putUserSetting } from "@/lib/database/user-settings";
 import { MEANINGS_DECK_ID, putDeckReviewSettings, readDeckReviewSettings } from "@/lib/fsrs/queries";
 import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_DECK_NEW_CARD_LIMIT } from "@/lib/fsrs/types";
-import { readMemorizedPageNumbers } from "@/lib/hifz/pages";
+import { DECLARED_WHOLE_QURAN_KEY, isFullHafiz } from "@/lib/hifz/memorized-ayahs";
+
+export { DECLARED_WHOLE_QURAN_KEY, isFullHafiz };
 
 /**
  * Which decks make up daily study (SPEC 3.6 to 3.8). Mutashabihat and Similar tails always do,
@@ -20,9 +22,6 @@ export const STUDY_DECK_SETTING_KEYS = {
   qiraat: "habit_study_qiraat",
   reasons: "habit_study_reasons",
 } as const;
-
-/** Set by plan setup when the declared portion is the whole Quran, for every recitation unit. */
-export const DECLARED_WHOLE_QURAN_KEY = "habit_declared_whole_quran";
 
 /** Automatic: on for a full hafiz, otherwise off. Nothing stored means automatic. */
 export type DeckSwitch = "auto" | "on" | "off";
@@ -61,22 +60,6 @@ export async function readStudyDeckSettings(db: DatabaseExecutor): Promise<Study
     keys,
   );
   return parseStudyDeckSettings(new Map(rows.map((row) => [row.key, row.value])));
-}
-
-const MUSHAF_PAGE_COUNT = 604;
-
-/**
- * A full hafiz for the automatic deck switches: the whole Quran declared at setup, every page
- * memorized, or the whole-Quran badge. This is "declared", not verified, on purpose; the Board's
- * hafiz band and the badge keep their own definitions.
- */
-export async function isFullHafiz(db: DatabaseExecutor, settings?: StudyDeckSettings): Promise<boolean> {
-  if ((settings ?? (await readStudyDeckSettings(db))).declaredWholeQuran) return true;
-  if ((await readMemorizedPageNumbers(db)).size >= MUSHAF_PAGE_COUNT) return true;
-  const badge = await db.getFirstAsync<{ found: number }>(
-    "SELECT 1 AS found FROM achievement_unlocks WHERE achievement_id = 'quran_complete' LIMIT 1",
-  );
-  return !!badge;
 }
 
 /** Whether a switchable deck is on, resolving automatic. */

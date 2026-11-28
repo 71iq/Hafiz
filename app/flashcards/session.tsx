@@ -42,7 +42,7 @@ import {
 import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { computeUniqueFront, type UniqueFrontContextAyah } from "@/lib/fsrs/uniqueness";
 import { addStudyMore, DAILY_SESSION_DECK_ID, loadDailyReviewQueue, readDailySessionDeckIds } from "@/lib/study/daily-queue";
-import { readKnownSurahs } from "@/lib/study/known-surahs";
+import { isMemorizedAyah, readMemorizedAyahs } from "@/lib/hifz/memorized-ayahs";
 import { DAILY_SESSION_HREF, opensDailySession, type StudyState, type StudyStep } from "@/lib/study/resolve";
 import { SessionNextStep, useNextStudyStep } from "@/components/habit/SessionNextStep";
 import { useSessionLeaveState } from "@/lib/navigation/entry-route";
@@ -426,14 +426,20 @@ function FlashcardSessionScreen() {
         }
 
         const loaded: CardData[] = [];
-        const knownSurahs = queue.some(({ card }) => card.id.startsWith("mutashabihat:"))
-          ? await readKnownSurahs(db)
+        const memorizedAyahs = queue.some(({ card }) => card.id.startsWith("mutashabihat:"))
+          ? await readMemorizedAyahs(db)
           : null;
         for (const { card: row, settings } of queue) {
           if (cancelled) return;
           const smartContent = await getSmartCardContent(db, row.id);
           if (smartContent?.targetRef) {
             const targetRef = smartContent.targetRef;
+            let refs = smartContent.refs;
+            if (smartContent.kind === "mutashabihat") {
+              refs = refs.filter((ref) => isMemorizedAyah(memorizedAyahs, ref));
+              const hasPartner = refs.some((ref) => ref.surah !== targetRef.surah || ref.ayah !== targetRef.ayah);
+              if (!hasPartner || !isMemorizedAyah(memorizedAyahs, targetRef)) continue;
+            }
             loaded.push({
               kind: smartContent.kind,
               card: row,
@@ -460,9 +466,7 @@ function FlashcardSessionScreen() {
               smartCue: smartContent.cue,
               answerKind: smartContent.answerKind,
               nextAyah: smartContent.nextAyah,
-              smartRefs: smartContent.kind === "mutashabihat" && knownSurahs
-                ? smartContent.refs.filter((ref) => ref.surah === targetRef.surah || knownSurahs.has(ref.surah))
-                : smartContent.refs,
+              smartRefs: refs,
               smartPromptContextQcf2: smartContent.promptContextQcf2,
               smartPromptContextUthmani: smartContent.promptContextUthmani,
               smartPromptContextV2Page: smartContent.promptContextV2Page,
