@@ -1,6 +1,6 @@
 import React from "react";
 import { Platform } from "react-native";
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import type { DayStatus } from "@/lib/habit/types";
 import { strings } from "@/lib/i18n/strings";
@@ -135,13 +135,17 @@ describe("ActivityHeatmap day access", () => {
     const view = render(
       <ActivityHeatmap data={data} isDark={false} s={strings[language]} isRTL={isRTL} weekStart={6} />,
     );
-    const grid = view.getByLabelText(strings[language].heatmapCalendarLabel);
     const preventDefault = jest.fn();
-    act(() => grid.props.onKeyDown({ key: earlierKey, preventDefault }));
+    const day = (date: string) => view.getByTestId(`heatmap-day-${date}`);
+    const key = (date: string, value: string) => fireEvent(day(date), "keyDown", { key: value, preventDefault });
+    key("2026-11-14", earlierKey);
     expect(preventDefault).toHaveBeenCalled();
     expect(view.getByText(label)).toBeTruthy();
-    act(() => grid.props.onKeyDown({ key: "End", preventDefault }));
-    expect(view.getByTestId("heatmap-day-2026-11-14").props.focusable).toBe(true);
-    expect(view.getByTestId("heatmap-day-2026-11-07").props.focusable).toBe(false);
+    key("2026-11-07", "End");
+    expect(day("2026-11-14").props.focusable).toBe(true);
+    expect(day("2026-11-07").props.focusable).toBe(false);
+    // A screen reader can focus a day outside the tab order. Arrows move from that day.
+    key("2026-11-07", "ArrowDown");
+    expect(day("2026-11-08").props.accessibilityState.selected).toBe(true);
   });
 });

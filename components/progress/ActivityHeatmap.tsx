@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { View, Text, Pressable, Platform, useWindowDimensions } from "react-native";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -240,38 +240,27 @@ export function ActivityHeatmap({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const selected = selectedDate < firstKey || selectedDate > todayKey ? todayKey : selectedDate;
   const cellRefs = useRef(new Map<string, FocusableCell | null>());
-  const focusAfterMove = useRef(false);
-
-  // Keyboard moves hand focus to the newly selected cell (roving focus).
-  useEffect(() => {
-    if (!focusAfterMove.current) return;
-    focusAfterMove.current = false;
-    cellRefs.current.get(selected)?.focus?.();
-  }, [selected]);
 
   const clampKey = (key: string) => (key < firstKey ? firstKey : key > todayKey ? todayKey : key);
   const moveSelection = (days: number) => setSelectedDate(clampKey(addDaysToKey(selected, days)));
 
-  const onGridKeyDown = (event: { key: string; preventDefault?: () => void }) => {
+  const onDayKeyDown = (event: React.KeyboardEvent, date: string) => {
     // Columns are weeks running toward the reading end: right in English, left in Arabic.
     const later = isRTL ? "ArrowLeft" : "ArrowRight";
     const earlier = isRTL ? "ArrowRight" : "ArrowLeft";
     let next: string | null = null;
-    if (event.key === "ArrowUp") next = addDaysToKey(selected, -1);
-    else if (event.key === "ArrowDown") next = addDaysToKey(selected, 1);
-    else if (event.key === later) next = addDaysToKey(selected, 7);
-    else if (event.key === earlier) next = addDaysToKey(selected, -7);
+    if (event.key === "ArrowUp") next = addDaysToKey(date, -1);
+    else if (event.key === "ArrowDown") next = addDaysToKey(date, 1);
+    else if (event.key === later) next = addDaysToKey(date, 7);
+    else if (event.key === earlier) next = addDaysToKey(date, -7);
     else if (event.key === "Home") next = firstKey;
     else if (event.key === "End") next = todayKey;
-    else if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault?.();
-      setDetailsOpen((open) => !open);
-      return;
-    }
+    // Enter and Space activate the day's Pressable, just like tapping it.
     if (next === null) return;
-    event.preventDefault?.();
-    focusAfterMove.current = true;
-    setSelectedDate(clampKey(next));
+    event.preventDefault();
+    const destination = clampKey(next);
+    setSelectedDate(destination);
+    cellRefs.current.get(destination)?.focus?.();
   };
 
   // Month labels at each month's first week in reading order: from the left in English, from the
@@ -343,7 +332,6 @@ export function ActivityHeatmap({
   const weekdayKeys = Array.from({ length: 7 }, (_, i) => (weekStart + i) % 7);
   // Mon, Wed and Fri are labelled on whichever rows they fall; they are never on adjacent rows.
   const labelledDays = new Set([1, 3, 5]);
-  const webKeyProps = Platform.OS === "web" ? ({ onKeyDown: onGridKeyDown } as object) : {};
 
   return (
     <View
@@ -455,7 +443,6 @@ export function ActivityHeatmap({
           <View
             accessibilityLabel={s.heatmapCalendarLabel}
             style={{ flexDirection: "row", gap: CELL_GAP, width: heatmapWidth }}
-            {...webKeyProps}
           >
             {renderedWeeks.map((week, wi) => (
               <View key={wi} style={{ gap: CELL_GAP }}>
@@ -476,6 +463,10 @@ export function ActivityHeatmap({
                       }}
                       testID={`heatmap-day-${day.dateStr}`}
                       focusable={isSelected}
+                      {...(Platform.OS === "web" && {
+                        tabIndex: isSelected ? 0 : -1,
+                        onKeyDown: (event: React.KeyboardEvent) => onDayKeyDown(event, day.dateStr),
+                      })}
                       onPress={() => {
                         if (isSelected) setDetailsOpen((open) => !open);
                         else {
