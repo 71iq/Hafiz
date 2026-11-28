@@ -77,7 +77,7 @@ jest.mock("@/lib/quran-foundation/config", () => {
 jest.mock("@/lib/quran-foundation/user", () => ({
   beginQfOAuthConnection: (...args: unknown[]) => mockBeginQfOAuthConnection(...args),
   disconnectQfUser: (...args: unknown[]) => mockDisconnectQfUser(...args),
-  getQfConnectionStatus: jest.fn(async () => ({ ok: true as const, status: "connected" as const })),
+  getQfConnectionStatus: jest.fn(),
   getQfLinkedIdentityState: jest.fn((...args: unknown[]) => mockUnexpected(...args)),
 }));
 jest.mock("@/lib/quran-foundation/user-sync", () => ({
@@ -138,6 +138,7 @@ beforeEach(() => {
   mockParams = { category: "account" };
   mockManualResult.status = "synced";
   mockCallbackResult.status = "synced";
+  jest.mocked(getQfConnectionStatus).mockReset().mockResolvedValue({ ok: true, status: "connected" });
   mockDatabase.getFirstAsync.mockResolvedValue(null);
   mockDatabase.getAllAsync.mockResolvedValue([]);
   mockDatabase.runAsync.mockImplementation(() => {
@@ -215,33 +216,65 @@ describe.each(manualCases)("manual QF sync $language/$status", ({ language, stat
 });
 
 describe.each(["en", "ar"] as const)("QF disconnect in %s", (language) => {
-  it("shows Not connected at once and puts Connected back when the server refuses, even offline", async () => {
+  it.each(["needs_reauth", "offline"] as const)(
+    "reconciles a refusal when the status read reports %s",
+    async (status) => {
+      configure(language);
+      const locale = strings[language];
+      let answer!: (value: unknown) => void;
+      mockDisconnectQfUser.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+      );
+      const view = await openSettings();
+      fireEvent.press(await view.findByLabelText(locale.qfDisconnect));
+      expect(view.getAllByText(locale.qfDisconnected).length).toBeGreaterThan(0);
+      expect(view.queryByText(locale.qfManualSync)).toBeNull();
+      jest
+        .mocked(getQfConnectionStatus)
+        .mockResolvedValueOnce(
+          status === "offline"
+            ? { ok: false, code: "upstream", message: "Synthetic offline failure" }
+            : { ok: true, status },
+        );
+
+      await act(async () => answer({ ok: false, code: "forbidden", message: "Synthetic refusal" }));
+
+      expect(getQfConnectionStatus).toHaveBeenCalledTimes(2);
+      expect(view.getByText(locale.qfDisconnectFailed)).toBeTruthy();
+      expect(view.getByText(status === "offline" ? locale.qfConnected : locale.qfNeedsReauth)).toBeTruthy();
+      expect(view.getByText(status === "offline" ? locale.qfManualSync : locale.qfReconnect)).toBeTruthy();
+    },
+  );
+
+  it("ignores a refused disconnect's late status after switching accounts", async () => {
     configure(language);
-    let answer: (value: unknown) => void = () => undefined;
-    mockDisconnectQfUser.mockImplementationOnce(
+    const locale = strings[language];
+    const view = await openSettings();
+    mockDisconnectQfUser.mockResolvedValueOnce({ ok: false, code: "forbidden", message: "Synthetic refusal" });
+    let finish!: (status: Awaited<ReturnType<typeof getQfConnectionStatus>>) => void;
+    jest.mocked(getQfConnectionStatus).mockImplementationOnce(
       () =>
         new Promise((resolve) => {
-          answer = resolve;
+          finish = resolve;
         }),
     );
-    const view = await openSettings();
-    fireEvent.press(await view.findByLabelText(strings[language].qfDisconnect));
-    // Before the server answers.
-    expect(view.getAllByText(strings[language].qfDisconnected).length).toBeGreaterThan(0);
-    expect(view.queryByText(strings[language].qfManualSync)).toBeNull();
-    // Offline, a status read would also report disconnected; the refusal must not rely on one.
-    const online = jest.mocked(getQfConnectionStatus).getMockImplementation();
-    jest
-      .mocked(getQfConnectionStatus)
-      .mockResolvedValue({ ok: false, code: "unavailable", message: "offline" } as never);
-    try {
-      await act(async () => answer({ ok: false, code: "unavailable", message: "synthetic failure" }));
-      await waitFor(() => expect(view.getByText(strings[language].qfDisconnectFailed)).toBeTruthy());
-      expect(view.getByText(strings[language].qfConnected)).toBeTruthy();
-      expect(view.getByText(strings[language].qfManualSync)).toBeTruthy();
-    } finally {
-      if (online) jest.mocked(getQfConnectionStatus).mockImplementation(online);
-    }
+    await act(async () => {
+      fireEvent.press(view.getByLabelText(locale.qfDisconnect));
+    });
+    expect(getQfConnectionStatus).toHaveBeenCalledTimes(2);
+
+    mockCurrentUser = mockOtherUser;
+    jest.mocked(getQfConnectionStatus).mockResolvedValueOnce({ ok: true, status: "disconnected" });
+    jest.mocked(getQfLinkedIdentityState).mockResolvedValueOnce({ linked: false });
+    view.rerender(<SettingsScreen />);
+    await act(async () => finish({ ok: true, status: "needs_reauth" }));
+
+    expect(view.getByText(locale.qfConnect)).toBeTruthy();
+    expect(view.queryByText(locale.qfDisconnectFailed)).toBeNull();
+    expect(view.queryByText(locale.qfReconnect)).toBeNull();
   });
 });
 

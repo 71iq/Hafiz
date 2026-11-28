@@ -248,40 +248,49 @@ export default function SettingsScreen() {
   const latestQfStatusRequest = useRef(0);
   const handledQfCallback = useRef<string | null>(null);
   const latestQfCallback = useRef(0);
-  useEffect(() => () => {
-    latestQfCallback.current += 1;
-    handledQfCallback.current = null;
-  }, []);
   const accountGeneration = useRef(0);
   const accountId = user?.id ?? null;
+  useEffect(
+    () => () => {
+      accountGeneration.current += 1;
+      handledQfCallback.current = null;
+    },
+    [],
+  );
   useEffect(() => {
     accountGeneration.current += 1;
+    setQfStatus("disconnected");
     setQfMessage(null);
     setQfBusy(false);
   }, [accountId]);
   const captureAccount = useCallback(() => {
     const generation = accountGeneration.current;
-    const capturedId = useAuthStore.getState().user?.id ?? null;
-    return () => generation === accountGeneration.current && (useAuthStore.getState().user?.id ?? null) === capturedId;
-  }, []);
+    return () => generation === accountGeneration.current && (useAuthStore.getState().user?.id ?? null) === accountId;
+  }, [accountId]);
 
-  const refreshQfStatus = useCallback(async () => {
+  const refreshQfStatus = useCallback(async (fallback: QfConnectionStatus = "disconnected") => {
+    const isCurrentAccount = captureAccount();
+    if (!isCurrentAccount()) return;
     const request = ++latestQfStatusRequest.current;
+    const isCurrent = () => request === latestQfStatusRequest.current && isCurrentAccount();
     const publish = (next: QfConnectionStatus) => {
-      if (request === latestQfStatusRequest.current) setQfStatus(next);
+      if (isCurrent()) setQfStatus(next);
       return next;
     };
     if (!configured || !accountId || !qfSyncEnabled) return publish("disconnected");
-    const status = await getQfConnectionStatus();
-    if (status.ok) {
+    const status = await getQfConnectionStatus().catch(() => null);
+    if (!isCurrent()) return;
+    if (status?.ok) {
       if (status.status === "disconnected") {
-        const linked = await getQfLinkedIdentityState();
-        return publish(linked.linked ? "linked_no_sync" : "disconnected");
+        const linked = await getQfLinkedIdentityState().catch(() => null);
+        return publish(linked?.linked ? "linked_no_sync" : "disconnected");
       }
       return publish(status.status);
     }
-    return publish(status.code === "needs_reauth" ? "needs_reauth" : "disconnected");
-  }, [accountId, configured, qfSyncEnabled]);
+    if (status?.code === "needs_reauth") return publish("needs_reauth");
+    if (status?.code === "not_connected") return publish("disconnected");
+    return publish(fallback);
+  }, [accountId, captureAccount, configured, qfSyncEnabled]);
 
   useEffect(() => {
     refreshQfStatus().catch(console.warn);
@@ -409,32 +418,26 @@ export default function SettingsScreen() {
     } catch (err) {
       if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfConnectionFailed);
     } finally {
-      setQfBusy(false);
+      if (isCurrentAccount()) setQfBusy(false);
     }
   }, [captureAccount, router, s.qfConnectionFailed, s.qfConnectionStarted]);
 
-  // Disconnect shows at once; a refusal puts back the status shown before and says so. It does not
-  // read the status again, since a read that fails offline would also say "disconnected".
-  const handleQfDisconnect = useCallback(() => {
+  const handleQfDisconnect = useCallback(async () => {
     const isCurrentAccount = captureAccount();
     const previous = qfStatus;
-    // A status read that started earlier cannot put "Connected" back.
     latestQfStatusRequest.current += 1;
+    setQfBusy(true);
     setQfStatus("disconnected");
     setQfMessage(s.qfDisconnected);
-    void (async () => {
-      try {
-        const result = await disconnectQfUser();
-        if (!result.ok) throw new Error(result.message);
-        if (isCurrentAccount()) await refreshQfStatus();
-      } catch (err) {
-        if (!isCurrentAccount()) return;
-        console.warn("[Settings] Quran Foundation disconnect failed:", err);
-        latestQfStatusRequest.current += 1;
-        setQfStatus(previous);
-        setQfMessage(s.qfDisconnectFailed);
-      }
-    })();
+    try {
+      const result = await disconnectQfUser().catch(() => null);
+      if (!isCurrentAccount()) return;
+      if (!result?.ok) setQfMessage(s.qfDisconnectFailed);
+      // After a refusal, use the last confirmed state if the status read also fails.
+      await refreshQfStatus(result?.ok ? "disconnected" : previous);
+    } finally {
+      if (isCurrentAccount()) setQfBusy(false);
+    }
   }, [captureAccount, qfStatus, refreshQfStatus, s.qfDisconnected, s.qfDisconnectFailed]);
 
   const handleQfManualSync = useCallback(async () => {
@@ -443,6 +446,7 @@ export default function SettingsScreen() {
     setQfMessage(null);
     try {
       const result = await fullQfUserSync(db);
+      if (!isCurrentAccount()) return;
       await refreshQfStatus();
       if (!isCurrentAccount()) return;
       setQfMessage(
@@ -457,7 +461,7 @@ export default function SettingsScreen() {
     } catch (err) {
       if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfSyncFailed);
     } finally {
-      setQfBusy(false);
+      if (isCurrentAccount()) setQfBusy(false);
     }
   }, [captureAccount, db, refreshQfStatus, s.qfFinishConnection, s.qfNeedsReauth, s.qfSyncComplete, s.qfSyncFailed]);
 
