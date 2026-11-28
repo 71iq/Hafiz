@@ -541,7 +541,7 @@ function ReflectionJourneyInner() {
                 {s.reflectionJourneyCompletedToast}
               </Text>
             </View>
-            {nextLevel ? (
+            {nextLevel && !journeyComplete ? (
               <View style={rowStyle}>
                 <Button variant="outline" onPress={() => selectLevel(nextLevel.id)} className={outlineClass}>
                   <View className="items-center gap-2" style={rowStyle}>
@@ -593,7 +593,7 @@ function ReflectionJourneyInner() {
         )}
       </Card>
 
-      {nextLevel === null ? (
+      {journeyComplete || nextLevel === null ? (
         <Card elevation="low" className="rounded-4xl p-5 gap-3">
           {journeyComplete && showZayt ? (
             <View className="items-center">

@@ -1,6 +1,7 @@
 import React from "react";
 import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
 import ReflectionJourneyScreen from "@/app/(tabs)/reflection-journey";
+import { ZaytAnimation } from "@/components/habit/ZaytAnimation";
 import {
   completeReflectionJourneyLevel,
   listReflectionJourneyLevels,
@@ -55,13 +56,15 @@ jest.mock("react-native-safe-area-context", () => {
   return { SafeAreaView: View, useSafeAreaInsets: () => insets };
 });
 jest.mock("@/components/reflection-journey/JourneyAyahCard", () => ({ JourneyAyahCard: () => null }));
+jest.mock("@/lib/zayt/presentation", () => ({ useShowZayt: () => true }));
+jest.mock("@/components/habit/ZaytAnimation", () => ({ ZaytAnimation: jest.fn(() => null) }));
 jest.mock("@/lib/reflection-journey/queries", () => ({
   listReflectionJourneyLevels: jest.fn(),
   saveReflectionJourneyDraft: jest.fn(),
   completeReflectionJourneyLevel: jest.fn(),
 }));
 
-const ORDER: Record<string, number> = { first: 1, second: 2, third: 3 };
+const ORDER: Record<string, number> = { first: 1, second: 2, third: 3, fourth: 4 };
 function level(
   id: string,
   status: ReflectionJourneyLevelListItem["status"],
@@ -243,6 +246,7 @@ describe.each(["en", "ar"] as const)("reflection journey loading in %s", (langua
     // The default revisits the last completed level, with Save changes disabled until the text changes.
     expect(view.getByText(summary("second"))).toBeTruthy();
     expect(view.getByText(s.journeyFinished)).toBeTruthy();
+    expect(jest.mocked(ZaytAnimation).mock.lastCall?.[0]).toMatchObject({ presentationId: null });
     expect(view.queryByText(s.journeyNextMarker)).toBeNull();
     expect(button(view, s.journeySaveChanges).props.accessibilityState?.disabled).toBe(true);
     await act(async () =>
@@ -250,6 +254,33 @@ describe.each(["en", "ar"] as const)("reflection journey loading in %s", (langua
     );
     expect(button(view, s.journeySaveChanges).props.accessibilityState?.disabled).toBe(false);
     expect(button(view, s.journeyNextLevel).props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it("shows the finish on the last outstanding response when levels are completed out of order", async () => {
+    let items = ["first", "second", "third", "fourth"].map((id) => level(id, "available"));
+    jest.mocked(listReflectionJourneyLevels).mockImplementation(async () => items);
+    jest.mocked(completeReflectionJourneyLevel).mockImplementation(async (_db, id, text) => {
+      const completed = level(id, "completed", text);
+      items = items.map((item) => item.id === id ? completed : item);
+      return completed.entry!;
+    });
+    const view = render(<ReflectionJourneyScreen />);
+    await act(async () => {});
+    for (const id of ["second", "fourth", "first", "third"]) {
+      expect(view.queryByText(s.journeyFinished)).toBeNull();
+      fireEvent.press(pill(view, id));
+      fireEvent.changeText(view.getByLabelText(s.reflectionJourneyResponseLabel), "a private reflection");
+      await act(async () => fireEvent.press(button(view, s.reflectionJourneySaveComplete)));
+    }
+    expect(view.getByText(summary("third"))).toBeTruthy();
+    expect(view.getByText(s.journeyFinished)).toBeTruthy();
+    expect(view.queryByText(s.reflectionJourneyOpenNext)).toBeNull();
+    expect(jest.mocked(ZaytAnimation).mock.lastCall?.[0]).toMatchObject({
+      animation: "A15",
+      presentationId: `journey:third:${items[2].entry!.updatedAt}`,
+    });
+    fireEvent.press(button(view, s.journeyNextLevel));
+    expect(view.getByText(summary("fourth"))).toBeTruthy();
   });
 
   it("keeps the text after a failed save and repeats the same save from Retry", async () => {
