@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { View, Text, Pressable, TextInput, Platform, useWindowDimensions } from "react-native";
+import { ActivityIndicator, View, Text, Pressable, TextInput, Platform, useWindowDimensions } from "react-native";
 import { X, Search, CornerDownLeft } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
@@ -51,8 +51,8 @@ export function GoToNavigator({
   const { width, height } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const overlayMaxHeight = isPhone ? "88%" : Math.min(Math.floor(height * 0.88), 820);
-  const [surahs, setSurahs] = useState<SurahRow[]>([]);
-  const [juzList, setJuzList] = useState<JuzInfo[]>([]);
+  const [lists, setLists] = useState<{ surahs: SurahRow[]; juzList: JuzInfo[] } | null>(null);
+  const { surahs = [], juzList = [] } = lists ?? {};
   const [searchText, setSearchText] = useState("");
   const [tab, setTab] = useState<GoToTab>(initialTab);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,7 +61,6 @@ export function GoToNavigator({
   const digits = (value: number) => (isArabicUI ? toArabicNumber(value) : String(value));
 
   useEffect(() => {
-    if (!visible) return;
     setSearchText("");
     setTab(initialTab);
   }, [initialTab, visible]);
@@ -105,17 +104,17 @@ export function GoToNavigator({
         ]);
 
         if (cancelled) return;
-        setSurahs(surahRows);
-        setJuzList(
-          juzRows.map((r) => ({
+        setLists({
+          surahs: surahRows,
+          juzList: juzRows.map((r) => ({
             juz: r.juz,
             startSurah: r.start_surah,
             startAyah: r.start_ayah,
             surahNameArabic: r.surah_name_arabic,
             surahNameEnglish: r.surah_name_english,
             page: r.page,
-          }))
-        );
+          })),
+        });
       } catch (err) {
         console.error("[GoToNavigator] Failed to load data:", err);
         if (!cancelled) setLoadError(s.goToLoadFailed);
@@ -206,7 +205,6 @@ export function GoToNavigator({
 
   const renderSurahList = () => (
     <>
-      {renderReferenceRow()}
       {filteredSurahs.length === 0 && !reference && (
         <View className="items-center gap-1 py-8">
           <Text
@@ -272,7 +270,6 @@ export function GoToNavigator({
 
   const renderJuzList = () => (
     <>
-      {renderReferenceRow()}
       {filteredJuz.length === 0 && !reference && (
         <Text
           className="text-warm-400 dark:text-neutral-500 text-center py-8"
@@ -419,6 +416,7 @@ export function GoToNavigator({
         contentContainerClassName="bg-surface dark:bg-surface-dark pb-6"
       >
         <View className="bg-surface dark:bg-surface-dark">
+          {!loadError && renderReferenceRow()}
           {loadError ? (
             <View className="items-center gap-3 py-8">
               <Text
@@ -441,6 +439,13 @@ export function GoToNavigator({
                 </Text>
               </Pressable>
             </View>
+          ) : lists === null ? (
+            <ActivityIndicator
+              accessibilityLabel={s.loading}
+              size="small"
+              color={isDark ? "#2dd4bf" : "#0d9488"}
+              className="my-8"
+            />
           ) : tab === "surah" ? renderSurahList() : renderJuzList()}
         </View>
       </OverlayBody>
