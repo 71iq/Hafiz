@@ -333,9 +333,12 @@ export default function SettingsScreen() {
     const callbackKey = `${qf ?? ""}|${qfError ?? ""}`;
     if (handledQfCallback.current === callbackKey) return;
     handledQfCallback.current = callbackKey;
-    // Consume the result in the router before starting the sync. Its lifetime belongs to this
-    // account and callback, so removing the params does not cancel its eventual feedback.
-    router.setParams({ category: "account", qf: undefined, qf_error: undefined });
+    // The callback arrives through the parent tab route. Replace its URL as a whole so the
+    // nested navigator cannot restore the result when Settings changes category or reloads.
+    router.replace({
+      pathname: "/settings",
+      params: { category: "account", ...(sectionParam ? { section: sectionParam } : {}) },
+    });
     const callback = ++latestQfCallback.current;
     const isCurrentAccount = captureAccount();
     const isCurrent = () => callback === latestQfCallback.current && isCurrentAccount();
@@ -382,6 +385,7 @@ export default function SettingsScreen() {
     params.qf_error,
     refreshQfStatus,
     router,
+    sectionParam,
     s.qfFinishConnection,
     s.qfSyncComplete,
     s.qfSyncFailed,

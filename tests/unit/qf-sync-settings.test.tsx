@@ -39,12 +39,16 @@ const mockManualResult: QfSyncResult = { status: "synced", pushed: 1, pulled: 2 
 const mockCallbackResult: QfSyncResult = { status: "synced", pushed: 1, pulled: 2 };
 const mockFullQfUserSync = jest.fn(async (_db: SQLiteDatabase): Promise<QfSyncResult> => mockManualResult);
 const mockRunInitialQfUserSync = jest.fn(async (_db: SQLiteDatabase): Promise<QfSyncResult> => mockCallbackResult);
-type SettingsParams = { category?: string; qf?: string; qf_error?: string };
+type SettingsParams = { category?: string; section?: string; qf?: string; qf_error?: string };
 let mockParams: SettingsParams = { category: "account" };
 const mockSetParams = jest.fn((patch: SettingsParams) => {
   mockParams = { ...mockParams, ...patch };
 });
-const mockRouter = { push: mockPush, setParams: mockSetParams, replace: mockUnexpected };
+const mockReplace = jest.fn(({ pathname, params }: { pathname: string; params: SettingsParams }) => {
+  if (pathname !== "/settings") return mockUnexpected(pathname);
+  mockParams = params;
+});
+const mockRouter = { push: mockPush, setParams: mockSetParams, replace: mockReplace };
 const mockSettings: Partial<ReturnType<typeof useSettings>> = {};
 const originalWindow = Dimensions.get("window");
 const originalScreen = Dimensions.get("screen");
@@ -306,8 +310,8 @@ it("consumes a callback error once in Account and does not replay it on refresh"
   configure("en");
   mockParams = { qf_error: "Synthetic denial" };
   const view = await openSettings();
-  expect(mockSetParams).toHaveBeenCalledTimes(1);
-  expect(mockParams).toEqual({ category: "account", qf: undefined, qf_error: undefined });
+  expect(mockReplace).toHaveBeenCalledTimes(1);
+  expect(mockParams).toStrictEqual({ category: "account" });
   view.rerender(<SettingsScreen />);
   expect(view.getByText("Synthetic denial")).toBeTruthy();
 
@@ -330,12 +334,12 @@ it("finishes the initial sync after the callback params have been consumed", asy
       }),
   );
   const view = await openSettings();
-  expect(mockParams).toEqual({ category: "account", qf: undefined, qf_error: undefined });
+  expect(mockParams).toStrictEqual({ category: "account" });
   view.rerender(<SettingsScreen />);
   await act(async () => finish(mockCallbackResult));
   expect(view.getByText(strings.en.qfSyncComplete)).toBeTruthy();
   expect(mockRunInitialQfUserSync).toHaveBeenCalledTimes(1);
-  expect(mockSetParams).toHaveBeenCalledTimes(1);
+  expect(mockReplace).toHaveBeenCalledTimes(1);
 });
 
 describe.each(callbackCases)("QF callback sync $language/$status", ({ language, status }) => {
